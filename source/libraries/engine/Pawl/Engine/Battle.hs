@@ -80,6 +80,7 @@ import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
@@ -274,7 +275,8 @@ siegeDefeat =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [exile, offer]))) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     -- "Exile it": the permanent the ability triggered from, which CR 113.7 binds

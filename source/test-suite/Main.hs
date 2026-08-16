@@ -235,6 +235,7 @@ import qualified Pawl.Codec.TopOfLibrarySpec
 import qualified Pawl.Codec.ToughnessSpec
 import qualified Pawl.Codec.TriggerConditionSpec
 import qualified Pawl.Codec.TriggerFrequencySpec
+import qualified Pawl.Codec.TriggerLimitSpec
 import qualified Pawl.Codec.TriggeredAbilitySpec
 import qualified Pawl.Codec.TurnScopeSpec
 import qualified Pawl.Codec.TurnUpRSpec
@@ -622,6 +623,7 @@ spec s registry = do
   Pawl.Codec.ToughnessSpec.spec s
   Pawl.Codec.TriggerConditionSpec.spec s
   Pawl.Codec.TriggerFrequencySpec.spec s
+  Pawl.Codec.TriggerLimitSpec.spec s
   Pawl.Codec.TriggeredAbilitySpec.spec s
   Pawl.Codec.TurnScopeSpec.spec s
   Pawl.Codec.TurnUpRSpec.spec s

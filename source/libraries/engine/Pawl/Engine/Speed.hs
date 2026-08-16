@@ -59,6 +59,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -143,7 +144,13 @@ increaseAbility =
               )
           )
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Just belowMaxSpeed
+      TriggeredAbility.intervening = Just belowMaxSpeed,
+      -- CR 702.179d's own "this ability triggers only once each turn", stated in
+      -- the data because the rule states it. It is NOT what enforces the limit
+      -- here: Engine.withinTurnLimit reads the CR 603.3b log, and the record it
+      -- reads is the one a SOURCELESS trigger does not get (#1026), so
+      -- `alreadyTriggered` below is still the enforcement. The two agree.
+      TriggeredAbility.limit = TriggerLimit.OncePerTurn
     }
 
 -- | CR 702.179d's "if your speed is less than 4", as the Condition both checks
@@ -168,7 +175,9 @@ belowMaxSpeed =
 -- opponents lose life" makes a whole batch of simultaneous losses a SINGLE
 -- occurrence, which is why this scans the batch rather than mapping over it; and
 -- "this ability triggers only once each turn" is the per-turn limit, which
--- GameState.speedIncreasedThisTurn carries and Engine.placePendingTriggers marks.
+-- GameState.speedIncreasedThisTurn carries and Engine.placePendingTriggers marks
+-- -- see `increaseAbility`'s TriggerLimit for why the generic reader does not
+-- reach a sourceless trigger.
 --
 -- Only the ACTIVE player's ability can fire, which is CR 702.179d's "during your
 -- turn" and not a shortcut. Only a player with 1 or more speed HAS the ability at

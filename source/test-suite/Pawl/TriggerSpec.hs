@@ -349,6 +349,7 @@ import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
+import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
@@ -1371,7 +1372,8 @@ delayedSpec s registry =
                 TriggeredAbility.MkTriggeredAbility
                   { TriggeredAbility.condition = TriggerCondition.SelfEnters,
                     TriggeredAbility.modal = Modal.MkModal {Modal.modes = Seq.singleton onlyMode, Modal.selection = ModeSelection.ChooseExactly 1},
-                    TriggeredAbility.intervening = Nothing
+                    TriggeredAbility.intervening = Nothing,
+                    TriggeredAbility.limit = TriggerLimit.Unlimited
                   }
               -- Stands in for a modal arming spell's own captured chosenModes --
               -- built with the SAME Binding.fromChoices Cast.castSpell uses, so
@@ -8451,6 +8453,173 @@ youngPyromancerSpec s registry =
           -- proves the seat is the only thing the silence above turns on.
           Spec.assertEqWith s "the same board fires for alice's own cast" (elementalsOf S.alice byAlice) 1
 
+-- The printed rider "This ability triggers only once each turn"
+-- (Pawl.Types.TriggerLimit), on top of the trigger event the group above covers.
+-- No comprehensive rule states the clause; CR 702.179d is where the rulebook
+-- prints it verbatim, and Pawl.Engine.Engine.withinTurnLimit is what spends it.
+--
+-- Whispering Wizard, {3}{U} Creature -- Human Wizard 3/2: "Whenever you cast a
+-- noncreature spell, create a 1/1 white Spirit creature token with flying. This
+-- ability triggers only once each turn." Nothing of the card is omitted. It is
+-- Young Pyromancer above with the rider and a wider filter, which is the point:
+-- the SAME three casts run past both creatures below, and the Pyromancer's three
+-- Elementals are what prove the board really offers three trigger events rather
+-- than one.
+--
+-- THREE noncreature spells, each a different card with a different draw --
+-- Think Twice draws alice one, Divination two, Vision Skeins two to every seat.
+-- A cast that silently failed would leave the Spirit count right and a hand size
+-- wrong, so "fired once" is told from "fired three times and did nothing twice"
+-- and from "cast once".
+--
+-- THREE seats, so Vision Skeins' "each player" is not two readings at once, and
+-- twelve library cards apiece so CR 104.3c decks nobody mid-case.
+--
+-- Ten Islands: seven pays the three casts of a turn, and the three left over pay
+-- the turn-boundary case's fourth cast without an untap step. Every case below
+-- casts on that one board, so mana can never be what separates them.
+whisperingWizardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+whisperingWizardSpec s registry =
+  let spirit = CardName.MkCardName (Text.pack "Spirit Token")
+      spiritsOf = S.countOnBattlefieldByName spirit
+      elemental = CardName.MkCardName (Text.pack "Elemental Token")
+      -- CR 603.3b's own record of an ability triggering, counted for one source.
+      -- The Spirit count says what RESOLVED; this says what TRIGGERED, which is
+      -- what the rider limits.
+      firedBy oid gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, AbilityTriggered.source record == oid]
+      board island bearer n =
+        let withLands = S.landsFor island S.alice 10 S.threePlayerGame
+            addBearer (ids, g) _ = let (oid, g') = S.addCreature bearer S.alice g in (ids <> [oid], g')
+            (bearers, withBearers) = List.foldl' addBearer ([], withLands) [1 .. (n :: Int)]
+            stock g pid = List.foldl' (\g' _ -> snd (S.addLibraryCard island pid g')) g [1 .. (12 :: Int)]
+            stocked = List.foldl' stock withBearers [S.alice, S.bob, S.carol]
+         in ( bearers,
+              stocked
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            )
+      castAndResolve caster oid gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast caster oid)) Engine.priorityLoop
+      -- The three casts, resolved one at a time so each trigger is a batch of its
+      -- own -- which is the harder case for the rider, the log having to carry
+      -- the first firing across two later scans.
+      threeCasts think divine skeins gs0 =
+        let (t, g1) = S.addHandCard think S.alice gs0
+            (d, g2) = S.addHandCard divine S.alice g1
+            (v, g3) = S.addHandCard skeins S.alice g2
+         in castAndResolve S.alice v (castAndResolve S.alice d (castAndResolve S.alice t g3))
+      -- The same three trigger events inside ONE gather: nobody receives priority
+      -- between the casts, so all three SpellCast events are unscanned when
+      -- Engine.placePendingTriggers finally runs and the batch holds three
+      -- entries at once. Three INSTANTS, since CR 307.1 would not let a sorcery
+      -- go on a stack that is not empty.
+      threeAtOnce think skeins gs0 =
+        let (t1, g1) = S.addHandCard think S.alice gs0
+            (t2, g2) = S.addHandCard think S.alice g1
+            (v, g3) = S.addHandCard skeins S.alice g2
+            castAll = S.runPure S.identityAnswer g3 (S.cast S.alice t1 >> S.cast S.alice t2 >> S.cast S.alice v)
+         in S.runPure S.identityAnswer castAll Engine.priorityLoop
+   in Spec.describe s "TriggerLimit" $ do
+        -- THE case: three trigger events in one turn, one triggering.
+        Spec.it s "three noncreature casts in one turn trigger Whispering Wizard once" $ do
+          island <- S.printingOf s registry "Island"
+          wizard <- S.printingOf s registry "Whispering Wizard"
+          think <- S.printingOf s registry "Think Twice"
+          divine <- S.printingOf s registry "Divination"
+          skeins <- S.printingOf s registry "Vision Skeins"
+          let (bearers, gs) = board island wizard 1
+              after = threeCasts think divine skeins gs
+          -- Each cast resolved, and each one differently: a fixture that cast
+          -- only the first would read 1 here rather than 5.
+          Spec.assertEqWith s "alice drew from all three spells" (S.handSize S.alice after) 5
+          Spec.assertEqWith s "and only Vision Skeins reached bob" (S.handSize S.bob after) 2
+          Spec.assertEqWith s "and carol alike" (S.handSize S.carol after) 2
+          Spec.assertEqWith s "the ability triggered exactly once" (fmap (`firedBy` after) bearers) [1]
+          Spec.assertEqWith s "so exactly one Spirit token" (spiritsOf S.alice after) 1
+        -- The same three casts against the UNLIMITED twin. One creature apart
+        -- from the case above, and the only thing it can prove is that the board
+        -- offers three trigger events -- so "one Spirit" above is the rider and
+        -- not a board that cast once.
+        Spec.it s "the same three casts fire Young Pyromancer three times" $ do
+          island <- S.printingOf s registry "Island"
+          pyromancer <- S.printingOf s registry "Young Pyromancer"
+          think <- S.printingOf s registry "Think Twice"
+          divine <- S.printingOf s registry "Divination"
+          skeins <- S.printingOf s registry "Vision Skeins"
+          let (bearers, gs) = board island pyromancer 1
+              after = threeCasts think divine skeins gs
+          Spec.assertEqWith s "the unlimited ability triggered three times" (fmap (`firedBy` after) bearers) [3]
+          Spec.assertEqWith s "so three Elemental tokens" (S.countOnBattlefieldByName elemental S.alice after) 3
+        -- The other half of "more than once in a turn": three trigger events in
+        -- ONE batch, where no event is in the log yet when the batch is filtered.
+        -- The Pyromancer half is the same board one creature apart, and proves
+        -- the batch really does hold three entries.
+        Spec.it s "three casts in one batch trigger Whispering Wizard once" $ do
+          island <- S.printingOf s registry "Island"
+          wizard <- S.printingOf s registry "Whispering Wizard"
+          pyromancer <- S.printingOf s registry "Young Pyromancer"
+          think <- S.printingOf s registry "Think Twice"
+          skeins <- S.printingOf s registry "Vision Skeins"
+          let (bearers, gs) = board island wizard 1
+              after = threeAtOnce think skeins gs
+              (twins, twinBoard) = board island pyromancer 1
+              twinAfter = threeAtOnce think skeins twinBoard
+          Spec.assertEqWith s "all three spells resolved" (S.handSize S.alice after) 4
+          Spec.assertEqWith s "the ability triggered exactly once" (fmap (`firedBy` after) bearers) [1]
+          Spec.assertEqWith s "so exactly one Spirit token" (spiritsOf S.alice after) 1
+          Spec.assertEqWith s "the unlimited twin saw three events in that batch" (fmap (`firedBy` twinAfter) twins) [3]
+          Spec.assertEqWith s "and made three Elementals" (S.countOnBattlefieldByName elemental S.alice twinAfter) 3
+        -- The rider is spent per TURN, and the record it is spent against is
+        -- GameState.events, which the handoff clears.
+        Spec.it s "the rider re-arms at the turn boundary" $ do
+          island <- S.printingOf s registry "Island"
+          wizard <- S.printingOf s registry "Whispering Wizard"
+          think <- S.printingOf s registry "Think Twice"
+          divine <- S.printingOf s registry "Divination"
+          skeins <- S.printingOf s registry "Vision Skeins"
+          let (_, gs) = board island wizard 1
+              spent = threeCasts think divine skeins gs
+              -- bob's turn, alice's Islands still tapped from her own: only the
+              -- three she never spent pay for this, and Think Twice is an instant
+              -- so CR 304.1 lets her cast it on a turn that is not hers.
+              handed = S.runPure S.identityAnswer spent Engine.handoffTurn
+              (fourth, ready) = S.addHandCard think S.alice (handed {GameState.priority = Just S.alice})
+              after = castAndResolve S.alice fourth ready
+          Spec.assertEqWith s "one Spirit at the end of alice's turn" (spiritsOf S.alice spent) 1
+          Spec.assertEqWith s "and a second on the next turn's first cast" (spiritsOf S.alice after) 2
+        -- Where a badly placed record gets it wrong: two bearers, one rider each.
+        -- A limit kept per ABILITY rather than per OBJECT would leave one Spirit
+        -- here, and a limit kept per CONTROLLER likewise.
+        Spec.it s "a second Whispering Wizard spends a rider of its own" $ do
+          island <- S.printingOf s registry "Island"
+          wizard <- S.printingOf s registry "Whispering Wizard"
+          think <- S.printingOf s registry "Think Twice"
+          divine <- S.printingOf s registry "Divination"
+          skeins <- S.printingOf s registry "Vision Skeins"
+          let (bearers, gs) = board island wizard 2
+              after = threeCasts think divine skeins gs
+          Spec.assertEqWith s "two bearers on the board" (length bearers) 2
+          Spec.assertEqWith s "each triggered exactly once" (fmap (`firedBy` after) bearers) [1, 1]
+          Spec.assertEqWith s "so two Spirit tokens" (spiritsOf S.alice after) 2
+        -- A cast the Filter rejects spends nothing: the rider is spent by the
+        -- ability TRIGGERING, not by an event that merely looks like its own.
+        Spec.it s "a creature spell neither fires the ability nor spends its rider" $ do
+          island <- S.printingOf s registry "Island"
+          wizard <- S.printingOf s registry "Whispering Wizard"
+          homunculus <- S.printingOf s registry "Furtive Homunculus"
+          think <- S.printingOf s registry "Think Twice"
+          let (bearers, gs) = board island wizard 1
+              (creature, g1) = S.addHandCard homunculus S.alice gs
+              (spell, g2) = S.addHandCard think S.alice g1
+              creatureCast = castAndResolve S.alice creature g2
+              after = castAndResolve S.alice spell creatureCast
+          Spec.assertEqWith s "the Homunculus resolved onto the battlefield" (S.countOnBattlefieldByName (S.printingName homunculus) S.alice creatureCast) 1
+          Spec.assertEqWith s "and fired nothing" (fmap (`firedBy` creatureCast) bearers) [0]
+          Spec.assertEqWith s "with no Spirit token" (spiritsOf S.alice creatureCast) 0
+          Spec.assertEqWith s "the noncreature cast that follows still fires" (fmap (`firedBy` after) bearers) [1]
+          Spec.assertEqWith s "and makes its Spirit" (spiritsOf S.alice after) 1
+
 -- The same CR 601.2i cast, read for WHICH cast of the turn it was --
 -- SpellCast.ordinal. The cast-side twin of drawTriggerSpec's Erudite Wizard, and
 -- the two conditions answer the same question about different events.
@@ -12331,6 +12500,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   anafenzaAttackSpec s registry
   ezuriExperienceSpec s registry
   youngPyromancerSpec s registry
+  whisperingWizardSpec s registry
   clarionSpiritSpec s registry
   desolationTwinSpec s registry
   presenceOfTheMasterSpec s registry

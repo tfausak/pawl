@@ -142,6 +142,7 @@ import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -1136,6 +1137,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
             TriggerCondition.SelfEnters
             (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.ExileAllGraveyards]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             Nothing
+            TriggerLimit.Unlimited
         (abilId, g4) = Game.freshObjectId g3
         (ts, g5) = Game.freshTimestamp g4
         abilObj =

@@ -45,6 +45,7 @@ import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TypeLine as TypeLine
@@ -101,7 +102,8 @@ roomAbility room dungeonRoom =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.RoomEntered room,
       TriggeredAbility.modal = DungeonRoom.ability dungeonRoom,
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
 
 -- | CR 309.4c: the room abilities that fired on this batch of events, as ordinary

@@ -522,6 +522,8 @@ library codec
     Pawl.Codec.TriggeredAbilitySpec
     Pawl.Codec.TriggerFrequency
     Pawl.Codec.TriggerFrequencySpec
+    Pawl.Codec.TriggerLimit
+    Pawl.Codec.TriggerLimitSpec
     Pawl.Codec.TurnScope
     Pawl.Codec.TurnScopeSpec
     Pawl.Codec.TurnUpR
@@ -1144,6 +1146,7 @@ library types
     Pawl.Types.TriggeredAbility
     Pawl.Types.TriggerEntry
     Pawl.Types.TriggerFrequency
+    Pawl.Types.TriggerLimit
     Pawl.Types.TriggerSource
     Pawl.Types.TurnScope
     Pawl.Types.TurnUpR

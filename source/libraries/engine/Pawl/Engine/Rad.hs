@@ -65,6 +65,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -165,7 +166,8 @@ ability =
               )
           )
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Just hasRadCounters
+      TriggeredAbility.intervening = Just hasRadCounters,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
 
 -- | CR 728.1: the inherent trigger this batch of events fires, if any, as an

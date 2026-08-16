@@ -97,7 +97,9 @@ import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
+import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
@@ -766,10 +768,17 @@ reacts = Event.reactsToAbilityTriggering . TriggeredAbility.condition . PendingT
 -- would be the engine deciding a game the rules do not; nothing in the pool
 -- reaches a second round, since a chapter ability's triggering fires only
 -- Historian's Boon and the Boon's triggering fires nothing.
+--
+-- Every round is filtered by `withinTurnLimit` first, which is what makes this
+-- the ONE place a "triggers only once each turn" rider is spent: the initial
+-- batch and each reaction round both arrive here, and the filter runs before
+-- `triggeredEvent` writes the record it will later read.
 reactions :: [PendingTrigger.PendingTrigger] -> Game [PendingTrigger.PendingTrigger]
-reactions batch
-  | null batch = pure []
-  | otherwise = do
+reactions incoming = do
+  before <- State.get
+  case withinTurnLimit before incoming of
+    [] -> pure []
+    batch -> do
       -- One CR 704.3 event group EACH, not one `Event.simultaneously` bracket
       -- around the lot: a batch is "the abilities that have triggered since the
       -- last time a player received priority" (CR 603.3b), and those can have
@@ -792,6 +801,101 @@ reactions batch
         )
       rest <- reactions fresh
       pure (batch <> rest)
+
+-- The printed rider "This ability triggers only once each turn"
+-- (Pawl.Types.TriggerLimit), applied to one gathered batch: drop every entry
+-- whose ability carries the rider and has already triggered this turn.
+--
+-- No stored flag. The record is CR 603.3b's own log -- `triggeredEvent` writes a
+-- GameEvent.AbilityTriggered for every trigger `reactions` takes, and
+-- GameState.events is cleared at the turn handoff (`beginTurnOf`), which is what
+-- makes "in the log" mean "this turn" and re-arms the rider at a turn boundary
+-- with no sweep of its own. CR 702.179d's hard-coded twin
+-- (GameState.speedIncreasedThisTurn) predates the field and is a stored flag;
+-- see Pawl.Engine.Speed for why a sourceless trigger still needs it.
+--
+-- Keyed on the SOURCE and the CONDITION, which is everything the log records:
+--
+--   * two permanents with the same printed ability spend separate limits, their
+--     ids differing (CR 113.7).
+--   * a permanent that leaves and returns re-arms, CR 400.7 making it a new
+--     object with a new id -- the rider is spent by the object that triggered,
+--     not by the card.
+--   * a change of CONTROL spends nothing and clears nothing, the key naming no
+--     player. That is CR 602.5b's posture read across to a trigger: a
+--     restriction on an object's ability follows the object.
+--
+-- Spent on TRIGGERING and not on resolving, so an instance countered on the
+-- stack has still taken the turn's one -- which is what the log says, the record
+-- being written where the batch is gathered.
+--
+-- The accumulator makes ONE batch behave like the log does across batches: two
+-- matching events in a single scan offer two entries, and the second is dropped
+-- against the first even though no event is recorded yet. Only a LIMITED entry
+-- writes to the accumulator, so an unlimited sibling sharing the key cannot
+-- suppress anything.
+--
+-- Not implemented: a SOURCELESS trigger is never limited here, the log holding
+-- no record of one (#1026); and two DISTINCT abilities on one source that share
+-- a trigger condition are one key, so an unlimited one firing can spend a
+-- limited one's turn (#1664).
+withinTurnLimit :: GameState -> [PendingTrigger.PendingTrigger] -> [PendingTrigger.PendingTrigger]
+withinTurnLimit gs = go (Set.fromList (Maybe.mapMaybe (fmap spentKey . abilityTriggeredOf . snd) (Foldable.toList (GameState.events gs))))
+  where
+    spentKey record = (AbilityTriggered.source record, AbilityTriggered.condition record)
+    go _ [] = []
+    go spent (pending : rest) = case limitedKey pending of
+      Nothing -> pending : go spent rest
+      Just key
+        | Set.member key spent -> go spent rest
+        | otherwise -> pending : go (Set.insert key spent) rest
+
+-- The key one pending trigger spends, or Nothing when it spends none -- because
+-- its ability prints no rider, or because it is sourceless.
+limitedKey :: PendingTrigger.PendingTrigger -> Maybe (ObjectId.ObjectId, TriggerCondition.TriggerCondition)
+limitedKey pending = case TriggeredAbility.limit (PendingTrigger.ability pending) of
+  TriggerLimit.Unlimited -> Nothing
+  TriggerLimit.OncePerTurn -> case PendingTrigger.source pending of
+    TriggerSource.Sourceless -> Nothing
+    TriggerSource.OfObject oid -> Just (oid, TriggeredAbility.condition (PendingTrigger.ability pending))
+
+-- `triggeredEvent` read back: the record an event carries if it is one ability
+-- triggering (CR 603.3b), and nothing otherwise.
+abilityTriggeredOf :: GameEvent.GameEvent -> Maybe AbilityTriggered.AbilityTriggered
+abilityTriggeredOf event = case event of
+  GameEvent.AbilityTriggered record -> Just record
+  GameEvent.SpellCast {} -> Nothing
+  GameEvent.HalfUnlocked {} -> Nothing
+  GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.BecameDesignated {} -> Nothing
+  GameEvent.Evolved _ -> Nothing
+  GameEvent.Mentored {} -> Nothing
+  GameEvent.Trained _ -> Nothing
+  GameEvent.PermanentSacrificed {} -> Nothing
+  GameEvent.Moved {} -> Nothing
+  GameEvent.DamageDealt _ -> Nothing
+  GameEvent.DamagePrevented {} -> Nothing
+  GameEvent.StepBegan {} -> Nothing
+  GameEvent.BecameMonarch _ -> Nothing
+  GameEvent.Discarded {} -> Nothing
+  GameEvent.Drew {} -> Nothing
+  GameEvent.Revealed {} -> Nothing
+  GameEvent.AttackerDeclared {} -> Nothing
+  GameEvent.BlockerDeclared {} -> Nothing
+  GameEvent.BlocksDeclared {} -> Nothing
+  GameEvent.AttackerBlocked {} -> Nothing
+  GameEvent.AttackerUnblocked _ -> Nothing
+  GameEvent.SpellCountered _ -> Nothing
+  GameEvent.LoyaltyAbilityActivated _ -> Nothing
+  GameEvent.LifeLost {} -> Nothing
+  GameEvent.LifeGained {} -> Nothing
+  GameEvent.CountersPut {} -> Nothing
+  GameEvent.CountersRemoved {} -> Nothing
+  GameEvent.ControlChanged {} -> Nothing
+  GameEvent.VentureMarkerEntered {} -> Nothing
+  GameEvent.BecameTarget {} -> Nothing
+  GameEvent.LeftTheGame _ -> Nothing
+  GameEvent.Milled {} -> Nothing
 
 -- CR 603.3b's record of one ability triggering: its source (CR 113.7), its
 -- controller as it triggered (CR 603.3a) and its trigger condition.

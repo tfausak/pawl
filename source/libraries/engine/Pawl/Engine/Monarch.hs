@@ -51,6 +51,7 @@ import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.TapState as TapState
 import Pawl.Types.TriggerCondition (TriggerCondition)
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -71,7 +72,8 @@ oneEffect cond eff =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton eff))) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
 
 -- CR 725.2's end step draw. Controller-scoped to the monarch, so
