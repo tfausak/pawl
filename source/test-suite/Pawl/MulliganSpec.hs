@@ -239,8 +239,10 @@ egretGame egret mountain n =
 -- that stays in hand for as long as the player keeps taking it (CR 103.5b caps
 -- nothing, CR 104.4b leaves an optional loop alone), so a test that answered
 -- "take" forever would hang rather than fail. Counting the offers instead makes
--- both wrong answers legible and fast: too few offers means the window stopped
--- re-offering, too many means it ignored the decline.
+-- the failure this is for -- a window that stops re-offering a repeatable
+-- action -- an assertion that fails in milliseconds. The opposite failure, a
+-- window that ignores the decline, is a real hang and can only ever show up as
+-- a TIMEOUT; nothing here changes that.
 takeThenDecline :: Int -> Prompt.Prompt r -> State.State [[(ObjectId.ObjectId, HandActionIndex.HandActionIndex)]] r
 takeThenDecline k p = case p of
   Prompt.MulliganAction _ _ candidates -> do
@@ -566,10 +568,10 @@ spec s registry =
     Spec.it s "CR 103.5b: an action that leaves its card in hand is offered again" $ do
       -- No-Regrets Egret only reveals itself, so nothing leaves the hand and
       -- the same entry comes back. The answerer takes it twice and then
-      -- declines, so THREE offers is the whole assertion: two would mean the
-      -- window stopped re-offering a repeatable action, four would mean the
-      -- decline was ignored. Neither reading can hang the case -- the answerer
-      -- bounds the loop, not a timeout.
+      -- declines, so THREE offers is the whole assertion: one or two would mean
+      -- the window stopped re-offering a repeatable action, and that is what
+      -- this case is here to catch. It cannot hang -- the answerer bounds the
+      -- loop, so the failure arrives as a number rather than as a timeout.
       egret <- S.printingOf s registry "No-Regrets Egret"
       mountain <- S.printingOf s registry "Mountain"
       let gs0 = egretGame egret mountain 20
