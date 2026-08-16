@@ -242,15 +242,17 @@ data ObjectRef
     -- one targeted seat; `Relative You` is the resolving controller choosing in
     -- their own hand.
     --
-    -- UNFILTERED, where the graveyard arm carries a Filter: EachCardInYourHand
-    -- above gives the reason a filtered hand is a harder question than a filtered
-    -- graveyard, and "a card from their hand" needs no filter to say (#1309).
+    -- UNFILTERED, where the graveyard arm carries a Filter, and NOT for
+    -- EachCardInYourHand's visibility reason: a filter narrowing a hand only its
+    -- own owner is shown reveals nothing to anybody else. "A card from their
+    -- hand" simply needs no filter to say, and a narrowed hand choice waits for a
+    -- printing that asks for one. Not implemented (#1635).
     --
-    -- NOT A TARGET, and here the zone settles what CR 115.1 settles for the
-    -- graveyard arm: a hand's cards cannot be targeted at all, since they are not
-    -- visible to the player who would announce the target (#559). The PLAYER is
-    -- the target Karn's text names, and the card is chosen while the effect is
-    -- applied (CR 608.2d).
+    -- NOT A TARGET, which the zone settles here rather than CR 115.1's "target"
+    -- test settling it as it does for the graveyard arm: pawl has no target pool
+    -- over a hidden zone, since announcing such a target would reveal the card
+    -- (#559). The PLAYER is the target Karn's text names, and the card is chosen
+    -- while the effect is applied (CR 608.2d).
     --
     -- ONE card per chooser, with CR 609.3 covering the shortfall exactly as it
     -- does for the graveyard arm: an empty hand yields nothing and that share of

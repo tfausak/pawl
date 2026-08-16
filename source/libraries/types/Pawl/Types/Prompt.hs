@@ -363,9 +363,9 @@ data Prompt r where
   -- THE CHOOSER OWNS THE HAND, which the graveyard prompt above never has to say
   -- and this one cannot avoid: CR 400.2 makes a hand hidden and CR 402.3 gives
   -- its cards to its owner alone to look at, so the seat asked is the only seat
-  -- the candidates are ever shown to. ChooseFateseal's asymmetry read the other
-  -- way round -- there the looker is not the owner because the rule says so, and
-  -- here the two must be the same player for the same kind of reason.
+  -- the candidates are ever shown to. ChooseFateseal is the contrast: it carries
+  -- TWO PlayerIds because CR 701.29a deliberately shows one seat another's
+  -- library, and no rule does that for the hand this prompt reads.
   --
   -- Its own constructor rather than ChooseCardInGraveyard reused, for
   -- ChooseExilesFromGraveyard's argument: a responder that knows which prompt it
@@ -375,8 +375,7 @@ data Prompt r where
   -- Raised only for TWO OR MORE candidates and not at all for zero,
   -- ChooseCardInGraveyard's rule and reason: a one-card hand is the whole of "a
   -- card from their hand", and an empty one makes the instruction impossible and
-  -- so ignored (CR 101.3, CR 609.3). Eliding the one-card ask reveals nothing
-  -- either way -- the card moves to a public zone regardless.
+  -- so ignored (CR 101.3, CR 609.3).
   ChooseCardInHand :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 309.5a \/ 701.49b: which arrow a venturing player follows. The ObjectId is
   -- the dungeon card their marker is on; the NonEmpty is the rooms the arrows out
