@@ -123,6 +123,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.RemovePlayerCounters {} -> Nothing
   Effect.Tap _ -> Nothing
   Effect.Untap _ -> Nothing
+  Effect.Detain _ -> Nothing
   Effect.Transform _ -> Nothing
   Effect.AddPhases _ -> Nothing
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> Nothing

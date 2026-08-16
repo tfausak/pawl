@@ -24,6 +24,7 @@ import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Daytime as Daytime
 import qualified Pawl.Engine.Decide as Decide
+import qualified Pawl.Engine.Detain as Detain
 import qualified Pawl.Engine.Dungeon as Dungeon
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
@@ -408,6 +409,7 @@ slotsOf effect = case effect of
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters ref _ quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.Tap ref -> objectRefSlots ref
   Effect.Untap ref -> objectRefSlots ref
+  Effect.Detain ref -> objectRefSlots ref
   Effect.Transform ref -> objectRefSlots ref
   Effect.AddPhases _ -> Map.empty
   Effect.GainControl (DurationRef.MkDurationRef _ ref) -> objectRefSlots ref
@@ -630,6 +632,7 @@ slotsAreExhaustive effect = case effect of
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Tap _ -> True
   Effect.Untap _ -> True
+  Effect.Detain _ -> True
   Effect.Transform _ -> True
   Effect.AddPhases _ -> True
   -- slotsOf's arm drops this Duration, so the slotless test is made here.
@@ -769,6 +772,7 @@ readsX = any effectReadsX
       Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
       Effect.Tap _ -> False
       Effect.Untap _ -> False
+      Effect.Detain _ -> False
       Effect.Transform _ -> False
       Effect.AddPhases _ -> False
       Effect.GainControl (DurationRef.MkDurationRef _ _) -> False
@@ -865,6 +869,7 @@ searchesLibrary effect = case effect of
   Effect.RemovePlayerCounters {} -> False
   Effect.Tap _ -> False
   Effect.Untap _ -> False
+  Effect.Detain _ -> False
   Effect.Transform _ -> False
   Effect.AddPhases _ -> False
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> False
@@ -1025,6 +1030,7 @@ boundSlots effect = case effect of
   Effect.RemovePlayerCounters {} -> Set.empty
   Effect.Tap _ -> Set.empty
   Effect.Untap _ -> Set.empty
+  Effect.Detain _ -> Set.empty
   Effect.Transform _ -> Set.empty
   Effect.AddPhases _ -> Set.empty
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> Set.empty
@@ -5084,6 +5090,21 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             { GameState.objects =
                 foldr (Map.adjust untap) (GameState.objects gs) (objectRefObjects legal resolving controller source gs ref)
             }
+  Effect.Detain ref ->
+    State.modify' $ \gs ->
+      -- CR 701.35a: detain each named permanent until the next turn of THIS
+      -- resolution's controller -- rule 109.5's "you", which is `controller`
+      -- here and is sampled once, since the sweep that ends the detain
+      -- (Pawl.Engine.Expiry.dropAtTurnOf) has no resolution left to read it off.
+      -- The victims are enumerated ONCE through the same objectRefObjects the Tap
+      -- and Untap arms above use, for the same CR 608.2f simultaneity, so an
+      -- illegal slot (CR 608.2b), a player recipient and a set that matched
+      -- nothing all arrive as the empty list and detain nothing.
+      --
+      -- Nothing is stored anywhere but on the victim, so a permanent already
+      -- detained is detained again with no count kept and no row to reconcile --
+      -- see Object.detainedUntil.
+      foldr (Detain.detain controller) gs (objectRefObjects legal resolving controller source gs ref)
   Effect.Transform ref ->
     State.modify' $ \gs ->
       -- CR 701.27a: "To transform a permanent, turn it over so that its other

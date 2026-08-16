@@ -12,6 +12,7 @@ import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Decide as Decide
+import qualified Pawl.Engine.Detain as Detain
 import qualified Pawl.Engine.EffectZone as EffectZone
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
@@ -431,6 +432,12 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
     -- windows that do serve a mana ability (Action.ActivateManaAbility,
     -- Cost.payMana) never reach this function, so neither is gated.
     && not (SplitSecond.inForce gs)
+    -- CR 701.35a's third clause. UNLIKE split second one line up, this reaches a
+    -- mana ability too -- rule 701.35a says "its activated abilities" with no
+    -- carve-out where CR 702.61b writes one -- so Cost.manaActivations carries the
+    -- same conjunct for CR 605.3a's windows, exactly as sickness below is asked in
+    -- both places.
+    && not (Detain.detained srcId gs)
     && sicknessOkGiven pcs pid srcId ability gs
     && restrictionsOk pid ability gs
     && loyaltyOk pid srcId ability gs
@@ -522,7 +529,8 @@ activateAbility pid srcId ability = do
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
             Object.kicked = False,
-            Object.announcedX = Nothing
+            Object.announcedX = Nothing,
+            Object.detainedUntil = Set.empty
           }
       onStack =
         gs2

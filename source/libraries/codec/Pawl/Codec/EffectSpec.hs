@@ -871,6 +871,30 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Untap (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
       """ {"type":"Untap","value":{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}}} """
+  -- CR 701.35a. Both ObjectRef arms, since the pool prints one of each: Azorius
+  -- Arrester's "detain target creature an opponent controls" is the slot, and
+  -- Lavinia of the Tenth's "detain each nonland permanent your opponents control"
+  -- is the filter. It shares Tap's and Untap's wire shape, so it must not collapse
+  -- into either tag.
+  Spec.it s "Detain round-trips both ObjectRef arms, and is not Tap" $ do
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Detain (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      """ {"type":"Detain","value":{"type":"InSlot","value":"target"}} """
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Detain (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
+      """ {"type":"Detain","value":{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}}} """
+    Spec.assertBool
+      s
+      ( toJson (Effect.Detain (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+          /= toJson (Effect.Tap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      )
+      "Detain and Tap of the same slot encode differently"
   -- CR 701.27a. Both ObjectRef arms, since the pool prints one of each shape's
   -- twin: Thraben Gargoyle's "transform this creature" is the slot, and a
   -- "transform all X" sweep is the filter.

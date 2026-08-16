@@ -600,6 +600,7 @@ library engine
     Pawl.Engine.Decide
     Pawl.Engine.Defender
     Pawl.Engine.Departure
+    Pawl.Engine.Detain
     Pawl.Engine.Dungeon
     Pawl.Engine.EffectZone
     Pawl.Engine.Engine
@@ -1228,6 +1229,7 @@ test-suite pawl-test-suite
     Pawl.DaytimeSpec
     Pawl.DecideSpec
     Pawl.DepartureSpec
+    Pawl.DetainSpec
     Pawl.DungeonSpec
     Pawl.EngineSpec
     Pawl.EventSpec

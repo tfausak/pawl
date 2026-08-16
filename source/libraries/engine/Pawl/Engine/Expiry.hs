@@ -12,6 +12,11 @@
 --
 -- One of them, CR 116.2d's ignore, is the one that SUPPRESSES rather than adds;
 -- its duration is a duration all the same, and it is swept as one.
+--
+-- An EIGHTH carrier holds no Expiry at all and is swept here anyway: rule 701.35a
+-- fixes a detain's duration, so Object.detainedUntil is a set of seats rather
+-- than a vocabulary of durations, and dropAtTurnOf is the only sweep it can
+-- reach. See clearedDetentions.
 module Pawl.Engine.Expiry where
 
 import qualified Control.Monad as Monad
@@ -19,6 +24,7 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -220,6 +226,25 @@ clearedPermissions survives gs =
         then Map.map clear (GameState.objects gs)
         else GameState.objects gs
 
+-- CR 701.35a's duration, ended: a detain lasts "until the next turn of the
+-- controller of that spell or ability", which is dropAtTurnOf's own moment, so
+-- that seat is dropped from every permanent detained until it. CLEARED rather
+-- than dropped, clearedPermissions' posture and for its reason -- the carrier is
+-- a field on an object that stays.
+--
+-- The EIGHTH carrier, and the one that holds no Pawl.Types.Expiry: rule 701.35a
+-- fixes the duration, so Object.detainedUntil remembers only whose turn ends it
+-- and this sweep is the only one that can reach it. A permanent detained by two
+-- players loses one seat here and stays detained by the other.
+--
+-- Scanned before rebuilding, anyPermissionEnded's reason: almost every board has
+-- nothing detained, and this runs at every seat of every handoff.
+clearedDetentions :: PlayerId -> Map.Map ObjectId Object.Object -> Map.Map ObjectId Object.Object
+clearedDetentions pid objects =
+  if any (Set.member pid . Object.detainedUntil) objects
+    then Map.map (\o -> o {Object.detainedUntil = Set.delete pid (Object.detainedUntil o)}) objects
+    else objects
+
 -- CR 611.2a: a duration a spell or ability states lasts as long as it says, so
 -- an until-your-next-turn duration ends as that player's turn begins.
 --
@@ -261,7 +286,7 @@ dropAtTurnOf pid gs =
           GameState.blockRequirements = filter keepBlockRequirement (GameState.blockRequirements gs),
           GameState.ignoredAbilities = filter keepIgnored (GameState.ignoredAbilities gs),
           GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),
-          GameState.objects = clearedPermissions (survives . ExilePlayPermission.expiry) gs
+          GameState.objects = clearedDetentions pid (clearedPermissions (survives . ExilePlayPermission.expiry) gs)
         }
 
 -- CR 500.5's first clause: effects lasting until the end of a step or phase
