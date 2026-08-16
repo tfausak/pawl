@@ -575,7 +575,8 @@ data Object = MkObject
     -- player named here. Empty for every permanent nothing has detained, which is
     -- almost all of them.
     --
-    -- On the VICTIM rather than in a GameState list: a zone change reuses the ObjectId
+    -- On the VICTIM rather than in a GameState list, which is
+    -- doesNotUntapNext below's reason: a zone change reuses the ObjectId
     -- (Pawl.Engine.Event.changeZoneAttaching re-inserts under the same key and
     -- replaces the value with `newIncarnation`), so a list keyed by id would
     -- follow the card back onto the battlefield as a permanent CR 400.7 makes a
@@ -597,7 +598,39 @@ data Object = MkObject
     -- different players run to two different turns and the later one has to
     -- outlast the earlier. Two detains by the SAME player collapse for free,
     -- which is right: rule 701.35a states a duration and not a count.
-    detainedUntil :: Set.Set PlayerId.PlayerId
+    detainedUntil :: Set.Set PlayerId.PlayerId,
+    -- | CR 502.3 / CR 611.2: a ONE-SHOT untap prohibition standing over this
+    -- permanent -- "that creature doesn't untap during its controller's next
+    -- untap step" (Elvish Hunter), and CR 701.43a's exert. Set by
+    -- Effect.DoesNotUntapNext as a spell or ability resolves.
+    --
+    -- Pawl.Types.UntapRestriction's stored counterpart, and it is a field on the
+    -- AFFECTED permanent where that one is a field on the PRINTING that forbids.
+    -- The printed carrier is a static ability and so re-derived live from the
+    -- battlefield every untap step; this one outlives the object that made it
+    -- (Elvish Hunter can die, Frost Breath is already in a graveyard), so it has
+    -- to be stored somewhere the source's departure cannot reach.
+    --
+    -- ON THE VICTIM rather than in a GameState list beside
+    -- GameState.blockRequirements, and the reason is CR 400.7: an object keeps
+    -- its ObjectId across a zone change (Event.changeZoneAttaching re-inserts
+    -- under the same key), so a list keyed by id would follow the card back onto
+    -- the battlefield as a new permanent the effect never named. As a field it is
+    -- forgotten by newIncarnation with everything else.
+    --
+    -- CLEARED WHERE IT APPLIES, by Engine.untapAll, which is why it needs no
+    -- Pawl.Types.Expiry and takes no part in any Pawl.Engine.Expiry sweep. CR
+    -- 701.43b fixes the duration as the untap step the prohibition bites in --
+    -- "each effect causing it not to untap expires during the same untap step" --
+    -- and CR 502.3 runs that step for whoever controls the permanent THEN, so
+    -- application and expiry are one event and a control change between the
+    -- resolution and the step needs nothing baked and nothing rewritten.
+    --
+    -- A Bool and not a count, which is CR 701.43b's own reading: two effects
+    -- prohibiting the same untap both expire at that one step, so they cannot
+    -- stack. Telekinesis' "next TWO untap steps" is the shape a Bool cannot hold,
+    -- and no card in the pool prints it (gap #1653).
+    doesNotUntapNext :: Bool
   }
   deriving (Eq, Ord, Show)
 
@@ -664,5 +697,9 @@ newIncarnation object =
       -- CR 400.7 again, and rule 701.35a needs it: the detained permanent that
       -- leaves the battlefield and comes back is a new object, and nothing
       -- detained that one.
-      detainedUntil = Set.empty
+      detainedUntil = Set.empty,
+      -- CR 400.7 forgets the prohibition with everything else, and no rule
+      -- writes it back: the effect named a permanent, and the object that
+      -- returns to the battlefield is not that permanent.
+      doesNotUntapNext = False
     }

@@ -895,6 +895,28 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           /= toJson (Effect.Tap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       )
       "Detain and Tap of the same slot encode differently"
+  -- CR 502.3's one-shot prohibition, which shares Tap's and Untap's wire shape
+  -- and must not collapse into either: a card printing "tap target creature. That
+  -- creature doesn't untap ..." writes two effects over the same slot.
+  Spec.it s "DoesNotUntapNext round-trips, and is neither Tap nor Untap" $ do
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.DoesNotUntapNext (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      """ {"type":"DoesNotUntapNext","value":{"type":"InSlot","value":"target"}} """
+    Spec.assertBool
+      s
+      ( toJson (Effect.DoesNotUntapNext (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+          /= toJson (Effect.Untap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      )
+      "DoesNotUntapNext and Untap of the same slot encode differently"
+    Spec.assertBool
+      s
+      ( toJson (Effect.DoesNotUntapNext (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+          /= toJson (Effect.Tap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      )
+      "DoesNotUntapNext and Tap of the same slot encode differently"
   -- CR 701.27a. Both ObjectRef arms, since the pool prints one of each shape's
   -- twin: Thraben Gargoyle's "transform this creature" is the slot, and a
   -- "transform all X" sweep is the filter.

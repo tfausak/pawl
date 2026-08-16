@@ -1,18 +1,23 @@
--- Covers: CR 502.3 / CR 101.2's UNTAP PROHIBITION -- Pawl.Types.UntapRestriction,
--- the set Pawl.Engine.UntapRestriction answers, and the one place it is
--- subtracted (Pawl.Engine.Engine.untapAll); CR 602.1 / 605.1a read as
+{-# LANGUAGE GADTs #-}
+
+-- Covers: CR 502.3 / CR 101.2's UNTAP PROHIBITION in both carriers --
+-- Pawl.Types.UntapRestriction, the set Pawl.Engine.UntapRestriction answers, and
+-- Object.doesNotUntapNext, the one-shot Effect.DoesNotUntapNext stores -- plus
+-- the one place both are subtracted (Pawl.Engine.Engine.untapAll); CR 602.1 /
+-- 605.1a read as
 -- Pawl.Types.Filter's HasNonManaActivatedAbility atom off
 -- Pawl.Engine.Filter.View's `nonManaActivatedAbility` field; and CR 702.77b's
 -- claim that a reinforce ability "continues to exist while the object is on the
 -- battlefield and in all other zones".
 --
--- Tsabo's Web and Rustic Clachan are the fixtures, and the pairing is the whole
+-- Tsabo's Web and Rustic Clachan are the PRINTED carrier's fixtures, and the
+-- pairing is the whole
 -- point: rule 702.77b is unobservable without an effect that depends on an object
 -- having an activated ability, and Tsabo's Web is that effect. Rustic Clachan is
 -- the one printing that is a LAND with reinforce, which is what puts the two
 -- cards on the same board at all.
 --
--- THE BOARD SHAPE that makes every case here discriminating: two of alice's
+-- THE BOARD SHAPE that makes those cases discriminating: two of alice's
 -- lands, both tapped, differing in exactly one thing. Seat of the Synod's only
 -- activated ability is "{T}: Add {U}", which CR 605.1a excludes; Rustic Clachan
 -- has that same shape of mana ability PLUS reinforce. So the Clachan staying
@@ -24,17 +29,19 @@
 -- land" conjunct is proved rather than assumed.
 --
 -- Rustic Clachan's CR 614.1c "you may reveal a Kithkin card from your hand" plays
--- no part here: every board in this file starts the land already on the
+-- no part here: every board in that group starts the land already on the
 -- battlefield, so no entry replacement runs. Pawl.ReplacementSpec is where that
 -- sentence is proved.
 module Pawl.UntapRestrictionSpec where
 
+import qualified Data.Set as Set
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -43,12 +50,16 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
 
 -- The untap step's turn-based actions, run for whoever the game state says is
--- active (CR 502.3). The one door Pawl.Engine.UntapRestriction is read through.
+-- active (CR 502.3). The one door both untap prohibitions are read through --
+-- Pawl.Engine.UntapRestriction's printed set and Object.doesNotUntapNext.
 untapStep :: GameState.GameState -> GameState.GameState
 untapStep gs = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
 
@@ -68,10 +79,81 @@ webBoard s registry web = do
       tapped = S.tapObject sorcererId (S.tapObject seatId (S.tapObject clachanId g3))
   pure (clachanId, seatId, sorcererId, tapped)
 
+-- Alice's board for the ONE-SHOT prohibition: an Elvish Hunter, a tapped Goblin
+-- Piker and a tapped Hill Giant, with two Forests to pay the Hunter's {1}{G}.
+-- `atGiant` decides which of the two tapped creatures the ability aims at, and
+-- decides NOTHING else -- the two boards this builds are the same five
+-- permanents, the same mana spent and the same tap states, so a creature that
+-- stays tapped on one board and untaps on the other did so because of the target.
+--
+-- Alice targets her OWN creature, which "target creature" allows and which keeps
+-- the victim under the seat whose untap step runs below.
+hunterBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+hunterBoard s registry atGiant = do
+  forest <- S.printingOf s registry "Forest"
+  hunter <- S.printingOf s registry "Elvish Hunter"
+  piker <- S.printingOf s registry "Goblin Piker"
+  giant <- S.printingOf s registry "Hill Giant"
+  let (hunterId, g1) = S.addCreature hunter S.alice (S.landsInPlay forest 2)
+      (pikerId, g2) = S.addCreature piker S.alice g1
+      (giantId, g3) = S.addCreature giant S.alice g2
+      board = S.tapObject giantId (S.tapObject pikerId g3)
+      victim = if atGiant then giantId else pikerId
+      -- The card's FIRST activated ability, off the JSON, and folded rather than
+      -- indexed so nothing here is partial. An Elvish Hunter that printed no
+      -- ability would activate nothing and let the victim untap, which is the
+      -- assertion below failing rather than a fixture passing quietly.
+      activate g ab = S.runPure (aimAt victim) g (Activate.activateAbility S.alice hunterId ab >> Stack.resolveTop)
+      activated = foldr (flip activate) board (take 1 (Face.activatedAbilities (S.combinedFace hunter)))
+  pure (hunterId, pikerId, giantId, activated)
+
+-- Aim every target slot at one object, and leave the mana payment to
+-- S.identityAnswer. ColorSpec.aimAtObject's shape, group-local per this suite's
+-- convention.
+aimAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAt oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
+  _ -> S.identityAnswer p
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "UntapRestriction" $ do
   prohibitionSpec s registry
+  oneShotSpec s registry
   existenceSpec s registry
+
+-- CR 502.3 / CR 611.2's ONE-SHOT prohibition: Effect.DoesNotUntapNext, the flag
+-- it writes, and CR 701.43b's expiry.
+oneShotSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+oneShotSpec s registry = Spec.describe s "OneShot" $ do
+  -- The unit's central claim. Every assertion is made on one board, so none of
+  -- them can pass because nothing untapped at all: the Hill Giant was tapped
+  -- exactly as the Piker was and untaps, and the Elvish Hunter tapped ITSELF to
+  -- pay the ability's cost and untaps too.
+  Spec.it s "CR 502.3 whole card: Elvish Hunter's target does not untap, and everything else on the board does" $ do
+    (hunterId, pikerId, giantId, gs) <- hunterBoard s registry False
+    Spec.assertBool s (Game.isTapped pikerId gs) "the Piker the ability aimed at is tapped before the step"
+    let untapped = untapStep gs
+    Spec.assertBool s (Game.isTapped pikerId untapped) "and it is still tapped after CR 502.3's untap"
+    Spec.assertBool s (not (Game.isTapped giantId untapped)) "the Hill Giant, tapped the same way and not aimed at, untapped"
+    Spec.assertBool s (not (Game.isTapped hunterId untapped)) "and so did the Elvish Hunter, which tapped for the cost"
+  -- The same board with the ability aimed at the OTHER tapped creature and
+  -- nothing else changed. Both assertions flip together, so neither board can be
+  -- passing because a Goblin Piker never untaps or a Hill Giant always does.
+  Spec.it s "CR 502.3 aimed at the Hill Giant instead, the Piker is the one that untaps" $ do
+    (_, pikerId, giantId, gs) <- hunterBoard s registry True
+    let untapped = untapStep gs
+    Spec.assertBool s (not (Game.isTapped pikerId untapped)) "the Piker untapped"
+    Spec.assertBool s (Game.isTapped giantId untapped) "and the Hill Giant did not"
+  -- CR 701.43b: the prohibition expires during the very untap step it applies in.
+  -- The Piker is still tapped going into the second step -- nothing re-tapped it
+  -- -- so a second step untapping it is the flag having been cleared and not a
+  -- board that had changed underneath.
+  Spec.it s "CR 701.43b the prohibition is spent at that untap step and the next one untaps it" $ do
+    (_, pikerId, _, gs) <- hunterBoard s registry False
+    let once = untapStep gs
+        twice = untapStep once
+    Spec.assertBool s (Game.isTapped pikerId once) "still tapped after the first untap step"
+    Spec.assertBool s (not (Game.isTapped pikerId twice)) "and untapped by the second"
 
 -- CR 502.3 / CR 101.2 through the untap step itself.
 prohibitionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

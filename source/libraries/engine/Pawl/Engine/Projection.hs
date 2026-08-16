@@ -1893,6 +1893,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Tap ref -> Effect.Tap (rewriteObjectRef pairs ref)
   Effect.Untap ref -> Effect.Untap (rewriteObjectRef pairs ref)
   Effect.Detain ref -> Effect.Detain (rewriteObjectRef pairs ref)
+  Effect.DoesNotUntapNext ref -> Effect.DoesNotUntapNext (rewriteObjectRef pairs ref)
   Effect.Transform ref -> Effect.Transform (rewriteObjectRef pairs ref)
   Effect.AddPhases _ -> effect
   Effect.GainControl (DurationRef.MkDurationRef duration ref) -> Effect.GainControl (DurationRef.MkDurationRef duration (rewriteObjectRef pairs ref))

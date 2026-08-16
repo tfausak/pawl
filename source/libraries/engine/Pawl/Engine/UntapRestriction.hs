@@ -12,6 +12,11 @@
 -- names the untap step's turn-based action and nothing else, so an Effect.Untap
 -- during the turn (CR 701.26b) is untouched -- which is the printed reading, not
 -- a shortcut.
+--
+-- The PRINTED carrier alone. The one-shot prohibition a resolution stores
+-- (Effect.DoesNotUntapNext, Object.doesNotUntapNext) is not gathered here and
+-- could not be: it is a field on the VICTIM rather than on anything the
+-- battlefield walk below would reach. Engine.untapAll subtracts both.
 module Pawl.Engine.UntapRestriction where
 
 import Data.Set (Set)

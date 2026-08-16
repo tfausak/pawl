@@ -731,6 +731,7 @@ effectCounts effect = case effect of
   Effect.Tap _ -> []
   Effect.Untap _ -> []
   Effect.Detain _ -> []
+  Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
   Effect.AddPhases _ -> []
   Effect.GainControl (DurationRef.MkDurationRef duration _) -> durationCounts duration
@@ -1140,6 +1141,7 @@ effectReplacements effect = case effect of
   Effect.Tap _ -> []
   Effect.Untap _ -> []
   Effect.Detain _ -> []
+  Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
   Effect.AddPhases _ -> []
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> []
@@ -1718,6 +1720,7 @@ effectMintedFaces effect = case effect of
   Effect.Tap _ -> []
   Effect.Untap _ -> []
   Effect.Detain _ -> []
+  Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
   Effect.AddPhases _ -> []
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> []
@@ -2889,6 +2892,7 @@ effectFilters effect = case effect of
   Effect.Tap ref -> unframed (objectRefFilters ref)
   Effect.Untap ref -> unframed (objectRefFilters ref)
   Effect.Detain ref -> unframed (objectRefFilters ref)
+  Effect.DoesNotUntapNext ref -> unframed (objectRefFilters ref)
   Effect.Transform ref -> unframed (objectRefFilters ref)
   Effect.AddPhases _ -> []
   Effect.GainControl (DurationRef.MkDurationRef duration ref) -> unframed (durationFilters duration <> objectRefFilters ref)

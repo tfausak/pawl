@@ -410,6 +410,7 @@ slotsOf effect = case effect of
   Effect.Tap ref -> objectRefSlots ref
   Effect.Untap ref -> objectRefSlots ref
   Effect.Detain ref -> objectRefSlots ref
+  Effect.DoesNotUntapNext ref -> objectRefSlots ref
   Effect.Transform ref -> objectRefSlots ref
   Effect.AddPhases _ -> Map.empty
   Effect.GainControl (DurationRef.MkDurationRef _ ref) -> objectRefSlots ref
@@ -633,6 +634,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Tap _ -> True
   Effect.Untap _ -> True
   Effect.Detain _ -> True
+  Effect.DoesNotUntapNext _ -> True
   Effect.Transform _ -> True
   Effect.AddPhases _ -> True
   -- slotsOf's arm drops this Duration, so the slotless test is made here.
@@ -773,6 +775,7 @@ readsX = any effectReadsX
       Effect.Tap _ -> False
       Effect.Untap _ -> False
       Effect.Detain _ -> False
+      Effect.DoesNotUntapNext _ -> False
       Effect.Transform _ -> False
       Effect.AddPhases _ -> False
       Effect.GainControl (DurationRef.MkDurationRef _ _) -> False
@@ -870,6 +873,7 @@ searchesLibrary effect = case effect of
   Effect.Tap _ -> False
   Effect.Untap _ -> False
   Effect.Detain _ -> False
+  Effect.DoesNotUntapNext _ -> False
   Effect.Transform _ -> False
   Effect.AddPhases _ -> False
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> False
@@ -1031,6 +1035,7 @@ boundSlots effect = case effect of
   Effect.Tap _ -> Set.empty
   Effect.Untap _ -> Set.empty
   Effect.Detain _ -> Set.empty
+  Effect.DoesNotUntapNext _ -> Set.empty
   Effect.Transform _ -> Set.empty
   Effect.AddPhases _ -> Set.empty
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> Set.empty
@@ -5105,6 +5110,26 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- detained is detained again with no count kept and no row to reconcile --
       -- see Object.detainedUntil.
       foldr (Detain.detain controller) gs (objectRefObjects legal resolving controller source gs ref)
+  Effect.DoesNotUntapNext ref ->
+    State.modify' $ \gs ->
+      -- CR 502.3's "effects can keep one or more of a player's permanents from
+      -- untapping", as a one-shot. The victims are enumerated ONCE through the
+      -- same objectRefObjects Tap and Untap above share, so an illegal slot (CR
+      -- 608.2b), a player recipient and a set that matched nothing all arrive as
+      -- the empty list and prohibit nothing.
+      --
+      -- No duration is stored and none is owed: CR 701.43b makes the untap step
+      -- the prohibition bites in the step it expires in, and
+      -- Engine.untapAll clears the flag there. That is also why marking a
+      -- permanent already carrying the flag is a no-op rather than a stack --
+      -- assigning True to True -- which is that rule's non-stacking said as a
+      -- state assignment, the shape Tap's arm takes toward an already-tapped
+      -- permanent.
+      let mark o = o {Object.doesNotUntapNext = True}
+       in gs
+            { GameState.objects =
+                foldr (Map.adjust mark) (GameState.objects gs) (objectRefObjects legal resolving controller source gs ref)
+            }
   Effect.Transform ref ->
     State.modify' $ \gs ->
       -- CR 701.27a: "To transform a permanent, turn it over so that its other

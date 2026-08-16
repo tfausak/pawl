@@ -192,7 +192,8 @@ gameSpec s registry = Spec.describe s "Game" $ do
               Object.designations = Set.empty,
               Object.kicked = False,
               Object.announcedX = Nothing,
-              Object.detainedUntil = Set.empty
+              Object.detainedUntil = Set.empty,
+              Object.doesNotUntapNext = False
             }
       )
 
@@ -1899,7 +1900,8 @@ handBobBolt lightningBolt gs =
             Object.designations = Set.empty,
             Object.kicked = False,
             Object.announcedX = Nothing,
-            Object.detainedUntil = Set.empty
+            Object.detainedUntil = Set.empty,
+            Object.doesNotUntapNext = False
           }
    in (oid, gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2), GameState.hand = Map.insert S.bob (Seq.singleton oid) (GameState.hand gs2)})
 
@@ -2235,7 +2237,8 @@ restartOnStack mountain =
             Object.designations = Set.empty,
             Object.kicked = False,
             Object.announcedX = Nothing,
-            Object.detainedUntil = Set.empty
+            Object.detainedUntil = Set.empty,
+            Object.doesNotUntapNext = False
           }
    in g4
         { GameState.objects = Map.insert abilId abilObj (GameState.objects g4),

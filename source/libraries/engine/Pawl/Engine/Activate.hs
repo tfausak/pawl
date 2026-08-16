@@ -530,7 +530,8 @@ activateAbility pid srcId ability = do
             Object.designations = Set.empty,
             Object.kicked = False,
             Object.announcedX = Nothing,
-            Object.detainedUntil = Set.empty
+            Object.detainedUntil = Set.empty,
+            Object.doesNotUntapNext = False
           }
       onStack =
         gs2

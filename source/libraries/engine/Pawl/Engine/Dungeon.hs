@@ -211,7 +211,8 @@ enter pid = do
                 Object.designations = Set.empty,
                 Object.kicked = False,
                 Object.announcedX = Nothing,
-                Object.detainedUntil = Set.empty
+                Object.detainedUntil = Set.empty,
+                Object.doesNotUntapNext = False
               }
           gs3 =
             Game.insertIntoZone

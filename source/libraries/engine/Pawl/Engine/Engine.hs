@@ -204,13 +204,32 @@ checkSba = sampleWorldSince >> Sba.checkStateBasedActions
 -- permanent this player does not control is never a candidate -- CR 502.3 untaps
 -- the active player's permanents, and the printed sentence says "its controller's
 -- untap step" of that same player.
+--
+-- TWO carriers, subtracted together. The printed static one above is re-derived
+-- live from the battlefield every time this runs; Object.doesNotUntapNext is the
+-- one-shot a resolution stored on the victim (Effect.DoesNotUntapNext, Elvish
+-- Hunter), and this is where it both applies and ENDS. CR 701.43b puts its
+-- expiry in the untap step it bites in -- "each effect causing it not to untap
+-- expires during the same untap step" -- so the flag is cleared for every
+-- candidate here, whether or not the permanent also stayed tapped for the
+-- printed carrier's sake, and whether or not it was tapped at all.
+--
+-- Clearing HERE, against `ids`, is what makes "its controller's" a live read
+-- rather than a baked one: the effect never records a player, and the step that
+-- consumes the flag is by construction the untap step of whoever controls the
+-- permanent then. A control change between the resolution and the step needs
+-- nothing rewritten, and no Pawl.Engine.Expiry sweep sees the flag at all.
 untapAll :: PlayerId -> Game ()
 untapAll pid = do
   gs <- State.get
   let untap obj = obj {Object.tapped = TapState.Untapped}
+      clear obj = obj {Object.doesNotUntapNext = False}
       ids = Projection.controls pid gs
       prohibited = UntapRestriction.doesNotUntap ids gs
-  State.put gs {GameState.objects = foldr (Map.adjust untap) (GameState.objects gs) (filter (\oid -> not (Set.member oid prohibited)) ids)}
+      oneShot oid = maybe False Object.doesNotUntapNext (Game.lookupObject oid gs)
+      untapping = filter (\oid -> not (Set.member oid prohibited) && not (oneShot oid)) ids
+      expiring = filter oneShot ids
+  State.put gs {GameState.objects = foldr (Map.adjust clear) (foldr (Map.adjust untap) (GameState.objects gs) untapping) expiring}
 
 -- CR 302.6: permanents the active player has controlled since their turn began
 -- are no longer summoning sick. The untap step is where that becomes true.
@@ -876,7 +895,8 @@ placeBorne srcId pending = do
             Object.designations = Set.empty,
             Object.kicked = False,
             Object.announcedX = Nothing,
-            Object.detainedUntil = Set.empty
+            Object.detainedUntil = Set.empty,
+            Object.doesNotUntapNext = False
           }
   State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}
   if not (Modal.selectionPossible legal selection)

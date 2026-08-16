@@ -314,6 +314,10 @@ data Face card = MkFace
     -- Its own field rather than an arm of sacrificeRestrictions above, for the
     -- reason that field gives one line up: the two forbid unrelated game actions,
     -- and this one is read at exactly one site, CR 502.3's turn-based action.
+    --
+    -- The STATIC prohibition only. A resolution's one-shot -- "doesn't untap
+    -- during its controller's NEXT untap step" -- is Effect.DoesNotUntapNext
+    -- writing Object.doesNotUntapNext on the victim, and never reaches this field.
     untapRestrictions :: [UntapRestriction.UntapRestriction],
     -- | CR 604.1/604.2 / 508.1c / 508.1h: this face's printed COSTS TO ATTACK --
     -- Ghostly Prison's {2} per attacking creature; read by Pawl.Engine.AttackCost,

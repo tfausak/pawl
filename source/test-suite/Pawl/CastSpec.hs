@@ -673,7 +673,8 @@ handInPlay printing board =
             Object.designations = Set.empty,
             Object.kicked = False,
             Object.announcedX = Nothing,
-            Object.detainedUntil = Set.empty
+            Object.detainedUntil = Set.empty,
+            Object.doesNotUntapNext = False
           }
    in ( g2
           { GameState.objects = Map.insert oid obj (GameState.objects g2),
