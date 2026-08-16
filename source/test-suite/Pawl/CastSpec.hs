@@ -82,6 +82,7 @@ import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
@@ -576,7 +577,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let (gs, oid) = S.boltInHand mountain lightningBolt 1 Phase.PrecombatMain
         after = S.runPure S.identityAnswer gs (S.cast S.alice oid)
-        casts = Maybe.mapMaybe Game.castOf (S.eventsOf after)
+        casts = fmap SpellWasCast.player (Maybe.mapMaybe Game.castOf (S.eventsOf after))
     Spec.assertEqWith s "no cast before" (Maybe.mapMaybe Game.castOf (S.eventsOf gs)) []
     Spec.assertEqWith s "exactly one cast, by alice" casts [S.alice]
   Spec.it s "CR 601.2i a cast that is rejected records nothing" $ do

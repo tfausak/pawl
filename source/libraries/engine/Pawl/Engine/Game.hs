@@ -647,17 +647,21 @@ honourShuffle offered answer =
     then answer
     else offered
 
--- The caster an event describes, if it is a cast (CR 601.2i).
+-- The cast an event describes, if it is one (CR 601.2i).
 --
 -- HERE rather than beside Pawl.Engine.Event's other GameEvent classifiers, and
--- only because of the import graph: its one caller is
--- Pawl.Engine.PlayerEffect.castsThisTurn, and Pawl.Engine.Event now asks that
--- module CR 701.6a's counterability question -- so an Event.castOf would put
--- the two modules in a cycle. Nothing about GameEvent is owned by Event --
+-- only because of the import graph: Pawl.Engine.PlayerEffect.castsThisTurn is a
+-- caller, and Pawl.Engine.Event now asks that module CR 701.6a's
+-- counterability question -- so an Event.castOf would put the two modules in a
+-- cycle. Nothing about GameEvent is owned by Event --
 -- Pawl.Engine.Projection and Pawl.Engine.Count already case on it too.
-castOf :: GameEvent -> Maybe PlayerId
+--
+-- The whole record rather than the caster alone, which is all castsThisTurn
+-- wants: Pawl.Engine.Event.castOrdinal needs the spell's id off the same arm,
+-- to find where in the log the cast it is matching sits.
+castOf :: GameEvent -> Maybe SpellWasCast.SpellWasCast
 castOf event = case event of
-  GameEvent.SpellCast (SpellWasCast.MkSpellWasCast pid _ _ _) -> Just pid
+  GameEvent.SpellCast cast -> Just cast
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.BecameDesignated {} -> Nothing

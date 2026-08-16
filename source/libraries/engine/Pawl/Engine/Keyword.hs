@@ -1889,7 +1889,10 @@ prowess =
               SpellCast.scope = TurnScope.EachTurn,
               -- CR 702.108a names no zone: prowess triggers on a noncreature
               -- spell cast from anywhere.
-              SpellCast.zone = Nothing
+              SpellCast.zone = Nothing,
+              -- And no ordinal either: every noncreature spell cast fires it,
+              -- not one chosen occurrence of the turn.
+              SpellCast.ordinal = Nothing
             },
       TriggeredAbility.modal =
         Modal.MkModal

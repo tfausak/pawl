@@ -773,6 +773,13 @@ data TriggerCondition
     --
     -- The same type StepBegins carries above, read against the same player: CR
     -- 109.5's "you", the ability's controller when it triggered (CR 603.3a).
+    --
+    -- The ORDINAL is a fourth axis, and Clarion Spirit's "whenever you cast your
+    -- SECOND spell each turn" earns it. It is the same question
+    -- PlayerDrawsNthCard asks of CR 121's draw, and it is a field of the payload
+    -- rather than a condition of its own for that constructor's mirror-image
+    -- reason: which cast of the turn it was narrows the very event the Filter,
+    -- the scope and the zone already describe.
     SpellCast SpellCast.SpellCast
   | -- | CR 601.2i again, read off the spell BEING cast rather than off a bystander
     -- -- "when you cast this spell", Desolation Twin's. Self-scoped like

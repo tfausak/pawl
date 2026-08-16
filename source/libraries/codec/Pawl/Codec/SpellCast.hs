@@ -13,11 +13,13 @@ import qualified Pawl.Types.SpellCast as SpellCast
 
 -- | A bare object keyed by the record's field names, replacing the two-element
 -- array this payload used to be. The first two keys are required: an unscoped
--- trigger is a different card, not a defaulted one. The zone is elided instead,
--- because a trigger that names no zone is what almost every printing writes.
+-- trigger is a different card, not a defaulted one. The zone and the ordinal are
+-- elided instead, because a trigger that names neither is what almost every
+-- printing writes.
 codec :: Codec.Codec SpellCast.SpellCast
 codec = Fields.object $ do
   filter_ <- Fields.required "filter" (Filter.codec Keyword.codec) SpellCast.filter
   scope <- Fields.required "scope" TurnScope.codec SpellCast.scope
   zone <- Fields.defaulted "zone" Nothing (Common.maybe Zone.codec) SpellCast.zone
-  pure SpellCast.MkSpellCast {SpellCast.filter = filter_, SpellCast.scope = scope, SpellCast.zone = zone}
+  ordinal <- Fields.defaulted "ordinal" Nothing (Common.maybe Common.natural) SpellCast.ordinal
+  pure SpellCast.MkSpellCast {SpellCast.filter = filter_, SpellCast.scope = scope, SpellCast.zone = zone, SpellCast.ordinal = ordinal}
