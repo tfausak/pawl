@@ -7,6 +7,10 @@ module Pawl.Types.TriggerFrequency where
 -- Warleader's phrase is plain card text narrowing a CR 508.3a trigger event, and
 -- this type says so rather than manufacturing a citation.
 --
+-- Pawl.Types.TriggerLimit is the other half of that pair and NOT a synonym: it
+-- rides the ABILITY and states "this ability triggers only once each turn",
+-- where this narrows one condition's EVENT.
+--
 -- Load-bearing on the one card that carries it: Aurelia adds a combat phase when
 -- she attacks (CR 500.8), so without the narrowing she attacks again in the phase
 -- she added, adds another, and the turn never ends.

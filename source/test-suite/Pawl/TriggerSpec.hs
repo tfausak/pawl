@@ -8582,7 +8582,7 @@ whisperingWizardSpec s registry =
               spent = threeCasts think divine skeins gs
               -- bob's turn, alice's Islands still tapped from her own: only the
               -- three she never spent pay for this, and Think Twice is an instant
-              -- so CR 307.1 lets her cast it here.
+              -- so CR 304.1 lets her cast it on a turn that is not hers.
               handed = S.runPure S.identityAnswer spent Engine.handoffTurn
               (fourth, ready) = S.addHandCard think S.alice (handed {GameState.priority = Just S.alice})
               after = castAndResolve S.alice fourth ready

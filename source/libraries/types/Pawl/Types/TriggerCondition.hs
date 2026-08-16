@@ -83,8 +83,9 @@ data TriggerCondition
     -- 4" is CR 603.4's intervening "if", which rides
     -- Pawl.Types.TriggeredAbility.intervening; "this ability triggers only once
     -- each turn" is a limit on the ABILITY rather than a description of the event,
-    -- which GameState.speedIncreasedThisTurn carries. Folding either in would make
-    -- this constructor mean one ability instead of one event.
+    -- which Pawl.Types.TriggeredAbility.limit now states and
+    -- GameState.speedIncreasedThisTurn still enforces here. Folding either in
+    -- would make this constructor mean one ability instead of one event.
     OpponentLostLifeDuringYourTurn
   | -- | CR 702.29c: "when you cycle this card". Self-scoped like SelfEnters. The
     -- bearer is the card in the zone it landed in, which is that rule's second
