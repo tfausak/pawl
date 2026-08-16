@@ -1035,9 +1035,11 @@ data Keyword
     -- and asks about the declaration instead -- TriggerCondition.SelfAttacksWithAnother
     -- carrying Filter.PowerGreaterThanSource.
     --
-    -- CR 702.149c -- "whenever this creature trains", an ability that triggers on a
-    -- resolving training ability putting counters on -- is a trigger condition
-    -- nothing here watches for (#1163).
+    -- CR 702.149c -- "whenever this creature trains" -- is TriggerCondition.SelfTrains,
+    -- reading the GameEvent.Trained that Effect.Train records as rule 702.149a's
+    -- counter goes on. So the counter is placed by an opcode of its own rather than
+    -- by a plain Effect.PutCounters: the rule needs that placement told apart from
+    -- any other +1/+1 counter arriving. Savior of Ollenbock is the printing.
     Training
   | -- | 702.164a: toxic N. N rides the constructor, so `Toxic 1` and `Toxic 2` are
     -- distinct keywords, and CR 702.164b's total toxic value is the sum over every

@@ -2500,10 +2500,13 @@ provokeTarget = SlotName.MkSlotName (Text.pack "provoked")
 -- renowned, put N +1/+1 counters on it and it becomes renowned. Rule 702 states
 -- it as a triggered ability, minted here like its siblings in `abilitiesFor`.
 --
--- Poisonous' condition with training's payload: rule 702.112a's event is the
+-- Poisonous' condition with a plain placement: rule 702.112a's event is the
 -- bearer's combat damage to a player (SelfDealsCombatDamageToPlayer, rule
 -- 702.70a's) and its counters go on the bearer (Effect.PutCounters against the
--- reserved Binding.triggerSource slot, rule 702.149a's). Not mentor's target slot:
+-- reserved Binding.triggerSource slot). No marking opcode, unlike training and
+-- evolve one rule apiece away: rule 702.112a's own marker is the DESIGNATION the
+-- next clause gives, which a later ability reads off the permanent rather than off
+-- an event. Not mentor's target slot either:
 -- rule 702.112a says "it", and CR 115.10a makes a named object not a target.
 --
 -- THE INTERVENING "IF" is what this row adds -- the first minted ability with one.

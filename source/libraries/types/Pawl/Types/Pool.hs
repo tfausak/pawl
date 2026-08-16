@@ -6,8 +6,11 @@ import qualified Pawl.Types.GraveyardScope as GraveyardScope
 -- both WHICH objects are candidates and HOW they are referenced
 -- (Recipient.ToCreature / ToPlaneswalker / ToBattle / ToPlayer / ToObject).
 -- Closed-half vocabulary, like the hand-carved target enum TargetSlot retired
--- (#40) -- it grows only when the rules define a new kind of targetable object,
--- never per card.
+-- (#40): it grows when the rules admit a new kind of targetable object, or a new
+-- ZONE for one -- never with a card's own restriction, which is the Filter's job.
+-- A union of two admitted kinds is the one further shape a card can force, since
+-- CR 601.2c fixes one count per slot and a slot has one pool; SpellsAndPermanents
+-- and CreaturesAndCardsInGraveyard are those.
 data Pool
   = Creatures -- CR 115.1a: creatures on the battlefield (ToCreature).
   | Players -- CR 115: players still in the game (ToPlayer).

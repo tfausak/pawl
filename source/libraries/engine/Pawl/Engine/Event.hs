@@ -1800,9 +1800,9 @@ resolveDestruction asOf cause regenerability oid = do
 --
 -- ANSWERS how many counters actually landed, which is not what was asked for: CR
 -- 614.16 may have grown or erased the placement, and an object that is no longer
--- there takes none. Only CR 702.100b's "one or more +1/+1 counters are put on it"
--- reads it (Pawl.Engine.Resolve's Effect.Evolve arm); every other caller places
--- and moves on.
+-- there takes none. Only the two rules that say "one or more +1/+1 counters" read
+-- it -- CR 702.100b and CR 702.149c, at Pawl.Engine.Resolve's Effect.Evolve and
+-- Effect.Train arms; every other caller places and moves on.
 putCounters :: CounterCause.CounterCause -> ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game Natural
 putCounters cause oid kind n = do
   resolved <- resolveCounters cause oid kind n

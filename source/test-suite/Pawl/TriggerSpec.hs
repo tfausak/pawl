@@ -5052,9 +5052,15 @@ saviorOfOllenbockSpec s registry =
               (giantId, withGiant) = S.addCreature giant S.bob withSavior
               (handed, spellId) = S.handOne battlegrowth withGiant
               cast = snd (Engine.runGamePure (aimingAt (Recipient.ToCreature saviorId) []) handed (S.cast S.alice spellId))
-              after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+              resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+              -- The SETTLE is the load-bearing step, not the resolution: CR 603.3
+              -- places a trigger when the boundary scans the log, so a state read
+              -- straight off the resolution cannot tell "never triggered" from
+              -- "triggered and not yet placed". Without this the case passes
+              -- against a condition that fires on every counter placement.
+              after = S.runPure S.identityAnswer resolved Engine.settleForPriority
           Spec.assertEqWith s "the counter really arrived" (countersOn saviorId after) (Map.singleton CounterKind.PlusOnePlusOne 1)
-          Spec.assertEqWith s "no trigger was placed" (length (GameState.stack after)) 0
+          Spec.assertEqWith s "and the settle placed no trigger" (length (GameState.stack after)) 0
           Spec.assertEqWith s "and nothing was exiled" (exiledNames after) []
           Spec.assertBool s (S.onBattlefield giantId after) "the Giant bob controls is untouched"
 
