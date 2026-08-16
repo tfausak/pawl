@@ -432,22 +432,25 @@ abominationAcrossNexus forest abomination nexus stocked =
 -- Elspeth, Sun's Champion {4}{W}{W} Legendary Planeswalker -- Elspeth, loyalty
 -- 4. "-7: You get an emblem with \"Creatures you control get +2/+2 and have
 -- flying.\"" (Name, cost, type line, loyalty and oracle text checked against
--- Scryfall.) The pool's first emblem with a STATIC ability, and what proves
--- CR 114.4 -- "abilities of emblems function in the command zone" -- for the
--- layer fold: the modifications are layer 7c and layer 6, and their only bearer
--- is an object CR 114.1 keeps in the command zone.
+-- Scryfall.) The first emblem a CARD in the pool prints with a static ability
+-- -- Ajani, Adversary of Tyrants' is a triggered one, and The Ring's is built in
+-- Haskell by Pawl.Engine.Ring -- and what proves CR 114.4, "abilities of emblems
+-- function in the command zone", for the layer fold: the two modifications are
+-- layer 7c and layer 6, and their only bearer is an object CR 114.1 keeps in the
+-- command zone.
 --
--- One board, read twice; the Bool is the single difference, whether the
+-- One board, built twice; the Bool is the single difference, whether the
 -- ultimate was activated. Everything else -- seats, creatures, Elspeth's
 -- loyalty -- is held equal, so a reading that came from the planeswalker's own
 -- presence rather than from the emblem it minted would move both halves.
 --
 -- Three seats, and three creatures of two printed sizes: alice's Goblin Piker
 -- (2/1), bob's Hill Giant (3/3) and carol's Piker. "Creatures you control" is
--- CR 114.2's controller, so a fold that took the active player, the emblem's
--- owner-as-everyone, or the whole battlefield would buff one of the other two.
--- The sizes keep the numbers apart: the buffed Piker is 4/3, which no unbuffed
--- creature on the board reads as.
+-- CR 114.2's controller, and bob is left as the active player once the ultimate
+-- has resolved, so a fold that took the active player, the whole battlefield, or
+-- every seat's creatures would move one of the other two. The sizes keep the
+-- numbers apart: the buffed Piker is 4/3, which no unbuffed creature here reads
+-- as.
 --
 -- The loyalty is a fixture rather than seven turns of +1: CR 306.5b's counters
 -- are what the ability's cost pays, and how they got there is no part of this.
@@ -470,7 +473,7 @@ elspethEmblemBoard s registry ultimate = do
       used = case (ultimate, drop 2 (Face.activatedAbilities (S.combinedFace elspeth))) of
         (True, ability : _) -> S.runPure S.identityAnswer armed (do Activate.activateAbility S.alice elspethId ability; Stack.resolveTop)
         _ -> armed
-  pure (mine, theirs, carols, used)
+  pure (mine, theirs, carols, used {GameState.activePlayer = S.bob})
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
