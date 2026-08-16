@@ -2035,7 +2035,8 @@ playGame =
    in loop
 
 -- CR 729: play a subgame as a FUNCTION CALL. Construct the subgame from the
--- parent's library cards (CR 729.2, subgameStateFrom), then run its setup and
+-- parent's library cards and commanders (CR 729.2 / 729.2c, subgameStateFrom),
+-- then run its setup and
 -- whole game LIFTED into the parent's StateT -- so the subgame's prompts flow
 -- through the SAME Program interpreter and Replay fold, which is what keeps a
 -- transcript replayable across one. They are not indistinguishable from the
@@ -2043,7 +2044,8 @@ playGame =
 -- parent game, so an answerer can tell a subgame's question from a main-game
 -- one (#153). The parent GameState sits untouched in the outer frame while the
 -- subgame runs (CR 729.1a). At the end, funnel each owner's cards back to
--- their main-game library (CR 729.5) and reshuffle. A subgame within a subgame
+-- their main-game library (CR 729.5), their commander to their main-game
+-- command zone (CR 729.5c), and reshuffle. A subgame within a subgame
 -- (CR 729.6) is free: the nested playGame's own priorityLoop re-supplies
 -- playSubgame.
 --
@@ -2053,12 +2055,12 @@ playGame =
 -- roughly |library| / 7 (the CR 729.6 gate rests on this bound).
 --
 -- Cards brought into a subgame from the main game, and the main-game triggers
--- their removal queues, are not implemented (#152). Neither is CR 729.5's other
--- half, the command-zone residents moving into and back out of a subgame: none of
--- them exists to move, with one exception: COMMANDERS now do, and neither
--- direction carries them (#943). The five other kinds of command-zone card are
--- still unbuilt -- #933 (dungeons), #934 (planes and phenomena), #935 (schemes),
--- #936 (vanguards) and #937 (conspiracies).
+-- their removal queues, are not implemented (#152). The command-zone residents
+-- that move into and back out of a subgame are CR 729.2a-c and CR 729.5a-c;
+-- commanders are the only kind that exists to move here and Setup carries them
+-- both ways. The five other kinds of command-zone card are not implemented --
+-- #933 (dungeons), #934 (planes and phenomena), #935 (schemes), #936
+-- (vanguards) and #937 (conspiracies).
 playSubgame :: Game Result
 playSubgame = do
   parent <- State.get

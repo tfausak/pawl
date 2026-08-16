@@ -456,7 +456,9 @@ subgameSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n (
 subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
   Spec.it s "CR 729.2: subgameStateFrom takes ONLY library cards; battlefield/hand do not enter" $ do
     -- alice owns 5 cards: 2 relocated to her library, 3 left on the battlefield.
-    -- The subgame state's object pool must be exactly the 2 library cards.
+    -- The subgame state's object pool must be exactly the 2 library cards. The
+    -- one other thing CR 729.2 lets in is a commander (CR 729.2c), and no player
+    -- here has one designated; Pawl.CommanderSpec's Subgame group covers that.
     mountain <- S.printingOf s registry "Mountain"
     let g0 = Setup.emptyGame S.bothPlayers
         g1 = addMany mountain 5 S.alice g0

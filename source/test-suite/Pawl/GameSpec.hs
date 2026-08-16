@@ -953,9 +953,10 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
   Spec.it s "CR 729.1a #153: a question names the game it came from, so a subgame's is not a main-game one" $ do
     -- The same cast-a-subgame fixture as the two cases around this one, run
     -- through the Asked seam instead of the Prompt one. `survivorId` is a
-    -- creature on the MAIN battlefield, and CR 729.2 puts only library cards
-    -- into the subgame -- so it is a fact that holds of one game and not the
-    -- other, which is exactly what an untagged question could not tell you.
+    -- creature on the MAIN battlefield, and CR 729.2 puts nothing but library
+    -- cards and CR 729.2c's commanders into the subgame -- so it is a fact that
+    -- holds of one game and not the other, which is exactly what an untagged
+    -- question could not tell you. This board designates no commander.
     mountain <- S.printingOf s registry "Mountain"
     syntheticSubgame <- S.printingOf s registry "Synthetic Subgame"
     let g0 = Setup.emptyGame S.bothPlayers
