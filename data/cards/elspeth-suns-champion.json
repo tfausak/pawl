@@ -1,0 +1,245 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "AddLoyaltyToThis",
+                "value": 1
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Create",
+                        "value": {
+                          "card": {
+                            "faces": [
+                              {
+                                "colorIndicator": [
+                                  {
+                                    "type": "White"
+                                  }
+                                ],
+                                "name": "Soldier Token",
+                                "power": {
+                                  "type": "Literal",
+                                  "value": 1
+                                },
+                                "toughness": {
+                                  "type": "Literal",
+                                  "value": 1
+                                },
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Soldier"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Creature"
+                                    }
+                                  ]
+                                }
+                              }
+                            ]
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 3
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "RemoveLoyaltyFromThis",
+                "value": 3
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Destroy",
+                        "value": {
+                          "ref": {
+                            "type": "EachMatching",
+                            "value": {
+                              "type": "And",
+                              "value": [
+                                {
+                                  "type": "HasCardType",
+                                  "value": {
+                                    "type": "Creature"
+                                  }
+                                },
+                                {
+                                  "type": "PowerAtLeast",
+                                  "value": 4
+                                }
+                              ]
+                            }
+                          },
+                          "regenerability": {
+                            "type": "Regenerable"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "RemoveLoyaltyFromThis",
+                "value": 7
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "CreateEmblem",
+                        "value": {
+                          "faces": [
+                            {
+                              "name": "Elspeth, Sun's Champion Emblem",
+                              "staticAbilities": [
+                                {
+                                  "affected": {
+                                    "type": "Matching",
+                                    "value": {
+                                      "type": "And",
+                                      "value": [
+                                        {
+                                          "type": "HasCardType",
+                                          "value": {
+                                            "type": "Creature"
+                                          }
+                                        },
+                                        {
+                                          "type": "ControlledBy",
+                                          "value": {
+                                            "type": "You"
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "modifications": [
+                                    {
+                                      "type": "ModifyPowerToughness",
+                                      "value": {
+                                        "power": {
+                                          "type": "Literal",
+                                          "value": 2
+                                        },
+                                        "toughness": {
+                                          "type": "Literal",
+                                          "value": 2
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "type": "GainKeyword",
+                                      "value": {
+                                        "type": "Flying"
+                                      }
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "loyalty": {
+        "type": "Literal",
+        "value": 4
+      },
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Elspeth, Sun's Champion",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Elspeth"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Planeswalker"
+          }
+        ]
+      }
+    }
+  ]
+}

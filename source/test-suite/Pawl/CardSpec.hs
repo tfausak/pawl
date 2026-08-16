@@ -3430,8 +3430,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- through a Printing.
   --
   -- Hand-built, in the two self-tests' posture above, because no card in the
-  -- pool names a reserved slot anywhere -- and only Ajani, Adversary of Tyrants
-  -- prints a CreateEmblem, whose emblem names none either; the corpus sweeps are
+  -- pool names a reserved slot anywhere -- and the two cards that print a
+  -- CreateEmblem, Ajani, Adversary of Tyrants and Elspeth, Sun's Champion, mint
+  -- emblems that name none either; the corpus sweeps are
   -- a regression guard for this, never its proof. Each
   -- case is asserted TWICE: the sweep sees the grafted offender, and the
   -- minting face's OWN slots stay empty. The second half is what makes this a
@@ -3484,7 +3485,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           other -> other
         -- The same, on a minted EMBLEM in place of the token.
         armEmblem effect = case effect of
-          Effect.Create {} -> Effect.CreateEmblem (onEveryFace arm (S.anthemEmblemCard piker))
+          Effect.Create {} -> Effect.CreateEmblem (onEveryFace arm (Printing.card piker))
           other -> other
     Spec.assertEqWith
       s
@@ -3503,9 +3504,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "a reserved slot on a two-faced token's back face is caught"
       (caught (overMint armBackFace traveler))
       offended
-    -- The emblem arm, which the pool's one CreateEmblem does not exercise --
-    -- Ajani, Adversary of Tyrants' emblem names no slot at all: the minting
-    -- effect is swapped for a CreateEmblem carrying the same graft.
+    -- The emblem arm, which neither printed CreateEmblem exercises -- their
+    -- emblems name no slot at all: the minting effect is swapped for a
+    -- CreateEmblem carrying the same graft, over a card's faces.
     Spec.assertEqWith
       s
       "a reserved slot on a minted EMBLEM's face is caught"
