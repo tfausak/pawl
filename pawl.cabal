@@ -510,6 +510,8 @@ library codec
     Pawl.Codec.TakeExtraTurnSpec
     Pawl.Codec.TapForTotalPower
     Pawl.Codec.TapForTotalPowerSpec
+    Pawl.Codec.TapPermanents
+    Pawl.Codec.TapPermanentsSpec
     Pawl.Codec.TapState
     Pawl.Codec.TapStateSpec
     Pawl.Codec.TargetCount
@@ -1149,6 +1151,7 @@ library types
     Pawl.Types.Supertype
     Pawl.Types.TakeExtraTurn
     Pawl.Types.TapForTotalPower
+    Pawl.Types.TapPermanents
     Pawl.Types.TapState
     Pawl.Types.TargetCount
     Pawl.Types.TargetSlot

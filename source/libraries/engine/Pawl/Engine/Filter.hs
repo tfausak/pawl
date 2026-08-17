@@ -27,6 +27,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
+import qualified Pawl.Types.TapPermanents as TapPermanents
 
 -- The characteristics a Filter atom consults. Supplied by the projection on the
 -- battlefield/stack and by the printed card off the battlefield (both builders
@@ -995,12 +996,12 @@ rewriteKeyword pairs keyword = case keyword of
 rewriteCost :: [(Subtype.Subtype, Subtype.Subtype)] -> Cost.Cost Keyword.Type.Keyword -> Cost.Cost Keyword.Type.Keyword
 rewriteCost pairs cost = cost {Cost.components = fmap (rewriteComponent pairs) (Cost.components cost)}
 
--- rewriteCost's per-component half. Five components carry a Filter and are the
--- five that descend; the rest name a number, or the object the cost is on, and
+-- rewriteCost's per-component half. Six components carry a Filter and are the
+-- six that descend; the rest name a number, or the object the cost is on, and
 -- CR 612.2 finds no word in them to swap.
 --
--- Of the five, only Sacrifice has a producer -- Dark Heart of the Wood. The
--- TapForTotalPower, DiscardCards, ExileCardsFromGraveyard and
+-- Of the six, only Sacrifice has a producer -- Dark Heart of the Wood. The
+-- TapForTotalPower, TapPermanents, DiscardCards, ExileCardsFromGraveyard and
 -- ExileTopFromGraveyard arms are a regression fence: no printing pairs any of
 -- them with a basic land type, so no test can falsify them. Magmatic Insight's
 -- "a land card" comes closest and is still not one -- CR 612.2 swaps a SUBTYPE
@@ -1009,6 +1010,7 @@ rewriteComponent :: [(Subtype.Subtype, Subtype.Subtype)] -> CostComponent.CostCo
 rewriteComponent pairs component = case component of
   CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) -> CostComponent.Sacrifice (Sacrifice.MkSacrifice n (rewrite pairs criterion))
   CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n criterion) -> CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n (rewrite pairs criterion))
+  CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) -> CostComponent.TapPermanents (TapPermanents.MkTapPermanents n (rewrite pairs criterion))
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) -> CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n (rewrite pairs criterion))
   CostComponent.ExileTopFromGraveyard criterion -> CostComponent.ExileTopFromGraveyard (rewrite pairs criterion)
   CostComponent.DiscardCards (DiscardCards.MkDiscardCards n criterion) -> CostComponent.DiscardCards (DiscardCards.MkDiscardCards n (rewrite pairs criterion))

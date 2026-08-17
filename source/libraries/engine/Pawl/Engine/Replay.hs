@@ -105,6 +105,7 @@ encode p answer = case p of
   Prompt.ChooseExilesFromGraveyard {} -> Response.ChoseExilesFromGraveyard answer
   Prompt.ChooseAnyNumberToSacrifice {} -> Response.ChoseSacrifices answer
   Prompt.ChooseTapsForTotalPower {} -> Response.ChoseTaps answer
+  Prompt.ChooseTaps {} -> Response.ChoseTaps answer
   Prompt.ChooseAttachment {} -> Response.ChoseAttachment answer
   Prompt.ChooseTurnUpAttachment {} -> Response.ChoseTurnUpAttachment answer
   Prompt.ChooseCost {} -> Response.ChoseCost answer
@@ -297,6 +298,9 @@ decode p response = case p of
     Response.ChoseSacrifices ids -> Just ids
     _ -> Nothing
   Prompt.ChooseTapsForTotalPower {} -> case response of
+    Response.ChoseTaps ids -> Just ids
+    _ -> Nothing
+  Prompt.ChooseTaps {} -> case response of
     Response.ChoseTaps ids -> Just ids
     _ -> Nothing
   Prompt.ChooseAttachment {} -> case response of
@@ -580,6 +584,10 @@ defaultAnswer p = case p of
   -- complete no-op rather than an illegal state. A deterministic fallback, not a
   -- recommendation.
   Prompt.ChooseTapsForTotalPower _ _ _ candidates _ -> Set.fromList candidates
+  -- The first `count` candidates, ChooseSacrifices' fallback: the count is exact
+  -- here, so the maximal subset the arm above takes would be rejected outright
+  -- wherever there are more candidates than the cost wants.
+  Prompt.ChooseTaps _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
   -- CR 701.3a: every candidate is a destination the card's own text offered.
   Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
   -- CR 303.4k: declining, the ChooseRiot posture -- the "may" is a real fork, so

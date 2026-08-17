@@ -207,6 +207,7 @@ import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
+import qualified Pawl.Types.TapPermanents as TapPermanents
 import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
@@ -2236,6 +2237,9 @@ costComponentFilters component = case component of
   CostComponent.Sacrifice (Sacrifice.MkSacrifice _ f) -> [f]
   -- CR 702.122a's "other untapped creatures you control".
   CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower _ f) -> [f]
+  -- CR 601.2f's "tapping permanents": Springleaf Drum's "an untapped creature
+  -- you control".
+  CostComponent.TapPermanents (TapPermanents.MkTapPermanents _ f) -> [f]
   -- CR 406.2 as a cost: Headless Skaab's "a creature card from your graveyard".
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard _ f) -> [f]
   -- CR 406.2 again: Circling Vultures' "the top creature card of your
