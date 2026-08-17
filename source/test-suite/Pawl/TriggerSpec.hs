@@ -11588,12 +11588,13 @@ falseCureSpec s registry =
 -- CR 120.3's event read by its RECIPIENT, which no condition could ask for
 -- before: every damage arm beside this one watches a permanent DEALING damage.
 --
--- Ripjaw Raptor, {2}{G}{G} Creature -- Dinosaur 4/5, whose whole text is
--- "Enrage -- Whenever this creature is dealt damage, draw a card." Enrage is an
--- ability word (CR 207.2c) with no rules meaning, so the condition is ordinary
--- and nothing about it reaches Pawl.Types.Keyword.
+-- Two producers. Ripjaw Raptor, {2}{G}{G} Creature -- Dinosaur 4/5, whose whole
+-- text is "Enrage -- Whenever this creature is dealt damage, draw a card", reads
+-- no part of the event; Coalhauler Swine, further down, reads its amount. Enrage
+-- is an ability word (CR 207.2c) with no rules meaning, so the condition is
+-- ordinary and nothing about it reaches Pawl.Types.Keyword.
 --
--- Three things the group has to separate, and one board each:
+-- What the group has to separate, a board or a pair of boards each:
 --
 --   * the RECIPIENT, not the damager and not any permanent -- a Hill Giant
 --     beside the Raptor, under the same controller, takes the same damage and
