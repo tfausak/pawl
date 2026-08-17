@@ -154,14 +154,19 @@ data View = MkView
     -- permanent -- the stale window CR 704.5m closes on the next
     -- state-based-action pass.
     --
-    -- Recursive, and therefore LAZY, load-bearingly so on both counts. Deciding
-    -- Just from Nothing costs no projection at all; only reaching INSIDE the
-    -- host's view does, and Projection.viewOfCharacteristics is itself called
-    -- from inside Projection.affects while a projection is being computed. So
+    -- Recursive, and therefore LAZY. Deciding Just from Nothing costs no
+    -- projection at all; only reaching INSIDE the host's view does, and
+    -- Projection.viewOfCharacteristics is itself called from inside
+    -- Projection.affectsGiven while a projection is being computed. So
     -- `AttachedTo (And [])` forces nothing beyond the attachment, and a nest that
-    -- names a characteristic forces exactly one further projection per link. No
-    -- affected-set filter in the pool nests one; one that did would recurse back
-    -- into the projection that is asking (#357).
+    -- names a characteristic forces exactly one further projection per link.
+    --
+    -- Laziness is the COST argument and not the termination one. What makes a
+    -- forced nest terminate is that the builder is handed a reader bounded at
+    -- its caller's own depth (Projection.viewOfCharacteristics' `hosts`), so a
+    -- nest reached from inside the fold reads the host through that fold's
+    -- layers rather than re-entering `gather`. A nest inside a nest descends the
+    -- filter, which is finite, so an attachment CYCLE terminates too.
     --
     -- View has no derived Eq, Ord or Show, and this field is why: CR 303.4 lets
     -- an effect momentarily produce a cycle of attachments before CR 704.5m's
@@ -280,12 +285,15 @@ data View = MkView
     -- test out of here: classifying an ability means importing
     -- Pawl.Engine.ManaAbility, and this module holds no abilities to classify.
     --
-    -- LAZY, for Pawl.Engine.Projection.viewOfCharacteristics' attachedToView
-    -- reason: filling it re-asks CR 702.178a's grant condition, which reaches a
-    -- second projection, and `affects` builds a view from inside a projection
-    -- already. Nothing forces it unless a Filter actually contains the atom, and
-    -- the pool's one printing (Tsabo's Web) is read outside the layer fold; an
-    -- affected-set filter that used it would recurse.
+    -- LAZY, for attachedToView's cost reason: filling it re-asks CR 702.178a's
+    -- grant condition, which reaches a second projection, and `affects` builds a
+    -- view from inside a projection already. Nothing forces it unless a Filter
+    -- actually contains the atom, and the pool's one printing (Tsabo's Web) is
+    -- read outside the layer fold.
+    --
+    -- Unlike attachedToView, this one has NO bounded reader behind it -- the
+    -- condition is asked through a full projection, so a filter forcing this from
+    -- inside the fold would not merely recurse but fail to terminate (gap #1758).
     nonManaActivatedAbility :: Bool
   }
 
