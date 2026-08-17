@@ -512,7 +512,7 @@ combatReplaySpec s =
             printed
         -- #136 / CR 729.2: "Randomly determine which player goes first." The
         -- determination is randomness, not a choice, so the prompt carries NO
-        -- Decider -- Shuffle is the only other such constructor. Recording it
+        -- Decider -- Shuffle and RandomObject below are the others. Recording it
         -- is what keeps a subgame replayable: the randomness lives in the
         -- interpreter, and the transcript carries what it rolled.
         Spec.it s "RandomFirstPlayer round-trips through the transcript" $ do

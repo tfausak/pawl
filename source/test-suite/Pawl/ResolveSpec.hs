@@ -10326,6 +10326,23 @@ randomRevealSpec s registry =
                 Spec.assertEqWith s "an empty hand reveals nothing" (revealed (S.runCombat S.aggressiveAnswer none)) []
               _ -> Spec.assertFailure s "fixture should give alice one attacker and bob none"
             _ -> Spec.assertFailure s "fixture should give alice one attacker and bob none"
+        -- CR 104.4b, GameSpec's lastChoiceSpec one effect over: being asked for
+        -- randomness is not being offered a CHOICE, so the ask must go through
+        -- Game.ask and leave GameState.lastChoice alone -- otherwise a loop
+        -- containing a random reveal would look interruptible and
+        -- Engine.checkMandatoryLoop could never call it a draw. Driven through
+        -- Resolve.applyEffect rather than combat because declaring attackers is
+        -- itself a choice and would stamp the field either way.
+        Spec.it s "CR 104.4b a random reveal is not an optional action" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          wraith <- S.printingOf s registry "Bog Wraith"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          let base = List.foldl' (\g p -> snd (S.addHandCard p S.bob g)) (Setup.emptyGame S.bothPlayers) [piker, wraith, maiden]
+              gs = base {GameState.lastChoice = Timestamp.MkTimestamp 0}
+              effect = Effect.Reveal (ObjectRef.RandomCardInHand (PlayerRef.Relative PlayerRelation.Opponent))
+              after = S.runPure (rolling 1) gs (Resolve.applyEffect S.noSource S.noSource S.alice Map.empty Map.empty effect)
+          Spec.assertEqWith s "the roll was honoured here too" (revealed after) [(S.bob, ["Bog Wraith"])]
+          Spec.assertEqWith s "and nobody was recorded as having been offered a choice" (GameState.lastChoice after) (Timestamp.MkTimestamp 0)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
