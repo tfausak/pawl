@@ -62,6 +62,7 @@ import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
+import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.DestructionCause as DestructionCause
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
@@ -2814,6 +2815,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   selflessSquireSpec s registry
   turnTheTablesSpec s registry
   gatherSpecimensSpec s registry
+  kismetSpec s registry
   shimatsuSpec s registry
   entryBudgetSpec s registry
   riotSpec s registry
@@ -3394,6 +3396,110 @@ gatherSpecimensSpec s registry =
                   Spec.assertEqWith s "carol named bob's row, so alice's applies second and keeps it" (Projection.controllerOf afterBob namedBob) (Just S.alice)
                 _ -> Spec.assertFailure s "the creature did not reach the battlefield"
         _ -> Spec.assertFailure s "both Gather Specimens rows should be floating"
+
+-- Kismet ({3}{W} Enchantment, "Artifacts, creatures, and lands your opponents
+-- control enter tapped") -- CR 614.1d's other-objects form, bucketing to CR
+-- 616.1e. bob controls it, so alice's entering permanent is the opponent's one
+-- it rewrites.
+--
+-- alice controls a Goblin Piker to copy and six of `land` to pay with, and holds
+-- one card of `spell`. It is her precombat main phase with priority. Returns the
+-- state, the Piker and the held card.
+kismetBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+kismetBoard land pikerPrinting kismet spell =
+  let addLands pid n g = List.foldl' (\acc _ -> snd (S.addCreature land pid acc)) g [1 .. n :: Int]
+      base = addLands S.alice 6 (Setup.emptyGame S.bothPlayers)
+      (pikerId, g1) = S.addCreature pikerPrinting S.alice base
+      (_, g2) = S.addCreature kismet S.bob g1
+      (spellId, g3) = S.addHandCard spell S.alice g2
+   in ( g3
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          },
+        pikerId,
+        spellId
+      )
+
+-- CR 616.1c's bucket, through the first pair in the pool that races it against
+-- CR 616.1e: an entering Clone (AsCopy, CR 616.1c) under an opponent's Kismet
+-- (Tapped, CR 616.1e). Both rows are applicable to the same entering permanent on
+-- the same iteration of CR 616.1f's loop, and the copy is alone in the highest
+-- non-empty bucket -- so there is nothing to choose and the engine must not ask.
+--
+-- The two orders CONVERGE on one board: CR 616.1f re-collects, so the Clone ends
+-- up both a copy and tapped whichever is applied first (Kismet's row is not on
+-- the copied Piker, so unlike CR 616.1f's Essence of the Wild example the copy
+-- does not take the tap clause away). The absence of the prompt is therefore the
+-- only observable the split has, which is why it is what the first case asserts;
+-- the second case is the discriminating twin that shows the recorder can see one.
+kismetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+kismetSpec s registry =
+  Spec.describe s "Kismet (CR 616.1c/616.1d)" $ do
+    -- THE PROVING CASE. Collapse CopyOnEntry into Other and the same board raises
+    -- a CR 616.1e race the rules do not have.
+    --
+    -- The two board assertions beside it are the non-vacuity check, not the
+    -- proof: they show Kismet really was a second candidate, so "no prompt" is
+    -- not "no second effect".
+    Spec.it s "CR 616.1c the copy bucket outranks Kismet's, so no order is asked" $ do
+      island <- S.printingOf s registry "Island"
+      pikerPrinting <- S.printingOf s registry "Goblin Piker"
+      kismet <- S.printingOf s registry "Kismet"
+      clonePrinting <- S.printingOf s registry "Clone"
+      let (gs, pikerId, cloneId) = kismetBoard island pikerPrinting kismet clonePrinting
+          cast = S.cast S.alice cloneId >> Stack.resolveTop
+          after = S.runPure (copyIfAskedOf S.alice pikerId) gs cast
+          asked = answersFor (copyIfAskedOf S.alice pikerId) gs cast
+      case newestNamed (CardName.MkCardName $ Text.pack "Clone") after of
+        Nothing -> Spec.assertFailure s "the Clone did not reach the battlefield"
+        Just cloneOid -> do
+          Spec.assertEqWith s "CR 616.1c the Clone copied the Piker" (Projection.powerOf cloneOid after) (Just 2)
+          Spec.assertBool s (Game.isTapped cloneOid after) "CR 614.1d and Kismet tapped it too"
+          Spec.assertBool s (not (wasAskedToReplace asked)) "no ChooseReplacement was raised"
+    -- The DISCRIMINATING TWIN: the same fixture and the same recorder, a spell
+    -- whose own entry rewrites are both CR 616.1e's. Coldsteel Heart is an
+    -- artifact, so Kismet's row joins its two in one bucket and the race really
+    -- is raised. Without this, "no prompt" above would pass under a recorder that
+    -- never sees a ChooseReplacement on any board.
+    Spec.it s "CR 616.1e rewrites sharing one bucket ARE raced" $ do
+      island <- S.printingOf s registry "Island"
+      pikerPrinting <- S.printingOf s registry "Goblin Piker"
+      kismet <- S.printingOf s registry "Kismet"
+      coldsteel <- S.printingOf s registry "Coldsteel Heart"
+      let (gs, _, heartId) = kismetBoard island pikerPrinting kismet coldsteel
+          asked = answersFor S.identityAnswer gs (S.cast S.alice heartId >> Stack.resolveTop)
+      Spec.assertBool s (wasAskedToReplace asked) "a ChooseReplacement was raised"
+    -- The sibling bucket, one step DOWN: CR 616.1d's back-face-up rewrite against
+    -- the same CR 616.1e row. CR 702.145b's daybound mints EntersTransformed, and
+    -- at night it and Kismet's row are both applicable to the entering werewolf in
+    -- one iteration -- so CR 616.1d's bucket is alone at the top and, again, there
+    -- is nothing to ask. Same convergence as the copy case: the werewolf ends up
+    -- transformed AND tapped either way, so the prompt is the observable.
+    --
+    -- Forests, not Islands: Infestation Expert is {4}{G}, and its faces are 3/4
+    -- and 4/5. The power reading 4 says the werewolf is back face up; it does NOT
+    -- say the entry rewrite is what put it there, since CR 702.145c would
+    -- transform it a moment later anyway. Like the tap, it is a non-vacuity
+    -- guard. The prompt is the assertion.
+    Spec.it s "CR 616.1d the back-face bucket outranks Kismet's, so no order is asked" $ do
+      forest <- S.printingOf s registry "Forest"
+      pikerPrinting <- S.printingOf s registry "Goblin Piker"
+      kismet <- S.printingOf s registry "Kismet"
+      werewolf <- S.printingOf s registry "Infestation Expert"
+      let (day, _, wolfId) = kismetBoard forest pikerPrinting kismet werewolf
+          gs = day {GameState.daytime = Just Daytime.Night}
+          cast = S.cast S.alice wolfId >> Stack.resolveTop
+          after = S.runPure S.identityAnswer gs cast
+          asked = answersFor S.identityAnswer gs cast
+      -- Named by the BACK face, which newestNamed reads off the current face: an
+      -- Infestation Expert that stayed front face up is not found at all.
+      case newestNamed (CardName.MkCardName $ Text.pack "Infested Werewolf") after of
+        Nothing -> Spec.assertFailure s "the werewolf did not reach the battlefield transformed"
+        Just wolfOid -> do
+          Spec.assertEqWith s "CR 702.145b it entered on its back face, a 4/5" (Projection.powerOf wolfOid after) (Just 4)
+          Spec.assertBool s (Game.isTapped wolfOid after) "CR 614.1d and Kismet tapped it too"
+          Spec.assertBool s (not (wasAskedToReplace asked)) "no ChooseReplacement was raised"
 
 -- Galvanic Blast's metalcraft clause as a floating row: the damage THIS source is
 -- dealing, whatever its kind, becomes 4 (CR 614.15 / 614.1a). Uses.Unlimited
