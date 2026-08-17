@@ -757,6 +757,7 @@ effectCounts effect = case effect of
   Effect.Detain _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
+  Effect.PhaseOut _ -> []
   Effect.AddPhases _ -> []
   Effect.GainControl (DurationRef.MkDurationRef duration _) -> durationCounts duration
   Effect.ArmDelayedTrigger {} -> []
@@ -1179,6 +1180,7 @@ effectReplacements effect = case effect of
   Effect.Detain _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
+  Effect.PhaseOut _ -> []
   Effect.AddPhases _ -> []
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> []
   Effect.ArmDelayedTrigger {} -> []
@@ -1763,6 +1765,7 @@ effectMintedFaces effect = case effect of
   Effect.Detain _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
+  Effect.PhaseOut _ -> []
   Effect.AddPhases _ -> []
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> []
   Effect.ArmDelayedTrigger {} -> []
@@ -2979,6 +2982,7 @@ effectFilters effect = case effect of
   Effect.Detain ref -> unframed (objectRefFilters ref)
   Effect.DoesNotUntapNext ref -> unframed (objectRefFilters ref)
   Effect.Transform ref -> unframed (objectRefFilters ref)
+  Effect.PhaseOut ref -> unframed (objectRefFilters ref)
   Effect.AddPhases _ -> []
   Effect.GainControl (DurationRef.MkDurationRef duration ref) -> unframed (durationFilters duration <> objectRefFilters ref)
   Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger _ _ mDuration) -> unframed (concatMap durationFilters (Maybe.maybeToList mDuration))

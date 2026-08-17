@@ -588,10 +588,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   -- than an Aura, so CR 702.26b's "does not exist" does not quietly hand the
   -- creature back to bob and let CR 800.4d answer instead.
   --
-  -- Built with Pawl.Engine.Phasing.phaseOut, CR 702.26b's own performer, because
-  -- the only thing that phases a permanent out today is CR 702.26a's schedule
-  -- for a permanent WITH phasing, and no card in the pool has both phasing and a
-  -- leaves-the-battlefield ability. Effects that phase a permanent out are #929.
+  -- Built with Pawl.Engine.Phasing.phaseOut, CR 702.26b's own performer, rather
+  -- than through a card: no printing in the pool has both phasing and a
+  -- leaves-the-battlefield ability, and the whole-card route -- Reality Ripple
+  -- aimed at the Thragtusk -- would need bob to hold {1}{U} and the priority to
+  -- spend it in a fixture whose subject is CR 800.4a. The phase-out itself is
+  -- proved on the card in Pawl.PhasingSpec.
   Spec.it s "CR 702.26k a PHASED-OUT permanent leaves the game with its owner and triggers nothing" $ do
     thragtusk <- S.printingOf s registry "Thragtusk"
     let (tusk, g1) = S.addCreature thragtusk S.bob S.threePlayerGame

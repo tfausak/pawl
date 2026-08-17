@@ -968,6 +968,29 @@ data Effect card
     -- they apply to transforming a permanent." So this opcode is the transform
     -- WORDING only, and a card printing "convert" needs its own (#698).
     Transform ObjectRef.ObjectRef
+  | -- | CR 702.26b: the permanents the ObjectRef names phase out. Reality Ripple's
+    -- "target artifact, creature, or land phases out" is `InSlot`; Teferi's
+    -- Protection's "all permanents you control phase out" is `EachMatching`, which
+    -- is why this takes Transform's ObjectRef rather than a bare slot.
+    --
+    -- The ObjectRef is swept when the effect executes (CR 608.2c) and is not in
+    -- itself a target (CR 115.10a): a slot it reads may have been filled by
+    -- targeting, as Reality Ripple's is, but nothing here demands it.
+    --
+    -- NOT a zone change, which is CR 702.26d in as many words, so this does not go
+    -- through Pawl.Engine.Event's zone-change funnel and no zone-change ability
+    -- triggers. What it writes is GameState.phasedOut, via
+    -- Pawl.Engine.Phasing.phaseOutSet -- shared with CR 502.1's turn-based action,
+    -- so the two ways of phasing out cannot disagree about CR 702.26g's closure or
+    -- CR 702.26h's tie-break.
+    --
+    -- A one-shot under CR 608.2c that stores NO duration, and owes none: CR 702.26a
+    -- fixes when it ends -- the permanent's controller's next untap step -- so a
+    -- Duration here would be a card restating a number the rulebook owns.
+    --
+    -- No PhaseIn twin. Rule 702.26a is the only thing that phases anything in, and
+    -- no printing asks for one out of turn.
+    PhaseOut ObjectRef.ObjectRef
   | -- | CR 708.2: turn the named permanent face down with the characteristics
     -- the effect LISTS for it. Backslide's "turn target creature with a morph
     -- ability face down" lists none, so CR 708.2a's 2/2 supplies them; Cyber

@@ -978,6 +978,30 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Transform (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
       """ {"type":"Transform","value":{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}}} """
+  -- CR 702.26b. Both ObjectRef arms, since the pool prints one of each: Reality
+  -- Ripple's "target artifact, creature, or land phases out" is the slot, and
+  -- Teferi's Protection's "all permanents you control phase out" is the filter. It
+  -- shares Tap's, Untap's and Transform's wire shape, so it must not collapse into
+  -- any of their tags.
+  Spec.it s "PhaseOut round-trips both ObjectRef arms, and is not Transform" $ do
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.PhaseOut (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      """ {"type":"PhaseOut","value":{"type":"InSlot","value":"target"}} """
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.PhaseOut (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
+      """ {"type":"PhaseOut","value":{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}}} """
+    Spec.assertBool
+      s
+      ( toJson (Effect.PhaseOut (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+          /= toJson (Effect.Transform (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      )
+      "PhaseOut and Transform of the same slot encode differently"
   -- CR 708.2. One slot and no ObjectRef, since Backslide names a target and
   -- nothing in the pool sweeps a set face down; the listed characteristics are
   -- CR 708.2a's here, so that key is absent.

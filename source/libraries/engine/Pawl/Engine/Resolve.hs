@@ -34,6 +34,7 @@ import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Mulligan as Mulligan
+import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
@@ -427,6 +428,7 @@ slotsOf effect = case effect of
   Effect.Detain ref -> objectRefSlots ref
   Effect.DoesNotUntapNext ref -> objectRefSlots ref
   Effect.Transform ref -> objectRefSlots ref
+  Effect.PhaseOut ref -> objectRefSlots ref
   Effect.AddPhases _ -> Map.empty
   Effect.GainControl (DurationRef.MkDurationRef _ ref) -> objectRefSlots ref
   Effect.ArmDelayedTrigger {} -> Map.empty
@@ -652,6 +654,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Detain _ -> True
   Effect.DoesNotUntapNext _ -> True
   Effect.Transform _ -> True
+  Effect.PhaseOut _ -> True
   Effect.AddPhases _ -> True
   -- slotsOf's arm drops this Duration, so the slotless test is made here.
   Effect.GainControl (DurationRef.MkDurationRef duration _) ->
@@ -794,6 +797,7 @@ readsX = any effectReadsX
       Effect.Detain _ -> False
       Effect.DoesNotUntapNext _ -> False
       Effect.Transform _ -> False
+      Effect.PhaseOut _ -> False
       Effect.AddPhases _ -> False
       Effect.GainControl (DurationRef.MkDurationRef _ _) -> False
       Effect.ArmDelayedTrigger {} -> False
@@ -892,6 +896,7 @@ searchesLibrary effect = case effect of
   Effect.Detain _ -> False
   Effect.DoesNotUntapNext _ -> False
   Effect.Transform _ -> False
+  Effect.PhaseOut _ -> False
   Effect.AddPhases _ -> False
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> False
   Effect.ArmDelayedTrigger {} -> False
@@ -1056,6 +1061,7 @@ boundSlots effect = case effect of
   Effect.Detain _ -> Set.empty
   Effect.DoesNotUntapNext _ -> Set.empty
   Effect.Transform _ -> Set.empty
+  Effect.PhaseOut _ -> Set.empty
   Effect.AddPhases _ -> Set.empty
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> Set.empty
   Effect.ArmDelayedTrigger {} -> Set.empty
@@ -5461,6 +5467,27 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             { GameState.objects =
                 foldr (turnOver pcs resolving now g1) (GameState.objects g1) (objectRefObjects legal resolving controller source g1 ref)
             }
+  Effect.PhaseOut ref ->
+    State.modify' $ \gs ->
+      -- CR 702.26b: each named permanent phases out. The victims are enumerated
+      -- ONCE, through the same objectRefObjects the Tap, Untap and Transform arms
+      -- above use, for the same CR 608.2f simultaneity -- so an illegal slot (CR
+      -- 608.2b), a player recipient and a set that matched nothing all arrive as
+      -- the empty list and phase nothing out.
+      --
+      -- The whole set goes to Phasing.phaseOutSet in one call rather than one call
+      -- per victim, because CR 702.26h's tie-break between phasing out directly
+      -- and indirectly asks whether a permanent's HOST is leaving in this same
+      -- event: Teferi's Protection phasing out a creature and the Equipment on it
+      -- must give the Equipment an indirect row, and per-victim calls could not
+      -- see that.
+      --
+      -- Nothing about the row is read off `controller`. Rule 702.26a schedules a
+      -- phased-out permanent's return by who controlled IT, not by who cast the
+      -- spell, so Reality Ripple aimed at an opponent's creature brings it back at
+      -- THEIR untap step; `controller` is only phaseOutSet's fallback for a
+      -- permanent the projection can no longer place.
+      Phasing.phaseOutSet controller (Set.fromList (objectRefObjects legal resolving controller source gs ref)) gs
   -- CR 500.8: add the phases, directly after the phase this is resolving in.
   --
   -- Turn.splicePhases is handed GameState.phase because "directly after this

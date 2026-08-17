@@ -15,19 +15,22 @@
 -- host: it is the pool's minimal pair with the Crocodile, since its enchant pool
 -- is creatures.
 --
--- What is NOT asserted, because no card in the pool can reach it: CR 702.26i's
--- DIRECTLY phased-out Aura, which needs an Aura or Equipment that itself has
--- phasing (#1032) -- CR 702.26h's tie-break between the two ways of phasing out
--- is written in Pawl.Engine.Phasing and needs that same card to be observable --
--- effects that phase a permanent out (#929), CR
--- 702.26e/f's continuous-effect consequences (#930), and CR 702.26n's schedule for
--- a permanent phased out under a player who has since left the game (#931) -- CR
--- 702.26k's own clause is asserted below. CR 506.4's removal from combat is in
--- Pawl.Engine.Phasing.phaseOut and is likewise unreachable: the untap step is the
--- turn's first step, so nothing is ever in combat when the phasing action runs,
--- and only #929 can reach that sentence of rule 702.26b.
+-- Reality Ripple is the second fixture, and the Effect group is everything the
+-- untap step cannot reach on its own. Its whole printed text is one clause
+-- ("target artifact, creature, or land phases out"), so those cases are about
+-- rule 702.26 too. Bonesplitter rides with it for CR 702.26i, an Equipment being
+-- an artifact (CR 301.5) and so a legal target -- which is how a DIRECTLY
+-- phased-out attachment becomes reachable without the Aura-with-phasing that has
+-- never been printed. Goblin Piker is its host, and its own phase-out is what
+-- distinguishes CR 702.26a's "the keyword decides who leaves, never who returns".
+--
+-- What is NOT asserted, because no card in the pool can reach it: CR 702.26e/f's
+-- continuous-effect consequences (#930), and CR 702.26n's schedule for a
+-- permanent phased out under a player who has since left the game (#931) -- CR
+-- 702.26k's own clause is asserted below.
 module Pawl.PhasingSpec where
 
+import qualified Control.Monad as Monad
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
@@ -35,13 +38,18 @@ import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Phasing as Phasing
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
@@ -50,6 +58,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasedOut as PhasedOut
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
@@ -107,6 +116,62 @@ enchantedCrocodile crocodile pacifism owner enchanter gs =
 attachedHostOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Recipient.Recipient
 attachedHostOf oid gs = Game.lookupObject oid gs >>= Object.attachedTo
 
+-- Aim every target slot at `oid`, and otherwise answer as S.aggressiveAnswer does
+-- -- so one answerer serves both the quiet boards and the combat ones.
+--
+-- FILTERS the offered set rather than building a Recipient, which is AuraSpec's
+-- aimAt posture and for its reason: Reality Ripple's slot pools permanents, and a
+-- hand-built recipient of a different shape than the pool offers is dropped by CR
+-- 608.2b's re-read at resolution with no error to see. S.preferring takes the
+-- slot's announced number, preferring the wanted candidate.
+aimedAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimedAt oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring ((== Just oid) . Recipient.objectOf) sets
+  _ -> S.aggressiveAnswer p
+
+-- alice casts `spell` at `victim` through the real cast path and resolves it.
+rippleAt :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+rippleAt victim spell gs =
+  S.runPure (aimedAt victim) gs $ do
+    S.cast S.alice spell
+    Monad.void Stack.resolveTop
+
+-- alice, with two Islands and a Reality Ripple in hand, plus whatever `stock`
+-- adds. Two Islands is EXACTLY {1}{U}: a board that could not pay would leave the
+-- spell on the stack or in hand and every assertion downstream would pass for the
+-- wrong reason, which is why each case asserts the phased-in setup first.
+rippleBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState -> (a, GameState.GameState)) ->
+  (a, ObjectId.ObjectId, GameState.GameState)
+rippleBoard island ripple stock =
+  let (ids, stocked) = stock (S.landsFor island S.alice 2 (Setup.emptyGame S.bothPlayers))
+      (board, spell) = S.handOne ripple stocked
+   in (ids, spell, board)
+
+-- alice's Goblin Piker with a Bonesplitter equipping it, on a rippleBoard.
+-- Attached directly rather than through CR 702.6's equip ability, which is
+-- enchantedCrocodile's posture above and for its reason: both printings are real,
+-- and the attachment is this fixture's premise rather than anything it asserts.
+equippedBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  ((ObjectId.ObjectId, ObjectId.ObjectId), ObjectId.ObjectId, GameState.GameState)
+equippedBoard island piker bonesplitter ripple =
+  rippleBoard island ripple $ \gs ->
+    let (host, withHost) = S.addCreature piker S.alice gs
+        (equip, withEquip) = S.addCreature bonesplitter S.alice withHost
+     in ((host, equip), S.attach equip host withEquip)
+
+-- Is `oid` in CR 508.1's attacking-creatures record? Membership in Combat.attackers
+-- is what Pawl.Engine.Projection reads for Filter.IsAttacking, so it is the same
+-- question CR 506.4's "stops being an attacking creature" asks.
+isAttacking :: ObjectId.ObjectId -> GameState.GameState -> Bool
+isAttacking oid gs = Map.member oid (Combat.Type.attackers (GameState.combat gs))
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Phasing" $ do
   phaseOutSpec s registry
@@ -116,6 +181,116 @@ spec s registry = Spec.describe s "Pawl.Engine.Phasing" $ do
   untapOrderSpec s registry
   nonexistenceSpec s registry
   departureSpec s registry
+  effectSpec s registry
+  attachedSpec s registry
+
+-- CR 702.26b's other door: an effect that says a permanent phases out. Reality
+-- Ripple throughout, whose whole printed text is "target artifact, creature, or
+-- land phases out" -- so nothing here is about a card either.
+effectSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+effectSpec s registry = Spec.describe s "Effect" $ do
+  -- The capability itself: GameState.phasedOut written by something other than CR
+  -- 502.1's turn-based action, with no phasing ability anywhere on the board.
+  --
+  -- The row says bob and not alice, which is CR 702.26a's "phased out under that
+  -- player's control" -- alice cast the spell, bob controls the creature.
+  Spec.it s "CR 702.26b Reality Ripple phases out a creature with no phasing" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ripple <- S.printingOf s registry "Reality Ripple"
+    let ((victim, bystander), spell, board) =
+          rippleBoard island ripple $ \gs ->
+            let (a, g1) = S.addCreature piker S.bob gs
+                (b, g2) = S.addCreature piker S.bob g1
+             in ((a, b), g2)
+        after = rippleAt victim spell board
+    Spec.assertEqWith s "setup: both of bob's Pikers are on the battlefield" (fmap (`onBattlefield` board) [victim, bystander]) [True, True]
+    Spec.assertEqWith s "setup: and neither has phasing" (fmap (`Phasing.isPhasedOut` board) [victim, bystander]) [False, False]
+    Spec.assertEqWith s "the one it targeted is phased out" (Phasing.isPhasedOut victim after) True
+    Spec.assertEqWith s "directly, under BOB, who controls it" (Phasing.phasedOutStatus victim after) (Just (PhasedOut.Directly S.bob))
+    Spec.assertEqWith s "and gone from the battlefield" (onBattlefield victim after) False
+    -- The same board's falsifier: the second Piker nobody aimed at is untouched,
+    -- so this is not an effect that swept the board.
+    Spec.assertEqWith s "the other Piker is not" (Phasing.isPhasedOut bystander after) False
+    Spec.assertEqWith s "and is still on the battlefield" (onBattlefield bystander after) True
+    -- CR 702.26d: no zone change, so Object.zone is untouched and the object still
+    -- exists. Both are what CR 702.26i's host test later reads.
+    Spec.assertEqWith s "its zone still says battlefield" (zoneOf victim after) (Just Zone.Battlefield)
+  -- CR 702.26b's "can't be affected by anything else in the game", at the one
+  -- reader a spell goes through: CR 115.10's legality. A second Reality Ripple
+  -- cannot aim at the permanent the first one sent away, though it can still aim
+  -- at the one beside it.
+  Spec.it s "CR 702.26b a phased-out permanent is not a legal target" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ripple <- S.printingOf s registry "Reality Ripple"
+    let ((victim, bystander), spell, board) =
+          rippleBoard island ripple $ \gs ->
+            let (a, g1) = S.addCreature piker S.bob gs
+                (b, g2) = S.addCreature piker S.bob g1
+             in ((a, b), g2)
+        after = rippleAt victim spell board
+        legalIn gs = case S.spellTargetSlot ripple of
+          Nothing -> Set.empty
+          Just slot -> Set.map Recipient.objectOf (Target.legalRecipients Nothing S.noSource slot gs)
+    Spec.assertEqWith s "setup: it was a legal target while phased in" (Set.member (Just victim) (legalIn board)) True
+    Spec.assertEqWith s "and is not once phased out" (Set.member (Just victim) (legalIn after)) False
+    Spec.assertEqWith s "while the Piker beside it still is" (Set.member (Just bystander) (legalIn after)) True
+  -- CR 702.26a's phase-in half applied to a permanent with NO phasing, which is
+  -- the reading Pawl.Engine.Phasing.phasingIn implements -- "the keyword decides
+  -- who leaves, never who returns" -- and which no board could distinguish from
+  -- "only a permanent with phasing phases in" until an effect could phase one out.
+  --
+  -- And the schedule is BOB's, not the caster's: alice's untap step comes and goes
+  -- with the Piker still away.
+  Spec.it s "CR 702.26a it phases back in at its own controller's next untap step" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ripple <- S.printingOf s registry "Reality Ripple"
+    let ((victim, _), spell, board) =
+          rippleBoard island ripple $ \gs ->
+            let (a, g1) = S.addCreature piker S.bob gs
+                (b, g2) = S.addCreature piker S.bob g1
+             in ((a, b), g2)
+        gone = rippleAt victim spell board
+        alices = untapStep S.alice gone
+        bobs = untapStep S.bob alices
+    Spec.assertEqWith s "setup: it is phased out" (Phasing.isPhasedOut victim gone) True
+    Spec.assertEqWith s "alice's untap step brings it back" (onBattlefield victim alices) False
+    Spec.assertEqWith s "bob's does" (onBattlefield victim bobs) True
+    Spec.assertEqWith s "with no row left" (Phasing.isPhasedOut victim bobs) False
+    -- CR 702.26p's other side: it never had phasing, so bob's untap step does not
+    -- send it straight back out again.
+    Spec.assertEqWith s "and it does not phase out again at once" (Phasing.phasedOutStatus victim bobs) Nothing
+  -- CR 506.4, restated as CR 702.26b's last sentence: "a permanent that phases out
+  -- is removed from combat." Reality Ripple is the only route to it -- CR 502.1's
+  -- action runs in the untap step, the turn's first, so nothing is ever in combat
+  -- when it fires.
+  --
+  -- alice phases out one of her OWN two attackers, so bob's life total counts the
+  -- clause: 2 instead of 4. The control is the same declaration with no Ripple
+  -- cast, which is what keeps "took no damage from it" from passing because the
+  -- board was never in combat at all.
+  Spec.it s "CR 506.4 an attacking creature that phases out mid-combat deals no combat damage" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ripple <- S.printingOf s registry "Reality Ripple"
+    let (base, mine, _) = S.combatBoardOf [piker, piker] []
+        withMana = S.landsFor island S.alice 2 base
+        (spell, board) = S.addHandCard ripple S.alice withMana
+    case mine of
+      victim : _ -> do
+        let declared = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
+            rippled = S.settleSba (rippleAt victim spell declared)
+            damaged = S.runPure S.aggressiveAnswer rippled (Monad.void Damage.dealCombatDamage)
+            bothConnect = S.runPure S.aggressiveAnswer (S.settleSba declared) (Monad.void Damage.dealCombatDamage)
+        Spec.assertEqWith s "setup: both Pikers are attacking" (fmap (`isAttacking` declared) mine) [True, True]
+        Spec.assertEqWith s "the Ripple phased its target out" (Phasing.isPhasedOut victim rippled) True
+        Spec.assertEqWith s "and CR 506.4 took it out of the record" (isAttacking victim rippled) False
+        Spec.assertEqWith s "the other attacker is still in it" (fmap (`isAttacking` rippled) (drop 1 mine)) [True]
+        Spec.assertEqWith s "so bob takes 2 rather than 4" (S.lifeOf S.bob damaged) (Just 18)
+        Spec.assertEqWith s "which is the same board with no Ripple cast" (S.lifeOf S.bob bothConnect) (Just 16)
+      [] -> Spec.assertFailure s "the combat board should have given alice two attackers"
 
 indirectSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 indirectSpec s registry = Spec.describe s "Indirect" $ do
@@ -346,11 +521,11 @@ nonexistenceSpec s registry = Spec.describe s "Nonexistence" $ do
   -- predicate reading that field instead of the set would call a creature the game
   -- treats as nonexistent a legal attacker.
   --
-  -- Unreachable through the engine today, and asserted anyway: Combat.legalAttackers
-  -- and legalBlockers filter Projection.controlsGiven, which walks the battlefield
-  -- set, so no menu ever offers one. These are the answers if something asks
-  -- off-menu -- which #929's effect-driven phasing, able to phase out a creature
-  -- already in the combat record, is what would.
+  -- Asked off-menu, which is the only way to ask: Combat.legalAttackers and
+  -- legalBlockers filter Projection.controlsGiven, which walks the battlefield
+  -- set, so no menu ever offers one. The Effect group below is where a creature
+  -- ALREADY in the combat record phases out, which is CR 506.4 rather than these
+  -- three predicates.
   Spec.it s "CR 702.26b a phased-out creature is not a legal attacker, blocker or combat damage source" $ do
     crocodile <- S.printingOf s registry "Sandbar Crocodile"
     let (crocId, board) = crocodileBoard crocodile
@@ -390,3 +565,84 @@ departureSpec s registry = Spec.describe s "Departure" $ do
     Spec.assertEqWith s "the game continued without her" (GameState.result after) Nothing
     Spec.assertEqWith s "the object is gone" (Maybe.isJust (Game.lookupObject crocId after)) False
     Spec.assertEqWith s "and so is its phased-out row" (Phasing.isPhasedOut crocId after) False
+
+-- CR 702.26i, the DIRECTLY phased-out attachment. Bonesplitter is the fixture and
+-- Reality Ripple is what reaches it: an Equipment is an artifact (CR 301.5), so
+-- rule 702.26i needs no Aura or Equipment carrying the phasing keyword -- which is
+-- as well, since none has been printed.
+attachedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+attachedSpec s registry = Spec.describe s "Attached" $ do
+  -- CR 702.26b's "treated as though it does not exist", read off the equipped
+  -- creature rather than off a flag: while the Equipment is away its static ability
+  -- generates nothing, so CR 613.1c's layer has no +2/+0 to apply. The projection
+  -- gets that from GameState.battlefield membership without knowing phasing exists.
+  Spec.it s "CR 702.26b a phased-out Equipment's static ability stops applying" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    ripple <- S.printingOf s registry "Reality Ripple"
+    let ((host, equip), spell, board) = equippedBoard island piker bonesplitter ripple
+        gone = rippleAt equip spell board
+        back = untapStep S.alice gone
+    Spec.assertEqWith s "setup: equipped, the Piker is 4/1" (Projection.powerOf host board) (Just 4)
+    Spec.assertEqWith s "the Equipment phased out" (Phasing.isPhasedOut equip gone) True
+    Spec.assertEqWith s "and the Piker is 2/1 again" (Projection.powerOf host gone) (Just 2)
+    Spec.assertEqWith s "CR 702.26c: 4/1 once more when it phases in" (Projection.powerOf host back) (Just 4)
+  -- CR 702.26h: "if an object would simultaneously phase out directly and
+  -- indirectly, it just phases out indirectly." The pair that proves the tie-break
+  -- is one board aimed two ways -- at the Equipment, which is CR 702.26a's direct
+  -- row, and at its HOST, where CR 702.26g drags the Equipment along instead.
+  Spec.it s "CR 702.26h the same Equipment phases out directly or indirectly by what was targeted" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    ripple <- S.printingOf s registry "Reality Ripple"
+    let ((host, equip), spell, board) = equippedBoard island piker bonesplitter ripple
+        atEquip = rippleAt equip spell board
+        atHost = rippleAt host spell board
+    Spec.assertEqWith s "aimed at the Equipment, it phased out directly" (Phasing.phasedOutStatus equip atEquip) (Just (PhasedOut.Directly S.alice))
+    Spec.assertEqWith s "and its host stayed" (onBattlefield host atEquip) True
+    Spec.assertEqWith s "aimed at the host, the Equipment phased out INDIRECTLY" (Phasing.phasedOutStatus equip atHost) (Just (PhasedOut.Indirectly S.alice))
+    Spec.assertEqWith s "the host itself directly" (Phasing.phasedOutStatus host atHost) (Just (PhasedOut.Directly S.alice))
+    Spec.assertEqWith s "and both are gone" (fmap (`onBattlefield` atHost) [host, equip]) [False, False]
+  -- CR 702.26i's first sentence: a directly phased-out Equipment "will phase in
+  -- attached to the object ... it was attached to when it phased out, if that
+  -- object is still in the same zone".
+  Spec.it s "CR 702.26i it phases in still attached when its host is still there" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    ripple <- S.printingOf s registry "Reality Ripple"
+    let ((host, equip), spell, board) = equippedBoard island piker bonesplitter ripple
+        gone = rippleAt equip spell board
+        back = untapStep S.alice gone
+    -- The attachment survives the trip untouched, which is what makes rule 702.26i
+    -- answerable at all: nothing clears Object.attachedTo while the permanent is away.
+    Spec.assertEqWith s "it is still attached while phased out" (attachedHostOf equip gone) (Just (Recipient.ToCreature host))
+    Spec.assertEqWith s "it phases in" (onBattlefield equip back) True
+    Spec.assertEqWith s "attached to the same Piker" (attachedHostOf equip back) (Just (Recipient.ToCreature host))
+  -- CR 702.26i's second sentence: "if not, that Aura, Equipment, or Fortification
+  -- phases in unattached." The host leaves the battlefield while the Equipment is
+  -- away, which it can only do because CR 702.26b does not protect it -- it never
+  -- phased out.
+  --
+  -- The paired positive is the case above, on the same board through the same
+  -- helper: without it this one passes for a version that drops every attachment on
+  -- the way back in.
+  Spec.it s "CR 702.26i it phases in UNATTACHED when its host has left the battlefield" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    ripple <- S.printingOf s registry "Reality Ripple"
+    let ((host, equip), spell, board) = equippedBoard island piker bonesplitter ripple
+        gone = rippleAt equip spell board
+        dead = S.runPure S.identityAnswer gone (Event.changeZone host Zone.Graveyard)
+        back = untapStep S.alice dead
+    Spec.assertEqWith s "setup: the Equipment phased out DIRECTLY" (Phasing.phasedOutStatus equip gone) (Just (PhasedOut.Directly S.alice))
+    -- CR 400.7 mints a new object for the graveyard, so the id the attachment names
+    -- stops existing -- which is what hostRemains reads as "not in the same zone".
+    Spec.assertEqWith s "its host then left the battlefield" (onBattlefield host dead) False
+    Spec.assertEqWith s "and stopped existing under that id" (Maybe.isJust (Game.lookupObject host dead)) False
+    Spec.assertEqWith s "the Equipment still phased out meanwhile" (Phasing.isPhasedOut equip dead) True
+    Spec.assertEqWith s "it phases in" (onBattlefield equip back) True
+    Spec.assertEqWith s "unattached, its host being gone" (attachedHostOf equip back) Nothing
