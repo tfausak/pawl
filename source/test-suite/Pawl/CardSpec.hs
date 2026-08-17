@@ -1667,7 +1667,7 @@ mintedFacesTagged card =
 data MintedKind
   = MintedToken
   | MintedEmblem
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 -- The faces one effect mints. Exhaustive and hand-maintained, with
 -- effectReplacements' caveat: a NEW effect embedding a Card must be added here
@@ -2806,7 +2806,7 @@ data Framing
   = Unframed
   | AttachDestination
   | InTargetSlot
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 -- Tag a Filter position as UNFRAMED -- one neither an attach nor a target slot
 -- frames, which is every position in the type except the two named above.

@@ -92,4 +92,4 @@ data ProposedEvent
     -- that turns anything face up, and the one funnel CR 116.2b's special action
     -- goes through.
     WouldTurnFaceUp ObjectId.ObjectId
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)

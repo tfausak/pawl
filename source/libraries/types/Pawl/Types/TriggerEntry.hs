@@ -47,4 +47,4 @@ data TriggerEntry = MkTriggerEntry
   { source :: TriggerSource.TriggerSource,
     ability :: TriggeredAbility.TriggeredAbility Card.Card
   }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)

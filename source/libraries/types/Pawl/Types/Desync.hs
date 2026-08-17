@@ -28,4 +28,4 @@ data Desync
   | -- | The next logged response does not answer the prompt being asked -- a
     -- stale or foreign transcript. Carries the offending entry.
     Mismatched Natural.Natural Response.Response
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
