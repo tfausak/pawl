@@ -518,7 +518,7 @@ affects source oid a partial gs = affectsGiven (fullView gs) source oid a partia
 -- viewOfCharacteristics for why the depths must agree, and why a caller inside
 -- the fold reaching for fullView would not terminate; see #1729.
 affectsGiven :: Count.ViewOf -> ObjectId -> ObjectId -> Affected.Affected -> ProjectedCharacteristics -> GameState -> Bool
-affectsGiven hosts source oid a partial gs = case a of
+affectsGiven peers source oid a partial gs = case a of
   Affected.TheseObjects s -> Set.member oid s
   -- CR 303.4m: read the SOURCE's attachment, not the candidate's. An unattached
   -- source names nothing, so the set is empty and the effect applies to no one.
@@ -535,11 +535,11 @@ affectsGiven hosts source oid a partial gs = case a of
         -- controller controls".
         perspective = controllerOf source gs
      in Set.member oid (GameState.battlefield gs)
-          && Filter.matches (Filter.contextFor perspective (Just source)) (viewOfCharacteristics hosts oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
+          && Filter.matches (Filter.contextFor perspective (Just source)) (viewOfCharacteristics peers oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
   -- Matching's body without the battlefield conjunct.
   Affected.MatchingAnywhere f ->
     let perspective = controllerOf source gs
-     in Filter.matches (Filter.contextFor perspective (Just source)) (viewOfCharacteristics hosts oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
+     in Filter.matches (Filter.contextFor perspective (Just source)) (viewOfCharacteristics peers oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
   -- CR 303.4b / 303.4m: the source's attachment again, read for the PLAYER it
   -- names. A source that is unattached, or attached to an object, names no player
   -- and affects nobody. The controller comparison is CR 613.1b's layer 2, already
@@ -558,7 +558,7 @@ affectsGiven hosts source oid a partial gs = case a of
       let controller = controllerOf oid gs
        in Set.member oid (GameState.battlefield gs)
             && controller == Just pid
-            && Filter.matches (Filter.contextFor (controllerOf source gs) (Just source)) (viewOfCharacteristics hosts oid partial controller (countersOf oid gs) gs) f
+            && Filter.matches (Filter.contextFor (controllerOf source gs) (Just source)) (viewOfCharacteristics peers oid partial controller (countersOf oid gs) gs) f
     _ -> False
 
 -- The characteristics view of an object: its CR 613 projection and its projected
@@ -598,7 +598,7 @@ viewOfSpell caster oid gs = viewOfCharacteristics (fullView gs) oid (project oid
 -- with all layers applied. `viewUpTo` below is the bounded counterpart for
 -- callers INSIDE the fold. Picking the wrong one is not a type error -- both are
 -- Count.ViewOf -- so it is a silent wrong answer in either direction, and for a
--- caller inside the fold that reaches for this one as its `hosts` it is a
+-- caller inside the fold that reaches for this one as its `peers` it is a
 -- non-terminating one (see viewOfCharacteristics).
 fullView :: GameState -> Count.ViewOf
 fullView gs oid = Just (viewOfObject oid gs)
@@ -1014,24 +1014,36 @@ milledIt oid event = case event of
 -- on the object, and only the caller knows whether it is reading a live one or CR
 -- 608.2h's record of one that is not.
 --
--- `hosts` comes in for the same reason and is the same choice one level out: an
--- attached object's HOST is another object with a projection of its own (CR
--- 701.3a), and only the caller knows how deep the fold it is standing in has
--- got. Every caller passes the reader that matches its own `pc` -- viewUpTo at
--- the same layer bound from inside the fold, baseView from a base-characteristics
--- reader, fullView from outside the fold -- so the host is read exactly as the
--- object itself is, which is CR 613.1's own order applied to both.
+-- `peers` comes in for the same reason and is the same choice one level out: two
+-- of the fields below are about an object OTHER than `oid`, which has a
+-- projection of its own, and only the caller knows how deep the fold it is
+-- standing in has got. They are an attached object's HOST (CR 701.3a) and the CR
+-- 702.178a gate `nonManaActivatedAbility` asks, which reads whatever board its
+-- clause names. Every caller passes the reader that matches its own `pc` --
+-- viewUpTo at the same layer bound from inside the fold, baseView from a
+-- base-characteristics reader, fullView from outside the fold -- so another
+-- object is read exactly as this one is, which is CR 613.1's own order applied to
+-- both.
 --
 -- Why it is a parameter rather than a projection taken here: a full projection
 -- taken from inside the fold re-enters `gather`, and gather's CR 604.2 gate is
 -- object-independent, so it asks the same condition again and again on the same
 -- state with no memo and no descending bound -- an unbounded loop rather than a
--- wrong answer; see #1729. Each caller's reader is bounded: viewUpTo's stays at the
--- caller's layer, and the fold below it drops to a strictly lower one, so the
--- only recursion left is a Filter nesting AttachedTo inside AttachedTo, which a
--- finite non-recursive filter term bounds.
+-- wrong answer; see #1729 and #1758. Each caller's reader is bounded: viewUpTo's
+-- stays at the caller's layer, and the fold below it drops to a strictly lower
+-- one, so the recursion left is a Filter nesting AttachedTo inside AttachedTo,
+-- which a finite non-recursive filter term bounds.
+--
+-- The gate has one more, which no bound the caller could pass would help with: a
+-- clause whose own filter asked for HasNonManaActivatedAbility would re-enter
+-- this field at the same bound. That one is circular in the RULES rather than in
+-- the reader -- the clause's answer decides which abilities the object has, and
+-- the filter asks which abilities it has. Nothing in print states it: the atom is
+-- printed on Tsabo's Web, Ravager Wurm and Tazri, Stalwart Survivor, and all
+-- three put it in an untap restriction or a target filter rather than in an "as
+-- long as" clause.
 viewOfCharacteristics :: Count.ViewOf -> ObjectId -> ProjectedCharacteristics -> Maybe PlayerId.PlayerId -> Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> GameState -> Filter.View
-viewOfCharacteristics hosts oid pc controller counters gs =
+viewOfCharacteristics peers oid pc controller counters gs =
   Filter.MkView
     { -- CR 201.1 / 709.4a off the PROJECTION, beside cardTypes: names are copiable
       -- (CR 707.2), so a Clone answers to what it copied and a face-down object
@@ -1094,7 +1106,7 @@ viewOfCharacteristics hosts oid pc controller counters gs =
       -- CR 701.3a: also not a characteristic, so the attachment comes off
       -- Object.attachedTo -- but AttachedTo's nest asks about the HOST, whose
       -- characteristics are projected (layer 4 can make a land a creature), so
-      -- the host arrives as a whole view of its own, read through `hosts` at the
+      -- the host arrives as a whole view of its own, read through `peers` at the
       -- caller's own depth (CR 613.1).
       --
       -- CR 303.4 / 110.1: narrowed to a host that is an object ON THE
@@ -1105,16 +1117,16 @@ viewOfCharacteristics hosts oid pc controller counters gs =
       -- permanent" and not "attached to anything".
       --
       -- The view under the Just must stay lazy -- `affects` calls this function
-      -- from inside a projection, and `hosts` is a reader that will project again
+      -- from inside a projection, and `peers` is a reader that will project again
       -- -- and deciding Just from Nothing forces no projection at all, so a nest
       -- that names no characteristic costs none. Laziness is what keeps the cost
-      -- off the ordinary path; it is `hosts` being BOUNDED, not laziness, that
+      -- off the ordinary path; it is `peers` being BOUNDED, not laziness, that
       -- keeps a forced nest terminating.
       Filter.attachedToView =
         Game.lookupObject oid gs
           >>= Object.attachedTo
           >>= Recipient.objectOf
-          >>= \host -> if Set.member host (GameState.battlefield gs) then hosts host else Nothing,
+          >>= \host -> if Set.member host (GameState.battlefield gs) then peers host else Nothing,
       -- CR 701.3a / 301.5a: the same attachment again, kept as the HOST'S ID rather
       -- than as a view -- IsAttachedToSource compares it against the match's
       -- source, which this builder does not know. Deliberately NOT narrowed to a
@@ -1161,7 +1173,12 @@ viewOfCharacteristics hosts oid pc controller counters gs =
       -- can activate here: that is Activate.abilitiesForGiven's narrower question.
       --
       -- LAZY -- see the field's own comment in Pawl.Engine.Filter.
-      Filter.nonManaActivatedAbility = not (all ManaAbility.isManaAbility (abilitiesFromCharacteristics pc oid gs))
+      --
+      -- CR 613.1: the CR 702.178a gate inside that list is judged through `peers`,
+      -- the same reader the attachment above takes and at the same depth, so a
+      -- clause naming a board reads it through the layers this caller has folded
+      -- and no further. Villainous Ogre's Demon is the test.
+      Filter.nonManaActivatedAbility = not (all ManaAbility.isManaAbility (abilitiesFromCharacteristics peers pc oid gs))
     }
 
 -- CR 122.1: the counters on an object right now, and none for an id that names
@@ -1417,7 +1434,7 @@ affectsBase source oid a gs = affectsGiven (baseView gs) source oid a (baseChara
 -- feeding the projection rather than reading it wants for an attached
 -- candidate's host, since anything folded would recurse into the projection
 -- affectsBase exists to stay out of. fullView and viewUpTo are the two
--- counterparts; picking between the three is viewOfCharacteristics' `hosts`
+-- counterparts; picking between the three is viewOfCharacteristics' `peers`
 -- choice, and none of them is a type error at the others' call sites.
 --
 -- Nothing for an id naming no object, like viewUpTo -- and like it, terminating
@@ -3899,7 +3916,7 @@ projectDeciding admits cands = forObject
                         -- AttachedTo nest sees the same partials the rest of this
                         -- view does (CR 701.3a). Recursive and terminating: the
                         -- partials are already built, and the fallback is
-                        -- `bounded`, whose own hosts stay at this layer's bound.
+                        -- `bounded`, whose own peers stay at this layer's bound.
                         -- A fence like baseView's: only a CR 613.8-movable layer
                         -- reaches this reader, and no card puts an AttachedTo
                         -- filter in one (gap #1757).
@@ -4233,15 +4250,17 @@ colorsGiven pcs oid gs = PC.colors (projectGiven pcs oid gs)
 -- event in between. Cheap by construction -- the filter is skipped entirely for
 -- the overwhelming majority of abilities, which carry no condition.
 --
--- The view is the FULL one, unlike Projection.conditionHolds' layer-bounded view:
--- nothing here is inside the fold, so there is no circularity to bound against.
--- The Filter.Context is the object's own controller and the object itself, which
--- is what makes CR 109.5's "your" in "your speed is 4" the ability's controller.
+-- This pair's view is the FULL one, unlike Projection.conditionHolds'
+-- layer-bounded view: neither of these two is inside the fold, so there is no
+-- circularity to bound against. viewOfCharacteristics IS inside it and passes its
+-- own bounded reader instead; see abilitiesFromCharacteristics. The
+-- Filter.Context is the object's own controller and the object itself, which is
+-- what makes CR 109.5's "your" in "your speed is 4" the ability's controller.
 abilitiesOf :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
 abilitiesOf = abilitiesGiven Map.empty
 
 abilitiesGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
-abilitiesGiven pcs oid gs = abilitiesFromCharacteristics (projectGiven pcs oid gs) oid gs
+abilitiesGiven pcs oid gs = abilitiesFromCharacteristics (fullView gs) (projectGiven pcs oid gs) oid gs
 
 -- abilitiesGiven with the projection already in hand -- the half
 -- viewOfCharacteristics calls, which holds a ProjectedCharacteristics and no way
@@ -4254,11 +4273,21 @@ abilitiesGiven pcs oid gs = abilitiesFromCharacteristics (projectGiven pcs oid g
 -- Pawl.Engine.Activate.abilitiesForGiven filters this list through functionsIn
 -- before offering anything. Pawl.Engine.Mana's reader is safe for the other
 -- reason: neither ability adds mana, so CR 605.1a excludes both.
-abilitiesFromCharacteristics :: ProjectedCharacteristics -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
-abilitiesFromCharacteristics pc oid gs =
+--
+-- CR 613.1: the board the CR 702.178a gate is judged against comes in as a
+-- parameter, the same choice and for the same reason viewOfCharacteristics' own
+-- `peers` is one -- each caller passes the reader that matches its `pc`, so a
+-- caller inside the layer fold judges the clause through the layers below it and
+-- a caller outside it through the whole projection. Taking fullView here instead
+-- would not terminate for a caller inside the fold: fullView re-enters `gather`,
+-- whose CR 604.2 gate is object-independent, so the fold restarts and asks this
+-- same field again on the same state with no memo and no descending bound (#1729
+-- is the same defect one field over).
+abilitiesFromCharacteristics :: Count.ViewOf -> ProjectedCharacteristics -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
+abilitiesFromCharacteristics peers pc oid gs =
   let granted ability = case ActivatedAbility.condition ability of
         Nothing -> True
-        Just cond -> Condition.holds (fullView gs) (Filter.contextFor (controllerOf oid gs) (Just oid)) gs oid cond
+        Just cond -> Condition.holds peers (Filter.contextFor (controllerOf oid gs) (Just oid)) gs oid cond
    in -- Rule 702's own activated abilities are appended here, the shape
       -- intrinsicReplacementsOf takes one function down: the card's printed list
       -- is the projection's, and Pawl.Engine.Keyword mints the rule's from the

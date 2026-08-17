@@ -2790,6 +2790,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "both colours with no face shown" (Projection.colorsOf oid gs0) (Set.fromList [Color.Green, Color.White])
 
   attachedHostSpec s registry
+  conditionalAbilitySpec s registry
   keywordCounterSpec s registry
   levelerSpec s registry
   supertypeSpec s registry
@@ -3118,3 +3119,86 @@ attachedHostSpec s registry = Spec.describe s "AttachedTo" $ do
       "not a creature below layer 4, a creature above it"
       (onto Layer.Type, onto Layer.ModifyPT)
       (Just False, Just True)
+
+-- CR 702.178a / 613.1: the "as long as" clause an ActivatedAbility carries, read
+-- from INSIDE the layer fold by Filter.HasNonManaActivatedAbility.
+--
+-- Villainous Ogre ({2}{B} Creature -- Ogre Warrior 3/2, "This creature can't
+-- block." / "As long as you control a Demon, this creature has '{B}: Regenerate
+-- this creature.'", checked against Scryfall 2026-08-17) is the pool's clause that
+-- reads the BOARD; max speed's reads a player's speed and so cannot tell one
+-- reader from another. Master of the Feast is a plain Demon, and Maskwood Nexus
+-- ("Creatures you control are every creature type...") is the layer-4 one that
+-- makes the Ogre its own Demon.
+conditionalAbilitySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+conditionalAbilitySpec s registry = Spec.describe s "ConditionalActivatedAbility" $ do
+  -- Two boards one permanent apart -- same Swamp, same priority, so the {B} is
+  -- payable on both and only the Demon can account for the difference. Both
+  -- directions, since a test that only asked the first would pass for an engine
+  -- that ignored the clause outright.
+  Spec.it s "CR 702.178a the clause decides whether the ability is offered at all" $ do
+    ogre <- S.printingOf s registry "Villainous Ogre"
+    demon <- S.printingOf s registry "Master of the Feast"
+    swamp <- S.printingOf s registry "Swamp"
+    let (ogreId, base) = S.addCreature ogre S.alice (S.landsInPlay swamp 1)
+        alone = base {GameState.priority = Just S.alice}
+        withDemon = (snd (S.addCreature demon S.alice base)) {GameState.priority = Just S.alice}
+        offered gs = (length (Activate.abilitiesFor ogreId gs), any (isActivateOfOgre ogreId) (Action.legalActions S.alice gs))
+    Spec.assertEqWith
+      s
+      "no Demon, no ability; one Demon, one activation"
+      (offered alone, offered withDemon)
+      ((0, False), (1, True))
+  -- The same clause answered through a LAYER rather than through a printed
+  -- subtype: Maskwood Nexus is the only Demon on the board, and it is one only
+  -- because layer 4 says the Ogre is every creature type.
+  Spec.it s "CR 613.1d a layer-4 subtype grant satisfies the clause" $ do
+    ogre <- S.printingOf s registry "Villainous Ogre"
+    nexus <- S.printingOf s registry "Maskwood Nexus"
+    swamp <- S.printingOf s registry "Swamp"
+    let (ogreId, base) = S.addCreature ogre S.alice (S.landsInPlay swamp 1)
+        gs = (snd (S.addCreature nexus S.alice base)) {GameState.priority = Just S.alice}
+    Spec.assertEqWith s "the Ogre is a Demon" (Set.member Subtype.Type.Demon (Projection.subtypesOf ogreId gs)) True
+    Spec.assertEqWith s "so the ability is offered" (length (Activate.abilitiesFor ogreId gs)) 1
+  -- CR 613.1: and the clause is judged at the depth of whoever asked. Asked of
+  -- Projection.viewUpTo directly, because the atom's three printings -- Tsabo's
+  -- Web, Ravager Wurm and Tazri, Stalwart Survivor -- all read a finished
+  -- projection, so no card puts this question inside the fold (#1758).
+  --
+  -- The two bounds are one layer apart, and layer 4 is that layer: below it the
+  -- Nexus has not made the Ogre a Demon yet, so the clause is false and the Ogre
+  -- has no ability at all; above it the clause holds and the regenerate ability is
+  -- there to be seen. A reader that took the FULL projection here would answer the
+  -- same at both bounds.
+  Spec.it s "CR 613.1 the gate reads the board at the layer bound it was asked at" $ do
+    ogre <- S.printingOf s registry "Villainous Ogre"
+    nexus <- S.printingOf s registry "Maskwood Nexus"
+    let (ogreId, g1) = S.addCreature ogre S.alice (Setup.emptyGame S.bothPlayers)
+        gs = snd (S.addCreature nexus S.alice g1)
+        cands = Projection.gather gs
+        context = Filter.contextFor (Just S.alice) (Just ogreId)
+        onto bound =
+          fmap
+            (\view -> Filter.matches context view Filter.Type.HasNonManaActivatedAbility)
+            (Projection.viewUpTo bound cands gs ogreId)
+    Spec.assertEqWith
+      s
+      "no such ability below layer 4, one above it"
+      (onto Layer.Type, onto Layer.Color)
+      (Just False, Just True)
+
+-- Is this action an activation of the Ogre? Pinned to the object, since the board
+-- also holds lands whose mana abilities are actions of their own.
+isActivateOfOgre :: ObjectId.ObjectId -> Action.Type.Action -> Bool
+isActivateOfOgre oid action = case action of
+  Action.Type.Activate o _ -> o == oid
+  Action.Type.Pass -> False
+  Action.Type.Play {} -> False
+  Action.Type.Cast {} -> False
+  Action.Type.TurnFaceUp _ -> False
+  Action.Type.Unlock _ _ -> False
+  Action.Type.DiscardFromHand _ -> False
+  Action.Type.Plot _ -> False
+  Action.Type.Foretell _ -> False
+  Action.Type.Ignore _ -> False
+  Action.Type.ActivateManaAbility _ -> False

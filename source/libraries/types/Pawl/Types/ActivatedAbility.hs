@@ -23,11 +23,16 @@ data ActivatedAbility card = MkActivatedAbility
     -- | The "as long as" clause of a static ability that GRANTS this one, or
     -- Nothing for an ability the object simply has, which is nearly all of them.
     --
-    -- CR 702.178a is the producer: "Max speed — [Ability]" means "as long as your
-    -- speed is 4, this object has '[Ability]'". A grant whose grantee is the
-    -- granting object itself and whose granted ability is printed right there is
-    -- indistinguishable from the printed ability plus its own gate, so pawl
-    -- carries the gate on the ability rather than minting a layer-6 grant.
+    -- CR 702.178a is one producer: "Max speed — [Ability]" means "as long as your
+    -- speed is 4, this object has '[Ability]'". A printed clause is the other, and
+    -- Villainous Ogre's "as long as you control a Demon, this creature has '{B}:
+    -- Regenerate this creature'" is the pool's -- unlike max speed's, its clause
+    -- reads the BOARD, so the reader it is judged through has to be the one at the
+    -- caller's own layer depth (Pawl.Engine.Projection.abilitiesFromCharacteristics).
+    -- A grant whose grantee is the granting object itself and whose granted
+    -- ability is printed right there is indistinguishable from the printed ability
+    -- plus its own gate, so pawl carries the gate on the ability rather than
+    -- minting a layer-6 grant.
     -- Pawl.Types.Modification's GainActivatedAbility is the layer-6 grant, and
     -- it is for the OTHER case: an ability handed to a DIFFERENT object, which
     -- is not indistinguishable from anything -- CR 113.7 moves the source and
