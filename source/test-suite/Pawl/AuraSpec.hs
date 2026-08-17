@@ -1,20 +1,28 @@
 -- Pattern matching on Pawl.Types.Prompt, a GADT, in aimAt below.
 {-# LANGUAGE GADTs #-}
+-- replenishSpec's `run` takes an ANSWERER, which is polymorphic in the prompt's
+-- answer type -- Pawl.CostSpec's reason for the same pragma.
+{-# LANGUAGE RankNTypes #-}
 
 -- Covers Pawl.Engine.Stack's Aura branch and Pawl.Engine.Resolve.targetsAllIllegal -- a
 -- resolving Aura spell either fizzles (CR 608.2b) or enters the battlefield
 -- already attached to its target (CR 303.4) -- together with the rest of the
 -- attachment substrate that shares Object.attachedTo: Pawl.Engine.Resolve's Attach
 -- opcode over Pawl.Engine.Attach (CR 701.3) and Pawl.Engine.Sba's three attachment
--- state-based actions (CR 704.5m, 704.5n, 704.5p). Rule 701.3's OTHER caller,
--- CR 303.4k's attachment as an Aura is turned face up, is Pawl.FaceDownSpec's:
--- CR 708.11 puts it inside the turning-over rather than in a resolution.
+-- state-based actions (CR 704.5m, 704.5n, 704.5p). Resolution is not the only door
+-- onto the battlefield: CR 303.4f's Aura entering from anywhere else has its host
+-- chosen inside Pawl.Engine.Event.changeZoneAttaching, which is replenishSpec's.
+-- Rule 701.3's OTHER caller, CR 303.4k's attachment as an Aura is turned face up,
+-- is Pawl.FaceDownSpec's: CR 708.11 puts it inside the turning-over rather than in
+-- a resolution.
 --
 -- Also Pawl.Engine.Replacement's CR 614.1c as-enters basic-land-type choice,
 -- since the pool's one producer of it is an Aura (Convincing Mirage) and
 -- proving it needs a real cast through this file's machinery.
 module Pawl.AuraSpec where
 
+import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
@@ -29,6 +37,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -54,6 +63,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
@@ -552,6 +562,178 @@ twoEnchantSpec s registry = Spec.describe s "TwoEnchantAbilities" $ do
         Spec.assertEqWith s "and it is Control Magic, whose enchant slot narrows nothing" (fmap (\oid -> Game.cardOf oid after) (attachedTo creature after)) [Just (Printing.card controlMagic)]
       _ -> Spec.assertFailure s "the Aura should have entered attached to alice's tapped Piker"
 
+-- Replenish {3}{W} Sorcery -- "Return all enchantment cards from your graveyard to
+-- the battlefield. (Auras with nothing to enchant remain in your graveyard.)" (name,
+-- cost, type line and Oracle text checked against api.scryfall.com). The
+-- parenthetical is reminder text (CR 207.2) restating CR 303.4g, so the card
+-- transcribes only the first sentence and the rules do the rest.
+--
+-- The pool's first producer of an Aura entering the battlefield by any means other
+-- than resolving as an Aura spell, so the first card to reach CR 303.4f's host
+-- choice in Pawl.Engine.Event.changeZoneAttaching. Its effect is Rise of the Dark
+-- Realms' shape one card type over.
+replenishSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+replenishSpec s registry =
+  let -- Eight Plains for a {3}{W} sorcery -- twice its cost, so a payment that taps
+      -- one source at a time cannot fail for reasons of its own, on both boards
+      -- below (the cast-gate vacuity trap).
+      board plains replenish creatures buried =
+        let withLands = S.landsFor plains S.alice 8 (Setup.emptyGame S.bothPlayers)
+            step add (acc, g) printing = let (oid, g') = add printing S.alice g in (acc <> [oid], g')
+            (creatureIds, withCreatures) = List.foldl' (step S.addCreature) ([], withLands) creatures
+            (buriedIds, withBuried) = List.foldl' (step S.addGraveyardCard) ([], withCreatures) buried
+            (ready, spell) = S.handOne replenish withBuried
+         in (spell, creatureIds, buriedIds, ready)
+      -- Cast, resolve, and take one CR 704.3 pass, so an Aura that entered
+      -- unattached has actually been buried by CR 704.5m before anything looks. The
+      -- responses come back beside the board, so one call answers both "what
+      -- happened" and "who was asked".
+      run :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, [Response.Response])
+      run answer spell gs =
+        let ((_, resolved), responses) = Replay.record answer gs (S.cast S.alice spell >> Stack.resolveTop)
+         in (S.settleSba resolved, responses)
+      hostsChosen responses = length [() | Response.ChoseAttachment _ <- responses]
+      -- Which card is on this host, read through attachedTo: CR 400.7 minted a
+      -- fresh id at the destination, so the Aura cannot be named by the id it was
+      -- buried under.
+      auraOn host gs = fmap (\oid -> Game.cardOf oid gs) (attachedTo host gs)
+      copiesOn printing gs =
+        length (filter (\oid -> Game.cardOf oid gs == Just (Printing.card printing)) (Set.toList (GameState.battlefield gs)))
+      nth n candidates = case drop (n - 1) (NonEmpty.toList candidates) of
+        x : _ -> x
+        [] -> NonEmpty.head candidates
+   in Spec.describe s "Replenish" $ do
+        -- CR 303.4f. THREE creatures for TWO Auras, so the prompt cannot pass by
+        -- short-circuiting (Attach.chooseHost elides at one candidate), and the two
+        -- Auras are pinned to DIFFERENT candidates so neither answer can stand in
+        -- for the other's.
+        Spec.it s "CR 303.4f each returned Aura's controller chooses what it enchants" $ do
+          plains <- S.printingOf s registry "Plains"
+          replenish <- S.printingOf s registry "Replenish"
+          unholy <- S.printingOf s registry "Unholy Strength"
+          pacifism <- S.printingOf s registry "Pacifism"
+          piker <- S.printingOf s registry "Goblin Piker"
+          mammoth <- S.printingOf s registry "War Mammoth"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          let (spell, creatureIds, buriedIds, gs) = board plains replenish [piker, mammoth, maiden] [unholy, pacifism]
+          case (creatureIds, buriedIds) of
+            ([pikerId, mammothId, maidenId], [unholyId, pacifismId]) -> do
+              -- Pinned BY THE SUBJECT the prompt names, which is the Aura's
+              -- GRAVEYARD incarnation: CR 303.4f's choice is made as it enters, so
+              -- before the CR 400.7 move. Pinned by INDEX, never by searching for a
+              -- legal option, so no mutation can let the answerer repair the
+              -- assertion. Attach.hostsFor sorts ascending, and the creatures went
+              -- in in this order, so candidate 2 is the Mammoth and 3 the Maiden.
+              let choosing :: Prompt.Prompt r -> r
+                  choosing p = case p of
+                    Prompt.ChooseAttachment _ _ subject offered
+                      | subject == unholyId -> nth 2 offered
+                      | subject == pacifismId -> nth 3 offered
+                    _ -> S.castAnswer p
+                  (after, responses) = run choosing spell gs
+              Spec.assertEqWith s "both Auras' controllers were asked" (hostsChosen responses) 2
+              Spec.assertEqWith s "Unholy Strength enchants the creature its own answer named" (auraOn mammothId after) [Just (Printing.card unholy)]
+              Spec.assertEqWith s "and Pacifism the creature its answer named" (auraOn maidenId after) [Just (Printing.card pacifism)]
+              Spec.assertEqWith s "nothing landed on the first candidate" (auraOn pikerId after) []
+              -- The choice is made AS the Aura enters, so a state-based pass leaves
+              -- both alone and the bonus is already applying -- which is what proves
+              -- the attachment is real rather than a field nothing reads.
+              Spec.assertEqWith s "the Piker is a plain 2/1" (S.powerToughnessOf pikerId after) (Just (2, 1))
+              Spec.assertEqWith s "the Mammoth is 3/3 plus Unholy Strength's +2/+1" (S.powerToughnessOf mammothId after) (Just (5, 4))
+              Spec.assertEqWith s "and Pacifism, which changes no characteristic, leaves the Maiden 1/2" (S.powerToughnessOf maidenId after) (Just (1, 2))
+            _ -> Spec.assertFailure s "the board should hold three creatures and two graveyard cards"
+        -- The paired control, and the whole reason there are three creatures: the
+        -- same cast on the same board with an answerer that takes every FIRST
+        -- candidate. If the engine were picking the host, the two legs could not
+        -- disagree.
+        Spec.it s "CR 303.4f the engine does not pick: another answer puts both Auras elsewhere" $ do
+          plains <- S.printingOf s registry "Plains"
+          replenish <- S.printingOf s registry "Replenish"
+          unholy <- S.printingOf s registry "Unholy Strength"
+          pacifism <- S.printingOf s registry "Pacifism"
+          piker <- S.printingOf s registry "Goblin Piker"
+          mammoth <- S.printingOf s registry "War Mammoth"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          let (spell, creatureIds, _, gs) = board plains replenish [piker, mammoth, maiden] [unholy, pacifism]
+          case creatureIds of
+            [pikerId, mammothId, maidenId] -> do
+              let takingFirst :: Prompt.Prompt r -> r
+                  takingFirst p = case p of
+                    Prompt.ChooseAttachment _ _ _ offered -> NonEmpty.head offered
+                    _ -> S.castAnswer p
+                  (after, responses) = run takingFirst spell gs
+              Spec.assertEqWith s "both controllers were asked here too" (hostsChosen responses) 2
+              Spec.assertEqWith s "both Auras went onto the first candidate" (List.sort (auraOn pikerId after)) (List.sort [Just (Printing.card unholy), Just (Printing.card pacifism)])
+              Spec.assertEqWith s "the Mammoth has none" (auraOn mammothId after) []
+              Spec.assertEqWith s "the Maiden has none" (auraOn maidenId after) []
+              Spec.assertEqWith s "and the Piker carries the +2/+1 instead" (S.powerToughnessOf pikerId after) (Just (4, 2))
+            _ -> Spec.assertFailure s "the board should hold three creatures"
+        -- CR 303.4g's "remains in its current zone". ONE board, TWO enchantment
+        -- cards: the non-Aura comes back and the Aura does not, so the same
+        -- resolution proves the effect ran and that the Aura was left alone.
+        --
+        -- The DISCRIMINATOR is the ObjectId, not the zone. "Remains in the
+        -- graveyard" and "was put into its owner's graveyard by CR 704.5m" are the
+        -- same zone on this board, so no zone assertion can tell them apart. A
+        -- completed move deletes the old id and mints a new one (CR 400.7), so an
+        -- Aura that entered and was buried has NO object under its original id while
+        -- one that never moved still does. CR 303.4g's other branch -- an Aura whose
+        -- current zone is the STACK -- has no producer and is not asked here
+        -- (gap #1734).
+        Spec.it s "CR 303.4g an Aura with nothing to enchant never leaves the graveyard" $ do
+          plains <- S.printingOf s registry "Plains"
+          replenish <- S.printingOf s registry "Replenish"
+          unholy <- S.printingOf s registry "Unholy Strength"
+          scales <- S.printingOf s registry "Hardened Scales"
+          -- NO creatures: Unholy Strength's enchant pool is Creatures, so its legal
+          -- host set is empty and alice's Plains are the only permanents.
+          let (spell, _, buriedIds, gs) = board plains replenish [] [unholy, scales]
+          case buriedIds of
+            [auraId, _] -> do
+              let (after, responses) = run S.castAnswer spell gs
+              Spec.assertEqWith s "nobody was asked -- there was nothing to choose" (hostsChosen responses) 0
+              Spec.assertEqWith s "the Aura is the same object it always was, still in the graveyard" (fmap Object.zone (Game.lookupObject auraId after)) (Just Zone.Graveyard)
+              Spec.assertEqWith s "and no Aura reached the battlefield" (copiesOn unholy after) 0
+              Spec.assertEqWith s "while the non-Aura enchantment did come back, so the effect really ran" (copiesOn scales after) 1
+            _ -> Spec.assertFailure s "the board should hold two graveyard cards"
+        -- CR 708.2a against CR 303.4f, on Soul Summons rather than Replenish: an
+        -- Aura card MANIFESTED off a library (CR 701.40a) enters as a 2/2 with no
+        -- subtypes and no enchant ability, so it is not an Aura the rule speaks
+        -- about and nobody is asked -- even though the card is an Aura in the zone
+        -- it is leaving, which is where the gate's projection reads. It enters
+        -- unattached, and CR 704.5m leaves it alone because Sba.fallsOff reads the
+        -- same substituted face.
+        --
+        -- The Piker is the whole point: it is a legal host for a face-UP Unholy
+        -- Strength, so a gate that read the projection alone would find it and
+        -- attach.
+        Spec.it s "CR 708.2a a manifested Aura card is not an Aura, so nobody chooses a host" $ do
+          plains <- S.printingOf s registry "Plains"
+          summons <- S.printingOf s registry "Soul Summons"
+          unholy <- S.printingOf s registry "Unholy Strength"
+          piker <- S.printingOf s registry "Goblin Piker"
+          mammoth <- S.printingOf s registry "War Mammoth"
+          let (host, base0) = S.addCreature piker S.alice (S.landsInPlay plains 2)
+              -- TWO creatures, so Attach.chooseHost's one-candidate elision cannot
+              -- make "nobody was asked" pass for the wrong reason.
+              (host2, base1) = S.addCreature mammoth S.alice base0
+              -- A second library card keeps CR 104.3c off the board; Unholy Strength
+              -- goes on top of it, so the manifest reaches the Aura.
+              (_, base2) = S.addLibraryCard piker S.alice base1
+              (_, base3) = S.addLibraryCard unholy S.alice base2
+              (gs, spell) = S.handOne summons base3
+              (after, responses) = run S.castAnswer spell gs
+              -- By CARD, since CR 400.7 minted a fresh id at the destination.
+              manifested = filter (\oid -> Game.cardOf oid after == Just (Printing.card unholy)) (Set.toList (GameState.battlefield after))
+          Spec.assertEqWith s "nobody was asked -- a face-down permanent has no enchant ability" (hostsChosen responses) 0
+          Spec.assertEqWith s "and it did not land on the Piker, which would have hosted it face up" (auraOn host after) []
+          Spec.assertEqWith s "nor on the Mammoth" (auraOn host2 after) []
+          case manifested of
+            [oid] -> do
+              Spec.assertEqWith s "the manifested card is on the battlefield, unattached" (fmap Object.attachedTo (Game.lookupObject oid after)) (Just Nothing)
+              Spec.assertEqWith s "CR 708.2a as a 2/2, not Unholy Strength" (S.powerToughnessOf oid after) (Just (2, 2))
+            _ -> Spec.assertFailure s "the manifest should have put Unholy Strength onto the battlefield"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   auraSpec s registry
@@ -563,6 +745,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   enchantPlayerSpec s registry
   chosenLandTypeSpec s registry
   twoEnchantSpec s registry
+  replenishSpec s registry
 
 -- Both of Convincing Mirage's prompts at once: its CR 303.4a enchant slot
 -- (Pool.Permanents narrowed to lands, so the recipient is tagged ToObject) and
