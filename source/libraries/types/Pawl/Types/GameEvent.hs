@@ -781,4 +781,21 @@ data GameEvent
     -- own steps record: each of those describes one step, any of them can be
     -- impossible, and none of them says an explore completed.
     Explored ObjectId.ObjectId
+  | -- | CR 701.43a: this permanent was EXERTED. Recorded by
+    -- Pawl.Engine.Combat.declareAttackers at CR 508.1g, the only place pawl
+    -- exerts anything, and what CR 701.43d's linked "when you do" trigger
+    -- watches for (TriggerCondition.SelfExerted). CR 701.43a states the keyword
+    -- action generally, so an effect that exerted a permanent outside a
+    -- declaration would record this same event.
+    --
+    -- The exerted permanent's id ALONE, Explored's shape and for its reason: the
+    -- exerting player is the permanent's controller (CR 508.1a already required
+    -- that of an attacker), so a reader gets both from the id.
+    --
+    -- Distinct from the AttackerDeclared event the same step records, and the
+    -- distinction is the point: every attacker records that one, and CR 701.43d's
+    -- trigger must fire only when the optional cost was actually PAID. It carries
+    -- no "which declaration" tag either -- CR 701.43b lets a permanent be exerted
+    -- more than once, so a second exert is a second event rather than a repeat.
+    Exerted ObjectId.ObjectId
   deriving (Eq, Ord, Show)

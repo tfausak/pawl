@@ -14,6 +14,13 @@ import qualified Pawl.Types.Reinforce as Reinforce
 -- 702.9; Goblin Piker is not. Constructors are ordered by RULE NUMBER, not by
 -- arrival, so this type stays diffable against rule 702 itself.
 --
+-- One constructor is NOT a rule 702 ability and sits after the rest rather than
+-- inside that ordering: Exert is rule 701.43's KEYWORD ACTION, and CR 701.43d is
+-- what puts a static ability naming it on a card. It is a citation by the same
+-- test -- rule 701 is as much the rulebook as rule 702 -- and Wizards' own card
+-- data calls it a keyword, so it belongs here rather than in a Face field of its
+-- own.
+--
 -- A keyword is not necessarily a STATIC ability: rule 702.70 spells poisonous out
 -- as a TRIGGERED one. What it grants is still a citation and not an effect
 -- identity, so Pawl.Engine.Keyword may read a constructor and mint the rule's
@@ -1111,6 +1118,30 @@ data Keyword
     -- Pawl.Types.ActivatedAbility.condition instead, which is the same "as long
     -- as" clause Pawl.Types.StaticAbility.condition already carries for CR 604.2.
     StartYourEngines
+  | -- | 701.43d: "you may exert this creature as it attacks" is an OPTIONAL COST
+    -- TO ATTACK (CR 508.1g). A static ability, read by
+    -- Pawl.Engine.Combat.declareAttackers at CR 508.1g and nowhere else --
+    -- exerting itself is rule 701.43a's keyword action, which writes
+    -- Pawl.Types.Object.doesNotUntapNext and is expired by
+    -- Pawl.Engine.Engine.untapAll under CR 701.43b.
+    --
+    -- Nullary, because CR 701.43d's sentence takes no parameter: the whole first
+    -- sentence of Glory-Bound Initiate IS the keyword, which is why Wizards' card
+    -- data reports it as one. Multiplicity is not this type's problem here either
+    -- -- CR 701.43b lets a permanent be exerted more than once, and the reader
+    -- takes membership because a second instance of the ability would offer a
+    -- second declining-or-paying choice that changes nothing (the flag is a
+    -- Bool, #1653).
+    --
+    -- The linked CR 607.2h "when you do" trigger is NOT minted from this
+    -- constructor, unlike miracle's: CR 701.43d states that such a trigger may
+    -- exist without stating what it does, so each card prints its own and
+    -- authors it as a TriggeredAbility on TriggerCondition.SelfExerted.
+    --
+    -- Not implemented: CR 702.154's enlist, rule 508.1g's other optional cost to
+    -- attack, whose cost is tapping a filtered creature rather than a yes-or-no
+    -- (#877).
+    Exert
   deriving (Eq, Ord, Show)
 
 -- Devoid takes TWO routes, decided by where the instance came from. A PRINTED one

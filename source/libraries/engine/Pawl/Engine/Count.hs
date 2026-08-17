@@ -501,6 +501,7 @@ snapshotView gs shape event = case event of
   GameEvent.Surveiled _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
+  GameEvent.Exerted _ -> Nothing
 
 -- The Filter.View a recorded snapshot yields, shared by every arm of
 -- snapshotView above so that two shapes of event cannot disagree about what a

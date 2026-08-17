@@ -138,6 +138,7 @@ manaProduced effect = case effect of
   Effect.DecreaseSpeed {} -> Nothing
   Effect.Create {} -> Nothing
   Effect.CreateCopy {} -> Nothing
+  Effect.BecomeCopy {} -> Nothing
   Effect.Replace {} -> Nothing
   Effect.SkipNextPhase {} -> Nothing
   -- CR 615.5's rider is not descended into, the same stop Effect.Create makes at
@@ -280,6 +281,9 @@ movesLibraryCard effect = case effect of
   -- battlefield.
   Effect.Create {} -> False
   Effect.CreateCopy {} -> False
+  -- CR 707.4 says so in as many words: the permanent remains on the
+  -- battlefield, so no card moves out of a library or anywhere else.
+  Effect.BecomeCopy {} -> False
   Effect.Replace {} -> False
   Effect.SkipNextPhase {} -> False
   -- CR 615.5's rider is not descended into, the same stop `manaProduced` makes:

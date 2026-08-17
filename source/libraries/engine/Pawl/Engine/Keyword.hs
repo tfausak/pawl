@@ -294,6 +294,12 @@ abilitiesFor keyword count = case keyword of
   -- the hand source picks it up, neither of them learning it is miracle.
   Keyword.Miracle cost -> List.genericReplicate count (miracle cost)
   Keyword.StartYourEngines -> []
+  -- CR 701.43d's static ability mints NO triggered ability. Rule 701.43d says a
+  -- card may print a linked "when you do" beside it without saying what that
+  -- ability does, unlike rule 702.94a's miracle above -- so each printing
+  -- authors its own on TriggerCondition.SelfExerted, and Glory-Bound Initiate
+  -- is the pool's.
+  Keyword.Exert -> []
 
 -- CR 602.1: the ACTIVATED abilities rule 702 gives a card while it sits in its
 -- owner's hand, and the first sibling here that mints something a player takes
@@ -396,6 +402,9 @@ handAbilitiesFor keyword = case keyword of
   -- minted by `abilitiesFor` above and reached from a hand by CR 113.6k.
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
+  -- CR 701.43d's ability is static and functions on the battlefield, so it mints
+  -- nothing activatable from a hand.
+  Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
 
@@ -607,6 +616,9 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Foretell _ -> []
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
+  -- CR 701.43d states no activated ability: exerting is a cost paid at CR 508.1g,
+  -- which Pawl.Engine.Combat.declareAttackers offers rather than the stack.
+  Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
 
@@ -934,6 +946,8 @@ permissionsFor cardTypes keyword = case keyword of
   -- own timing.
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
+  -- CR 701.43d names no zone a card may be cast from.
+  Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
 
@@ -1399,6 +1413,9 @@ mintedReplacementsFor keyword count = case keyword of
   -- rewrite. Pawl.Engine.Event's draw funnel asks miracleCost directly.
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
+  -- CR 701.43d replaces no event: CR 508.1g's choice is a step of a turn-based
+  -- action, and the exert itself writes Object.doesNotUntapNext directly.
+  Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
 
@@ -1544,6 +1561,10 @@ mintedCombatRestrictionsFor keyword = case keyword of
   -- CR 702.94a states no combat restriction.
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
+  -- CR 701.43d states no combat restriction. It states an optional COST to
+  -- attack, which never makes an attack illegal -- the active player may always
+  -- decline it (CR 508.1g).
+  Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
   Keyword.Changeling -> []
@@ -1657,6 +1678,8 @@ familyOf keyword = case keyword of
   -- CR 702.149a takes no parameter, so training has no family of its own.
   Keyword.Training -> Nothing
   Keyword.StartYourEngines -> Nothing
+  -- CR 701.43d takes no parameter, so exert has no family of its own.
+  Keyword.Exert -> Nothing
   -- CR 702.79a and CR 702.93a take no parameter, so neither has a family.
   Keyword.Persist -> Nothing
   Keyword.Undying -> Nothing

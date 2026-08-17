@@ -30,6 +30,7 @@ import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
+import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -1129,10 +1130,22 @@ countersOf :: ObjectId -> GameState -> Map (CounterKind.CounterKind Keyword.Type
 countersOf oid gs = maybe Map.empty Object.counters (Game.lookupObject oid gs)
 
 -- CR 707.2 / 613.1a: an object's layer-1 (copy) result, the value the layer fold
--- starts from -- the entry-stamped snapshot (CR 707.5) when it has one, the
--- printed base otherwise. Base-or-snapshot only, so counters, pumps, control and
--- ability grants are structurally never part of a copied object's copiable value.
--- Not a recursion: a copy of a copy already stored resolved values at entry.
+-- starts from -- its stamped copy snapshot when it has one, the printed base
+-- otherwise. Base-or-snapshot only, so counters, pumps, control and ability
+-- grants are structurally never part of a copied object's copiable value.
+--
+-- Four writers of that snapshot, every one of them layer 1 and every one of them
+-- reaching it through Binding.setCopy: the CR 707.5 entry replacement
+-- (EntryRewrite.AsCopy, Clone), the CR 707.1 token mint (Effect.CreateCopy,
+-- Event.createTokens), CR 208.2b's chosen entry shape
+-- (Replacement.applyEntryOption, Primal Plasma), and the CR 707.4 change of a
+-- permanent already on the battlefield (Effect.BecomeCopy, Unstable
+-- Shapeshifter). One reader for the four is what makes CR 707.3's last sentence
+-- free -- "objects that copy the object will use the new copiable values" -- so a
+-- token copy of a Shapeshifter reads what the Shapeshifter copied.
+--
+-- Not a recursion: a copy of a copy already stored resolved values when it was
+-- stamped.
 copiableCharacteristics :: ObjectId -> GameState -> ProjectedCharacteristics
 copiableCharacteristics oid gs =
   case Game.lookupObject oid gs >>= (Binding.copyOf . Object.bindings) of
@@ -1907,6 +1920,10 @@ rewriteEffect pairs effect = case effect of
   -- card at all -- it is the copied permanent's copiable values, and CR 707.2
   -- excludes text-changing effects from those, so nothing here rewrites them.
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> Effect.CreateCopy (CreateCopy.MkCreateCopy quantity (rewriteObjectRef pairs ref))
+  -- BOTH refs, RequireBlock's arm below: either may be an EachMatching whose
+  -- Filter names a subtype word.
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) ->
+    Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (rewriteObjectRef pairs original) (rewriteObjectRef pairs subject))
   Effect.Replace {} -> effect
   Effect.SkipNextPhase {} -> effect
   -- CR 612.1: a rider's text is as changeable as any other, so the recursion
@@ -2310,6 +2327,8 @@ rewriteTriggerCondition pairs condition = case condition of
   -- as it reaches PermanentDies' above: Wildgrowth Walker's "a creature you
   -- control" is a subtype-free one, but a text-changed printing need not be.
   TriggerCondition.PermanentExplores f -> TriggerCondition.PermanentExplores (Filter.rewrite pairs f)
+  -- Nullary, so there is nothing for CR 612.1 to reach.
+  TriggerCondition.SelfExerted -> condition
 
 -- CR 612.1 through Condition's predicate vocabulary, at the four clauses a
 -- PRINTED ability carries one in: a triggered ability's CR 603.8 state trigger

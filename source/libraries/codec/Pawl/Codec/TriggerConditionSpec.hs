@@ -594,4 +594,12 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PermanentExplores (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You]))
       " {\"type\":\"PermanentExplores\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]}} "
+  -- CR 701.43d. Nullary, SelfEvolves' shape: rule 701.43d links the trigger to
+  -- the static ability printed beside it, so its subject is always the bearer.
+  Spec.it s "SelfExerted round-trips" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.SelfExerted
+      " {\"type\":\"SelfExerted\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s TriggerCondition.codec

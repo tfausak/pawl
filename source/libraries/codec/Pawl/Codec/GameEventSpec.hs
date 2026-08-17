@@ -4,6 +4,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Pawl.Codec.GameEvent as GameEvent
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec as ProjectedCharacteristicsSpec
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
@@ -362,3 +363,15 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Explored (ObjectId.MkObjectId 6))
       " {\"type\":\"Explored\",\"value\":6} "
+  -- CR 701.43a. Explored's payload exactly, so the TAG is all that separates the
+  -- two -- a codec that dropped it would turn an exert into an explore.
+  Spec.it s "Exerted" $ do
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.Exerted (ObjectId.MkObjectId 7))
+      " {\"type\":\"Exerted\",\"value\":7} "
+    Spec.assertBool
+      s
+      (Codec.encode GameEvent.codec (GameEvent.Exerted (ObjectId.MkObjectId 7)) /= Codec.encode GameEvent.codec (GameEvent.Explored (ObjectId.MkObjectId 7)))
+      "an exert and an explore of the same object encode differently"

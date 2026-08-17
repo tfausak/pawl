@@ -45,6 +45,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
@@ -1438,10 +1439,11 @@ announceAttackTarget pid oid options = case options of
 -- minted from the candidate list, so with no candidate there is nothing to
 -- require.
 --
--- The steps run here are CR 508.1a, 508.1b, 508.1c, 508.1d, 508.1f, 508.1h,
--- 508.1i, 508.1j and 508.1k, in the rule's own order, plus the event CR 508.1m's
--- triggers watch. CR 508.1g's OPTIONAL costs to attack (exert, enlist) are not
--- implemented (#597).
+-- The steps run here are CR 508.1a, 508.1b, 508.1c, 508.1d, 508.1f, 508.1g,
+-- 508.1h, 508.1i, 508.1j and 508.1k, in the rule's own order, plus the event
+-- CR 508.1m's triggers watch. CR 508.1g offers Keyword.Exert alone; rule
+-- 702.154's enlist is the optional cost to attack it does not offer, and the
+-- step's own comment says why.
 --
 -- CR 508.1's preamble is the one clause that costs this function its shape: a
 -- declaration the active player cannot comply with is illegal, and the game
@@ -1572,6 +1574,50 @@ declareAttackers pid = do
         -- is tapped, so it is no longer a mana source for the very cost its attack
         -- incurred.
         State.modify' (\g -> List.foldl' tapIt g attacking)
+        -- CR 508.1g: the OPTIONAL costs to attack, asked after CR 508.1f's tapping
+        -- and before CR 508.1h's determination, which is the rule's own order.
+        -- Asked per creature, since "which, if any, they will pay" is a choice
+        -- about each of them, and of `attacking` rather than `chosen` so that a
+        -- creature the CR 508.1d degradation dropped is never offered one.
+        --
+        -- Read off the PROJECTION, not the printed face: CR 613 is what decides
+        -- whether a permanent has the keyword, so a granted exert would count
+        -- exactly as a printed one does. Re-read per creature from the live state
+        -- because the exert writes above it do change the board -- none of them
+        -- touches a keyword today, so the re-read is a fence rather than a
+        -- difference this pool can show.
+        --
+        -- CR 701.43a's keyword action is the write itself: Object.doesNotUntapNext
+        -- on the exerted permanent, which Pawl.Engine.Engine.untapAll applies and
+        -- then expires under CR 701.43b. NOT routed through
+        -- Effect.DoesNotUntapNext, which is a resolving effect (Elvish Hunter);
+        -- exerting is a cost payment and never goes on the stack.
+        --
+        -- The whole step sits after `before`, so CR 508.1's preamble undoes an
+        -- exert along with the declaration when the CR 508.1j payment fails.
+        --
+        -- Nothing is added to CR 508.1h's total: exert's cost is the rider itself
+        -- rather than mana, so `owed` below is unchanged by this step. An optional
+        -- cost WITH a mana component would have to join the determination there.
+        --
+        -- Not implemented: CR 702.154's enlist, rule 508.1g's other optional cost
+        -- to attack, whose cost is tapping a filtered untapped creature rather
+        -- than a yes-or-no and whose trigger reads that creature's power (#877).
+        --
+        -- CR 701.43a says "your next untap step", meaning the EXERTING player's,
+        -- where untapAll clears the flag at the permanent's controller's. The two
+        -- coincide on every board a printed exert card can reach, CR 508.1a having
+        -- required the attacker to be the active player's (#1736).
+        Monad.forM_ attacking $ \oid -> do
+          gsExert <- State.get
+          Monad.when (Projection.hasKeyword Keyword.Exert oid gsExert) $ do
+            let exertDecider = Decide.deciderFor pid gsExert
+                exert g =
+                  Event.recordEvent
+                    (GameEvent.Exerted oid)
+                    g {GameState.objects = Map.adjust (\o -> o {Object.doesNotUntapNext = True}) oid (GameState.objects g)}
+            answer <- Game.choose (Prompt.ChooseExert exertDecider pid oid)
+            Monad.when (answer == OptionalDecision.Exercises) (State.modify' exert)
         gs1 <- State.get
         -- CR 508.1h: the total cost to attack is determined once and then LOCKED
         -- IN. That is this `let`, and nothing more elaborate is needed: the total

@@ -996,6 +996,9 @@ rewriteKeyword pairs keyword = case keyword of
   -- CR 702.94a states a cost too, so it is reached the same way.
   Keyword.Type.Miracle cost -> Keyword.Type.Miracle (rewriteCost pairs cost)
   Keyword.Type.StartYourEngines -> keyword
+  -- CR 701.43d names no quality and carries no cost, so CR 612.2 has nothing here
+  -- to swap.
+  Keyword.Type.Exert -> keyword
   Keyword.Type.Persist -> keyword
   Keyword.Type.Undying -> keyword
 
