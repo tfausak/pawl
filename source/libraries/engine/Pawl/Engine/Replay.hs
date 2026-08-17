@@ -46,6 +46,7 @@ encode :: Prompt r -> r -> Response
 encode p answer = case p of
   Prompt.Shuffle _ -> Response.Shuffled answer
   Prompt.RandomFirstPlayer _ -> Response.DeterminedFirstPlayer answer
+  Prompt.RandomObject _ -> Response.SelectedAtRandom answer
   Prompt.ChooseAction {} -> Response.ChoseAction answer
   Prompt.Concede _ -> Response.Conceded answer
   Prompt.ChooseDiscard {} -> Response.ChoseDiscard answer
@@ -137,6 +138,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.RandomFirstPlayer _ -> case response of
     Response.DeterminedFirstPlayer pid -> Just pid
+    _ -> Nothing
+  Prompt.RandomObject _ -> case response of
+    Response.SelectedAtRandom oid -> Just oid
     _ -> Nothing
   Prompt.ChooseAction {} -> case response of
     Response.ChoseAction action -> Just action
@@ -379,6 +383,11 @@ defaultAnswer p = case p of
   Prompt.Shuffle ids -> ids
   -- CR 729.2: the head of the turn order is always a legal starting player.
   Prompt.RandomFirstPlayer order -> NonEmpty.head order
+  -- The head of the offer is always one of the offered objects. Legal, and
+  -- FIXED -- so a spec asserting WHICH card randomness named must supply its own
+  -- answerer, or it proves nothing about an engine that reveals the first card
+  -- unasked (Pawl.ResolveSpec's "RandomReveal" pair).
+  Prompt.RandomObject candidates -> NonEmpty.head candidates
   Prompt.ChooseAction _ _ actions -> case actions of
     h : _ -> h
     [] -> Action.Pass

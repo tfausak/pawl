@@ -45,6 +45,15 @@ data Response
   | Shuffled [ObjectId.ObjectId]
   | -- | CR 729.2: the player randomness picked to go first in a subgame.
     DeterminedFirstPlayer PlayerId.PlayerId
+  | -- | The object randomness named for a
+    -- Pawl.Types.ObjectRef.RandomCardInHand -- Merfolk Spy's "a card at random
+    -- from their hand".
+    --
+    -- Its own constructor rather than ChoseCardInHand reused, though both name
+    -- one card in one hand: this type's rule at the top, and here the difference
+    -- is the whole point -- a transcript of a player DECIDING must not satisfy a
+    -- prompt that asked randomness, which is CR 701.9b's distinction.
+    SelectedAtRandom ObjectId.ObjectId
   | ChoseDiscard [ObjectId.ObjectId]
   | -- | CR 701.22a: the ordered partition a scrying player chose -- the cards
     -- going to the bottom, then the ones staying on top, each in the order the

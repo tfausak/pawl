@@ -5,6 +5,7 @@ import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 
@@ -92,10 +93,11 @@ data ObjectRef
     -- at all (#559) -- and swept when the effect executes (CR 608.2c), the two
     -- properties EachMatching above has.
     --
-    -- ONE card chosen out of a hand rather than all of them is ChosenCardInHand
-    -- below, which does reach another player's hand -- it answers the visibility
-    -- question this arm avoids rather than dodging it, by asking that hand's own
-    -- owner (CR 402.3).
+    -- ONE card out of a hand rather than all of them is ChosenCardInHand or
+    -- RandomCardInHand below, both of which do reach another player's hand --
+    -- they answer the visibility question this arm avoids rather than dodging
+    -- it, the first by asking that hand's own owner (CR 402.3) and the second by
+    -- naming the card without anybody looking at all.
     EachCardInYourHand
   | -- | CR 607.2a's linked set: every card in exile that an instruction in an
     -- ability of THIS EFFECT'S SOURCE put there -- Hoarding Dragon's "the exiled
@@ -302,4 +304,33 @@ data ObjectRef
     -- ChosenCardInGraveyard's note above describes what a card writing it under
     -- any other opcode gets, and why that inert answer earns no lint.
     ChosenCardInHand ChosenCardInHand.ChosenCardInHand
+  | -- | A card RANDOMNESS names out of a hand -- Merfolk Spy's "that player
+    -- reveals a card at random from their hand". ChosenCardInHand's PlayerRef,
+    -- doing that arm's double duty (CR 402.3 collapses the seat whose hand it is
+    -- onto the seat who answers), with the seat's own DECISION replaced by
+    -- randomness.
+    --
+    -- Its own arm rather than a flag on ChosenCardInHand: the two differ in who
+    -- answers -- a seat, weighing options, against nobody weighing anything --
+    -- and Pawl.Types.Prompt.RandomObject accordingly carries no
+    -- Pawl.Types.Decider where Prompt.ChooseCardInHand does. CR 701.9b is the
+    -- rulebook's own acknowledgment that "at random" and "the player chooses"
+    -- are different instructions over the same zone.
+    --
+    -- The engine does not roll: the candidates are asked of the interpreter
+    -- through Prompt.RandomObject and the answer is FILTERED back against them,
+    -- which is what Prompt.Shuffle and Prompt.RandomFirstPlayer already do. So
+    -- this arm no more picks a card than it lets a player pick one.
+    --
+    -- NO FILTER beside the PlayerRef, where the chosen sibling carries one, and
+    -- ONE card per seat: Merfolk Spy states no characteristic and no count, and
+    -- nothing else in the pool asks for either (gap #1742).
+    --
+    -- Read when the effect executes (CR 608.2c), and a QUESTION rather than a
+    -- read -- so objectRefObjects answers nothing for it and only
+    -- Pawl.Engine.Resolve's Reveal arm carries it out. A card writing it under
+    -- any other opcode names no object and does nothing, the inert card-data
+    -- error ChosenCardInGraveyard's note above describes, which earns no lint for
+    -- that note's reason.
+    RandomCardInHand PlayerRef.PlayerRef
   deriving (Eq, Ord, Show)

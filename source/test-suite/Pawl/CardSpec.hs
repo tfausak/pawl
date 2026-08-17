@@ -2351,6 +2351,10 @@ objectRefFilters ref = case ref of
   -- whole of what there is to lint -- the chosen graveyard card's arm's answer,
   -- for its reason.
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand _ f) -> [f]
+  -- Merfolk Spy's "a card at random from their hand" carries no Filter at all,
+  -- only the PlayerRef naming whose hand, so there is nothing here to lint
+  -- (gap #1742).
+  ObjectRef.RandomCardInHand _ -> []
 
 -- The Filter a Count folds over (CR 608.2h). Delegated to the *Counts family
 -- above rather than re-walked: those traversals are already the project's answer
@@ -4490,6 +4494,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- player" would be one each. The same per-seat count TopOfLibrary
           -- takes of its own PlayerRef, which is why they share namesOneSeat.
           ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player _) -> namesOneSeat player
+          -- One card per SEAT, the arm above's answer with randomness in the
+          -- chooser's place: Merfolk Spy's slot names one seat and so one card.
+          ObjectRef.RandomCardInHand player -> namesOneSeat player
         -- Does this PlayerRef name at most ONE seat? A per-player count over it
         -- -- a library's top card, a card chosen out of a hand -- moves at most
         -- one object exactly when it does.

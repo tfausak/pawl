@@ -286,6 +286,10 @@ objectRefSlots ref = case ref of
   -- card from their hand" names its seat with a target slot. The Filter beside it
   -- names no slot, exactly as the graveyard arms' Filters do not.
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player _) -> playerRefSlots player
+  -- The seats whose hands randomness reads, which is the arm above's read: Merfolk
+  -- Spy's "THAT PLAYER reveals a card at random from their hand" names its seat
+  -- with the slot the trigger bound.
+  ObjectRef.RandomCardInHand player -> playerRefSlots player
 
 -- The Quantities an ObjectRef carries. ONE arm does: TopOfLibrary's depth, which
 -- is Commune with Lava's X and Act on Impulse's literal three. Everything else
@@ -322,6 +326,7 @@ objectRefQuantities ref = case ref of
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary _ count) -> [count]
   ObjectRef.ChosenCardInGraveyard {} -> []
   ObjectRef.ChosenCardInHand {} -> []
+  ObjectRef.RandomCardInHand _ -> []
 
 -- The slots a MonarchTarget reads: only the targeted arm names one. Written out
 -- rather than routed through playerRefSlots because MonarchTarget is its own
@@ -2139,6 +2144,10 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- above, for the graveyard arm's reason, and answered for real by the
   -- MoveToZone arm over the seats handChoosers below names.
   ObjectRef.ChosenCardInHand {} -> []
+  -- A card randomness names out of a hand: the arm above's answer, for its
+  -- reason -- asking is monadic and this function is not -- and answered for real
+  -- by the REVEAL arm, over the same seats handChoosers names.
+  ObjectRef.RandomCardInHand _ -> []
 
 -- The players a graveyard scope names, in APNAP order: the seat half of
 -- graveyardCards, shared with ObjectRef.ChosenCardInGraveyard's EachInScope
@@ -2193,8 +2202,10 @@ graveyardCards :: PlayerId -> ObjectId -> GameState -> PlayerScope.PlayerScope -
 graveyardCards controller source gs scope filter_ =
   concatMap (\pid -> graveyardCardsOf controller source gs pid filter_) (graveyardPlayers controller gs scope)
 
--- The seats an ObjectRef.ChosenCardInHand asks, in APNAP order: graveyardPlayers
--- one type over, with the PlayerScope replaced by the ref's own PlayerRef.
+-- The seats an ObjectRef.ChosenCardInHand asks -- and the seats an
+-- ObjectRef.RandomCardInHand reads, which is the same list for the same reason
+-- with nobody asked anything -- in APNAP order: graveyardPlayers one type over,
+-- with the PlayerScope replaced by the ref's own PlayerRef.
 --
 -- ONE list, where the graveyard arm needs a chooser and a scope: CR 402.3 lets a
 -- player look at their own hand and no other, so these seats are the choosers
@@ -2348,6 +2359,9 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   -- No recipients either, and for the arm above's reason: the answer needs the
   -- chooser asked, and only the MoveToZone gather can ask.
   ObjectRef.ChosenCardInHand {} -> []
+  -- No recipients either: nobody is asked, but the interpreter still is, and
+  -- only the Reveal arm can do that.
+  ObjectRef.RandomCardInHand _ -> []
 
 -- CR 608.2f's order for the per-object loop: APNAP first ("APNAP order is used
 -- to make the primary determination of the order of those actions"), reading a
@@ -3740,6 +3754,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
               fmap concat . Monad.mapM (\pid -> ask pid (handCardsOf controller source gs pid filter_)) $
                 handChoosers legal controller gs player
+            -- Not implemented: a card moved at random out of a hand -- CR
+            -- 701.9b's random discard, which Hymn to Tourach prints. Nothing
+            -- moves it here, so a card writing the ref under this opcode names
+            -- no object, which is the inert card-data error the arm above
+            -- describes. Merfolk Spy's reveal is what the ref does carry out,
+            -- under Effect.Reveal, and the discard needs its own design call
+            -- about the count and about the other exception in that rule
+            -- (#1733).
+            ObjectRef.RandomCardInHand _ -> pure []
           arrived <- Monad.mapM moveOne =<< settleArrivals zone placement targets
           Monad.mapM_ (\slot -> bindArrivals slot (Maybe.catMaybes arrived)) mSlot
   -- CR 701.24: shuffle the objects the ref names into their OWNERS' libraries.
@@ -3991,10 +4014,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- where they are, so the GameEvent.Revealed the funnel appends IS the whole
   -- effect -- the rule, not a shortcut (Event.reveal's own haddock).
   --
-  -- The SHOWER is this effect's controller, not each card's owner: rule 701.20a
-  -- says "show that card", and the player carrying out the instruction is the
-  -- one doing the showing. Every printing in the pool reveals a card the
-  -- controller already holds, so the two readings coincide today.
+  -- The SHOWER is the player CARRYING OUT the instruction: rule 701.20a says
+  -- "show that card", and that is who does the showing. For every ref that names
+  -- the resolving controller's own cards the two coincide and the controller
+  -- shows them; for RandomCardInHand the instruction falls on the seat whose
+  -- hand it is, which is Merfolk Spy's bob rather than the trigger's alice. The
+  -- proving pair is Pawl.ResolveSpec's "RandomReveal" group.
   --
   -- RevealCause.Ordinary: rule 702.94a's "this way" is the miracle window's
   -- alone, and no rule asks again about a reveal a card's own sentence caused.
@@ -4005,7 +4030,39 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- since nothing moves and nothing is decided in between.
   Effect.Reveal ref -> do
     gs <- State.get
-    Monad.mapM_ (Event.reveal RevealCause.Ordinary controller) (objectRefObjects legal resolving controller source gs ref)
+    case ref of
+      -- Merfolk Spy's "that player reveals a card at random from their hand".
+      -- The one ref whose objects are a QUESTION rather than a read, so it is
+      -- answered here (objectRefObjects' own note) -- and the question goes to
+      -- the INTERPRETER, not to a seat: the engine does not roll and no player
+      -- gets to pick. Filtered rather than trusted, so an answer naming a card
+      -- that was never offered falls back to the head of the offer instead of
+      -- inventing an object.
+      --
+      -- Game.ask and not Game.choose, Prompt.RandomObject's reason: randomness
+      -- is not CR 104.4b's optional action, so a loop containing one is still a
+      -- loop of mandatory actions.
+      --
+      -- Elided at one card and skipped at none, ChooseCardInHand's rule (CR
+      -- 101.3, CR 609.3): one card is the whole hand, so randomness has nothing
+      -- left to determine, and an empty hand leaves nothing to reveal. The
+      -- candidates are the hand as CR 608.2c reaches it, in the zone's own order
+      -- (CR 400.5), and the seats come from handChoosers so the per-seat asks
+      -- run in CR 608.2e's APNAP order.
+      ObjectRef.RandomCardInHand player ->
+        Monad.forM_ (handChoosers legal controller gs player) $ \pid ->
+          case Game.zoneMembers Zone.Hand pid gs of
+            [] -> pure ()
+            [only] -> Event.reveal RevealCause.Ordinary pid only
+            first : second : more -> do
+              let offered = first NonEmpty.:| (second : more)
+              answer <- Game.ask (Prompt.RandomObject offered)
+              Event.reveal RevealCause.Ordinary pid $
+                if List.elem answer (NonEmpty.toList offered) then answer else first
+      _ ->
+        Monad.mapM_
+          (Event.reveal RevealCause.Ordinary controller)
+          (objectRefObjects legal resolving controller source gs ref)
   Effect.LookAt (LookAt.MkLookAt ref slot) -> do
     gs <- State.get
     -- CR 608.2c: the cards are named as this instruction is reached, and CR

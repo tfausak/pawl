@@ -54,8 +54,9 @@ data Prompt r where
   -- The only CHOICE prompt carrying no Decider, and that asymmetry IS CR 723.6's
   -- mechanism: the ask must reach the true player, and there must be nowhere to
   -- put a controller. Folding concede into ChooseAction would hand the controller
-  -- exactly the power that rule forbids. (Shuffle and RandomFirstPlayer carry no
-  -- Decider either, for the unrelated reason that randomness is not a choice.)
+  -- exactly the power that rule forbids. (Shuffle, RandomFirstPlayer and
+  -- RandomObject carry no Decider either, for the unrelated reason that
+  -- randomness is not a choice.)
   --
   -- "At any time" is narrowed to "at each priority grant", and while a CR 729
   -- subgame runs this asks about the SUBGAME rather than the main game (#144,
@@ -66,8 +67,9 @@ data Prompt r where
   -- turn order; the answer is the starting player, and the order is then rotated
   -- to begin with them (CR 103.1).
   --
-  -- Carries no Decider, and neither does Shuffle: randomness is not a choice, so
-  -- there is no decision to usurp and nowhere for a CR 723 controller to sit.
+  -- Carries no Decider, and neither do Shuffle and RandomObject: randomness is
+  -- not a choice, so there is no decision to usurp and nowhere for a CR 723
+  -- controller to sit.
   -- Asked only where the rules call for randomness -- a subgame's start. A main
   -- game's starting player is settled before the game begins (CR 103.1), which is
   -- the caller-supplied turn order Setup.emptyGame takes.
@@ -75,6 +77,31 @@ data Prompt r where
   -- NonEmpty rather than []: the answer has to come from somewhere and a fallback
   -- must be total.
   RandomFirstPlayer :: NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
+  -- | Which of these objects randomness named --
+  -- Pawl.Types.ObjectRef.RandomCardInHand, over the cards in one hand. Merfolk
+  -- Spy's "that player reveals a card at random from their hand" is the
+  -- producer.
+  --
+  -- Carries no Decider, and no PlayerId either: Shuffle's and
+  -- RandomFirstPlayer's reason. Randomness is not a choice, so there is no
+  -- decision to usurp, nowhere for a CR 723 controller to sit, and no seat whose
+  -- answer this is -- WHO the randomness is asked of is unobservable for the
+  -- reason CR 701.24a makes who shuffles unobservable. Asked through
+  -- Pawl.Engine.Game.ask rather than Game.choose for the same reason: being
+  -- asked this is not CR 104.4b's optional action.
+  --
+  -- The engine never rolls. The candidates go to the INTERPRETER, which supplies
+  -- the outcome, and the caller filters the answer back against the offer rather
+  -- than trusting it -- so the decision is neither the engine's nor a player's.
+  --
+  -- NonEmpty, for RandomFirstPlayer's reason: the answer has to come from
+  -- somewhere and a fallback must be total. A caller with one candidate elides
+  -- the ask, where randomness has nothing to determine.
+  --
+  -- No hidden-zone leak (CR 400.2, CR 402.3) in handing over cards in a hand:
+  -- the ids reach the interpreter, which already receives the whole GameState
+  -- through Pawl.Types.Asked.
+  RandomObject :: NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 514.2. The [ObjectId] is the hand; the Natural is how many to discard.
   ChooseDiscard :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt [ObjectId.ObjectId]
   -- | CR 701.22a: how a scrying player splits the cards they just looked at. The
