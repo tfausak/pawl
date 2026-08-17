@@ -864,6 +864,13 @@ blockPermissionCounts permission =
   foldMap quantityCounts (BlockPermission.additional permission)
     <> foldMap conditionCounts (BlockPermission.while permission)
 
+-- CR 508.1h's per-attacker share. Only the Counted arm holds anything: the Fixed
+-- arm is mana symbols.
+perAttackerCounts :: PerAttacker.PerAttacker -> [Count.Type.Count Quantity.Type.Quantity]
+perAttackerCounts perAttacker = case perAttacker of
+  PerAttacker.Fixed _ -> []
+  PerAttacker.Counted quantity -> quantityCounts quantity
+
 -- Hand-maintained, with cardCounts' caveat: a NEW Face field holding effects
 -- must be added here too.
 cardResolutionEffects :: Face.Face Card.Type.Card -> [Effect.Effect Card.Type.Card]
@@ -918,6 +925,10 @@ cardCounts card =
     <> concatMap (quantityCounts . CostReduction.perEach) (Face.costReductions card)
     <> concatMap combatRestrictionCounts (Face.combatRestrictions card)
     <> concatMap blockPermissionCounts (Face.blockPermissions card)
+    -- CR 508.1h's counted share (Sphere of Safety's "the number of enchantments
+    -- you control"), the one Count a cost to attack can hold: its subject is an
+    -- Affected, which holds a Filter but no Count.
+    <> concatMap (perAttackerCounts . AttackCost.perAttacker) (Face.attackCosts card)
 
 -- CR 400.1: "each player has their own library, hand, and graveyard. The
 -- other zones are shared by all players." Battlefield/Stack/Exile/Command are
@@ -4242,6 +4253,16 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             (anyFace cardOffendsSharedZoneScope . Printing.card)
             ps
     Spec.assertEqWith s "no shared-zone scope with a non-EachPlayer ref" (fmap (S.nameOf . Printing.card) offenders) []
+    -- The sweep above is vacuous on any Count position the traversal forgets, so
+    -- the newest one is asserted positively: Sphere of Safety's CR 508.1h share
+    -- counts "enchantments you control", the only Count a cost to attack can
+    -- hold, and cardCounts must see it.
+    sphere <- S.printingOf s registry "Sphere of Safety"
+    Spec.assertEqWith
+      s
+      "a cost to attack's counted share is in the sweep"
+      (fmap Count.Type.scope (cardCounts (S.combinedFace sphere)))
+      [Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)]
   Spec.it s "a card with no enchant ability declares no enchant slot" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let card = S.combinedFace piker
