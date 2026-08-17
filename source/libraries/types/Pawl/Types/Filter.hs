@@ -404,9 +404,9 @@ data Filter keyword
     -- zone, comparison and filter at once, because Pawl.Types.Count already
     -- imports this module -- naming it here closes a module cycle, and the
     -- parametricity escape hatch is spent on `keyword`. Natural rather than
-    -- Integer because a zone's size cannot be negative, and
-    -- Pawl.JsonCodec.Common.natural rejects a literal that is at decode, where
-    -- Integer would admit a vacuously true filter.
+    -- Integer because a zone's size cannot be negative:
+    -- Pawl.JsonCodec.Common.natural rejects a negative literal at decode, where
+    -- Common.integer would accept -1 and yield a vacuously true filter.
     CardsInGraveyardAtLeast Natural.Natural
   | -- | CR 508.1k: the candidate is an ATTACKING creature -- declared as an
     -- attacker this combat phase and not since removed from combat (CR 506.4).
