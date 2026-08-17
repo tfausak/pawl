@@ -1277,18 +1277,52 @@ manifestSpec s registry = Spec.describe s "Manifest" $ do
 
   -- CR 701.40b's parenthesis, first half: "if the card representing that
   -- permanent ISN'T A CREATURE CARD ... it can't be turned face up this way."
-  -- Backslide is the card because it isolates that half -- {1}{U} Instant, so it
-  -- HAS a mana cost and fails only the card-type guard -- and the six untapped
-  -- lands would pay it.
+  --
+  -- Lightning Bolt is the card because it isolates that half and nothing else:
+  -- {R} Instant, so it HAS a mana cost and fails only the card-type guard, and
+  -- the six untapped MOUNTAINS on this board would pay that cost several times
+  -- over. A blue or black noncreature card here would be refused for want of the
+  -- colour instead, and the case would pass whether the guard existed or not.
   Spec.it s "CR 701.40b a manifested noncreature card offers no procedure at all" $ do
-    backslide <- S.printingOf s registry "Backslide"
-    (after, entered) <- manifestedBoard s registry backslide 6
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    (after, entered) <- manifestedBoard s registry bolt 6
     case entered of
       Nothing -> Spec.assertFailure s "the manifest did not reach the battlefield"
       Just permanent -> do
         Spec.assertEqWith s "CR 701.40a it is face down, manifested" (fmap Object.facing (Game.lookupObject permanent after)) (Just (Facing.faceDown FaceDownReason.Manifested))
         Spec.assertEqWith s "CR 708.2a and a 2/2 like any other" (S.powerToughnessOf permanent after) (Just (2, 2))
         Spec.assertEqWith s "CR 701.40b no procedure is offered" (FaceDown.turnableFaceUp S.alice after) []
+
+  -- CR 702.37b's condition, which CR 701.40c is what makes reachable: "put a
+  -- +1/+1 counter on it IF ITS MEGAMORPH COST WAS PAID to turn it face up". A
+  -- manifested megamorph card has two roads face up and only one of them pays
+  -- that cost.
+  --
+  -- THE PAIR, both legs off ONE board, differing in the procedure alone. Misthoof
+  -- Kirin is the card because its two prices and its two outcomes BOTH differ:
+  -- {2}{W} against megamorph {1}{W}, and the printed 2/1 against the 3/2 the
+  -- counter makes. A card whose costs agreed, or whose counter landed on a
+  -- symmetric body, could not tell the roads apart.
+  Spec.it s "CR 702.37b the manifest procedure pays no megamorph cost, so no counter lands" $ do
+    kirin <- S.printingOf s registry "Misthoof Kirin"
+    plains <- S.printingOf s registry "Plains"
+    (after, entered) <- manifestedWith s registry plains kirin 3
+    case entered of
+      Nothing -> Spec.assertFailure s "the manifest did not reach the battlefield"
+      Just permanent -> do
+        Spec.assertEqWith s "CR 708.2a the face-down 2/2 before either road" (S.powerToughnessOf permanent after) (Just (2, 2))
+        Spec.assertEqWith s "CR 701.40c both roads are open" (FaceDown.turnableFaceUp S.alice after) [(permanent, TurnUpProcedure.Morph), (permanent, TurnUpProcedure.Manifest)]
+        let manifested = S.runPure S.identityAnswer after (FaceDown.turnFaceUp S.alice TurnUpProcedure.Manifest permanent)
+            morphed = S.runPure S.identityAnswer after (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph permanent)
+        Spec.assertEqWith s "CR 701.40b three lands went down for {2}{W}" (S.tappedCount S.alice manifested) 5
+        Spec.assertEqWith s "CR 702.37b two for the megamorph {1}{W}" (S.tappedCount S.alice morphed) 4
+        Spec.assertEqWith s "CR 702.37b no counter down the manifest road" (S.counterOf CounterKind.PlusOnePlusOne permanent manifested) 0
+        Spec.assertEqWith s "CR 702.37b and the printed 2/1, not the 3/2" (S.powerToughnessOf permanent manifested) (Just (2, 1))
+        -- THE CONTROL, and what stops the leg above passing because the row was
+        -- never minted: the same permanent, the same board, the megamorph cost
+        -- paid, and the counter lands.
+        Spec.assertEqWith s "CR 702.37b the counter down the megamorph road" (S.counterOf CounterKind.PlusOnePlusOne permanent morphed) 1
+        Spec.assertEqWith s "CR 613.4c and the 3/2 it makes" (S.powerToughnessOf permanent morphed) (Just (3, 2))
 
 -- alice with two Plains and Soul Summons in hand, her library holding Thragtusk
 -- on top of a Goblin Piker, returned as (the board before the cast, the board
@@ -1325,16 +1359,22 @@ summonsBoard s registry = do
 -- non-empty, summonsBoard's reason.
 --
 -- The two Plains are the sorcery's own {1}{W} and are counted against it: the
--- board has `mountains` + 2 lands and the cast takes two, so what is left for a
--- turn-face-up procedure is `mountains` lands with red among them either way the
+-- board has `extra` + 2 lands and the cast takes two, so what is left for a
+-- turn-face-up procedure is `extra` lands of the second colour either way the
 -- auto-tapper spends the generic.
 manifestedBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Printing.Printing -> Int -> m (GameState.GameState, Maybe ObjectId.ObjectId)
-manifestedBoard s registry top mountains = do
+manifestedBoard s registry top extra = do
+  mountain <- S.printingOf s registry "Mountain"
+  manifestedWith s registry mountain top extra
+
+-- manifestedBoard with the second colour named, for a manifested card whose own
+-- costs are not red.
+manifestedWith :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Printing.Printing -> Printing.Printing -> Int -> m (GameState.GameState, Maybe ObjectId.ObjectId)
+manifestedWith s registry land top extra = do
   summons <- S.printingOf s registry "Soul Summons"
   plains <- S.printingOf s registry "Plains"
-  mountain <- S.printingOf s registry "Mountain"
   piker <- S.printingOf s registry "Goblin Piker"
-  let (g1, summonsId) = S.handOne summons (S.landsFor mountain S.alice mountains (S.landsInPlay plains 2))
+  let (g1, summonsId) = S.handOne summons (S.landsFor land S.alice extra (S.landsInPlay plains 2))
       (_, g2) = S.addLibraryCard piker S.alice g1
       (_, before) = S.addLibraryCard top S.alice g2
       after = S.runPure S.identityAnswer before (S.cast S.alice summonsId >> Stack.resolveTop)

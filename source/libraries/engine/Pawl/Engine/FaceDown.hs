@@ -256,7 +256,7 @@ turnFaceUp pid procedure oid = do
             -- 614.1e's abilities add to the turning over rather than replacing it
             -- -- and there is nothing left to cancel by this point anyway: the
             -- status is already written.
-            Monad.void (Event.applyReplacements (ProposedEvent.WouldTurnFaceUp oid))
+            Monad.void (Event.applyReplacements (ProposedEvent.WouldTurnFaceUp oid procedure))
             -- CR 708.7 through CR 603.2: Skirk Marauder's "when this creature is
             -- turned face up" watches for this, and this is the only place in the
             -- engine that writes it.

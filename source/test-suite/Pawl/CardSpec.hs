@@ -4862,6 +4862,30 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- prints one.
     Spec.assertBool s (any (anyFace (any manifests . cardResolutionEffects) . Printing.card) ps) "the pool has a card putting a permanent onto the battlefield face down"
     Spec.assertEqWith s "only the battlefield takes a face-down entry (CR 708.3)" (fmap (S.nameOf . Printing.card) offenders) []
+  -- What Pawl.Engine.Replacement.applies rests on when it gates a WithCounters
+  -- turn-up rewrite on CR 702.37b's "if its megamorph cost was paid": the only
+  -- producer of that rewrite is the megamorph arm of
+  -- Pawl.Engine.Keyword.mintedReplacementsFor, whose rule carries the condition.
+  -- A printing that authored one of its own would be gated by a rule it does not
+  -- have, so this holds that none does.
+  --
+  -- Guarded against a vacuous sweep by the MayAttachTo half: Gift of Doom prints
+  -- the other TurnUpRewrite, so the pool really does reach this constructor and an
+  -- empty offender list is a fact about the rewrites rather than about the type.
+  Spec.it s "no printing authors a counter rewrite on being turned face up (CR 702.37b)" $ do
+    ps <- S.allPrintings s
+    let rewrites effect = case effect of
+          ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ rewrite) -> [rewrite]
+          _ -> []
+        withCounters rewrite = case rewrite of
+          TurnUpRewrite.WithCounters {} -> True
+          TurnUpRewrite.MayAttachTo {} -> False
+        attaches rewrite = not (withCounters rewrite)
+        writes p = anyFace (any (any p . rewrites) . cardReplacementEffects) . Printing.card
+        offenders = filter (writes withCounters) ps
+        attachers = filter (writes attaches) ps
+    Spec.assertBool s (not (null attachers)) "the pool prints a turn-up rewrite at all (Gift of Doom)"
+    Spec.assertEqWith s "only CR 702.37b's megamorph mints a turn-up counter" (fmap (S.nameOf . Printing.card) offenders) []
   -- The sibling of the lint above, for the OTHER PlayerId the engine bakes and
   -- the codec accepts. See phasePatternOffends for why a card cannot name a
   -- player, and for why this is a lint rather than a type split (#437).

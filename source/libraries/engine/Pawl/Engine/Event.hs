@@ -1652,7 +1652,7 @@ apply batch candidate event =
     -- The event survives: turning face up is not replaced by the counter, only
     -- accompanied by it, so Just is returned and FaceDown.turnFaceUp goes on to
     -- record CR 708.7's event.
-    (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ rewrite), ProposedEvent.WouldTurnFaceUp oid) -> case rewrite of
+    (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ rewrite), ProposedEvent.WouldTurnFaceUp oid _) -> case rewrite of
       TurnUpRewrite.WithCounters (WithCounters.MkWithCounters kind n) -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         Monad.void (putOwnCounters oid kind n)
