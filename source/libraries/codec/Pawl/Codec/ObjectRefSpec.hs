@@ -12,12 +12,14 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
+import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
+import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
@@ -106,18 +108,30 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
     Common.assertCodec
       s
       ObjectRef.codec
-      (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) 3))
-      """ {"type":"TopOfLibrary","value":{"player":{"type":"Relative","value":{"type":"You"}},"count":3}} """
+      (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 3)))
+      """ {"type":"TopOfLibrary","value":{"player":{"type":"Relative","value":{"type":"You"}},"count":{"type":"Literal","value":3}}} """
+  -- Commune with Lava's "the top X cards of your library": the same arm with a
+  -- computed depth, which is what a bare number could never say.
+  Spec.it s "TopOfLibrary carries the computed depth Commune with Lava needs" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) (Quantity.InSlot (SlotName.MkSlotName (Text.pack "X")))))
+      """ {"type":"TopOfLibrary","value":{"player":{"type":"Relative","value":{"type":"You"}},"count":{"type":"InSlot","value":"X"}}} """
   Spec.it s "TopOfLibrary rejects a bare player reference with no depth" $
     Spec.assertBool
       s
       (Either.isLeft (Common.parse (Text.pack """ {"type":"TopOfLibrary","value":{"type":"Relative","value":{"type":"You"}}} """) >>= Codec.decode ObjectRef.codec))
       "expected a decode failure"
-  -- CR 401.2 counts cards, so a negative depth is not a number of them.
-  Spec.it s "TopOfLibrary rejects a negative depth" $
+  -- The depth was a bare number before it became a Quantity, so a card file
+  -- written against that shape fails to decode rather than reading as a literal.
+  -- A NEGATIVE depth is no longer a decode failure -- Quantity.Literal takes an
+  -- Integer -- and is clamped to zero where it is read instead (CR 107.1b),
+  -- which Pawl.Engine.Resolve.objectRefObjects' own note records.
+  Spec.it s "TopOfLibrary rejects a bare number as a depth" $
     Spec.assertBool
       s
-      (Either.isLeft (Common.parse (Text.pack """ {"type":"TopOfLibrary","value":[{"type":"Relative","value":{"type":"You"}},-1]} """) >>= Codec.decode ObjectRef.codec))
+      (Either.isLeft (Common.parse (Text.pack """ {"type":"TopOfLibrary","value":{"player":{"type":"Relative","value":{"type":"You"}},"count":3}} """) >>= Codec.decode ObjectRef.codec))
       "expected a decode failure"
   -- The graveyard's OTHER arm: a card somebody chooses rather than the whole
   -- matching set. Its scope and filter are EachCardInGraveyard's exactly, so
@@ -154,14 +168,31 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       (Either.isLeft (Common.parse (Text.pack """ {"type":"ChosenCardInGraveyard","value":[{"type":"You"},{"type":"HasCardType","value":{"type":"Creature"}}]} """) >>= Codec.decode ObjectRef.codec))
       "expected a decode failure"
   -- Karn Liberated's "+4: target player exiles a card from their hand". One
-  -- PlayerRef and no record, since CR 402.3 makes the chooser and the hand's
-  -- owner the same player -- and the slot it names is the one Karn targets.
+  -- PlayerRef, since CR 402.3 makes the chooser and the hand's owner the same
+  -- player -- and the slot it names is the one Karn targets. Karn states no
+  -- characteristic, so its filter is the always-matching one.
   Spec.it s "ChosenCardInHand" $
     Common.assertCodec
       s
       ObjectRef.codec
-      (ObjectRef.ChosenCardInHand (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
-      """ {"type":"ChosenCardInHand","value":{"type":"InSlot","value":"target"}} """
+      (ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Filter.And [])))
+      """ {"type":"ChosenCardInHand","value":{"player":{"type":"InSlot","value":"target"},"filter":{"type":"And","value":[]}}} """
+  -- Elvish Piper's "a creature card from your hand": the same arm with the
+  -- Filter stating a characteristic, which is the pair Karn's unfiltered wording
+  -- cannot tell apart.
+  Spec.it s "ChosenCardInHand carries the filter Elvish Piper needs" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (PlayerRef.Relative PlayerRelation.You) (Filter.HasCardType CardType.Creature)))
+      """ {"type":"ChosenCardInHand","value":{"player":{"type":"Relative","value":{"type":"You"}},"filter":{"type":"HasCardType","value":{"type":"Creature"}}}} """
+  -- The filter is REQUIRED rather than defaulted, so a card written before it
+  -- existed is a decode failure rather than a silently unnarrowed choice.
+  Spec.it s "ChosenCardInHand rejects the bare player reference that preceded the filter" $
+    Spec.assertBool
+      s
+      (Either.isLeft (Common.parse (Text.pack """ {"type":"ChosenCardInHand","value":{"type":"InSlot","value":"target"}} """) >>= Codec.decode ObjectRef.codec))
+      "expected a decode failure"
   -- Guards against a decoder that read every payload as one arm. The arms are
   -- all objects, so only the tag separates them, and a duplicated tag would
   -- collapse two of these. The two graveyard arms are the pair it really
@@ -180,9 +211,9 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardExiledWithSource Nothing),
                 Codec.encode ObjectRef.codec (ObjectRef.EachSpell (Filter.Not Filter.IsSource)),
                 Codec.encode ObjectRef.codec ObjectRef.EachPlayer,
-                Codec.encode ObjectRef.codec (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) 3)),
+                Codec.encode ObjectRef.codec (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 3))),
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature))),
-                Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInHand (PlayerRef.Relative PlayerRelation.You))
+                Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (PlayerRef.Relative PlayerRelation.You) (Filter.HasCardType CardType.Creature)))
               ]
           )
       )

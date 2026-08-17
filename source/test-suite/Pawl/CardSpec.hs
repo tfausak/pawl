@@ -82,6 +82,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
+import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
@@ -429,6 +430,14 @@ cardSpec s = Spec.describe s "Card" $ do
       (Face.triggeredAbilities c)
       [oneEffectTrigger TriggerCondition.SelfDies (youDraw 1), oneEffectTrigger TriggerCondition.SelfDies (youDraw 2)]
 
+-- Every Count reachable from an ObjectRef, through the Quantities it carries.
+-- Delegated to Resolve.objectRefQuantities so this traversal and the engine's two
+-- static-analysis passes (Resolve.slotsAreExhaustive, Resolve.readsX) cannot
+-- disagree about which arms hold a number: today that is
+-- ObjectRef.TopOfLibrary's depth alone.
+refCounts :: ObjectRef.ObjectRef -> [Count.Type.Count Quantity.Type.Quantity]
+refCounts = concatMap quantityCounts . Resolve.objectRefQuantities
+
 -- Every Count reachable from a Quantity: a leaf Count directly, or one nested
 -- through Plus's two children (CR 208.2 composition -- a printed 1+*) or
 -- Negate's one.
@@ -702,14 +711,17 @@ effectCounts effect = case effect of
   Effect.ControlPlayerNextTurn _ -> []
   Effect.Destroy {} -> []
   Effect.Sacrifice _ -> []
-  Effect.MoveToZone {} -> []
+  -- A Quantity nested in the ObjectRef: rule 701.20a's reveal, rule 701.20e's
+  -- look, a zone move and CR 608.2f's ForEach each name their cards through one,
+  -- and ObjectRef.TopOfLibrary's depth is a Quantity that may hold a Count.
+  -- Resolve.objectRefQuantities is what recovers it, so a second ObjectRef arm
+  -- gaining a Quantity answers there rather than here -- and that function is
+  -- also where the four opcodes that route their ref are named.
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> refCounts ref
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.Mill (Mill.MkMill _ quantity _) -> quantityCounts quantity
-  -- No Quantity: rule 701.20a's reveal and rule 701.20e's look each name their
-  -- cards through an ObjectRef, and ObjectRef.TopOfLibrary's depth is a literal
-  -- Natural.
-  Effect.Reveal {} -> []
-  Effect.LookAt {} -> []
+  Effect.Reveal ref -> refCounts ref
+  Effect.LookAt (LookAt.MkLookAt ref _) -> refCounts ref
   Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
@@ -786,7 +798,7 @@ effectCounts effect = case effect of
   Effect.GrantPlayFromExile grant -> durationCounts (GrantPlayFromExile.duration grant)
   -- CR 608.2f's body is an effect list a card authors, so its Counts are this
   -- card's -- the rider's recursion one opcode over.
-  Effect.ForEach (ForEach.MkForEach _ _ body) -> concatMap effectCounts body
+  Effect.ForEach (ForEach.MkForEach ref _ body) -> refCounts ref <> concatMap effectCounts body
 
 -- Every Count reachable from one triggered ability (a card's own, or a
 -- delayed one -- both TriggeredAbility Card): its TriggerCondition, its
@@ -2321,17 +2333,21 @@ objectRefFilters ref = case ref of
   ObjectRef.EachSpell f -> [f]
   -- Molten Disaster's "each player" holds no Filter to lint.
   ObjectRef.EachPlayer -> []
-  -- Count on Luck's "the top card of your library" names a POSITION, so it holds
-  -- no Filter either; its PlayerRef names players, and its depth counts cards --
-  -- neither is a characteristic.
-  ObjectRef.TopOfLibrary {} -> []
+  -- Count on Luck's "the top card of your library" names a POSITION, so it states
+  -- no Filter of its own, and its PlayerRef names players. Its DEPTH is a
+  -- Quantity, which reaches one through a Count -- "the top X cards" where X is
+  -- itself a fold -- so the depth goes through refCounts for the reason
+  -- Effect.DealDamage's quantity does.
+  ObjectRef.TopOfLibrary {} -> countFilters (refCounts ref)
   -- Port of Karfell's "a creature card from your graveyard"; its PlayerScope and
   -- its Chooser name players, so the Filter is the whole of what there is to
   -- lint, exactly as for the graveyard sweep above.
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard _ _ f) -> [f]
-  -- Karn Liberated's "a card from their hand": one PlayerRef and no Filter at
-  -- all, so there is nothing here to lint.
-  ObjectRef.ChosenCardInHand _ -> []
+  -- Elvish Piper's "a creature card from your hand"; its PlayerRef names the
+  -- choosers, who are also the hands' owners (CR 402.3), so the Filter is the
+  -- whole of what there is to lint -- the chosen graveyard card's arm's answer,
+  -- for its reason.
+  ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand _ f) -> [f]
 
 -- The Filter a Count folds over (CR 608.2h). Delegated to the *Counts family
 -- above rather than re-walked: those traversals are already the project's answer
@@ -4435,9 +4451,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     ps <- S.allPrintings s
     let -- The refs that move at most ONE object, and so bind the singular shape
         -- whatever the board holds. A TopOfLibrary is `depth` cards PER LIBRARY,
-        -- so it qualifies only at a depth of one over a PlayerRef naming a single
-        -- library -- "each player's" and, in a game of three, "each opponent's"
-        -- both move several, and so does any depth above one.
+        -- so it qualifies only at a LITERAL depth of one over a PlayerRef naming a
+        -- single library -- "each player's" and, in a game of three, "each
+        -- opponent's" both move several, and so does any depth above one. A
+        -- COMPUTED depth (Commune with Lava's X) is not statically one, so it is
+        -- plural here whatever the board would make it: this lint asks what a card
+        -- may be written as, and a card whose depth is a number it computes may
+        -- always compute more than one.
         movesAtMostOne ref = case ref of
           ObjectRef.InSlot _ -> True
           ObjectRef.EachMatching _ -> False
@@ -4449,7 +4469,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           ObjectRef.EachCardExiledWithSource {} -> False
           ObjectRef.EachSpell _ -> False
           ObjectRef.EachPlayer -> False
-          ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player depth) -> depth <= 1 && namesOneSeat player
+          ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player depth) -> case depth of
+            Quantity.Type.Literal n -> n <= 1 && namesOneSeat player
+            _ -> False
           -- One card per CHOOSER: the resolving controller chooses once however
           -- many graveyards the scope draws candidates from, where Exhume's
           -- "each player" is one choice each and so several cards on any board
@@ -4464,7 +4486,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- choosers: Karn Liberated's targeted seat exiles one card, and "each
           -- player" would be one each. The same per-seat count TopOfLibrary
           -- takes of its own PlayerRef, which is why they share namesOneSeat.
-          ObjectRef.ChosenCardInHand player -> namesOneSeat player
+          ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player _) -> namesOneSeat player
         -- Does this PlayerRef name at most ONE seat? A per-player count over it
         -- -- a library's top card, a card chosen out of a hand -- moves at most
         -- one object exactly when it does.

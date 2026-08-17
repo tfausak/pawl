@@ -24,8 +24,14 @@
                           "ref": {
                             "type": "ChosenCardInHand",
                             "value": {
-                              "type": "InSlot",
-                              "value": "target"
+                              "filter": {
+                                "type": "And",
+                                "value": []
+                              },
+                              "player": {
+                                "type": "InSlot",
+                                "value": "target"
+                              }
                             }
                           },
                           "zone": {

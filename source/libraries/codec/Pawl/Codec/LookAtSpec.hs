@@ -10,6 +10,7 @@ import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 
@@ -21,8 +22,8 @@ spec s = Spec.describe s "Pawl.Codec.LookAt" $ do
       s
       LookAt.codec
       ( LookAt.MkLookAt
-          (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) 1))
+          (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)))
           (SlotName.MkSlotName (Text.pack "looked"))
       )
-      """ {"ref":{"type":"TopOfLibrary","value":{"count":1,"player":{"type":"Relative","value":{"type":"You"}}}},"slot":"looked"} """
+      """ {"ref":{"type":"TopOfLibrary","value":{"count":{"type":"Literal","value":1},"player":{"type":"Relative","value":{"type":"You"}}}},"slot":"looked"} """
   Spec.it s "has a schema" $ Common.assertHasSchema s LookAt.codec

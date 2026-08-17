@@ -3,20 +3,28 @@
     {
       "manaCost": [
         {
-          "type": "Generic",
-          "value": 1
+          "type": "Variable"
         },
         {
           "type": "OfType",
           "value": {
             "type": "Colored",
             "value": {
-              "type": "White"
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
             }
           }
         }
       ],
-      "name": "Soul Summons",
+      "name": "Commune with Lava",
       "spell": {
         "modes": [
           {
@@ -30,8 +38,8 @@
                         "type": "TopOfLibrary",
                         "value": {
                           "count": {
-                            "type": "Literal",
-                            "value": 1
+                            "type": "InSlot",
+                            "value": "X"
                           },
                           "player": {
                             "type": "Relative",
@@ -41,11 +49,21 @@
                           }
                         }
                       },
-                      "riders": {
-                        "faceDown": true
-                      },
+                      "slot": "exiled",
                       "zone": {
-                        "type": "Battlefield"
+                        "type": "Exile"
+                      }
+                    }
+                  },
+                  {
+                    "type": "GrantPlayFromExile",
+                    "value": {
+                      "duration": {
+                        "type": "UntilEndOfYourNextTurn"
+                      },
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "exiled"
                       }
                     }
                   }
@@ -58,7 +76,7 @@
       "typeLine": {
         "types": [
           {
-            "type": "Sorcery"
+            "type": "Instant"
           }
         ]
       }

@@ -1,10 +1,10 @@
 module Pawl.Codec.ObjectRef where
 
 import qualified Pawl.Codec.ChosenCardInGraveyard as ChosenCardInGraveyard
+import qualified Pawl.Codec.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Codec.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
-import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.TopOfLibrary as TopOfLibrary
 import qualified Pawl.JsonCodec.Arm as Arm
@@ -20,12 +20,11 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 --
 -- A BUNDLE since 'Pawl.Codec.PlayerRef' became one, which is what 'TopOfLibrary'
 -- was waiting on. The wire format is unchanged by that conversion -- the same
--- five tags, emitted identically -- and what it adds is the schema.
+-- tags, emitted identically -- and what it adds is the schema.
 --
--- 'EachCardInGraveyard', 'TopOfLibrary' and 'ChosenCardInGraveyard' each carry a
--- payload record of their own (#1464), so no arm here writes a positional array.
--- 'ChosenCardInHand' needs no record: CR 402.3 collapses its chooser and its
--- hand's owner into the one 'Pawl.Codec.PlayerRef' it carries.
+-- 'EachCardInGraveyard', 'TopOfLibrary', 'ChosenCardInGraveyard' and
+-- 'ChosenCardInHand' each carry a payload record of their own (#1464), so no arm
+-- here writes a positional array.
 --
 -- 'EachCardExiledWithSource' takes an OPTIONAL payload: the bare tag is the whole
 -- linked set (CR 607.3), and a value narrows it to the cards a printing's own
@@ -43,7 +42,7 @@ codec =
       Arm.nullary "EachPlayer" ObjectRef.EachPlayer,
       Arm.payload "TopOfLibrary" TopOfLibrary.codec ObjectRef.TopOfLibrary (\x -> case x of ObjectRef.TopOfLibrary y -> Just y; _ -> Nothing),
       Arm.payload "ChosenCardInGraveyard" ChosenCardInGraveyard.codec ObjectRef.ChosenCardInGraveyard (\x -> case x of ObjectRef.ChosenCardInGraveyard y -> Just y; _ -> Nothing),
-      Arm.payload "ChosenCardInHand" PlayerRef.codec ObjectRef.ChosenCardInHand (\x -> case x of ObjectRef.ChosenCardInHand y -> Just y; _ -> Nothing)
+      Arm.payload "ChosenCardInHand" ChosenCardInHand.codec ObjectRef.ChosenCardInHand (\x -> case x of ObjectRef.ChosenCardInHand y -> Just y; _ -> Nothing)
     ]
   where
     -- Written once so the encoder, the decoder and the schema cannot disagree
