@@ -71,6 +71,10 @@ data TriggerCondition
     -- damage step's damage simultaneously and Pawl.Engine.Damage records a
     -- DamageDealt per surviving event, so a creature blocked by two others
     -- triggers this twice. Pinned by Pawl.TriggerSpec.
+    --
+    -- Binds how much that one event dealt under Pawl.Engine.Binding.eventAmount,
+    -- which is Coalhauler Swine's "that much". The DAMAGER gets no slot -- no
+    -- printing reads it here -- and neither does the recipient, who is the bearer.
     SelfIsDealtDamage
   | -- | CR 603.2 / 509-510 again, read by a BYSTANDER: a permanent the Filter
     -- admits dealt combat damage to a player -- Tovolar, Dire Overlord's

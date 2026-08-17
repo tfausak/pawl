@@ -6902,6 +6902,32 @@ eventBindings cond event = case (cond, event) of
   -- outright, and CR 725.3 makes it exactly one.
   (TriggerCondition.PlayerBecomesMonarch _, GameEvent.BecameMonarch crowned) ->
     Binding.setTriggerPlayer crowned Map.empty
+  -- CR 120.3's "that much", read by the damage's RECIPIENT: Coalhauler Swine's
+  -- "whenever this creature is dealt damage, it deals that much damage to each
+  -- player". The same reserved slot CR 615.13's prevention and CR 119.9's life
+  -- gain stamp (see Binding.eventAmount), and the same reading -- the AMOUNT the
+  -- event recorded, never the damager's power or the bearer's: CR 702.19b lets a
+  -- trampler split its power across a blocker and a player, and CR 120.3 admits
+  -- noncombat damage whose amount its source's power never named at all.
+  --
+  -- ONE event's amount, not a batch's: CR 510.2 deals a combat damage step's
+  -- damage simultaneously and Pawl.Engine.Damage records a DamageDealt per
+  -- surviving event, so two blockers stamp two triggers with their own numbers
+  -- rather than one with the sum. Pinned by Pawl.TriggerSpec's two-blocker board.
+  --
+  -- Unconditional given a match, which is what eventBindingSlots' per-condition
+  -- promise needs: every GameEvent.DamageDealt carries a DamageEvent.amount,
+  -- whichever of CR 120.3's damage kinds it is.
+  --
+  -- The DAMAGER gets no slot alongside it. The event names one and
+  -- Binding.combatDamager is the slot it would take, but no printing points at it
+  -- under this condition: a Scryfall sweep of "is dealt damage" against "the
+  -- source" / "that source" matches nothing at all, so unlike the damaged player
+  -- of the bystander arm above (#1175) this one has no card waiting on it. The
+  -- RECIPIENT needs no slot either -- matchesTrigger has just proved it is the
+  -- bearer, whom CR 113.7a's source slot already names.
+  (TriggerCondition.SelfIsDealtDamage, GameEvent.DamageDealt ev) ->
+    Binding.setEventAmount (DamageEvent.amount ev) Map.empty
   -- CR 603.1b's multi-condition ability reaches this fallthrough and stamps
   -- nothing, which agrees with eventBindingSlots' intersection for the pool's one
   -- AnyOf and is pinned by Pawl.TriggerSpec against every event either branch
@@ -6989,14 +7015,15 @@ eventBindingSlots cond = case cond of
   TriggerCondition.StateIs _ -> Set.empty
   -- CR 702.70a's "that player": the player the bearer dealt combat damage to.
   TriggerCondition.SelfDealsCombatDamageToPlayer -> Set.singleton Binding.triggerPlayer
-  -- NOTHING for enrage. CR 120.3's event names a source and an amount, and the
-  -- recipient is the bearer, whom CR 113.7a's source slot already names -- so the
-  -- two nameable halves are the damager and the number. Neither is bound and
-  -- eventBindings has no arm for this condition: Ripjaw Raptor's "draw a card"
-  -- reads no part of the event, and a slot nothing reads is a promise never kept.
-  -- Brash Taunter's "it deals that much damage" is what would want the amount
-  -- (gap #1712).
-  TriggerCondition.SelfIsDealtDamage -> Set.empty
+  -- CR 120.3's amount for enrage, which Coalhauler Swine's "it deals that much
+  -- damage to each player" reads: the same slot CR 615.13's prevention and CR
+  -- 119.9's life gain stamp, and guaranteed given a match -- every DamageDealt
+  -- event carries an amount, whichever of CR 120.3's two damage kinds this
+  -- unfiltered condition admitted.
+  --
+  -- No slot for the DAMAGER, the event's other nameable half, and none for the
+  -- recipient, who is the bearer. See the eventBindings arm above for both.
+  TriggerCondition.SelfIsDealtDamage -> Set.singleton Binding.eventAmount
   -- CR 510.2's damager, which the bystander's form needs and the self-scoped one
   -- above does not: there the damager IS the bearer, already bound as CR 113.7a's
   -- source. Aragorn, Hornburg Hero's "double the number of +1/+1 counters on it"
