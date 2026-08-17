@@ -1,6 +1,8 @@
 module Pawl.Decimal where
 
 import qualified Data.Function as Function
+import qualified Data.Ord as Ord
+import qualified GHC.Num.Integer as Integer
 
 -- | A decimal number representing @mantissa * 10 ^ exponent@.
 data Decimal = UnsafeDecimal
@@ -15,16 +17,14 @@ data Decimal = UnsafeDecimal
 -- representation canonical, so only values built directly with 'UnsafeDecimal'
 -- can disagree.
 instance Ord Decimal where
-  compare x y =
-    let s = signum $ mantissa x
-     in case compare s . signum $ mantissa y of
-          EQ -> case compare s 0 of
-            -- Both are negative, so the bigger magnitude is the smaller value.
-            LT -> compareMagnitude y x
-            -- Both mantissas are zero, whatever the exponents say.
-            EQ -> EQ
-            GT -> compareMagnitude x y
-          o -> o
+  compare x y = case Ord.comparing (signum . mantissa) x y of
+    EQ -> case compare (mantissa x) 0 of
+      -- Both are negative, so the bigger magnitude is the smaller value.
+      LT -> compareMagnitude y x
+      -- Both mantissas are zero, whatever the exponents say.
+      EQ -> EQ
+      GT -> compareMagnitude x y
+    o -> o
 
 -- | Creates a normalized decimal number from the given mantissa and exponent.
 mkDecimal :: Integer -> Integer -> Decimal
@@ -43,12 +43,11 @@ mkDecimal = Function.fix $ \rec m e ->
 -- the shift is bounded by the difference in digit counts rather than by the
 -- exponents themselves.
 compareMagnitude :: Decimal -> Decimal -> Ordering
-compareMagnitude x@(UnsafeDecimal _ ex) y@(UnsafeDecimal _ ey) =
-  case Function.on compare adjustedExponent x y of
+compareMagnitude x@(UnsafeDecimal mx ex) y@(UnsafeDecimal my ey) =
+  case Ord.comparing adjustedExponent x y of
     EQ ->
       let e = min ex ey
-          scale (UnsafeDecimal m f) = abs m * 10 ^ (f - e)
-       in Function.on compare scale x y
+       in compare (abs mx * 10 ^ (ex - e)) (abs my * 10 ^ (ey - e))
     o -> o
 
 -- | The power of ten of the leading digit: for a non-zero mantissa, the
@@ -60,7 +59,4 @@ adjustedExponent (UnsafeDecimal m e) = e + digitCount m - 1
 -- | The number of base ten digits in an integer's absolute value. Zero counts
 -- as one digit.
 digitCount :: Integer -> Integer
-digitCount =
-  Function.fix
-    (\rec n -> if n < 10 then 1 else 1 + rec (quot n 10))
-    . abs
+digitCount = (+ 1) . toInteger . Integer.integerLogBase 10 . abs
