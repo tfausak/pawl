@@ -326,7 +326,7 @@ slotsOf effect = case effect of
   Effect.AddMana (ManaAddition.MkManaAddition ref _) -> playerRefSlots ref
   -- BOTH refs: Extract's library owner is the slot it targets, and a slot read
   -- only by that ref would otherwise look dangling to the dataflow lint.
-  Effect.Search (Search.MkSearch searcher owner quantity _ _) ->
+  Effect.Search (Search.MkSearch searcher owner quantity _ _ _) ->
     joinSlots [playerRefSlots searcher, playerRefSlots owner, quantitySlots quantity]
   Effect.ExileAllGraveyards -> Map.empty
   Effect.Proliferate -> Map.empty
@@ -587,7 +587,7 @@ slotsAreExhaustive effect = case effect of
       && all Quantity.slotsAreExhaustive (Projection.quantitiesOf modification)
   Effect.ChangeText {} -> True
   Effect.AddMana _ -> True
-  Effect.Search (Search.MkSearch _ _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
+  Effect.Search (Search.MkSearch _ _ quantity _ _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.ExileAllGraveyards -> True
   Effect.Proliferate -> True
   Effect.Bolster quantity -> Quantity.slotsAreExhaustive quantity
@@ -732,7 +732,7 @@ readsX = any effectReadsX
       Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> any Quantity.readsX (Projection.quantitiesOf modification)
       Effect.ChangeText {} -> False
       Effect.AddMana _ -> False
-      Effect.Search (Search.MkSearch _ _ quantity _ _) -> Quantity.readsX quantity
+      Effect.Search (Search.MkSearch _ _ quantity _ _ _) -> Quantity.readsX quantity
       Effect.ExileAllGraveyards -> False
       Effect.Proliferate -> False
       Effect.Bolster quantity -> Quantity.readsX quantity
@@ -2906,7 +2906,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- has neither of. No triggered ability in the pool adds mana of any colour
       -- (#1571).
       _ : _ : _ -> pure ()
-  Effect.Search (Search.MkSearch searcherRef ownerRef quantity filter_ destination) ->
+  Effect.Search (Search.MkSearch searcherRef ownerRef quantity filter_ upTo destination) ->
     -- CR 701.23a: match each library card against "the given description",
     -- through the card's own CR 613 projection. Rule 613.1 starts from the actual
     -- object and names no zone, so a library card is folded exactly as a permanent
@@ -3025,10 +3025,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- declining answer cannot be obeyed. `filler` is disjoint from
                   -- `picked` and both are drawn from `matches`, so the take yields
                   -- the cap or the whole of what matched, whichever is smaller.
+                  --
+                  -- Search.upTo is the third case, the one the filter cannot
+                  -- classify: Denying Wind's "up to seven cards" states no quality,
+                  -- so CR 701.23d would force it, and the card's own "up to" says
+                  -- otherwise. The permission is the same one CR 701.23b grants, so
+                  -- it lands in the same branch rather than in a third.
                   let picked = List.genericTake cap . List.nub $ filter (\oid -> List.elem oid matches) answer
                       filler = filter (\oid -> List.notElem oid picked) matches
                   pure $
-                    if Filter.statesAQuality filter_
+                    if Filter.statesAQuality filter_ || upTo
                       then picked
                       else List.genericTake cap (picked <> filler)
             -- Where the cards go is the CARD's instruction, not rule 701.23's --

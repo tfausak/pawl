@@ -30,8 +30,26 @@ spec s = Spec.describe s "Pawl.Codec.Search" $ do
             Search.owner = PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "player")),
             Search.quantity = Quantity.Literal 1,
             Search.filter = Filter.HasCardType CardType.Land,
+            Search.upTo = True,
             Search.destination = SearchDestination.BattlefieldTapped
           }
       )
-      """ {"searcher":{"type":"Relative","value":{"type":"You"}},"owner":{"type":"InSlot","value":"player"},"quantity":{"type":"Literal","value":1},"filter":{"type":"HasCardType","value":{"type":"Land"}},"destination":{"type":"BattlefieldTapped"}} """
+      """ {"searcher":{"type":"Relative","value":{"type":"You"}},"owner":{"type":"InSlot","value":"player"},"quantity":{"type":"Literal","value":1},"filter":{"type":"HasCardType","value":{"type":"Land"}},"upTo":true,"destination":{"type":"BattlefieldTapped"}} """
+  -- The other reading of the same count: no "upTo" key means the quantity is a
+  -- quota. Paired with the case above so the key's absence is asserted, not just
+  -- its presence -- a required key would have made every card file rewrite.
+  Spec.it s "an absent upTo decodes as False and is not written back" $
+    Common.assertCodec
+      s
+      Search.codec
+      ( Search.MkSearch
+          { Search.searcher = PlayerRef.Relative PlayerRelation.You,
+            Search.owner = PlayerRef.Relative PlayerRelation.You,
+            Search.quantity = Quantity.Literal 1,
+            Search.filter = Filter.HasCardType CardType.Land,
+            Search.upTo = False,
+            Search.destination = SearchDestination.BattlefieldTapped
+          }
+      )
+      """ {"searcher":{"type":"Relative","value":{"type":"You"}},"owner":{"type":"Relative","value":{"type":"You"}},"quantity":{"type":"Literal","value":1},"filter":{"type":"HasCardType","value":{"type":"Land"}},"destination":{"type":"BattlefieldTapped"}} """
   Spec.it s "has a schema" $ Common.assertHasSchema s Search.codec

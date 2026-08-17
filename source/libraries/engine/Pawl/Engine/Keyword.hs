@@ -454,6 +454,10 @@ cycling cost searchFor =
               Search.owner = PlayerRef.Relative PlayerRelation.You,
               Search.quantity = Quantity.Literal 1,
               Search.filter = filter_,
+              -- CR 702.29e prints no "up to", and its quality-stating filter puts
+              -- the search under CR 701.23b anyway, so the shortfall is already
+              -- legal here and this value is unobservable.
+              Search.upTo = False,
               Search.destination = SearchDestination.RevealThenHand
             }
 

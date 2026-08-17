@@ -20,6 +20,23 @@ data Search = MkSearch
     owner :: PlayerRef.PlayerRef,
     quantity :: Quantity.Quantity,
     filter :: Filter.Filter Keyword.Keyword,
+    -- | Whether the printed instruction says "up to", making the quantity a
+    -- ceiling the searcher chooses within rather than one they must fill.
+    --
+    -- Not derivable from `filter`. CR 701.23b already lets a search STATING A
+    -- QUALITY find fewer or none, so Explosive Vegetation's "up to two basic
+    -- land cards" needs no flag; CR 701.23d then forces a search for a bare
+    -- quantity, Extract's "a card". Denying Wind's "up to seven cards" is the
+    -- third case the other two fields cannot express: a bare quantity the card
+    -- nonetheless makes optional, which CR 701.23d does not reach because the
+    -- search is not "simply for a quantity of cards".
+    --
+    -- A Bool beside the Quantity rather than a Quantity arm: "up to" is a
+    -- permission attached to a count, not a different count. An unbounded "any
+    -- number of cards" is the other axis -- a count with no number at all --
+    -- and belongs on the Quantity (gap #1685), where it would carry this flag
+    -- too.
+    upTo :: Bool,
     destination :: SearchDestination.SearchDestination
   }
   deriving (Eq, Ord, Show)

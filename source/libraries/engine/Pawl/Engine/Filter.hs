@@ -1185,8 +1185,12 @@ manaValueThresholds predicate = case predicate of
 -- and being overridden.
 --
 -- Derived rather than stored on the opcode: the two are not independent -- the
--- rule reads the search's own description of what it looks for -- so a flag
--- beside the Filter could only ever disagree with it.
+-- rule reads the search's own description of what it looks for -- so a stored
+-- answer to THIS question could only ever disagree with the filter it reads.
+-- Search.upTo is a different question, not this one stored: the card printing
+-- "up to seven cards" (Denying Wind) grants the shortfall itself, so the search
+-- is optional whatever this predicate says. That flag is read beside this
+-- answer, never instead of it.
 --
 -- A quality is stated unless the predicate is TRIVIALLY TRUE, and by the type's
 -- own note `And []` is the only way to write that. Hence And joins with `any` and

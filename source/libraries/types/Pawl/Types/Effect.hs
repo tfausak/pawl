@@ -147,17 +147,17 @@ data Effect card
     --
     -- The Quantity is how many cards the search may find: Explosive Vegetation's
     -- "up to two basic land cards" is `Literal 2`, and Rampant Growth's "a basic
-    -- land card" is `Literal 1`. Whether it is a CEILING or a QUOTA is read off
-    -- the Filter rather than stored, since the rule reads the search's own
-    -- description of what it looks for: CR 701.23b lets a search STATING A
+    -- land card" is `Literal 1`. Whether it is a CEILING or a QUOTA is mostly
+    -- read off the Filter rather than stored, since the rule reads the search's
+    -- own description of what it looks for: CR 701.23b lets a search STATING A
     -- QUALITY find fewer or none even when the library holds them, while CR
     -- 701.23d makes a search for a bare quantity -- "a card", Extract's whole
     -- filter -- find that many, or as many as the library can supply.
-    -- Filter.statesAQuality is that classification.
+    -- Filter.statesAQuality is that classification, and Search.upTo is the one
+    -- case it cannot reach: Denying Wind's "up to seven cards" states no quality
+    -- and is optional anyway.
     --
-    -- Not implemented: a search of any zone but a library (#1318). Nor "up to N
-    -- cards" with no quality stated, which CR 701.23d does not force and this
-    -- pair of fields cannot tell from a bare "N cards" (#1379).
+    -- Not implemented: a search of any zone but a library (#1318).
     Search Search.Search
   | -- | CR 701.13 / Rest in Peace: exile every card in every graveyard. Targetless
     -- and bulk; a general exile-from-zone is future.
