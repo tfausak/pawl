@@ -35,8 +35,8 @@
 --
 -- And how a battle is defeated: CR 310.6 / 120.3h's damage removing defense
 -- counters, CR 115.4's "any target" admitting one, CR 310.12b's intrinsic Siege
--- ability, and CR 310.7 / 704.5v's state-based action. Those are damageSpec and
--- defeatSpec below.
+-- ability, and CR 310.7 / 704.5v's and CR 310.8 / 704.5w's state-based actions.
+-- Those are damageSpec and defeatSpec below.
 --
 -- Lightning Bolt ({R} Instant, "deals 3 damage to any target") and Firebolt ({R}
 -- Sorcery, "deals 2 damage to any target") are the pool's two plainest CR 115.4
@@ -501,10 +501,12 @@ damageSpec s registry = Spec.describe s "Damage" $ do
         dealt = S.runPure S.identityAnswer killed (Monad.void Damage.dealCombatDamage)
     Spec.assertEqWith s "no damage was dealt at all" (S.damageEventsOf dealt) []
 
--- CR 310.12b and CR 310.7 / 704.5v: what happens when the last defense counter
--- comes off. The two rules are only jointly observable -- 704.5v alone would send
--- the Siege to a graveyard where 310.12b exiles it -- so every case here asserts
--- the DESTINATION zone rather than merely that the battle left.
+-- CR 310.12b, CR 310.7 / 704.5v and CR 310.8 / 704.5w: what happens when the last
+-- defense counter comes off. The first two rules are only jointly observable --
+-- 704.5v alone would send the Siege to a graveyard where 310.12b exiles it -- so
+-- every gameplay-level case here asserts the DESTINATION zone rather than merely
+-- that the battle left. 704.5w's battle-type split has no printing to reach it, so
+-- the three classifier cases at the end read Battle.defeated directly.
 defeatSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 defeatSpec s registry = Spec.describe s "Defeat" $ do
   Spec.it s "CR 310.12b a Siege has the intrinsic defeat ability" $ do
@@ -620,6 +622,24 @@ defeatSpec s registry = Spec.describe s "Defeat" $ do
         removal = [GameEvent.CountersRemoved (CounterChange.MkCounterChange battle CounterKind.Defense 2 0)]
     Spec.assertBool s (Battle.awaitingAbility removal drained battle) "the ability has triggered"
     Spec.assertEqWith s "so nothing is buried" (Battle.defeated (Projection.projectAll drained) removal drained) []
+  Spec.it s "CR 704.5w a NON-Siege battle at defense 0 is buried anyway" $ do
+    -- THE PROVING CASE for rule 704.5w, and the case above is its discriminator:
+    -- the same fixture, the same drain and the same unscanned event, differing in
+    -- the battle types ALONE. Without that pair a fix that dropped the exemption
+    -- outright would pass this one.
+    --
+    -- The projection is the real Siege's with its subtypes stripped, the fixture
+    -- candidateSpec and the CR 310.12b case above already build for CR 310.9a's
+    -- other branch: rule 310.12 says only that SOME battles are Sieges, so a
+    -- battle with no battle types is unprinted rather than rules-forbidden.
+    -- Stripping them also takes CR 310.12b's ability away, which is what makes
+    -- the board coherent -- 704.5w's world is one where no defeat ability is owed.
+    (entered, battle) <- castInvasionThreeSeated s registry (protectTo S.carol)
+    let drained = drain battle entered
+        removal = [GameEvent.CountersRemoved (CounterChange.MkCounterChange battle CounterKind.Defense 2 0)]
+        pcs = Map.adjust (\pc -> pc {PC.subtypes = Set.empty}) battle (Projection.projectAll drained)
+    Spec.assertBool s (Battle.awaitingAbility removal drained battle) "an ability has still triggered"
+    Spec.assertEqWith s "and CR 704.5w exempts nothing" (Battle.defeated pcs removal drained) [battle]
 
 -- Cast the spell in `caster`'s hand at `battle`, then settle: the spell resolves,
 -- CR 310.6 takes its counters off, and CR 310.12b's ability -- if the last one came

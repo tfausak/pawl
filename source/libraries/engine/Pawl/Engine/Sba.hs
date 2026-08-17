@@ -592,13 +592,14 @@ performStateBasedActions = Event.simultaneously $ do
         filter
           (\(_, oid) -> not (SacrificeRestriction.prohibited oid gs))
           (Saga.sacrificing (\oid -> Projection.controllerOf oid gs) pcs (Event.unscannedEvents gs) gs)
-      -- CR 704.5v / 310.7, from the SAME pre-pass state as everything above, and
-      -- living in Pawl.Engine.Battle with the rest of rule 310 the way CR 704.5s
-      -- lives in Pawl.Engine.Saga.
+      -- CR 704.5v / 310.7 and CR 704.5w / 310.8, from the SAME pre-pass state as
+      -- everything above, and living in Pawl.Engine.Battle with the rest of rule
+      -- 310 the way CR 704.5s lives in Pawl.Engine.Saga.
       --
-      -- The unscanned event log is an input for the reason CR 704.5s's is: the rule
-      -- exempts a battle whose ability "has triggered but not yet left the stack",
-      -- and this pass runs before placePendingTriggers. See Battle.awaitingAbility.
+      -- The unscanned event log is an input for the reason CR 704.5s's is: rule
+      -- 704.5v exempts a SIEGE whose ability "has triggered but not yet left the
+      -- stack", and this pass runs before placePendingTriggers. Rule 704.5w exempts
+      -- nothing. See Battle.awaitingAbility.
       routed = Battle.defeated pcs (Event.unscannedEvents gs) gs
       -- CR 704.5x / 704.5y: the battles whose protector designation has become
       -- illegal, paired with the projection and controller the re-choice needs.
@@ -662,8 +663,8 @@ performStateBasedActions = Event.simultaneously $ do
   -- Every put-into-graveyard this pass performs, as ONE deduplicated batch:
   -- CR 704.5f (toughness <= 0), CR 704.5i (loyalty 0), CR 704.5j (the legend
   -- rule's losers), CR 704.5k (the world rule's), CR 704.5m (an Aura attached to
-  -- nothing), CR 704.5v (a battle at defense 0) and CR 704.5x/704.5y (a battle no
-  -- player can protect). None of the seven is a destruction, so none consults
+  -- nothing), CR 704.5v/704.5w (a battle at defense 0) and CR 704.5x/704.5y (a
+  -- battle no player can protect). None of them is a destruction, so none consults
   -- indestructible or a regeneration shield.
   --
   -- Deduplicated because the sets overlap: a legend at 0 toughness whose
