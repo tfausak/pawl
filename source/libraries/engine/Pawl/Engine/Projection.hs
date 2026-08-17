@@ -1983,9 +1983,11 @@ swapWordIn family pairs word = List.foldl' step word pairs
 -- rather than a word on the card; the sweeping arms' Filters and the chosen
 -- card's are card text like any other, and a graveyard arm's PlayerScope and
 -- Chooser name players rather than subtypes -- as does a hand arm's PlayerRef,
--- whose Filter beside it is rewritten like every other. EachPlayer and
--- EachCardInYourHand carry no word at all -- CR 612.1 changes subtype words, and
--- "each player" and "all cards from your hand" have none. TopOfLibrary names a
+-- whose Filter beside it is rewritten like every other. EachPlayer,
+-- EachCardInYourHand and RandomCardInHand carry no word at all -- CR 612.1
+-- changes subtype words, and "each player", "all cards from your hand" and "a
+-- card at random from their hand" have none -- the last because it carries no
+-- Filter at all, only the PlayerRef naming whose hand. TopOfLibrary names a
 -- POSITION and a depth: its PlayerRef names a player, and the Quantity beside it
 -- goes through rewriteQuantity, since a Count nested in it carries a Filter that
 -- is card text like any other. EachCardExiledWithSource carries one only where a printing narrows
@@ -2004,6 +2006,7 @@ rewriteObjectRef pairs ref = case ref of
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary p c) -> ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary p (rewriteQuantity pairs c))
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s f) -> ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s (Filter.rewrite pairs f))
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand p f) -> ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand p (Filter.rewrite pairs f))
+  ObjectRef.RandomCardInHand _ -> ref
 
 -- CR 612.1/612.2a through the CARD an Effect.Create or an Effect.CreateEmblem
 -- defines its token or emblem with. Three groups of fields: the type line, the

@@ -512,7 +512,7 @@ combatReplaySpec s =
             printed
         -- #136 / CR 729.2: "Randomly determine which player goes first." The
         -- determination is randomness, not a choice, so the prompt carries NO
-        -- Decider -- Shuffle is the only other such constructor. Recording it
+        -- Decider -- Shuffle and RandomObject below are the others. Recording it
         -- is what keeps a subgame replayable: the randomness lives in the
         -- interpreter, and the transcript carries what it rolled.
         Spec.it s "RandomFirstPlayer round-trips through the transcript" $ do
@@ -524,6 +524,33 @@ combatReplaySpec s =
             "the head"
             (Replay.defaultAnswer (Prompt.RandomFirstPlayer (S.alice NonEmpty.:| [S.bob])))
             S.alice
+        -- The third Decider-less prompt (#1622): Merfolk Spy's "a card at random
+        -- from their hand". RandomFirstPlayer's reason for being recorded, one
+        -- type over -- the randomness lives in the interpreter, so the
+        -- transcript has to carry what it named.
+        Spec.it s "RandomObject round-trips through the transcript" $ do
+          let a = ObjectId.MkObjectId 7
+              b = ObjectId.MkObjectId 8
+              p = Prompt.RandomObject (a NonEmpty.:| [b])
+          Spec.assertEqWith s "b round trips" (Replay.decode p (Replay.encode p b)) (Just b)
+          -- Discriminating, ChooseDefender's reason: a decode that ignored the
+          -- response and handed back the head would pass the leg above by
+          -- accident of which was written first.
+          Spec.assertEqWith s "a round trips" (Replay.decode p (Replay.encode p a)) (Just a)
+        Spec.it s "a short transcript takes the head of the offered cards" $
+          Spec.assertEqWith
+            s
+            "the head"
+            (Replay.defaultAnswer (Prompt.RandomObject (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 8])))
+            (ObjectId.MkObjectId 7)
+        -- The assertion that fails if RandomObject reuses Response.ChoseCardInHand
+        -- rather than getting its own constructor. Both name one ObjectId in one
+        -- hand, so the types would not object -- and a player's DECISION
+        -- replaying as randomness is exactly what Pawl.Types.Response's own rule
+        -- forbids, CR 701.9b's distinction.
+        Spec.it s "a hand CHOICE does not decode as a random selection" $ do
+          let p = Prompt.RandomObject (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 8])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseCardInHand (ObjectId.MkObjectId 7))) Nothing
         -- CR 507.1 / 703.4h: the defending-player choice round-trips like every
         -- other prompt. NonEmpty because the action only runs when there is at
         -- least one candidate.

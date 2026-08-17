@@ -118,7 +118,7 @@ permute xs order =
 -- engine's whole definition of an optional action, and a new prompt site that
 -- forgot to say so would make a loop containing it look mandatory.
 --
--- FOUR prompts deliberately do not come through here, and are asked with a bare
+-- FIVE prompts deliberately do not come through here, and are asked with a bare
 -- 'ask' instead:
 --
 --   * Prompt.Concede, because CR 104.3a lets a player concede at any time, in a
@@ -127,9 +127,11 @@ permute xs order =
 --   * Prompt.ChooseAction when Pass is the only legal action -- passing is not a
 --     decision. Engine.priorityLoop makes that call, being the only caller that
 --     knows the menu.
---   * Prompt.Shuffle and Prompt.RandomFirstPlayer, which ask for RANDOMNESS
---     rather than for a choice (CR 701.24, CR 729.2). A loop that reshuffles a
---     library every cycle is still a loop of mandatory actions.
+--   * Prompt.Shuffle, Prompt.RandomFirstPlayer and Prompt.RandomObject, which
+--     ask for RANDOMNESS rather than for a choice (CR 701.24, CR 729.2, and CR
+--     701.9b's acknowledgment that "at random" is not "the player chooses"). A
+--     loop that reshuffles a library every cycle is still a loop of mandatory
+--     actions.
 --
 -- Every other prompt site already elides its prompt when the answer is forced,
 -- so only the branch that genuinely asks reaches this.

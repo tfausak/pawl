@@ -5,6 +5,7 @@ import qualified Pawl.Codec.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Codec.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.TopOfLibrary as TopOfLibrary
 import qualified Pawl.JsonCodec.Arm as Arm
@@ -24,7 +25,8 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 --
 -- 'EachCardInGraveyard', 'TopOfLibrary', 'ChosenCardInGraveyard' and
 -- 'ChosenCardInHand' each carry a payload record of their own (#1464), so no arm
--- here writes a positional array.
+-- here writes a positional array. 'RandomCardInHand' carries a bare PlayerRef
+-- instead, since it holds only the one field.
 --
 -- 'EachCardExiledWithSource' takes an OPTIONAL payload: the bare tag is the whole
 -- linked set (CR 607.3), and a value narrows it to the cards a printing's own
@@ -42,7 +44,8 @@ codec =
       Arm.nullary "EachPlayer" ObjectRef.EachPlayer,
       Arm.payload "TopOfLibrary" TopOfLibrary.codec ObjectRef.TopOfLibrary (\x -> case x of ObjectRef.TopOfLibrary y -> Just y; _ -> Nothing),
       Arm.payload "ChosenCardInGraveyard" ChosenCardInGraveyard.codec ObjectRef.ChosenCardInGraveyard (\x -> case x of ObjectRef.ChosenCardInGraveyard y -> Just y; _ -> Nothing),
-      Arm.payload "ChosenCardInHand" ChosenCardInHand.codec ObjectRef.ChosenCardInHand (\x -> case x of ObjectRef.ChosenCardInHand y -> Just y; _ -> Nothing)
+      Arm.payload "ChosenCardInHand" ChosenCardInHand.codec ObjectRef.ChosenCardInHand (\x -> case x of ObjectRef.ChosenCardInHand y -> Just y; _ -> Nothing),
+      Arm.payload "RandomCardInHand" PlayerRef.codec ObjectRef.RandomCardInHand (\x -> case x of ObjectRef.RandomCardInHand y -> Just y; _ -> Nothing)
     ]
   where
     -- Written once so the encoder, the decoder and the schema cannot disagree
