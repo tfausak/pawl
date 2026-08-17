@@ -7363,7 +7363,8 @@ looksBack condition = case condition of
 -- offered from the command zone under CR 114.4. The rest of the command zone is
 -- unscanned (#1411).
 --
--- Two holes are left in that reading, and last known information fills both. A
+-- Two holes are left in the BATTLEFIELD half of that reading, and last known
+-- information fills both. A
 -- permanent that left WITHIN its own group is missing from that group's sample, the
 -- sample being taken as the last of the group's members is recorded and CR 704.3's
 -- whole destruction batch being one group; and a group nothing sampled has no
@@ -7397,8 +7398,18 @@ looksBack condition = case condition of
 -- and never a wildcard: CR 603.10a states a closed list, so a condition the rule
 -- has not been read against must be classified rather than defaulted.
 --
+-- The GRAVEYARD half has a hole of the same shape, and last known information
+-- fills it the same way: a card the batch put into a graveyard and took back out
+-- again is not in the graveyard the boundary scan walks, so `arrivedInGraveyard`
+-- offers it to its own arrival event from CR 608.2h.
+--
 -- Not reconstructed: a permanent that ENTERED later in the batch and left before
--- the boundary is still offered to the batch's earlier events (#441).
+-- the boundary is still offered to the batch's earlier events (#441). Nor is a
+-- departed graveyard card offered to any event but its own arrival: the three
+-- conditions zonesTriggeredFrom sends to a graveyard are self-referential arrival
+-- conditions whose only matching event IS that arrival, so the only ability that
+-- could observe the difference is a CR 113.6m one -- Squee, Goblin Nabob's
+-- upkeep, read from a graveyard (#1732).
 --
 -- Events outer, permanents inner (ascending by id): the deterministic canonical
 -- order the CR 603.3b ordering prompt indexes into. Groups do not disturb it --
@@ -7706,9 +7717,13 @@ eventTriggers events gs =
       --
       -- CR 603.10a does not apply to what this serves -- a card ENTERING a
       -- graveyard is on none of its look-back list -- so CR 603.10's normal first
-      -- sentence governs and this live read is the game as it stands. A card that
-      -- arrives in a graveyard and is gone again before the boundary is lost
-      -- (#349).
+      -- sentence governs and this live read is the game as it stands. The card
+      -- that arrived in a graveyard and is gone again by the boundary is the one
+      -- this read cannot reach; `arrivedInGraveyard` below is its source.
+      --
+      -- Its `_ -> Nothing` arm is what keeps the two disjoint: `Game.lookupObject`
+      -- fails for an id that has ceased, and a ceased id is exactly the one the
+      -- other source answers for.
       graveyardCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
         (Just obj, Just face) ->
           case filter (functionsIn Zone.Graveyard) (Face.triggeredAbilities face) of
@@ -7718,6 +7733,72 @@ eventTriggers events gs =
       inGraveyards =
         Map.fromList
           (concatMap (Maybe.mapMaybe graveyardCandidate . Foldable.toList) (Map.elems (GameState.graveyard gs)))
+      -- CR 603.10's first sentence again, for the card THIS event put into a
+      -- graveyard that is gone by the CR 117.5 boundary: it existed in the
+      -- graveyard immediately after the event, so its ability is checked, and
+      -- CR 608.2h last known information is the only reading of it left. The
+      -- graveyard twin of `leftBattlefield`, and per EVENT for the same reason --
+      -- the arrival is what scopes it. Corpse Churn milling Narcomoeba and
+      -- returning it in one resolution is the proving board, in
+      -- Pawl.TriggerSpec's `graveyardTriggerSpec`.
+      --
+      -- Keyed by `ZoneChange.object`, where `departedFrom` keys by
+      -- `ZoneChange.departed` -- the one place the graveyard source inverts the
+      -- battlefield one. The bearer here is the CR 400.7 incarnation that ARRIVED
+      -- in the graveyard, which is the id `matchesTriggerGiven` compares against
+      -- for SelfPutIntoGraveyardFromLibrary and the id `inGraveyards` would have
+      -- offered. It is also the id `lastKnown` files the later departure under,
+      -- the graveyard card being what left; the two ids coincide by construction,
+      -- and that is the hinge of this source.
+      --
+      -- ONLY the destination is gated. Which origins a condition accepts is the
+      -- CONDITION's business -- SelfPutIntoGraveyardFromAnywhere is served from
+      -- the same zone -- which is the posture `departedFrom`'s comment argues for.
+      -- That gate is a regression fence rather than a proved behaviour: widening it
+      -- to every non-battlefield destination leaves the suite green, since the key
+      -- below is the ARRIVING id and only a graveyard arrival that has itself since
+      -- departed has a `lastKnown` entry under it.
+      --
+      -- Abilities from the last known projection rather than a printed face: a
+      -- ceased id has no face to look up, and `LastKnown` carries none. Identical
+      -- to `inGraveyards`' printed read today, no pool effect changing the
+      -- abilities of a card in a graveyard (gap #160). Not `abilitiesOf` either --
+      -- nothing rule 702 or rule 310 mints functions from a graveyard, and
+      -- `inGraveyards` does not consult them, so the two graveyard sources read
+      -- alike.
+      --
+      -- The controller is `LastKnown.controller`, which for a graveyard card is
+      -- the OWNER and so agrees with `inGraveyards` -- CR 113.8's second clause,
+      -- CR 108.4 giving a card in a graveyard no controller. Not asserted by the
+      -- read but true of the write: `changeZoneAttaching` computes it as
+      -- Projection.controllerOf, which bottoms out at Object.enteredUnder and then
+      -- the owner, and only a CR 613.1b layer-2 effect could move it -- those
+      -- reach permanents (CR 110.2), never a card in a graveyard.
+      --
+      -- `functionsIn Zone.Graveyard` is CR 113.6k's own gate, as it is for
+      -- `inGraveyards` and not for `leftBattlefield`: without it a departed Doomed
+      -- Traveler would be offered its dies trigger from a graveyard. A regression
+      -- fence rather than a proved behaviour: removing it leaves the suite green,
+      -- and no board can observe it today for a RULES reason rather than for want
+      -- of a card -- a battlefield-only trigger on a departed graveyard card would
+      -- have to see an event this source does not offer it, the arrival being the
+      -- only one, which is the same residue #1732 records.
+      --
+      -- Disjoint from `inGraveyards` by construction, not by Map.unions' bias: an
+      -- id in `lastKnown` is one the same write deleted from GameState.objects,
+      -- and CR 400.7 mints a fresh id per move, so `graveyardCandidate` drops it.
+      -- A card that was in a graveyard before this batch is unreachable here too
+      -- -- its arrival event is not in the log this scan reads.
+      arrivedInGraveyard event = case movedOf event of
+        Just zc
+          | ZoneChange.to zc == Zone.Graveyard ->
+              case Map.lookup (ZoneChange.object zc) (GameState.lastKnown gs) of
+                Nothing -> Map.empty
+                Just lk ->
+                  case filter (functionsIn Zone.Graveyard) (PC.triggeredAbilities (LastKnown.characteristics lk)) of
+                    [] -> Map.empty
+                    abilities -> Map.singleton (ZoneChange.object zc) (LastKnown.controller lk, abilities)
+        _ -> Map.empty
       -- CR 113.6k's third zone, `inGraveyards` one zone over: every card in exile
       -- carrying an ability that functions from there. Rule 702.55c is the
       -- sentence it exists for -- "triggered abilities of cards with haunt that
@@ -7944,6 +8025,10 @@ eventTriggers events gs =
       -- `inGraveyards` genuinely overlaps `cycledCard` on purpose -- a card
       -- cycled into a graveyard is honestly a member of both -- and the winner
       -- offers that card's printed abilities unfiltered, a superset either way.
+      -- `arrivedInGraveyard` overlaps neither: it answers only for an id
+      -- `lastKnown` holds, which is one no longer in GameState.objects and so in
+      -- no player's graveyard and no player's hand, so its position beside
+      -- `inGraveyards` is documentation rather than arbitration.
       -- `spellCast` overlaps nothing: CR 601.2a keeps its object on the stack,
       -- which no other source reads. Neither does `inCommand`: CR 114.1 puts an
       -- emblem into the command zone, and no rule or effect in pawl moves one
@@ -7951,7 +8036,7 @@ eventTriggers events gs =
       -- `inExile`: CR 400.1 makes exile a zone of its own, and an id in it is in
       -- no other. Nor does `revealedInHand`: CR 701.20b leaves the revealed card
       -- in the hand, which no other source reads.
-      candidates onBattlefield event later same = Map.toAscList (Map.unions [onBattlefield, leftBattlefield event, later, same, cycledCard event, spellCast event, revealedInHand event, inGraveyards, inCommand, inExile])
+      candidates onBattlefield event later same = Map.toAscList (Map.unions [onBattlefield, leftBattlefield event, later, same, cycledCard event, spellCast event, revealedInHand event, inGraveyards, arrivedInGraveyard event, inCommand, inExile])
       scanOne onBattlefield later same event = concatMap (forOne event) (candidates onBattlefield event later same)
       -- The battlefield reading is per GROUP and so is hoisted out of the block:
       -- every event in one group happened at the same time, so they share it. A
@@ -8170,8 +8255,8 @@ zonesTriggeredFrom cond = case cond of
   -- The mirror image, defaulting for a reason rather than by omission: a dies trigger CAN
   -- trigger from the battlefield, which CR 603.10a's look-back is what makes true
   -- of a permanent that is a graveyard card by the time the scan runs.
-  -- `leftBattlefield` serves it from CR 608.2h; `inGraveyards` must NOT, or the
-  -- ability would be read off the printed text and credited to its owner.
+  -- `leftBattlefield` serves it from CR 608.2h; neither graveyard source may, or
+  -- the ability would be read off the graveyard card and credited to its owner.
   TriggerCondition.SelfDies -> battlefield
   -- The same answer one step further: this condition's bearer is not the permanent
   -- that died at all, and watches from the battlefield.
