@@ -296,6 +296,20 @@ objectRefSlots ref = case ref of
 -- nested Quantity THROUGH -- their own arms for the ObjectRef-taking opcodes are
 -- written `{}` and answer a constant, so a second ObjectRef arm gaining a
 -- Quantity would be invisible to all three unless it must answer here.
+--
+-- FOUR opcodes route their ref through this, not all two dozen that take one:
+-- MoveToZone, Reveal, LookAt and ForEach are the ones whose ref can name a card
+-- in a library and have the instruction mean something. Under any other opcode a
+-- TopOfLibrary names a card that opcode cannot act on -- a library card is not a
+-- permanent to tap, a spell to counter or a target to modify -- so such a card is
+-- INERT card data, the class Pawl.Types.ObjectRef's ChosenCardInGraveyard note
+-- describes and deliberately declines to lint. slotsOf needs no such split: it
+-- routes EVERY ObjectRef-taking opcode through objectRefSlots already, so a
+-- depth's target-slot read is reported wherever it is written.
+--
+-- Note this is about the DEPTH, not the ref: objectRefSlots and Pawl.CardSpec's
+-- Filter traversal both cover every opcode, and only the three constant-answering
+-- classifications above have to opt in one opcode at a time.
 objectRefQuantities :: ObjectRef -> [Quantity.Type.Quantity]
 objectRefQuantities ref = case ref of
   ObjectRef.InSlot _ -> []
@@ -731,7 +745,7 @@ slotsAreExhaustive effect = case effect of
   Effect.GrantPlayFromExile grant -> durationSlotsAreExhaustive (GrantPlayFromExile.duration grant)
   -- PreventNextDamage's answer: the ref is reported by slotsOf, so only the
   -- body can hide a read, and each of its effects answers for itself.
-  Effect.ForEach (ForEach.MkForEach _ _ body) -> all slotsAreExhaustive body
+  Effect.ForEach (ForEach.MkForEach ref _ body) -> all Quantity.slotsAreExhaustive (objectRefQuantities ref) && all slotsAreExhaustive body
 
 -- CR 611.2b: only ForAsLongAs reads anything, through its Condition.
 durationSlotsAreExhaustive :: Duration.Duration -> Bool
@@ -860,7 +874,7 @@ readsX = any effectReadsX
       Effect.GrantPlayFromExile {} -> False
       -- CR 608.2f's body is an effect list like any other, so an X inside it is
       -- an X this card reads -- PreventNextDamage's rider, one opcode over.
-      Effect.ForEach (ForEach.MkForEach _ _ body) -> readsX (Foldable.toList body)
+      Effect.ForEach (ForEach.MkForEach ref _ body) -> any Quantity.readsX (objectRefQuantities ref) || readsX (Foldable.toList body)
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.

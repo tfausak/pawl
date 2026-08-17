@@ -797,7 +797,7 @@ effectCounts effect = case effect of
   Effect.GrantPlayFromExile grant -> durationCounts (GrantPlayFromExile.duration grant)
   -- CR 608.2f's body is an effect list a card authors, so its Counts are this
   -- card's -- the rider's recursion one opcode over.
-  Effect.ForEach (ForEach.MkForEach _ _ body) -> concatMap effectCounts body
+  Effect.ForEach (ForEach.MkForEach ref _ body) -> refCounts ref <> concatMap effectCounts body
 
 -- Every Count reachable from one triggered ability (a card's own, or a
 -- delayed one -- both TriggeredAbility Card): its TriggerCondition, its
