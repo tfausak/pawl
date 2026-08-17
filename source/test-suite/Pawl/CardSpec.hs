@@ -72,6 +72,7 @@ import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackCost as AttackCost
+import qualified Pawl.Types.AttackCostScope as AttackCostScope
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BlockPermission as BlockPermission
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
@@ -153,6 +154,7 @@ import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PerAttacker as PerAttacker
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
@@ -2254,6 +2256,14 @@ affectedFilters affected = case affected of
   Affected.Attached -> []
   Affected.AttachedPlayerControls f -> [f]
 
+-- CR 508.1h's per-attacker share. The Counted arm reaches a Filter through its
+-- Quantity -- Sphere of Safety counts "enchantments you control" -- where the
+-- Fixed arm is mana symbols and nothing else.
+perAttackerFilters :: PerAttacker.PerAttacker -> [Filter.Type.Filter Keyword.Keyword]
+perAttackerFilters perAttacker = case perAttacker of
+  PerAttacker.Fixed _ -> []
+  PerAttacker.Counted quantity -> quantityFilters quantity
+
 objectRefFilters :: ObjectRef.ObjectRef -> [Filter.Type.Filter Keyword.Keyword]
 objectRefFilters ref = case ref of
   ObjectRef.InSlot _ -> []
@@ -3024,7 +3034,8 @@ activatedAbilityFilters ability =
 --   * `combatRestrictions` (CR 508.1c / 509.1b), `sacrificeRestrictions` (CR
 --     701.21a / 101.2), `untapRestrictions` (CR 502.3 / 101.2),
 --     `attackRequirements` (CR 508.1d), `blockRequirements`
---     (CR 509.1c) and `attackCosts` (CR 508.1h) -- six more affected sets.
+--     (CR 509.1c) and `attackCosts` (CR 508.1h) -- six more affected sets, plus
+--     a cost to attack's Counted share, which is a Quantity.
 --   * `spell`, `activatedAbilities`, `triggeredAbilities`, `delayedAbilities` --
 --     every mode's target slots and effects, plus an activation cost, a
 --     trigger's own condition and its intervening clause.
@@ -3066,6 +3077,7 @@ cardFilters card =
         <> concatMap blockPermissionFilters (Face.blockPermissions card)
         <> concatMap (affectedFilters . AttackRequirement.subject) (Face.attackRequirements card)
         <> concatMap (affectedFilters . AttackCost.subject) (Face.attackCosts card)
+        <> concatMap (perAttackerFilters . AttackCost.perAttacker) (Face.attackCosts card)
         <> concatMap combatRestrictionFilters (Face.combatRestrictions card)
         <> concatMap (affectedFilters . SacrificeRestriction.affected) (Face.sacrificeRestrictions card)
         <> concatMap (affectedFilters . UntapRestriction.affected) (Face.untapRestrictions card)
@@ -5191,7 +5203,21 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               base {Face.combatRestrictions = [CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless (Affected.Matching buried) Nothing)]}
             ),
             ( "CR 508.1h's cost to attack",
-              base {Face.attackCosts = [AttackCost.MkAttackCost (Affected.Matching buried) (ManaCost.MkManaCost [ManaSymbol.Generic 2])]}
+              base {Face.attackCosts = [AttackCost.MkAttackCost (Affected.Matching buried) (PerAttacker.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 2])) AttackCostScope.Controller]}
+            ),
+            ( "CR 508.1h's counted share",
+              base
+                { Face.attackCosts =
+                    [ AttackCost.MkAttackCost
+                        (Affected.Matching (Filter.Type.HasCardType CardType.Creature))
+                        ( PerAttacker.Counted
+                            ( Quantity.Type.Count
+                                (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) buried Aggregation.Members)
+                            )
+                        )
+                        AttackCostScope.Controller
+                    ]
+                }
             ),
             ( "CR 614.1's counter-placement pattern",
               base
