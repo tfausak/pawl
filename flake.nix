@@ -1,13 +1,11 @@
 {
   inputs = {
-    claude-code-nix.url = "github:sadjow/claude-code-nix";
     hooky.url = "github:tfausak/hooky-nix";
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
   };
 
   outputs =
     {
-      claude-code-nix,
       hooky,
       nixpkgs,
       ...
@@ -127,7 +125,6 @@
         {
           default = pkgs.mkShell {
             nativeBuildInputs = [
-              claude-code-nix.packages.${system}.default
               hooky.packages.${system}.default
               pkgs.bash
               pkgs.cabal-install
