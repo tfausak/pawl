@@ -2034,7 +2034,12 @@ objectRefObjects legal resolving controller source gs ref = case ref of
     Just group -> Foldable.toList group
     Nothing -> Maybe.mapMaybe Recipient.objectOf (legalMany slot legal)
   ObjectRef.EachMatching filter_ ->
-    let context = Filter.contextFor (Just controller) (Just source)
+    -- CR 303.4b's host is supplied here and nowhere else in this module: the one
+    -- effect-borne Filter position that names what the SOURCE enchants is this
+    -- sweep, which is how Ray of Frost's "tap it" reaches the creature its Aura is
+    -- attached to. Read live off the source, so an Aura moved between the trigger
+    -- and its resolution taps the host it has now.
+    let context = (Filter.contextFor (Just controller) (Just source)) {Filter.sourceAttachedTo = Projection.hostOf source gs}
         matching =
           filter
             (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_)

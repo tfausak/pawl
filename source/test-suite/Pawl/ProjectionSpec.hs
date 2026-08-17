@@ -2790,6 +2790,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "both colours with no face shown" (Projection.colorsOf oid gs0) (Set.fromList [Color.Green, Color.White])
 
   attachedHostSpec s registry
+  hostOfSourceSpec s registry
   conditionalAbilitySpec s registry
   keywordCounterSpec s registry
   levelerSpec s registry
@@ -3119,6 +3120,42 @@ attachedHostSpec s registry = Spec.describe s "AttachedTo" $ do
       "not a creature below layer 4, a creature above it"
       (onto Layer.Type, onto Layer.ModifyPT)
       (Just False, Just True)
+
+-- CR 303.4b / 604.2: Filter.IsHostOfSource inside a static ability's "as long as"
+-- clause, which is the position Pawl.Engine.Projection.conditionHolds answers.
+--
+-- Ray of Frost ({1}{U} Enchantment -- Aura, "Flash / Enchant creature / When this
+-- Aura enters, if enchanted creature is red, tap it. / As long as enchanted
+-- creature is red, it loses all abilities. / Enchanted creature doesn't untap
+-- during its controller's untap step.", checked against Scryfall 2026-08-17). Its
+-- clause names what the SOURCE enchants, which no other atom can say: the Aura is
+-- the source and the creature is the candidate.
+--
+-- Bird Maiden ({2}{R} Creature -- Human Bird 1/2, flying) and Aven Squire
+-- ({1}{W} Creature -- Bird Soldier 1/1, flying and exalted) are the two hosts, one
+-- red and one white, so the clause's colour test has both answers on one board.
+hostOfSourceSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+hostOfSourceSpec s registry = Spec.describe s "IsHostOfSource" $ do
+  -- One board, two creatures, and the Aura moved between them -- so the RED
+  -- creature is present in both readings and only the attachment differs. An atom
+  -- that ignored the host and counted red creatures anywhere would strip the Squire
+  -- in the second reading; one that never matched would leave the Maiden alone in
+  -- the first.
+  Spec.it s "CR 604.2 the clause reads the colour of the SOURCE's own host" $ do
+    ray <- S.printingOf s registry "Ray of Frost"
+    maiden <- S.printingOf s registry "Bird Maiden"
+    squire <- S.printingOf s registry "Aven Squire"
+    let (maidenId, g1) = S.addCreature maiden S.alice (Setup.emptyGame S.bothPlayers)
+        (squireId, g2) = S.addCreature squire S.alice g1
+        (rayId, g3) = S.addCreature ray S.alice g2
+        onMaiden = S.attach rayId maidenId g3
+        onSquire = S.attach rayId squireId g3
+        flying gs = (Projection.hasKeyword Keyword.Flying maidenId gs, Projection.hasKeyword Keyword.Flying squireId gs)
+    Spec.assertEqWith
+      s
+      "only the enchanted creature loses its abilities, and only while it is red"
+      (flying onMaiden, flying onSquire)
+      ((False, True), (True, True))
 
 -- CR 702.178a / 613.1: the "as long as" clause an ActivatedAbility carries, read
 -- from INSIDE the layer fold by Filter.HasNonManaActivatedAbility.

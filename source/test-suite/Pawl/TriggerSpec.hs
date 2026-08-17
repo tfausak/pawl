@@ -27,7 +27,9 @@
 -- with Harried Dronesmith -- `singleTokenSlotReadSpec`. The CR 603.3b ordering prompt -- `orderingSpec`, and its
 -- CR 725.2 sourceless case (the monarch's inherent triggers ordered WITH the
 -- batch) -- `monarchOrderingSpec`. The CR 603.4 / 608.2a intervening "if" --
--- `interveningSpec`, and the same rule over a draw count that is a SUBTRACTION,
+-- `interveningSpec`, and the same rule over an intervening clause reading the
+-- SOURCE's own attachment (CR 303.4b's Filter.IsHostOfSource), with Ray of Frost --
+-- `enchantedHostTriggerSpec`, and the same rule over a draw count that is a SUBTRACTION,
 -- with The Ten Rings -- `tenRingsDrawSpec`. Also Pawl.Engine.Keyword: CR
 -- 702.70 poisonous, the first keyword whose rule text IS a triggered ability,
 -- and the
@@ -2279,6 +2281,66 @@ interveningSpec s registry =
               after = resolveAll responded
           Spec.assertBool s (not (null (GameState.stack onStack))) "the trigger really was on the stack"
           Spec.assertEqWith s "no damage on resolution" (S.lifeOf S.alice after) (Just 20)
+
+-- CR 603.4 / 303.4b: an intervening "if" that reads the SOURCE's own host, which is
+-- Filter.IsHostOfSource in the position Pawl.Engine.Event.interveningHolds answers.
+--
+-- Ray of Frost ({1}{U} Enchantment -- Aura, "Flash / Enchant creature / When this
+-- Aura enters, if enchanted creature is red, tap it. / As long as enchanted
+-- creature is red, it loses all abilities. / Enchanted creature doesn't untap
+-- during its controller's untap step.", checked against Scryfall 2026-08-17). Its
+-- first sentence is the only intervening "if" in the pool about an attachment, and
+-- its "tap it" is the only effect naming a host.
+--
+-- Bird Maiden ({2}{R} Creature -- Human Bird 1/2) and Aven Squire ({1}{W} Creature
+-- -- Bird Soldier 1/1) are the two hosts, so the two boards differ in the host's
+-- COLOUR and in nothing else.
+enchantedHostTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+enchantedHostTriggerSpec s registry =
+  let settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      tapStateOf oid gs = fmap Object.tapped (Game.lookupObject oid gs)
+      -- The Aura on the battlefield attached to `host`, with the entry event CR
+      -- 603.6a's scan reads -- Sarcomancy's fixture above with an attachment, which
+      -- is what the clause is about.
+      entering ray host gs0 =
+        let (rayId, gs1) = S.addCreature ray S.alice gs0
+            attached = S.attach rayId host gs1
+            entered = ZoneChange.MkZoneChange rayId rayId Zone.Stack Zone.Battlefield
+         in S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project rayId attached))] attached
+   in Spec.describe s "EnchantedHostTrigger" $ do
+        Spec.it s "CR 603.4 the clause holds on a RED host, so the trigger taps it" $ do
+          ray <- S.printingOf s registry "Ray of Frost"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          let (maidenId, board) = S.addCreature maiden S.alice (Setup.emptyGame S.bothPlayers)
+              onStack = settle (entering ray maidenId board)
+              after = resolveAll onStack
+          Spec.assertEqWith s "the ability triggered" (length (GameState.stack onStack)) 1
+          Spec.assertEqWith s "and tapped the creature it enchants" (tapStateOf maidenId after) (Just TapState.Tapped)
+        -- THE NEGATIVE, asserted on the STACK rather than on the tap state: a
+        -- trigger that reached the stack and then found the host untappable would
+        -- leave the same board behind, and CR 608.2a's re-check would mask it.
+        Spec.it s "CR 603.4 the clause fails on a WHITE host, so nothing triggers" $ do
+          ray <- S.printingOf s registry "Ray of Frost"
+          squire <- S.printingOf s registry "Aven Squire"
+          let (squireId, board) = S.addCreature squire S.alice (Setup.emptyGame S.bothPlayers)
+              onStack = settle (entering ray squireId board)
+              after = resolveAll onStack
+          Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack onStack)) 0
+          Spec.assertEqWith s "and the creature is untapped" (tapStateOf squireId after) (Just TapState.Untapped)
+        -- The atom rather than the colour: a red creature is on the board in BOTH
+        -- readings, and only the one the Aura enchants can decide the clause. An
+        -- IsHostOfSource that matched every candidate would tap here too.
+        Spec.it s "CR 303.4b a red creature the Aura does NOT enchant decides nothing" $ do
+          ray <- S.printingOf s registry "Ray of Frost"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          squire <- S.printingOf s registry "Aven Squire"
+          let (maidenId, g1) = S.addCreature maiden S.alice (Setup.emptyGame S.bothPlayers)
+              (squireId, board) = S.addCreature squire S.alice g1
+              onStack = settle (entering ray squireId board)
+              after = resolveAll onStack
+          Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack onStack)) 0
+          Spec.assertEqWith s "neither creature is tapped" (tapStateOf squireId after, tapStateOf maidenId after) (Just TapState.Untapped, Just TapState.Untapped)
 
 -- The 2/2 black Zombie Sarcomancy's own ETB mints, read back out of the card data
 -- so the "in response" fixture makes the same object the card would.
@@ -13434,6 +13496,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   secondPlacementPassSpec s registry
   monarchOrderingSpec s registry
   interveningSpec s registry
+  enchantedHostTriggerSpec s registry
   tenRingsDrawSpec s registry
   poisonousSpec s registry
   ingestSpec s registry

@@ -521,6 +521,27 @@ data Filter keyword
     -- the candidate's own view rather than the host's, and answers without any
     -- projection of the host at all.
     IsAttachedToSource
+  | -- | CR 303.4b's "enchanted": the candidate is what the evaluation's SOURCE is
+    -- attached to -- Ray of Frost's "enchanted creature", where the Aura is the
+    -- source and the creature it enchants is the candidate.
+    --
+    -- The THIRD attachment direction, and the one the two atoms above cannot
+    -- say between them: IsSource asks whether the candidate is the source,
+    -- IsAttachedToSource whether the candidate's host is, and this whether the
+    -- SOURCE's host is the candidate. Vacuously False where the source is
+    -- attached to nothing or to a player (CR 303.4's other destination), and
+    -- where no source frames the match.
+    --
+    -- Nullary for IsAttachedToSource's reason, and reading the mirror-image
+    -- field: the host id comes off Pawl.Engine.Filter.Context rather than off
+    -- the candidate's view, because it is ONE reading of the source, the same
+    -- for every candidate. So this too answers with no projection of anything.
+    --
+    -- Answerable only where that field is filled, which is the CR 604.2 clause
+    -- of a static ability, the CR 603.4 intervening clause of a triggered one,
+    -- and an effect's Pawl.Types.ObjectRef; Pawl.CardSpec's position lint is
+    -- what keeps a card out of every other position.
+    IsHostOfSource
   | -- | CR 701.3a's last sentence: the candidate is one the SUBJECT of the
     -- surrounding attach -- the permanent being moved -- could legally be attached
     -- to. Aura Graft's "another permanent IT CAN ENCHANT".

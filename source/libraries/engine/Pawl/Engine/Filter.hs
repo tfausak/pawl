@@ -453,7 +453,30 @@ data Context = MkContext
     -- What keeps a card out of those positions is Pawl.CardSpec's
     -- "CR 709.4a no card asks SameNameAsBound outside a mode's target slot",
     -- the sweep sourcePower's and defendingPlayer's siblings each have.
-    slotNames :: Map.Map SlotName.SlotName (Set.Set CardName.CardName)
+    slotNames :: Map.Map SlotName.SlotName (Set.Set CardName.CardName),
+    -- CR 303.4b's "enchanted": WHICH object the SOURCE is attached to, for the one
+    -- atom that compares a candidate against it (IsHostOfSource). The id and not a
+    -- view, because the answer is one reading of the source and the same for every
+    -- candidate -- the division sourcePower makes against `source`. View.attachedTo
+    -- is the same read in the other direction, per candidate.
+    --
+    -- Supplied by the caller for sourcePower's reason -- this module holds no game
+    -- state and cannot read an object's attachment -- and by four:
+    -- Pawl.Engine.Projection.conditionHolds for CR 604.2's "as long as" clause,
+    -- Pawl.Engine.Event.interveningHolds for CR 603.4's "if" clause,
+    -- Pawl.Engine.Stack for CR 608.2a's re-check of that same clause, and
+    -- Pawl.Engine.Resolve.objectRefObjects for an effect naming the host.
+    --
+    -- NOT lazy, unlike sourcePower and defendingPlayer: filling it is a map lookup
+    -- and a Recipient read, with no projection behind it at all, so there is
+    -- nothing for a filter that omits the atom to avoid paying.
+    --
+    -- Nothing wherever the atom cannot appear, which contextFor below is the
+    -- spelling of -- the posture every context-relative atom here takes. What keeps
+    -- a card out of those positions is Pawl.CardSpec's "CR 303.4b no card asks
+    -- IsHostOfSource where the source's host is unknown", the sweep sourcePower's
+    -- and slotNames' siblings each have.
+    sourceAttachedTo :: Maybe ObjectId.ObjectId
   }
   deriving (Eq, Ord, Show)
 
@@ -465,13 +488,17 @@ data Context = MkContext
 -- provoke; Pawl.CardSpec's lints keep all three out of card data, so no other
 -- position can read the Nothings this leaves.
 --
+-- CR 303.4b's host atom is the second one a CARD may write (Ray of Frost), and it
+-- reads a Nothing here in every position but the four that supply it -- see
+-- sourceAttachedTo above for the list and for the lint that keeps a card to it.
+--
 -- CR 119.5's recipient atom is the one a CARD may write (Biorhythm), so the
 -- Nothing it leaves here is reachable: a card naming "they control" outside a
 -- per-recipient effect matches nothing, which is PlayerRef.Candidate's posture one
 -- type over rather than a hole -- an evaluation that has reached no recipient has
 -- no honest player to substitute.
 contextFor :: Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty}
+contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, sourceAttachedTo = Nothing}
 
 -- contextFor with the resolution's slot objects supplied. The one caller is
 -- Pawl.Engine.Resolve.effectContext; see slotObjects above.
@@ -486,8 +513,12 @@ contextWithSlots p s m = (contextFor p s) {slotObjects = m}
 -- position names the atom: rule 702.39a's writes it in a target slot, and the
 -- only card-written one is a CR 508.1c gate, which
 -- Pawl.Engine.CombatRestriction.inForce evaluates through contextFor instead.
+--
+-- The source's host stays Nothing on both callers for the same reason: neither
+-- position is one CR 303.4b's atom may be written into, which is what
+-- Pawl.CardSpec's position lint enforces.
 contextComparingPower :: Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower p s n = MkContext {perspective = p, source = Just s, sourcePower = n, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty}
+contextComparingPower p s n = MkContext {perspective = p, source = Just s, sourcePower = n, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, sourceAttachedTo = Nothing}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -686,6 +717,15 @@ matches context view predicate = case predicate of
   Filter.IsAttachedToSource -> case (attachedTo view, source context) of
     (Just host, Just src) -> host == src
     _ -> False
+  -- CR 303.4b: the same comparison a THIRD way -- the source's host against the
+  -- candidate, rather than the candidate's host against the source. A live read
+  -- too, one record over: the caller re-reads Object.attachedTo on every match, so
+  -- an Aura that has moved names its new host at once. Vacuously False where the
+  -- source is attached to nothing or to a player, where no source frames the match,
+  -- and where the position does not supply the field at all.
+  Filter.IsHostOfSource -> case (identity view, sourceAttachedTo context) of
+    (Just oid, Just host) -> oid == host
+    _ -> False
   -- CR 701.3a: a live read of the legality of the attach this match is framing,
   -- computed by the caller that knows what is moving. Vacuously False outside one.
   Filter.CanHostSubject -> canHostSubject view
@@ -816,6 +856,7 @@ rewrite pairs predicate = case predicate of
   -- as it reaches the same description written at the top level.
   Filter.AttachedTo f -> Filter.AttachedTo (rewrite pairs f)
   Filter.IsAttachedToSource -> predicate
+  Filter.IsHostOfSource -> predicate
   Filter.CanHostSubject -> predicate
   Filter.IsToken -> predicate
   Filter.IsTapped -> predicate
@@ -1144,6 +1185,7 @@ bakeBound players predicate = case predicate of
   -- the pairing that function's comment insists on.
   Filter.AttachedTo f -> Filter.AttachedTo (bakeBound players f)
   Filter.IsAttachedToSource -> predicate
+  Filter.IsHostOfSource -> predicate
   Filter.CanHostSubject -> predicate
   Filter.IsToken -> predicate
   Filter.IsTapped -> predicate
@@ -1219,6 +1261,7 @@ manaValueThresholds predicate = case predicate of
   -- widening CR 601.3a's sample is the safe direction.
   Filter.AttachedTo f -> manaValueThresholds f
   Filter.IsAttachedToSource -> []
+  Filter.IsHostOfSource -> []
   Filter.CanHostSubject -> []
   Filter.IsToken -> []
   Filter.IsTapped -> []
@@ -1302,6 +1345,7 @@ statesAQuality predicate = case predicate of
   -- nest `And []` leaves this atom stating one and no descent could change it.
   Filter.AttachedTo _ -> True
   Filter.IsAttachedToSource -> True
+  Filter.IsHostOfSource -> True
   Filter.CanHostSubject -> True
   Filter.IsToken -> True
   Filter.IsTapped -> True
