@@ -12819,8 +12819,12 @@ matoyaTriggerSpec s registry =
           let (_, withMatoya) = S.addCreature matoya S.alice (S.landsInPlay island 4)
               lands = S.landsFor island S.bob 4 withMatoya
               (ballId, placed) = S.addCreature crystalBall S.bob lands
-              deal g p = snd (S.addLibraryCard p S.bob g)
-              stocked = List.foldl' deal placed [maiden, piker]
+              deal who g p = snd (S.addLibraryCard p who g)
+              -- ALICE's library is stocked too, and that is not decoration: an
+              -- inverted relation fires Matoya here, and a draw off an empty
+              -- library (CR 121.4) moves no card -- so without these two the
+              -- assertion below would pass for a reason this case did not choose.
+              stocked = List.foldl' (deal S.alice) (List.foldl' (deal S.bob) placed [maiden, piker]) [maiden, piker]
               board = stocked {GameState.priority = Just S.bob}
               after = runBall S.bob ballId board
           Spec.assertBool s (elem (GameEvent.Scried S.bob) (S.eventsOf after)) "bob really scried, so there was an event to match"
