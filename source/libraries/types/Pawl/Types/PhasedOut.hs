@@ -17,6 +17,15 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- controlled it. CR 702.26h is why one object cannot be both: an object that
 -- would phase out both ways "just phases out indirectly".
 --
+-- `Orphaned` is CR 702.26n's second sentence, and a direct row in every other
+-- respect: the player it phased out under has since left the game, so CR 800.4k
+-- gives them no further untap step and rule 702.26a's schedule can never come
+-- round. Rule 702.26n reschedules it to "the next untap step after that player's
+-- next turn would have begun", which is the untap step of whichever seat the
+-- turn order reaches instead. The stored player is kept rather than re-keyed to
+-- that seat, because CR 702.26a defines it as who controlled the permanent when
+-- it phased out and Pawl.Engine.Phasing.phasedOutUnder answers that question.
+--
 -- What is deliberately NOT stored is the host an indirect row came in with.
 -- Object.attachedTo already names it and phasing does not clear that field (CR
 -- 702.26i needs it intact), so a second copy here could only drift out of step
@@ -24,4 +33,5 @@ import qualified Pawl.Types.PlayerId as PlayerId
 data PhasedOut
   = Directly {under :: PlayerId.PlayerId}
   | Indirectly {under :: PlayerId.PlayerId}
+  | Orphaned {under :: PlayerId.PlayerId}
   deriving (Eq, Ord, Show)

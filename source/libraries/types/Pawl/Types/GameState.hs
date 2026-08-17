@@ -54,7 +54,7 @@ data GameState = MkGameState
     -- reader that walks the battlefield -- the projection, targeting, the
     -- state-based actions, combat, cost payment -- is asking about existing
     -- permanents, and none of them has to remember phasing to get the right
-    -- answer. Three rules sit on the other side of rule 702.26b's "except", and
+    -- answer. Four rules sit on the other side of rule 702.26b's "except", and
     -- each is answered somewhere different:
     --
     --   * CR 502.1's phasing event, which reads and writes this field, and
@@ -62,6 +62,10 @@ data GameState = MkGameState
     --     (Pawl.Engine.Phasing).
     --   * CR 702.26k, a phased-out permanent leaving the game with its owner,
     --     which deletes from it (Pawl.Engine.Game.removeFromZones).
+    --   * CR 702.26n, a row whose player has left and whose turn CR 800.4k will
+    --     not let begin, which is rekeyed to that rule's schedule as the walk
+    --     passes the seat (Pawl.Engine.Phasing.orphanSchedule, called from
+    --     Pawl.Engine.Engine).
     --   * CR 514.2's damage sweep, which does NOT name this field and does not
     --     have to: Pawl.Engine.Damage.removeAllDamage clears every object rather
     --     than every permanent, so a phased-out one is already covered.
@@ -74,11 +78,12 @@ data GameState = MkGameState
     -- (CR 702.26f) hand it back to somebody else. A stored player is that
     -- sentence; Pawl.Engine.Projection.controllerOf is not.
     --
-    -- The row also says WHICH of rule 702.26's two schedules the permanent is
-    -- on, which is CR 702.26g's own distinction: a permanent that phased out
-    -- directly phases in during its player's next untap step, while one that
-    -- phased out indirectly "won't phase in by itself" and comes back with the
-    -- permanent it is attached to. See Pawl.Types.PhasedOut.
+    -- The row also says WHICH of rule 702.26's schedules the permanent is on:
+    -- CR 702.26g's distinction between a permanent that phased out directly,
+    -- which phases in during its player's next untap step, and one that phased
+    -- out indirectly, which "won't phase in by itself" and comes back with the
+    -- permanent it is attached to -- plus CR 702.26n's, which a direct row moves
+    -- onto once its player has left. See Pawl.Types.PhasedOut.
     --
     -- What DOESN'T live here is why a permanent phased out DIRECTLY, and nothing
     -- needs it: rule 702.26a phases in every permanent that phased out under that

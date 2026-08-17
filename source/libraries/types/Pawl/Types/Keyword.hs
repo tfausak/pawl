@@ -248,9 +248,11 @@ data Keyword
     -- instances redundant, so its reader takes membership rather than the
     -- per-keyword count the projection carries.
     --
-    -- Phasing is a property of the PERMANENT, not of the phased-out state: a
-    -- permanent phased out by an effect (Teferi's Protection) has no phasing
-    -- ability and so never phases back in on its own. That is why "is it phased
+    -- Phasing is a property of the PERMANENT, not of the phased-out state, and
+    -- the keyword decides who LEAVES rather than who returns: rule 702.26a
+    -- phases in every permanent that phased out under that player's control, so
+    -- one an effect sent away (Teferi's Protection) comes back on the same
+    -- schedule with no phasing ability anywhere on it. That is why "is it phased
     -- out" lives on Pawl.Types.GameState and not here.
     Phasing
   | -- | 702.28b: a creature with shadow can't be blocked by creatures without

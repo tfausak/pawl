@@ -490,11 +490,12 @@ runTurnBasedActions phase = do
       -- what THE ACTIVE PLAYER controls and controlled -- vacuous under the guard
       -- rather than merely skipped for the permanents CR 800.4a's first clause
       -- reaches: it has already taken everything a departed player OWNED, and CR
-      -- 702.26k took their phased-out ones with it. It is NOT vacuous where owner
-      -- and controller come apart -- a permanent somebody else owns that phased
-      -- out under a player who has since left keeps a GameState.phasedOut row
-      -- keyed to a player with no further untap step, which CR 800.4c and CR
-      -- 702.26n between them say what to do about (#931).
+      -- 702.26k took their phased-out ones with it.
+      --
+      -- A row keyed to a player who left EARLIER never reaches this guard at
+      -- all: CR 800.4k gives that seat no turn, so walkToNextTurn walks past it
+      -- and this step never runs for them. CR 702.26n's reschedule is therefore
+      -- at the walk (Phasing.orphanSchedule) and not here.
       Monad.when hasActive (State.modify' (Phasing.phasingEvent active))
       -- CR 502.2 / 703.4b: the day/night check, second in the step and BEFORE the
       -- untap itself (CR 502.3 / 703.4c). Outside the CR 800.4j guard the actions
@@ -1578,6 +1579,11 @@ priorityLoop = do
 -- turn WOULD have begun, so Expiry.dropAtTurnOf fires at EVERY seat the walk
 -- passes and at every extra turn popped, including the ones whose turn never
 -- begins. For the seat that does begin a turn, the same call is CR 611.2a.
+--
+-- CR 702.26n hangs off that same moment for a phased-out permanent that would
+-- otherwise never come back, so Phasing.orphanSchedule fires at both of the
+-- places dropAtTurnOf does -- but only where the turn does not begin, a seat
+-- that begins one being nobody's orphan.
 handoffTurn :: Game ()
 handoffTurn = State.modify' takeNextTurn
 
@@ -1608,8 +1614,9 @@ turnAnchorOf gs = Maybe.fromMaybe (GameState.activePlayer gs) (GameState.turnAnc
 --
 -- CR 800.4k applies to an extra turn exactly as it does to an ordinary one: a
 -- departed player's extra turn does not begin. The entry is still SPENT, and
--- Expiry.dropAtTurnOf still fires for CR 800.4m -- the same two things
--- walkToNextTurn does for a seat it walks past.
+-- both of the rules that hang off "would have begun" still fire --
+-- Expiry.dropAtTurnOf for CR 800.4m and Phasing.orphanSchedule for CR 702.26n
+-- -- which is what walkToNextTurn does for a seat it walks past.
 --
 -- Total: each recursive call consumes one entry, and the empty case falls
 -- through to walkToNextTurn, which is bounded by the seat count.
@@ -1627,7 +1634,12 @@ takeNextTurn gs = case GameState.extraTurns gs of
           -- the `else` spends belongs to a turn that never begins. Nothing of
           -- this turn has started yet, so CR 614.10 is not yet in the way.
             Replacement.installTurnSkips entry (beginTurnOf pid anchored)
-          else takeNextTurn swept
+          else -- CR 702.26n, as on walkToNextTurn's skip branch below: this
+          -- entry is a turn `pid` would have begun, so a row keyed to them is
+          -- rescheduled here too. No board reaches it -- an extra turn for a
+          -- departed player needs a phased-out permanent besides -- so it is
+          -- the rule written out at its second site rather than a proved one.
+            takeNextTurn (Phasing.orphanSchedule pid swept)
 
 -- One seat at a time, bounded by the number of seats, so it terminates even when
 -- every seat has departed. The fallback returns the state without beginning a
@@ -1643,12 +1655,19 @@ walkToNextTurn seatsLeft seat gs =
     else
       let next = nextInOrder (GameState.turnOrder gs) seat
           swept = Expiry.dropAtTurnOf next gs
+          -- CR 702.26n: the phasing analogue of the sweep above, and it belongs
+          -- on the same line for the same reason -- this is the moment the turn
+          -- WOULD have begun. A row keyed to a seat this walk passes is
+          -- rescheduled onto rule 702.26n's, and phases in at the untap step of
+          -- whichever seat the walk lands on. Applied on this branch only: a
+          -- seat that does begin a turn is nobody's orphan.
+          orphaned = Phasing.orphanSchedule next swept
        in if List.elem next (Game.stillPlaying swept)
             then -- CR 500.7 / 103.1: this turn IS the ordinary rotation, so the
             -- seat it is dealt to is the one the next walk starts from and
             -- there is nothing left to remember (see GameState.turnAnchor).
               beginTurnOf next swept {GameState.turnAnchor = Nothing}
-            else walkToNextTurn (seatsLeft - 1) next swept
+            else walkToNextTurn (seatsLeft - 1) next orphaned
 
 -- The turn actually begins for `pid`. Split out of handoffTurn so the CR 800.4k
 -- seat walk has exactly one place to land.
