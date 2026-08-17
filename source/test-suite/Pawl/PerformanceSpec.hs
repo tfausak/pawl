@@ -160,7 +160,7 @@ activationsIn =
         Action.Type.Pass -> False
         Action.Type.Play _ _ -> False
         Action.Type.Cast {} -> False
-        Action.Type.TurnFaceUp _ -> False
+        Action.Type.TurnFaceUp {} -> False
         Action.Type.Unlock _ _ -> False
         Action.Type.DiscardFromHand _ -> False
         Action.Type.Plot _ -> False

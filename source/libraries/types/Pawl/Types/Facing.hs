@@ -1,6 +1,7 @@
 module Pawl.Types.Facing where
 
 import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
+import qualified Pawl.Types.FaceDownReason as FaceDownReason
 
 -- | CR 110.5: one of the four status categories a permanent always has a value
 -- for -- face up or face down. TapState's sibling, and deliberately a second
@@ -21,22 +22,34 @@ import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 -- is that other thing, and its own haddock has the rest of the distinction.
 data Facing
   = FaceUp
-  | -- | CR 708.2: the FaceDown arm carries the characteristics the ability or
-    -- rules that allowed the object to be face down LISTED for it, because that
-    -- list is the whole of what the object is and nothing else in the game state
-    -- records what turned it over. Morph and the rest list nothing and carry
-    -- FaceDownCharacteristics.defaultValue.
-    FaceDown FaceDownCharacteristics.FaceDownCharacteristics
+  | -- | CR 708.2: the FaceDown arm carries the ability or rules that ALLOWED the
+    -- object to be face down (CR 708.6) and the characteristics that allower
+    -- LISTED for it, because between them those two are the whole of what the
+    -- game knows about a face-down object. Morph and the rest list nothing and
+    -- carry FaceDownCharacteristics.defaultValue.
+    --
+    -- The reason is first because CR 708.2's own sentence puts it first: the
+    -- listed characteristics are "those listed by the ability or rules that
+    -- allowed the spell or permanent to be face down", so the list is the
+    -- allower's and not the other way round.
+    FaceDown FaceDownReason.FaceDownReason FaceDownCharacteristics.FaceDownCharacteristics
   deriving (Eq, Ord, Show)
 
 -- | CR 708.2a's face-down status -- what every producer that lists no
--- characteristics writes.
-faceDown :: Facing
-faceDown = FaceDown FaceDownCharacteristics.defaultValue
+-- characteristics writes, named by the rule that allowed it.
+faceDown :: FaceDownReason.FaceDownReason -> Facing
+faceDown reason = FaceDown reason FaceDownCharacteristics.defaultValue
 
 -- | Whether an object is face down at all, for a reader that wants the CR 110.5
 -- STATUS rather than the list on it.
 isFaceDown :: Facing -> Bool
 isFaceDown x = case x of
   FaceUp -> False
-  FaceDown _ -> True
+  FaceDown _ _ -> True
+
+-- | CR 708.6's fact on its own: which ability or rules turned this object over,
+-- or Nothing for an object that is face up and so was turned over by none.
+reasonOf :: Facing -> Maybe FaceDownReason.FaceDownReason
+reasonOf x = case x of
+  FaceUp -> Nothing
+  FaceDown reason _ -> Just reason

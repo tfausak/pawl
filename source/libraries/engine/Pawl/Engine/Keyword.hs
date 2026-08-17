@@ -1328,13 +1328,15 @@ mintedReplacementsFor keyword count = case keyword of
   -- Filter.IsSource, because CR 614.1e's ability is the turning permanent's own
   -- ("As THIS permanent is turned face up").
   --
-  -- The rule's "IF ITS MEGAMORPH COST WAS PAID" is not a condition anything here
-  -- checks, and is satisfied by construction rather than elided:
-  -- Pawl.Engine.FaceDown.turnFaceUp is the only place that turns a permanent face
-  -- up, and CR 702.37e's cost is the only cost it pays -- for a megamorph card,
-  -- the megamorph cost. Not implemented: another way to turn a permanent face up
-  -- (Ixidron, Zoetic Cavern's own morph beside a granted megamorph), where the
-  -- counter would have to be withheld (#986).
+  -- The rule's "IF ITS MEGAMORPH COST WAS PAID" is not checked here but at the
+  -- row's match, Pawl.Engine.Replacement.applies: CR 701.40c gives a manifested
+  -- megamorph card a second road face up at its MANA cost, and the row is refused
+  -- down that one. Pawl.FaceDownSpec's Misthoof Kirin pair is the proof.
+  --
+  -- Not implemented: the rest of the condition, which asks about the COST and not
+  -- the road -- a permanent holding a plain morph ability beside a megamorph one
+  -- would take the counter for either cost, since Keyword.morphCost reads only
+  -- the first (#986).
   --
   -- ONE ROW PER INSTANCE, as riot's is, and reached the same way -- the instance
   -- ordinal, not the effect value, is what separates two equal rows. Unexercised

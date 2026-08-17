@@ -12,6 +12,7 @@ import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- | CR 614.6: an event as it WOULD happen -- the thing a replacement effect
@@ -37,11 +38,18 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- is the active player, and so CR 616.1's "affected player" for the choice among
 -- applicable skips.
 --
--- WouldTurnFaceUp carries an ObjectId and nothing else for WouldEnter's reason:
--- CR 708.11 has the ability applied WHILE the permanent is turning over, and
+-- WouldTurnFaceUp carries the object for WouldEnter's reason: CR 708.11 has the
+-- ability applied WHILE the permanent is turning over, and
 -- Pawl.Engine.FaceDown.turnFaceUp has already written the face-up status by the
 -- time it raises this -- so every property a CR 614.1e replacement can modify is
 -- read off, and written to, the object.
+--
+-- It carries the PROCEDURE beside it, which no other arm needs, because CR
+-- 702.37b's rewrite is conditional on WHICH COST WAS PAID -- "put a +1/+1 counter
+-- on it if its megamorph cost was paid to turn it face up" -- and CR 701.40c gives
+-- a manifested megamorph card a second, cheaper way over that pays no megamorph
+-- cost at all. Nothing on the object records which road it came by, so the event
+-- has to.
 --
 -- Nine arms, not every replaceable event class the rules define: each of the
 -- rest is one more arm plus the funnel that raises it.
@@ -91,5 +99,5 @@ data ProposedEvent
     -- Raised by Pawl.Engine.FaceDown.turnFaceUp, the only place in the engine
     -- that turns anything face up, and the one funnel CR 116.2b's special action
     -- goes through.
-    WouldTurnFaceUp ObjectId.ObjectId
+    WouldTurnFaceUp ObjectId.ObjectId TurnUpProcedure.TurnUpProcedure
   deriving (Eq, Ord, Show)

@@ -112,7 +112,7 @@ isCast action = case action of
   A.Pass -> False
   A.Play {} -> False
   A.Activate _ _ -> False
-  A.TurnFaceUp _ -> False
+  A.TurnFaceUp {} -> False
   A.Unlock _ _ -> False
   A.DiscardFromHand _ -> False
   A.Plot _ -> False
@@ -126,7 +126,7 @@ isActivate action = case action of
   A.Cast {} -> False
   A.Pass -> False
   A.Play {} -> False
-  A.TurnFaceUp _ -> False
+  A.TurnFaceUp {} -> False
   A.Unlock _ _ -> False
   A.DiscardFromHand _ -> False
   A.Plot _ -> False
@@ -141,7 +141,7 @@ isManaAbility action = case action of
   A.Cast {} -> False
   A.Pass -> False
   A.Play {} -> False
-  A.TurnFaceUp _ -> False
+  A.TurnFaceUp {} -> False
   A.Unlock _ _ -> False
   A.DiscardFromHand _ -> False
   A.Plot _ -> False

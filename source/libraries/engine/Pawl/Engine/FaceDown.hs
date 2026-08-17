@@ -20,9 +20,14 @@
 -- an ordinary rules type and never an effect's identity -- Pawl.Engine.Event
 -- classifies both like any other.
 --
--- THE INVARIANT: rule 702.37 is part of the rulebook, so reading
--- Keyword.Morph's cost here is the same closed-half act as reading a Phase. This
--- module never asks which CARD is underneath.
+-- TWO PROCEDURES, because CR 708.7's permission belongs to whatever allowed the
+-- permanent to be face down and two rules write one: CR 702.37e's, at the morph
+-- cost, and CR 701.40b's, at the card's mana cost. CR 701.40c is the case where
+-- both are open at once, and the engine offers both rather than picking.
+--
+-- THE INVARIANT: rules 701.40 and 702.37 are part of the rulebook, so reading
+-- Keyword.Morph's cost or a FaceDownReason here is the same closed-half act as
+-- reading a Phase. This module never asks which CARD is underneath.
 module Pawl.Engine.FaceDown where
 
 import qualified Control.Monad as Monad
@@ -34,8 +39,11 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Types.CardType as CardType
 import Pawl.Types.Cost (Cost)
+import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -48,6 +56,9 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProposedEvent as ProposedEvent
+import Pawl.Types.TurnUpProcedure (TurnUpProcedure)
+import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
+import qualified Pawl.Types.TypeLine as TypeLine
 
 -- CR 702.37e: "what the permanent's morph cost WOULD BE if it were face up".
 -- Nothing when the card underneath has no morph ability, which is the rule's own
@@ -69,15 +80,48 @@ morphCostOf oid gs = do
   face <- Game.faceUpFaceOf oid gs
   Keyword.morphCost (Face.keywords face)
 
--- CR 702.37e / 116.2b: may this player turn this permanent face up right now?
--- Four conjuncts, each a clause of the rule:
+-- CR 701.40b: "show all players that the card representing that permanent IS A
+-- CREATURE CARD and what THAT CARD'S MANA COST is, pay that cost". Its
+-- parenthesis is the two guards below: "if the card representing that permanent
+-- isn't a creature card or it doesn't have a mana cost, it can't be turned face
+-- up this way."
+--
+-- Read through Game.faceUpFaceOf for morphCostOf's reason, and the rule words it
+-- even more plainly: both guards are about "the CARD representing that
+-- permanent" rather than about the permanent, and CR 708.2a has left the
+-- permanent itself with no card type and no mana cost at all -- so a projected
+-- read would refuse every manifested permanent ever put onto the battlefield.
+--
+-- The card's own printed types, not its projected ones, for the same reason and
+-- morphCostOf's: the rule's subject is the card, so a CR 613 read of the
+-- permanent answers a different question.
+manifestCostOf :: ObjectId -> GameState -> Maybe (Cost Keyword)
+manifestCostOf oid gs = do
+  face <- Game.faceUpFaceOf oid gs
+  Monad.guard (Set.member CardType.Creature (TypeLine.types (Face.typeLine face)))
+  manaCost <- Face.manaCost face
+  pure (Cost.Type.MkCost (Just manaCost) [])
+
+-- What one of CR 708.7's two procedures costs on this permanent, or Nothing when
+-- that procedure is closed to it. A classification of the two rules, never of a
+-- card: which procedure is which is CR 701.40c's own distinction.
+costOf :: TurnUpProcedure -> ObjectId -> GameState -> Maybe (Cost Keyword)
+costOf procedure oid gs = case procedure of
+  TurnUpProcedure.Morph -> morphCostOf oid gs
+  TurnUpProcedure.Manifest -> manifestCostOf oid gs
+
+-- CR 116.2b: may this player turn this permanent face up right now, by this
+-- procedure? Five conjuncts, each a clause of the rule:
 --
 --   * it is FACE DOWN (CR 708.2b's mirror -- there is nothing to turn up
 --     otherwise);
---   * it is a PERMANENT this player CONTROLS ("a face-down permanent you
+--   * it is a PERMANENT this player CONTROLS (CR 702.37e's "a face-down
+--     permanent you control", CR 701.40b's "a manifested permanent you
 --     control"), which is why the battlefield membership and the projected
 --     controller are both asked;
---   * the card would have a MORPH COST if it were face up;
+--   * the procedure is one this permanent is ELIGIBLE for, which is the only
+--     conjunct the two rules disagree on and is `eligible` below;
+--   * the procedure's cost exists on the card underneath;
 --   * that cost is payable. An action the player cannot take is not offered,
 --     which is Pawl.Engine.Action.legalActions' posture for every other action
 --     on the menu.
@@ -88,24 +132,55 @@ morphCostOf oid gs = do
 -- Pawl.Engine.Activate takes of an activation cost (#90).
 --
 -- The TIMING clause has no conjunct here because the engine is the timing: CR
--- 702.37e's "any time you have priority" is satisfied by legalActions being
--- asked only of the priority holder, exactly as CR 116.2a's land play relies on.
-canTurnFaceUp :: PlayerId -> ObjectId -> GameState -> Bool
-canTurnFaceUp pid oid gs =
-  maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject oid gs)
-    && Projection.controllerOf oid gs == Just pid
-    && case morphCostOf oid gs of
-      Nothing -> False
-      Just cost -> Cost.canPay pid oid cost gs
+-- 702.37e's and CR 701.40b's shared "any time you have priority" is satisfied by
+-- legalActions being asked only of the priority holder, exactly as CR 116.2a's
+-- land play relies on.
+canTurnFaceUp :: PlayerId -> TurnUpProcedure -> ObjectId -> GameState -> Bool
+canTurnFaceUp pid procedure oid gs =
+  let -- CR 701.40b's subject is "a MANIFESTED permanent", so this procedure is
+      -- open only to a permanent CR 701.40a turned over; the reason on the status
+      -- is how that is known (CR 708.6). Without this guard a morph-CAST creature
+      -- could be turned face up for its mana cost, which CR 702.37c/702.37e
+      -- allow nowhere.
+      --
+      -- CR 702.37e's subject is only "a face-down permanent you control WITH A
+      -- MORPH ABILITY", which asks about the card and not about the allower --
+      -- so that procedure has no reason guard at all, and a permanent Backslide
+      -- turned face down is turnable by it. That asymmetry is the rule's, not a
+      -- shortcut.
+      eligible = case procedure of
+        TurnUpProcedure.Morph -> True
+        TurnUpProcedure.Manifest ->
+          fmap (Facing.reasonOf . Object.facing) (Game.lookupObject oid gs)
+            == Just (Just FaceDownReason.Manifested)
+   in maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject oid gs)
+        && Projection.controllerOf oid gs == Just pid
+        && eligible
+        && case costOf procedure oid gs of
+          Nothing -> False
+          Just cost -> Cost.canPay pid oid cost gs
 
--- Every permanent this player may turn face up right now, in battlefield order
--- -- what Action.TurnFaceUp is built from.
-turnableFaceUp :: PlayerId -> GameState -> [ObjectId]
+-- Every way this player may turn a permanent face up right now, in battlefield
+-- order -- what Action.TurnFaceUp is built from.
+--
+-- ONE ENTRY PER PROCEDURE, so a manifested morph card appears twice. That is CR
+-- 701.40c in the shape Pawl.Engine.Room.unlockable takes for CR 709.5e's doors:
+-- "its controller MAY turn that card face up using EITHER ... OR", two prices,
+-- and offering both as legal actions is how the engine declines to choose
+-- (docs/design.md's second invariant).
+turnableFaceUp :: PlayerId -> GameState -> [(ObjectId, TurnUpProcedure)]
 turnableFaceUp pid gs =
-  filter (\oid -> canTurnFaceUp pid oid gs) (Set.toAscList (GameState.battlefield gs))
+  [ (oid, procedure)
+  | oid <- Set.toAscList (GameState.battlefield gs),
+    procedure <- [TurnUpProcedure.Morph, TurnUpProcedure.Manifest],
+    canTurnFaceUp pid procedure oid gs
+  ]
 
--- CR 702.37e, in the rule's own order: show all players what the morph cost
--- would be, pay it, then turn the permanent face up.
+-- CR 702.37e and CR 701.40b, in the order both rules share: show all players
+-- what the procedure's cost is, pay it, then turn the permanent face up. ONE
+-- function for both, because everything after the payment is the same game
+-- action -- the two rules differ only in what they showed and what they charged,
+-- which is `costOf` and nothing else.
 --
 -- The SHOWING is not modelled. Nothing in pawl hides a face-down permanent's
 -- card from a reader in the first place, so there is no concealment for a reveal
@@ -113,7 +188,7 @@ turnableFaceUp pid gs =
 --
 -- REJECT-NOT-REPAIR, the posture Cast.castSpell and Activate.activateAbility
 -- both take: a payment that fails restores the state from before it was
--- attempted and the permanent stays face down. CR 702.37e's order is what makes
+-- attempted and the permanent stays face down. The rules' order is what makes
 -- that correct rather than merely tidy -- the cost is paid BEFORE the permanent
 -- turns over, so a failed payment has turned nothing over to undo.
 --
@@ -131,12 +206,12 @@ turnableFaceUp pid gs =
 -- being turned face up, NOT AFTERWARD". That is why the CR 616.1 loop runs
 -- between the two lines below rather than after both -- see the note at the
 -- call.
-turnFaceUp :: PlayerId -> ObjectId -> Game ()
-turnFaceUp pid oid = do
+turnFaceUp :: PlayerId -> TurnUpProcedure -> ObjectId -> Game ()
+turnFaceUp pid procedure oid = do
   before <- State.get
-  if not (canTurnFaceUp pid oid before)
+  if not (canTurnFaceUp pid procedure oid before)
     then pure ()
-    else case morphCostOf oid before of
+    else case costOf procedure oid before of
       Nothing -> pure ()
       Just cost -> do
         payment <- Cost.pay ManaSpending.AsProduced pid oid cost
@@ -181,7 +256,7 @@ turnFaceUp pid oid = do
             -- 614.1e's abilities add to the turning over rather than replacing it
             -- -- and there is nothing left to cancel by this point anyway: the
             -- status is already written.
-            Monad.void (Event.applyReplacements (ProposedEvent.WouldTurnFaceUp oid))
+            Monad.void (Event.applyReplacements (ProposedEvent.WouldTurnFaceUp oid procedure))
             -- CR 708.7 through CR 603.2: Skirk Marauder's "when this creature is
             -- turned face up" watches for this, and this is the only place in the
             -- engine that writes it.
