@@ -36,8 +36,8 @@ import qualified Pawl.Types.Recipient as Recipient
 -- Pawl.Types.PhasePattern.whosePhase is: card data cannot name an ObjectId or a
 -- PlayerId, so the only producers are Resolve's three arms that bake one
 -- (PreventNextDamage, PreventAllDamage and RedirectDamage), which share one
--- `installDamageRow`. RedirectDamage is also the one that names a KIND -- Turn
--- the Tables' "all combat damage" -- where the two prevention arms name none.
+-- `installDamageRow`. All three thread a printed KIND through -- Turn the
+-- Tables' "all combat damage", Decorated Griffin's "the next 1 combat damage".
 --
 -- `whatRecipient` is the CARD-PRINTED half of that same question, and the two
 -- are not one field: `whichRecipient` names an id the engine baked, where this

@@ -973,6 +973,173 @@ testOfFaithSpec s registry = Spec.describe s "Test of Faith (CR 615.5)" $ do
     Spec.assertEqWith s "with 2 of the shield left (CR 615.7)" (shieldsLeft after) [2]
     Spec.assertEqWith s "and unshielded the same ping marks 1 and puts no counter on" (S.damageOf victim control, countersOn CounterKind.PlusOnePlusOne victim control) (Just 1, 0)
 
+-- How many UNBOUNDED shields (CR 615.1 / 615.3) are on the board. `shieldsLeft`
+-- above is the wrong reader for these: it reports a countdown amount, and this
+-- row has none, so it answers the empty list whether the shield is installed or
+-- not.
+preventAllRows :: GameState.GameState -> Int
+preventAllRows gs =
+  let isPreventAll re = case re of
+        ReplacementEffect.DamageR (DamageR.MkDamageR _ DamageRewrite.PreventAll _) -> True
+        _ -> False
+   in length (filter (isPreventAll . ActiveReplacement.effect) (GameState.replacements gs))
+
+-- Attacks with everything and blocks with NOTHING, so an attack's damage reaches
+-- the defending player. skirmishAnswer's combat half without its targeting half.
+attackNoBlock :: Prompt.Prompt r -> r
+attackNoBlock p = case p of
+  Prompt.DeclareAttackers _ _ ids -> ids
+  Prompt.DeclareBlockers {} -> Map.empty
+  _ -> S.identityAnswer p
+
+-- Put a board at declare attackers with BOB active and alice defending -- the
+-- mirror of testOfFaithSpec's `atCombat`, since a shield over "you" is over the
+-- player who activated it and it takes combat damage only when that player is
+-- the one being attacked.
+bobAttacks :: GameState.GameState -> GameState.GameState
+bobAttacks gs =
+  gs
+    { GameState.activePlayer = S.bob,
+      GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+      -- CR 703.4h has already happened on this board, so the defending player is
+      -- stated rather than derived (S.combatBoardOf's posture).
+      GameState.combat = Combat.emptyCombat {Combat.Type.defender = Just S.alice},
+      GameState.remaining =
+        Seq.fromList
+          [ Phase.Combat CombatStep.DeclareBlockers,
+            Phase.Combat CombatStep.CombatDamage,
+            Phase.Combat CombatStep.EndOfCombat,
+            Phase.PostcombatMain
+          ]
+    }
+
+-- Aim every target slot at one creature by FILTERING the offered set rather than
+-- building a recipient, so a candidate the card's filter excludes cannot be
+-- smuggled back in: an illegal aim leaves the slot empty instead of silently
+-- becoming a legal one.
+onlyCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+onlyCreature oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToCreature oid) . snd) sets
+  _ -> S.identityAnswer p
+
+-- CR 510.2 vs CR 608: a shield that names a KIND. Decorated Griffin ({4}{W}
+-- Creature -- Griffin 2/3, flying) prints "{1}{W}: Prevent the next 1 combat
+-- damage that would be dealt to you this turn" -- a counted shield (CR 615.7)
+-- over a PLAYER, with no CR 615.5 clause, so the kind is the only thing under
+-- test.
+--
+-- The discrimination needs both halves and a control each. A group using only
+-- combat damage would pass identically on a shield that named no kind at all.
+--
+-- Numbers all distinct: the ping is 1 and the attack is 5, so alice ends on 19
+-- where the kind is respected and 16 where the shield bites, against 20 and 15
+-- for the two readings that are wrong.
+decoratedGriffinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+decoratedGriffinSpec s registry = Spec.describe s "Decorated Griffin (CR 510.2)" $ do
+  Spec.it s "a combat-only shield leaves noncombat damage alone (CR 608)" $ do
+    plains <- S.printingOf s registry "Plains"
+    griffin <- S.printingOf s registry "Decorated Griffin"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let base = S.landsInPlay plains 2
+        (bird, g1) = S.addCreature griffin S.alice base
+        (pinger, g2) = S.addCreature sorcerer S.alice g1
+        shielded = S.runPure S.identityAnswer g2 (Activate.activateAbility S.alice bird (theAbility griffin) Monad.>> Stack.resolveTop)
+        ping g = S.runPure (aimPlayer S.alice) g (Activate.activateAbility S.alice pinger (theAbility sorcerer) Monad.>> Stack.resolveTop)
+        after = ping shielded
+        -- The CONTROL is the same board with the ability never activated, so
+        -- the only difference is the shield.
+        control = ping g2
+    Spec.assertEqWith s "setup: the activation installed a shield of 1" (shieldsLeft shielded) [1]
+    Spec.assertEqWith s "the Sorcerer's noncombat 1 is dealt anyway (CR 608)" (S.lifeOf S.alice after) (Just 19)
+    Spec.assertEqWith s "and the combat-only shield is untouched" (shieldsLeft after) [1]
+    Spec.assertEqWith s "which is what the unshielded board does too" (S.lifeOf S.alice control) (Just 19)
+  Spec.it s "the same shield does prevent combat damage, 1 of it (CR 615.7)" $ do
+    plains <- S.printingOf s registry "Plains"
+    griffin <- S.printingOf s registry "Decorated Griffin"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    let base = S.landsInPlay plains 2
+        (bird, g1) = S.addCreature griffin S.alice base
+        (_, g2) = S.addCreature jedit S.bob g1
+        shielded = S.runPure S.identityAnswer g2 (Activate.activateAbility S.alice bird (theAbility griffin) Monad.>> Stack.resolveTop)
+        after = S.runCombat attackNoBlock (bobAttacks shielded)
+        control = S.runCombat attackNoBlock (bobAttacks g2)
+    Spec.assertEqWith s "setup: the activation installed a shield of 1" (shieldsLeft shielded) [1]
+    Spec.assertEqWith s "1 of the attacker's 5 is prevented" (S.lifeOf S.alice after) (Just 16)
+    Spec.assertEqWith s "and the shield is spent to 0 and dropped (CR 615.7)" (shieldsLeft after) []
+    Spec.assertEqWith s "where the unshielded board takes all 5" (S.lifeOf S.alice control) (Just 15)
+
+-- CR 615.5's additional effect on the UNBOUNDED shield (CR 615.1 / 615.3), which
+-- Test of Faith's countdown shield above cannot reach. Brace for Impact ({4}{W}
+-- Instant) prints "Prevent all damage that would be dealt to target multicolored
+-- creature this turn. For each 1 damage prevented this way, put a +1/+1 counter
+-- on that creature."
+--
+-- "Multicolored" is CR 105.2b -- two or more of the five colors -- written as
+-- the ten pairs of Filter.HasColor rather than as an atom of its own, since a
+-- composition of existing atoms is not a second spelling of one relation.
+--
+-- The unbounded shield has no count, so CR 615.5's "the damage prevented this
+-- way" is per APPLICATION rather than a running total; the second case is what
+-- tells those two readings apart, and they answer 2 and 3.
+braceForImpactSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+braceForImpactSpec s registry = Spec.describe s "Brace for Impact (CR 615.5)" $ do
+  Spec.it s "an unbounded shield carries CR 615.5's rider" $ do
+    plains <- S.printingOf s registry "Plains"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    brace <- S.printingOf s registry "Brace for Impact"
+    let base = S.landsInPlay plains 5
+        (victim, g1) = S.addCreature jedit S.alice base
+        (pinger, g2) = S.addCreature sorcerer S.alice g1
+        (g3, spellId) = S.handOne brace g2
+        shielded = castAndResolve (aimCreature victim) g3 spellId
+        ping g = S.runPure (aimCreature victim) g (Activate.activateAbility S.alice pinger (theAbility sorcerer) Monad.>> Stack.resolveTop)
+        after = ping shielded
+        control = ping g3
+    Spec.assertEqWith s "setup: the unbounded shield is a floating replacement" (preventAllRows shielded) 1
+    Spec.assertEqWith s "the ping's 1 is prevented, so nothing is marked" (S.damageOf victim after) (Just 0)
+    Spec.assertEqWith s "and one +1/+1 counter goes on, per damage prevented" (countersOn CounterKind.PlusOnePlusOne victim after) 1
+    Spec.assertEqWith s "so the 5/5 is a 6/6" (S.powerToughnessOf victim after) (Just (6, 6))
+    Spec.assertEqWith s "and the shield stays: CR 615.7's terminator does not apply" (preventAllRows after) 1
+    Spec.assertEqWith s "unshielded that same ping marks 1 and puts none on" (S.damageOf victim control, countersOn CounterKind.PlusOnePlusOne victim control) (Just 1, 0)
+  Spec.it s "CR 615.5's amount is per application, not a running total" $ do
+    plains <- S.printingOf s registry "Plains"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    brace <- S.printingOf s registry "Brace for Impact"
+    let base = S.landsInPlay plains 5
+        (victim, g1) = S.addCreature jedit S.alice base
+        -- TWO Sorcerers, because one taps for its own ability and a running-total
+        -- reading can only be told from a per-application one by a SECOND
+        -- application.
+        (first, g2) = S.addCreature sorcerer S.alice g1
+        (second, g3) = S.addCreature sorcerer S.alice g2
+        (g4, spellId) = S.handOne brace g3
+        shielded = castAndResolve (aimCreature victim) g4 spellId
+        ping oid g = S.runPure (aimCreature victim) g (Activate.activateAbility S.alice oid (theAbility sorcerer) Monad.>> Stack.resolveTop)
+        after = ping second (ping first shielded)
+    Spec.assertEqWith s "setup: the unbounded shield is a floating replacement" (preventAllRows shielded) 1
+    -- A running-total reading would put 1 on and then 2 on, for 3.
+    Spec.assertEqWith s "two applications of 1 put one counter on each" (countersOn CounterKind.PlusOnePlusOne victim after) 2
+    Spec.assertEqWith s "with nothing ever marked" (S.damageOf victim after) (Just 0)
+    Spec.assertEqWith s "and the shield still installed after both" (preventAllRows after) 1
+  -- The POSITIVE half is the pin: the multicolored creature IS in the legal set
+  -- on the same board the mono-coloured one is not, so a filter that excluded
+  -- everything would fail here rather than pass the negative vacuously.
+  Spec.it s "CR 105.2b: only a multicolored creature is a legal target" $ do
+    plains <- S.printingOf s registry "Plains"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    brace <- S.printingOf s registry "Brace for Impact"
+    let base = S.landsInPlay plains 5
+        (multi, g1) = S.addCreature jedit S.alice base
+        (mono, g2) = S.addCreature pikerPrinting S.alice g1
+        (g3, spellId) = S.handOne brace g2
+        atMulti = castAndResolve (onlyCreature multi) g3 spellId
+        atMono = castAndResolve (onlyCreature mono) g3 spellId
+    Spec.assertEqWith s "the white-and-blue 5/5 is offered, so a shield goes up" (preventAllRows atMulti) 1
+    Spec.assertEqWith s "the mono-red 2/1 is not, so none does" (preventAllRows atMono) 0
+
 -- CR 615.5's additional effect on a STATIC prevention ability, which is where
 -- Test of Faith's floating shield above cannot reach: Stormwild Capridor ({2}{W}
 -- Creature -- Bird Goat 1/3, flying) prints "If noncombat damage would be dealt
@@ -2813,6 +2980,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   galvanicBlastSpec s registry
   mendingHandsSpec s registry
   testOfFaithSpec s registry
+  decoratedGriffinSpec s registry
+  braceForImpactSpec s registry
   stormwildCapridorSpec s registry
   jaredCarthalionSpec s registry
   spiderPunkSpec s registry

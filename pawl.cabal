@@ -418,6 +418,8 @@ library codec
     Pawl.Codec.PoolSpec
     Pawl.Codec.Power
     Pawl.Codec.PowerSpec
+    Pawl.Codec.PreventAllDamage
+    Pawl.Codec.PreventAllDamageSpec
     Pawl.Codec.PreventNextDamage
     Pawl.Codec.PreventNextDamageSpec
     Pawl.Codec.PrintedReplacement
@@ -1089,6 +1091,7 @@ library types
     Pawl.Types.Plus
     Pawl.Types.Pool
     Pawl.Types.Power
+    Pawl.Types.PreventAllDamage
     Pawl.Types.Prevention
     Pawl.Types.PreventionRider
     Pawl.Types.PreventNextDamage
