@@ -4,6 +4,7 @@ import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachTarget as AttachTarget
+import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.Create as Create
@@ -687,6 +688,29 @@ data Effect card
     -- counters (#1255) -- and neither is in the pool, so each is owed to the
     -- first card that asks rather than to the opcode.
     CreateCopy CreateCopy.CreateCopy
+  | -- | CR 707.4 / 613.1a: make a permanent ALREADY ON THE BATTLEFIELD a copy of
+    -- another object -- Unstable Shapeshifter's "this creature becomes a copy of
+    -- that creature". CreateCopy's sibling on the other axis: that one mints a new
+    -- object off an existing one's copiable values, this one rewrites an existing
+    -- object's.
+    --
+    -- Writes the copiable values THEMSELVES (CR 707.2), by stamping the subject's
+    -- copy snapshot -- the same place the CR 707.5 entry replacement and CreateCopy
+    -- write, so all three ways of becoming a copy converge on one reader
+    -- (Projection.copiableCharacteristics) and CR 707.3's "objects that copy the
+    -- object will use the new copiable values" holds for free.
+    --
+    -- CR 707.4's two riders fall out of that rather than being checked for: nothing
+    -- moves zones, so no enters- or leaves-the-battlefield ability triggers; and the
+    -- snapshot is layer 1, so layers 2-7 re-apply over the new base and the
+    -- noncopy effects presently affecting the permanent are untouched. The rule's
+    -- own example -- a Giant Growth'd Shapeshifter keeping its +3/+3 across the
+    -- change -- is Pawl.CopySpec's proving test.
+    --
+    -- Not implemented: the CR 707.9a exception every printed producer carries
+    -- ("except it has this ability"), so pawl's Shapeshifter loses its own trigger
+    -- as it copies and cannot copy again (#1292); and a stated duration (#1753).
+    BecomeCopy BecomeCopy.BecomeCopy
   | -- | CR 614.3 / 615.3: install a floating replacement effect for a duration,
     -- with a use count, an origin and an optional condition. Fog and Drudge
     -- Skeletons' regeneration are both this opcode, differing only in the

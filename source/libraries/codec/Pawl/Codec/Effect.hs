@@ -17,6 +17,7 @@ import qualified Pawl.Codec.AffectPlayers as AffectPlayers
 import qualified Pawl.Codec.Amass as Amass
 import qualified Pawl.Codec.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Codec.AttachTarget as AttachTarget
+import qualified Pawl.Codec.BecomeCopy as BecomeCopy
 import qualified Pawl.Codec.ChangeText as ChangeText
 import qualified Pawl.Codec.Counter as Counter
 import qualified Pawl.Codec.Create as Create
@@ -107,6 +108,7 @@ codec cardCodec =
       Arm.payload "DecreaseSpeed" SpeedDecrease.codec Effect.DecreaseSpeed (\x -> case x of Effect.DecreaseSpeed y -> Just y; _ -> Nothing),
       Arm.payload "Create" createCodec Effect.Create (\x -> case x of Effect.Create y -> Just y; _ -> Nothing),
       Arm.payload "CreateCopy" CreateCopy.codec Effect.CreateCopy (\x -> case x of Effect.CreateCopy y -> Just y; _ -> Nothing),
+      Arm.payload "BecomeCopy" BecomeCopy.codec Effect.BecomeCopy (\x -> case x of Effect.BecomeCopy y -> Just y; _ -> Nothing),
       Arm.payload "Replace" replaceCodec Effect.Replace (\x -> case x of Effect.Replace y -> Just y; _ -> Nothing),
       Arm.payload "SkipNextPhase" SkipNextPhase.codec Effect.SkipNextPhase (\x -> case x of Effect.SkipNextPhase y -> Just y; _ -> Nothing),
       Arm.payload "PreventNextDamage" preventCodec Effect.PreventNextDamage (\x -> case x of Effect.PreventNextDamage y -> Just y; _ -> Nothing),
