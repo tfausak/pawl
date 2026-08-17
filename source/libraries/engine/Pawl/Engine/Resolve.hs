@@ -2090,7 +2090,10 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- ONE evaluation for the whole ref rather than one per seat: the depth is a
   -- number the card computed, not a per-recipient amount, and no printing writes a
   -- per-library depth. A depth that will not evaluate, or evaluates negative, is
-  -- ZERO cards (CR 107.1b) -- the same nothing an empty library gives.
+  -- ZERO cards (CR 107.1b) -- the same nothing an empty library gives. Both of
+  -- those are REGRESSION FENCES rather than proven behaviour: every depth in the
+  -- pool evaluates, and none of them can go negative, so making the fallback 5
+  -- instead of 0 leaves the whole suite green.
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player count) ->
     let named = playerRefPlayers legal controller gs player
         viewOf = Projection.viewWithLastKnown source gs

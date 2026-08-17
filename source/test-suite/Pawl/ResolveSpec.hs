@@ -142,6 +142,7 @@ import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Timestamp as Timestamp
+import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -9032,6 +9033,42 @@ communeWithLavaSpec s registry =
             (exiledNames S.alice after, length (namesIn Zone.Library S.alice after))
             ([], 5)
           Spec.assertEqWith s "the game has no result" (GameState.result after) Nothing
+        -- The STATIC-ANALYSIS half, planted rather than read off a card, because no
+        -- printing puts a TARGET slot in a library's depth and the gameplay cases
+        -- above pass whatever these two answer. Both are the seam a nested Quantity
+        -- slips through: objectRefSlots and readsX reach it only via
+        -- objectRefQuantities, and Effect.Reveal is the cheapest of the three
+        -- ObjectRef-taking opcodes to plant it under.
+        Spec.it s "CR 603.3b a depth nested in an ObjectRef is a slot read and an X read" $ do
+          let slot = SlotName.MkSlotName (Text.pack "victim")
+              depthOf q = ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) q)
+          Spec.assertEqWith
+            s
+            "a depth naming a slot is reported, so the CR 603.3b dataflow lint sees it"
+            (Resolve.slotsOf (Effect.Reveal (depthOf (Quantity.InSlot slot))))
+            (Map.singleton slot SlotArity.One)
+          Spec.assertEqWith
+            s
+            "and a literal depth names none, so the report is the depth's and not the arm's"
+            (Resolve.slotsOf (Effect.Reveal (depthOf (Quantity.Literal 3))))
+            Map.empty
+          Spec.assertEqWith
+            s
+            "CR 107.3: a depth reading X makes the effect an X reader"
+            (Resolve.readsX [Effect.Reveal (depthOf (Quantity.InSlot Binding.variableX))], Resolve.readsX [Effect.Reveal (depthOf (Quantity.Literal 3))])
+            (True, False)
+          -- The third reader of the same seam, and the one CR 603.3b's elision
+          -- rests on: a PlayerRef nested in the depth is a TARGET slot that
+          -- Quantity.slots leaves to this module, so the effect must stop claiming
+          -- its reads are fully stated. A LifeTotal over a slot rather than a bare
+          -- Quantity.InSlot, since that arm is slotless-exhaustive on its own.
+          Spec.assertEqWith
+            s
+            "CR 603.3b: a depth hiding a target slot is not exhaustively reported"
+            ( Resolve.slotsAreExhaustive (Effect.Reveal (depthOf (Quantity.LifeTotal (PlayerRef.InSlot slot)))),
+              Resolve.slotsAreExhaustive (Effect.Reveal (depthOf (Quantity.Literal 3)))
+            )
+            (False, True)
 
 -- alice is mid-combat with one creature per printing in `mine`, bob defends with
 -- one per printing in `theirs`, and alice holds a Trumpet Blast plus exactly the
