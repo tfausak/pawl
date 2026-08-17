@@ -3163,7 +3163,7 @@ conditionalAbilitySpec s registry = Spec.describe s "ConditionalActivatedAbility
   -- CR 613.1: and the clause is judged at the depth of whoever asked. Asked of
   -- Projection.viewUpTo directly, because the atom's three printings -- Tsabo's
   -- Web, Ravager Wurm and Tazri, Stalwart Survivor -- all read a finished
-  -- projection, so no card puts this question inside the fold (#1758).
+  -- projection, so no card puts this question inside the fold; see #1758.
   --
   -- The two bounds are one layer apart, and layer 4 is that layer: below it the
   -- Nexus has not made the Ogre a Demon yet, so the clause is false and the Ogre

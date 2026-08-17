@@ -506,17 +506,20 @@ data Gathered = MkGathered
 --
 -- This one is for callers OUTSIDE the layer fold -- CR 613.11's combat modules
 -- and the CR 305.7 gate that reads a finished projection -- which is what makes
--- fullView the right reader for an attached candidate's host. A caller inside
--- the fold wants affectsGiven with its own layer's bound; see there.
+-- fullView the right reader for the objects a filter reaches PAST the candidate.
+-- A caller inside the fold wants affectsGiven with its own layer's bound; see
+-- there.
 affects :: ObjectId -> ObjectId -> Affected.Affected -> ProjectedCharacteristics -> GameState -> Bool
 affects source oid a partial gs = affectsGiven (fullView gs) source oid a partial gs
 
--- affects with the reader for an ATTACHED candidate's HOST supplied (CR 701.3a),
--- which every caller has to pick at the same depth as `partial`: a caller folding
--- at layer L passes viewUpTo L, a caller reading base characteristics passes
--- baseView, and a caller outside the fold takes `affects` above. See
--- viewOfCharacteristics for why the depths must agree, and why a caller inside
--- the fold reaching for fullView would not terminate; see #1729.
+-- affects with the reader for the objects a filter reaches past the candidate --
+-- an ATTACHED candidate's host (CR 701.3a) and the board the CR 702.178a gate
+-- names -- which every caller has to pick at the same depth as `partial`: a
+-- caller folding at layer L passes viewUpTo L, a caller reading base
+-- characteristics passes baseView, and a caller outside the fold takes `affects`
+-- above. See viewOfCharacteristics for why the depths must agree, and why a
+-- caller inside the fold reaching for fullView would not terminate; see #1729 and
+-- #1758.
 affectsGiven :: Count.ViewOf -> ObjectId -> ObjectId -> Affected.Affected -> ProjectedCharacteristics -> GameState -> Bool
 affectsGiven peers source oid a partial gs = case a of
   Affected.TheseObjects s -> Set.member oid s
@@ -1431,18 +1434,20 @@ affectsBase :: ObjectId -> ObjectId -> Affected.Affected -> GameState -> Bool
 affectsBase source oid a gs = affectsGiven (baseView gs) source oid a (baseCharacteristics oid gs) gs
 
 -- The ViewOf that reads every object at its BASE characteristics: what a caller
--- feeding the projection rather than reading it wants for an attached
--- candidate's host, since anything folded would recurse into the projection
--- affectsBase exists to stay out of. fullView and viewUpTo are the two
--- counterparts; picking between the three is viewOfCharacteristics' `peers`
--- choice, and none of them is a type error at the others' call sites.
+-- feeding the projection rather than reading it wants for the two fields that
+-- reach another object -- an attached candidate's host, and the CR 702.178a gate
+-- -- since anything folded would recurse into the projection affectsBase exists
+-- to stay out of. fullView and viewUpTo are the two counterparts; picking between
+-- the three is viewOfCharacteristics' `peers` choice, and none of them is a type
+-- error at the others' call sites.
 --
 -- Nothing for an id naming no object, like viewUpTo -- and like it, terminating
 -- because nothing under here folds: baseCharacteristics reads the printed face.
 --
 -- A regression fence rather than proven behaviour: swapping this for fullView
 -- leaves the whole suite green, since reaching it needs a card that sets a
--- subtype on a filtered set of ATTACHED permanents and no printing does
+-- subtype on a filtered set of permanents and reads either an ATTACHED
+-- candidate's host or its non-mana activated abilities, and no printing does
 -- (gap #1757).
 baseView :: GameState -> Count.ViewOf
 baseView gs oid =
@@ -3912,14 +3917,14 @@ projectDeciding admits cands = forObject
                         -- stands in for applies it too, so the two agree wherever
                         -- there is nothing at this layer to see.
                         --
-                        -- A HOST is read off the running board too, so an
-                        -- AttachedTo nest sees the same partials the rest of this
-                        -- view does (CR 701.3a). Recursive and terminating: the
-                        -- partials are already built, and the fallback is
-                        -- `bounded`, whose own peers stay at this layer's bound.
-                        -- A fence like baseView's: only a CR 613.8-movable layer
-                        -- reaches this reader, and no card puts an AttachedTo
-                        -- filter in one (gap #1757).
+                        -- Another OBJECT is read off the running board too, so an
+                        -- AttachedTo nest and the CR 702.178a gate both see the
+                        -- same partials the rest of this view does (CR 701.3a / CR
+                        -- 613.1). Recursive and terminating: the partials are
+                        -- already built, and the fallback is `bounded`, whose own
+                        -- peers stay at this layer's bound. A fence like
+                        -- baseView's: only a CR 613.8-movable layer reaches this
+                        -- reader, and no card puts either atom in one (gap #1757).
                         viewOfBoard board o = case Map.lookup o board of
                           Just (p, _) -> Just (viewOfCharacteristics (viewOfBoard board) o (noncreaturePT o gs p) (controllerOf o gs) (countersOf o gs) gs)
                           Nothing -> bounded o
@@ -4237,10 +4242,11 @@ colorsGiven pcs oid gs = PC.colors (projectGiven pcs oid gs)
 -- CR 602 / 613.1f: an object's activated abilities after the layer system, the
 -- same projection posture as keywordsOf. A Humility'd creature has none.
 --
--- CR 702.178a's gate is applied HERE, over the finished projection, rather than
--- inside the fold: "as long as your speed is 4, this object has '[Ability]'" is
--- an ability the object has or lacks, and every reader of an object's activated
--- abilities goes through this pair. The layer system is asked first and this
+-- CR 702.178a's gate is applied HERE, over the finished projection: "as long as
+-- your speed is 4, this object has '[Ability]'" is an ability the object has or
+-- lacks, and every reader of an object's activated abilities goes through this
+-- pair. viewOfCharacteristics is the one place the same gate is asked from INSIDE
+-- the fold, over a board bounded at that caller's layer instead. The layer system is asked first and this
 -- second, which is the right order -- a Muraganda Raceway whose rules text CR
 -- 305.7 stripped has no max speed ability to gate, whatever its controller's
 -- speed, and CR 613.1f's LoseAllAbilities says the same of a creature.
@@ -4304,9 +4310,11 @@ abilitiesFromCharacteristics peers pc oid gs =
 -- the same projection posture as abilitiesOf. A Humility'd creature has none --
 -- except the shield pair, which no layer can reach; see shieldOf.
 --
--- CR 604.2's "as long as" clause is asked HERE, the same place and the same way
+-- CR 604.2's "as long as" clause is asked HERE, the same place
 -- abilitiesFromCharacteristics asks an activated ability's (CR 702.178a): against
--- the board handed in, with the source's own controller for CR 109.5's "you".
+-- a finished projection, with the source's own controller for CR 109.5's "you".
+-- The full view is not a choice this one has to make, unlike that one's -- no
+-- reader of a replacement effect stands inside the layer fold.
 -- Nothing is latched -- every caller re-derives this list, and the CR 616.1 loop
 -- re-collects on each iteration -- so Jared Carthalion's shield goes away the
 -- moment the monarchy does, with no trigger and no resolution in between.
