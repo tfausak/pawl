@@ -4799,7 +4799,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   --
   -- PutCounters' slot read without the quantity: a player recipient takes no
   -- designation (rule 702.112b: "only permanents can be or become renowned", and
-  -- rules 701.37b and 701.60b say the same of the other two), an illegal slot at
+  -- rules 701.37b, 701.60b and 719.3b say the same of the other marks), an illegal slot at
   -- resolution is CR 608.2b's no-op, and an id naming no object -- the permanent has
   -- left the battlefield (CR 400.7) -- writes nothing and emits nothing, the lookup
   -- below answering Nothing.
@@ -4818,7 +4818,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- stack (CR 608.2a); monstrosity's CR 701.37a "if this permanent isn't monstrous"
   -- is the CLAUSE's condition, read as Quantity.HasDesignation Monstrous before
   -- either of its effects runs, which is also what keeps a second monstrosity from
-  -- putting counters on. Suspect CAN reach it -- Rune-Brand Juggler's "up to one
+  -- putting counters on. CR 719.3a's "and this Case is not solved" is a third
+  -- intervening "if", Case of the Ransacked Lab's. Suspect CAN reach it --
+  -- Rune-Brand Juggler's "up to one
   -- target creature you control" narrows by nothing else -- but the only thing the
   -- gate suppresses is the event, and no card reads a permanent becoming suspected
   -- (#1215), so there is nothing to assert on either side.
