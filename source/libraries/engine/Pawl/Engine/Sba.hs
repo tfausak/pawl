@@ -360,9 +360,21 @@ stillLegalEnchant pcs gs source slot recipient = case (slot, recipient) of
 -- ONE ENTRY PER NAME the permanent has, not one per permanent, which is CR
 -- 709.4a's "an object has the chosen name if ONE OF ITS NAMES is the chosen
 -- name" read through "the same name": a permanent with two names is same-named
--- as anything sharing either. Nothing in the pool can make two such groups
--- overlap -- no printed Room or split permanent is legendary -- and a permanent
--- that landed in two would have its controller asked once per group (#1313).
+-- as anything sharing either. A Room with both doors unlocked has two names (CR
+-- 709.5), and Leyline of Singularity grants the supertype, so two of them under
+-- one controller really do land in two keys.
+--
+-- Deduplicated ON THE MEMBER SET, which is where CR 704.5j's "chooses one of
+-- them, and the rest" would otherwise be broken: two fully unlocked Rooms are
+-- keyed under both names, and asking twice about the SAME pair lets two
+-- independent answers bury both and leave the controller with none.
+--
+-- Deduplication, NOT a merge of overlapping groups. Three Rooms unlocked
+-- {left}, {both}, {right} are two DISTINCT same-named sets under CR 704.5j --
+-- {A,B} and {B,C} -- and keeping A and keeping C is a legal pair of choices that
+-- buries only B. A transitive closure over shared names would bury two of the
+-- three. Partial overlap needs no special handling anyway: CR 704.3 repeats the
+-- check, so whatever survives is re-grouped against the new board.
 legendGroups :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> [(PlayerId, NonEmpty.NonEmpty ObjectId)]
 legendGroups pcs gs =
   let legendary oid = case Map.lookup oid pcs of
@@ -381,7 +393,10 @@ legendGroups pcs gs =
       toGroup ((controller, _), oids) = case List.sort oids of
         first : rest@(_ : _) -> Just (controller, first NonEmpty.:| rest)
         _ -> Nothing
-   in Maybe.mapMaybe toGroup (Map.toList byKey)
+   in -- Sorted above, so two keys over the same permanents produce EQUAL pairs
+      -- and nub collapses them. A member has one controller, so equal member
+      -- lists cannot carry different controllers.
+      List.nub (Maybe.mapMaybe toGroup (Map.toList byKey))
 
 -- CR 704.5j: ask one same-named group's controller which to keep, and return the
 -- rest -- the permanents this pass must put into their OWNERS' graveyards.
