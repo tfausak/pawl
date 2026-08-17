@@ -7,6 +7,7 @@ import qualified Pawl.BattleSpec
 import qualified Pawl.BindingSpec
 import qualified Pawl.CardSpec
 import qualified Pawl.CardsSpec
+import qualified Pawl.CaseSpec
 import qualified Pawl.CastSpec
 import qualified Pawl.Codec.AbilityNameSpec
 import qualified Pawl.Codec.AbilityTriggeredSpec
@@ -399,6 +400,7 @@ spec s registry = do
   Pawl.BindingSpec.spec s
   Pawl.CardSpec.spec s registry
   Pawl.CardsSpec.spec s
+  Pawl.CaseSpec.spec s registry
   Pawl.CastSpec.spec s registry
   Pawl.Codec.AbilityNameSpec.spec s
   Pawl.Codec.AbilityTriggeredSpec.spec s
