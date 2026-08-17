@@ -5,6 +5,7 @@ import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 
 -- | What a player with priority may do. The SPECIAL actions CR 116.2 lists that
 -- are here are CR 116.2a's land play, CR 116.2b's turning a face-down permanent
@@ -75,12 +76,19 @@ data Action
     -- not use the stack -- so it is an Action rather than anything that goes
     -- through Pawl.Engine.Stack, exactly as CR 116.2a's land play is.
     --
-    -- Carries only the permanent. What it costs is not a choice: CR 702.37e
-    -- fixes it as "the permanent's morph cost ... if it were face up", so
-    -- Pawl.Engine.FaceDown reads it off the card rather than the player naming
-    -- it. Nor is the RESULT one -- turning face up reveals what the card is, and
-    -- the card is already decided.
-    TurnFaceUp ObjectId.ObjectId
+    -- Carries the PROCEDURE as well as the permanent, Unlock's shape below,
+    -- because CR 701.40c makes it a choice: "if a card with morph is manifested,
+    -- its controller may turn that card face up using EITHER the procedure
+    -- described in rule 702.37e ... OR the procedure described above" -- two
+    -- procedures at two different prices, on one permanent. Offering each as its
+    -- own legal action is how the engine declines to pick.
+    --
+    -- What each one COSTS is not a choice: CR 702.37e fixes one as "the
+    -- permanent's morph cost ... if it were face up" and CR 701.40b the other as
+    -- the card's mana cost, so Pawl.Engine.FaceDown reads both off the card
+    -- rather than the player naming either. Nor is the RESULT one -- turning
+    -- face up reveals what the card is, and the card is already decided.
+    TurnFaceUp ObjectId.ObjectId TurnUpProcedure.TurnUpProcedure
   | -- | CR 116.2m / 709.5e: pay a locked half's mana cost to give this permanent
     -- the matching unlocked designation. "A player can take this action any time
     -- they have priority and the stack is empty during a main phase of their
@@ -88,9 +96,10 @@ data Action
     -- anything that goes through Pawl.Engine.Stack, exactly as CR 116.2a's land
     -- play is.
     --
-    -- Carries the DOOR as well as the permanent, unlike TurnFaceUp above, because
-    -- here there is a choice to make: CR 709.5e says "a locked half", and a Room
-    -- with both doors shut offers two different actions at two different prices.
+    -- Carries the DOOR as well as the permanent, TurnFaceUp's shape above,
+    -- because here there is a choice to make: CR 709.5e says "a locked half", and
+    -- a Room with both doors shut offers two different actions at two different
+    -- prices.
     -- Naming it rather than indexing into Card.faces is Cast's argument
     -- unchanged -- CR 709.4a gives the halves names, and a name either resolves
     -- or fails loudly where an index silently replays as the wrong door.
@@ -104,9 +113,9 @@ data Action
     -- rather than anything that goes through Pawl.Engine.Stack, exactly as CR
     -- 116.2a's land play is.
     --
-    -- Carries only the object, TurnFaceUp's shape: CR 116.2e leaves nothing to
-    -- choose. Which card is discarded is the card whose ability it is, and there
-    -- is no cost.
+    -- Carries only the object, where TurnFaceUp and Unlock above carry a choice
+    -- beside it: CR 116.2e leaves nothing to choose. Which card is discarded is
+    -- the card whose ability it is, and there is no cost.
     --
     -- CR 116.1 is also why this is only ever OFFERED: a special action is not
     -- one the game generates, so the engine never takes it unasked.
@@ -116,7 +125,7 @@ data Action
     -- the stack (CR 116.1), so it is an Action rather than anything that goes
     -- through Pawl.Engine.Stack, exactly as CR 116.2a's land play is.
     --
-    -- Carries only the SOURCE PERMANENT, TurnFaceUp's shape. What it costs is
+    -- Carries only the SOURCE PERMANENT, DiscardFromHand's shape. What it costs is
     -- printed on that permanent, and which of its abilities is ignored is not a
     -- choice pawl offers -- see Pawl.Types.SpecialAction (#1267). WHO ignores it
     -- is the player taking the action, which is the priority holder; whether it

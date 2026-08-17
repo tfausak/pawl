@@ -105,6 +105,7 @@ import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TokenR as TokenR
+import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.Uses as Uses
@@ -409,7 +410,25 @@ applies gs event candidate =
         -- written Facing.FaceUp when it raises the event, so CR 708.11's "would
         -- have ... after it's turned face up" is answered by asking about the
         -- board rather than by a counterfactual.
-        (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR pat _), ProposedEvent.WouldTurnFaceUp oid) -> matchesFiltered gs candidate pat oid
+        --
+        -- CR 702.37b is the second conjunct, and only for the counter rewrite:
+        -- "put a +1/+1 counter on it IF ITS MEGAMORPH COST WAS PAID to turn it
+        -- face up". CR 701.40c gives a manifested megamorph card a second road up
+        -- at its MANA cost, and down that road the ability does not apply at all
+        -- -- so the row is refused here rather than consumed and skipped, which
+        -- is CR 614.1's own shape for an ability whose condition is not met.
+        --
+        -- Scoped to WithCounters because that rewrite has exactly one producer:
+        -- Pawl.Engine.Keyword.mintedReplacementsFor's megamorph arm, whose rule
+        -- carries the condition. CR 303.4k's MayAttachTo has no such clause and
+        -- applies down either road. Pawl.CardSpec holds that no printing writes a
+        -- WithCounters turn-up rewrite of its own, which is what keeps this from
+        -- over-gating a card.
+        (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR pat rewrite), ProposedEvent.WouldTurnFaceUp oid procedure) ->
+          matchesFiltered gs candidate pat oid
+            && case rewrite of
+              TurnUpRewrite.WithCounters {} -> procedure == TurnUpProcedure.Morph
+              TurnUpRewrite.MayAttachTo {} -> True
         -- Every row below falls through to False because an arm ABOVE already
         -- matches every event of that class: a row below fires only for a
         -- MISMATCHED class, where False is the correct answer rather than a
@@ -1131,7 +1150,7 @@ chooserOf gs event = case event of
   ProposedEvent.WouldBeginPhase _ pid -> Just pid
   -- CR 616.1's affected object is the permanent turning over, and its controller
   -- is CR 702.37e's "you" -- the player who took the special action.
-  ProposedEvent.WouldTurnFaceUp oid -> Projection.controllerOf oid gs
+  ProposedEvent.WouldTurnFaceUp oid _ -> Projection.controllerOf oid gs
 
 -- CR 208.2b / 707.2: stamp a chosen entry shape into the object's copiable
 -- snapshot. Power and toughness are SET; keywords are UNIONED into whatever is

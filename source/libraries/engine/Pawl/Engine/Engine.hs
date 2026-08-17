@@ -1487,16 +1487,16 @@ priorityLoop = do
                                 State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
                                 loop
-                              -- CR 116.2b / 702.37e: a special action, so
-                              -- nothing goes on the stack and no player gets a
-                              -- window to respond to it -- the same shape as
+                              -- CR 116.2b / 702.37e / 701.40b: a special action,
+                              -- so nothing goes on the stack and no player gets
+                              -- a window to respond to it -- the same shape as
                               -- CR 116.2a's land play above. Priority is
                               -- retained and the pass count restarts, because
                               -- CR 117.4's "passing in succession" means
                               -- passing without taking actions in between and
                               -- this was an action.
-                              Action.Type.TurnFaceUp oid -> do
-                                FaceDown.turnFaceUp p oid
+                              Action.Type.TurnFaceUp oid procedure -> do
+                                FaceDown.turnFaceUp p procedure oid
                                 State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
                                 loop

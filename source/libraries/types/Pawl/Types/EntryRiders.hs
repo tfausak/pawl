@@ -141,11 +141,12 @@ import qualified Pawl.Types.TapState as TapState
 -- Create arm does not read it and the same CardSpec lint holds that no Create in
 -- the pool sets it.
 --
--- Not implemented: manifested-ness as state (CR 701.40a's "that permanent is a
--- manifested permanent"), so a permanent put onto the battlefield face down by
--- this rider cannot be turned face up for its mana cost (#1540). A Bool and not
--- a choice of listed characteristics, which is what CR 701.58a's cloak would
--- need -- a 2/2 with ward {2} -- and that second face is #922.
+-- A Bool and not a choice of listed characteristics, which is what CR 701.58a's
+-- cloak would need -- a 2/2 with ward {2} -- and that second face is #922. The
+-- same Bool is why Event.changeZoneEntering writes FaceDownReason.Manifested
+-- unconditionally: CR 701.40a is the only rule in the pool that puts a card onto
+-- the battlefield face down, and cloak, the one other rule that would, arrives
+-- with the listing it needs (gap #922).
 data EntryRiders = MkEntryRiders
   { tapped :: TapState.TapState,
     attacking :: Bool,

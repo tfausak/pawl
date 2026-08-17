@@ -102,6 +102,7 @@ import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.ForEach as ForEach
@@ -3406,7 +3407,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- layer. The swap itself lives elsewhere: Pawl.Engine.Game.faceOf
           -- answers with Pawl.Engine.Card.faceDownFace of whatever list the
           -- facing carries, and every characteristic read in the engine starts
-          -- there.
+          -- there. The reason written beside it is CR 708.6's other half:
+          -- FaceDownReason.TurnedFaceDown, since the allower here is the spell or
+          -- ability and not a keyword the player announced. That closes CR
+          -- 701.40b's turn-face-up procedure to the permanent and leaves CR
+          -- 702.37e's open, which is right -- that rule asks whether the CARD
+          -- would have a morph cost and nothing about what turned it over.
           --
           -- What is NOT written is everything the list does not name. No CR
           -- 400.7 incarnation is minted -- the permanent keeps its object id --
@@ -3432,7 +3438,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             | otherwise ->
                 gs
                   { GameState.objects =
-                      Map.adjust (\o -> o {Object.facing = Facing.FaceDown listed}) target (GameState.objects gs)
+                      Map.adjust (\o -> o {Object.facing = Facing.FaceDown FaceDownReason.TurnedFaceDown listed}) target (GameState.objects gs)
                   }
         -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
         _ -> gs

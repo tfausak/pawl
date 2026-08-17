@@ -4681,7 +4681,7 @@ isActivation a = case a of
   A.Pass -> False
   A.Play {} -> False
   A.Cast {} -> False
-  A.TurnFaceUp _ -> False
+  A.TurnFaceUp {} -> False
   A.Unlock _ _ -> False
   A.DiscardFromHand _ -> False
   A.Plot _ -> False

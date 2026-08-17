@@ -324,7 +324,7 @@ playLandAnswer p = case p of
           A.Play {} -> True
           A.Pass -> False
           A.Cast {} -> False
-          A.TurnFaceUp _ -> False
+          A.TurnFaceUp {} -> False
           A.Unlock _ _ -> False
           A.Activate _ _ -> False
           A.DiscardFromHand _ -> False
@@ -1602,7 +1602,7 @@ isCastOf oid action = case action of
   A.Pass -> False
   A.Play {} -> False
   A.Activate _ _ -> False
-  A.TurnFaceUp _ -> False
+  A.TurnFaceUp {} -> False
   A.Unlock _ _ -> False
   A.DiscardFromHand _ -> False
   A.Plot _ -> False

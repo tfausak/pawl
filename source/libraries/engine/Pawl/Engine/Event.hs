@@ -94,6 +94,7 @@ import Pawl.Types.EventGroup (EventGroup)
 import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.EventShape as EventShape
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
@@ -1651,7 +1652,7 @@ apply batch candidate event =
     -- The event survives: turning face up is not replaced by the counter, only
     -- accompanied by it, so Just is returned and FaceDown.turnFaceUp goes on to
     -- record CR 708.7's event.
-    (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ rewrite), ProposedEvent.WouldTurnFaceUp oid) -> case rewrite of
+    (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ rewrite), ProposedEvent.WouldTurnFaceUp oid _) -> case rewrite of
       TurnUpRewrite.WithCounters (WithCounters.MkWithCounters kind n) -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         Monad.void (putOwnCounters oid kind n)
@@ -2212,7 +2213,13 @@ changeZoneEntering oid requestedDest position riders under = do
       -- (CR 708.4, changeZoneCasting), so the gate cannot live there. A card
       -- stating the rider on a move anywhere else says something no rule reads,
       -- which Pawl.CardSpec lints.
-      facing = if onto && EntryRiders.faceDown riders then Facing.faceDown else Facing.FaceUp
+      -- CR 701.40a names the allower: manifest is the only rule in the pool that
+      -- puts a card onto the battlefield face down, and "that permanent is a
+      -- manifested permanent for as long as it remains face down" is what the
+      -- reason records -- which is what opens CR 701.40b's turn-face-up procedure
+      -- to it (Pawl.Engine.FaceDown.canTurnFaceUp). The rider is a Bool, so it
+      -- names no other; see Pawl.Types.EntryRiders.
+      facing = if onto && EntryRiders.faceDown riders then Facing.faceDown FaceDownReason.Manifested else Facing.FaceUp
   if refused
     then pure Nothing
     else changeZoneAttaching Nothing oid requestedDest position Nothing (EntryRiders.tapped riders) (EntryRiders.counters riders) under' shown facing (EntryRiders.exiledFaceDown riders)
@@ -2274,7 +2281,7 @@ changeZoneShowing oid requestedDest shown = changeZoneAttaching Nothing oid requ
 -- than being stored. Turning the permanent face up is what makes it observable
 -- again (CR 708.8).
 changeZoneFaceDown :: ObjectId -> Zone -> Maybe CardName.CardName -> Game (Maybe ObjectId)
-changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown Facing.faceDown False
+changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown (Facing.faceDown FaceDownReason.Morphed) False
 
 -- CR 601.2a's move: the card goes onto the stack and "that player becomes its
 -- controller". The caster is carried BY THE MOVE, for the reason CR 709.3a

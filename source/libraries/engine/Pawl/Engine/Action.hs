@@ -163,7 +163,12 @@ legalActions pid gs =
       -- Ungated by phase or by an empty stack, which it shares with CR 116.2e's
       -- discard below: CR 116.2a and CR 116.2m both state those restrictions and
       -- CR 116.2b and CR 116.2e state neither.
-      turnUps = fmap Action.TurnFaceUp (FaceDown.turnableFaceUp pid gs)
+      --
+      -- ONE ACTION PER PROCEDURE, which is CR 701.40c's choice made the way CR
+      -- 709.3's cast and CR 709.5e's unlock below make theirs: a manifested morph
+      -- card may be turned face up by either rule's procedure, at two different
+      -- prices, and the engine names both rather than one.
+      turnUps = fmap (uncurry Action.TurnFaceUp) (FaceDown.turnableFaceUp pid gs)
       -- CR 116.2m / 709.5e: the third special action, and the one whose window is
       -- CR 116.2a's rather than CR 116.2b's -- "any time they have priority and
       -- the stack is empty during a main phase of their turn". That gate is

@@ -291,7 +291,7 @@ isCast action = case action of
   Action.Type.Cast {} -> True
   Action.Type.Play {} -> False
   Action.Type.Activate _ _ -> False
-  Action.Type.TurnFaceUp _ -> False
+  Action.Type.TurnFaceUp {} -> False
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
   Action.Type.Plot _ -> False
@@ -2197,7 +2197,7 @@ isSilenceActivate action = case action of
   Action.Type.Activate _ _ -> True
   Action.Type.Cast {} -> False
   Action.Type.Play {} -> False
-  Action.Type.TurnFaceUp _ -> False
+  Action.Type.TurnFaceUp {} -> False
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
   Action.Type.Plot _ -> False
@@ -3290,7 +3290,7 @@ isActivateOf oid action = case action of
   Action.Type.Activate o _ -> o == oid
   Action.Type.Cast {} -> False
   Action.Type.Play {} -> False
-  Action.Type.TurnFaceUp _ -> False
+  Action.Type.TurnFaceUp {} -> False
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
   Action.Type.Plot _ -> False
@@ -3304,7 +3304,7 @@ isPlay action = case action of
   Action.Type.Play {} -> True
   Action.Type.Cast {} -> False
   Action.Type.Activate _ _ -> False
-  Action.Type.TurnFaceUp _ -> False
+  Action.Type.TurnFaceUp {} -> False
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
   Action.Type.Plot _ -> False
@@ -3825,7 +3825,7 @@ playing wanted action = case action of
   Action.Type.Pass -> False
   Action.Type.Cast {} -> False
   Action.Type.Activate _ _ -> False
-  Action.Type.TurnFaceUp _ -> False
+  Action.Type.TurnFaceUp {} -> False
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
   Action.Type.Plot _ -> False

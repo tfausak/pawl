@@ -73,12 +73,10 @@
 -- passes through the stack. {1}{W} Sorcery, "Manifest the top card of your
 -- library" (CR 701.40a) -- one clause, transcribed whole, and preferred over
 -- Write into Being, whose look-at-two-and-choose prompt is beside CR 708.3.
--- Thragtusk is the card underneath it; summonsBoard says why that one.
---
--- Not implemented, and it leaves pawl's Soul Summons STRICTER than printed
--- rather than weaker: CR 701.40b's special action turning a manifested permanent
--- face up for its mana cost, which is the card's reminder text and an engine
--- capability rather than a clause of the card (#1540).
+-- Thragtusk is the card underneath it; summonsBoard says why that one, and
+-- Ainok Tracker is the card underneath it again for CR 701.40c, where the
+-- Tracker's {5}{R} against its morph {4}{R} is the only thing that tells the
+-- rule's two turn-face-up procedures apart.
 module Pawl.FaceDownSpec where
 
 import qualified Data.List as List
@@ -107,6 +105,7 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
@@ -124,6 +123,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.Zone as Zone
@@ -178,12 +178,12 @@ turnUpAttachSpec s registry = Spec.describe s "Turning an Aura face up" $ do
         Spec.assertBool s (Projection.isCreatureOf aura before) "CR 708.2a a creature before"
         Spec.assertBool s (not (Set.member Subtype.Aura (Projection.subtypesOf aura before))) "CR 708.2a no Aura subtype before"
         Spec.assertEqWith s "and attached to nothing" (fmap Object.attachedTo (Game.lookupObject aura before)) (Just Nothing)
-        Spec.assertEqWith s "CR 702.37e the action is available" (FaceDown.turnableFaceUp S.alice before) [aura]
+        Spec.assertEqWith s "CR 702.37e the action is available" (FaceDown.turnableFaceUp S.alice before) [(aura, TurnUpProcedure.Morph)]
         -- The destination answered is BOB's creature, which is neither the
         -- lowest-sorting candidate nor alice's own: an implementation that
         -- offered one candidate, or that fell back to the head of the list,
         -- lands the Aura on the Mammoth instead and fails here.
-        let after = S.runPure (giftAnswer fodder theirs) before (FaceDown.turnFaceUp S.alice aura)
+        let after = S.runPure (giftAnswer fodder theirs) before (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph aura)
             settled = S.settleSba (S.settleSba after)
         Spec.assertEqWith s "CR 303.4k attached to the creature alice chose" (fmap Object.attachedTo (Game.lookupObject aura after)) (Just (Just (Recipient.ToCreature theirs)))
         -- CR 613.1f: the Aura's own static ability, which is what says the
@@ -198,7 +198,7 @@ turnUpAttachSpec s registry = Spec.describe s "Turning an Aura face up" $ do
         -- THE OTHER LEG of the same choice. Answering with alice's Mammoth puts
         -- the Aura there instead, so both candidates really were offered and the
         -- answer above was not the only outcome this board can produce.
-        let mineInstead = S.settleSba (S.runPure (giftAnswer fodder mine) before (FaceDown.turnFaceUp S.alice aura))
+        let mineInstead = S.settleSba (S.runPure (giftAnswer fodder mine) before (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph aura))
         Spec.assertEqWith s "CR 303.4k the other candidate is equally available" (fmap Object.attachedTo (Game.lookupObject aura mineInstead)) (Just (Just (Recipient.ToCreature mine)))
         Spec.assertBool s (Projection.hasKeyword Keyword.Deathtouch mine mineInstead) "and it is that creature that gains deathtouch"
   -- CR 303.4k's "AS IT WOULD EXIST IF IT WERE FACE UP", read directly off the
@@ -223,7 +223,7 @@ turnUpAttachSpec s registry = Spec.describe s "Turning an Aura face up" $ do
           Spec.assertEqWith s "CR 708.2a face down, no enchant ability, so nothing is admitted" (Attach.turnUpHosts S.alice aura filter_ before) []
           -- The turn-up, which sacrifices the fodder; the list is then read on
           -- the face-up permanent, before the attachment it goes on to make.
-          let up = S.runPure (giftAnswer fodder theirs) before (FaceDown.turnFaceUp S.alice aura)
+          let up = S.runPure (giftAnswer fodder theirs) before (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph aura)
               unattached = up {GameState.objects = Map.adjust (\o -> o {Object.attachedTo = Nothing}) aura (GameState.objects up)}
           Spec.assertEqWith
             s
@@ -248,7 +248,7 @@ turnUpAttachSpec s registry = Spec.describe s "Turning an Aura face up" $ do
     case giftBoard swamp piker mammoth gift of
       Nothing -> Spec.assertFailure s "the morph cast of Gift of Doom did not reach the battlefield"
       Just (before, fodder, mine, _, aura) -> do
-        let after = S.runPure (declining fodder) before (FaceDown.turnFaceUp S.alice aura)
+        let after = S.runPure (declining fodder) before (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph aura)
             settled = S.settleSba (S.settleSba after)
         Spec.assertEqWith s "CR 110.5 it did turn face up" (fmap Object.facing (Game.lookupObject aura after)) (Just Facing.FaceUp)
         Spec.assertEqWith s "CR 303.4k and attached to nothing" (fmap Object.attachedTo (Game.lookupObject aura after)) (Just Nothing)
@@ -318,7 +318,7 @@ turnFaceDownSpec s registry = Spec.describe s "Turning face down" $ do
     Spec.assertEqWith s "the printed 3/3 before" (S.powerToughnessOf morphling gs) (Just (3, 3))
     Spec.assertEqWith s "face up before" (fmap Object.facing (Game.lookupObject morphling gs)) (Just Facing.FaceUp)
     let after = S.runPure (aimAtCreature morphling) gs (Cast.castSpell S.alice spell (S.printingName backslide) Facing.FaceUp >> Stack.resolveTop)
-    Spec.assertEqWith s "CR 708.2a it is face down" (fmap Object.facing (Game.lookupObject morphling after)) (Just Facing.faceDown)
+    Spec.assertEqWith s "CR 708.2a it is face down" (fmap Object.facing (Game.lookupObject morphling after)) (Just (Facing.faceDown FaceDownReason.TurnedFaceDown))
     Spec.assertEqWith s "CR 708.2a a 2/2, not the printed 3/3" (S.powerToughnessOf morphling after) (Just (2, 2))
     Spec.assertEqWith s "CR 708.2a no name" (Projection.namesOf morphling after) noNames
     Spec.assertEqWith s "CR 708.2a no subtypes, not Dog Scout" (Projection.subtypesOf morphling after) Set.empty
@@ -348,7 +348,7 @@ turnFaceDownSpec s registry = Spec.describe s "Turning face down" $ do
         gs = tap morphling (S.addCounter CounterKind.PlusOnePlusOne 1 morphling (S.markDamage morphling 1 base))
     Spec.assertEqWith s "the printed 3/3 plus a counter before" (S.powerToughnessOf morphling gs) (Just (4, 4))
     let after = S.runPure (aimAtCreature morphling) gs (Cast.castSpell S.alice spell (S.printingName backslide) Facing.FaceUp >> Stack.resolveTop)
-    Spec.assertEqWith s "CR 708.2a it is face down" (fmap Object.facing (Game.lookupObject morphling after)) (Just Facing.faceDown)
+    Spec.assertEqWith s "CR 708.2a it is face down" (fmap Object.facing (Game.lookupObject morphling after)) (Just (Facing.faceDown FaceDownReason.TurnedFaceDown))
     Spec.assertEqWith s "CR 708.2a the marked damage survives" (S.damageOf morphling after) (Just 1)
     Spec.assertEqWith s "CR 708.2a the +1/+1 counter survives" (S.counterOf CounterKind.PlusOnePlusOne morphling after) 1
     Spec.assertEqWith s "CR 708.2a it is still tapped" (fmap Object.tapped (Game.lookupObject morphling after)) (Just TapState.Tapped)
@@ -493,7 +493,7 @@ listedSpec s registry = Spec.describe s "Listed characteristics" $ do
     let (gs, spell, _, victim, _) = cyberBoard island mountain cyber backslide ainok piker
         down = S.runPure (aimAtByFiltering victim) gs (Cast.castSpell S.alice spell (S.printingName cyber) Facing.FaceUp >> Stack.resolveTop)
     Spec.assertEqWith s "the listed subtype while face down" (Projection.subtypesOf victim down) (Set.singleton Subtype.Cyberman)
-    let up = S.runPure S.identityAnswer down (FaceDown.turnFaceUp S.alice victim)
+    let up = S.runPure S.identityAnswer down (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph victim)
     Spec.assertEqWith s "CR 708.8 face up again" (fmap Object.facing (Game.lookupObject victim up)) (Just Facing.FaceUp)
     Spec.assertEqWith s "CR 708.8 the printed 3/3 is back" (S.powerToughnessOf victim up) (Just (3, 3))
     Spec.assertEqWith s "CR 708.8 the printed subtypes are back, and no Cyberman" (Projection.subtypesOf victim up) (Set.fromList [Subtype.Dog, Subtype.Scout])
@@ -544,7 +544,7 @@ listedSpec s registry = Spec.describe s "Listed characteristics" $ do
     let after = S.runPure (aimAtByFiltering victim) down (Cast.castSpell S.alice spell (S.printingName cyber) Facing.FaceUp >> Stack.resolveTop)
     Spec.assertEqWith s "CR 708.2b still no subtypes, not Cyberman" (Projection.subtypesOf victim after) Set.empty
     Spec.assertEqWith s "CR 708.2b still creature alone, not artifact creature" (Projection.cardTypesOf victim after) (Set.singleton CardType.Creature)
-    Spec.assertEqWith s "CR 708.2b the copiable values are untouched" (fmap Object.facing (Game.lookupObject victim after)) (Just Facing.faceDown)
+    Spec.assertEqWith s "CR 708.2b the copiable values are untouched" (fmap Object.facing (Game.lookupObject victim after)) (Just (Facing.faceDown FaceDownReason.TurnedFaceDown))
 
 -- alice with four untapped Islands -- {U}{U} for the Conversion and {1}{U} for
 -- the Backslide, whose generic the auto-tapper also pays in blue -- five
@@ -586,7 +586,7 @@ offerSpec s registry = Spec.describe s "Offer" $ do
     let (gs, oid) = morphBoard mountain ainok 3
         offered = Action.legalActions S.alice gs
         name = S.printingName ainok
-    Spec.assertBool s (elem (Action.Type.Cast oid name Facing.faceDown) offered) "the face-down cast is offered"
+    Spec.assertBool s (elem (Action.Type.Cast oid name (Facing.faceDown FaceDownReason.Morphed)) offered) "the face-down cast is offered"
     Spec.assertBool s (notElem (Action.Type.Cast oid name Facing.FaceUp) offered) "the {5}{R} cast is not"
 
   -- Six Mountains pay either, so both actions stand on the menu at once and the
@@ -598,7 +598,7 @@ offerSpec s registry = Spec.describe s "Offer" $ do
     let (gs, oid) = morphBoard mountain ainok 6
         offered = Action.legalActions S.alice gs
         name = S.printingName ainok
-    Spec.assertBool s (elem (Action.Type.Cast oid name Facing.faceDown) offered) "the face-down cast is offered"
+    Spec.assertBool s (elem (Action.Type.Cast oid name (Facing.faceDown FaceDownReason.Morphed)) offered) "the face-down cast is offered"
     Spec.assertBool s (elem (Action.Type.Cast oid name Facing.FaceUp) offered) "and so is the {5}{R} one"
 
   -- A card with no morph ability offers no face-down cast at all: the offer
@@ -609,7 +609,7 @@ offerSpec s registry = Spec.describe s "Offer" $ do
     let (gs, oid) = morphBoard mountain piker 6
         offered = Action.legalActions S.alice gs
     Spec.assertBool s (elem (Action.Type.Cast oid (S.printingName piker) Facing.FaceUp) offered) "the ordinary cast is offered"
-    Spec.assertBool s (notElem (Action.Type.Cast oid (S.printingName piker) Facing.faceDown) offered) "and no face-down one is"
+    Spec.assertBool s (notElem (Action.Type.Cast oid (S.printingName piker) (Facing.faceDown FaceDownReason.Morphed)) offered) "and no face-down one is"
 
   -- CR 708.4: "effects that care about the characteristics of a spell will see
   -- only the face-down spell's characteristics", and CR 702.37c says the same of
@@ -635,7 +635,7 @@ offerSpec s registry = Spec.describe s "Offer" $ do
         offered = Action.legalActions S.alice gs
         name = S.printingName ainok
     Spec.assertBool s (notElem (Action.Type.Cast oid name Facing.FaceUp) offered) "the named card cannot be cast face up"
-    Spec.assertBool s (elem (Action.Type.Cast oid name Facing.faceDown) offered) "but the morph cast is nameless and still offered"
+    Spec.assertBool s (elem (Action.Type.Cast oid name (Facing.faceDown FaceDownReason.Morphed)) offered) "but the morph cast is nameless and still offered"
 
 -- Put a set of chosen card names onto a permanent (CR 201.4 / 614.1c).
 withChosenNames :: ObjectId.ObjectId -> Set.Set CardName.CardName -> GameState.GameState -> GameState.GameState
@@ -652,7 +652,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
     mountain <- S.printingOf s registry "Mountain"
     ainok <- S.printingOf s registry "Ainok Tracker"
     let (gs, oid) = morphBoard mountain ainok 3
-        (after, entered) = castAndResolve ainok Facing.faceDown gs oid
+        (after, entered) = castAndResolve ainok (Facing.faceDown FaceDownReason.Morphed) gs oid
     case entered of
       Nothing -> Spec.assertFailure s "the morph cast did not reach the battlefield"
       Just permanent -> do
@@ -663,7 +663,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
         -- CR 110.5 / 708.4's last sentence: the permanent the spell becomes is a
         -- face-down permanent, so the status survived the stack-to-battlefield
         -- move CR 400.7 would otherwise forget.
-        Spec.assertEqWith s "CR 708.4 it is face down" (fmap Object.facing (Game.lookupObject permanent after)) (Just Facing.faceDown)
+        Spec.assertEqWith s "CR 708.4 it is face down" (fmap Object.facing (Game.lookupObject permanent after)) (Just (Facing.faceDown FaceDownReason.Morphed))
     -- CR 702.37a: {3} was paid, not {5}{R}. Three Mountains were in play and all
     -- three are tapped, which is the whole board.
     Spec.assertEqWith s "CR 702.37a three mana paid" (S.tappedCount S.alice after) 3
@@ -675,7 +675,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
     mountain <- S.printingOf s registry "Mountain"
     ainok <- S.printingOf s registry "Ainok Tracker"
     let (gs, oid) = morphBoard mountain ainok 3
-        (after, entered) = castAndResolve ainok Facing.faceDown gs oid
+        (after, entered) = castAndResolve ainok (Facing.faceDown FaceDownReason.Morphed) gs oid
     case entered of
       Nothing -> Spec.assertFailure s "the morph cast did not reach the battlefield"
       Just permanent ->
@@ -720,9 +720,9 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
       (Just (shortGs, shortId), Just (enoughGs, enoughId)) -> do
         -- Both boards really do carry a face-down permanent, so the empty
         -- answer below is the COST failing and not the permanent missing.
-        Spec.assertEqWith s "the short board has a face-down permanent" (fmap Object.facing (Game.lookupObject shortId shortGs)) (Just Facing.faceDown)
+        Spec.assertEqWith s "the short board has a face-down permanent" (fmap Object.facing (Game.lookupObject shortId shortGs)) (Just (Facing.faceDown FaceDownReason.Morphed))
         Spec.assertEqWith s "four untapped Mountains cannot pay {4}{R}" (FaceDown.turnableFaceUp S.alice shortGs) []
-        Spec.assertEqWith s "five can" (FaceDown.turnableFaceUp S.alice enoughGs) [enoughId]
+        Spec.assertEqWith s "five can" (FaceDown.turnableFaceUp S.alice enoughGs) [(enoughId, TurnUpProcedure.Morph)]
       _ -> Spec.assertFailure s "the morph cast did not reach the battlefield"
 
   -- CR 702.37e / 708.8, in both directions off ONE board: the permanent is the
@@ -737,7 +737,7 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
         Spec.assertEqWith s "a 2/2 before" (S.powerToughnessOf permanent before) (Just (2, 2))
         Spec.assertEqWith s "no subtypes before" (Projection.subtypesOf permanent before) Set.empty
         Spec.assertEqWith s "three lands tapped before" (S.tappedCount S.alice before) 3
-        let after = S.runPure S.identityAnswer before (FaceDown.turnFaceUp S.alice permanent)
+        let after = S.runPure S.identityAnswer before (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph permanent)
         Spec.assertEqWith s "CR 708.8 the printed 3/3 after" (S.powerToughnessOf permanent after) (Just (3, 3))
         Spec.assertEqWith s "CR 708.8 the printed name after" (Projection.namesOf permanent after) (Set.singleton (S.printingName ainok))
         Spec.assertEqWith s "CR 708.8 the printed subtypes after" (Projection.subtypesOf permanent after) (Set.fromList [Subtype.Dog, Subtype.Scout])
@@ -755,7 +755,7 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
     case faceDownWith mountain ainok 8 of
       Nothing -> Spec.assertFailure s "the morph cast did not reach the battlefield"
       Just (gs, permanent) -> do
-        Spec.assertEqWith s "alice may" (FaceDown.turnableFaceUp S.alice gs) [permanent]
+        Spec.assertEqWith s "alice may" (FaceDown.turnableFaceUp S.alice gs) [(permanent, TurnUpProcedure.Morph)]
         Spec.assertEqWith s "bob may not" (FaceDown.turnableFaceUp S.bob gs) []
 
   -- CR 708.8's "any effects that have been applied to the face-down permanent
@@ -771,7 +771,7 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
         let damaged = S.markDamage permanent 2 gs
             -- The control: left face down, CR 704.5g buries it.
             leftDown = S.settleSba damaged
-            turned = S.runPure S.identityAnswer damaged (FaceDown.turnFaceUp S.alice permanent)
+            turned = S.runPure S.identityAnswer damaged (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph permanent)
             settled = S.settleSba turned
         Spec.assertBool s (not (S.onBattlefield permanent leftDown)) "CR 704.5g two damage is lethal to the face-down 2/2"
         Spec.assertBool s (S.onBattlefield permanent settled) "CR 708.8 the 3/3 survives the same two damage"
@@ -803,8 +803,8 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
         Spec.assertEqWith s "CR 708.3 the face-down entry fired nothing" (S.lifeOf S.bob before) (Just 20)
         -- The control: the action really is on offer, so a silent engine below
         -- cannot be a permanent that simply never turned over.
-        Spec.assertEqWith s "CR 702.37e the action is available" (FaceDown.turnableFaceUp S.alice before) [permanent]
-        let after = S.runPure (aimAt S.bob) before (FaceDown.turnFaceUp S.alice permanent >> Engine.priorityLoop)
+        Spec.assertEqWith s "CR 702.37e the action is available" (FaceDown.turnableFaceUp S.alice before) [(permanent, TurnUpProcedure.Morph)]
+        let after = S.runPure (aimAt S.bob) before (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph permanent >> Engine.priorityLoop)
         Spec.assertEqWith s "CR 708.7 bob took the 2" (S.lifeOf S.bob after) (Just 18)
         -- CR 115.1: the ability TARGETS, so the damage went where it was aimed
         -- and was not broadcast at the table.
@@ -822,7 +822,7 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
         -- entry -- record it unconditionally and this second call fires the
         -- ability again, since by now the permanent has its text back to see it
         -- with.
-        let again = S.runPure (aimAt S.bob) after (FaceDown.turnFaceUp S.alice permanent >> Engine.priorityLoop)
+        let again = S.runPure (aimAt S.bob) after (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph permanent >> Engine.priorityLoop)
         Spec.assertEqWith s "CR 702.37e asking again turns nothing over and fires nothing" (S.lifeOf S.bob again) (Just 18)
 
   -- CR 708.8's last sentence, said the way Skirk Marauder can say it: a permanent
@@ -869,8 +869,8 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
       Nothing -> Spec.assertFailure s "the morph cast did not reach the battlefield"
       Just (before, permanent) -> do
         Spec.assertEqWith s "two Mountains cannot pay {2}{R}" (FaceDown.turnableFaceUp S.alice before) []
-        let after = S.runPure (aimAt S.bob) before (FaceDown.turnFaceUp S.alice permanent >> Engine.priorityLoop)
-        Spec.assertEqWith s "CR 702.37e it is still face down" (fmap Object.facing (Game.lookupObject permanent after)) (Just Facing.faceDown)
+        let after = S.runPure (aimAt S.bob) before (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph permanent >> Engine.priorityLoop)
+        Spec.assertEqWith s "CR 702.37e it is still face down" (fmap Object.facing (Game.lookupObject permanent after)) (Just (Facing.faceDown FaceDownReason.Morphed))
         Spec.assertEqWith s "and bob took nothing" (S.lifeOf S.bob after) (Just 20)
 
   -- CR 603.2 through the bearer: the ability fires for the permanent it is ON and
@@ -889,12 +889,12 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
     marauder <- S.printingOf s registry "Skirk Marauder"
     let (base, firstCard) = S.handOne marauder (S.landsInPlay mountain 12)
         (secondCard, both) = S.addHandCard marauder S.alice base
-        (afterFirst, firstEntered) = castAndResolve marauder Facing.faceDown both firstCard
-        (afterSecond, secondEntered) = castAndResolve marauder Facing.faceDown afterFirst secondCard
+        (afterFirst, firstEntered) = castAndResolve marauder (Facing.faceDown FaceDownReason.Morphed) both firstCard
+        (afterSecond, secondEntered) = castAndResolve marauder (Facing.faceDown FaceDownReason.Morphed) afterFirst secondCard
     case (firstEntered, secondEntered) of
       (Just one, Just two) -> do
-        let flippedOne = S.runPure (aimAt S.bob) afterSecond (FaceDown.turnFaceUp S.alice one >> Engine.priorityLoop)
-            flippedTwo = S.runPure (aimAt S.bob) flippedOne (FaceDown.turnFaceUp S.alice two >> Engine.priorityLoop)
+        let flippedOne = S.runPure (aimAt S.bob) afterSecond (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph one >> Engine.priorityLoop)
+            flippedTwo = S.runPure (aimAt S.bob) flippedOne (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph two >> Engine.priorityLoop)
         Spec.assertEqWith s "the first flip is worth 2" (S.lifeOf S.bob flippedOne) (Just 18)
         -- Both are face up now, and only the one that turned over fired.
         Spec.assertEqWith s "CR 603.2 the second flip is worth 2 more and not 4" (S.lifeOf S.bob flippedTwo) (Just 16)
@@ -938,8 +938,8 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
         Spec.assertEqWith s "CR 702.37b no counter before" (S.counterOf CounterKind.PlusOnePlusOne permanent before) 0
         -- The control: the action really is on offer, so nothing below is a
         -- permanent that simply never turned over.
-        Spec.assertEqWith s "CR 702.37e the action is available" (FaceDown.turnableFaceUp S.alice before) [permanent]
-        let after = S.runPure S.identityAnswer before (FaceDown.turnFaceUp S.alice permanent)
+        Spec.assertEqWith s "CR 702.37e the action is available" (FaceDown.turnableFaceUp S.alice before) [(permanent, TurnUpProcedure.Morph)]
+        let after = S.runPure S.identityAnswer before (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph permanent)
         -- CR 702.37b: "put a +1/+1 counter on it". ONE, not two -- CR 614.5 gives
         -- the minted row one opportunity.
         Spec.assertEqWith s "CR 702.37b exactly one +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne permanent after) 1
@@ -965,7 +965,7 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
         -- during it -- would find the same row on this second ask and put a
         -- SECOND counter on. The count staying at 1 is what says the counter was
         -- applied as part of the turning over.
-        let again = S.runPure S.identityAnswer after (FaceDown.turnFaceUp S.alice permanent)
+        let again = S.runPure S.identityAnswer after (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph permanent)
         Spec.assertEqWith s "CR 708.11 asking again adds no second counter" (S.counterOf CounterKind.PlusOnePlusOne permanent again) 1
         Spec.assertEqWith s "CR 708.11 and it is still a 3/2" (S.powerToughnessOf permanent again) (Just (3, 2))
 
@@ -1017,8 +1017,8 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
         Spec.assertEqWith s "CR 708.2a and the Tracker is the face-down 2/2" (S.powerToughnessOf morphling before) (Just (2, 2))
         -- The control: the action really is on offer, so a silent engine below
         -- cannot be a permanent that simply never turned over.
-        Spec.assertEqWith s "CR 702.37e the action is available" (FaceDown.turnableFaceUp S.alice before) [morphling]
-        let after = S.runPure S.identityAnswer before (FaceDown.turnFaceUp S.alice morphling >> Engine.priorityLoop)
+        Spec.assertEqWith s "CR 702.37e the action is available" (FaceDown.turnableFaceUp S.alice before) [(morphling, TurnUpProcedure.Morph)]
+        let after = S.runPure S.identityAnswer before (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph morphling >> Engine.priorityLoop)
         -- CR 708.7 through CR 603.2: the counter is on the WATCHER.
         Spec.assertEqWith s "CR 708.7 the Farseer took the +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne watcher after) 1
         Spec.assertEqWith s "CR 613.4c so the 1/1 is a 2/2" (S.powerToughnessOf watcher after) (Just (2, 2))
@@ -1070,7 +1070,7 @@ farseerBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> I
 farseerBoard land farseer morph n =
   let (gs0, card) = morphBoard land morph n
       (watcher, gs1) = S.addCreature farseer S.alice gs0
-      (after, entered) = castAndResolve morph Facing.faceDown gs1 card
+      (after, entered) = castAndResolve morph (Facing.faceDown FaceDownReason.Morphed) gs1 card
    in fmap (\permanent -> (after, watcher, permanent)) entered
 
 -- The one target slot of Skirk Marauder's ability, answered with `who` rather
@@ -1101,7 +1101,7 @@ giftBoard land piker mammoth gift =
       (fodder, gs1) = S.addCreature piker S.alice gs0
       (mine, gs2) = S.addCreature mammoth S.alice gs1
       (theirs, gs3) = S.addCreature piker S.bob gs2
-      (after, entered) = castAndResolve gift Facing.faceDown gs3 card
+      (after, entered) = castAndResolve gift (Facing.faceDown FaceDownReason.Morphed) gs3 card
    in fmap (\aura -> (after, fodder, mine, theirs, aura)) entered
 
 -- Both of Gift of Doom's turn-up questions: the morph cost's CR 701.21a
@@ -1154,7 +1154,7 @@ manifestSpec s registry = Spec.describe s "Manifest" $ do
         Spec.assertEqWith s "CR 708.2a a 2/2, not the printed 5/3" (S.powerToughnessOf permanent after) (Just (2, 2))
         Spec.assertEqWith s "CR 708.2a no name, not Thragtusk" (Projection.namesOf permanent after) noNames
         Spec.assertEqWith s "CR 708.2a no subtypes, not Beast" (Projection.subtypesOf permanent after) Set.empty
-        Spec.assertEqWith s "CR 110.5 it is face down" (fmap Object.facing (Game.lookupObject permanent after)) (Just Facing.faceDown)
+        Spec.assertEqWith s "CR 110.5 it is face down" (fmap Object.facing (Game.lookupObject permanent after)) (Just (Facing.faceDown FaceDownReason.Manifested))
         -- CR 400.7: the card that left the library is gone, and the permanent is
         -- a new incarnation of it rather than the same object relabelled.
         Spec.assertBool s (permanent /= topId) "the permanent is a new incarnation (CR 400.7)"
@@ -1198,6 +1198,132 @@ manifestSpec s registry = Spec.describe s "Manifest" $ do
         Spec.assertEqWith s "CR 708.3 whose trigger paid nothing" (S.lifeOf S.alice down) (Just 20)
       _ -> Spec.assertFailure s "the card did not reach the battlefield"
 
+  -- CR 701.40c, the rule the two-procedure shape exists for: "if a card with
+  -- morph is manifested, its controller may turn that card face up using EITHER
+  -- the procedure described in rule 702.37e ... OR the procedure described
+  -- above". Both stand on the menu at once and the engine picks neither
+  -- (docs/design.md's second invariant).
+  --
+  -- Ainok Tracker is the card because the two procedures are DISTINGUISHABLE on
+  -- it and on nothing cheaper: mana cost {5}{R} against morph cost {4}{R}, six
+  -- mana against five. A morph creature whose two costs agreed would leave every
+  -- assertion below passing whichever procedure actually ran.
+  Spec.it s "CR 701.40c a manifested morph card offers both procedures" $ do
+    ainok <- S.printingOf s registry "Ainok Tracker"
+    (after, entered) <- manifestedBoard s registry ainok 6
+    case entered of
+      Nothing -> Spec.assertFailure s "the manifest did not reach the battlefield"
+      Just permanent -> do
+        -- The POSITIVE fixture facts first: this really is a face-down permanent
+        -- alice controls, so neither assertion below can pass for want of one.
+        Spec.assertEqWith s "CR 701.40a it is face down, manifested" (fmap Object.facing (Game.lookupObject permanent after)) (Just (Facing.faceDown FaceDownReason.Manifested))
+        Spec.assertEqWith s "CR 708.2a and a 2/2, not the printed 3/3" (S.powerToughnessOf permanent after) (Just (2, 2))
+        let offered = Action.legalActions S.alice after
+        Spec.assertBool s (elem (Action.Type.TurnFaceUp permanent TurnUpProcedure.Morph) offered) "CR 702.37e the morph procedure is offered"
+        Spec.assertBool s (elem (Action.Type.TurnFaceUp permanent TurnUpProcedure.Manifest) offered) "CR 701.40b the manifest procedure is offered"
+
+  -- THE PAIR, and the prices are what tells the procedures apart. One board, two
+  -- actions: CR 701.40b charges Ainok Tracker's MANA COST of {5}{R} -- six lands
+  -- -- and CR 702.37e its MORPH COST of {4}{R} -- five. Both end with the same
+  -- printed 3/3 Dog Scout, so "it is face up" alone could not discriminate; the
+  -- tapped count is the only thing that can.
+  Spec.it s "CR 701.40b the manifest procedure pays the mana cost, CR 702.37e the morph cost" $ do
+    ainok <- S.printingOf s registry "Ainok Tracker"
+    (after, entered) <- manifestedBoard s registry ainok 6
+    case entered of
+      Nothing -> Spec.assertFailure s "the manifest did not reach the battlefield"
+      Just permanent -> do
+        Spec.assertEqWith s "the {1}{W} sorcery tapped two lands and no more" (S.tappedCount S.alice after) 2
+        let manifested = S.runPure S.identityAnswer after (FaceDown.turnFaceUp S.alice TurnUpProcedure.Manifest permanent)
+            morphed = S.runPure S.identityAnswer after (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph permanent)
+        Spec.assertEqWith s "CR 701.40b six more lands went down for {5}{R}" (S.tappedCount S.alice manifested) 8
+        Spec.assertEqWith s "CR 702.37e five for {4}{R}" (S.tappedCount S.alice morphed) 7
+        -- CR 708.8 off both roads: the permanent regains its normal
+        -- characteristics either way, which is why the price is the discriminator
+        -- and this is the control.
+        Spec.assertEqWith s "CR 708.8 the printed 3/3 after the manifest procedure" (S.powerToughnessOf permanent manifested) (Just (3, 3))
+        Spec.assertEqWith s "CR 708.8 and after the morph one" (S.powerToughnessOf permanent morphed) (Just (3, 3))
+        Spec.assertEqWith s "CR 708.8 the printed name after the manifest procedure" (Projection.namesOf permanent manifested) (Set.singleton (S.printingName ainok))
+        Spec.assertEqWith s "CR 110.5 face up after the manifest procedure" (fmap Object.facing (Game.lookupObject permanent manifested)) (Just Facing.FaceUp)
+
+  -- THE PRICE PAIR as a gate, so the six is the rule's and not the fixture's:
+  -- five lands left after the sorcery pay {4}{R} and not {5}{R}, so only the
+  -- morph procedure is offered; six pay either. Everything else is held fixed.
+  Spec.it s "CR 701.40b the mana cost is required before the manifest procedure is offered" $ do
+    ainok <- S.printingOf s registry "Ainok Tracker"
+    (short, shortEntered) <- manifestedBoard s registry ainok 5
+    (enough, enoughEntered) <- manifestedBoard s registry ainok 6
+    case (shortEntered, enoughEntered) of
+      (Just shortId, Just enoughId) -> do
+        Spec.assertEqWith s "five lands buy the morph procedure alone" (FaceDown.turnableFaceUp S.alice short) [(shortId, TurnUpProcedure.Morph)]
+        Spec.assertEqWith s "six buy both" (FaceDown.turnableFaceUp S.alice enough) [(enoughId, TurnUpProcedure.Morph), (enoughId, TurnUpProcedure.Manifest)]
+      _ -> Spec.assertFailure s "the manifest did not reach the battlefield"
+
+  -- THE REASON GUARD, which is the whole of what CR 701.40a's "that permanent is
+  -- a MANIFESTED permanent" buys: the same card, face down on the battlefield for
+  -- the same cost, offered only CR 702.37e's procedure because it got there by
+  -- CR 702.37c's cast instead. Nine Mountains leave six untapped after the {3},
+  -- which is exactly what {5}{R} would need -- so the manifest procedure is
+  -- withheld for the REASON and demonstrably not for the money.
+  Spec.it s "CR 702.37c a morph-cast creature is not offered the manifest procedure" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    ainok <- S.printingOf s registry "Ainok Tracker"
+    case faceDownWith mountain ainok 9 of
+      Nothing -> Spec.assertFailure s "the morph cast did not reach the battlefield"
+      Just (gs, permanent) -> do
+        Spec.assertEqWith s "CR 702.37c it is face down, morphed" (fmap Object.facing (Game.lookupObject permanent gs)) (Just (Facing.faceDown FaceDownReason.Morphed))
+        Spec.assertEqWith s "six lands are untapped, enough for {5}{R}" (S.tappedCount S.alice gs) 3
+        Spec.assertEqWith s "CR 701.40b only the morph procedure is offered" (FaceDown.turnableFaceUp S.alice gs) [(permanent, TurnUpProcedure.Morph)]
+
+  -- CR 701.40b's parenthesis, first half: "if the card representing that
+  -- permanent ISN'T A CREATURE CARD ... it can't be turned face up this way."
+  --
+  -- Lightning Bolt is the card because it isolates that half and nothing else:
+  -- {R} Instant, so it HAS a mana cost and fails only the card-type guard, and
+  -- the six untapped MOUNTAINS on this board would pay that cost several times
+  -- over. A blue or black noncreature card here would be refused for want of the
+  -- colour instead, and the case would pass whether the guard existed or not.
+  Spec.it s "CR 701.40b a manifested noncreature card offers no procedure at all" $ do
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    (after, entered) <- manifestedBoard s registry bolt 6
+    case entered of
+      Nothing -> Spec.assertFailure s "the manifest did not reach the battlefield"
+      Just permanent -> do
+        Spec.assertEqWith s "CR 701.40a it is face down, manifested" (fmap Object.facing (Game.lookupObject permanent after)) (Just (Facing.faceDown FaceDownReason.Manifested))
+        Spec.assertEqWith s "CR 708.2a and a 2/2 like any other" (S.powerToughnessOf permanent after) (Just (2, 2))
+        Spec.assertEqWith s "CR 701.40b no procedure is offered" (FaceDown.turnableFaceUp S.alice after) []
+
+  -- CR 702.37b's condition, which CR 701.40c is what makes reachable: "put a
+  -- +1/+1 counter on it IF ITS MEGAMORPH COST WAS PAID to turn it face up". A
+  -- manifested megamorph card has two roads face up and only one of them pays
+  -- that cost.
+  --
+  -- THE PAIR, both legs off ONE board, differing in the procedure alone. Misthoof
+  -- Kirin is the card because its two prices and its two outcomes BOTH differ:
+  -- {2}{W} against megamorph {1}{W}, and the printed 2/1 against the 3/2 the
+  -- counter makes. A card whose costs agreed, or whose counter landed on a
+  -- symmetric body, could not tell the roads apart.
+  Spec.it s "CR 702.37b the manifest procedure pays no megamorph cost, so no counter lands" $ do
+    kirin <- S.printingOf s registry "Misthoof Kirin"
+    plains <- S.printingOf s registry "Plains"
+    (after, entered) <- manifestedWith s registry plains kirin 3
+    case entered of
+      Nothing -> Spec.assertFailure s "the manifest did not reach the battlefield"
+      Just permanent -> do
+        Spec.assertEqWith s "CR 708.2a the face-down 2/2 before either road" (S.powerToughnessOf permanent after) (Just (2, 2))
+        Spec.assertEqWith s "CR 701.40c both roads are open" (FaceDown.turnableFaceUp S.alice after) [(permanent, TurnUpProcedure.Morph), (permanent, TurnUpProcedure.Manifest)]
+        let manifested = S.runPure S.identityAnswer after (FaceDown.turnFaceUp S.alice TurnUpProcedure.Manifest permanent)
+            morphed = S.runPure S.identityAnswer after (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph permanent)
+        Spec.assertEqWith s "CR 701.40b three lands went down for {2}{W}" (S.tappedCount S.alice manifested) 5
+        Spec.assertEqWith s "CR 702.37b two for the megamorph {1}{W}" (S.tappedCount S.alice morphed) 4
+        Spec.assertEqWith s "CR 702.37b no counter down the manifest road" (S.counterOf CounterKind.PlusOnePlusOne permanent manifested) 0
+        Spec.assertEqWith s "CR 702.37b and the printed 2/1, not the 3/2" (S.powerToughnessOf permanent manifested) (Just (2, 1))
+        -- THE CONTROL, and what stops the leg above passing because the row was
+        -- never minted: the same permanent, the same board, the megamorph cost
+        -- paid, and the counter lands.
+        Spec.assertEqWith s "CR 702.37b the counter down the megamorph road" (S.counterOf CounterKind.PlusOnePlusOne permanent morphed) 1
+        Spec.assertEqWith s "CR 613.4c and the 3/2 it makes" (S.powerToughnessOf permanent morphed) (Just (3, 2))
+
 -- alice with two Plains and Soul Summons in hand, her library holding Thragtusk
 -- on top of a Goblin Piker, returned as (the board before the cast, the board
 -- after it has fully resolved, the library card that was on top).
@@ -1223,6 +1349,37 @@ summonsBoard s registry = do
       cast = S.runPure S.identityAnswer before (S.cast S.alice summonsId)
   pure (before, S.runPure S.identityAnswer cast Engine.priorityLoop, topId)
 
+-- alice manifests `top` off her library with Soul Summons, off two Plains and
+-- `mountains` Mountains, returned as (the board with the manifested permanent on
+-- it, that permanent). Resolved through Stack.resolveTop rather than the priority
+-- loop, which is the narrowest path that reaches CR 701.40a and leaves the tapped
+-- count answering for the sorcery alone.
+--
+-- The Piker under `top` keeps CR 104.3c off the board and leaves the library
+-- non-empty, summonsBoard's reason.
+--
+-- The two Plains are the sorcery's own {1}{W} and are counted against it: the
+-- board has `extra` + 2 lands and the cast takes two, so what is left for a
+-- turn-face-up procedure is `extra` lands of the second colour either way the
+-- auto-tapper spends the generic.
+manifestedBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Printing.Printing -> Int -> m (GameState.GameState, Maybe ObjectId.ObjectId)
+manifestedBoard s registry top extra = do
+  mountain <- S.printingOf s registry "Mountain"
+  manifestedWith s registry mountain top extra
+
+-- manifestedBoard with the second colour named, for a manifested card whose own
+-- costs are not red.
+manifestedWith :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Printing.Printing -> Printing.Printing -> Int -> m (GameState.GameState, Maybe ObjectId.ObjectId)
+manifestedWith s registry land top extra = do
+  summons <- S.printingOf s registry "Soul Summons"
+  plains <- S.printingOf s registry "Plains"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let (g1, summonsId) = S.handOne summons (S.landsFor land S.alice extra (S.landsInPlay plains 2))
+      (_, g2) = S.addLibraryCard piker S.alice g1
+      (_, before) = S.addLibraryCard top S.alice g2
+      after = S.runPure S.identityAnswer before (S.cast S.alice summonsId >> Stack.resolveTop)
+  pure (after, enteredOne before after)
+
 -- One card from a library onto the battlefield through the door an
 -- Effect.MoveToZone takes, with CR 708.3's rider set or not and nothing else
 -- differing -- then settled and run to a stable board so any enters trigger has
@@ -1238,5 +1395,5 @@ putOntoBattlefield faceDown oid gs =
 faceDownWith :: Printing.Printing -> Printing.Printing -> Int -> Maybe (GameState.GameState, ObjectId.ObjectId)
 faceDownWith land morph n =
   let (gs, oid) = morphBoard land morph n
-      (after, entered) = castAndResolve morph Facing.faceDown gs oid
+      (after, entered) = castAndResolve morph (Facing.faceDown FaceDownReason.Morphed) gs oid
    in fmap (\permanent -> (after, permanent)) entered

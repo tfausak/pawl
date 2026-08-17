@@ -131,7 +131,7 @@ landPlays actions =
         A.Play oid mName -> Just (oid, mName)
         A.Pass -> Nothing
         A.Cast {} -> Nothing
-        A.TurnFaceUp _ -> Nothing
+        A.TurnFaceUp {} -> Nothing
         A.Unlock _ _ -> Nothing
         A.Activate _ _ -> Nothing
         A.DiscardFromHand _ -> Nothing
