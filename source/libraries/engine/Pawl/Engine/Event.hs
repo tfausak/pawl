@@ -2456,6 +2456,15 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
               -- designation." A Room put onto the battlefield by an effect
               -- reaches this with `shown` Nothing and enters with both doors shut.
               unlocking = dest == Zone.Battlefield && maybe False Card.hasSharedTypeLine (Game.cardOf oid gs)
+              -- CR 110.5's status the ARRIVING incarnation will carry. Named
+              -- because two readers want it: mkObj's `facing` field below, whose
+              -- comment has the reasoning, and the CR 303.4f gate further down,
+              -- which must not ask about an Aura card entering FACE DOWN -- CR
+              -- 708.2a leaves such a permanent with no subtypes and no enchant
+              -- ability, so it is not an Aura the rule speaks about. That read
+              -- cannot come off the projection here, which sees the object face up
+              -- in the zone it is leaving.
+              entryFacing = if dest == requestedDest then facing else Facing.FaceUp
               mkObj entrySeed ts =
                 (Object.newIncarnation obj)
                   { Object.zone = dest,
@@ -2488,7 +2497,7 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
                     -- face-down permanent to all players as it leaves the
                     -- battlefield, so a CR 616.1 redirect that lands the object
                     -- anywhere else must leave it face up.
-                    Object.facing = if dest == requestedDest then facing else Facing.FaceUp,
+                    Object.facing = entryFacing,
                     -- CR 406.3: an exiled card is kept face up unless the effect
                     -- exiled it face down, so this is part of the move for
                     -- `facing`'s reason -- the card is never face up in exile
@@ -2646,10 +2655,17 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
           -- about characteristics) rather than the printed type line
           -- Pawl.Engine.Card.isAura reads. Nothing observes the difference in this
           -- pool: every Aura subtype in data/cards is a printed type line or a
-          -- HasSubtype filter, and no effect grants the subtype. Reading through the
-          -- projection is also CR 708.2a -- a permanent still face down has no Aura
-          -- subtype, so it enters unattached and Sba.fallsOff, which reads the same
-          -- substituted face, leaves it alone.
+          -- HasSubtype filter, and no effect grants the subtype.
+          --
+          -- `entryFacing` and not the projection is what answers CR 708.2a, and the
+          -- distinction matters: the projection sees the object in the zone it is
+          -- LEAVING, where an Aura card manifested off a library (CR 701.40a) is
+          -- still face up and would trip this gate. A permanent entering face down
+          -- has no subtypes and no enchant ability, so it is not an Aura CR 303.4f
+          -- speaks about -- it enters unattached, and Sba.fallsOff, which reads the
+          -- substituted face too, leaves it alone. Pawl.AuraSpec's "a manifested
+          -- Aura card is not an Aura" is the proof: Soul Summons manifests an Unholy
+          -- Strength over two legal hosts, and dropping the conjunct raises a prompt.
           --
           -- Answering Nothing is CR 303.4g's "the Aura remains in its current
           -- zone": this funnel's CR 614.6 cancel arm above, one case over, so the
@@ -2660,7 +2676,7 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
           -- zone is the stack or that is a token, and CR 303.4i's effect that names
           -- an attachment the Aura can't legally enchant (gap #1734).
           settledSeed <-
-            if dest == Zone.Battlefield && Maybe.isNothing seed && Set.member Subtype.Aura (Projection.subtypesOf oid gs)
+            if dest == Zone.Battlefield && entryFacing == Facing.FaceUp && Maybe.isNothing seed && Set.member Subtype.Aura (Projection.subtypesOf oid gs)
               then do
                 -- CR 303.4f's "that player" is CR 110.2a's entry controller, which
                 -- is `under` -- falling back to the owner when the effect named

@@ -696,6 +696,43 @@ replenishSpec s registry =
               Spec.assertEqWith s "and no Aura reached the battlefield" (copiesOn unholy after) 0
               Spec.assertEqWith s "while the non-Aura enchantment did come back, so the effect really ran" (copiesOn scales after) 1
             _ -> Spec.assertFailure s "the board should hold two graveyard cards"
+        -- CR 708.2a against CR 303.4f, on Soul Summons rather than Replenish: an
+        -- Aura card MANIFESTED off a library (CR 701.40a) enters as a 2/2 with no
+        -- subtypes and no enchant ability, so it is not an Aura the rule speaks
+        -- about and nobody is asked -- even though the card is an Aura in the zone
+        -- it is leaving, which is where the gate's projection reads. It enters
+        -- unattached, and CR 704.5m leaves it alone because Sba.fallsOff reads the
+        -- same substituted face.
+        --
+        -- The Piker is the whole point: it is a legal host for a face-UP Unholy
+        -- Strength, so a gate that read the projection alone would find it and
+        -- attach.
+        Spec.it s "CR 708.2a a manifested Aura card is not an Aura, so nobody chooses a host" $ do
+          plains <- S.printingOf s registry "Plains"
+          summons <- S.printingOf s registry "Soul Summons"
+          unholy <- S.printingOf s registry "Unholy Strength"
+          piker <- S.printingOf s registry "Goblin Piker"
+          mammoth <- S.printingOf s registry "War Mammoth"
+          let (host, base0) = S.addCreature piker S.alice (S.landsInPlay plains 2)
+              -- TWO creatures, so Attach.chooseHost's one-candidate elision cannot
+              -- make "nobody was asked" pass for the wrong reason.
+              (host2, base1) = S.addCreature mammoth S.alice base0
+              -- A second library card keeps CR 104.3c off the board; Unholy Strength
+              -- goes on top of it, so the manifest reaches the Aura.
+              (_, base2) = S.addLibraryCard piker S.alice base1
+              (_, base3) = S.addLibraryCard unholy S.alice base2
+              (gs, spell) = S.handOne summons base3
+              (after, responses) = run S.castAnswer spell gs
+              -- By CARD, since CR 400.7 minted a fresh id at the destination.
+              manifested = filter (\oid -> Game.cardOf oid after == Just (Printing.card unholy)) (Set.toList (GameState.battlefield after))
+          Spec.assertEqWith s "nobody was asked -- a face-down permanent has no enchant ability" (hostsChosen responses) 0
+          Spec.assertEqWith s "and it did not land on the Piker, which would have hosted it face up" (auraOn host after) []
+          Spec.assertEqWith s "nor on the Mammoth" (auraOn host2 after) []
+          case manifested of
+            [oid] -> do
+              Spec.assertEqWith s "the manifested card is on the battlefield, unattached" (fmap Object.attachedTo (Game.lookupObject oid after)) (Just Nothing)
+              Spec.assertEqWith s "CR 708.2a as a 2/2, not Unholy Strength" (S.powerToughnessOf oid after) (Just (2, 2))
+            _ -> Spec.assertFailure s "the manifest should have put Unholy Strength onto the battlefield"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
