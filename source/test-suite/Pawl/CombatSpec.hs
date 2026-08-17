@@ -2310,7 +2310,7 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     -- blockCeilingGiven's fold go to the earlier declaration in enumeration
     -- order, so under a pair-counting reading -- where both blocks obey one --
     -- the forced declaration names the FIRST attacker. Putting the Lure last
-    -- makes the third assertion discriminate; on the first attacker it would
+    -- makes the LAST assertion discriminate too; on the first attacker it would
     -- agree with both readings.
     --
     -- Both boards are built here rather than leaning on the case above, so the
