@@ -53,8 +53,8 @@ data ActivationRestriction
     -- 505.2), and can never name the combat phase as a whole. Jade Statue's
     -- "Activate only during combat" is PhaseSelector.CombatPhase.
     -- Pawl.Engine.Turn.inWindow is the reader, and it is a containment test
-    -- rather than an equality. The casting side still carries a bare Phase
-    -- (#527).
+    -- rather than an equality. Pawl.Types.CastingRestriction.DuringPhase now
+    -- carries this same bundle, so both sides read one window vocabulary.
     --
     -- The TurnScope is the same type Pawl.Types.TriggerCondition.StepBegins
     -- carries and means the same thing: CR 109.5 makes a printed "your" name the

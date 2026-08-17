@@ -1,6 +1,6 @@
 module Pawl.Types.CastingRestriction where
 
-import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.DuringPhase as DuringPhase
 
 -- | CR 601.3's PROHIBITION half -- a rule or effect that stops a player casting a
 -- spell -- printed on a card about itself (Rally the Troops).
@@ -20,33 +20,31 @@ import qualified Pawl.Types.Phase as Phase
 -- only module that may case on it. Casing here is casing on a RESTRICTION's
 -- classification, not on an effect's identity.
 data CastingRestriction
-  = -- | CR 500.1: castable only while the game is in this step or phase. Rally the
-    -- Troops' "only during the declare attackers step".
+  = -- | CR 500.1: castable only while the game is in the window the rider names,
+    -- on a turn its scope admits. Rally the Troops' "only during the declare
+    -- attackers step" (any player's, so TurnScope.EachTurn) and Necrologia's
+    -- "only during your end step" (TurnScope.ControllersTurn).
     --
-    -- Pawl.Types.Phase is one type over the CR 500.1 phases and their steps, so
-    -- naming a step and naming a STEPLESS phase (the two main phases) are the same
-    -- act here. A phase that HAS steps is not nameable -- "Cast this spell only
-    -- during combat" would have to name five steps at once.
-    -- Pawl.Types.PhaseSelector is the type that already says it, and
-    -- Pawl.Types.ActivationRestriction.DuringPhase already carries one; this arm
-    -- does not (#527).
+    -- The same Pawl.Types.DuringPhase bundle Pawl.Types.ActivationRestriction's
+    -- arm of this name carries, and for the same reasons: a
+    -- Pawl.Types.PhaseSelector rather than a bare Pawl.Types.Phase, so a phase
+    -- that HAS steps is nameable without naming five steps at once, and a
+    -- Pawl.Types.TurnScope beside it, since CR 109.5's "your" narrows the window
+    -- by turn independently of which window it is.
     --
-    -- The change is small; the CARD is the obstacle. Every one of the five cards
-    -- printing "Cast this spell only during combat" (checked against Scryfall
-    -- 2026-08-02) drags in machinery pawl lacks: an end-the-combat-phase effect
-    -- (Mandate of Peace), a CONDITIONAL alternative cost that taps another
+    -- The PhaseSelector.CombatPhase window has no producer in the pool. Every
+    -- card printing "Cast this spell only during combat" (checked against
+    -- Scryfall 2026-08-16) drags in machinery pawl lacks: an end-the-combat-phase
+    -- effect (Mandate of Peace), a CONDITIONAL alternative cost that taps another
     -- creature (Angelic Favor), an effect putting a chosen card from a HAND onto
     -- the battlefield (Cauldron Dance, Surprise Deployment), or a delayed ability
     -- naming a spell mode's TARGET slot, which CardSpec's delayed-ability lint
-    -- rejects (Spinal Embrace). The narrower cards ("only during combat before
-    -- blockers are declared", Blaze of Glory and eight others) do not want this
-    -- arm at all: their window is not a phase.
-    --
-    -- WHOSE turn is a second axis this arm does not carry: "only during an
-    -- opponent's upkeep" (Festival) and "only during your end step" (Necrologia)
-    -- narrow the same window by turn as well. Pawl.Types.TurnScope is the type that
-    -- would say it; no card in the pool needs it yet (#445).
-    DuringPhase Phase.Phase
+    -- rejects (Spinal Embrace). So the window is sayable and unexercised here
+    -- (gap #527); Pawl.Engine.Activate's Jade Statue cases are what keep
+    -- Pawl.Engine.Turn.inWindow's containment honest. The narrower cards ("only
+    -- during combat before blockers are declared", Blaze of Glory and eight
+    -- others) do not want this arm at all: their window is not a phase.
+    DuringPhase DuringPhase.DuringPhase
   | -- | "and only if you've been attacked this step" -- the second clause
     -- fourteen cards carry on a CAST, Rally the Troops among them. (Kongming's
     -- Contraptions prints the same words on an activated ability, where the arm
