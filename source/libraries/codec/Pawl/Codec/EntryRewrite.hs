@@ -30,6 +30,7 @@ codec effectCodec =
       Arm.payload "WithCounters" WithCounters.codec EntryRewrite.WithCounters (\x -> case x of EntryRewrite.WithCounters y -> Just y; _ -> Nothing),
       Arm.nullary "ChooseColor" EntryRewrite.ChooseColor,
       Arm.nullary "ChooseBasicLandType" EntryRewrite.ChooseBasicLandType,
+      Arm.nullary "ChoosePlayer" EntryRewrite.ChoosePlayer,
       Arm.payload "ChooseCardNames" (Filter.codec Keyword.codec) EntryRewrite.ChooseCardNames (\x -> case x of EntryRewrite.ChooseCardNames y -> Just y; _ -> Nothing),
       Arm.nullary "UnderSourceControl" EntryRewrite.UnderSourceControl,
       Arm.nullary "Riot" EntryRewrite.Riot,

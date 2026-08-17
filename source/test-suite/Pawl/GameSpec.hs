@@ -174,6 +174,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
               Object.chosenColor = Nothing,
               Object.chosenSubtype = Nothing,
               Object.chosenNames = Set.empty,
+              Object.chosenPlayer = Nothing,
               -- changeZone draws a fresh timestamp; oneMountainState's
               -- nextTimestamp starts at 1 (object 0 already holds 0).
               Object.timestamp = Timestamp.MkTimestamp 1,
@@ -1895,6 +1896,7 @@ handBobBolt lightningBolt gs =
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
             Object.chosenNames = Set.empty,
+            Object.chosenPlayer = Nothing,
             Object.timestamp = ts,
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
@@ -2233,6 +2235,7 @@ restartOnStack mountain =
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
             Object.chosenNames = Set.empty,
+            Object.chosenPlayer = Nothing,
             Object.timestamp = ts,
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,

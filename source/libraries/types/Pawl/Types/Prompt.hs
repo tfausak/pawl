@@ -910,8 +910,10 @@ data Prompt r where
   -- Siege, CR 310.12a's opponents of its controller.
   --
   -- Asked from TWO places, which is why it carries the battle rather than
-  -- assuming an entry. CR 310.9a asks as the battle enters, through the CR 614.12a
-  -- as-enters route (EntryRewrite.ChooseProtector); CR 310.11 -- listed as CR
+  -- assuming an entry. CR 310.9a asks as the battle enters, through
+  -- Pawl.Engine.Event.designateProtector -- a bare instruction about entering
+  -- rather than a replacement effect, as that function's own note argues; CR
+  -- 310.11 -- listed as CR
   -- 704.5x and CR 704.5y -- asks again as a state-based action when the
   -- designation has become illegal, on a battle that has been on the battlefield
   -- for turns.
@@ -930,6 +932,28 @@ data Prompt r where
   -- one in practice -- which is what makes Pawl.BattleSpec's protector cases
   -- three-seated.
   ChooseProtector :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
+  -- | CR 614.1c with CR 614.12a: which player this permanent's controller chooses
+  -- as it enters ("As this creature enters, choose a player" -- Stuffy Doll). The
+  -- PlayerId is the chooser, CR 109.5's "you"; the ObjectId is the entering
+  -- permanent; the NonEmpty is every player still in the game (CR 102.1), which
+  -- CR 800.4 has already emptied of anyone who left.
+  --
+  -- CARRIES ITS CANDIDATES, where ChooseColor and ChooseBasicLandType beside it
+  -- carry none: rules 105.1 and 305.6 fix their five options for every board,
+  -- while how many players there are is a property of THIS game.
+  --
+  -- Its own prompt rather than a reuse of ChooseOpponent or ChooseProtector
+  -- above, by those two arms' own argument -- a responder that knows which prompt
+  -- it is answering knows which question it was asked -- and each would also be
+  -- wrong on candidates. ChooseOpponent by construction never offers the chooser
+  -- themselves, and "a player" includes you; ChooseProtector asks CR 310.9a's
+  -- question and narrows to CR 310.12a's opponents for a Siege.
+  --
+  -- Asked only when there are two or more candidates, the elision ChooseProtector
+  -- and ChooseCardNames take: one candidate is one outcome, so the options are
+  -- indistinguishable. That is a board with one player left, since CR 102.1
+  -- counts the chooser too -- so in practice this is always asked.
+  ChoosePlayer :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
   -- | CR 603.3b: each player, in APNAP order, puts the triggered abilities they
   -- control on the stack in any order they choose. The [TriggerEntry] is that
   -- player's pending triggers in the engine's canonical order; the answer is a

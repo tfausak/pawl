@@ -16,7 +16,7 @@
 --
 -- Also the pieces rule 310 needed underneath it, exercised here because this is
 -- where a card reaches them: Pawl.Types.Defense, CounterKind.Defense,
--- EntryRewrite.ChooseProtector, Object.protector and AttackTarget.OfBattle.
+-- Event.designateProtector, Object.protector and AttackTarget.OfBattle.
 --
 -- Invasion of Dominaria // Serra Faithkeeper is the whole card pool for this file,
 -- and is the only battle in `data/cards`. {2}{W} Battle -- Siege, defense 5, "When

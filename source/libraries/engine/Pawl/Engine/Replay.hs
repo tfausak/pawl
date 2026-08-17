@@ -96,6 +96,7 @@ encode p answer = case p of
   Prompt.ChooseCardName {} -> Response.ChoseCardName answer
   Prompt.ChooseOpponent {} -> Response.ChoseOpponent answer
   Prompt.ChooseProtector {} -> Response.ChoseProtector answer
+  Prompt.ChoosePlayer {} -> Response.ChosePlayer answer
   Prompt.ChooseBasicLandType {} -> Response.ChoseBasicLandType answer
   Prompt.OrderTriggers {} -> Response.OrderedTriggers answer
   Prompt.OrderDamage {} -> Response.OrderedDamage answer
@@ -274,6 +275,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseProtector {} -> case response of
     Response.ChoseProtector pid -> Just pid
+    _ -> Nothing
+  Prompt.ChoosePlayer {} -> case response of
+    Response.ChosePlayer pid -> Just pid
     _ -> Nothing
   Prompt.ChooseBasicLandType {} -> case response of
     Response.ChoseBasicLandType t -> Just t
@@ -568,6 +572,9 @@ defaultAnswer p = case p of
   -- CR 310.9a: the head of Battle.protectorCandidates, the same filter-not-trust
   -- fallback Battle.designateProtector applies to a wrong answer.
   Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
+  -- CR 102.1: every candidate is a player in the game, so the head is legal --
+  -- the same filter-not-trust fallback Event's arm applies to a wrong answer.
+  Prompt.ChoosePlayer _ _ _ candidates -> NonEmpty.head candidates
   -- CR 305.6: any of the five basic land types is legal. Mountain is what the
   -- ChooseLandTypeSwap arm above falls back to, so the two agree on which type
   -- a short transcript conjures.
