@@ -437,7 +437,8 @@ slotsOf effect = case effect of
   -- is the spell's own target slot -- so its reads join this effect's, LESS the
   -- reserved amount slot. That one is not a dangling read: the prevention itself
   -- binds it, exactly as a trigger condition binds one for its ability's effects
-  -- (Event.eventBindingSlots), and Resolve.runPreventionRiders is the writer.
+  -- (Event.eventBindingSlots), and Resolve.runPreventionRider is the writer --
+  -- into GameState.ambientAmounts rather than onto an object.
   -- Subtracted here rather than added to `boundSlots` below, because the
   -- Pawl.CardSpec sweep that forbids a CARD binding a reserved name reads that
   -- one.
@@ -4766,7 +4767,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 PreventionRider.MkPreventionRider
                   { PreventionRider.effects = riderEffects,
                     PreventionRider.targets = chosen,
-                    PreventionRider.controller = controller
+                    PreventionRider.controller = controller,
+                    -- CR 113.7's source, baked with the rest: the rider needs an
+                    -- id to run against and the recipient may be a player.
+                    PreventionRider.source = source
                   }
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       -- An unevaluable quantity is a no-op, the powerOf posture DealDamage takes.
@@ -4802,7 +4806,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 PreventionRider.MkPreventionRider
                   { PreventionRider.effects = riderEffects,
                     PreventionRider.targets = chosen,
-                    PreventionRider.controller = controller
+                    PreventionRider.controller = controller,
+                    -- CR 113.7's source, baked with the rest: the rider needs an
+                    -- id to run against and the recipient may be a player.
+                    PreventionRider.source = source
                   }
     State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration kind DamageRewrite.PreventAll rider) g0 recipients
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration kind srcRef destRef) -> do
@@ -5799,45 +5806,39 @@ runPreventionRiders = do
   Foldable.traverse_ runPreventionRider queued
 
 -- One queued prevention's additional effect. Nothing to run unless the
--- prevention carries a rider AND its recipient is an object.
+-- prevention carries a rider; the recipient is not consulted at all.
 --
--- The recipient's OBJECT is where the prevented amount is stamped, and it is the
--- only place it can be: CR 615.5's clause "may refer to the amount of damage
--- that was prevented" is a Quantity.InSlot read of the reserved
--- Binding.eventAmount slot, which Quantity.evaluateFor answers off a live
--- object, and the spell that installed the shield went to its owner's graveyard
--- as a new object long ago (CR 400.7). The shielded permanent is live by
--- construction -- it is what the damage was addressed to. A shield over a PLAYER
--- has no such object, so its rider does not run (#1104).
+-- CR 615.5's clause "may refer to the amount of damage that was prevented" is a
+-- Quantity.InSlot read of the reserved Binding.eventAmount slot, published here
+-- through GameState.ambientAmounts rather than bound onto an object. It has to
+-- be ambient because the shielded recipient may be a PLAYER, which has no
+-- Object to bind to -- Inkshield prevents combat damage to YOU and makes an
+-- Inkling per point -- and the installing spell cannot stand in for it either,
+-- since CR 400.7 replaced that object with a new one in a graveyard.
 --
--- The stamp is UNDONE afterwards, restoring whatever was there. It is the one
--- writer that puts Binding.eventAmount on a BATTLEFIELD permanent -- every other
--- writer of that slot is Pawl.Engine.Event.eventBindings, stamping a resolving
--- object's own bindings as a trigger is gathered -- and Quantity.evaluateFor
--- asks an effect's SOURCE before the object on the stack, so a value left behind
--- here would shadow the amount a later CR 615.13 trigger of that same permanent
--- supplied. No board in the pool reaches that collision, so this is a fence
--- rather than a fix: it has no test, and mutating it away leaves the suite
--- green.
+-- Saved and RESTORED rather than cleared, because a rider whose own effects
+-- reach this slot must see the same value throughout. Nesting cannot occur
+-- inside one call: runPreventionRiders empties the queue before running it, so a
+-- rider whose damage is itself prevented appends to a fresh queue that a later
+-- call drains.
 --
--- `resolving` and `source` are both the recipient: the rider is not resolving
--- from the stack, and the recipient is the one object it can read anything off.
--- Every slot the rider names is treated as a LEGAL target, because CR 608.2b was
--- applied when the installing spell resolved -- a shield exists only because its
--- target was legal then -- and the rider re-targets nothing.
+-- `resolving` and `source` are both the rider's own source (CR 113.7), which for
+-- a floating row is the dead installing spell and for a static ability is the
+-- permanent -- what a Filter.IsSource inside the rider means is the effect's
+-- source, not the shielded thing. Every slot the rider names is treated as a
+-- LEGAL target, because CR 608.2b was applied when the installing spell resolved
+-- -- a shield exists only because its target was legal then -- and the rider
+-- re-targets nothing.
 runPreventionRider :: Prevention.Prevention -> Game ()
-runPreventionRider prevention = case (Prevention.rider prevention, Recipient.objectOf (Prevention.recipient prevention)) of
-  (Just rider, Just oid) -> do
-    was <- State.gets (Map.lookup Binding.eventAmount . maybe Map.empty Object.bindings . Game.lookupObject oid)
-    State.modify' (bindAmountSlot oid Binding.eventAmount (Prevention.amount prevention))
-    let targets = PreventionRider.targets rider
-    Foldable.traverse_
-      (applyEffect oid oid (PreventionRider.controller rider) targets targets)
-      (PreventionRider.effects rider)
-    State.modify' $ \gs ->
-      let restore obj = obj {Object.bindings = Map.alter (const was) Binding.eventAmount (Object.bindings obj)}
-       in gs {GameState.objects = Map.adjust restore oid (GameState.objects gs)}
-  _ -> pure ()
+runPreventionRider prevention = Foldable.for_ (Prevention.rider prevention) $ \rider -> do
+  was <- State.gets GameState.ambientAmounts
+  State.modify' (\gs -> gs {GameState.ambientAmounts = Map.insert Binding.eventAmount (Prevention.amount prevention) was})
+  let targets = PreventionRider.targets rider
+      src = PreventionRider.source rider
+  Foldable.traverse_
+    (applyEffect src src (PreventionRider.controller rider) targets targets)
+    (PreventionRider.effects rider)
+  State.modify' (\gs -> gs {GameState.ambientAmounts = was})
 
 -- CR 614.1c: run the effects of every as-enters rewrite that has applied and not
 -- run yet -- Monstrous War-Leech's "as this creature enters, if it was kicked,
@@ -5863,8 +5864,9 @@ runEntryEffects = do
 -- One entered permanent's as-enters effects, in printed order.
 --
 -- `resolving` and `source` are both the permanent, runPreventionRider's posture:
--- nothing is resolving from the stack, and the permanent is the object every
--- Filter.IsSource in the effects resolves against. The slot maps are empty
+-- nothing is resolving from the stack, and both ids are the effect's own source
+-- (CR 113.7), which every Filter.IsSource in the effects resolves against. The
+-- slot maps are empty
 -- because a static ability targets nothing (CR 115.10a), so there is no chosen
 -- target for an effect to name.
 runEntryEffect :: PendingEntryEffect.PendingEntryEffect -> Game ()

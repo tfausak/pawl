@@ -5,6 +5,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
@@ -23,13 +24,25 @@ import qualified Pawl.Types.SlotName as SlotName
 -- "that creature" nameable turns later. `controller` is who performs the rider,
 -- which is the shield's controller and not the damage's source.
 --
+-- `source` is CR 113.7's source of the effect that created the prevention: the
+-- resolving spell or ability for a floating shield, and the permanent itself for
+-- a static prevention ability. Carried because
+-- Pawl.Engine.Resolve.runPreventionRider has to hand the executor an ObjectId
+-- and the shielded recipient may be a PLAYER, which has none. For a floating row
+-- it names a dead object, the same posture and for the same reason as
+-- Pawl.Types.ActiveReplacement.source: CR 400.7 replaced the installing spell
+-- long ago.
+--
 -- What is NOT here is the prevented amount: that is a property of the
--- APPLICATION rather than of the shield, so it rides Pawl.Types.Prevention and
--- is stamped on the shielded recipient by
--- Pawl.Engine.Resolve.runPreventionRiders for Quantity.InSlot to read.
+-- APPLICATION rather than of the shield, so it rides Pawl.Types.Prevention, and
+-- Pawl.Engine.Resolve.runPreventionRider publishes it through
+-- Pawl.Types.GameState.ambientAmounts for Quantity.InSlot to read -- an ambient
+-- channel rather than a binding on an object, because a shielded player has no
+-- object to bind it to.
 data PreventionRider = MkPreventionRider
   { effects :: Seq.Seq (Effect.Effect Card.Card),
     targets :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient),
-    controller :: PlayerId.PlayerId
+    controller :: PlayerId.PlayerId,
+    source :: ObjectId.ObjectId
   }
   deriving (Eq, Ord, Show)

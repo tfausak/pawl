@@ -103,6 +103,7 @@ import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.StepBegan as StepBegan
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Uses as Uses
@@ -1139,6 +1140,66 @@ braceForImpactSpec s registry = Spec.describe s "Brace for Impact (CR 615.5)" $ 
         atMono = castAndResolve (onlyCreature mono) g3 spellId
     Spec.assertEqWith s "the white-and-blue 5/5 is offered, so a shield goes up" (preventAllRows atMulti) 1
     Spec.assertEqWith s "the mono-red 2/1 is not, so none does" (preventAllRows atMono) 0
+
+-- CR 615.5's additional effect over a PLAYER recipient, which neither Test of
+-- Faith's nor Brace for Impact's nor Stormwild Capridor's permanent recipient can
+-- reach: a player has no Object, so the prevented amount has nowhere to be bound
+-- and CR 615.5's "the amount of damage that was prevented" travels on
+-- GameState.ambientAmounts instead. Inkshield ({3}{W}{B} Instant) prints "Prevent
+-- all combat damage that would be dealt to you this turn. For each 1 damage
+-- prevented this way, create a 2/1 white and black Inkling creature token with
+-- flying."
+--
+-- Numbers all distinct: the attacker is a 5/5 and the pinger deals 1, so the
+-- readings answer 20 life and 5 tokens (right), 20 and 1 (one token per
+-- application), 20 and 0 (the rider never runs), 15 and 0 (no shield at all) and
+-- 19 and 0 (the kind refused it). No two coincide.
+inkshieldSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+inkshieldSpec s registry = Spec.describe s "Inkshield (CR 615.5)" $ do
+  Spec.it s "a shield over a PLAYER runs CR 615.5's rider, scaled by the amount" $ do
+    plains <- S.printingOf s registry "Plains"
+    swamp <- S.printingOf s registry "Swamp"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    inkshield <- S.printingOf s registry "Inkshield"
+    let base = S.landsFor swamp S.alice 3 (S.landsInPlay plains 2)
+        (_, g1) = S.addCreature jedit S.bob base
+        (g2, spellId) = S.handOne inkshield g1
+        shielded = castAndResolve S.identityAnswer g2 spellId
+        after = S.runCombat attackNoBlock (bobAttacks shielded)
+        -- The CONTROL is the same board with Inkshield still in hand, so the one
+        -- difference between the two is the shield.
+        control = S.runCombat attackNoBlock (bobAttacks g2)
+    Spec.assertEqWith s "setup: the unbounded shield is a floating replacement" (preventAllRows shielded) 1
+    Spec.assertEqWith s "the 5/5's whole combat damage is prevented" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "and five Inklings arrive, one per damage prevented" (length (S.tokensOf after)) 5
+    Monad.forM_ (S.tokensOf after) $ \oid -> do
+      Spec.assertEqWith s "each a 2/1" (S.powerToughnessOf oid after) (Just (2, 1))
+      Spec.assertEqWith s "white and black" (Projection.colorsOf oid after) (Set.fromList [Color.White, Color.Black])
+      Spec.assertEqWith s "an Inkling" (Projection.subtypesOf oid after) (Set.singleton Subtype.Inkling)
+      Spec.assertEqWith s "with flying" (Projection.hasKeyword Keyword.Flying oid after) True
+      -- CR 111.4: the name is the subtypes plus the word "Token".
+      Spec.assertEqWith s "named Inkling Token (CR 111.4)" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Inkling Token")))
+    -- The channel the amount travelled on is put back, which the stamp it
+    -- replaced had no test for: a value left behind would shadow every later
+    -- reserved-slot read in the game.
+    Spec.assertEqWith s "and CR 615.5's amount channel does not outlive the rider" (GameState.ambientAmounts after) Map.empty
+    -- The VACUITY guard: unshielded, that same attack really is dealt, so the
+    -- prevention above is a prevention rather than an attack that never happened.
+    Spec.assertEqWith s "unshielded the same attack takes 5 and makes no token" (S.lifeOf S.alice control, length (S.tokensOf control)) (Just 15, 0)
+  Spec.it s "the combat-only shield leaves noncombat damage alone, rider and all (CR 608)" $ do
+    plains <- S.printingOf s registry "Plains"
+    swamp <- S.printingOf s registry "Swamp"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    inkshield <- S.printingOf s registry "Inkshield"
+    let base = S.landsFor swamp S.alice 3 (S.landsInPlay plains 2)
+        (pinger, g1) = S.addCreature sorcerer S.alice base
+        (g2, spellId) = S.handOne inkshield g1
+        shielded = castAndResolve S.identityAnswer g2 spellId
+        ping g = S.runPure (aimPlayer S.alice) g (Activate.activateAbility S.alice pinger (theAbility sorcerer) Monad.>> Stack.resolveTop)
+        after = ping shielded
+    Spec.assertEqWith s "setup: the shield is installed" (preventAllRows shielded) 1
+    Spec.assertEqWith s "the Sorcerer's noncombat 1 is dealt anyway" (S.lifeOf S.alice after) (Just 19)
+    Spec.assertEqWith s "so nothing was prevented and no rider ran" (length (S.tokensOf after)) 0
 
 -- CR 615.5's additional effect on a STATIC prevention ability, which is where
 -- Test of Faith's floating shield above cannot reach: Stormwild Capridor ({2}{W}
@@ -2982,6 +3043,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   testOfFaithSpec s registry
   decoratedGriffinSpec s registry
   braceForImpactSpec s registry
+  inkshieldSpec s registry
   stormwildCapridorSpec s registry
   jaredCarthalionSpec s registry
   spiderPunkSpec s registry
