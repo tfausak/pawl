@@ -278,8 +278,11 @@ afterBlockersDeclared = Combat.blockersDeclared . GameState.combat
 -- planeswalker is what lets Damage.combatRecipient tell "was attacking a
 -- planeswalker that is gone" from "was never attacking anything" (Thrasta,
 -- Tempest's Roar is the printing). What no board can yet show is a trigger that
--- reads WHAT was attacked, CR 508.3b's shape, since GameEvent.AttackerDeclared
--- carries no target (#538).
+-- reads WHICH PERMANENT was attacked -- CR 508.3b's planeswalker and battle
+-- forms -- since GameEvent.AttackerDeclared carries no target (gap #538). WHOM
+-- it attacked is a different question and is answerable: the event carries CR
+-- 508.5's defending player, which TriggerCondition.CreatureAttacksYou reads
+-- (Marchesa's Decree).
 stillAttacked :: ObjectId -> GameState -> Bool
 stillAttacked oid gs = case Combat.defender (GameState.combat gs) of
   -- No defending player is no attack (see Pawl.Types.Combat's defender field), so
