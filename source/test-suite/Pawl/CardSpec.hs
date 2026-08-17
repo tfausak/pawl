@@ -3754,6 +3754,30 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         Spec.assertBool s (not (tokenNameOffends token)) "the real token passes"
         Spec.assertBool s (tokenNameOffends token {Face.name = CardName.MkCardName $ Text.pack "Inkling"}) "misnamed token detected"
       other -> Spec.assertFailure s ("expected exactly one Create, got " <> show (length other))
+  -- The countdown shield's rider, the same limb one opcode over: Test of Faith
+  -- hangs CR 615.5's counters off a PreventNextDamage where Inkshield hangs its
+  -- tokens off a PreventAllDamage. No lint fires on a PutCounters, so this is
+  -- what observes that arm at all.
+  Spec.it s "CR 615.5 the sweep reaches a rider on the countdown shield" $ do
+    testOfFaith <- S.printingOf s registry "Test of Faith"
+    Spec.assertEqWith
+      s
+      "the shield's rider is swept"
+      (length [() | Effect.PutCounters {} <- cardResolutionEffects (S.combinedFace testOfFaith)])
+      1
+  -- The closure's OTHER limb with a producer in the pool: CR 608.2f's body.
+  -- Soulfire Eruption's exile is nested in a ForEach, so the four MoveToZone
+  -- sweeps below (CR 406.3's face-down exile, CR 708.3's face-down entry, CR
+  -- 401.2's owner-chosen end, and the plural binding) saw nothing of it before
+  -- this closure, and no corpus card offends any of them from a nested position
+  -- to say so.
+  Spec.it s "CR 608.2f the sweep reaches an effect nested in a ForEach body" $ do
+    soulfireEruption <- S.printingOf s registry "Soulfire Eruption"
+    Spec.assertEqWith
+      s
+      "the body's move is swept"
+      [zone | Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone _ _ _ _) <- cardResolutionEffects (S.combinedFace soulfireEruption)]
+      [Zone.Exile]
   -- ONE sweep over the whole reserved set, replacing the five per-name
   -- cases this grew out of. Those five each filtered on
   -- Card.allTargetSlots, so they saw a card's spell modes and enchant slot
