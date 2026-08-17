@@ -160,6 +160,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.CreatureAttacksAlone (Filter.ControlledBy PlayerRelation.You))
       """ {"type":"CreatureAttacksAlone","value":{"type":"ControlledBy","value":{"type":"You"}}} """
+  -- CR 508.3a's second sentence, nullary where the sibling above takes a Filter:
+  -- CR 508.1a already makes every declared attacker a creature.
+  Spec.it s "CreatureAttacksYou" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.CreatureAttacksYou
+      """ {"type":"CreatureAttacksYou"} """
   -- CR 702.105a, nullary: the comparison is over life totals, so there is nothing
   -- for a card to parameterize.
   Spec.it s "SelfAttacksPlayerWithMostLife" $
