@@ -2310,6 +2310,8 @@ rewriteTriggerCondition pairs condition = case condition of
   -- as it reaches PermanentDies' above: Wildgrowth Walker's "a creature you
   -- control" is a subtype-free one, but a text-changed printing need not be.
   TriggerCondition.PermanentExplores f -> TriggerCondition.PermanentExplores (Filter.rewrite pairs f)
+  -- Nullary, so there is nothing for CR 612.1 to reach.
+  TriggerCondition.SelfExerted -> condition
 
 -- CR 612.1 through Condition's predicate vocabulary, at the four clauses a
 -- PRINTED ability carries one in: a triggered ability's CR 603.8 state trigger

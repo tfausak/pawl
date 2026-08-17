@@ -655,6 +655,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.SelfBecomesPlotted -> []
   TriggerCondition.PermanentExplores _ -> []
+  -- CR 701.43d carries nothing at all, so no Count either.
+  TriggerCondition.SelfExerted -> []
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> []
   TriggerCondition.SelfDies -> []
@@ -2228,6 +2230,9 @@ keywordFilters keyword = case keyword of
   -- ability compares is life totals, which no Filter reaches.
   Keyword.Dethrone -> []
   Keyword.StartYourEngines -> []
+  -- CR 701.43d is payload-free: the linked trigger it permits is the CARD's own
+  -- TriggeredAbility, so any Filter in it is swept there rather than here.
+  Keyword.Exert -> []
   -- CR 702.43a names no quality: the +1/+1 counters and the "target artifact
   -- creature" are written into the replacement effect and the ability
   -- Pawl.Engine.Keyword mints, not into the keyword.
@@ -2514,6 +2519,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 701.44b DOES carry one, a predicate over the explorer -- Wildgrowth
   -- Walker's "a creature you control" -- which the card lint must sweep.
   TriggerCondition.PermanentExplores f -> [f]
+  -- CR 701.43d carries nothing, so no Filter either.
+  TriggerCondition.SelfExerted -> []
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> []
   TriggerCondition.SelfDies -> []

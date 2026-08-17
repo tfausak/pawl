@@ -458,6 +458,24 @@ data Prompt r where
   -- backwards: with no planeswalker, no battle and one defending player the rule
   -- calls for no announcement.
   ChooseAttackTarget :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty AttackTarget.AttackTarget -> Prompt AttackTarget.AttackTarget
+  -- | CR 508.1g / 701.43d: an optional cost to attack. The active player decides,
+  -- for one chosen creature with exert, whether to exert it as it attacks. The
+  -- ObjectId is that creature.
+  --
+  -- One prompt PER CREATURE, ChooseAttackTarget's shape and for its reason: rule
+  -- 508.1g says "which, if any, they will pay", and a per-declaration answer
+  -- would collapse choices the rules keep apart -- exerting one attacker and not
+  -- another is a legal and observably different declaration.
+  --
+  -- An OptionalDecision and not a two-option list, ChooseRiot's reading: rule
+  -- 508.1g states a "may pay" rather than a menu. Exercises exerts.
+  --
+  -- NEVER ELIDED while the creature has the keyword. The two outcomes are
+  -- distinguishable in both directions -- Glory-Bound Initiate attacks as a 4\/4
+  -- with lifelink and misses the next untap step, or as a 3\/1 that untaps -- so
+  -- there is no indistinguishable-options case, and CR 701.43b makes a permanent
+  -- exertable even when already exerted, so no board makes the answer moot.
+  ChooseExert :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt OptionalDecision.OptionalDecision
   -- | CR 509.1. The legal blockers, then the attackers they may block. The answer
   -- maps each blocking creature to the attackers it blocks.
   --

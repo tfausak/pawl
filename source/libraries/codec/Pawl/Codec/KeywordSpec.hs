@@ -763,5 +763,20 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.Undying
       """ {"type":"Undying"} """
     Spec.assertBool s (Codec.encode Keyword.codec Keyword.Undying /= Codec.encode Keyword.codec Keyword.Persist) "undying and persist encode differently"
+  -- CR 702.179a. Nullary, and the tag is the whole encoding.
+  Spec.it s "StartYourEngines" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.StartYourEngines
+      """ {"type":"StartYourEngines"} """
+  -- CR 701.43d. The one arm here that is not a rule 702 ability, and nullary
+  -- because rule 701.43d's sentence carries no parameter.
+  Spec.it s "Exert" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Exert
+      """ {"type":"Exert"} """
   Spec.it s "has a schema" $
     Common.assertHasSchema s Keyword.codec

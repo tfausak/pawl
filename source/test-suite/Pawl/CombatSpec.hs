@@ -57,6 +57,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
@@ -6095,6 +6096,82 @@ castingWindowSpec s registry = Spec.describe s "CastingWindow" $ do
     Spec.assertBool s (S.castable S.bob curtainId (inStep CombatStep.CombatDamage)) "castable in the combat damage step"
     Spec.assertBool s (S.castable S.bob curtainId (inStep CombatStep.EndOfCombat)) "castable in the end of combat step"
 
+-- Glory-Bound Initiate {1}{W} Creature -- Human Warrior 3/1, "You may exert this
+-- creature as it attacks. When you do, it gets +1\/+3 and gains lifelink until
+-- end of turn." The pool's producer for Keyword.Exert, and so for CR 508.1g's
+-- optional-cost step, for GameEvent.Exerted and for
+-- TriggerCondition.SelfExerted's CR 607.2h linked trigger.
+--
+-- Every case runs a PAIR of boards differing in exactly one thing -- the answer
+-- to Prompt.ChooseExert -- so no assertion can pass because the board could not
+-- have shown the difference. The Goblin Piker beside the Initiate is there for
+-- two reasons: it makes Prompt.DeclareAttackers a real choice rather than one the
+-- engine could elide, and it is an attacker WITHOUT exert on the same board, so
+-- "the exerted creature stays tapped" is measured against a creature that does
+-- not.
+exertSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+exertSpec s registry = Spec.describe s "Exert" $ do
+  Spec.it s "CR 508.1g / 701.43d exerting an attacker fires its linked trigger" $ do
+    initiate <- S.printingOf s registry "Glory-Bound Initiate"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [initiate, piker] []
+        exerted = S.runCombat (exertAnswer OptionalDecision.Exercises) gs
+        declined = S.runCombat (exertAnswer OptionalDecision.Declines) gs
+    case mine of
+      [] -> Spec.assertFailure s "the fixture should have put two attackers on the board"
+      initiateId : _ -> do
+        -- The pair pins BOTH halves of "+1/+3": the misreading +3/+1 would leave a
+        -- 6/2 here and take bob to 12 below, so neither number is a coincidence
+        -- with the other.
+        Spec.assertEqWith s "CR 701.43d the exerted Initiate is 4/4" (S.powerToughnessOf initiateId exerted) (Just (4, 4))
+        Spec.assertEqWith s "the declined Initiate is still 3/1" (S.powerToughnessOf initiateId declined) (Just (3, 1))
+        -- The Piker's 2 damage is in both totals, which is what makes the
+        -- difference between them the Initiate's power alone.
+        Spec.assertEqWith s "bob took 4 from the exerted Initiate and 2 from the Piker" (S.lifeOf S.bob exerted) (Just 14)
+        Spec.assertEqWith s "bob took 3 and 2 without the exert" (S.lifeOf S.bob declined) (Just 15)
+        -- CR 702.15b: the lifelink half of the same trigger, and the second thing
+        -- that separates the two boards.
+        Spec.assertEqWith s "the granted lifelink gained alice 4" (S.lifeOf S.alice exerted) (Just 24)
+        Spec.assertEqWith s "no lifelink without the exert" (S.lifeOf S.alice declined) (Just 20)
+        -- CR 701.43a's own event, which is what the linked trigger matched.
+        Spec.assertBool s (elem (GameEvent.Exerted initiateId) (S.eventsOf exerted)) "CR 701.43a the exert recorded its event"
+        Spec.assertBool s (notElem (GameEvent.Exerted initiateId) (S.eventsOf declined)) "and a declined exert records none"
+  Spec.it s "CR 701.43a / 701.43b an exerted attacker misses one untap step, then untaps" $ do
+    initiate <- S.printingOf s registry "Glory-Bound Initiate"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [initiate, piker] []
+        -- CR 502.3's turn-based action, called directly: that is the narrowest
+        -- path to the prohibition, and alice is both the exerting player and the
+        -- permanent's controller, so it is her untap step under either reading of
+        -- CR 701.43a (#1736).
+        untap g = S.runPure S.identityAnswer g (Engine.untapAll S.alice)
+        exerted = S.runPure (exertAnswer OptionalDecision.Exercises) gs (Combat.declareAttackers S.alice)
+        declined = S.runPure (exertAnswer OptionalDecision.Declines) gs (Combat.declareAttackers S.alice)
+    case mine of
+      initiateId : pikerId : _ -> do
+        -- CR 508.1f: the declaration taps both, whichever way CR 508.1g was
+        -- answered -- so the untap step below starts from one board state.
+        Spec.assertEqWith s "CR 508.1f the exerted attacker is tapped by the declaration" (tapStateOf initiateId exerted) (Just TapState.Tapped)
+        Spec.assertEqWith s "and so is the declined one" (tapStateOf initiateId declined) (Just TapState.Tapped)
+        Spec.assertEqWith s "CR 701.43a the exerted attacker does not untap" (tapStateOf initiateId (untap exerted)) (Just TapState.Tapped)
+        Spec.assertEqWith s "the declined attacker untaps" (tapStateOf initiateId (untap declined)) (Just TapState.Untapped)
+        -- The prohibition rides the CREATURE and not the declaration: the Piker
+        -- attacked in the same declaration and untaps.
+        Spec.assertEqWith s "the Piker that attacked beside it untaps" (tapStateOf pikerId (untap exerted)) (Just TapState.Untapped)
+        -- CR 701.43b: "each effect causing it not to untap expires during the same
+        -- untap step", so ONE step is all it costs.
+        Spec.assertEqWith s "CR 701.43b and untaps at the next untap step" (tapStateOf initiateId (untap (untap exerted))) (Just TapState.Untapped)
+      _ -> Spec.assertFailure s "the fixture should have put two attackers on the board"
+
+-- S.aggressiveAnswer with Prompt.ChooseExert pinned, on Support's `attackTo`
+-- pattern: the rank-1 signature partially applies to the `forall r. Prompt r ->
+-- r` runCombat and runPure want. Pinned EXPLICITLY rather than left to the
+-- fallthrough, which is a searching answerer and could repair a mutation.
+exertAnswer :: OptionalDecision.OptionalDecision -> Prompt.Prompt r -> r
+exertAnswer decision p = case p of
+  Prompt.ChooseExert {} -> decision
+  _ -> S.aggressiveAnswer p
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   combatLegalitySpec s registry
@@ -6136,3 +6213,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   sharedBlockerSpec s registry
   lastKnownDefendingPlayerSpec s registry
   attackCostSpec s registry
+  exertSpec s registry
