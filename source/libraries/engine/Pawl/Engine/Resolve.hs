@@ -5921,6 +5921,12 @@ scryOne n pid = do
     answer <- Game.choose (Prompt.ChooseScry (Decide.deciderFor pid gs) pid looked)
     let (toBottom, onTop) = splitLooked looked answer
     State.modify' (reorderLibrary pid (onTop <> beneath <> toBottom))
+  -- CR 701.22d: recorded AFTER rule 701.22a's process and OUTSIDE the guard
+  -- above, that rule saying the trigger fires "even if some or all of those
+  -- actions were impossible" -- which is exactly the empty and lone-card
+  -- libraries `decided` declines to ask about. Matoya, Archon Elder draws off an
+  -- empty library, and Pawl.TriggerSpec proves it.
+  State.modify' (Event.recordEvent (GameEvent.Scried pid))
 
 -- Repair a look-and-split answer into the two groups the effect then moves: the
 -- cards going AWAY from the top (to the bottom of a library, or to a graveyard),
@@ -5976,6 +5982,11 @@ surveilOne n pid = do
     -- kept cards are what this function decided.
     State.modify' (reorderLibrary pid (onTop <> beneath))
     Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard) toGraveyard
+  -- CR 701.25d, scryOne's placement and for its rule: outside the guard, so a
+  -- surveil of an empty library is still a surveil. Recorded after the graveyard
+  -- moves, whose own Moved entries say a card changed zones rather than that a
+  -- surveil happened -- so a surveil that binned nothing fires this all the same.
+  State.modify' (Event.recordEvent (GameEvent.Surveiled pid))
 
 -- CR 701.29a: one player's fateseal -- look at the top n cards of AN OPPONENT'S
 -- library, then put any number of them on the bottom of that library in any
@@ -6045,21 +6056,29 @@ exploreOne oid = do
   case Projection.controllerWithLastKnown oid gs of
     -- An id nothing was ever filed under: nobody explores and nothing happens.
     Nothing -> pure ()
-    Just pid -> case Game.zoneMembers Zone.Library pid gs of
-      [] -> grow pid
-      top : _ -> do
-        Event.reveal RevealCause.Ordinary pid top
-        after <- State.get
-        let isLand = case Game.faceOf top after of
-              Nothing -> False
-              Just face -> Set.member CardType.Land (Filter.cardTypes (Projection.viewOfCardIn after top face))
-        if isLand
-          then Event.changeZone top Zone.Hand
-          else do
-            grow pid
-            asked <- State.get
-            decision <- Game.choose (Prompt.ChooseExplore (Decide.deciderFor pid asked) pid oid top)
-            Monad.when (decision == OptionalDecision.Exercises) (Event.changeZone top Zone.Graveyard)
+    Just pid -> do
+      case Game.zoneMembers Zone.Library pid gs of
+        [] -> grow pid
+        top : _ -> do
+          Event.reveal RevealCause.Ordinary pid top
+          after <- State.get
+          let isLand = case Game.faceOf top after of
+                Nothing -> False
+                Just face -> Set.member CardType.Land (Filter.cardTypes (Projection.viewOfCardIn after top face))
+          if isLand
+            then Event.changeZone top Zone.Hand
+            else do
+              grow pid
+              asked <- State.get
+              decision <- Game.choose (Prompt.ChooseExplore (Decide.deciderFor pid asked) pid oid top)
+              Monad.when (decision == OptionalDecision.Exercises) (Event.changeZone top Zone.Graveyard)
+      -- CR 701.44b: the permanent explores once the whole of rule 701.44a is
+      -- done, so this comes after every branch above and after the reveal, the
+      -- counter and the bin -- none of which says an explore happened. Inside the
+      -- Just, since an id nobody ever controlled explores nothing; but not inside
+      -- the library case, that rule firing "even if some or all of those actions
+      -- were impossible".
+      State.modify' (Event.recordEvent (GameEvent.Explored oid))
   where
     -- CR 122.6 through the one counter funnel, so a CR 614.16 replacement
     -- (Hardened Scales) gets its opportunity against this placement too.

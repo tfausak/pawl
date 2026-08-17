@@ -432,8 +432,9 @@ data Effect card
     -- and rule 701.22a is why: scry's look and scry's ordered partition are one
     -- instruction, so the cards it looks at are the candidate list of the very
     -- prompt that decides where they go, rather than something a later clause
-    -- names. Not implemented: CR 701.22d's "whenever a player scries" trigger
-    -- (#1339).
+    -- names. CR 701.22d's "whenever a player scries" trigger reads
+    -- GameEvent.Scried instead, which Pawl.Engine.Resolve.scryOne records
+    -- outside its prompt guard.
     Scry PlayerQuantity.PlayerQuantity
   | -- | CR 701.25a: the players the PlayerRef names each surveil this many -- look
     -- at the top N of their own library, then put any number of them into their
@@ -454,8 +455,11 @@ data Effect card
     -- top of the library are different places, where scry's top and bottom of a
     -- one-card library are the same position.
     --
-    -- Not implemented: CR 701.25b's "additional cards" rider (#1343), and CR
-    -- 701.25d's "whenever a player surveils" trigger (#1342).
+    -- CR 701.25d's "whenever a player surveils" trigger reads
+    -- GameEvent.Surveiled, recorded outside the guard for CR 701.22d's reason
+    -- one arm up.
+    --
+    -- Not implemented: CR 701.25b's "additional cards" rider (#1343).
     Surveil PlayerQuantity.PlayerQuantity
   | -- | CR 701.29a: the players the PlayerRef names each fateseal this many -- look
     -- at the top N cards of AN OPPONENT'S library, then put any number of them on
@@ -507,9 +511,11 @@ data Effect card
     --
     -- CR 701.44b: the permanent explores even where the actions were impossible,
     -- which is why an empty library still reaches the counter, and CR 701.44c
-    -- reads the controller from last known information. Not implemented: CR
-    -- 701.44d's choice of WHICH of several simultaneous explores goes first
-    -- (#1345), and a "whenever a creature you control explores" trigger (#1346).
+    -- reads the controller from last known information. That rule's own reason
+    -- for existing is the trigger, which reads GameEvent.Explored.
+    --
+    -- Not implemented: CR 701.44d's choice of WHICH of several simultaneous
+    -- explores goes first (#1345).
     Explore ObjectRef.ObjectRef
   | -- | CR 701.9: the slot's target player discards this many. The DISCARDING
     -- player chooses which (CR 701.9b) via Prompt.ChooseDiscard, routed through

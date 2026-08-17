@@ -2287,6 +2287,14 @@ rewriteTriggerCondition pairs condition = case condition of
   -- than out of the condition.
   TriggerCondition.LoseControlOfBound _ -> condition
   TriggerCondition.RoomEntered _ -> condition
+  -- A PlayerRelation and a nullary hold no subtype word for CR 612.1 to swap.
+  TriggerCondition.PlayerScries _ -> condition
+  TriggerCondition.PlayerSurveils _ -> condition
+  TriggerCondition.SelfBecomesPlotted -> condition
+  -- Its Filter is a predicate over the EXPLORER, so a subtype rewrite reaches it
+  -- as it reaches PermanentDies' above: Wildgrowth Walker's "a creature you
+  -- control" is a subtype-free one, but a text-changed printing need not be.
+  TriggerCondition.PermanentExplores f -> TriggerCondition.PermanentExplores (Filter.rewrite pairs f)
 
 -- CR 612.1 through Condition's predicate vocabulary, at the four clauses a
 -- PRINTED ability carries one in: a triggered ability's CR 603.8 state trigger
