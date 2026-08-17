@@ -567,7 +567,10 @@ Card-driven unless noted.
 2. **CR 303.4f / 303.4g / 303.4i** — an Aura entering the battlefield by any
    means other than resolving as an Aura spell, including the controller's choice
    of what to enchant and the stays-in-its-zone rule when no legal object exists.
-   Unreachable while resolution is the only door.
+   Unreachable while resolution is the only door. *Landed since:* Replenish is a
+   second door, so `Event.changeZoneAttaching` now asks CR 303.4f's host choice and
+   answers `Nothing` for CR 303.4g's "remains in its current zone". CR 303.4g's
+   stack and token branches and CR 303.4i still have no producer (#1734).
 3. **CR 702.5c** — multiple `enchant` instances. `Card.enchant` is a `Maybe`, so
    the pool cannot express a second one.
 4. **CR 702.5d "enchant player"** — a *modelling* limit, not a missing producer.
