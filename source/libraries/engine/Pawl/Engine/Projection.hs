@@ -3081,6 +3081,13 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               -- creates instead is a replacement and a prevention effect, minted
               -- by shieldOf below.
               CounterKind.Shield -> []
+              -- Nor a level counter (CR 711.2). This kind is the sharpest case
+              -- for the arms above: a leveler's level symbols DO grant keywords
+              -- and DO set base P/T, but CR 711.2a states each as a static
+              -- ability of the card conditioned on the tally, so those grants
+              -- reach the layer system through gatherStatic like any other card
+              -- ability. Granting them here as well would apply them twice.
+              CounterKind.Level -> []
          in pt <> concatMap grantOf (Map.toList cs)
 
 -- CR 701.60c / 613.1f: a SUSPECTED permanent has menace, so the designation is

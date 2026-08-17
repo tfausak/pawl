@@ -16,7 +16,9 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Numeric.Natural as Natural
 import qualified Pawl.CardSpec as CardSpec
+import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Engine as Engine
@@ -34,16 +36,21 @@ import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+-- Pawl.Types.Action aliased Action.Type: Pawl.Engine.Action already claims the
+-- alias Action above (the same phase exception Filter takes).
+import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
+import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
@@ -53,7 +60,11 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.Layer as Layer
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.Modification as Modification
@@ -70,9 +81,11 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
+import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -2777,7 +2790,157 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "both colours with no face shown" (Projection.colorsOf oid gs0) (Set.fromList [Color.Green, Color.White])
 
   keywordCounterSpec s registry
+  levelerSpec s registry
   supertypeSpec s registry
+
+-- CR 711 / CR 702.87 through a whole card: Student of Warfare ({W} Creature --
+-- Human Knight 1/1, "Level up {W}", "LEVEL 2-6 / 3/3 / First strike",
+-- "LEVEL 7+ / 4/4 / Double strike", checked against Scryfall 2026-08-17).
+--
+-- The two halves of rule 711 are built differently and this group proves both
+-- together. The KEYWORD is Pawl.Engine.Keyword.levelUp's minted ability, rule
+-- 702.87a in full. The LEVEL SYMBOLS are ordinary conditional static abilities in
+-- the card data -- CR 711.3 says the striations "have no game significance other
+-- than clearly demarcating which abilities and which power/toughness box are
+-- associated with which level symbol", so nothing about them is a new type.
+--
+-- The numbers are what make it observable: 1/1, 3/3 and 4/4 are three distinct
+-- pairs, and first strike and double strike are two distinct keywords, so no two
+-- readings of the board produce the same answer.
+levelerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+levelerSpec s registry = Spec.describe s "Leveler" $ do
+  -- CR 711.5: "If the number of level counters on a leveler creature is less
+  -- than N1 [...] it has the power and toughness denoted by its uppermost
+  -- power/toughness box." An engine that applied the first striation
+  -- unconditionally reports 3/3 with first strike here.
+  Spec.it s "CR 711.5 with no level counters the Student is 1/1 with neither strike" $ do
+    (oid, gs) <- studentBoard s registry 0
+    Spec.assertEqWith s "the uppermost box" (S.powerToughnessOf oid gs) (Just (1, 1))
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.FirstStrike oid gs)) "no first strike"
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.DoubleStrike oid gs)) "no double strike"
+
+  -- The whole arc, driven through activation rather than by placing counters:
+  -- pay {W}, resolve, one level counter; again, two; and at two the CR 711.2a
+  -- striation turns the 1/1 into a 3/3 with first strike.
+  Spec.it s "CR 702.87a / 711.2a levelling up twice crosses into 3/3 first strike" $ do
+    (oid, gs) <- studentBoard s registry 2
+    let one = levelUpOnce oid gs
+        two = levelUpOnce oid one
+    Spec.assertEqWith s "no counter before" (levelsOn oid gs) 0
+    Spec.assertEqWith s "one after the first activation resolves" (levelsOn oid one) 1
+    Spec.assertEqWith s "still the uppermost box at one" (S.powerToughnessOf oid one) (Just (1, 1))
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.FirstStrike oid one)) "and no first strike at one"
+    Spec.assertEqWith s "two after the second" (levelsOn oid two) 2
+    Spec.assertEqWith s "CR 711.2a: 3/3 at two" (S.powerToughnessOf oid two) (Just (3, 3))
+    Spec.assertBool s (Projection.hasKeyword Keyword.FirstStrike oid two) "first strike at two"
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.DoubleStrike oid two)) "but not double strike"
+    Spec.assertEqWith s "nothing tapped before" (tappedCount gs) 0
+    Spec.assertEqWith s "both Plains paid the two costs, and the Student itself never tapped" (tappedCount two) 2
+
+  -- CR 711.2a's UPPER bound, which is the half an engine drops silently. At seven
+  -- counters the 2-6 striation must stop applying: the Student is 4/4 with double
+  -- strike and WITHOUT first strike. An "at least 2" with no upper limb leaves
+  -- first strike on and makes the layer 7b answer a timestamp coin flip.
+  Spec.it s "CR 711.2a/711.2b at seven counters the 2-6 striation has stopped" $ do
+    (oid, gs) <- studentBoard s registry 0
+    let six = S.addCounter CounterKind.Level 6 oid gs
+        seven = S.addCounter CounterKind.Level 7 oid gs
+    Spec.assertEqWith s "3/3 at the top of the first range" (S.powerToughnessOf oid six) (Just (3, 3))
+    Spec.assertBool s (Projection.hasKeyword Keyword.FirstStrike oid six) "first strike at six"
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.DoubleStrike oid six)) "no double strike at six"
+    Spec.assertEqWith s "CR 711.2b: 4/4 at seven" (S.powerToughnessOf oid seven) (Just (4, 4))
+    Spec.assertBool s (Projection.hasKeyword Keyword.DoubleStrike oid seven) "double strike at seven"
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.FirstStrike oid seven)) "and first strike is gone"
+
+  -- CR 711.4: "each leveler permanent has its level up ability at all times; it
+  -- may be activated regardless of how many level counters are on that
+  -- permanent." Past the last level symbol's range included. CR 602.5d is the
+  -- only limit, and every negative below is the SAME board as the positive with
+  -- one thing varied, so none of them can be the mana gate refusing instead.
+  Spec.it s "CR 711.4 / 602.5d level up is offered at any level, only at sorcery speed" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    (oid, gs) <- studentBoard s registry 1
+    let seven = S.addCounter CounterKind.Level 7 oid gs
+        (spellId, withSpell) = S.spellOnStack piker S.alice gs
+    Spec.assertBool s (not (null (levelUpsOf oid gs))) "offered at zero counters"
+    Spec.assertBool s (not (null (levelUpsOf oid (S.addCounter CounterKind.Level 6 oid gs)))) "offered at six"
+    Spec.assertBool s (not (null (levelUpsOf oid seven))) "and still offered past the last level symbol"
+    Spec.assertEqWith s "not during combat" (levelUpsOf oid gs {GameState.phase = Phase.Combat CombatStep.DeclareBlockers}) []
+    Spec.assertEqWith s "not on bob's turn" (levelUpsOf oid gs {GameState.activePlayer = S.bob}) []
+    Spec.assertBool s (elem spellId (GameState.stack withSpell)) "the stack really is occupied"
+    Spec.assertEqWith s "not with a spell on the stack" (levelUpsOf oid withSpell) []
+
+  -- CR 302.6 reaches an ability only through a tap or untap symbol in its cost,
+  -- and rule 702.87a writes none -- where rule 702.107a's outlast does. So a
+  -- Student that arrived this turn can level up, and Pawl.ActivateSpec's
+  -- Disowned Ancestor case is the other half of the contrast. Same board, sick
+  -- and settled, so nothing but the sickness varies.
+  Spec.it s "CR 302.6 a Student that arrived this turn can still level up" $ do
+    (oid, gs) <- studentBoard s registry 1
+    let sick = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
+    Spec.assertBool s (not (null (levelUpsOf oid sick))) "offered while summoning sick"
+    Spec.assertBool s (not (null (levelUpsOf oid gs))) "and once it has settled"
+
+  -- CR 702.87a's payload makes level up a family-bearing keyword, and
+  -- Pawl.Engine.Keyword.familyOf answering Nothing for it would compile. The
+  -- observer is Filter.HasKeywordFamily, which reads familyOf: "a creature with
+  -- level up" must find the Student whatever its cost is written as, while the
+  -- exact-instance atom beside it must not find a cost the card does not print.
+  Spec.it s "CR 702.87a the Student answers to the level up FAMILY, not only to level up {W}" $ do
+    (oid, gs) <- studentBoard s registry 0
+    let view = Projection.viewOfObject oid gs
+        context = Filter.contextFor (Just S.alice) (Just oid)
+        white = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.White)])) []
+        blue = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Blue)])) []
+    Spec.assertBool s (Filter.matches context view (Filter.Type.HasKeywordFamily KeywordFamily.LevelUp)) "the family reaches it"
+    Spec.assertBool s (Filter.matches context view (Filter.Type.HasKeyword (Keyword.LevelUp white))) "so does the written {W} instance"
+    Spec.assertBool s (not (Filter.matches context view (Filter.Type.HasKeyword (Keyword.LevelUp blue)))) "but level up {U} is a different instance"
+    Spec.assertBool s (not (Filter.matches context view (Filter.Type.HasKeywordFamily KeywordFamily.Outlast))) "and it is not outlast"
+
+-- alice controls a Student of Warfare and `plains` untapped Plains, in her
+-- precombat main phase with priority.
+studentBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m (ObjectId.ObjectId, GameState.GameState)
+studentBoard s registry plains = do
+  student <- S.printingOf s registry "Student of Warfare"
+  plainsPrinting <- S.printingOf s registry "Plains"
+  let (oid, g0) = S.addCreature student S.alice (S.landsInPlay plainsPrinting plains)
+  pure (oid, g0 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain})
+
+-- The level counters on a permanent, 0 if it has none.
+levelsOn :: ObjectId.ObjectId -> GameState.GameState -> Natural.Natural
+levelsOn oid gs = case Game.lookupObject oid gs of
+  Nothing -> 0
+  Just o -> Map.findWithDefault 0 CounterKind.Level (Object.counters o)
+
+-- The tapped permanents on the battlefield. The Student never taps -- rule
+-- 702.87a appends no {T}, unlike outlast's 702.107a -- so on studentBoard's
+-- battlefield this counts exactly the Plains the level-up costs consumed.
+tappedCount :: GameState.GameState -> Int
+tappedCount gs =
+  length
+    [ o
+    | oid <- Set.toList (GameState.battlefield gs),
+      Just o <- [Game.lookupObject oid gs],
+      Object.tapped o == TapState.Tapped
+    ]
+
+-- The Activate actions offered for one source. Filtered by source rather than
+-- `any isActivate`, so a board with other permanents on it cannot answer for
+-- the Student.
+levelUpsOf :: ObjectId.ObjectId -> GameState.GameState -> [Action.Type.Action]
+levelUpsOf oid gs = filter isIt (Action.legalActions S.alice gs)
+  where
+    isIt a = case a of
+      Action.Type.Activate o _ -> o == oid
+      _ -> False
+
+-- Activate the Student's one ability and resolve it. Partial on purpose: a board
+-- offering anything but exactly one ability is a fixture bug, and a silent
+-- fallthrough would let a case pass having levelled up zero times.
+levelUpOnce :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+levelUpOnce oid gs = case Activate.abilitiesFor oid gs of
+  [ability] -> S.runPure S.identityAnswer gs (Activate.activateAbility S.alice oid ability >> Stack.resolveTop)
+  abilities -> error ("expected exactly one ability, got " <> show (length abilities))
 
 -- CR 205.4b / 613.1d layer 4, through a whole card: Arcum's Weathervane
 -- ({2} Artifact, "{2}, {T}: Target snow land is no longer snow." / "{2}, {T}:

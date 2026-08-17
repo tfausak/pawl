@@ -617,6 +617,25 @@ data Keyword
     -- and GameEvent.AttackerDeclared carries it, and the minted ability reads it
     -- back through the reserved Pawl.Engine.Binding.triggerPlayer slot.
     Annihilator Natural.Natural
+  | -- | 702.87a: "Level up [cost]" means "[Cost]: Put a level counter on this
+    -- permanent. Activate only as a sorcery." Outlast's shape (702.107a) down to
+    -- the timing clause; what it does not have is that rule's ", {T}", so a
+    -- summoning-sick leveler can still level up.
+    --
+    -- The COST rides the constructor and nothing else does: rule 702.87a writes
+    -- the counter and its count itself. What the card contributes beyond the cost
+    -- are its LEVEL SYMBOLS, and those are not part of this keyword -- CR 711.2a
+    -- states each as "as long as this creature has at least N1 ... it has base
+    -- power and toughness [P/T] and has [abilities]", which is one ordinary
+    -- conditional Pawl.Types.StaticAbility in the card data. CR 711.3 is why that
+    -- is not a loss: "The text box striations have no game significance other
+    -- than clearly demarcating which abilities and which power/toughness box are
+    -- associated with which level symbol."
+    --
+    -- CR 711.4 is why the minted ability carries no condition: "each leveler
+    -- permanent has its level up ability at all times; it may be activated
+    -- regardless of how many level counters are on that permanent."
+    LevelUp (Cost.Cost Keyword)
   | Infect -- 702.90
   | -- | 702.91a: whenever this creature attacks, each other attacking creature gets
     -- +1/+0 until end of turn. Rule 702 states it as a triggered ability, so
