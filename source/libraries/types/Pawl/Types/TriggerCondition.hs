@@ -154,9 +154,9 @@ data TriggerCondition
     -- attacking, and CR 508.4 says such a creature never attacked. So this matches
     -- GameEvent.AttackerDeclared, which only the declaration appends, and never
     -- the combat record. No attack TARGET is compared against by THIS arm; CR
-    -- 508.3a's second sentence, which names one, is still a condition no card in
-    -- the pool has (#538) -- SelfAttacksPlayerWithMostLife below reads the target
-    -- for rule 702.105a's own comparison and is not that general form. What the
+    -- 508.3a's second sentence is CreatureAttacksYou below, which compares the
+    -- DEFENDING PLAYER instead, and SelfAttacksPlayerWithMostLife reads the target
+    -- for rule 702.105a's own comparison rather than as a general form. What the
     -- event does carry alongside the attacker is CR 508.5's defending player, whom
     -- Pawl.Engine.Event.eventBindings binds under
     -- Pawl.Engine.Binding.triggerPlayer for CR 702.86a's annihilator to read --
@@ -221,6 +221,31 @@ data TriggerCondition
     -- 702.83a's "that creature" to read -- a different object from the bearer, as
     -- SelfBecomesBlockedBy's blocker is.
     CreatureAttacksAlone (Filter.Filter Keyword.Keyword)
+  | -- | CR 508.3a's second sentence read by a BYSTANDER: Marchesa's Decree's
+    -- "whenever a creature attacks you or a planeswalker you control". Matched
+    -- against the same GameEvent.AttackerDeclared, and DECLARED for SelfAttacks'
+    -- reason (CR 508.4).
+    --
+    -- Per declared attacker, so three attackers fire it three times. CR 508.3b's
+    -- "[a player] is attacked" is once per DECLARATION instead -- a different
+    -- arity, needing the grouped event pawl does not have (gap #538).
+    --
+    -- NULLARY where CreatureAttacksAlone carries a Filter: CR 508.1a lets only a
+    -- creature be declared as an attacker, so "a creature" is no predicate to
+    -- check. A card narrowing the attacker would add a Filter here rather than a
+    -- sibling constructor.
+    --
+    -- "You or a planeswalker you control" is ONE test: CR 508.5/508.5a make the
+    -- defending player the attacked player or the attacked planeswalker's
+    -- controller, and that is exactly the field the event carries. So this reads
+    -- the event and never the board, unlike SelfAttacksPlayerWithMostLife. CR
+    -- 109.5/603.3a fix "you" as the ability's controller.
+    --
+    -- Not self-scoped, PlayerDiscards' posture: the bearer is an enchantment
+    -- watching somebody else's attack. The attacker is bound under
+    -- Pawl.Engine.Binding.attackingCreature for "that creature's controller",
+    -- CreatureAttacksAlone's arrangement.
+    CreatureAttacksYou
   | -- | CR 702.105a: "whenever this creature attacks the player with the most life
     -- or tied for most life" -- dethrone's. SelfAttacks narrowed by a fact about
     -- WHOM the bearer attacked, matched against the same

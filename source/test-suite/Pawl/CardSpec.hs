@@ -609,6 +609,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 702.149a's Filter holds no Count for PermanentEnters' reason.
   TriggerCondition.SelfAttacksWithAnother _ -> []
   TriggerCondition.CreatureAttacksAlone _ -> []
+  -- Nullary, so no Count either.
+  TriggerCondition.CreatureAttacksYou -> []
   -- CR 702.105a compares life totals rather than counting objects, so no Count.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> []
   TriggerCondition.SelfBlocks -> []
@@ -2417,6 +2419,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 506.5's condition names a quality the ATTACKER must have, so it carries a
   -- Filter -- rule 702.83a's "a creature you control".
   TriggerCondition.CreatureAttacksAlone f -> [f]
+  -- CR 508.3a's second sentence names no quality of the attacker -- CR 508.1a has
+  -- already made it a creature -- so this one carries no Filter to traverse.
+  TriggerCondition.CreatureAttacksYou -> []
   -- CR 702.105a names no quality of the attacker, only a fact about whom it
   -- attacked, so no Filter.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> []
