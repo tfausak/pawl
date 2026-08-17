@@ -857,8 +857,9 @@ data Prompt r where
   -- pool CR 106.4 then holds it; the ObjectId is the resolving object.
   --
   -- CARRIES ITS CANDIDATES, where ChooseColor above carries none: the offer is
-  -- Pawl.Engine.Mana.producedTypes' answer for THIS production, CR 105.1's five
-  -- colours for AnyColor and a different list for a production that names one.
+  -- Pawl.Engine.Mana.producedTypes' answer for THIS production, which is CR
+  -- 105.1's five colours for AnyColor and would be another list for a production
+  -- offering something else.
   --
   -- Its own prompt rather than a reuse of ChooseColor above or of ChooseManaYield,
   -- by ChoosePlayer's argument. ChooseColor asks CR 614.1c's as-enters question,

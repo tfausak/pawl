@@ -216,7 +216,8 @@ data Response
   | -- | CR 105.4 / 106.3: the mana a player chose to add as a spell or ability
     -- that named no settled type resolved. Distinct from ChoseColor above for
     -- the reason Prompt.ChooseManaType gives, and it carries a ManaType rather
-    -- than a Color because the answer is the unit that reaches the pool.
+    -- than a Color because the answer is the type of the unit that reaches the
+    -- pool.
     ChoseManaType ManaType.ManaType
   | -- | CR 201.4 / 614.1c: the card name a player chose as an object entered.
     ChoseCardName CardName.CardName
