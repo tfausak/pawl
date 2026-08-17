@@ -163,6 +163,23 @@ data TriggerCondition
     -- makes cycling a discard, so a cycled card must fire this; CR 702.29d bounds
     -- it to once, which the single Discarded event supplies by construction.
     PlayerDiscards PlayerRelation.PlayerRelation
+  | -- | "Whenever you cycle a card" -- Prickly Marmoset's. CR 702.29a makes
+    -- cycling a discard ("[Cost], Discard this card: Draw a card"), so this is
+    -- PlayerDiscards above narrowed to Pawl.Types.DiscardCause.ToPayCyclingCost
+    -- --- which is the same discard rule 702.29c names when it defines the
+    -- self-scoped "when you cycle this card". That rule governs only the
+    -- self-scoped phrase; what fixes this one's "you" is CR 603.3a, the
+    -- ability's controller, read through the PlayerRelation.
+    --
+    -- NOT self-scoped, unlike SelfCycled: the bearer is a permanent watching a
+    -- hand, and the card that left it is nothing to do with the Marmoset.
+    --
+    -- A separate constructor rather than a DiscardCause field on PlayerDiscards,
+    -- because a card prints one phrase or the other and never both. CR 702.29d's
+    -- "cycles or discards a card" is a third phrase and needs neither: a cycle
+    -- IS a discard, so that phrase's event set is PlayerDiscards' exactly, and
+    -- rule 702.29d is the sentence saying so.
+    PlayerCycles PlayerRelation.PlayerRelation
   | -- | CR 121.1: "whenever [a player] draws their Nth card each turn" -- Erudite
     -- Wizard's whole text. Matched against GameEvent.Drew, whose PlayerId is the
     -- drawing player and whose Natural is which of that player's draws this turn

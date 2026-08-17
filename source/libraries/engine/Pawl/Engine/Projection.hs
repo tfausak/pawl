@@ -2317,6 +2317,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfCast -> condition
   TriggerCondition.SelfBecomesTargeted _ -> condition
   TriggerCondition.PlayerDiscards _ -> condition
+  TriggerCondition.PlayerCycles _ -> condition
   TriggerCondition.PlayerDrawsNthCard {} -> condition
   TriggerCondition.PlayerBecomesMonarch _ -> condition
   TriggerCondition.SelfAttacks _ -> condition

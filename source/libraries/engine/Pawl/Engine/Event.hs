@@ -3991,6 +3991,60 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
+  -- The discard arm above narrowed by the CAUSE, which is the whole of the
+  -- difference: CR 702.29a makes cycling a discard, so an ordinary discard
+  -- reaches the same log through the same funnel and must fire nothing here.
+  -- That cause is what rule 702.29c calls "to pay an activation cost of a
+  -- cycling ability"; rule 702.29c itself defines only the self-scoped phrase,
+  -- and what fixes the "you" of this watcher-scoped one is CR 603.3a, read
+  -- through PlayerRelation.holds so a new relation is answered once.
+  --
+  -- The bearer is NOT part of the match, on PlayerDiscards' posture: Prickly
+  -- Marmoset watches its controller's hand and has nothing to do with the card
+  -- that left it.
+  --
+  -- CR 702.29d needs no clause: one cycle is one Discarded event, so this fires
+  -- once by construction, exactly as the discard arm above does.
+  TriggerCondition.PlayerCycles relation -> case event of
+    GameEvent.Discarded (Discarded.MkDiscarded discarder _ DiscardCause.ToPayCyclingCost) -> PlayerRelation.holds relation you discarder
+    GameEvent.Discarded (Discarded.MkDiscarded _ _ DiscardCause.Ordinary) -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Exerted _ -> False
   -- CR 121.1: a card was DRAWN, by a player the relation admits, and it was that
   -- player's `nth` draw of the turn. The ordinal comes off the event, which
   -- Event.drawCard stamped from GameState.drawsThisTurn as the draw happened;
@@ -6599,6 +6653,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.SelfRevealedForMiracle -> False
   TriggerCondition.SelfDiscarded -> False
   TriggerCondition.PlayerDiscards _ -> False
+  TriggerCondition.PlayerCycles _ -> False
   -- CR 121.1's draw is something that happens to a player, not an ability
   -- triggering.
   TriggerCondition.PlayerDrawsNthCard {} -> False
@@ -7115,6 +7170,12 @@ eventBindingSlots cond = case cond of
   -- CR 701.9a's discarding player, which is nobody the bearer already names --
   -- Megrim's "that player" is the opponent whose hand the card left.
   TriggerCondition.PlayerDiscards _ -> Set.singleton Binding.triggerPlayer
+  -- NOTHING, where the cause-blind sibling above binds the discarder. Prickly
+  -- Marmoset's payload says "this creature", which is CR 113.7a's source slot
+  -- the placement already stamps, and names no player; a printing under this
+  -- condition that said "that player" is what would earn the slot. eventBindings
+  -- has no arm for this condition, and the two must agree.
+  TriggerCondition.PlayerCycles _ -> Set.empty
   -- NOTHING. The event names the drawing player, and CR 701.9a's `triggerPlayer`
   -- is the slot they would take, but no card in the pool reads them under this
   -- condition: Erudite Wizard's payload points only at its own bearer, and Faerie
@@ -7483,6 +7544,7 @@ looksBack condition = case condition of
   TriggerCondition.SelfRevealedForMiracle -> False
   TriggerCondition.SelfDiscarded -> False
   TriggerCondition.PlayerDiscards _ -> False
+  TriggerCondition.PlayerCycles _ -> False
   TriggerCondition.PlayerDrawsNthCard {} -> False
   TriggerCondition.SelfAttacks _ -> False
   TriggerCondition.SelfAttacksWithAnother _ -> False
@@ -8433,6 +8495,12 @@ zonesTriggeredFrom cond = case cond of
   -- CR 113.6's default: the bearer watches from the battlefield, so a card in a
   -- graveyard does not see an opponent discard.
   TriggerCondition.PlayerDiscards _ -> battlefield
+  -- CR 113.6's default too, and NOT the graveyard SelfCycled answers above: the
+  -- bearer here is a permanent, not the card that was cycled, so the zone the
+  -- cycled card winds up in (rule 702.29c's second sentence) is nothing to do
+  -- with where this ability functions. eventTriggers' `cycledCard` serves the
+  -- self-scoped condition only.
+  TriggerCondition.PlayerCycles _ -> battlefield
   -- CR 113.6's default again: Erudite Wizard watches its controller's draws from
   -- the battlefield. CR 702.94a's miracle answers a hand below, and it is a
   -- different condition -- it watches the REVEAL, not the draw.
@@ -8606,6 +8674,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfRevealedForMiracle -> False
   TriggerCondition.SelfDiscarded -> False
   TriggerCondition.PlayerDiscards _ -> False
+  TriggerCondition.PlayerCycles _ -> False
   TriggerCondition.PlayerDrawsNthCard {} -> False
   -- CR 508.1a makes this the ACTIVE player's turn, which is not the same thing:
   -- CR 109.5's "you" is the ability's controller, and a stolen creature attacks on
@@ -8786,6 +8855,7 @@ stateTriggers gs
               TriggerCondition.SelfRevealedForMiracle -> False
               TriggerCondition.SelfDiscarded -> False
               TriggerCondition.PlayerDiscards _ -> False
+              TriggerCondition.PlayerCycles _ -> False
               TriggerCondition.PlayerDrawsNthCard {} -> False
               TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
               TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False

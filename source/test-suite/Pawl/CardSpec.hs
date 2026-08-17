@@ -644,6 +644,9 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfDiscarded -> []
   -- CR 701.9a's discard condition is a PlayerRelation, which holds no Count.
   TriggerCondition.PlayerDiscards _ -> []
+  -- CR 702.29a's cycling read as a discard: the same PlayerRelation, so no Count
+  -- either.
+  TriggerCondition.PlayerCycles _ -> []
   TriggerCondition.PlayerDrawsNthCard {} -> []
   -- CR 725.1's crowning condition is a PlayerRelation too.
   TriggerCondition.PlayerBecomesMonarch _ -> []
@@ -2640,6 +2643,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfRevealedForMiracle -> []
   TriggerCondition.SelfDiscarded -> []
   TriggerCondition.PlayerDiscards _ -> []
+  TriggerCondition.PlayerCycles _ -> []
   TriggerCondition.PlayerDrawsNthCard {} -> []
   -- CR 725.1's crowning condition is a PlayerRelation, which holds no Filter.
   TriggerCondition.PlayerBecomesMonarch _ -> []
