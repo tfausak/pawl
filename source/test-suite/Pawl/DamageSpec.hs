@@ -7,6 +7,7 @@
 module Pawl.DamageSpec where
 
 import qualified Control.Monad as Monad
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -882,6 +883,44 @@ copiesAndKeeps target keep p = case p of
 inPlay :: ObjectId.ObjectId -> GameState.GameState -> Bool
 inPlay oid gs = fmap Object.zone (Game.lookupObject oid gs) == Just Zone.Battlefield
 
+-- The two doors of Roaring Furnace // Steaming Sauna, and the halves a Room
+-- permanent below is set up with.
+furnaceName, saunaName :: CardName.CardName
+furnaceName = CardName.MkCardName (Text.pack "Roaring Furnace")
+saunaName = CardName.MkCardName (Text.pack "Steaming Sauna")
+
+-- CR 709.5c: give a Room permanent these unlocked designations directly. The
+-- names a Room projects are one per UNLOCKED door (CR 709.4a, via
+-- Pawl.Engine.Card.roomNames), so this is what makes a permanent multi-named --
+-- the only way in the pool for two legend groups to share a member set. Set
+-- rather than cast-and-unlock because the doors cost {1}{R} and {3}{U}{U} apiece
+-- and this group's subject is the grouping, not the unlocking; Pawl.RoomSpec
+-- covers the end-to-end route and asserts against this same field.
+unlockDoors :: Set.Set CardName.CardName -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+unlockDoors doors oid gs =
+  gs {GameState.objects = Map.adjust (\o -> o {Object.unlockedHalves = doors}) oid (GameState.objects gs)}
+
+-- Answers Prompt.ChooseLegend with a DIFFERENT candidate each time it is asked,
+-- and counts the asks. Two identical prompts cannot be told apart by a pure
+-- answerer, so this is what shows that asking twice about one set of legends
+-- lets independent answers bury every member of it.
+alternatingLegend :: Prompt.Prompt r -> State.State Natural.Natural r
+alternatingLegend p = case p of
+  Prompt.ChooseLegend _ _ candidates -> do
+    n <- State.get
+    State.modify' (+ 1)
+    pure (if even n then NonEmpty.head candidates else NonEmpty.last candidates)
+  _ -> pure (S.identityAnswer p)
+
+-- Keeps `left` when it is on offer and `right` otherwise: the answer a
+-- controller of three chained Rooms gives to keep both ends of the chain.
+keepsEitherEnd :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+keepsEitherEnd left right p = case p of
+  Prompt.ChooseLegend _ _ candidates
+    | elem left (NonEmpty.toList candidates) -> left
+    | elem right (NonEmpty.toList candidates) -> right
+  _ -> S.identityAnswer p
+
 legendRuleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 legendRuleSpec s registry =
   Spec.describe s "LegendRule" $ do
@@ -1036,6 +1075,69 @@ legendRuleSpec s registry =
       Spec.assertBool s (a /= b) "the two Forests are separate objects"
       Spec.assertBool s (inPlay a after && inPlay b after) "both Forests stay"
       Spec.assertEqWith s "nothing was buried" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+
+    -- CR 704.5j is ONE choice over ONE set of same-named legendary permanents,
+    -- and CR 704.3 performs the whole pass as a single event -- so a permanent
+    -- with two names is asked about once, not once per name.
+    --
+    -- CR 709.5 gives a Room permanent one name per unlocked door (CR 709.4a), so
+    -- two Rooms with both doors open are same-named through BOTH names: the
+    -- pool's only board where keying the groups by name and keying them by
+    -- member set disagree. Leyline of Singularity supplies the supertype.
+    --
+    -- Asked twice about the same pair, the two answers are independent, and
+    -- keeping one Room under the first name and the OTHER under the second
+    -- buries both -- leaving alice with no Room at all, which "chooses one of
+    -- them, and the rest" forbids. The alternating answerer is what makes that
+    -- observable: two identical prompts are indistinguishable to a pure one.
+    Spec.it s "CR 704.5j/709.4a two fully unlocked Rooms are one legend group, asked once" $ do
+      room <- S.printingOf s registry "Roaring Furnace"
+      leyline <- S.printingOf s registry "Leyline of Singularity"
+      let bothDoors = Set.fromList [furnaceName, saunaName]
+          (p, g0) = S.addCreature room S.alice (Setup.emptyGame S.bothPlayers)
+          (q, g1) = S.addCreature room S.alice g0
+          board = unlockDoors bothDoors q (unlockDoors bothDoors p g1)
+          -- The CONTROL: without the Leyline neither Room is legendary, so the
+          -- rule has nothing to say and the pass below cannot be vacuous.
+          before = S.runPure S.identityAnswer board Sba.performStateBasedActions
+          (_, staged) = S.spellOnStack leyline S.alice board
+          ((_, after), asked) = State.runState (Engine.runGame alternatingLegend staged (Stack.resolveTop >> Engine.settleForPriority)) 0
+      Spec.assertBool s (p /= q) "the two Rooms are separate objects, not one counted twice"
+      Spec.assertEqWith s "the first Room projects BOTH door names" (Projection.namesOf p board) bothDoors
+      Spec.assertEqWith s "and so does the second" (Projection.namesOf q board) bothDoors
+      Spec.assertBool s (inPlay p before && inPlay q before) "without the Leyline both survive"
+      Spec.assertEqWith s "the legend rule asked exactly once" asked 1
+      Spec.assertBool s (inPlay p after || inPlay q after) "alice is left with a Room, whatever she answered"
+      Spec.assertEqWith s "and exactly one Room was buried" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+
+    -- The other side of the same design call: groups that OVERLAP are still two
+    -- groups. Three Rooms unlocked {Roaring Furnace}, both, {Steaming Sauna} are
+    -- two distinct same-named sets under CR 704.5j, and keeping the first under
+    -- one name and the third under the other is a legal pair of choices that
+    -- buries only the middle one. Merging by shared name -- a transitive closure
+    -- rather than the deduplication Sba.legendGroups does -- would make one
+    -- group of three and bury two of them.
+    Spec.it s "CR 704.5j overlapping legend groups stay two groups, so both ends survive" $ do
+      room <- S.printingOf s registry "Roaring Furnace"
+      leyline <- S.printingOf s registry "Leyline of Singularity"
+      let (a, g0) = S.addCreature room S.alice (Setup.emptyGame S.bothPlayers)
+          (b, g1) = S.addCreature room S.alice g0
+          (c, g2) = S.addCreature room S.alice g1
+          board =
+            unlockDoors (Set.singleton saunaName) c
+              . unlockDoors (Set.fromList [furnaceName, saunaName]) b
+              $ unlockDoors (Set.singleton furnaceName) a g2
+          (_, staged) = S.spellOnStack leyline S.alice board
+          after = S.runPure (keepsEitherEnd a c) staged (Stack.resolveTop >> Engine.settleForPriority)
+      -- The chain really is a chain: the ends share a name with the middle and
+      -- none with each other.
+      Spec.assertEqWith s "one end is named for one door only" (Projection.namesOf a board) (Set.singleton furnaceName)
+      Spec.assertEqWith s "the middle has both names" (Projection.namesOf b board) (Set.fromList [furnaceName, saunaName])
+      Spec.assertEqWith s "the other end is named for the other door only" (Projection.namesOf c board) (Set.singleton saunaName)
+      Spec.assertBool s (inPlay a after) "alice keeps the first end"
+      Spec.assertBool s (inPlay c after) "and the other end too"
+      Spec.assertBool s (not (inPlay b after)) "the middle Room, named by both groups, is the only loser"
+      Spec.assertEqWith s "exactly one Room was buried" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
 
 -- The two world enchantments in the pool, fetched together: most tests below
 -- want two DIFFERENTLY NAMED world permanents, since a rule that ignores names
