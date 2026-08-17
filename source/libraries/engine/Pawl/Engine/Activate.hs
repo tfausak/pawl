@@ -264,10 +264,10 @@ restrictionMet pid gs restriction = case restriction of
   -- falls inside the window the rider names. CONTAINMENT rather than equality,
   -- because a rider may name a phase that has steps -- Jade Statue's "only
   -- during combat" is live in all five of CR 506.1's combat steps, while
-  -- Desert's names one of them. Pawl.Engine.Cast makes the equality comparison
-  -- for CastingRestriction.DuringPhase, whose arm still carries a bare Phase
-  -- (#527); deliberately duplicated rather than shared, since the two gates
-  -- differ in what else they may read.
+  -- Desert's names one of them. Pawl.Engine.Cast reads the same
+  -- Pawl.Types.DuringPhase bundle off CastingRestriction.DuringPhase;
+  -- deliberately duplicated rather than shared, since the two gates differ in
+  -- what else they may read.
   --
   -- CR 102.1 supplies the second conjunct, a genuinely separate fact: Desert's
   -- rider names no turn (EachTurn, and the step alone decides), while Llanowar
