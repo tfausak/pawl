@@ -3039,6 +3039,50 @@ ajaniEmblemChain s registry swap = do
       after = S.runPure S.identityAnswer onStack Engine.priorityLoop
   pure (S.tokensOf after, after)
 
+-- alice's Blade Instructor (3/1 Human Soldier) and Goblin Piker (2/1 Goblin
+-- Warrior); she casts Piety Charm's SECOND mode at the Instructor, optionally
+-- has an Artificial Evolution resolved at the CHARM ON THE STACK, and then the
+-- charm resolves. Returns the Instructor, the Piker and the final state.
+--
+-- A Plains and an Island, one each: the charm is {W} and the Evolution {U}, so
+-- neither payment can strand the other.
+--
+-- The target set is FILTERED rather than rebuilt, so the recipient shape the
+-- engine offered is the one CR 608.2b re-reads.
+pietyCharmChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe (Subtype.Subtype, Subtype.Subtype) -> m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+pietyCharmChain s registry swap = do
+  plains <- S.printingOf s registry "Plains"
+  island <- S.printingOf s registry "Island"
+  bladeInstructor <- S.printingOf s registry "Blade Instructor"
+  goblinPiker <- S.printingOf s registry "Goblin Piker"
+  pietyCharm <- S.printingOf s registry "Piety Charm"
+  artificialEvolution <- S.printingOf s registry "Artificial Evolution"
+  let lands = S.landsFor island S.alice 1 (S.landsInPlay plains 1)
+      (soldierId, g1) = S.addCreature bladeInstructor S.alice lands
+      (gobId, g2) = S.addCreature goblinPiker S.alice g1
+      (charmId, g3) = S.addHandCard pietyCharm S.alice g2
+      (evolutionId, g4) = S.addHandCard artificialEvolution S.alice g3
+      onStack = S.runPure (charmAt soldierId) g4 (S.cast S.alice charmId)
+      spellId = case GameState.stack onStack of
+        top : _ -> top
+        [] -> ObjectId.MkObjectId 999
+      evolved = case swap of
+        Nothing -> onStack
+        Just (from, to) ->
+          S.runPure (evolveAt spellId from to) onStack $ do
+            S.cast S.alice evolutionId
+            Stack.resolveTop
+      after = S.runPure S.identityAnswer evolved Stack.resolveTop
+  pure (soldierId, gobId, after)
+
+-- Piety Charm's two asks: its CR 700.2a mode -- the second, "target Soldier
+-- creature gets +2/+2" -- and that mode's one target.
+charmAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+charmAt oid p = case p of
+  Prompt.ChooseModes {} -> Seq.singleton (ModeIndex.MkModeIndex 1)
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter (\r -> r == Recipient.ToCreature oid || r == Recipient.ToObject oid) candidates) sets
+  _ -> S.identityAnswer p
+
 -- CR 612.2a's third carrier, and the one whose word is the RULEBOOK's: alice
 -- controls a Ministrant of Obligation ({2}{W} Creature -- Human Cleric 2/1 whose
 -- whole text box is "Afterlife 2", checked against Scryfall), optionally has an
@@ -3274,6 +3318,39 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
     Spec.assertEqWith s "three tokens" (length tokens) 3
     mapM_ (\oid -> Spec.assertEqWith s "Creature -- Cat" (Projection.subtypesOf oid after) (Set.singleton Subtype.Cat)) tokens
     mapM_ (\oid -> Spec.assertEqWith s "named Cat Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Cat Token")))) tokens
+
+  -- CR 608.2b names this case in as many words: a target stops being legal when
+  -- "an effect may have changed the text of the spell". Piety Charm {W} Instant,
+  -- second mode "Target Soldier creature gets +2/+2 until end of turn" (checked
+  -- against Scryfall); the target is legal when chosen at CR 601.2c, an
+  -- Evolution then rewrites the clause to say Goblin, and the re-check at
+  -- resolution finds a Soldier where the clause now asks for a Goblin.
+  --
+  -- THREE BOARDS DIFFERING IN ONE THING, since "the spell fizzled" is the
+  -- repository's most reliable false pass -- a mis-set-up board fizzles too. The
+  -- unevolved case and the irrelevant-swap case both resolve and apply the
+  -- +2/+2, off the same board and the same two casts.
+  --
+  -- Blade Instructor is a 3/1 Human Soldier and the Goblin Piker beside it a
+  -- 2/1: no assertion here can be met by the wrong creature, and 5/3 is a number
+  -- neither prints.
+  Spec.it s "CR 608.2b an unevolved Piety Charm resolves and the Soldier is 5/3" $ do
+    (soldierId, gobId, after) <- pietyCharmChain s registry Nothing
+    Spec.assertEqWith s "the stack emptied" (length (GameState.stack after)) 0
+    Spec.assertEqWith s "3/1 plus 2/2" (S.powerToughnessOf soldierId after) (Just (5, 3))
+    Spec.assertEqWith s "and the Goblin beside it is untouched" (S.powerToughnessOf gobId after) (Just (2, 1))
+
+  Spec.it s "CR 608.2b an evolved Piety Charm finds its target illegal and fizzles" $ do
+    (soldierId, gobId, after) <- pietyCharmChain s registry (Just (Subtype.Soldier, Subtype.Goblin))
+    Spec.assertEqWith s "the stack emptied" (length (GameState.stack after)) 0
+    Spec.assertEqWith s "the Soldier is its printed 3/1" (S.powerToughnessOf soldierId after) (Just (3, 1))
+    Spec.assertEqWith s "and the Goblin the clause now names got nothing either" (S.powerToughnessOf gobId after) (Just (2, 1))
+
+  Spec.it s "CR 612.2 an Evolution naming a word the charm lacks leaves it resolving" $ do
+    (soldierId, gobId, after) <- pietyCharmChain s registry (Just (Subtype.Elf, Subtype.Goblin))
+    Spec.assertEqWith s "the stack emptied" (length (GameState.stack after)) 0
+    Spec.assertEqWith s "still 5/3" (S.powerToughnessOf soldierId after) (Just (5, 3))
+    Spec.assertEqWith s "and the Goblin is untouched" (S.powerToughnessOf gobId after) (Just (2, 1))
 
   -- The falsifier for a word-blind rewrite, on the same board with one word
   -- changed: Human is printed on the Ministrant and nowhere in rule 702.135a, so

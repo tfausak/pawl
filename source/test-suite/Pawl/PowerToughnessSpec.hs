@@ -1344,7 +1344,7 @@ aspectOfWolfSpec s registry = Spec.describe s "Aspect of Wolf" $ do
     aspect <- S.printingOf s registry "Aspect of Wolf"
     let (_, after, giantId) = wolfOn forest hillGiant aspect 4
     Spec.assertEqWith s "no fraction to round" (S.powerToughnessOf giantId after) (Just (5, 5))
-  -- CR 612.1 at the last carrier of an object's rules text (#711): the "for each
+  -- CR 612.1 at a P/T modification's quantities (see #711): the "for each
   -- Forest you control" inside a layer-7c P/T modification is printed in the
   -- text box exactly as Kird Ape's "as long as" clause is, so a Magical Hack
   -- aimed at the AURA moves which land the Aura counts.

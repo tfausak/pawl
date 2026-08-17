@@ -2152,13 +2152,21 @@ rewriteModal pairs modal =
             -- why this is a record update rather than a Filter.rewriteCost call.
             Clause.condition = fmap (rewriteCondition pairs) (Clause.condition c)
           }
-      rewriteTargetSlot slot = slot {TargetSlot.filter = fmap (Filter.rewrite pairs) (TargetSlot.filter slot)}
       rewriteMode m =
         m
           { Mode.clauses = fmap rewriteClause (Mode.clauses m),
-            Mode.targetSlots = fmap rewriteTargetSlot (Mode.targetSlots m)
+            Mode.targetSlots = fmap (rewriteTargetSlot pairs) (Mode.targetSlots m)
           }
    in modal {Modal.modes = fmap rewriteMode (Modal.modes modal)}
+
+-- A single target slot under CR 612.1. Top-level rather than local to
+-- rewriteModal because Pawl.Engine.Resolve needs the same rewrite over a
+-- resolving SPELL's slots, which it reads off the printed face rather than
+-- through a Modal (CR 608.2b).
+--
+-- Only the Filter, and the Pool is not an omission: see rewriteModal's comment.
+rewriteTargetSlot :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> TargetSlot.TargetSlot -> TargetSlot.TargetSlot
+rewriteTargetSlot pairs slot = slot {TargetSlot.filter = fmap (Filter.rewrite pairs) (TargetSlot.filter slot)}
 
 -- CR 612.1 through a trigger's own condition. Exhaustive rather than a wildcard,
 -- so a later condition carrying a Filter fails to compile here instead of

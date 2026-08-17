@@ -1139,10 +1139,10 @@ bakeTokenCharacteristics eval card = card {Card.Type.faces = fmap bakeFace (Card
 -- printed words -- a clause's effects and its CR 701.46a gate -- so optionality
 -- passes through untouched.
 --
--- Not implemented: a SPELL's mode target slots are left unrewritten, so CR
--- 608.2b's re-validation in targetsAllIllegal below measures the printed clause
--- (#635). An ACTIVATED ability has no such gap -- Projection.rewriteModal rewrites
--- its slots and CR 602.2a's stack object carries them.
+-- The mode's TARGET SLOTS are rewritten too, by targetSlotsOf below rather than
+-- here: CR 608.2b re-reads them off the printed face through
+-- Card.modesTargetSlots, which unions in CR 303.4a's enchant slot and so cannot
+-- be derived from this list.
 modesOf :: ObjectId -> GameState -> [(ModeInstance, Mode.Mode Card.Type.Card)]
 modesOf oid gs = case Game.lookupObject oid gs of
   Nothing -> []
@@ -1161,6 +1161,24 @@ modesOf oid gs = case Game.lookupObject oid gs of
               }
           rewriteMode m = m {Mode.clauses = fmap rewriteClause (Mode.clauses m)}
        in fmap (fmap rewriteMode) (Card.chosenModes chosen face)
+
+-- CR 608.2b names this case in as many words: a target can stop being legal
+-- because "an effect may have changed the text of the spell". So the slots the
+-- re-check measures are the PRINTED ones with every text change affecting the
+-- spell applied (CR 612.1), never the printed ones alone.
+--
+-- Off the face through Card.modesTargetSlots rather than off modesOf, because
+-- that function unions in CR 303.4a's enchant slot -- an Aura spell's target --
+-- which lives on the face and not in any mode.
+--
+-- Both readers go through this: the fizzle test and resolveSpellWith's
+-- per-effect skip. A slot legal under one and illegal under the other would be a
+-- spell that resolved and quietly applied nothing.
+targetSlotsOf :: Object.Object -> ObjectId -> GameState -> Face.Face Card.Type.Card -> Map.Map SlotName TargetSlot.TargetSlot
+targetSlotsOf obj oid gs face =
+  fmap
+    (Projection.rewriteTargetSlot (Projection.textChangesAffecting oid gs))
+    (Card.modesTargetSlots (Binding.modesOf (Object.bindings obj)) face)
 
 -- CR 405.4: who controls a SPELL on the stack -- both CR 608.2b's legality
 -- perspective and the effects' own execution. One function because those two
@@ -1195,7 +1213,7 @@ targetsAllIllegal oid gs = case Game.lookupObject oid gs of
   Just obj -> case Game.faceOf oid gs of
     Nothing -> False
     Just face ->
-      let slots = Card.modesTargetSlots (Binding.modesOf (Object.bindings obj)) face
+      let slots = targetSlotsOf obj oid gs face
           chosen = Binding.targetsOf (Object.bindings obj)
           legalSlot slot recipients = case Map.lookup slot slots of
             Nothing -> recipients
@@ -1236,7 +1254,7 @@ resolveSpellWith runSubgame oid = do
         -- unchosen mode's slot was never filled and is not part of this
         -- resolution's legality question.
         let chosenSelection = Binding.modesOf (Object.bindings obj)
-            slots = Card.modesTargetSlots chosenSelection face
+            slots = targetSlotsOf obj oid gs face
             -- The slots as FILLED, which a slot-scoped pool is re-derived
             -- against (Target.stillLegal).
             chosen = Binding.targetsOf (Object.bindings obj)
