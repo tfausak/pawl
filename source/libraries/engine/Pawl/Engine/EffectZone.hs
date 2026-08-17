@@ -127,6 +127,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.Detain _ -> Nothing
   Effect.DoesNotUntapNext _ -> Nothing
   Effect.Transform _ -> Nothing
+  Effect.PhaseOut _ -> Nothing
   Effect.AddPhases _ -> Nothing
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> Nothing
   Effect.ArmDelayedTrigger {} -> Nothing

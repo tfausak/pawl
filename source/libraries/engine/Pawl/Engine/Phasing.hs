@@ -37,22 +37,25 @@
 -- CR 702.26g's indirect half is the second thing this module maintains, and it
 -- is why GameState.phasedOut holds a Pawl.Types.PhasedOut rather than a bare
 -- player: a row says which of rule 702.26's two schedules its permanent is on,
--- and only the direct ones are read by CR 702.26a's phase-in half. The
--- attachment itself is NOT touched by either half -- CR 702.26i needs
--- Object.attachedTo intact -- and the only two paths that clear that field are
--- elsewhere: Pawl.Engine.Sba's CR 704.5n/704.5p detach sweep, which classifies
--- only battlefield permanents and so cannot see a phased-out one, and
--- Pawl.Engine.Event's zone-change funnel, which CR 702.26d keeps phasing out of.
+-- and only the direct ones are read by CR 702.26a's phase-in half. Going OUT, the
+-- attachment is not touched by either half -- CR 702.26i needs Object.attachedTo
+-- intact -- and nothing clears it meanwhile: Pawl.Engine.Sba's CR 704.5n/704.5p
+-- detach sweep classifies only battlefield permanents and so cannot see a
+-- phased-out one, and Pawl.Engine.Event's zone-change funnel is what CR 702.26d
+-- keeps phasing out of. Coming back, `hostRemains` is rule 702.26i's own
+-- condition and the one thing that does clear it.
+--
+-- Either of two things starts a phase-out, and `phaseOutSet` is both of their
+-- one performer: CR 502.1's turn-based action, and Effect.PhaseOut -- Reality
+-- Ripple's "target artifact, creature, or land phases out" -- resolved by
+-- Pawl.Engine.Resolve. The effect mints no event and goes through no funnel,
+-- which is CR 702.26d.
 --
 -- WHAT IS NOT IMPLEMENTED, none of which the pool can reach:
 --
---   * CR 702.26i, an Aura, Equipment or Fortification that phased out DIRECTLY
---     and phases in attached only if its host is still in the same zone (#1032).
---   * Effects that phase a permanent out (Teferi's Protection), which is the
---     effect-DSL half rather than this one (#929). Only CR 702.26a's own
---     schedule can phase anything today, so `phasedOut` is only ever written by
---     this module.
 --   * CR 702.26e/f, the continuous-effect consequences of being gone (#930).
+--   * CR 702.26h's own half of `phaseOutSet`'s tie-break, which needs an effect
+--     that phases out a permanent and its own Equipment together (#1723).
 --   * CR 702.26n's second sentence: a permanent that phased out under a player
 --     who has since LEFT the game phases in "during the next untap step after
 --     that player's next turn would have begun", a schedule for a turn that never
@@ -74,6 +77,7 @@ import qualified Pawl.Types.PhasedOut as PhasedOut
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Zone as Zone
 
 -- | CR 502.1 / 703.4a / 702.26a: the untap step's first turn-based action, for
 -- the player whose untap step it is.
@@ -90,15 +94,44 @@ import qualified Pawl.Types.Subtype as Subtype
 -- pure GameState -> GameState rather than a Game action.
 phasingEvent :: PlayerId -> GameState -> GameState
 phasingEvent pid gs =
-  let leaving = draggedAlong (Set.fromList (phasingOut pid gs)) gs
+  let returning = phasingIn pid gs
+   in foldr (phaseIn pid) (phaseOutSet pid (Set.fromList (phasingOut pid gs)) gs) returning
+
+-- | CR 702.26b: `hosts` phase out, and -- CR 702.26g -- so does everything
+-- attached to them. The whole of "phasing out" for both of the two things that
+-- can start it: CR 502.1's turn-based action above, and an effect that says so
+-- (Pawl.Engine.Resolve's Effect.PhaseOut arm). Shared rather than duplicated
+-- because CR 702.26g's closure and CR 702.26h's tie-break are the same rules
+-- whichever asked, and two copies could disagree about them.
+--
+-- `fallback` is the player a row names when the projection can no longer place a
+-- permanent -- the active player for the turn-based action, the resolution's
+-- controller for an effect. Unreachable either way: everything in `leaving` is on
+-- the battlefield at this moment, which is what makes heldBy answer.
+--
+-- Takes the SET in one call, and must: rules 702.26g and 702.26h ask whether a
+-- permanent's host is leaving in this same event, so a per-victim call could not
+-- tell an Equipment whose creature is also going from one whose creature is
+-- staying.
+phaseOutSet :: PlayerId -> Set.Set ObjectId -> GameState -> GameState
+phaseOutSet fallback hosts gs =
+  let leaving = draggedAlong hosts gs
       -- CR 702.26h: an object that would phase out both ways just phases out
       -- indirectly, which is exactly "its host is leaving too" -- so this is
-      -- the rule and not a tie-break invented for it.
+      -- the rule and not a tie-break invented for it. It is also CR 702.26g for
+      -- everything the closure added, the two rules being one expression here.
+      -- Rule 702.26h's own half -- an object named by the effect AND dragged in the
+      -- same event -- is not implemented in the sense of being unobservable, no
+      -- producer phasing out such a set (#1723).
       status oid
-        | maybe False (`Set.member` leaving) (hostOf oid gs) = PhasedOut.Indirectly (heldBy pid oid gs)
-        | otherwise = PhasedOut.Directly pid
-      returning = phasingIn pid gs
-   in foldr (phaseIn pid) (foldr (\oid -> phaseOut (status oid) oid) gs (Set.toAscList leaving)) returning
+        | maybe False (`Set.member` leaving) (hostOf oid gs) = PhasedOut.Indirectly (heldBy fallback oid gs)
+        -- CR 702.26a schedules the return by who controlled the permanent when it
+        -- phased out, which is not necessarily who asked: Reality Ripple aimed at
+        -- an opponent's creature phases it back in at THAT player's untap step.
+        -- For the turn-based action the two coincide, phasingOut having filtered
+        -- on control.
+        | otherwise = PhasedOut.Directly (heldBy fallback oid gs)
+   in foldr (\oid -> phaseOut (status oid) oid) gs (Set.toAscList leaving)
 
 -- CR 702.26a's first half: the phased-in permanents with phasing this player
 -- controls.
@@ -230,12 +263,66 @@ phaseOut status oid gs =
 --
 -- No combat counterpart to phaseOut's removal: CR 506.4 has no clause putting
 -- anything back, and the untap step is not a combat phase.
+--
+-- CR 702.26i is the one thing that comes back CHANGED: an attachment that phased
+-- out DIRECTLY phases in attached only if what it was attached to is still there,
+-- and unattached otherwise. See hostRemains.
 phaseIn :: PlayerId -> ObjectId -> GameState -> GameState
 phaseIn _ oid gs =
-  gs
-    { GameState.battlefield = Set.insert oid (GameState.battlefield gs),
-      GameState.phasedOut = Map.delete oid (GameState.phasedOut gs)
-    }
+  let -- CR 702.26i names only the DIRECT rows, and the restriction is the rule's
+      -- and not a shortcut: an indirect row (CR 702.26g) comes back on its host's
+      -- own schedule, in the same event as that host, so asking whether the host
+      -- is still there would be asking about a board mid-write.
+      unattaching = case phasedOutStatus oid gs of
+        Just (PhasedOut.Directly _) -> not (hostRemains oid gs)
+        Just (PhasedOut.Indirectly _) -> False
+        Nothing -> False
+      detach o = o {Object.attachedTo = Nothing}
+   in gs
+        { GameState.battlefield = Set.insert oid (GameState.battlefield gs),
+          GameState.phasedOut = Map.delete oid (GameState.phasedOut gs),
+          GameState.objects =
+            if unattaching
+              then Map.adjust detach oid (GameState.objects gs)
+              else GameState.objects gs
+        }
+
+-- CR 702.26i's condition: is the object or player this permanent was attached to
+-- when it phased out still there for it to phase in attached to?
+--
+-- Not guarded on the permanent being an Aura, Equipment or Fortification, the way
+-- draggedAlong's outward trip is. Rule 702.26i names those three, and CR 704.5p
+-- makes anything ELSE that is somehow attached illegal -- so detaching it is the
+-- same answer rule 704.5p would reach, and asking Pawl.Engine.Projection for the
+-- subtypes of a permanent that is not on the battlefield yet cannot answer at all.
+--
+-- "Still in the same zone" is read off Object.zone rather than off
+-- GameState.battlefield membership, and the difference is a rule: CR 702.26d makes
+-- phasing not a zone change, so a host that has ALSO phased out is still in the
+-- battlefield zone and its Equipment comes back attached to it. A host that truly
+-- left is gone from GameState.objects entirely (CR 400.7 mints a new object for
+-- the destination), which is the Nothing this reads as "not there".
+--
+-- Attached to nothing at all answers True: rule 702.26i has nothing to say about
+-- it, and there is no attachment to lose.
+--
+-- The PLAYER arm has no producer and no test that discriminates it: a permanent
+-- attached to a player is an Aura (CR 702.5d), which Reality Ripple cannot target
+-- and which no printing gives phasing, so nothing can phase one out directly. It
+-- is rule 702.26i's own second clause written out rather than elided, and a
+-- regression fence rather than a proof.
+hostRemains :: ObjectId -> GameState -> Bool
+hostRemains oid gs = case Game.lookupObject oid gs >>= Object.attachedTo of
+  Nothing -> True
+  Just recipient -> case Recipient.playerOf recipient of
+    -- "or that player is still in the game" -- the roster Game.stillPlaying
+    -- answers, which CR 800.4 empties as players leave.
+    Just pid -> pid `elem` Game.stillPlaying gs
+    Nothing ->
+      maybe
+        False
+        ((== Zone.Battlefield) . Object.zone)
+        (Recipient.objectOf recipient >>= flip Game.lookupObject gs)
 
 -- | CR 702.26b's membership test, for the rules that are on the far side of its
 -- "except for rules and effects that specifically mention phased-out

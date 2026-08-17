@@ -57,7 +57,8 @@ data GameState = MkGameState
     -- answer. Three rules sit on the other side of rule 702.26b's "except", and
     -- each is answered somewhere different:
     --
-    --   * CR 502.1's phasing event, which reads and writes this field
+    --   * CR 502.1's phasing event, which reads and writes this field, and
+    --     Effect.PhaseOut, which writes it through the same performer
     --     (Pawl.Engine.Phasing).
     --   * CR 702.26k, a phased-out permanent leaving the game with its owner,
     --     which deletes from it (Pawl.Engine.Game.removeFromZones).
@@ -79,10 +80,11 @@ data GameState = MkGameState
     -- phased out indirectly "won't phase in by itself" and comes back with the
     -- permanent it is attached to. See Pawl.Types.PhasedOut.
     --
-    -- What DOESN'T live here is why a permanent phased out DIRECTLY. Phasing
-    -- back in on one's own is CR 702.26a's business and is read off the
-    -- permanent's keywords; an unattached permanent phased out by an effect has
-    -- no phasing ability and so is not among those that phase in.
+    -- What DOESN'T live here is why a permanent phased out DIRECTLY, and nothing
+    -- needs it: rule 702.26a phases in every permanent that phased out under that
+    -- player's control, so the keyword decides who LEAVES and never who returns.
+    -- A creature with no phasing ability that Reality Ripple phased out is on the
+    -- same schedule as one that phased out on its own.
     phasedOut :: Map.Map ObjectId.ObjectId PhasedOut.PhasedOut,
     exile :: Set.Set ObjectId.ObjectId,
     -- | CR 400.1: the command zone -- a shared collection (not per-player), keyed
