@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.PlayerIdSpec where
 
 import qualified Data.Either as Either
@@ -17,7 +15,7 @@ spec s = Spec.describe s "Pawl.Codec.PlayerId" $ do
       s
       PlayerId.codec
       (PlayerId.MkPlayerId 1)
-      """ 1 """
+      " 1 "
 
   Spec.it s "has a schema" $
     Common.assertHasSchema s PlayerId.codec
@@ -25,5 +23,5 @@ spec s = Spec.describe s "Pawl.Codec.PlayerId" $ do
   Spec.it s "rejects a negative id" $
     Spec.assertBool
       s
-      (Either.isLeft (Common.parse (Text.pack """ -1 """) >>= Codec.decode PlayerId.codec))
+      (Either.isLeft (Common.parse (Text.pack " -1 ") >>= Codec.decode PlayerId.codec))
       "expected a decode failure"

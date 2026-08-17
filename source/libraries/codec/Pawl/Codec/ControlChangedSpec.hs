@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ControlChangedSpec where
 
 import qualified Pawl.Codec.ControlChanged as ControlChanged
@@ -25,5 +23,5 @@ spec s = Spec.describe s "Pawl.Codec.ControlChanged" $ do
             ControlChanged.after = PlayerId.MkPlayerId 1
           }
       )
-      """ {"object":1,"before":0,"after":1} """
+      " {\"object\":1,\"before\":0,\"after\":1} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ControlChanged.codec

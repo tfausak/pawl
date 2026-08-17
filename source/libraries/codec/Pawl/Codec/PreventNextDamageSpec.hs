@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.PreventNextDamageSpec where
 
 import qualified Data.Sequence as Seq
@@ -38,7 +36,7 @@ spec s = Spec.describe s "Pawl.Codec.PreventNextDamage" $ do
             PreventNextDamage.riders = Seq.empty
           }
       )
-      """ {"duration":{"type":"UntilEndOfTurn"},"ref":{"type":"InSlot","value":"target"},"quantity":{"type":"Literal","value":4}} """
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"quantity\":{\"type\":\"Literal\",\"value\":4}} "
   -- Decorated Griffin's "combat" and Test of Faith's CR 615.5 additional effect,
   -- together.
   Spec.it s "MkPreventNextDamage, kind and riders written" $
@@ -53,5 +51,5 @@ spec s = Spec.describe s "Pawl.Codec.PreventNextDamage" $ do
             PreventNextDamage.riders = Seq.singleton (Text.pack "a rider")
           }
       )
-      """ {"duration":{"type":"UntilEndOfTurn"},"kind":{"type":"Combat"},"ref":{"type":"InSlot","value":"target"},"quantity":{"type":"Literal","value":3},"riders":["a rider"]} """
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"kind\":{\"type\":\"Combat\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"quantity\":{\"type\":\"Literal\",\"value\":3},\"riders\":[\"a rider\"]} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

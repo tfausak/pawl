@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ZoneSpec where
 
 import qualified Pawl.Codec.Zone as Zone
@@ -14,43 +12,43 @@ spec s = Spec.describe s "Pawl.Codec.Zone" $ do
       s
       Zone.codec
       Zone.Library
-      """ {"type":"Library"} """
+      " {\"type\":\"Library\"} "
   Spec.it s "Hand" $
     Common.assertCodec
       s
       Zone.codec
       Zone.Hand
-      """ {"type":"Hand"} """
+      " {\"type\":\"Hand\"} "
   Spec.it s "Graveyard" $
     Common.assertCodec
       s
       Zone.codec
       Zone.Graveyard
-      """ {"type":"Graveyard"} """
+      " {\"type\":\"Graveyard\"} "
   Spec.it s "Battlefield" $
     Common.assertCodec
       s
       Zone.codec
       Zone.Battlefield
-      """ {"type":"Battlefield"} """
+      " {\"type\":\"Battlefield\"} "
   Spec.it s "Stack" $
     Common.assertCodec
       s
       Zone.codec
       Zone.Stack
-      """ {"type":"Stack"} """
+      " {\"type\":\"Stack\"} "
   Spec.it s "Exile" $
     Common.assertCodec
       s
       Zone.codec
       Zone.Exile
-      """ {"type":"Exile"} """
+      " {\"type\":\"Exile\"} "
   Spec.it s "Command" $
     Common.assertCodec
       s
       Zone.codec
       Zone.Command
-      """ {"type":"Command"} """
+      " {\"type\":\"Command\"} "
   -- Exhaustive where the literals above are representative: Arm.enum derives
   -- the arm list from the type, so this is what would catch a constructor the
   -- derivation missed or two that encode alike.

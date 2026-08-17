@@ -1414,7 +1414,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
   -- CR 701.43d replaces no event: CR 508.1g's choice is a step of a turn-based
-  -- action, and the exert itself writes Object.doesNotUntapNext directly.
+  -- action, and the exert itself writes Object.exertedBy directly.
   Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []

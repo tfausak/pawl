@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.DuringPhaseSpec where
 
 import qualified Pawl.Codec.DuringPhase as DuringPhase
@@ -24,7 +22,7 @@ spec s = Spec.describe s "Pawl.Codec.DuringPhase" $ do
             DuringPhase.scope = TurnScope.EachTurn
           }
       )
-      """ {"window":{"type":"Step","value":{"type":"Combat","value":{"type":"EndOfCombat"}}},"scope":{"type":"EachTurn"}} """
+      " {\"window\":{\"type\":\"Step\",\"value\":{\"type\":\"Combat\",\"value\":{\"type\":\"EndOfCombat\"}}},\"scope\":{\"type\":\"EachTurn\"}} "
   -- Jade Statue's whole-phase window, and the other turn scope. BOTH keys are
   -- required: there is no scope-less form, so a payload naming only a window is
   -- a decode failure rather than a silent EachTurn.
@@ -37,5 +35,5 @@ spec s = Spec.describe s "Pawl.Codec.DuringPhase" $ do
             DuringPhase.scope = TurnScope.ControllersTurn
           }
       )
-      """ {"window":{"type":"CombatPhase"},"scope":{"type":"ControllersTurn"}} """
+      " {\"window\":{\"type\":\"CombatPhase\"},\"scope\":{\"type\":\"ControllersTurn\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s DuringPhase.codec

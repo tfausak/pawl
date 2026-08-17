@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.MoveToZoneSpec where
 
 import qualified Data.Text as Text
@@ -42,7 +40,7 @@ spec s = Spec.describe s "Pawl.Codec.MoveToZone" $ do
       s
       MoveToZone.codec
       bare
-      """ {"ref":{"type":"InSlot","value":"target"},"zone":{"type":"Hand"}} """
+      " {\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"zone\":{\"type\":\"Hand\"}} "
   -- The case @moveTail@ existed for, and the one it could only just handle: an
   -- origin zone and the riders are BOTH objects, so the positional tail had to
   -- try the zone codec first and fall back to riders, because EntryRiders would
@@ -57,7 +55,7 @@ spec s = Spec.describe s "Pawl.Codec.MoveToZone" $ do
           MoveToZone.riders = tapped,
           MoveToZone.origin = Just Zone.Graveyard
         }
-      """ {"ref":{"type":"InSlot","value":"target"},"zone":{"type":"Battlefield"},"riders":{"tapped":{"type":"Tapped"}},"origin":{"type":"Graveyard"}} """
+      " {\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"zone\":{\"type\":\"Battlefield\"},\"riders\":{\"tapped\":{\"type\":\"Tapped\"}},\"origin\":{\"type\":\"Graveyard\"}} "
   -- All four optional keys at once, which no card in the corpus writes: the
   -- longest form moveTail accepted was six elements and it had to reject a
   -- repeat of any of them by hand. Griptide's Top rather than Bottom, since
@@ -73,5 +71,5 @@ spec s = Spec.describe s "Pawl.Codec.MoveToZone" $ do
           MoveToZone.origin = Just Zone.Exile,
           MoveToZone.placement = LibraryPlacement.Stated LibraryPosition.Top
         }
-      """ {"ref":{"type":"InSlot","value":"target"},"zone":{"type":"Library"},"riders":{"tapped":{"type":"Tapped"}},"slot":"moved","origin":{"type":"Exile"},"placement":{"type":"Stated","value":{"type":"Top"}}} """
+      " {\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"zone\":{\"type\":\"Library\"},\"riders\":{\"tapped\":{\"type\":\"Tapped\"}},\"slot\":\"moved\",\"origin\":{\"type\":\"Exile\"},\"placement\":{\"type\":\"Stated\",\"value\":{\"type\":\"Top\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s MoveToZone.codec

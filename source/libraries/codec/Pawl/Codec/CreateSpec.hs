@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.CreateSpec where
 
 import qualified Data.Map.Strict as Map
@@ -45,7 +43,7 @@ spec s = Spec.describe s "Pawl.Codec.Create" $ do
             Create.slot = Nothing
           }
       )
-      """ {"quantity":{"type":"Literal","value":2},"card":"Spirit Token"} """
+      " {\"quantity\":{\"type\":\"Literal\",\"value\":2},\"card\":\"Spirit Token\"} "
   -- The slot alone. Under the positional payload this and the riders-alone case
   -- below were BOTH the three-element form, told apart by JSON TYPE; two named
   -- keys need no such argument.
@@ -60,7 +58,7 @@ spec s = Spec.describe s "Pawl.Codec.Create" $ do
             Create.slot = Just (SlotName.MkSlotName (Text.pack "token"))
           }
       )
-      """ {"quantity":{"type":"Literal","value":1},"card":"Spirit Token","slot":"token"} """
+      " {\"quantity\":{\"type\":\"Literal\",\"value\":1},\"card\":\"Spirit Token\",\"slot\":\"token\"} "
   -- CR 110.5b's riders alone.
   Spec.it s "MkCreate, riders alone" $
     Common.assertCodec
@@ -73,5 +71,5 @@ spec s = Spec.describe s "Pawl.Codec.Create" $ do
             Create.slot = Nothing
           }
       )
-      """ {"quantity":{"type":"Literal","value":2},"card":"Spirit Token","riders":{"attacking":true}} """
+      " {\"quantity\":{\"type\":\"Literal\",\"value\":2},\"card\":\"Spirit Token\",\"riders\":{\"attacking\":true}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ChangeSubtypeWordSpec where
 
 import qualified Pawl.Codec.ChangeSubtypeWord as ChangeSubtypeWord
@@ -20,5 +18,5 @@ spec s = Spec.describe s "Pawl.Codec.ChangeSubtypeWord" $ do
             ChangeSubtypeWord.to = Subtype.Bird
           }
       )
-      """ {"from":{"type":"Wall"},"to":{"type":"Bird"}} """
+      " {\"from\":{\"type\":\"Wall\"},\"to\":{\"type\":\"Bird\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ChangeSubtypeWord.codec

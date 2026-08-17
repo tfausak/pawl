@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.DiscardSpec where
 
 import qualified Data.Text as Text
@@ -22,5 +20,5 @@ spec s = Spec.describe s "Pawl.Codec.Discard" $ do
             Discard.quantity = Quantity.Literal 1
           }
       )
-      """ {"slot":"player","quantity":{"type":"Literal","value":1}} """
+      " {\"slot\":\"player\",\"quantity\":{\"type\":\"Literal\",\"value\":1}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Discard.codec

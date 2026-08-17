@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.LookAtSpec where
 
 import qualified Data.Text as Text
@@ -25,5 +23,5 @@ spec s = Spec.describe s "Pawl.Codec.LookAt" $ do
           (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)))
           (SlotName.MkSlotName (Text.pack "looked"))
       )
-      """ {"ref":{"type":"TopOfLibrary","value":{"count":{"type":"Literal","value":1},"player":{"type":"Relative","value":{"type":"You"}}}},"slot":"looked"} """
+      " {\"ref\":{\"type\":\"TopOfLibrary\",\"value\":{\"count\":{\"type\":\"Literal\",\"value\":1},\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}}},\"slot\":\"looked\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s LookAt.codec

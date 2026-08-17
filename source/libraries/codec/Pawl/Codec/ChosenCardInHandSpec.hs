@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ChosenCardInHandSpec where
 
 import qualified Pawl.Codec.ChosenCardInHand as ChosenCardInHand
@@ -25,5 +23,5 @@ spec s = Spec.describe s "Pawl.Codec.ChosenCardInHand" $ do
             ChosenCardInHand.filter = Filter.HasCardType CardType.Creature
           }
       )
-      """ {"player":{"type":"Relative","value":{"type":"You"}},"filter":{"type":"HasCardType","value":{"type":"Creature"}}} """
+      " {\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ChosenCardInHand.codec

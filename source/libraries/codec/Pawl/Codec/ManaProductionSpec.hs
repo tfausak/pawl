@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ManaProductionSpec where
 
 import qualified Pawl.Codec.ManaProduction as ManaProduction
@@ -16,24 +14,24 @@ spec s = Spec.describe s "Pawl.Codec.ManaProduction" $ do
       s
       ManaProduction.codec
       (ManaProduction.OfType (ManaType.Colored Color.Green))
-      """ {"type":"OfType","value":{"type":"Colored","value":{"type":"Green"}}} """
+      " {\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}} "
   Spec.it s "AnyColor" $
     Common.assertCodec
       s
       ManaProduction.codec
       ManaProduction.AnyColor
-      """ {"type":"AnyColor"} """
+      " {\"type\":\"AnyColor\"} "
   Spec.it s "Chosen" $
     Common.assertCodec
       s
       ManaProduction.codec
       ManaProduction.Chosen
-      """ {"type":"Chosen"} """
+      " {\"type\":\"Chosen\"} "
   Spec.it s "SnowSymbol" $
     Common.assertCodec
       s
       ManaProduction.codec
       ManaProduction.SnowSymbol
-      """ {"type":"SnowSymbol"} """
+      " {\"type\":\"SnowSymbol\"} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s ManaProduction.codec

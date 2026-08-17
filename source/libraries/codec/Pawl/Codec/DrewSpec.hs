@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.DrewSpec where
 
 import qualified Pawl.Codec.Drew as Drew
@@ -16,5 +14,5 @@ spec s = Spec.describe s "Pawl.Codec.Drew" $ do
       s
       Drew.codec
       (Drew.MkDrew {Drew.player = PlayerId.MkPlayerId 0, Drew.nth = 2})
-      """ {"player":0,"nth":2} """
+      " {\"player\":0,\"nth\":2} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Drew.codec

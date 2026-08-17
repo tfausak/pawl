@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.CostReductionSpec where
 
 import qualified Pawl.Codec.CostReduction as CostReduction
@@ -34,5 +32,5 @@ spec s = Spec.describe s "Pawl.Codec.CostReduction" $ do
                   }
           }
       )
-      """ {"amount":[{"type":"Generic","value":3}],"perEach":{"type":"Count","value":{"scope":{"type":"InHistory","value":{"type":"SpellCast"}},"filter":{"type":"And","value":[]},"aggregation":{"type":"Members"}}}} """
+      " {\"amount\":[{\"type\":\"Generic\",\"value\":3}],\"perEach\":{\"type\":\"Count\",\"value\":{\"scope\":{\"type\":\"InHistory\",\"value\":{\"type\":\"SpellCast\"}},\"filter\":{\"type\":\"And\",\"value\":[]},\"aggregation\":{\"type\":\"Members\"}}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s CostReduction.codec

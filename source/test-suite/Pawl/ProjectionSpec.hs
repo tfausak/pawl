@@ -2991,9 +2991,7 @@ weathervaneChain s registry landName which = do
       (vaneId, board) = S.addCreature weathervane S.alice g2
       before = Projection.supertypesOf landId board
   case drop which (Projection.abilitiesOf vaneId board) of
-    [] -> do
-      Spec.assertFailure s "expected the Weathervane to project both of its activated abilities"
-      pure (before, before)
+    [] -> Spec.assertFailure s "expected the Weathervane to project both of its activated abilities"
     ability : _ ->
       let after = S.runPure (aimingAt landId) board (do Activate.activateAbility S.alice vaneId ability; Stack.resolveTop)
        in pure (before, Projection.supertypesOf landId after)

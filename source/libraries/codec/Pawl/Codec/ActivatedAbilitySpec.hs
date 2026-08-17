@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ActivatedAbilitySpec where
 
 import qualified Data.Map.Strict as Map
@@ -73,7 +71,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
           [ActivationRestriction.SorcerySpeed]
           Nothing
       )
-      """ {"cost":{"mana":[{"type":"Generic","value":1}]},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Attach","value":"target"}]}],"targetSlots":{"target":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}}]},"restrictions":[{"type":"SorcerySpeed"}]} """
+      " {\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]},\"modal\":{\"modes\":[{\"clauses\":[{\"effects\":[{\"type\":\"Attach\",\"value\":\"target\"}]}],\"targetSlots\":{\"target\":{\"pool\":{\"type\":\"Creatures\"},\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}}}}]},\"restrictions\":[{\"type\":\"SorcerySpeed\"}]} "
   -- CR 602.5's conjunction, in the JSON: two clauses in printed order, which is
   -- the shape a single tagged object could not hold.
   Spec.it s "MkActivatedAbility, Kongming's Contraptions' two clauses" $
@@ -89,7 +87,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
           ]
           Nothing
       )
-      """ {"cost":{"mana":null,"components":[{"type":"TapThis"}]},"modal":{"modes":[{}]},"restrictions":[{"type":"DuringPhase","value":{"window":{"type":"Step","value":{"type":"Combat","value":{"type":"DeclareAttackers"}}},"scope":{"type":"EachTurn"}}},{"type":"AttackedThisStep"}]} """
+      " {\"cost\":{\"mana\":null,\"components\":[{\"type\":\"TapThis\"}]},\"modal\":{\"modes\":[{}]},\"restrictions\":[{\"type\":\"DuringPhase\",\"value\":{\"window\":{\"type\":\"Step\",\"value\":{\"type\":\"Combat\",\"value\":{\"type\":\"DeclareAttackers\"}}},\"scope\":{\"type\":\"EachTurn\"}}},{\"type\":\"AttackedThisStep\"}]} "
   -- CR 602.2: no rider is the default for nearly every ability, so the key stays
   -- out of the JSON.
   Spec.it s "an unrestricted ability omits the restrictions key, and an absent key decodes to none" $
@@ -103,4 +101,4 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
           []
           Nothing
       )
-      """ {"cost":{"mana":null},"modal":{"modes":[{}]}} """
+      " {\"cost\":{\"mana\":null},\"modal\":{\"modes\":[{}]}} "

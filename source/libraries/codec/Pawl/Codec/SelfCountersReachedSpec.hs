@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.SelfCountersReachedSpec where
 
 import qualified Pawl.Codec.SelfCountersReached as SelfCountersReached
@@ -21,5 +19,5 @@ spec s = Spec.describe s "Pawl.Codec.SelfCountersReached" $ do
             SelfCountersReached.amount = 3
           }
       )
-      """ {"kind":{"type":"Lore"},"amount":3} """
+      " {\"kind\":{\"type\":\"Lore\"},\"amount\":3} "
   Spec.it s "has a schema" $ Common.assertHasSchema s SelfCountersReached.codec

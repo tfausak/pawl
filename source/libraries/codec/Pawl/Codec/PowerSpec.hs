@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.PowerSpec where
 
 import qualified Pawl.Codec.Power as Power
@@ -15,5 +13,5 @@ spec s = Spec.describe s "Pawl.Codec.Power" $ do
       s
       Power.codec
       (Power.MkPower (Quantity.Literal 2))
-      """ {"type":"Literal","value":2} """
+      " {\"type\":\"Literal\",\"value\":2} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Power.codec

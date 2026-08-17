@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.LoyaltySpec where
 
 import qualified Data.Either as Either
@@ -17,14 +15,14 @@ spec s = Spec.describe s "Pawl.Codec.Loyalty" $ do
       s
       Loyalty.codec
       (Loyalty.Literal 3)
-      """ {"type":"Literal","value":3} """
+      " {\"type\":\"Literal\",\"value\":3} "
 
   Spec.it s "Variable" $
     Common.assertCodec
       s
       Loyalty.codec
       Loyalty.Variable
-      """ {"type":"Variable"} """
+      " {\"type\":\"Variable\"} "
 
   Spec.it s "has a schema" $
     Common.assertHasSchema s Loyalty.codec
@@ -34,5 +32,5 @@ spec s = Spec.describe s "Pawl.Codec.Loyalty" $ do
   Spec.it s "rejects a negative number" $
     Spec.assertBool
       s
-      (Either.isLeft (Common.parse (Text.pack """ {"type":"Literal","value":-1} """) >>= Codec.decode Loyalty.codec))
+      (Either.isLeft (Common.parse (Text.pack " {\"type\":\"Literal\",\"value\":-1} ") >>= Codec.decode Loyalty.codec))
       "expected a decode failure"

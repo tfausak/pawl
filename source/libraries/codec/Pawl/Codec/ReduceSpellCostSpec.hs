@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ReduceSpellCostSpec where
 
 import qualified Pawl.Codec.ReduceSpellCost as ReduceSpellCost
@@ -23,5 +21,5 @@ spec s = Spec.describe s "Pawl.Codec.ReduceSpellCost" $ do
             ReduceSpellCost.reduction = ManaCost.MkManaCost [ManaSymbol.Generic 1]
           }
       )
-      """ {"whichSpells":{"type":"HasColor","value":{"type":"Blue"}},"reduction":[{"type":"Generic","value":1}]} """
+      " {\"whichSpells\":{\"type\":\"HasColor\",\"value\":{\"type\":\"Blue\"}},\"reduction\":[{\"type\":\"Generic\",\"value\":1}]} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ReduceSpellCost.codec

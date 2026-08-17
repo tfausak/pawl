@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.InZoneSpec where
 
 import qualified Pawl.Codec.InZone as InZone
@@ -17,5 +15,5 @@ spec s = Spec.describe s "Pawl.Codec.InZone" $ do
       s
       InZone.codec
       (InZone.MkInZone {InZone.zone = Zone.Battlefield, InZone.player = PlayerRef.EachPlayer})
-      """ {"zone":{"type":"Battlefield"},"player":{"type":"EachPlayer"}} """
+      " {\"zone\":{\"type\":\"Battlefield\"},\"player\":{\"type\":\"EachPlayer\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s InZone.codec

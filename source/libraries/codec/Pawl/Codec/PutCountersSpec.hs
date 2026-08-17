@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.PutCountersSpec where
 
 import qualified Data.Text as Text
@@ -26,5 +24,5 @@ spec s = Spec.describe s "Pawl.Codec.PutCounters" $ do
             PutCounters.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))
           }
       )
-      """ {"kind":{"type":"PlusOnePlusOne"},"quantity":{"type":"Literal","value":1},"ref":{"type":"InSlot","value":"target"}} """
+      " {\"kind\":{\"type\":\"PlusOnePlusOne\"},\"quantity\":{\"type\":\"Literal\",\"value\":1},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s PutCounters.codec

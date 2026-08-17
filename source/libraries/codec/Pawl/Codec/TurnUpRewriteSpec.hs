@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.TurnUpRewriteSpec where
 
 import qualified Pawl.Codec.TurnUpRewrite as TurnUpRewrite
@@ -18,12 +16,12 @@ spec s = Spec.describe s "Pawl.Codec.TurnUpRewrite" $ do
       s
       TurnUpRewrite.codec
       (TurnUpRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne 1))
-      """ {"type":"WithCounters","value":{"kind":{"type":"PlusOnePlusOne"},"amount":1}} """
+      " {\"type\":\"WithCounters\",\"value\":{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"amount\":1}} "
   Spec.it s "MayAttachTo (Gift of Doom, CR 303.4k)" $
     Common.assertCodec
       s
       TurnUpRewrite.codec
       (TurnUpRewrite.MayAttachTo (Filter.HasCardType CardType.Creature))
-      """ {"type":"MayAttachTo","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
+      " {\"type\":\"MayAttachTo\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s TurnUpRewrite.codec

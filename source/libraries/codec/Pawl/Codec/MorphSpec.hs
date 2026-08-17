@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.MorphSpec where
 
 import qualified Pawl.Codec.Keyword as Keyword
@@ -31,5 +29,5 @@ spec s = Spec.describe s "Pawl.Codec.Morph" $ do
             Morph.variant = MorphVariant.Mega
           }
       )
-      """ {"cost":{"mana":[{"type":"Generic","value":3}]},"variant":{"type":"Mega"}} """
+      " {\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]},\"variant\":{\"type\":\"Mega\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.DamageEventSpec where
 
 import qualified Pawl.Codec.DamageEvent as DamageEvent
@@ -32,7 +30,7 @@ spec s = Spec.describe s "Pawl.Codec.DamageEvent" $ do
           DamageEvent.dealtByLifelink = Nothing,
           DamageEvent.kind = DamageKind.Combat
         }
-      """ {"source":1,"target":{"type":"ToPlayer","value":2},"amount":3,"dealtByDeathtouch":true,"dealtByWither":true,"dealtByToxic":2,"kind":{"type":"Combat"}} """
+      " {\"source\":1,\"target\":{\"type\":\"ToPlayer\",\"value\":2},\"amount\":3,\"dealtByDeathtouch\":true,\"dealtByWither\":true,\"dealtByToxic\":2,\"kind\":{\"type\":\"Combat\"}} "
   -- CR 120.3c's recipient tag and CR 608's noncombat damage are each the other
   -- arm of their type. CR 702.15b's lifelink payee is a concrete PlayerId.
   Spec.it s "MkDamageEvent, dealt to a planeswalker, with lifelink" $
@@ -50,7 +48,7 @@ spec s = Spec.describe s "Pawl.Codec.DamageEvent" $ do
           DamageEvent.dealtByLifelink = Just (PlayerId.MkPlayerId 2),
           DamageEvent.kind = DamageKind.Noncombat
         }
-      """ {"source":1,"target":{"type":"ToPlaneswalker","value":5},"amount":4,"dealtByInfect":true,"dealtByLifelink":2,"kind":{"type":"Noncombat"}} """
+      " {\"source\":1,\"target\":{\"type\":\"ToPlaneswalker\",\"value\":5},\"amount\":4,\"dealtByInfect\":true,\"dealtByLifelink\":2,\"kind\":{\"type\":\"Noncombat\"}} "
   -- Every dealtBy* rider at its default, which is what an event carrying none
   -- of them means.
   Spec.it s "an all-default value omits every optional key" $
@@ -68,4 +66,4 @@ spec s = Spec.describe s "Pawl.Codec.DamageEvent" $ do
           DamageEvent.dealtByLifelink = Nothing,
           DamageEvent.kind = DamageKind.Combat
         }
-      """ {"source":1,"target":{"type":"ToPlayer","value":2},"amount":3,"kind":{"type":"Combat"}} """
+      " {\"source\":1,\"target\":{\"type\":\"ToPlayer\",\"value\":2},\"amount\":3,\"kind\":{\"type\":\"Combat\"}} "

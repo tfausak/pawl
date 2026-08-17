@@ -952,7 +952,10 @@ data Effect card
   | -- | CR 502.3 / 611.2: the permanents the ObjectRef names don't untap during
     -- their controller's NEXT untap step. Elvish Hunter's "{1}{G}, {T}: Target
     -- creature doesn't untap during its controller's next untap step" is the
-    -- pool's printing; CR 701.43a's exert is the same sentence said of oneself.
+    -- pool's printing. CR 701.43a's exert is the neighbouring sentence and NOT
+    -- this opcode: it names the exerting player's own next untap step rather than
+    -- the victim's controller's, so it rides Object.exertedBy and is paid as a
+    -- cost (Pawl.Engine.Combat.declareAttackers) rather than resolved.
     --
     -- NOT Tap above and not a rider on it. The two clauses are printed together
     -- most of the time ("tap target creature. That creature doesn't untap ...")

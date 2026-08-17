@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.RequireBlockSpec where
 
 import qualified Data.Text as Text
@@ -26,5 +24,5 @@ spec s = Spec.describe s "Pawl.Codec.RequireBlock" $ do
             RequireBlock.attacker = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "attacker"))
           }
       )
-      """ {"duration":{"type":"UntilEndOfTurn"},"blocker":{"type":"InSlot","value":"blocker"},"attacker":{"type":"InSlot","value":"attacker"}} """
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"blocker\":{\"type\":\"InSlot\",\"value\":\"blocker\"},\"attacker\":{\"type\":\"InSlot\",\"value\":\"attacker\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s RequireBlock.codec

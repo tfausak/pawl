@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.SacrificeSpec where
 
 import qualified Pawl.Codec.Keyword as Keyword
@@ -29,5 +27,5 @@ spec s = Spec.describe s "Pawl.Codec.Sacrifice" $ do
             Sacrifice.whichPermanents = Filter.HasSubtype Subtype.Mountain
           }
       )
-      """ {"count":2,"whichPermanents":{"type":"HasSubtype","value":{"type":"Mountain"}}} """
+      " {\"count\":2,\"whichPermanents\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Mountain\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

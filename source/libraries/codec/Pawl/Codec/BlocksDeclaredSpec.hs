@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.BlocksDeclaredSpec where
 
 import qualified Pawl.Codec.BlocksDeclared as BlocksDeclared
@@ -16,5 +14,5 @@ spec s = Spec.describe s "Pawl.Codec.BlocksDeclared" $ do
       s
       BlocksDeclared.codec
       (BlocksDeclared.MkBlocksDeclared {BlocksDeclared.blocker = ObjectId.MkObjectId 1, BlocksDeclared.count = 2})
-      """ {"blocker":1,"count":2} """
+      " {\"blocker\":1,\"count\":2} "
   Spec.it s "has a schema" $ Common.assertHasSchema s BlocksDeclared.codec

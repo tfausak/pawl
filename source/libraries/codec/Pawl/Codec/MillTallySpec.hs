@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.MillTallySpec where
 
 import qualified Data.Text as Text
@@ -22,5 +20,5 @@ spec s = Spec.describe s "Pawl.Codec.MillTally" $ do
         { MillTally.slot = SlotName.MkSlotName (Text.pack "milled"),
           MillTally.filter = Filter.Not (Filter.HasCardType CardType.Land)
         }
-      """ {"slot":"milled","filter":{"type":"Not","value":{"type":"HasCardType","value":{"type":"Land"}}}} """
+      " {\"slot\":\"milled\",\"filter\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s MillTally.codec

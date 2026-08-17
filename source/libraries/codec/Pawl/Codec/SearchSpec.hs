@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.SearchSpec where
 
 import qualified Data.Text as Text
@@ -34,7 +32,7 @@ spec s = Spec.describe s "Pawl.Codec.Search" $ do
             Search.destination = SearchDestination.BattlefieldTapped
           }
       )
-      """ {"searcher":{"type":"Relative","value":{"type":"You"}},"owner":{"type":"InSlot","value":"player"},"quantity":{"type":"Literal","value":1},"filter":{"type":"HasCardType","value":{"type":"Land"}},"upTo":true,"destination":{"type":"BattlefieldTapped"}} """
+      " {\"searcher\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"owner\":{\"type\":\"InSlot\",\"value\":\"player\"},\"quantity\":{\"type\":\"Literal\",\"value\":1},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},\"upTo\":true,\"destination\":{\"type\":\"BattlefieldTapped\"}} "
   -- The other reading of the same count: no "upTo" key means the quantity is a
   -- quota. Paired with the case above so the key's absence is asserted, not just
   -- its presence -- a required key would have made every card file rewrite.
@@ -51,5 +49,5 @@ spec s = Spec.describe s "Pawl.Codec.Search" $ do
             Search.destination = SearchDestination.BattlefieldTapped
           }
       )
-      """ {"searcher":{"type":"Relative","value":{"type":"You"}},"owner":{"type":"Relative","value":{"type":"You"}},"quantity":{"type":"Literal","value":1},"filter":{"type":"HasCardType","value":{"type":"Land"}},"destination":{"type":"BattlefieldTapped"}} """
+      " {\"searcher\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"owner\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"quantity\":{\"type\":\"Literal\",\"value\":1},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},\"destination\":{\"type\":\"BattlefieldTapped\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Search.codec

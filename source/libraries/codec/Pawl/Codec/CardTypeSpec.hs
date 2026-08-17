@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.CardTypeSpec where
 
 import qualified Pawl.Codec.CardType as CardType
@@ -14,105 +12,105 @@ spec s = Spec.describe s "Pawl.Codec.CardType" $ do
       s
       CardType.codec
       CardType.Artifact
-      """ {"type":"Artifact"} """
+      " {\"type\":\"Artifact\"} "
 
   Spec.it s "Battle" $ do
     Common.assertCodec
       s
       CardType.codec
       CardType.Battle
-      """ {"type":"Battle"} """
+      " {\"type\":\"Battle\"} "
 
   Spec.it s "Conspiracy" $ do
     Common.assertCodec
       s
       CardType.codec
       CardType.Conspiracy
-      """ {"type":"Conspiracy"} """
+      " {\"type\":\"Conspiracy\"} "
 
   Spec.it s "Creature" $ do
     Common.assertCodec
       s
       CardType.codec
       CardType.Creature
-      """ {"type":"Creature"} """
+      " {\"type\":\"Creature\"} "
 
   Spec.it s "Dungeon" $ do
     Common.assertCodec
       s
       CardType.codec
       CardType.Dungeon
-      """ {"type":"Dungeon"} """
+      " {\"type\":\"Dungeon\"} "
 
   Spec.it s "Enchantment" $ do
     Common.assertCodec
       s
       CardType.codec
       CardType.Enchantment
-      """ {"type":"Enchantment"} """
+      " {\"type\":\"Enchantment\"} "
 
   Spec.it s "Instant" $ do
     Common.assertCodec
       s
       CardType.codec
       CardType.Instant
-      """ {"type":"Instant"} """
+      " {\"type\":\"Instant\"} "
 
   Spec.it s "Kindred" $ do
     Common.assertCodec
       s
       CardType.codec
       CardType.Kindred
-      """ {"type":"Kindred"} """
+      " {\"type\":\"Kindred\"} "
 
   Spec.it s "Land" $ do
     Common.assertCodec
       s
       CardType.codec
       CardType.Land
-      """ {"type":"Land"} """
+      " {\"type\":\"Land\"} "
 
   Spec.it s "Phenomenon" $ do
     Common.assertCodec
       s
       CardType.codec
       CardType.Phenomenon
-      """ {"type":"Phenomenon"} """
+      " {\"type\":\"Phenomenon\"} "
 
   Spec.it s "Plane" $ do
     Common.assertCodec
       s
       CardType.codec
       CardType.Plane
-      """ {"type":"Plane"} """
+      " {\"type\":\"Plane\"} "
 
   Spec.it s "Planeswalker" $ do
     Common.assertCodec
       s
       CardType.codec
       CardType.Planeswalker
-      """ {"type":"Planeswalker"} """
+      " {\"type\":\"Planeswalker\"} "
 
   Spec.it s "Scheme" $ do
     Common.assertCodec
       s
       CardType.codec
       CardType.Scheme
-      """ {"type":"Scheme"} """
+      " {\"type\":\"Scheme\"} "
 
   Spec.it s "Sorcery" $ do
     Common.assertCodec
       s
       CardType.codec
       CardType.Sorcery
-      """ {"type":"Sorcery"} """
+      " {\"type\":\"Sorcery\"} "
 
   Spec.it s "Vanguard" $ do
     Common.assertCodec
       s
       CardType.codec
       CardType.Vanguard
-      """ {"type":"Vanguard"} """
+      " {\"type\":\"Vanguard\"} "
 
   -- Exhaustive where the literals above are representative: Arm.enum derives
   -- the arm list from the type, so this is what would catch a constructor the

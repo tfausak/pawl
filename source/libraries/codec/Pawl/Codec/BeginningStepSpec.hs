@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.BeginningStepSpec where
 
 import qualified Pawl.Codec.BeginningStep as BeginningStep
@@ -14,19 +12,19 @@ spec s = Spec.describe s "Pawl.Codec.BeginningStep" $ do
       s
       BeginningStep.codec
       BeginningStep.Untap
-      """ {"type":"Untap"} """
+      " {\"type\":\"Untap\"} "
   Spec.it s "Upkeep" $
     Common.assertCodec
       s
       BeginningStep.codec
       BeginningStep.Upkeep
-      """ {"type":"Upkeep"} """
+      " {\"type\":\"Upkeep\"} "
   Spec.it s "DrawStep" $
     Common.assertCodec
       s
       BeginningStep.codec
       BeginningStep.DrawStep
-      """ {"type":"DrawStep"} """
+      " {\"type\":\"DrawStep\"} "
   -- Exhaustive where the literals above are representative: Arm.enum derives
   -- the arm list from the type, so this is what would catch a constructor the
   -- derivation missed or two that encode alike.

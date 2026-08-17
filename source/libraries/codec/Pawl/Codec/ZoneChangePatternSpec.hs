@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ZoneChangePatternSpec where
 
 import qualified Pawl.Codec.ZoneChangePattern as ZoneChangePattern
@@ -25,7 +23,7 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangePattern" $ do
           ZoneChangePattern.whatObject = Filter.And [],
           ZoneChangePattern.whoseObject = ControllerRelation.Anyones
         }
-      """ {"whenDestination":{"type":"Graveyard"}} """
+      " {\"whenDestination\":{\"type\":\"Graveyard\"}} "
   -- CR 614.1a: Anafenza, the Foremost's "a nontoken creature an opponent owns
   -- would die". The characteristic filter is what distinguishes this from the
   -- shape above, so it has to survive the wire.
@@ -38,5 +36,5 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangePattern" $ do
           ZoneChangePattern.whatObject = Filter.And [Filter.HasCardType CardType.Creature, Filter.Not Filter.IsToken],
           ZoneChangePattern.whoseObject = ControllerRelation.Opponents
         }
-      """ {"whatObject":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Creature"}},{"type":"Not","value":{"type":"IsToken"}}]},"whenDestination":{"type":"Graveyard"},"whoseObject":{"type":"Opponents"}} """
+      " {\"whatObject\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"Not\",\"value\":{\"type\":\"IsToken\"}}]},\"whenDestination\":{\"type\":\"Graveyard\"},\"whoseObject\":{\"type\":\"Opponents\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ZoneChangePattern.codec

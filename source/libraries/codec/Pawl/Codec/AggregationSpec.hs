@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.AggregationSpec where
 
 import qualified Pawl.Codec.Aggregation as Aggregation
@@ -17,17 +15,17 @@ spec s = Spec.describe s "Pawl.Codec.Aggregation" $ do
       s
       (Aggregation.codec Common.integer)
       Aggregation.Members
-      """ {"type":"Members"} """
+      " {\"type\":\"Members\"} "
   Spec.it s "DistinctCardTypes" $
     Common.assertCodec
       s
       (Aggregation.codec Common.integer)
       Aggregation.DistinctCardTypes
-      """ {"type":"DistinctCardTypes"} """
+      " {\"type\":\"DistinctCardTypes\"} "
   Spec.it s "Greatest" $
     Common.assertCodec
       s
       (Aggregation.codec Common.integer)
       (Aggregation.Greatest 3)
-      """ {"type":"Greatest","value":3} """
+      " {\"type\":\"Greatest\",\"value\":3} "
   Spec.it s "has a schema" $ Common.assertHasSchema s (Aggregation.codec Common.integer)

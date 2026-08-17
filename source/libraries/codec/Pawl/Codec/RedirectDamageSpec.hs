@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.RedirectDamageSpec where
 
 import qualified Data.Text as Text
@@ -28,7 +26,7 @@ spec s = Spec.describe s "Pawl.Codec.RedirectDamage" $ do
             RedirectDamage.to = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "attacker"))
           }
       )
-      """ {"duration":{"type":"UntilEndOfTurn"},"kind":{"type":"Combat"},"from":{"type":"InSlot","value":"you"},"to":{"type":"InSlot","value":"attacker"}} """
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"kind\":{\"type\":\"Combat\"},\"from\":{\"type\":\"InSlot\",\"value\":\"you\"},\"to\":{\"type\":\"InSlot\",\"value\":\"attacker\"}} "
   -- A redirect naming no kind, which is the elided case.
   Spec.it s "MkRedirectDamage, kind elided" $
     Common.assertCodec
@@ -41,5 +39,5 @@ spec s = Spec.describe s "Pawl.Codec.RedirectDamage" $ do
             RedirectDamage.to = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "attacker"))
           }
       )
-      """ {"duration":{"type":"UntilEndOfTurn"},"from":{"type":"InSlot","value":"you"},"to":{"type":"InSlot","value":"attacker"}} """
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"from\":{\"type\":\"InSlot\",\"value\":\"you\"},\"to\":{\"type\":\"InSlot\",\"value\":\"attacker\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s RedirectDamage.codec

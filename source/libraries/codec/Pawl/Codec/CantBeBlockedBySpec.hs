@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.CantBeBlockedBySpec where
 
 import qualified Pawl.Codec.CantBeBlockedBy as CantBeBlockedBy
@@ -25,5 +23,5 @@ spec s = Spec.describe s "Pawl.Codec.CantBeBlockedBy" $ do
             CantBeBlockedBy.unless = Nothing
           }
       )
-      """ {"affected":{"type":"Matching","value":{"type":"HasCardType","value":{"type":"Creature"}}},"blockers":{"type":"PowerGreaterThanSource"}} """
+      " {\"affected\":{\"type\":\"Matching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"blockers\":{\"type\":\"PowerGreaterThanSource\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s CantBeBlockedBy.codec

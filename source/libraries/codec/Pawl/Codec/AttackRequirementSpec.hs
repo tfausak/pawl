@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.AttackRequirementSpec where
 
 import qualified Pawl.Codec.AttackRequirement as AttackRequirement
@@ -20,5 +18,5 @@ spec s = Spec.describe s "Pawl.Codec.AttackRequirement" $ do
       s
       AttackRequirement.codec
       (AttackRequirement.MkAttackRequirement (Affected.AttachedPlayerControls (Filter.HasCardType CardType.Creature)))
-      """ {"subject":{"type":"AttachedPlayerControls","value":{"type":"HasCardType","value":{"type":"Creature"}}}} """
+      " {\"subject\":{\"type\":\"AttachedPlayerControls\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s AttackRequirement.codec

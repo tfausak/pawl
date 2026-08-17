@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ScopeSpec where
 
 import qualified Pawl.Codec.Scope as Scope
@@ -20,19 +18,19 @@ spec s = Spec.describe s "Pawl.Codec.Scope" $ do
       s
       Scope.codec
       (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
-      """ {"type":"InZone","value":{"zone":{"type":"Battlefield"},"player":{"type":"EachPlayer"}}} """
+      " {\"type\":\"InZone\",\"value\":{\"zone\":{\"type\":\"Battlefield\"},\"player\":{\"type\":\"EachPlayer\"}}} "
   -- CR 608.2i's look-back-in-time domain.
   Spec.it s "InHistory" $
     Common.assertCodec
       s
       Scope.codec
       (Scope.InHistory (EventShape.MovedBetween (MovedBetween.MkMovedBetween Zone.Battlefield Zone.Graveyard)))
-      """ {"type":"InHistory","value":{"type":"MovedBetween","value":{"from":{"type":"Battlefield"},"to":{"type":"Graveyard"}}}} """
+      " {\"type\":\"InHistory\",\"value\":{\"type\":\"MovedBetween\",\"value\":{\"from\":{\"type\":\"Battlefield\"},\"to\":{\"type\":\"Graveyard\"}}}} "
   -- CR 102.1's domain: the players a reference names, rather than their zones.
   Spec.it s "OverPlayers" $
     Common.assertCodec
       s
       Scope.codec
       (Scope.OverPlayers (PlayerRef.Relative PlayerRelation.Opponent))
-      """ {"type":"OverPlayers","value":{"type":"Relative","value":{"type":"Opponent"}}} """
+      " {\"type\":\"OverPlayers\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"Opponent\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Scope.codec

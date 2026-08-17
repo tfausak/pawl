@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.PermanentSacrificedSpec where
 
 import qualified Pawl.Codec.PermanentSacrificed as PermanentSacrificed
@@ -21,5 +19,5 @@ spec s = Spec.describe s "Pawl.Codec.PermanentSacrificed" $ do
             PermanentSacrificed.permanent = ObjectId.MkObjectId 1
           }
       )
-      """ {"player":0,"permanent":1} """
+      " {\"player\":0,\"permanent\":1} "
   Spec.it s "has a schema" $ Common.assertHasSchema s PermanentSacrificed.codec

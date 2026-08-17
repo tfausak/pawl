@@ -838,9 +838,7 @@ castInvasionThreeSeated s registry answer = do
 
 named :: (Monad m) => Spec.Spec m n -> GameState.GameState -> m (GameState.GameState, ObjectId.ObjectId)
 named s gs = case battleOf gs of
-  Nothing -> do
-    Spec.assertFailure s "Invasion of Dominaria did not reach the battlefield"
-    pure (gs, ObjectId.MkObjectId 0)
+  Nothing -> Spec.assertFailure s "Invasion of Dominaria did not reach the battlefield"
   Just oid -> pure (gs, oid)
 
 -- The battlefield's one battle, by the card type rule 310 keys on.

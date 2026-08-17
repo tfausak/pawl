@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.IncreaseSpellCostSpec where
 
 import qualified Pawl.Codec.IncreaseSpellCost as IncreaseSpellCost
@@ -21,5 +19,5 @@ spec s = Spec.describe s "Pawl.Codec.IncreaseSpellCost" $ do
             IncreaseSpellCost.amount = 1
           }
       )
-      """ {"whichSpells":{"type":"Not","value":{"type":"HasCardType","value":{"type":"Creature"}}},"amount":1} """
+      " {\"whichSpells\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"amount\":1} "
   Spec.it s "has a schema" $ Common.assertHasSchema s IncreaseSpellCost.codec

@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.CardSpec where
 
 import qualified Data.Either as Either
@@ -96,7 +94,7 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
       s
       Card.codec
       mountainCard
-      """ {"faces":[{"name":"Mountain","typeLine":{"supertypes":[{"type":"Basic"}],"types":[{"type":"Land"}],"subtypes":[{"type":"Mountain"}]}}]} """
+      " {\"faces\":[{\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]}}]} "
   Spec.it s "a card with two faces round-trips, and layout is omitted when Normal" $ do
     let face n =
           (bareFace (CardName.MkCardName (Text.pack n)))
@@ -114,14 +112,14 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
       s
       Card.codec
       card
-      """ {"faces":[{"name":"Wax","typeLine":{"types":[{"type":"Instant"}]}},{"name":"Wane","typeLine":{"types":[{"type":"Instant"}]}}]} """
+      " {\"faces\":[{\"name\":\"Wax\",\"typeLine\":{\"types\":[{\"type\":\"Instant\"}]}},{\"name\":\"Wane\",\"typeLine\":{\"types\":[{\"type\":\"Instant\"}]}}]} "
   -- Omission is permitted on input, never required: a file that spells the
   -- default out must still load.
   Spec.it s "a card that spells its layout out still decodes" $
     Common.assertFromJson
       s
       (Codec.decode Card.codec)
-      """ {"faces":[{"name":"Mountain","typeLine":{"supertypes":[{"type":"Basic"}],"types":[{"type":"Land"}],"subtypes":[{"type":"Mountain"}]}}],"layout":{"type":"Normal"}} """
+      " {\"faces\":[{\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]}}],\"layout\":{\"type\":\"Normal\"}} "
       mountainCard
   -- Where the at-least-one-face invariant is enforced: Card.faces is a NonEmpty
   -- so that Pawl.Engine.Card.combined can be total, and Common.decodeNonEmpty is
@@ -129,5 +127,5 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
   Spec.it s "a card with no faces is rejected rather than decoded" $
     Spec.assertBool
       s
-      (Either.isLeft (Common.parse (Text.pack """ {"faces":[]} """) >>= Codec.decode Card.codec))
+      (Either.isLeft (Common.parse (Text.pack " {\"faces\":[]} ") >>= Codec.decode Card.codec))
       "expected an empty faces array to fail to decode"

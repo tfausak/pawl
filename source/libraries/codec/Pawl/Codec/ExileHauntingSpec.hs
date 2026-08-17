@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ExileHauntingSpec where
 
 import qualified Data.Text as Text
@@ -23,5 +21,5 @@ spec s = Spec.describe s "Pawl.Codec.ExileHaunting" $ do
             ExileHaunting.host = SlotName.MkSlotName (Text.pack "haunted")
           }
       )
-      """ {"card":"haunter","host":"haunted"} """
+      " {\"card\":\"haunter\",\"host\":\"haunted\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ExileHaunting.codec

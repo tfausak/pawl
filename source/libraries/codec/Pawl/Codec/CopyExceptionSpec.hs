@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.CopyExceptionSpec where
 
 import qualified Data.Either as Either
@@ -21,19 +19,19 @@ spec s = Spec.describe s "Pawl.Codec.CopyException" $ do
       s
       CopyException.codec
       (CopyException.SetPowerToughness (SetPowerToughness.MkSetPowerToughness 7 7))
-      """ {"type":"SetPowerToughness","value":{"power":7,"toughness":7}} """
+      " {\"type\":\"SetPowerToughness\",\"value\":{\"power\":7,\"toughness\":7}} "
 
   Spec.it s "SetPowerToughness writes power before toughness" $
     Common.assertCodec
       s
       CopyException.codec
       (CopyException.SetPowerToughness (SetPowerToughness.MkSetPowerToughness 4 5))
-      """ {"type":"SetPowerToughness","value":{"power":4,"toughness":5}} """
+      " {\"type\":\"SetPowerToughness\",\"value\":{\"power\":4,\"toughness\":5}} "
 
   Spec.it s "rejects a payload of the wrong length" $
     Spec.assertBool
       s
-      (Either.isLeft (Common.parse (Text.pack """ {"type":"SetPowerToughness","value":[4]} """) >>= Codec.decode CopyException.codec))
+      (Either.isLeft (Common.parse (Text.pack " {\"type\":\"SetPowerToughness\",\"value\":[4]} ") >>= Codec.decode CopyException.codec))
       "expected a decode failure"
 
   Spec.it s "has a schema" $

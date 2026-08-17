@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.TargetSlotSpec where
 
 import qualified Data.Map.Strict as Map
@@ -27,26 +25,26 @@ spec s = Spec.describe s "Pawl.Codec.TargetSlot" $ do
       s
       TargetSlot.codec
       (TargetSlot.required Pool.Creatures Nothing)
-      """ {"pool":{"type":"Creatures"}} """
+      " {\"pool\":{\"type\":\"Creatures\"}} "
   Spec.it s "a required spec: filtered pool" $
     Common.assertCodec
       s
       TargetSlot.codec
       (TargetSlot.required Pool.Permanents (Just (Filter.HasCardType CardType.Artifact)))
-      """ {"pool":{"type":"Permanents"},"filter":{"type":"HasCardType","value":{"type":"Artifact"}}} """
+      " {\"pool\":{\"type\":\"Permanents\"},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}}} "
   Spec.it s "a required spec: \"another\" (Not IsSource)" $
     Common.assertCodec
       s
       TargetSlot.codec
       (TargetSlot.required Pool.Permanents (Just (Filter.And [Filter.Not (Filter.HasCardType CardType.Land), Filter.Not Filter.IsSource])))
-      """ {"pool":{"type":"Permanents"},"filter":{"type":"And","value":[{"type":"Not","value":{"type":"HasCardType","value":{"type":"Land"}}},{"type":"Not","value":{"type":"IsSource"}}]}} """
+      " {\"pool\":{\"type\":\"Permanents\"},\"filter\":{\"type\":\"And\",\"value\":[{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}},{\"type\":\"Not\",\"value\":{\"type\":\"IsSource\"}}]}} "
   -- CR 115.2 clause (a): a target slot over a graveyard, tagged with WHOSE.
   Spec.it s "a required spec: over a graveyard" $
     Common.assertCodec
       s
       TargetSlot.codec
       (TargetSlot.required (Pool.CardsInGraveyard (GraveyardScope.Scoped PlayerScope.You)) (Just (Filter.HasCardType CardType.Creature)))
-      """ {"pool":{"type":"CardsInGraveyard","value":{"type":"Scoped","value":{"type":"You"}}},"filter":{"type":"HasCardType","value":{"type":"Creature"}}} """
+      " {\"pool\":{\"type\":\"CardsInGraveyard\",\"value\":{\"type\":\"Scoped\",\"value\":{\"type\":\"You\"}}},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   -- CR 115.2 clause (a)'s other zone: no PlayerScope (CR 400.1's shared zone)
   -- and no Filter.
   Spec.it s "a required spec: over exile, scopeless and unfiltered" $
@@ -54,7 +52,7 @@ spec s = Spec.describe s "Pawl.Codec.TargetSlot" $ do
       s
       TargetSlot.codec
       (TargetSlot.required Pool.CardsInExile Nothing)
-      """ {"pool":{"type":"CardsInExile"}} """
+      " {\"pool\":{\"type\":\"CardsInExile\"}} "
   -- CR 115.6's "up to one target", and CR 601.2c's larger count: the two cases
   -- that spend the count key.
   Spec.it s "an up-to-one spec" $
@@ -62,13 +60,13 @@ spec s = Spec.describe s "Pawl.Codec.TargetSlot" $ do
       s
       TargetSlot.codec
       (TargetSlot.upTo 1 Pool.Creatures Nothing)
-      """ {"pool":{"type":"Creatures"},"count":{"least":0,"most":1}} """
+      " {\"pool\":{\"type\":\"Creatures\"},\"count\":{\"least\":0,\"most\":1}} "
   Spec.it s "an up-to-two spec" $
     Common.assertCodec
       s
       TargetSlot.codec
       (TargetSlot.upTo 2 Pool.Creatures Nothing)
-      """ {"pool":{"type":"Creatures"},"count":{"least":0,"most":2}} """
+      " {\"pool\":{\"type\":\"Creatures\"},\"count\":{\"least\":0,\"most\":2}} "
   -- The slot-keyed map is a JSON OBJECT keyed by the slot name (#1303). The two
   -- entries are inserted in DESCENDING slot-name order, so a trip that emitted
   -- the map's incidental traversal order rather than Map.toAscList fails this
@@ -83,6 +81,6 @@ spec s = Spec.describe s "Pawl.Codec.TargetSlot" $ do
             (SlotName.MkSlotName (Text.pack "a-slot"), TargetSlot.required Pool.Creatures Nothing)
           ]
       )
-      """ {"a-slot":{"pool":{"type":"Creatures"}},"z-slot":{"pool":{"type":"Players"}}} """
+      " {\"a-slot\":{\"pool\":{\"type\":\"Creatures\"}},\"z-slot\":{\"pool\":{\"type\":\"Players\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s TargetSlot.codec
   Spec.it s "the map has a schema" $ Common.assertHasSchema s TargetSlot.codecMap

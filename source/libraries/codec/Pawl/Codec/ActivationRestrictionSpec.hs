@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ActivationRestrictionSpec where
 
 import qualified Pawl.Codec.ActivationRestriction as ActivationRestriction
@@ -20,7 +18,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivationRestriction" $ do
       s
       ActivationRestriction.codec
       ActivationRestriction.SorcerySpeed
-      """ {"type":"SorcerySpeed"} """
+      " {\"type\":\"SorcerySpeed\"} "
   -- A stepped window (CR 511.1) beside a phase one (CR 500.1):
   -- Pawl.Types.PhaseSelector spans both, so the arm has to carry both.
   Spec.it s "DuringPhase, Desert's end-of-combat rider" $
@@ -33,7 +31,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivationRestriction" $ do
               DuringPhase.scope = TurnScope.EachTurn
             }
       )
-      """ {"type":"DuringPhase","value":{"window":{"type":"Step","value":{"type":"Combat","value":{"type":"EndOfCombat"}}},"scope":{"type":"EachTurn"}}} """
+      " {\"type\":\"DuringPhase\",\"value\":{\"window\":{\"type\":\"Step\",\"value\":{\"type\":\"Combat\",\"value\":{\"type\":\"EndOfCombat\"}}},\"scope\":{\"type\":\"EachTurn\"}}} "
   -- The arm's second axis: the SAME window under each scope, so a codec that
   -- dropped the scope would collapse this and the previous case into one.
   Spec.it s "DuringPhase, Llanowar Augur's controller's-turn upkeep" $
@@ -46,7 +44,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivationRestriction" $ do
               DuringPhase.scope = TurnScope.ControllersTurn
             }
       )
-      """ {"type":"DuringPhase","value":{"window":{"type":"Step","value":{"type":"Beginning","value":{"type":"Upkeep"}}},"scope":{"type":"ControllersTurn"}}} """
+      " {\"type\":\"DuringPhase\",\"value\":{\"window\":{\"type\":\"Step\",\"value\":{\"type\":\"Beginning\",\"value\":{\"type\":\"Upkeep\"}}},\"scope\":{\"type\":\"ControllersTurn\"}}} "
   -- The PhaseSelector's stepless arm, with one printed producer in the pool
   -- (#520).
   Spec.it s "DuringPhase, Jade Statue's combat-phase rider" $
@@ -59,7 +57,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivationRestriction" $ do
               DuringPhase.scope = TurnScope.EachTurn
             }
       )
-      """ {"type":"DuringPhase","value":{"window":{"type":"CombatPhase"},"scope":{"type":"EachTurn"}}} """
+      " {\"type\":\"DuringPhase\",\"value\":{\"window\":{\"type\":\"CombatPhase\"},\"scope\":{\"type\":\"EachTurn\"}}} "
   -- CR 602.5's second clause, and the arm that made this type a list: Kongming's
   -- Contraptions prints it beside the DuringPhase above.
   Spec.it s "AttackedThisStep" $
@@ -67,7 +65,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivationRestriction" $ do
       s
       ActivationRestriction.codec
       ActivationRestriction.AttackedThisStep
-      """ {"type":"AttackedThisStep"} """
+      " {\"type\":\"AttackedThisStep\"} "
   -- Trap Runner's "activate only during combat after blockers are declared"
   -- (CR 506.7b through CR 506.7g).
   Spec.it s "AfterBlockersDeclared" $
@@ -75,5 +73,5 @@ spec s = Spec.describe s "Pawl.Codec.ActivationRestriction" $ do
       s
       ActivationRestriction.codec
       ActivationRestriction.AfterBlockersDeclared
-      """ {"type":"AfterBlockersDeclared"} """
+      " {\"type\":\"AfterBlockersDeclared\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ActivationRestriction.codec

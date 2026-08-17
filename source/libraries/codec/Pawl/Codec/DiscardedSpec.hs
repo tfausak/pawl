@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.DiscardedSpec where
 
 import qualified Pawl.Codec.Discarded as Discarded
@@ -24,5 +22,5 @@ spec s = Spec.describe s "Pawl.Codec.Discarded" $ do
             Discarded.cause = DiscardCause.ToPayCyclingCost
           }
       )
-      """ {"player":0,"card":7,"cause":{"type":"ToPayCyclingCost"}} """
+      " {\"player\":0,\"card\":7,\"cause\":{\"type\":\"ToPayCyclingCost\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Discarded.codec

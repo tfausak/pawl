@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.EntryOptionSpec where
 
 import qualified Data.Set as Set
@@ -19,12 +17,12 @@ spec s = Spec.describe s "Pawl.Codec.EntryOption" $ do
       s
       EntryOption.codec
       (EntryOption.MkEntryOption {EntryOption.power = 3, EntryOption.toughness = 3, EntryOption.keywords = Set.empty})
-      """ {"power":3,"toughness":3} """
+      " {\"power\":3,\"toughness\":3} "
   Spec.it s "MkEntryOption round-trips with its keyword set" $
     Common.assertCodec
       s
       EntryOption.codec
       (EntryOption.MkEntryOption {EntryOption.power = 1, EntryOption.toughness = 6, EntryOption.keywords = Set.singleton Keyword.Defender})
-      """ {"power":1,"toughness":6,"keywords":[{"type":"Defender"}]} """
+      " {\"power\":1,\"toughness\":6,\"keywords\":[{\"type\":\"Defender\"}]} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s EntryOption.codec

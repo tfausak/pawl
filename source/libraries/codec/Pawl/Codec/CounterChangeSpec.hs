@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.CounterChangeSpec where
 
 import qualified Pawl.Codec.CounterChange as CounterChange
@@ -26,5 +24,5 @@ spec s = Spec.describe s "Pawl.Codec.CounterChange" $ do
             CounterChange.after = 3
           }
       )
-      """ {"object":1,"kind":{"type":"Lore"},"before":1,"after":3} """
+      " {\"object\":1,\"kind\":{\"type\":\"Lore\"},\"before\":1,\"after\":3} "
   Spec.it s "has a schema" $ Common.assertHasSchema s CounterChange.codec

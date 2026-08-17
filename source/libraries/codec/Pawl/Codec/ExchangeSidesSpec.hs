@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ExchangeSidesSpec where
 
 import qualified Data.Text as Text
@@ -16,11 +14,11 @@ spec s = Spec.describe s "Pawl.Codec.ExchangeSides" $ do
       s
       ExchangeSides.codec
       (ExchangeSides.WithController (SlotName.MkSlotName (Text.pack "target")))
-      """ {"type":"WithController","value":"target"} """
+      " {\"type\":\"WithController\",\"value\":\"target\"} "
   Spec.it s "BetweenTargets" $
     Common.assertCodec
       s
       ExchangeSides.codec
       (ExchangeSides.BetweenTargets (SlotName.MkSlotName (Text.pack "players")))
-      """ {"type":"BetweenTargets","value":"players"} """
+      " {\"type\":\"BetweenTargets\",\"value\":\"players\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ExchangeSides.codec

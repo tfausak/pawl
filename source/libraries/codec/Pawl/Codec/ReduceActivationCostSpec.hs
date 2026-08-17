@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ReduceActivationCostSpec where
 
 import qualified Pawl.Codec.ReduceActivationCost as ReduceActivationCost
@@ -26,5 +24,5 @@ spec s = Spec.describe s "Pawl.Codec.ReduceActivationCost" $ do
             ReduceActivationCost.floor = 1
           }
       )
-      """ {"whichAbilities":{"type":"HasCardType","value":{"type":"Creature"}},"reduction":[{"type":"Generic","value":1}],"floor":1} """
+      " {\"whichAbilities\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"reduction\":[{\"type\":\"Generic\",\"value\":1}],\"floor\":1} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ReduceActivationCost.codec

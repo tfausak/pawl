@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.EventShapeSpec where
 
 import qualified Pawl.Codec.EventShape as EventShape
@@ -17,7 +15,7 @@ spec s = Spec.describe s "Pawl.Codec.EventShape" $ do
       s
       EventShape.codec
       (EventShape.MovedBetween (MovedBetween.MkMovedBetween Zone.Battlefield Zone.Graveyard))
-      """ {"type":"MovedBetween","value":{"from":{"type":"Battlefield"},"to":{"type":"Graveyard"}}} """
+      " {\"type\":\"MovedBetween\",\"value\":{\"from\":{\"type\":\"Battlefield\"},\"to\":{\"type\":\"Graveyard\"}}} "
   -- CR 601.2i's cast: PAYLOADLESS, so the encoded form is the bare tag and a
   -- decoder that demanded a value would reject every card that names it.
   Spec.it s "SpellCast" $
@@ -25,5 +23,5 @@ spec s = Spec.describe s "Pawl.Codec.EventShape" $ do
       s
       EventShape.codec
       EventShape.SpellCast
-      """ {"type":"SpellCast"} """
+      " {\"type\":\"SpellCast\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s EventShape.codec

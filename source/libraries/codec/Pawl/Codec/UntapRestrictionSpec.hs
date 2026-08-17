@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.UntapRestrictionSpec where
 
 import qualified Pawl.Codec.UntapRestriction as UntapRestriction
@@ -28,5 +26,5 @@ spec s = Spec.describe s "Pawl.Codec.UntapRestriction" $ do
               )
           )
       )
-      """ {"affected":{"type":"Matching","value":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Land"}},{"type":"HasNonManaActivatedAbility"}]}}} """
+      " {\"affected\":{\"type\":\"Matching\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},{\"type\":\"HasNonManaActivatedAbility\"}]}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s UntapRestriction.codec

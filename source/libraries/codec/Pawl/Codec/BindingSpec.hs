@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.BindingSpec where
 
 import qualified Data.Map.Strict as Map
@@ -26,7 +24,7 @@ spec s = Spec.describe s "Pawl.Codec.Binding" $ do
       s
       Binding.codec
       Binding.empty
-      """ {} """
+      " {} "
   -- A codec totality check, not a claim about a reachable game state: no real
   -- slot carries all five fields at once. The stand-in snapshot is needed
   -- because this sublibrary cannot reach the registry or Projection.project.

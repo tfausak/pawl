@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.DamageRewriteSpec where
 
 import qualified Pawl.Codec.DamageRewrite as DamageRewrite
@@ -17,7 +15,7 @@ spec s = Spec.describe s "Pawl.Codec.DamageRewrite" $ do
       s
       DamageRewrite.codec
       DamageRewrite.PreventAll
-      """ {"type":"PreventAll"} """
+      " {\"type\":\"PreventAll\"} "
   -- CR 122.1c's prevention half. Minted from a permanent's shield counters and
   -- never authored on a card, so this codec is the only place its wire form is
   -- pinned.
@@ -26,7 +24,7 @@ spec s = Spec.describe s "Pawl.Codec.DamageRewrite" $ do
       s
       DamageRewrite.codec
       DamageRewrite.PreventRemovingShieldCounter
-      """ {"type":"PreventRemovingShieldCounter"} """
+      " {\"type\":\"PreventRemovingShieldCounter\"} "
   -- CR 615.7's shield, whose Natural is what REMAINS of it. Baked by Resolve's
   -- PreventNextDamage arm and never authored on a card, so this codec is the
   -- only place the wire form is pinned.
@@ -35,21 +33,21 @@ spec s = Spec.describe s "Pawl.Codec.DamageRewrite" $ do
       s
       DamageRewrite.codec
       (DamageRewrite.PreventNext 4)
-      """ {"type":"PreventNext","value":4} """
+      " {\"type\":\"PreventNext\",\"value\":4} "
   -- CR 614.1a: a flat instead-amount.
   Spec.it s "SetAmount" $
     Common.assertCodec
       s
       DamageRewrite.codec
       (DamageRewrite.SetAmount 4)
-      """ {"type":"SetAmount","value":4} """
+      " {\"type\":\"SetAmount\",\"value\":4} "
   -- A doubling, which is Scaling's Multiply 2.
   Spec.it s "Scale" $
     Common.assertCodec
       s
       DamageRewrite.codec
       (DamageRewrite.Scale (Scaling.Multiply 2))
-      """ {"type":"Scale","value":{"type":"Multiply","value":2}} """
+      " {\"type\":\"Scale\",\"value\":{\"type\":\"Multiply\",\"value\":2}} "
   -- CR 614.9's redirection. Baked by Resolve's RedirectDamage arm and never
   -- authored on a card -- card data cannot name an ObjectId -- so this codec is
   -- the replay path's, not a card's.
@@ -58,5 +56,5 @@ spec s = Spec.describe s "Pawl.Codec.DamageRewrite" $ do
       s
       DamageRewrite.codec
       (DamageRewrite.Redirect (Recipient.ToCreature (ObjectId.MkObjectId 7)))
-      """ {"type":"Redirect","value":{"type":"ToCreature","value":7}} """
+      " {\"type\":\"Redirect\",\"value\":{\"type\":\"ToCreature\",\"value\":7}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s DamageRewrite.codec

@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.SpellCastSpec where
 
 import qualified Pawl.Codec.SpellCast as SpellCast
@@ -25,7 +23,7 @@ spec s = Spec.describe s "Pawl.Codec.SpellCast" $ do
             SpellCast.ordinal = Nothing
           }
       )
-      """ {"filter":{"type":"ControlledBy","value":{"type":"You"}},"scope":{"type":"EachTurn"}} """
+      " {\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"EachTurn\"}} "
   -- Brineborn Cutthroat's "during an opponent's turn". The scope is REQUIRED,
   -- for the reason Pawl.Codec.StepBegins gives.
   Spec.it s "MkSpellCast, an opponent's-turn window" $
@@ -39,7 +37,7 @@ spec s = Spec.describe s "Pawl.Codec.SpellCast" $ do
             SpellCast.ordinal = Nothing
           }
       )
-      """ {"filter":{"type":"ControlledBy","value":{"type":"You"}},"scope":{"type":"OpponentsTurn"}} """
+      " {\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"OpponentsTurn\"}} "
   -- Harness the Storm's "from your hand". The zone is ELIDED when absent, which
   -- the two cases above pin; here it is written, which is what pins the key.
   Spec.it s "MkSpellCast, a window naming the zone the cast came from" $
@@ -53,7 +51,7 @@ spec s = Spec.describe s "Pawl.Codec.SpellCast" $ do
             SpellCast.ordinal = Nothing
           }
       )
-      """ {"filter":{"type":"ControlledBy","value":{"type":"You"}},"scope":{"type":"EachTurn"},"zone":{"type":"Hand"}} """
+      " {\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"EachTurn\"},\"zone\":{\"type\":\"Hand\"}} "
   -- Clarion Spirit's "your second spell each turn". The ordinal is ELIDED when
   -- absent, which the three cases above pin; here it is written.
   Spec.it s "MkSpellCast, a window naming which cast of the turn" $
@@ -67,5 +65,5 @@ spec s = Spec.describe s "Pawl.Codec.SpellCast" $ do
             SpellCast.ordinal = Just 2
           }
       )
-      """ {"filter":{"type":"ControlledBy","value":{"type":"You"}},"scope":{"type":"EachTurn"},"ordinal":2} """
+      " {\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"EachTurn\"},\"ordinal\":2} "
   Spec.it s "has a schema" $ Common.assertHasSchema s SpellCast.codec

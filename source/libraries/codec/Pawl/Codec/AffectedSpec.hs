@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.AffectedSpec where
 
 import qualified Data.Set as Set
@@ -19,19 +17,19 @@ spec s = Spec.describe s "Pawl.Codec.Affected" $ do
       s
       Affected.codec
       (Affected.TheseObjects (Set.fromList [ObjectId.MkObjectId 1, ObjectId.MkObjectId 2]))
-      """ {"type":"TheseObjects","value":[1,2]} """
+      " {\"type\":\"TheseObjects\",\"value\":[1,2]} "
   Spec.it s "Matching" $
     Common.assertCodec
       s
       Affected.codec
       (Affected.Matching (Filter.HasCardType CardType.Creature))
-      """ {"type":"Matching","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
+      " {\"type\":\"Matching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   Spec.it s "MatchingAnywhere" $
     Common.assertCodec
       s
       Affected.codec
       (Affected.MatchingAnywhere (Filter.HasCardType CardType.Creature))
-      """ {"type":"MatchingAnywhere","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
+      " {\"type\":\"MatchingAnywhere\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   -- An "each other" card text as Not IsSource nested inside Matching -- the
   -- composed form the bare atom cases above do not exercise.
   Spec.it s "Matching, Opalescence's \"each other\" shape" $
@@ -46,18 +44,18 @@ spec s = Spec.describe s "Pawl.Codec.Affected" $ do
               ]
           )
       )
-      """ {"type":"Matching","value":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Enchantment"}},{"type":"Not","value":{"type":"HasSubtype","value":{"type":"Mountain"}}},{"type":"Not","value":{"type":"IsSource"}}]}} """
+      " {\"type\":\"Matching\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Enchantment\"}},{\"type\":\"Not\",\"value\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Mountain\"}}},{\"type\":\"Not\",\"value\":{\"type\":\"IsSource\"}}]}} "
   Spec.it s "Attached" $
     Common.assertCodec
       s
       Affected.codec
       Affected.Attached
-      """ {"type":"Attached"} """
+      " {\"type\":\"Attached\"} "
   -- CR 303.4m through a player.
   Spec.it s "AttachedPlayerControls" $
     Common.assertCodec
       s
       Affected.codec
       (Affected.AttachedPlayerControls (Filter.HasCardType CardType.Creature))
-      """ {"type":"AttachedPlayerControls","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
+      " {\"type\":\"AttachedPlayerControls\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Affected.codec

@@ -13,10 +13,11 @@
 -- during the turn (CR 701.26b) is untouched -- which is the printed reading, not
 -- a shortcut.
 --
--- The PRINTED carrier alone. The one-shot prohibition stored on the victim
--- (Object.doesNotUntapNext, written by Effect.DoesNotUntapNext or by CR 508.1g's
--- exert payment) is not gathered here and could not be: it is a field on the VICTIM rather than on anything the
--- battlefield walk below would reach. Engine.untapAll subtracts both.
+-- The PRINTED carrier alone. The one-shot prohibitions stored on the victim
+-- (Object.doesNotUntapNext, written by Effect.DoesNotUntapNext, and
+-- Object.exertedBy, written by CR 508.1g's exert payment) are not gathered here
+-- and could not be: they are fields on the VICTIM rather than on anything the
+-- battlefield walk below would reach. Engine.untapAll subtracts all three.
 module Pawl.Engine.UntapRestriction where
 
 import Data.Set (Set)

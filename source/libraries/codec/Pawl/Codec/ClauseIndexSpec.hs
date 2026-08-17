@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ClauseIndexSpec where
 
 import qualified Data.Either as Either
@@ -17,7 +15,7 @@ spec s = Spec.describe s "Pawl.Codec.ClauseIndex" $ do
       s
       ClauseIndex.codec
       (ClauseIndex.MkClauseIndex 2)
-      """ 2 """
+      " 2 "
 
   Spec.it s "has a schema" $
     Common.assertHasSchema s ClauseIndex.codec
@@ -27,5 +25,5 @@ spec s = Spec.describe s "Pawl.Codec.ClauseIndex" $ do
   Spec.it s "rejects a negative number" $
     Spec.assertBool
       s
-      (Either.isLeft (Common.parse (Text.pack """ -1 """) >>= Codec.decode ClauseIndex.codec))
+      (Either.isLeft (Common.parse (Text.pack " -1 ") >>= Codec.decode ClauseIndex.codec))
       "expected a decode failure"

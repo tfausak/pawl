@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.OptionalitySpec where
 
 import qualified Pawl.Codec.Optionality as Optionality
@@ -14,13 +12,13 @@ spec s = Spec.describe s "Pawl.Codec.Optionality" $ do
       s
       Optionality.codec
       Optionality.Mandatory
-      """ {"type":"Mandatory"} """
+      " {\"type\":\"Mandatory\"} "
   Spec.it s "Optional" $
     Common.assertCodec
       s
       Optionality.codec
       Optionality.Optional
-      """ {"type":"Optional"} """
+      " {\"type\":\"Optional\"} "
   -- Exhaustive where the literals above are representative: Arm.enum derives
   -- the arm list from the type, so this is what would catch a constructor the
   -- derivation missed or two that encode alike.

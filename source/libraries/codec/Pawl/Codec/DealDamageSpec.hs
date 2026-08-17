@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.DealDamageSpec where
 
 import qualified Data.Text as Text
@@ -25,7 +23,7 @@ spec s = Spec.describe s "Pawl.Codec.DealDamage" $ do
             DealDamage.dealer = Nothing
           }
       )
-      """ {"ref":{"type":"InSlot","value":"target"},"quantity":{"type":"Literal","value":3}} """
+      " {\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"quantity\":{\"type\":\"Literal\",\"value\":3}} "
   -- CR 120.2b: the sentence names some other object as the source.
   Spec.it s "MkDealDamage, all three keys" $
     Common.assertCodec
@@ -37,5 +35,5 @@ spec s = Spec.describe s "Pawl.Codec.DealDamage" $ do
             DealDamage.dealer = Just (SlotName.MkSlotName (Text.pack "dealer"))
           }
       )
-      """ {"ref":{"type":"InSlot","value":"target"},"quantity":{"type":"Literal","value":3},"dealer":"dealer"} """
+      " {\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"quantity\":{\"type\":\"Literal\",\"value\":3},\"dealer\":\"dealer\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s DealDamage.codec

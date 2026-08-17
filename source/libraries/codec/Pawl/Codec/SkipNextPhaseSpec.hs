@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.SkipNextPhaseSpec where
 
 import qualified Pawl.Codec.SkipNextPhase as SkipNextPhase
@@ -22,5 +20,5 @@ spec s = Spec.describe s "Pawl.Codec.SkipNextPhase" $ do
             SkipNextPhase.selector = PhaseSelector.CombatPhase
           }
       )
-      """ {"player":{"type":"Relative","value":{"type":"You"}},"selector":{"type":"CombatPhase"}} """
+      " {\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"selector\":{\"type\":\"CombatPhase\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s SkipNextPhase.codec

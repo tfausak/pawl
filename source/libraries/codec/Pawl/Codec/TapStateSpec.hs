@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.TapStateSpec where
 
 import qualified Pawl.Codec.TapState as TapState
@@ -14,13 +12,13 @@ spec s = Spec.describe s "Pawl.Codec.TapState" $ do
       s
       TapState.codec
       TapState.Untapped
-      """ {"type":"Untapped"} """
+      " {\"type\":\"Untapped\"} "
   Spec.it s "Tapped" $
     Common.assertCodec
       s
       TapState.codec
       TapState.Tapped
-      """ {"type":"Tapped"} """
+      " {\"type\":\"Tapped\"} "
   -- Exhaustive where the literals above are representative: Arm.enum derives
   -- the arm list from the type, so this is what would catch a constructor the
   -- derivation missed or two that encode alike.

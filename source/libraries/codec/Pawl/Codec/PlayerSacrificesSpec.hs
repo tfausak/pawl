@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.PlayerSacrificesSpec where
 
 import qualified Data.Text as Text
@@ -27,5 +25,5 @@ spec s = Spec.describe s "Pawl.Codec.PlayerSacrifices" $ do
             PlayerSacrifices.quantity = Quantity.Literal 1
           }
       )
-      """ {"slot":"player","filter":{"type":"HasCardType","value":{"type":"Creature"}},"quantity":{"type":"Literal","value":1}} """
+      " {\"slot\":\"player\",\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"quantity\":{\"type\":\"Literal\",\"value\":1}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s PlayerSacrifices.codec

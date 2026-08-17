@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.TriggerFrequencySpec where
 
 import qualified Pawl.Codec.TriggerFrequency as TriggerFrequency
@@ -14,13 +12,13 @@ spec s = Spec.describe s "Pawl.Codec.TriggerFrequency" $ do
       s
       TriggerFrequency.codec
       TriggerFrequency.EveryTime
-      """ {"type":"EveryTime"} """
+      " {\"type\":\"EveryTime\"} "
   Spec.it s "FirstTimeEachTurn" $
     Common.assertCodec
       s
       TriggerFrequency.codec
       TriggerFrequency.FirstTimeEachTurn
-      """ {"type":"FirstTimeEachTurn"} """
+      " {\"type\":\"FirstTimeEachTurn\"} "
   -- Exhaustive where the literals above are representative: Arm.enum derives
   -- the arm list from the type, so this is what would catch a constructor the
   -- derivation missed or two that encode alike.

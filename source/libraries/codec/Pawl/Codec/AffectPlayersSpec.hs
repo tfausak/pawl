@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.AffectPlayersSpec where
 
 import qualified Pawl.Codec.AffectPlayers as AffectPlayers
@@ -26,5 +24,5 @@ spec s = Spec.describe s "Pawl.Codec.AffectPlayers" $ do
             AffectPlayers.effect = PlayerEffect.CantCastSpells
           }
       )
-      """ {"duration":{"type":"UntilEndOfTurn"},"players":{"type":"Scoped","value":{"type":"Opponents"}},"effect":{"type":"CantCastSpells"}} """
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"players\":{\"type\":\"Scoped\",\"value\":{\"type\":\"Opponents\"}},\"effect\":{\"type\":\"CantCastSpells\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s AffectPlayers.codec

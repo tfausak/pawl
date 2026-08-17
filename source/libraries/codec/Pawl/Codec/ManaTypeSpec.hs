@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ManaTypeSpec where
 
 import qualified Pawl.Codec.ManaType as ManaType
@@ -15,12 +13,12 @@ spec s = Spec.describe s "Pawl.Codec.ManaType" $ do
       s
       ManaType.codec
       (ManaType.Colored Color.Red)
-      """ {"type":"Colored","value":{"type":"Red"}} """
+      " {\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}} "
   Spec.it s "Colorless" $
     Common.assertCodec
       s
       ManaType.codec
       ManaType.Colorless
-      """ {"type":"Colorless"} """
+      " {\"type\":\"Colorless\"} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s ManaType.codec
