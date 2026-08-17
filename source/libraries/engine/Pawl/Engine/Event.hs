@@ -8749,8 +8749,11 @@ delayedPending events gs =
       store = GameState.delayedTriggers gs
       -- CR 603.2 plus CR 603.4: the event matched AND the intervening "if" held,
       -- which together are what "triggered" means. Per occurrence, since CR 603.4
-      -- is a claim about the moment the event occurs and the paragraph above says
-      -- an occurrence it rejects spends nothing.
+      -- asks about the moment the event occurs. AFTER firedBy rather than inside
+      -- it, so an entry with no stated duration still commits to the earliest
+      -- match and then triggers or does not: this docstring's CR 603.4 paragraph
+      -- has the entry survive an occurrence whose "if" was false, not skip past it
+      -- to a later one in the same batch.
       triggered entry = filter (interveningHolds gs) (fmap (pend entry) (firedBy entry))
       -- Triggering spends the one shot only for an entry with no stated duration.
       spent entry = not (null (triggered entry)) && Maybe.isNothing (DelayedTrigger.expiry entry)
