@@ -230,6 +230,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   -- against a player who is not it.
   Filter.Type.AttachedTo _ -> predicate
   Filter.Type.IsAttachedToSource -> predicate
+  Filter.Type.IsHostOfSource -> predicate
   Filter.Type.CanHostSubject -> predicate
   Filter.Type.IsToken -> predicate
   Filter.Type.IsTapped -> predicate

@@ -78,6 +78,7 @@ codec keywordCodec =
       -- HOST, and a card author writes it exactly as they write any other filter.
       Arm.payload "AttachedTo" (codec keywordCodec) Filter.AttachedTo (\x -> case x of Filter.AttachedTo y -> Just y; _ -> Nothing),
       Arm.nullary "IsAttachedToSource" Filter.IsAttachedToSource,
+      Arm.nullary "IsHostOfSource" Filter.IsHostOfSource,
       Arm.nullary "CanHostSubject" Filter.CanHostSubject,
       Arm.nullary "IsToken" Filter.IsToken,
       Arm.nullary "IsTapped" Filter.IsTapped,

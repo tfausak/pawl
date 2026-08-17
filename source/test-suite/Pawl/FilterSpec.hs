@@ -834,6 +834,37 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches framed aPlayer Filter.Type.IsAttachedToSource)) "player"
 
+  Spec.describe s "IsHostOfSource" $ do
+    -- CR 303.4b: the SOURCE's host against the candidate, the direction the two
+    -- atoms above cannot say. `blackCreature` is object 7 and `aHost` is object 8,
+    -- so the cases below differ only in which id the context reports the source as
+    -- attached to.
+    let enchanting oid = (Filter.contextFor (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) {Filter.sourceAttachedTo = Just (ObjectId.MkObjectId oid)}
+    Spec.it s "matches the object the source is attached to" $ do
+      Spec.assertBool s (Filter.matches (enchanting 7) blackCreature Filter.Type.IsHostOfSource) "the host itself"
+
+    -- The discriminating case: an atom answering "is the source attached to
+    -- anything" rather than "to THIS" would admit both candidates here.
+    Spec.it s "does not match another object" $ do
+      Spec.assertBool s (not (Filter.matches (enchanting 8) blackCreature Filter.Type.IsHostOfSource)) "not the host"
+      Spec.assertBool s (Filter.matches (enchanting 8) aHost Filter.Type.IsHostOfSource) "the host is"
+
+    -- The direction it is NOT: object 7 is attached to nothing, and the source is
+    -- attached to object 7, so IsAttachedToSource and this atom disagree on the
+    -- same board -- which is what makes the third direction a third atom.
+    Spec.it s "is not IsAttachedToSource in disguise" $ do
+      Spec.assertBool s (not (Filter.matches (enchanting 7) blackCreature Filter.Type.IsAttachedToSource)) "the candidate's own host is not the source"
+
+    -- Vacuously False wherever the position does not supply the field, which is
+    -- every context but the four -- contextFor's own posture.
+    Spec.it s "an unsupplied host is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches (Filter.contextFor (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) blackCreature Filter.Type.IsHostOfSource)) "no host supplied"
+
+    -- CR 303.4's other destination: a source attached to a PLAYER names no object,
+    -- and a player candidate has no id to be named, so both ends answer False.
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches (enchanting 7) aPlayer Filter.Type.IsHostOfSource)) "player"
+
   Spec.describe s "CanHostSubject" $ do
     Spec.it s "matches a view the caller marked as a legal destination" $ do
       Spec.assertBool s (Filter.matches self (blackCreature {Filter.canHostSubject = True}) Filter.Type.CanHostSubject) "can host"

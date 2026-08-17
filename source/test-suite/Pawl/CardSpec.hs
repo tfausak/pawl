@@ -2171,6 +2171,7 @@ canHostSubjects predicate = case predicate of
   -- the tag at any depth, and turn a legitimate card into a reported offence.
   Filter.Type.AttachedTo f -> canHostSubjects f
   Filter.Type.IsAttachedToSource -> 0
+  Filter.Type.IsHostOfSource -> 0
   Filter.Type.IsToken -> 0
   Filter.Type.IsTapped -> 0
   Filter.Type.HasNonManaActivatedAbility -> 0
@@ -2549,12 +2550,17 @@ modificationFilters modification = case modification of
 -- keywords and Counts, -- since CR 604.2's "as long as" gate landed -- the
 -- Counts inside that condition, and the leaves-the-battlefield duration's own,
 -- which a CR 611.2b "for as long as" would carry.
-staticAbilityFilters :: StaticAbility.StaticAbility Card.Type.Card -> [Filter.Type.Filter Keyword.Keyword]
+-- Tagged rather than flat, because one of the four is framed: CR 604.2's clause is
+-- answered by Pawl.Engine.Projection.conditionHolds, which supplies the source's
+-- host, and the affected set beside it is not.
+staticAbilityFilters :: StaticAbility.StaticAbility Card.Type.Card -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 staticAbilityFilters ability =
-  affectedFilters (StaticAbility.affected ability)
-    <> concatMap conditionFilters (Maybe.maybeToList (StaticAbility.condition ability))
-    <> concatMap durationFilters (Maybe.maybeToList (StaticAbility.lingers ability))
-    <> concatMap modificationFilters (StaticAbility.modifications ability)
+  unframed
+    ( affectedFilters (StaticAbility.affected ability)
+        <> concatMap durationFilters (Maybe.maybeToList (StaticAbility.lingers ability))
+        <> concatMap modificationFilters (StaticAbility.modifications ability)
+    )
+    <> sourceHosted (concatMap conditionFilters (Maybe.maybeToList (StaticAbility.condition ability)))
 
 -- CR 603.6a's "whenever [a permanent] enters" carries one directly; CR 603.8's
 -- state trigger carries one through its Condition's Counts.
@@ -3006,10 +3012,12 @@ blockPermissionFilters permission =
     <> foldMap quantityFilters (BlockPermission.additional permission)
     <> foldMap conditionFilters (BlockPermission.while permission)
 
--- WHICH position of a card's text a Filter sits in, for the two lints that are
+-- WHICH position of a card's text a Filter sits in, for the three lints that are
 -- about position rather than about the atom. Each atom they police is answered
--- off a field that exactly one caller fills -- a Filter.View's for CR 701.3a, a
--- Filter.Context's for CR 709.4a -- so the position IS the soundness question.
+-- off a field only certain callers fill -- a Filter.View's for CR 701.3a, a
+-- Filter.Context's for CR 709.4a and for CR 303.4b -- so the position IS the
+-- soundness question. Two of the three name ONE position; CR 303.4b's names three,
+-- which is why this is a tag on the position rather than a Bool.
 --
 --   * AttachDestination -- Effect.AttachTarget's destination, the one position
 --     evaluated against a view whose `canHostSubject` is filled in
@@ -3019,6 +3027,13 @@ blockPermissionFilters permission =
 --     Pawl.Engine.Target.admittedGiven, which is the one site that fills
 --     Filter.Context.slotNames. CR 709.4a's Filter.SameNameAsBound belongs here
 --     and nowhere else.
+--   * SourceHostFramed -- a position whose evaluator fills
+--     Filter.Context.sourceAttachedTo, which is three rather than one: a static
+--     ability's CR 604.2 clause (Pawl.Engine.Projection.conditionHolds), a
+--     triggered ability's CR 603.4 clause (Pawl.Engine.Event.interveningHolds and
+--     Pawl.Engine.Stack's CR 608.2a re-check), and an effect's
+--     Pawl.Types.ObjectRef (Pawl.Engine.Resolve.objectRefObjects). CR 303.4b's
+--     Filter.IsHostOfSource belongs in those three and nowhere else.
 --   * Unframed -- everything else.
 --
 -- CR 303.4a's enchant slot (Face.enchant) is Unframed rather than InTargetSlot,
@@ -3032,12 +3047,20 @@ data Framing
   = Unframed
   | AttachDestination
   | InTargetSlot
+  | SourceHostFramed
   deriving (Eq, Ord, Show)
 
 -- Tag a Filter position as UNFRAMED -- one neither an attach nor a target slot
 -- frames, which is every position in the type except the two named above.
 unframed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 unframed = fmap ((,) Unframed)
+
+-- Tag a Filter position as one whose evaluator supplies the SOURCE's host -- the
+-- three listed on Framing above. An ObjectRef's own Filter is always one, whatever
+-- effect carries it, because Pawl.Engine.Resolve.objectRefObjects is the single
+-- site that turns an ObjectRef into objects.
+sourceHosted :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+sourceHosted = fmap ((,) SourceHostFramed)
 
 -- Every Filter one effect carries, paired with its Framing. Exactly one arm
 -- answers AttachDestination: Effect.AttachTarget's destination, which is the
@@ -3061,9 +3084,9 @@ effectFilters effect = case effect of
   -- enchant".
   Effect.AttachTarget (AttachTarget.MkAttachTarget _ f) -> [(AttachDestination, f)]
   -- The dealer is a SlotName and carries no Filter.
-  Effect.DealDamage (DealDamage.MkDealDamage ref quantity _) -> unframed (objectRefFilters ref <> quantityFilters quantity)
+  Effect.DealDamage (DealDamage.MkDealDamage ref quantity _) -> sourceHosted (objectRefFilters ref) <> unframed (quantityFilters quantity)
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
-    unframed (durationFilters duration <> modificationFilters (Projection.widenModification modification) <> objectRefFilters ref)
+    unframed (durationFilters duration <> modificationFilters (Projection.widenModification modification)) <> sourceHosted (objectRefFilters ref)
   Effect.ChangeText {} -> []
   Effect.AddMana _ -> []
   Effect.Search (Search.MkSearch _ _ _ f _ _) -> unframed [f]
@@ -3085,28 +3108,28 @@ effectFilters effect = case effect of
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ f quantity) -> unframed (f : quantityFilters quantity)
   Effect.RestartGame _ -> []
   Effect.ControlPlayerNextTurn _ -> []
-  Effect.Destroy (Destroy.MkDestroy ref _ _) -> unframed (objectRefFilters ref)
+  Effect.Destroy (Destroy.MkDestroy ref _ _) -> sourceHosted (objectRefFilters ref)
   Effect.Sacrifice _ -> []
   -- The riders reach a Filter one level further down than the ObjectRef: CR
   -- 122.6a's counters are keyed by CounterKind, and CR 122.1b's keyword counter
   -- carries a whole Keyword. Swept for the reason canHostSubjects sweeps the
   -- same shape -- the lint is about the positions a card author can write, not
   -- about which of them the pool has used.
-  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _) -> unframed (objectRefFilters ref <> concatMap counterKindFilters (Map.keys (EntryRiders.counters riders)))
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _) -> sourceHosted (objectRefFilters ref) <> unframed (concatMap counterKindFilters (Map.keys (EntryRiders.counters riders)))
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   -- The tally's Filter is a position a card author writes, so the lint reaches
   -- it: rule 728.1's "nonland card" is one of these.
   Effect.Mill (Mill.MkMill _ quantity mTally) -> unframed (quantityFilters quantity <> fmap MillTally.filter (Maybe.maybeToList mTally))
   -- The ObjectRef's Filter is a position a card author writes, so the lint
   -- reaches it, as Explore's does. Both halves of CR 701.20 answer alike.
-  Effect.Reveal ref -> unframed (objectRefFilters ref)
-  Effect.LookAt (LookAt.MkLookAt ref _) -> unframed (objectRefFilters ref)
+  Effect.Reveal ref -> sourceHosted (objectRefFilters ref)
+  Effect.LookAt (LookAt.MkLookAt ref _) -> sourceHosted (objectRefFilters ref)
   Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   -- The ObjectRef's Filter is a position a card author writes, so the lint
   -- reaches it, as PutCounters' does.
-  Effect.Explore ref -> unframed (objectRefFilters ref)
+  Effect.Explore ref -> sourceHosted (objectRefFilters ref)
   Effect.Discard (Discard.MkDiscard _ quantity) -> unframed (quantityFilters quantity)
   Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
@@ -3120,51 +3143,51 @@ effectFilters effect = case effect of
   Effect.Create (Create.MkCreate quantity card riders _) -> unframed (quantityFilters quantity <> concatMap counterKindFilters (Map.keys (EntryRiders.counters riders))) <> overFaces cardFilters card
   -- An EachMatching ref's Filter is card text like RequireBlock's below, and the
   -- count's Filters are as much card text as Create's.
-  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> unframed (quantityFilters quantity <> objectRefFilters ref)
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> unframed (quantityFilters quantity) <> sourceHosted (objectRefFilters ref)
   -- BOTH refs, RequireBlock's arm below: each EachMatching Filter is card text.
-  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) -> unframed (objectRefFilters original <> objectRefFilters subject)
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) -> sourceHosted (objectRefFilters original <> objectRefFilters subject)
   Effect.Replace (Replace.MkReplace duration _ _ condition replacement) -> unframed (durationFilters duration <> foldMap conditionFilters condition <> replacementEffectFilters replacement) <> concatMap effectFilters (replacementEffectRiders replacement)
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- The rider's Filters too, for CR 615.5. This is the traversal that dropped
   -- landwalk's payload once, so a nested effect list is exactly what it must not
   -- stop at.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ ref quantity rider) ->
-    unframed (durationFilters duration <> objectRefFilters ref <> quantityFilters quantity) <> concatMap effectFilters rider
+    unframed (durationFilters duration <> quantityFilters quantity) <> sourceHosted (objectRefFilters ref) <> concatMap effectFilters rider
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ ref rider) ->
-    unframed (durationFilters duration <> objectRefFilters ref) <> concatMap effectFilters rider
+    unframed (durationFilters duration) <> sourceHosted (objectRefFilters ref) <> concatMap effectFilters rider
   -- BOTH refs, or a Filter inside a redirect's destination escapes this lint.
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ srcRef destRef) ->
-    unframed (durationFilters duration <> objectRefFilters srcRef <> objectRefFilters destRef)
+    unframed (durationFilters duration) <> sourceHosted (objectRefFilters srcRef <> objectRefFilters destRef)
   -- CR 708.2's listed characteristics hold no Filter.
   Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
   Effect.BecomesBlocked _ -> []
   -- Swift Silence's "all other spells" is an ObjectRef Filter like Destroy's,
   -- so the lint reaches it.
-  Effect.Counter (Counter.MkCounter ref _) -> unframed (objectRefFilters ref)
+  Effect.Counter (Counter.MkCounter ref _) -> sourceHosted (objectRefFilters ref)
   -- BOTH positions: the ObjectRef carries Renegade Krasis' "each other creature
   -- you control with a +1/+1 counter on it", and a Filter there would otherwise
   -- escape the lint.
-  Effect.PutCounters (PutCounters.MkPutCounters _ quantity ref) -> unframed (quantityFilters quantity <> objectRefFilters ref)
+  Effect.PutCounters (PutCounters.MkPutCounters _ quantity ref) -> unframed (quantityFilters quantity) <> sourceHosted (objectRefFilters ref)
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> unframed (quantityFilters quantity)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> unframed (quantityFilters quantity)
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> unframed (quantityFilters quantity)
-  Effect.Tap ref -> unframed (objectRefFilters ref)
-  Effect.Untap ref -> unframed (objectRefFilters ref)
-  Effect.Detain ref -> unframed (objectRefFilters ref)
-  Effect.DoesNotUntapNext ref -> unframed (objectRefFilters ref)
-  Effect.Transform ref -> unframed (objectRefFilters ref)
-  Effect.PhaseOut ref -> unframed (objectRefFilters ref)
+  Effect.Tap ref -> sourceHosted (objectRefFilters ref)
+  Effect.Untap ref -> sourceHosted (objectRefFilters ref)
+  Effect.Detain ref -> sourceHosted (objectRefFilters ref)
+  Effect.DoesNotUntapNext ref -> sourceHosted (objectRefFilters ref)
+  Effect.Transform ref -> sourceHosted (objectRefFilters ref)
+  Effect.PhaseOut ref -> sourceHosted (objectRefFilters ref)
   Effect.AddPhases _ -> []
-  Effect.GainControl (DurationRef.MkDurationRef duration ref) -> unframed (durationFilters duration <> objectRefFilters ref)
+  Effect.GainControl (DurationRef.MkDurationRef duration ref) -> unframed (durationFilters duration) <> sourceHosted (objectRefFilters ref)
   Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger _ _ mDuration) -> unframed (concatMap durationFilters (Maybe.maybeToList mDuration))
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ playerEffect) -> unframed (durationFilters duration <> playerEffectFilters playerEffect)
-  Effect.RequireBlock (RequireBlock.MkRequireBlock duration blocker attacker) -> unframed (durationFilters duration <> objectRefFilters blocker <> objectRefFilters attacker)
+  Effect.RequireBlock (RequireBlock.MkRequireBlock duration blocker attacker) -> unframed (durationFilters duration) <> sourceHosted (objectRefFilters blocker <> objectRefFilters attacker)
   -- CR 114.2's emblem is a whole card too.
   Effect.CreateEmblem card -> overFaces cardFilters card
   Effect.BecomeMonarch _ -> []
   Effect.Designate (Designate.MkDesignate _ _) -> []
-  Effect.Unsuspect ref -> unframed (objectRefFilters ref)
+  Effect.Unsuspect ref -> sourceHosted (objectRefFilters ref)
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []
   Effect.Train _ -> []
@@ -3177,15 +3200,15 @@ effectFilters effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.ChooseOpponent _ -> []
   Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn _ _) -> []
-  Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> unframed (objectRefFilters ref)
+  Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> sourceHosted (objectRefFilters ref)
   Effect.OfferCast {} -> []
   -- Both, as GainControl's arm does: the Duration's Condition carries Victor
   -- Mancha, Runaway's IsSource and ControlledBy, and an empty list here would
   -- take them out of the lint without failing anything.
-  Effect.GrantPlayFromExile grant -> unframed (durationFilters (GrantPlayFromExile.duration grant) <> objectRefFilters (GrantPlayFromExile.ref grant))
+  Effect.GrantPlayFromExile grant -> unframed (durationFilters (GrantPlayFromExile.duration grant)) <> sourceHosted (objectRefFilters (GrantPlayFromExile.ref grant))
   -- The swept ref's Filters AND the body's, the rider's shape: a nested effect
   -- list is exactly what this traversal must not stop at.
-  Effect.ForEach (ForEach.MkForEach ref _ body) -> unframed (objectRefFilters ref) <> concatMap effectFilters body
+  Effect.ForEach (ForEach.MkForEach ref _ body) -> sourceHosted (objectRefFilters ref) <> concatMap effectFilters body
 
 -- Per MODE rather than through Modal.allTargetSlots, which is a Map.unions and so
 -- collapses two modes declaring the same slot name (#475) -- the cross-check
@@ -3217,10 +3240,12 @@ grantedAbilities card =
 
 triggeredAbilityFilters :: TriggeredAbility.TriggeredAbility Card.Type.Card -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 triggeredAbilityFilters ability =
-  unframed
-    ( triggerConditionFilters (TriggeredAbility.condition ability)
-        <> concatMap conditionFilters (Maybe.maybeToList (TriggeredAbility.intervening ability))
-    )
+  unframed (triggerConditionFilters (TriggeredAbility.condition ability))
+    -- THE CR 603.4 position: Pawl.Engine.Event.interveningHolds and
+    -- Pawl.Engine.Stack's CR 608.2a re-check both supply the source's host here,
+    -- and the trigger CONDITION above them is matched by Event.matchesTrigger,
+    -- which does not.
+    <> sourceHosted (concatMap conditionFilters (Maybe.maybeToList (TriggeredAbility.intervening ability)))
     <> modalFilters (TriggeredAbility.modal ability)
 
 activatedAbilityFilters :: ActivatedAbility.ActivatedAbility Card.Type.Card -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
@@ -3285,7 +3310,6 @@ cardFilters card =
         <> concatMap quantityFilters (Maybe.maybeToList (Face.characteristicPT card))
         <> concatMap (\(Power.MkPower quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.power card))
         <> concatMap (\(Toughness.MkToughness quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.toughness card))
-        <> concatMap staticAbilityFilters (Face.staticAbilities card)
         <> concatMap printedReplacementFilters (Face.replacementEffects card)
         <> concatMap targetSlotFilters (Face.enchant card)
         <> concatMap costComponentFilters (Face.additionalCosts card)
@@ -3302,6 +3326,7 @@ cardFilters card =
         <> concatMap (affectedFilters . SacrificeRestriction.affected) (Face.sacrificeRestrictions card)
         <> concatMap (affectedFilters . UntapRestriction.affected) (Face.untapRestrictions card)
     )
+    <> concatMap staticAbilityFilters (Face.staticAbilities card)
     <> modalFilters (Face.spell card)
     <> concatMap activatedAbilityFilters (Face.activatedAbilities card)
     <> concatMap activatedAbilityFilters (grantedAbilities card)
@@ -3414,6 +3439,36 @@ sameNameAsBoundOffends :: Face.Face Card.Type.Card -> Bool
 sameNameAsBoundOffends card =
   let (slotted, elsewhere) = sameNameAsBoundCounts card
    in elsewhere /= 0 || slotted + elsewhere /= jsonAtoms sameNameAsBoundTag (Codec.encode (Face.Codec.codec Card.codec) card)
+
+-- The CR 303.4b tag, spelled once.
+hostOfSourceTag :: Text.Text
+hostOfSourceTag = Text.pack "IsHostOfSource"
+
+-- How many CR 303.4b atoms this card carries in a position whose evaluator
+-- supplies the source's host, and how many anywhere else. The second number is the
+-- offence; the first is what Ray of Frost legitimately has three of.
+hostOfSourceCounts :: Face.Face Card.Type.Card -> (Int, Int)
+hostOfSourceCounts card =
+  let total wanted = sum [filterAtoms hostOfSourceTag f | (framing, f) <- cardFilters card, (framing == SourceHostFramed) == wanted]
+   in (total True, total False)
+
+-- CR 303.4b's "enchanted" is answerable only where Filter.Context.sourceAttachedTo
+-- is filled, which is the three positions Framing's SourceHostFramed names and
+-- nothing else: Filter.contextFor, Filter.contextWithSlots and
+-- Filter.contextComparingPower all leave it Nothing, so Filter.IsHostOfSource in an
+-- affected set, a target slot, a search filter or a cost criterion is a silent
+-- False rather than a rejected card. This is where that is made loud.
+--
+-- Two offences under one name, for canHostSubjectOffends' two reasons: the
+-- traversal found the atom outside those three positions, or the traversal and the
+-- codec disagree about how many the card holds -- the second being a blind spot in
+-- cardFilters, in which an atom would be reported as zero rather than as an
+-- offence. The second disjunct is a REGRESSION FENCE for sameNameAsBoundOffends'
+-- reason.
+hostOfSourceOffends :: Face.Face Card.Type.Card -> Bool
+hostOfSourceOffends card =
+  let (framed, elsewhere) = hostOfSourceCounts card
+   in elsewhere /= 0 || framed + elsewhere /= jsonAtoms hostOfSourceTag (Codec.encode (Face.Codec.codec Card.codec) card)
 
 -- A lint fixture built as a FACE, put back into the one-face card an
 -- Effect.Create's token payload has to be.
@@ -5251,6 +5306,43 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let positions = concatMap (cardFilters . S.combinedFace) ps
     Spec.assertBool s (length positions > 100) "the pool gives the traversal Filter positions to walk"
     Spec.assertBool s (length (filter ((== InTargetSlot) . fst) positions) > 10) "and target slot filters for the accepted side to be about"
+  -- CR 303.4b's Filter.IsHostOfSource is CR 709.4a's atom one axis over again:
+  -- answerable only where Filter.Context.sourceAttachedTo is filled, which is the
+  -- three positions Framing's SourceHostFramed names. See hostOfSourceOffends for
+  -- the two offences.
+  Spec.it s "CR 303.4b no card asks IsHostOfSource where the source's host is unknown" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace hostOfSourceOffends . Printing.card) ps
+    Spec.assertEqWith s "the atom sits only where the host is supplied" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous: the pool authors the atom, and the one card that does is
+    -- ACCEPTED here rather than skipped. Ray of Frost writes it three times, once
+    -- per accepted position -- a CR 604.2 clause, a CR 603.4 clause and an
+    -- Effect.Tap's ObjectRef -- so all three legs of the tagging are exercised.
+    ray <- S.printingOf s registry "Ray of Frost"
+    Spec.assertEqWith
+      s
+      "Ray of Frost's three atoms are all framed"
+      (hostOfSourceCounts (S.combinedFace ray))
+      (3, 0)
+    Spec.assertEqWith
+      s
+      "and they are the pool's only ones"
+      (sum (fmap (uncurry (+) . hostOfSourceCounts . S.combinedFace) ps))
+      3
+    -- The rejected side, which the sweep above cannot show while the pool has no
+    -- offender: the same atom planted in a target slot -- the position a card
+    -- author would most plausibly reach for -- IS counted as elsewhere.
+    piker <- S.printingOf s registry "Goblin Piker"
+    let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.IsHostOfSource]]
+        planted =
+          (S.combinedFace piker)
+            { Face.spell =
+                Modal.MkModal
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buried)))))
+                  (ModeSelection.ChooseExactly 1)
+            }
+    Spec.assertEqWith s "a planted atom is an offence" (hostOfSourceCounts planted) (0, 1)
+    Spec.assertBool s (hostOfSourceOffends planted) "and the lint says so"
   -- The two source-power comparisons are answerable only where the CONTEXT
   -- supplies a source power: Filter.Context.sourcePower is filled by
   -- Pawl.Engine.Target.admittedGiven for a target slot (CR 702.134a), by

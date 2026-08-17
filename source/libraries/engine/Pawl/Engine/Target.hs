@@ -222,7 +222,13 @@ admittedGiven pcs grants pools perspective bindings source slot gs =
             --
             -- A THUNK, like the two above: one projection per bound object, paid
             -- for only by a filter that names the atom.
-            Filter.slotNames = fmap (foldMap (foldMap (foldMap Filter.names . Projection.viewWithLastKnownAnywhere gs) . Recipient.objectOf)) bindings
+            Filter.slotNames = fmap (foldMap (foldMap (foldMap Filter.names . Projection.viewWithLastKnownAnywhere gs) . Recipient.objectOf)) bindings,
+            -- Nothing: CR 303.4b's atom names what the SOURCE enchants, and no
+            -- printing puts that in a target slot -- "enchanted creature" is a
+            -- reference the card already made rather than a choice CR 601.2c
+            -- leaves open. Pawl.CardSpec's position lint is what keeps that true,
+            -- and widening it here would be a capability no card asks for.
+            Filter.sourceAttachedTo = Nothing
           }
       -- ONE whole-board projection and ONE control-grant walk for the whole
       -- slot: both the base pool's creature test and the Filter's per-candidate

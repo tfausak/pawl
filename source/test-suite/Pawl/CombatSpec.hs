@@ -1630,6 +1630,37 @@ blockPermissionSpec s registry = Spec.describe s "BlockPermission" $ do
           )
           (True, False, True)
       _ -> Spec.assertFailure s "fixture should have three attackers and one blocker"
+  Spec.it s "CR 604.2 / 613.1f a conditional ability-remover whose clause is FALSE removes nothing" $ do
+    -- Ray of Frost {1}{U} Enchantment -- Aura: "As long as enchanted creature is
+    -- red, it loses all abilities." Palace Guard is WHITE, so the clause is false
+    -- and its permission stands. Pawl.Engine.BlockPermission reads
+    -- Projection.abilityRemoval from OUTSIDE the layer fold, which is the reader
+    -- that used to count a false clause as a removal.
+    --
+    -- Humility beside it is the anti-vacuity control: an UNCONDITIONAL
+    -- LoseAllAbilities on the same board and the same blocker does drop the
+    -- permission, so a gate that had turned the whole reader off would fail here.
+    ray <- S.printingOf s registry "Ray of Frost"
+    humility <- S.printingOf s registry "Humility"
+    palaceGuard <- S.printingOf s registry "Palace Guard"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker, piker] [palaceGuard]
+    case (mine, theirs) of
+      ([first, second], [guard]) -> do
+        let both = Map.singleton guard (Set.fromList [first, second])
+            (rayId, withRay) = S.addCreature ray S.bob gs
+            enchanted = S.attach rayId guard withRay
+            humbled = snd (S.addCreature humility S.bob gs)
+        Spec.assertEqWith
+          s
+          "the Guard blocks both under the Ray, and only one under Humility"
+          ( Combat.legalBlockDeclaration S.bob both gs,
+            Combat.legalBlockDeclaration S.bob both enchanted,
+            Combat.legalBlockDeclaration S.bob both humbled,
+            Combat.legalBlockDeclaration S.bob (Map.singleton guard (Set.singleton first)) humbled
+          )
+          (True, True, False, True)
+      _ -> Spec.assertFailure s "fixture should have two attackers and one blocker"
   Spec.it s "CR 604.2 the Entourage's permission holds only while its controller is the monarch" $ do
     -- Entourage of Trest {4}{G} 4/4, "As long as you're the monarch, this
     -- creature can block an additional creature each combat". CR 109.5's "you" is
