@@ -1,5 +1,6 @@
 module Pawl.Types.Filter where
 
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
@@ -384,6 +385,29 @@ data Filter keyword
     -- any other -- matched against each battlefield permanent through the same
     -- CR 613 projection every other count reads.
     ControlsMoreThanYou (Filter keyword)
+  | -- | CR 400.1 / 404.1: the candidate PLAYER's own graveyard holds at least
+    -- this many cards -- The Master of Lake-town's "each graveyard with seven or
+    -- more cards in it", folded through Scope.OverPlayers EachPlayer.
+    --
+    -- A PLAYER atom, like the two above and unlike every characteristic atom:
+    -- rule 400.1 gives each player their own graveyard, and CR 109.3 counts no
+    -- zone among an object's characteristics, so there is nothing to ask of an
+    -- object candidate. Vacuously False if it survives to
+    -- Pawl.Engine.Filter.matches, the posture ControlsMoreThanYou takes and for
+    -- its reason: the answer is a question about the board, and that module holds
+    -- none. Pawl.Engine.Count.bakePerspective answers it.
+    --
+    -- Carries a BARE Natural rather than a Zone, a Comparison or a Count. Not a
+    -- Zone, because four of CR 400.1's seven are shared rather than per-player
+    -- and no card asks a player fold about the other two, and ManaValueAtMost's
+    -- note forbids the unused arms. Not a Count, though that would generalize
+    -- zone, comparison and filter at once, because Pawl.Types.Count already
+    -- imports this module -- naming it here closes a module cycle, and the
+    -- parametricity escape hatch is spent on `keyword`. Natural rather than
+    -- Integer because a zone's size cannot be negative:
+    -- Pawl.JsonCodec.Common.natural rejects a negative literal at decode, where
+    -- Common.integer would accept -1 and yield a vacuously true filter.
+    CardsInGraveyardAtLeast Natural.Natural
   | -- | CR 508.1k: the candidate is an ATTACKING creature -- declared as an
     -- attacker this combat phase and not since removed from combat (CR 506.4).
     -- Kill Shot's "target attacking creature".

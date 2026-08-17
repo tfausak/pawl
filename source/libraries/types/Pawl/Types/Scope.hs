@@ -30,13 +30,19 @@ data Scope
     -- first scope folding over players rather than over their objects would
     -- observe the difference. This is that scope.
     --
-    -- The Filter runs over the players, and two atoms answer for one:
-    -- Filter.IsPlayer, which relates the candidate to the perspective, and
-    -- Filter.ControlsMoreThanYou, which compares the candidate's board against
-    -- yours -- Oreskos Explorer's "players who control more lands than you".
+    -- The Filter runs over the players, and the atoms that answer for one split
+    -- in two. Filter.IsPlayer is answered off the VIEW, relating the candidate to
+    -- the perspective, and it is the only atom playerView holds a field for.
+    -- Filter.ControlsMoreThanYou (Oreskos Explorer's "players who control more
+    -- lands than you"), Filter.IsControllerOfBound (Spikeshell Harrier's "each
+    -- other player") and Filter.CardsInGraveyardAtLeast (The Master of
+    -- Lake-town's "each graveyard with seven or more cards in it") are instead
+    -- BAKED against the board at Pawl.Engine.Count.bakePerspective, each asking
+    -- something no view of a player could carry.
+    --
     -- Saying "opponents" through the REFERENCE rather than through the first atom
     -- is the convention, since the reference is the only spelling the sibling arm
-    -- has; a question about a candidate's own board has no spelling but the
-    -- second, and Pawl.Engine.Count.bakePerspective is where it is answered.
+    -- has; a question about a candidate's own board or zone has no spelling but
+    -- one of the baked three.
     OverPlayers PlayerRef.PlayerRef
   deriving (Eq, Ord, Show)

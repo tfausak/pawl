@@ -175,6 +175,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.ControlsMoreThanYou (Filter.HasCardType CardType.Land))
       """ {"type":"ControlsMoreThanYou","value":{"type":"HasCardType","value":{"type":"Land"}}} """
+  Spec.it s "CardsInGraveyardAtLeast" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.CardsInGraveyardAtLeast 7)
+      """ {"type":"CardsInGraveyardAtLeast","value":7} """
   Spec.it s "IsSource" $
     Common.assertCodec
       s
