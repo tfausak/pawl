@@ -1,6 +1,7 @@
 {
   inputs = {
     claude-code-nix.url = "github:sadjow/claude-code-nix";
+    hooky.inputs.nixpkgs.follows = "nixpkgs";
     hooky.url = "github:tfausak/hooky-nix";
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
   };
@@ -21,6 +22,15 @@
       ];
 
       inherit (nixpkgs.lib) fileset;
+
+      # nixpkgs builds cabal-gild as a library plus an executable, so the
+      # result keeps references to GHC and every dependency: a 3.9 GB closure,
+      # sharing nothing with the compiler below. Linking the executable and
+      # dropping those references leaves 80 MB, at the cost of building it
+      # here rather than fetching it. Only the dev shell wants this, since
+      # every check's output is an empty directory that references neither.
+      cabalGild =
+        pkgs: pkgs.haskell.lib.compose.justStaticExecutables pkgs.haskellPackages.cabal-gild_1_8_4_1;
 
       source = fileset.toSource {
         root = ./.;
@@ -127,6 +137,7 @@
         {
           default = pkgs.mkShell {
             nativeBuildInputs = [
+              (cabalGild pkgs)
               claude-code-nix.packages.${system}.default
               hooky.packages.${system}.default
               pkgs.bash
@@ -136,7 +147,6 @@
               pkgs.gh
               pkgs.git
               pkgs.haskell.compiler.native-bignum.ghc9141
-              pkgs.haskellPackages.cabal-gild_1_8_4_1
               pkgs.hlint
               pkgs.jq
               pkgs.nixfmt
