@@ -26,9 +26,8 @@ The second invariant: the engine never makes a player's choice. Eliding a
 prompt is legitimate only for indistinguishable options, and every elision
 carries an issue. Where the rules leave nothing to ask, don't prompt.
 
-Design notes live in `docs/`. Read them by section, on demand --- reading a
-whole doc "for context" front-loads tens of thousands of tokens before the
-first question.
+Design notes live in `docs/`. Read them by section, on demand --- a whole doc
+"for context" costs tens of thousands of tokens.
 
 - What's next?
   `gh issue list`
@@ -38,9 +37,7 @@ first question.
 
 - Rules ground truth:
   `docs/rules.txt`, grepped by rule number --- never memory, and never a rule
-  number quoted in an issue or a dispatch brief. One brief cited CR 118 for
-  paying life, which this revision numbers 119; #1239's own title cited
-  CR 208.2a for something that rule does not govern.
+  number quoted in an issue or a brief; those have been wrong.
 
 - Prior-art evidence:
   `docs/prior-art-lessons.md`
@@ -53,158 +50,124 @@ first question.
 
 - Dispatched as a subagent?
   `docs/agents/` --- `implementing.md` if you hold the build and will open a PR,
-  `researching.md` if you are read-only
+  `researching.md` if you are read-only, `drain-loop.md` if you orchestrate.
 
 ## Workflow
 
 `CONTRIBUTING.md` has the loop --- issue, branch, TDD, draft PR --- and applies
 to agents as written. What it doesn't say:
 
-- Agents usually work in a fresh `git worktree`, which starts without the
-  gitignored `cabal.project.local`. Copy it in from the primary checkout before
-  the first build, or a locally green build says nothing about CI.
+- A fresh `git worktree` has no gitignored `cabal.project.local`, so `pedantic`
+  and `-Werror` are off and a green build says nothing about CI. Copy it in
+  from the primary checkout before the first build.
 
-- That file sets `semaphore: True`, so concurrent `cabal` runs in *different*
-  worktrees contend on one shared GHC job semaphore --- that is the mechanism
-  behind one-build-at-a-time. A killed or crashed run corrupts it; the symptom
-  is `semWait: invalid argument`, and `cabal test --no-semaphore -j4` gets
-  through. The likeliest killer is not a deliberate one: a tool timeout reaping
-  a backgrounded `cabal` corrupts the semaphore exactly as a `pkill` does.
-  Never `pkill -f 'cabal test'` --- it reaches into other agents' worktrees.
-  Match your own worktree path, or wait.
+- That file sets `semaphore: True`, so concurrent `cabal` runs in different
+  worktrees share one GHC job semaphore --- builds are one at a time. A killed
+  run corrupts it (a `pkill`, or a tool timeout reaping a backgrounded `cabal`);
+  the symptom is `semWait: invalid argument`, and `cabal test --no-semaphore
+  -j4` gets through. Never `pkill -f 'cabal test'` --- it reaches other agents'
+  worktrees. Match your own worktree path, or wait.
 
-- Derive against `origin/main`, not the working checkout. The primary checkout
-  drifts --- it sat 47 commits behind during one drain run --- so a grep there
-  reports a type as absent that landed hours ago, and every line number in an
-  issue body is stale besides. `git fetch` first, then read through
-  `git show origin/main:<path>` or a worktree cut from it.
+- Derive against `origin/main`, not the working checkout, which drifts:
+  `git fetch`, then `git show origin/main:<path>` or a worktree cut from it.
+  Line numbers in issue bodies are stale; grep for identifiers.
 
 - Self-review the branch before opening the PR, and fix the findings on the
   branch. At minimum: re-check every CR citation against `docs/rules.txt`, and
-  re-read every comment the change touched for prose the rewrite made wrong.
-  Those two reliably catch real defects here. Scale the effort to the diff.
+  re-read every comment the change touched. Both reliably catch real defects.
 
-- The PR body carries the case for merging, since the owner reads every PR that
-  lands. Give all of:
-  - what changed and why, with `Closes #N`
+- The PR body carries the case for merging. A line each:
+  - what changed and why, with `Closes #N` --- bare text, since backticks break
+    the link. Never write close, fix or resolve next to an issue number you do
+    not intend to close, in any phrasing including a denial ("does not close
+    #N" closed it); write "related to #N". A keyword in any branch commit
+    survives the squash.
   - the CR citations behind it
   - the design calls made, and the alternatives rejected
   - how it was verified: suite count before -> after and the proving test
-  - whether the diff makes the rules core case on an effect's *identity* --- an
-    explicit "no" is cheap
+  - whether the rules core cases on an effect's *identity* --- an explicit "no"
   - what was deferred
 
-- Keep the prose terse --- PR bodies, issue comments and code comments alike.
-  Say what needs saying and stop: a line each for the points above rather than a
-  section each, and a citation in place of a quoted rule. Do the verification
-  work in full; just don't write it up at length.
+- Keep the prose terse --- PR bodies, issue comments and code comments alike,
+  and a citation in place of a quoted rule. Do the verification work in full;
+  write it up short.
 
-- Mark the PR ready for review once the self-review's findings are pushed and
-  the suite is green, then report it and stop. Don't wait for CI. Don't start
-  the next unit either: one unit at a time per checkout, since two branches
-  contend for `HEAD`.
+- Mark the PR ready once the self-review's findings are pushed and the suite is
+  green, report it, and stop. Don't wait for CI. Don't start the next unit ---
+  one unit at a time per checkout, since two branches contend for `HEAD`.
 
-- STAGE, then `hooky fix`. It acts on staged files, which is exactly the set
-  you changed, and it covers far more than CI's `Ormolu` job: `.hooky.kdl`
-  wires up ormolu, hlint, cabal-gild, `cabal check`, nixfmt, JSON formatting
-  and the builtin lint rules. Running those tools one at a time both misses
-  hooks and takes longer.
+- STAGE, then `hooky fix`. It acts on staged files only --- an unstaged file is
+  skipped, which is where "hooky fix wasn't enough" comes from --- and runs
+  every check `.hooky.kdl` wires up: CI's ormolu, hlint, cabal-gild, `cabal
+  check` and nixfmt, plus the JSON formatter, the citation check and the
+  builtin lint rules. It rewrites in place, so `git add` again afterwards.
+  `--all` sweeps the tree in two minutes instead of one second; use it only
+  when you suspect something landed unstaged.
 
-  Staging is the whole trick --- an unstaged file is skipped, which is where
-  "hooky fix isn't enough" comes from. It rewrites files in place and then
-  tells you to `git add` again. `--all` sweeps the tree instead, but it takes
-  two minutes against about one second, so reach for it only when you suspect
-  something landed unstaged.
+- After a PR merges, before the next unit, ask: did anything catch you that
+  your own checks didn't? did you violate an instruction? did you learn a
+  project fact the repo doesn't record? A project fact belongs here, in the
+  section it bears on, folded into the next unit's PR. Skip it when there is
+  genuinely nothing.
 
-- After a PR merges, before picking up the next unit, spend a few minutes on
-  what the cycle taught. Three questions: did anything catch you that your own
-  checks didn't (CI, a review, the owner)? did you violate an instruction? did
-  you learn a project fact the repo doesn't already record? Write the answers
-  down --- a project fact belongs here, in the section it bears on, folded into
-  the next unit's PR rather than a PR of its own. Skip it when there is
-  genuinely nothing; ceremonial notes cost more than they return.
+- Most of what's left is card-driven: working an issue means finding the real
+  card and adding it to `data/cards/`. That is the work, not a side quest, and
+  "no producer in the pool" describes it rather than excusing it. What is
+  forbidden is a capability no card exercises: per `docs/design.md` section 4,
+  an effect is not done until a card exercises it in a gameplay-level test. The
+  one good reason to stop is a *rules* reason --- the card turns out not to
+  exercise the thing after all.
 
-- Most of what's left is card-driven --- it fires when a card demands it, so
-  the backlog is a menu rather than a queue. Working one means finding the real
-  card and adding it to `data/cards/`; that is expected, not a side quest, and
-  "no producer in the pool" describes the work rather than excusing it. What is
-  forbidden is building a capability no card exercises: per `docs/design.md`
-  section 4, an effect is not done until a card exercises it in a
-  gameplay-level test. The one good reason to stop is a *rules* reason --- the
-  card turns out not to exercise the thing after all.
+- Labels: `elision`, `gap`, `rules-correctness` and `bug`, plus the expiry
+  triggers `expires:milestone`, `expires:card-driven`, `expires:subsystem` and
+  `expires:synthetic`. Priority labels are the owner's: prefer high-priority
+  issues when picking, never set one. `gap` (the capability does not exist) and
+  `rules-correctness` (behaviour observably diverges) often both apply;
+  `elision` excludes `rules-correctness`, since an elision is sound only while
+  the options are indistinguishable. `expires:card-driven` does NOT mean wait
+  --- it means add the card. An issue carrying no `expires:*` is one whose
+  trigger already fired. An `area:*` label goes on where one genuinely fits:
+  beyond the subsystem names there are `area:keywords` (CR 701/702),
+  `area:effects` (the effect DSL), `area:cards` (card data, faces, layouts,
+  schemas, lints), `area:stack` (CR 601/602/608) and `area:variants` (CR
+  313/315, subgames, Commander, the Ring, dungeons).
 
-- The labels worth knowing are `elision`, `gap`, `rules-correctness` and `bug`,
-  plus the expiry triggers `expires:milestone`, `expires:card-driven`,
-  `expires:subsystem` and `expires:synthetic`. Priority labels are the owner's:
-  prefer high-priority issues when picking, and never set one yourself.
-
-  `gap` and `rules-correctness` are orthogonal and often both apply: `gap` says
-  the capability does not exist, `rules-correctness` that behaviour observably
-  diverges. `elision` is the one that excludes `rules-correctness` --- an
-  elision is sound only while the options are indistinguishable, so once the
-  divergence is observable it is not an elision any more.
-
-  `expires:card-driven` does NOT mean "wait". It means the work includes adding
-  a card to the pool to exercise the behavior, which is ordinary work. What the
-  labels never say is which issues are ready: an issue carrying no `expires:*`
-  is one whose trigger already fired, usually because the producer is in
-  `data/cards/` transcribed a clause short.
-
-  An `area:*` label goes on where one genuinely fits; leave it off rather than
-  mislabel. Beyond the subsystem names there are `area:keywords` (CR 701/702),
-  `area:effects` (the effect DSL --- opcodes, filters, quantities, slots,
-  modes, durations), `area:cards` (card data, faces, layouts, schemas, lints),
-  `area:stack` (CR 601/602/608) and `area:variants` (CR 313/315, subgames,
-  Commander, the Ring, dungeons).
-
-- `_scratch/AllPrintings.json` is a dated MTGJSON dump, so it is sound for
-  FINDING a card and unsound for ruling one out --- it misses every set printed
-  after it was taken. Confirm an absence against Scryfall
-  (`curl -s 'https://api.scryfall.com/cards/named?fuzzy=<name>'`) before writing
-  "no such card exists"; Goblin Plate Mail is absent from the dump and real.
-  When grepping the dump, note there is no space after the colon (`"name":"Foo"`)
-  and that `rulings` sorts before `text`, so a hit near a name is usually
-  ruling boilerplate rather than oracle text. It lives in gitignored
-  `_scratch/`, so it may simply be absent --- fall back to Scryfall.
+- Verify Oracle text with `curl -s
+  'https://api.scryfall.com/cards/named?fuzzy=<name>'`; WebFetch gets 403s.
+  `_scratch/AllPrintings.json` is a dated MTGJSON dump: sound for FINDING a
+  card, unsound for ruling one out. When grepping it there is no space after
+  the colon (`"name":"Foo"`), and `rulings` sorts before `text`, so a hit near
+  a name is usually ruling boilerplate.
 
 - `_scratch/` also holds permissively licensed prior art --- `phase`, `mtgish`,
-  `argentum-engine` --- whose corpora shortcut two slow steps: finding the card
-  that produces a behaviour, and choosing an effect's field shape. Consult them
-  AFTER deriving the rule from `docs/rules.txt`, never before, since reading
-  someone else's model first imports it; the CR wins every disagreement. What
-  each is good for is in `docs/agents/implementing.md`, why in
-  `docs/prior-art-lessons.md` section 11. Being gitignored, any of them may be
-  absent --- that is a skipped step, not a blocked one.
+  `argentum-engine`; `docs/agents/implementing.md` says what each is good for.
+  Consult them AFTER deriving the rule from `docs/rules.txt`, since reading
+  someone else's model first imports it; the CR wins every disagreement.
+  Everything under `_scratch/` is gitignored and may be absent --- a skipped
+  step, not a blocked one.
 
-- When no printing can reach the rule, write a synthetic card as
-  `data/cards/synthetic-*.json`. A real card wins whenever one exists, and "I
-  could not find one" is not the test --- search first. All five sources are
-  acceptable, in the preference order regular > Arena > playtest > un-set >
-  synthetic (`docs/design.md` section 6), and a better-ranked card replaces a
-  worse-ranked one whenever it turns up; an issue whose only producer is a
-  digital-only printing is ordinary card-driven work. Legitimate when you can
-  cite the rule it exercises and nothing in the CR forbids such a card
-  existing (two lands that both set land subtypes); an issue in that
-  position waits under `expires:synthetic` until someone writes the card.
-  Illegitimate when the absence is rules-*enforced*, because then the
-  elision is provably sound (half a battle: CR 310 makes the first battle need
-  the whole subsystem) --- close that issue as wontfix.
+- When no printing can reach the rule, write `data/cards/synthetic-*.json`.
+  Search first: a real card wins whenever one exists, in the order regular >
+  Arena > playtest > un-set > synthetic (`docs/design.md` section 6), and a
+  better-ranked card replaces a worse-ranked one whenever it turns up; an
+  issue whose only producer is digital-only is ordinary card-driven work.
+  Legitimate when you can cite the rule it exercises and nothing in the CR
+  forbids such a card existing; that issue waits under `expires:synthetic`.
+  Illegitimate when the absence is rules-*enforced*, because then the elision
+  is provably sound --- close that issue as wontfix.
 
-- File the issue, cite it inline. When you elide something, open an issue
-  carrying the status, rationale and expiry trigger, then leave a comment at
-  the code site stating only what is *not* implemented, plus `(#N)`. Never
-  write the expiry into the comment --- an in-code expiry is a promise nothing
-  checks, and it drifted at a 23% rate before the tracker existed. That comment
-  dies in the commit that closes the issue. A comment citing the test that
-  *proves* a behavior is a different genre and outlives the issue.
+- File the issue, cite it inline. An elision gets an issue carrying the status,
+  rationale and expiry trigger, and a comment at the code site stating only
+  what is *not* implemented, plus `(#N)`. Never write the expiry into the
+  comment --- nothing checks it. That comment dies in the commit that closes
+  the issue; a comment citing the test that *proves* a behavior is a different
+  genre and outlives it.
 
-  Which genre a `(#N)` is has to be readable, because `script/check-gaps.sh`
-  checks the elision genre for exactly that death: an elision comment whose
-  issue has closed is a comment claiming a capability is missing that landed.
-  It reads the WORDING --- a comment paragraph saying "not implemented" is an
-  elision paragraph, and every `(#N)` in it must be open. An elision phrased
-  otherwise marks its citation `(gap #N)`, and a historical reference that
-  shares a paragraph with an elision drops the parentheses (`see #1116`).
+  `script/check-gaps.sh` reads the WORDING: a comment paragraph saying "not
+  implemented" is an elision paragraph, and every `(#N)` in it must be open.
+  An elision phrased otherwise marks its citation `(gap #N)`; a historical
+  reference sharing a paragraph with an elision drops the parentheses (`see
+  #1116`).
 
   A BLOCKED issue records its blocker as a GitHub dependency, not as prose:
 
@@ -213,44 +176,40 @@ to agents as written. What it doesn't say:
     -F issue_id="$(gh api repos/tfausak/pawl/issues/<BLOCKER> --jq .id)"
   ```
 
-  The metadata is the whole record --- don't also write a `Blocked by #N`
-  comment. A closed blocker KEEPS its link and renders as satisfied, which is
-  how a reader sees an issue became workable; removing it destroys the signal.
-  A blocker with no issue of its own is an untracked deficiency: file it, then
-  link it. Read a capability's dependents
-  (`gh api repos/tfausak/pawl/issues/N/dependencies/blocking`) when it lands,
-  and say in the PR body which issues it unblocked.
+  Don't also write a `Blocked by #N` comment. A closed blocker KEEPS its link
+  --- that is how a reader sees an issue became workable. A blocker with no
+  issue is an untracked deficiency: file it, then link it. When a capability
+  lands, read its dependents
+  (`gh api repos/tfausak/pawl/issues/N/dependencies/blocking`) and say in the
+  PR body which issues it unblocked.
 
-- A spec or plan is optional, not ceremony --- write one when the unit warrants
-  it and commit it in the same PR. If you are following a plan, work its tasks
-  strictly in order, and never edit the plan, weaken an assertion, or delete a
-  test to make a check pass. If the plan looks wrong, stop and say so.
+- A spec or plan is optional; commit one in the same PR when the unit
+  warrants it. If you are following one, work its tasks in order, and never
+  edit the plan, weaken an assertion, or delete a test to make a check pass.
+  If the plan looks wrong, stop and say so.
 
 ## Before you consider a change done
 
-1.  Distrust the issue body. Six cycles of one drain run found a stated blocker
-    already removed by unrelated work. Re-derive the status against the tree
-    before planning against it, and correct the issue in a comment when it's
-    wrong.
+1.  Distrust the issue body --- its status, its blockers and its size estimate
+    have all been wrong. Re-derive against the tree before planning, and
+    correct the issue in a comment when it's wrong.
 
 2.  Verify a scripted edit's blast radius. Bulk `sed`/Python rewrites land in
     comments, strings, and the middle of multi-line case bodies. Read the diff
-    stat and confirm the shape before staging.
+    and confirm the shape before staging.
 
 3.  Mutate the change away and re-run. A green suite is not evidence the test
-    proves anything, and in this repository it repeatedly has not been. Break
-    the line you just wrote, confirm the new test *fails*, put it back. Three
-    tests in one drain run would otherwise have shipped green and proved
-    nothing. If nothing fails, say so in the PR rather than implying coverage.
+    proves anything. Break the line you just wrote, confirm the new test
+    *fails*, put it back. If nothing fails, say so in the PR rather than
+    implying coverage. `docs/agents/implementing.md` lists the traps.
 
 4.  Find the sites `-Werror` won't. A `{}` or `_` pattern absorbs a new
-    constructor or field silently, and the recurring ones are
+    constructor or field silently; the recurring ones are
     `Pawl.Engine.Event`'s `eventBindings` fallthrough, `Pawl.TriggerSpec`'s
     hand-kept `everyTriggerCondition` and `representativeEvents`, and
-    `Pawl.CardSpec`'s filter and keyword traversals --- the last of which
-    already dropped a payload once, when landwalk's `Subtype` became a `Filter`.
-    Grep the sibling constructor, read every hit, and record in the PR which
-    ones you read and why each is right as it stands.
+    `Pawl.CardSpec`'s filter and keyword traversals. Grep the sibling
+    constructor, read every hit, and record in the PR which ones you read and
+    why each is right as it stands.
 
 ## Code conventions
 
@@ -277,10 +236,9 @@ project-specific rules it doesn't cover:
 
 - A new `Pawl.Types.Keyword` constructor that CARRIES A PAYLOAD owes a matching
   `Pawl.Types.KeywordFamily` constructor in the same change --- that type is how
-  a card says "a creature with toxic" rather than "with toxic 2", and it is
-  owed at the keyword, not at the first card that asks. `-Werror` catches the
-  missing `Pawl.Engine.Keyword.familyOf` arm but not a missing family, since
-  answering `Nothing` compiles.
+  a card says "a creature with toxic" rather than "with toxic 2". `-Werror`
+  catches the missing `Pawl.Engine.Keyword.familyOf` arm but not a missing
+  family, since answering `Nothing` compiles.
 
 ## Adding a module
 
