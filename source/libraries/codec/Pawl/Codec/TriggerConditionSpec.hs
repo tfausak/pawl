@@ -72,6 +72,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.SelfDealsCombatDamageToPlayer
       """ {"type":"SelfDealsCombatDamageToPlayer"} """
+  -- CR 120.3: the same history read the other way round -- the bearer was DEALT
+  -- damage. Nullary, since enrage qualifies the damage in no way.
+  Spec.it s "SelfIsDealtDamage" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.SelfIsDealtDamage
+      """ {"type":"SelfIsDealtDamage"} """
   -- The same event read by a bystander, carrying Tovolar's "you control": the
   -- Filter is the whole payload, so it has to survive both directions.
   Spec.it s "PermanentDealsCombatDamageToPlayer round-trips with its Filter" $
