@@ -10497,10 +10497,10 @@ minusCountersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.MinusOneMinusOn
 -- (data/cards/high-perfect-morcant.json): "Whenever High Perfect Morcant or
 -- another Elf you control enters, each opponent blights 1." (Name, cost, type
 -- line, P/T and oracle text checked against Scryfall.) Its second printed ability,
--- "Tap three untapped Elves you control: Proliferate", is not transcribed: no cost
--- component taps a COUNT of creatures matching a filter -- CostComponent's
--- TapForTotalPower states an aggregate power threshold instead -- gap #1650.
--- Omitting a permission leaves pawl's card STRICTER than printed.
+-- "Tap three untapped Elves you control: Proliferate. Activate only as a
+-- sorcery", is transcribed as of #1650's fix: CostComponent's TapPermanents is
+-- the count-plus-criterion cost that ability wants, and Pawl.CostSpec's "High
+-- Perfect Morcant" group is what proves it pays.
 --
 -- WHY MORCANT and not Champion of the Weird, which #1491's body nominates: that
 -- card's "As an additional cost to cast this spell, behold a Goblin and exile it"

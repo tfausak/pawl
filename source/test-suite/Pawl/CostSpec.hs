@@ -1616,6 +1616,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   thrastaSpec s registry
   omniscienceSpec s registry
   springleafDrumSpec s registry
+  morcantSpec s registry
 
 -- alice holds `card` and controls `n` untapped Mountains, plus Omniscience when
 -- `granted` is True, with priority in her own precombat main phase so a sorcery
@@ -2231,8 +2232,15 @@ springleafDrumSpec s registry = Spec.describe s "Springleaf Drum" $ do
     Spec.assertBool s (not (isTapped drumId (afterDrum S.identityAnswer drumId unpayable))) "leaving the Drum untapped"
   -- CR 302.6 and CR 107.5 gate on the tap SYMBOL in the creature's OWN
   -- activation cost. This cost taps another creature by written instruction, so
-  -- summoning sickness has nothing to say about it -- and Cost.requiresSicknessCheck
-  -- must not grow this arm. Both creatures arrived this turn.
+  -- summoning sickness has nothing to say about it. Both creatures arrived this
+  -- turn and either can still pay.
+  --
+  -- What this proves is that Cost.tapCandidates does not filter on sickness:
+  -- mutating it to do so turns this case red. It does NOT discriminate on
+  -- Cost.requiresSicknessCheck, and cannot -- rule 302.6 gates a CREATURE's
+  -- ability, and Springleaf Drum is an artifact, so adding this component to
+  -- that function leaves the suite green. A creature printing this cost
+  -- (Aphetto Grifter) is what would tell the two apart.
   Spec.it s "CR 302.6 a creature that arrived this turn can still be tapped for the cost" $ do
     drum <- S.printingOf s registry "Springleaf Drum"
     hillGiant <- S.printingOf s registry "Hill Giant"
@@ -2243,3 +2251,78 @@ springleafDrumSpec s registry = Spec.describe s "Springleaf Drum" $ do
         after = afterDrum (tapping giantId) drumId gs
     Spec.assertEqWith s "one mana" (pooledFrom (tapping giantId) drumId gs) 1
     Spec.assertBool s (isTapped giantId after) "the summoning-sick creature is tapped"
+
+-- High Perfect Morcant {2}{B}{G} 4/4 Legendary Creature -- Elf Noble: "Tap three
+-- untapped Elves you control: Proliferate. Activate only as a sorcery." The
+-- second producer for CostComponent.TapPermanents, and the one that exercises a
+-- COUNT ABOVE ONE -- Springleaf Drum's is one, where 1 and "some" cannot be told
+-- apart.
+--
+-- Morcant is itself an Elf and the cost does not say "another", so it is one of
+-- its own candidates. Four candidates against a count of three is what makes the
+-- prompt a real choice.
+--
+-- Not a mana ability, so unlike the Drum this one is legitimately asked of
+-- Activate.activatable (CR 605.3b is what bars that for the Drum).
+morcantBoard :: Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+morcantBoard morcant elves =
+  let (morcantId, gs0) = S.addCreature morcant S.alice (Setup.emptyGame S.bothPlayers)
+      add (ids, g) p = let (oid, g1) = S.addCreature p S.alice g in (ids <> [oid], g1)
+      (elfIds, gs1) = foldl add ([], gs0) elves
+   in ( morcantId,
+        elfIds,
+        gs1
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Answer Prompt.ChooseTaps with the named permanents, filtered against the
+-- offer -- `tapping`'s posture for a count above one.
+tappingAll :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+tappingAll wanted p = case p of
+  Prompt.ChooseTaps _ _ _ candidates _ -> Set.fromList (filter (\c -> elem c wanted) candidates)
+  _ -> S.identityAnswer p
+
+morcantSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+morcantSpec s registry = Spec.describe s "High Perfect Morcant" $ do
+  -- CR 118.3: three untapped Elves are the necessary resources. The pair varies
+  -- ONE thing -- how many Elves are on the battlefield beside Morcant.
+  Spec.it s "CR 118.3 three Elves are needed and two are not enough" $ do
+    morcant <- S.printingOf s registry "High Perfect Morcant"
+    glistener <- S.printingOf s registry "Glistener Elf"
+    hunter <- S.printingOf s registry "Elvish Hunter"
+    let (enoughId, _, enough) = morcantBoard morcant [glistener, hunter]
+        (shortId, _, short) = morcantBoard morcant [glistener]
+    -- Morcant is an Elf and the cost does not say "another", so it counts
+    -- itself: two other Elves make three candidates.
+    Spec.assertBool s (Activate.activatable S.alice enoughId (theAbility morcant) enough) "Morcant and two Elves: activatable"
+    Spec.assertBool s (not (Activate.activatable S.alice shortId (theAbility morcant) short)) "Morcant and one Elf: not"
+  -- The payment: four candidates, three tapped, and the payer says which three.
+  -- Morcant itself is a candidate and is the one left untapped here, so a case
+  -- that tapped "the first three" would still pass -- which is why the twin
+  -- below leaves a different Elf untapped.
+  Spec.it s "the payer chooses which three of the four Elves are tapped" $ do
+    morcant <- S.printingOf s registry "High Perfect Morcant"
+    glistener <- S.printingOf s registry "Glistener Elf"
+    hunter <- S.printingOf s registry "Elvish Hunter"
+    augur <- S.printingOf s registry "Llanowar Augur"
+    let (morcantId, elfIds, gs) = morcantBoard morcant [glistener, hunter, augur]
+        after = S.runPure (tappingAll elfIds) gs (Activate.activateAbility S.alice morcantId (theAbility morcant))
+    Spec.assertBool s (all (`isTapped` after) elfIds) "the three chosen Elves are tapped"
+    Spec.assertBool s (not (isTapped morcantId after)) "and Morcant, which was offered too, is not"
+    Spec.assertEqWith s "the ability is on the stack" (length (GameState.stack after)) 1
+  -- The discriminating twin: the same board, a different three. Morcant pays
+  -- this time and one Elf is spared.
+  Spec.it s "the choice is the player's: a different three leaves a different Elf untapped" $ do
+    morcant <- S.printingOf s registry "High Perfect Morcant"
+    glistener <- S.printingOf s registry "Glistener Elf"
+    hunter <- S.printingOf s registry "Elvish Hunter"
+    augur <- S.printingOf s registry "Llanowar Augur"
+    let (morcantId, elfIds, gs) = morcantBoard morcant [glistener, hunter, augur]
+        spared = last elfIds
+        after = S.runPure (tappingAll (morcantId : filter (/= spared) elfIds)) gs (Activate.activateAbility S.alice morcantId (theAbility morcant))
+    Spec.assertBool s (isTapped morcantId after) "Morcant paid this time"
+    Spec.assertBool s (not (isTapped spared after)) "and the Elf left out is untapped"
+    Spec.assertEqWith s "the ability is on the stack" (length (GameState.stack after)) 1
