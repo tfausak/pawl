@@ -163,6 +163,9 @@
 -- through the ordinary Pool + Filter target machinery, with Bitterblossom --
 -- `kindredSpec`. CR 701.9a's discard trigger, and CR 702.29d's
 -- "only once when a card is cycled", with Megrim -- `discardTriggerSpec`.
+-- CR 702.29a's cycling read as a discard by a BYSTANDER rather than by the
+-- cycled card, across three seats so CR 603.3a's "you" is separated from
+-- everyone else, with Prickly Marmoset -- `cyclesTriggerSpec`.
 -- The same rule read by the card that was DISCARDED, one ability whose two
 -- conditions function in different zones (CR 113.6k), with Bartered Cow --
 -- `selfDiscardTriggerSpec`.
@@ -3195,6 +3198,122 @@ discardTriggerSpec s registry =
       Spec.assertEqWith s "the controller's own discard costs him nothing" (S.lifeOf S.bob (settle byBob)) (S.lifeOf S.bob gs)
       Spec.assertEqWith s "and costs alice nothing either" (S.lifeOf S.alice (settle byBob)) (S.lifeOf S.alice gs)
       Spec.assertEqWith s "bob's discard put nothing on the stack at all" (GameState.stack (S.runPure S.identityAnswer byBob Engine.settleForPriority)) []
+
+-- One board for every case below, differing in exactly one thing: WHICH seat
+-- holds the Barkhide Mauler and cycles it. alice controls the Prickly Marmoset
+-- throughout, so CR 603.3a fixes its "you" as alice on all three boards.
+--
+-- Three seats, not two. The condition's axis is CR 109.5's "you" against
+-- everyone else, and a board with one other player cannot show that "everyone
+-- else" is more than the one seat opposite.
+--
+-- Two Forests each, so the {2} is payable whoever cycles, and a library card
+-- each, so CR 104.3c cannot deck the seat that draws before the assertion runs.
+marmosetBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  PlayerId.PlayerId ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+marmosetBoard marmoset mauler forest piker cycler =
+  let seats = [S.alice, S.bob, S.carol]
+      lands = List.foldl' (\g pid -> S.landsFor forest pid 2 g) (Setup.emptyGame S.threePlayers) seats
+      libraries = List.foldl' (\g pid -> snd (S.addLibraryCard piker pid g)) lands seats
+      (marmosetId, withMarmoset) = S.addCreature marmoset S.alice libraries
+      (maulerId, withMauler) = S.addHandCard mauler cycler withMarmoset
+   in ( marmosetId,
+        maulerId,
+        withMauler
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just cycler
+          }
+      )
+
+-- CR 702.29a: "'Cycling [cost]' means '[Cost], Discard this card: Draw a
+-- card.'", so a cycle IS a discard, and rule 702.29c names that discard when it
+-- defines what cycling a card is. Prickly Marmoset, {2}{R} 2/3 Creature --
+-- Monkey, is the pool's first card to watch a PLAYER do it rather than to watch
+-- itself be cycled: "Whenever you cycle a card, this creature gets +2/+0 until
+-- end of turn." First strike is the rest of its text and is inert on every board
+-- here.
+--
+-- Rule 702.29c governs only its own self-scoped phrase; what fixes this
+-- watcher-scoped one's "you" is CR 603.3a, the ability's controller.
+--
+-- Barkhide Mauler is the cycled card throughout -- its whole text is "Cycling
+-- {2}", so nothing on it can contribute a trigger and every count below is the
+-- Marmoset's alone. 2/3 pumped by +2/+0 is 4/3, so no reading of the rule lands
+-- on the same pair of numbers as another.
+cyclesTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+cyclesTriggerSpec s registry =
+  Spec.describe s "CyclesTrigger" $ do
+    -- The whole card: alice cycles the Mauler for {2}, the Marmoset's trigger is
+    -- placed above the cycling ability, and the Marmoset is a 4/3 once it
+    -- resolves.
+    Spec.it s "CR 702.29a whole card: cycling a card pumps Prickly Marmoset" $ do
+      forest <- S.printingOf s registry "Forest"
+      marmoset <- S.printingOf s registry "Prickly Marmoset"
+      mauler <- S.printingOf s registry "Barkhide Mauler"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (marmosetId, maulerId, gs) = marmosetBoard marmoset mauler forest piker S.alice
+      Spec.assertEqWith s "the Marmoset starts a 2/3" (S.powerToughnessOf marmosetId gs) (Just (2, 3))
+      case Activate.abilitiesFor maulerId gs of
+        [ability] -> do
+          let cycled = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice maulerId ability)
+              placed = S.runPure S.identityAnswer cycled Engine.settleForPriority
+              after = S.runPure S.identityAnswer placed Stack.resolveTop
+          Spec.assertEqWith s "the Mauler was discarded to pay the cost" (length (Game.zoneMembers Zone.Graveyard S.alice cycled)) 1
+          Spec.assertEqWith s "the trigger is on the stack, above the cycling ability" (length (GameState.stack placed)) 2
+          Spec.assertEqWith s "and the Marmoset is a 4/3 once it resolves" (S.powerToughnessOf marmosetId after) (Just (4, 3))
+        abilities -> Spec.assertFailure s ("expected one cycling ability, got " <> show (length abilities))
+    -- The player axis, which is what makes this condition PlayerCycles rather
+    -- than a nullary one: the same board and the same act, one cycling seat
+    -- apart. An arm ignoring the discarder would pump alice's Marmoset on all
+    -- three.
+    Spec.it s "CR 603.3a 'you' is the Marmoset's controller: only alice's cycling pumps it" $ do
+      forest <- S.printingOf s registry "Forest"
+      marmoset <- S.printingOf s registry "Prickly Marmoset"
+      mauler <- S.printingOf s registry "Barkhide Mauler"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let run cycler =
+            let (marmosetId, maulerId, gs) = marmosetBoard marmoset mauler forest piker cycler
+             in case Activate.abilitiesFor maulerId gs of
+                  [ability] ->
+                    let cycled = S.runPure S.identityAnswer gs (Activate.activateAbility cycler maulerId ability)
+                        placed = S.runPure S.identityAnswer cycled Engine.settleForPriority
+                        after = S.runPure S.identityAnswer placed Stack.resolveTop
+                     in Just
+                          ( length (Game.zoneMembers Zone.Graveyard cycler cycled),
+                            length (GameState.stack placed),
+                            S.powerToughnessOf marmosetId after
+                          )
+                  _ -> Nothing
+      Spec.assertEqWith
+        s
+        "every seat's cycle reaches its own graveyard, but only alice's adds a trigger and pumps the Marmoset"
+        (fmap run [S.alice, S.bob, S.carol])
+        [ Just (1, 2, Just (4, 3)),
+          Just (1, 1, Just (2, 3)),
+          Just (1, 1, Just (2, 3))
+        ]
+    -- The neighbouring cause, and the reason this is not TriggerCondition.PlayerDiscards:
+    -- an ORDINARY discard of the same card by the same player, through the same
+    -- CR 400.7 funnel into the same graveyard, is not cycling and fires nothing.
+    Spec.it s "CR 702.29c an ordinary discard by the same player is not cycling" $ do
+      forest <- S.printingOf s registry "Forest"
+      marmoset <- S.printingOf s registry "Prickly Marmoset"
+      mauler <- S.printingOf s registry "Barkhide Mauler"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (marmosetId, _, gs) = marmosetBoard marmoset mauler forest piker S.alice
+          -- The Mauler is the only card in alice's hand, so CR 701.9b has
+          -- nothing to ask and the same card leaves by the other door.
+          discarded = S.runPure S.identityAnswer gs (Cost.payComponent S.alice S.noSource (CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.And []))))
+          placed = S.runPure S.identityAnswer discarded Engine.settleForPriority
+      Spec.assertEqWith s "the Mauler really did reach alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice discarded)) 1
+      Spec.assertEqWith s "nothing was put on the stack" (GameState.stack placed) []
+      Spec.assertEqWith s "and the Marmoset is still a 2/3" (S.powerToughnessOf marmosetId placed) (Just (2, 3))
 
 -- The Food token Bartered Cow makes, by name, which is how the cases below read
 -- the trigger's whole payload off the board.
@@ -9468,6 +9587,10 @@ representativeEvents cond =
           GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary)
             NonEmpty.:| [GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.ToPayCyclingCost)]
         TriggerCondition.PlayerDiscards _ -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary))
+        -- The CYCLING cause, which is the only one this condition admits -- an
+        -- Ordinary discard is an event it rejects, and eventBindings is consulted
+        -- only for a match, so it would pin nothing.
+        TriggerCondition.PlayerCycles _ -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.ToPayCyclingCost))
         -- The ordinal matches the condition's own, so the event is one this
         -- condition genuinely admits -- an event it rejected would pin nothing,
         -- eventBindings being consulted only for a match.
@@ -9686,6 +9809,8 @@ everyTriggerCondition =
     TriggerCondition.SelfRevealedForMiracle,
     TriggerCondition.SelfDiscarded,
     TriggerCondition.PlayerDiscards PlayerRelation.Opponent,
+    TriggerCondition.PlayerCycles PlayerRelation.You,
+    TriggerCondition.PlayerCycles PlayerRelation.Opponent,
     TriggerCondition.PlayerDrawsNthCard (PlayerDrawsNthCard.MkPlayerDrawsNthCard PlayerRelation.You 2),
     TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
     TriggerCondition.SelfAttacksWithAnother (Filter.Type.And []),
@@ -13572,6 +13697,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   aetherFlashSpec s registry
   kindredSpec s registry
   discardTriggerSpec s registry
+  cyclesTriggerSpec s registry
   selfDiscardTriggerSpec s registry
   drawTriggerSpec s registry
   miracleSpec s registry

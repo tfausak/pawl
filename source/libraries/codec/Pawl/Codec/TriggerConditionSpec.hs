@@ -136,6 +136,21 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PlayerDiscards PlayerRelation.You)
       " {\"type\":\"PlayerDiscards\",\"value\":{\"type\":\"You\"}} "
+  -- CR 702.29a's cycling read as a discard, watched by a bystander: Prickly
+  -- Marmoset's "whenever you cycle a card". Both relations, for PlayerDiscards'
+  -- reason, and the tag is what keeps it distinct on the wire from that
+  -- cause-blind sibling.
+  Spec.it s "PlayerCycles round-trips both relations" $ do
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerCycles PlayerRelation.You)
+      " {\"type\":\"PlayerCycles\",\"value\":{\"type\":\"You\"}} "
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerCycles PlayerRelation.Opponent)
+      " {\"type\":\"PlayerCycles\",\"value\":{\"type\":\"Opponent\"}} "
   -- CR 121.1's Nth draw of a turn. The relation and the ordinal are both content,
   -- and the ordinal is not 1, so a codec dropping it would fail rather than
   -- round-trip the default.
