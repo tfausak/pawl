@@ -9608,9 +9608,11 @@ becameSlotSpec s registry =
         -- The INTERSECTION over the events a condition admits, because the
         -- classification answers the guaranteed floor rather than the union: a
         -- slot the lint says is available must be bound for every event that
-        -- could have placed the trigger. For every condition but
-        -- SelfLeavesTheBattlefield that list has one element, so the
-        -- intersection is exactly that event's keyset.
+        -- could have placed the trigger. Two conditions have a list longer than
+        -- one -- SelfLeavesTheBattlefield, where the two destinations disagree
+        -- about `became`, and SelfIsDealtDamage, where CR 120.3's two damage
+        -- kinds agree on `thatMuch` and so make the floor a real one; for every
+        -- other the intersection is exactly that single event's keyset.
         Spec.it s "CR 603.2 eventBindingSlots names exactly the keys eventBindings stamps for EVERY event a condition admits" $ do
           mapM_
             ( \cond ->
@@ -11600,6 +11602,9 @@ falseCureSpec s registry =
 --     do: a noncombat event and a CR 510.2 combat event each draw one.
 --   * CR 510.2's simultaneity, which is the reading a naive once-per-batch arm
 --     gets wrong: two blockers deal two events and draw TWO cards.
+--   * the AMOUNT the event carried, which the payload reads back as CR 120.3's
+--     "that much" -- Coalhauler Swine, below, where the Raptor reads no number at
+--     all.
 --
 -- Hand size is asserted BEFORE and AFTER every time. "alice holds one card" alone
 -- passes on a board she drew for turn on.
@@ -11675,6 +11680,71 @@ enrageSpec s registry =
               Spec.assertEqWith s "alice started with an empty hand" (S.handSize S.alice gs) 0
               Spec.assertEqWith s "one card per event, so two" (S.handSize S.alice after) 2
               Spec.assertEqWith s "and both events' damage is marked" (damageOn raptorId after) (Just 3)
+        -- CR 603.2's amount, the half of CR 120.3's event no payload could read
+        -- before. Coalhauler Swine, {4}{R}{R} Creature -- Boar Beast 4/4, whose
+        -- whole text is "Whenever this creature is dealt damage, it deals that
+        -- much damage to each player."
+        --
+        -- A PAIR OF BOARDS differing in exactly one thing -- the number the event
+        -- carries -- because "each player lost 3" alone is passed by a constant
+        -- binding of 3 as happily as by reading the event.
+        --
+        -- Neither amount coincides with a characteristic a wrong binding could
+        -- reach: 3 and 5 are neither the Swine's power nor its toughness (4) nor
+        -- the Goblin Piker damager's power (2), so a binding reading a
+        -- characteristic instead of the event fails both boards rather than
+        -- passing one by luck.
+        --
+        -- THREE SEATS, because "each player" over two collapses onto "you and an
+        -- opponent"; carol blocks the payload that hit only the combatants.
+        --
+        -- TOUGHNESS 4 is load-bearing: 3 is not lethal (CR 704.5g), so the Swine
+        -- is still on the battlefield when its own trigger resolves and the
+        -- assertion says nothing about CR 608.2h. The 5-damage board IS lethal, and
+        -- is asserted on life totals only -- the number the event carried, which
+        -- the binding captured at CR 603.2 rather than at resolution.
+        Spec.it s "CR 120.3 the payload reads the amount the event carried" $ do
+          swine <- S.printingOf s registry "Coalhauler Swine"
+          piker <- S.printingOf s registry "Goblin Piker"
+          brigade <- S.printingOf s registry "Foriysian Brigade"
+          let (swineId, g1) = S.addCreature swine S.alice S.threePlayerGame
+              (mineId, g2) = S.addCreature brigade S.alice g1
+              (theirsId, gs) = S.addCreature piker S.bob g2
+              lives g = (S.lifeOf S.alice g, S.lifeOf S.bob g, S.lifeOf S.carol g)
+              threeAt = dealing [noncombat theirsId swineId 3] gs
+              fiveAt = dealing [noncombat theirsId swineId 5] gs
+              atOther = dealing [noncombat theirsId mineId 3] gs
+          Spec.assertEqWith s "all three seats start at 20" (lives gs) (Just 20, Just 20, Just 20)
+          Spec.assertEqWith s "CR 120.3a: a 3-damage event costs every player 3" (lives threeAt) (Just 17, Just 17, Just 17)
+          Spec.assertEqWith s "and the 3 really landed on the Swine (CR 120.3e)" (damageOn swineId threeAt) (Just 3)
+          Spec.assertEqWith s "the same board with a 5-damage event costs every player 5" (lives fiveAt) (Just 15, Just 15, Just 15)
+          -- The RECIPIENT control, on the same board and the same amount: the
+          -- event pointed at alice's Foriysian Brigade instead, so the life totals
+          -- above are this trigger and not damage-adjacent bookkeeping. Its
+          -- toughness is 4 too, so it survives to be asked about.
+          Spec.assertEqWith s "an event on another of her creatures moves no life total" (lives atOther) (Just 20, Just 20, Just 20)
+          Spec.assertEqWith s "though that damage landed too (CR 120.3e)" (damageOn mineId atOther) (Just 3)
+        -- CR 510.2 again, now on the AMOUNT rather than on the firing count: two
+        -- blockers of 2 and 1 deal two events, and each trigger reads its OWN
+        -- event, so the players lose 2 and then 1. The readings this separates,
+        -- both of which give 3 per firing and so 6 in total, are "the damage
+        -- marked on the recipient" (CR 120.3e has recorded all 3 before either
+        -- trigger resolves) and "the batch's total".
+        --
+        -- Two seats suffice here -- the "each player" reach is the board above's
+        -- job, and this one is about which number each of two firings reads.
+        Spec.it s "CR 510.2 two simultaneous events are read one at a time, not summed" $ do
+          swine <- S.printingOf s registry "Coalhauler Swine"
+          piker <- S.printingOf s registry "Goblin Piker"
+          sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+          let (gs, mine, _) = S.combatBoardOf [swine] [piker, sorcerer]
+          case mine of
+            [] -> Spec.assertFailure s "fixture should have given alice a Coalhauler Swine"
+            swineId : _ -> do
+              let after = resolveAll (S.fightWith S.aggressiveAnswer gs)
+              Spec.assertEqWith s "both players started at 20" (S.lifeOf S.alice gs, S.lifeOf S.bob gs) (Just 20, Just 20)
+              Spec.assertEqWith s "2 then 1, so 3 each -- not 3 twice" (S.lifeOf S.alice after, S.lifeOf S.bob after) (Just 17, Just 17)
+              Spec.assertEqWith s "with both blockers' damage marked on the Swine" (damageOn swineId after) (Just 3)
 
 -- The life-GAIN group's mirror: "whenever an opponent loses life", which the
 -- rules give no CR 119.9 of its own. What counts as a loss is therefore fixed by
