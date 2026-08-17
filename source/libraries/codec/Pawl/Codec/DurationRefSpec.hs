@@ -13,9 +13,9 @@ import qualified Pawl.Types.SlotName as SlotName
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.DurationRef" $ do
-  -- Shared by PreventAllDamage and GainControl, which differ only in their tag.
-  -- Both keys are required: this payload has no optional part, which is what
-  -- makes it shareable at all.
+  -- GainControl's payload, and today its only user. Both keys are required:
+  -- this payload has no optional part, which is what made it shareable at all,
+  -- and an arm that grew one took its own type instead.
   Spec.it s "MkDurationRef, both keys" $
     Common.assertCodec
       s

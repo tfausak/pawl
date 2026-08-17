@@ -98,6 +98,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.Power as Power
+import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
@@ -1907,11 +1908,12 @@ rewriteEffect pairs effect = case effect of
   Effect.Replace {} -> effect
   Effect.SkipNextPhase {} -> effect
   -- CR 612.1: a rider's text is as changeable as any other, so the recursion
-  -- reaches it. The shield's own three fields hold nothing a text change
-  -- touches, which is why the arm was a no-op before.
-  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration ref quantity rider) ->
-    Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration ref quantity (fmap (rewriteEffect pairs) rider))
-  Effect.PreventAllDamage {} -> effect
+  -- reaches it, on both shields. The shields' own fields hold nothing a text
+  -- change touches, which is why each arm was a no-op before it grew a rider.
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration kind ref quantity rider) ->
+    Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration kind ref quantity (fmap (rewriteEffect pairs) rider))
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration kind ref rider) ->
+    Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration kind ref (fmap (rewriteEffect pairs) rider))
   Effect.RedirectDamage {} -> effect
   Effect.Counter (Counter.MkCounter ref mSlot) -> Effect.Counter (Counter.MkCounter (rewriteObjectRef pairs ref) mSlot)
   Effect.PutCounters {} -> effect

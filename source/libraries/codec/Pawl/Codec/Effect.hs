@@ -1,9 +1,10 @@
 -- | Where the effect knot is tied. The card codec is a PARAMETER, so this module
 -- names no concrete card type; Pawl.Codec.Card passes its own codec in.
 --
--- RECURSIVE four times over: PreventNextDamage's CR 615.5 rider, the same rule's
--- rider on a Replace's DamageR, and ForEach's CR 608.2f body all hold effects,
--- and CreateEmblem's payload is a whole card whose faces hold effects. Each names 'codec' inside its own definition, which
+-- RECURSIVE five times over: PreventNextDamage's CR 615.5 rider, PreventAllDamage's
+-- rider under the same rule, the same rule's rider on a Replace's DamageR, and
+-- ForEach's CR 608.2f body all hold effects, and CreateEmblem's payload is a whole
+-- card whose faces hold effects. Each names 'codec' inside its own definition, which
 -- terminates for Pawl.Codec.TriggerCondition's
 -- reason -- 'Arm.tagged' reaches WHNF without forcing its arm list, and
 -- 'Define.define' registers the type's name before running the schema body.
@@ -42,6 +43,7 @@ import qualified Pawl.Codec.OfferCast as OfferCast
 import qualified Pawl.Codec.PlayerCounters as PlayerCounters
 import qualified Pawl.Codec.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Codec.PlayerSacrifices as PlayerSacrifices
+import qualified Pawl.Codec.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Codec.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Codec.PutCounters as PutCounters
 import qualified Pawl.Codec.Quantity as Quantity
@@ -108,7 +110,7 @@ codec cardCodec =
       Arm.payload "Replace" replaceCodec Effect.Replace (\x -> case x of Effect.Replace y -> Just y; _ -> Nothing),
       Arm.payload "SkipNextPhase" SkipNextPhase.codec Effect.SkipNextPhase (\x -> case x of Effect.SkipNextPhase y -> Just y; _ -> Nothing),
       Arm.payload "PreventNextDamage" preventCodec Effect.PreventNextDamage (\x -> case x of Effect.PreventNextDamage y -> Just y; _ -> Nothing),
-      Arm.payload "PreventAllDamage" DurationRef.codec Effect.PreventAllDamage (\x -> case x of Effect.PreventAllDamage y -> Just y; _ -> Nothing),
+      Arm.payload "PreventAllDamage" preventAllCodec Effect.PreventAllDamage (\x -> case x of Effect.PreventAllDamage y -> Just y; _ -> Nothing),
       Arm.payload "RedirectDamage" RedirectDamage.codec Effect.RedirectDamage (\x -> case x of Effect.RedirectDamage y -> Just y; _ -> Nothing),
       Arm.payload "PutCounters" PutCounters.codec Effect.PutCounters (\x -> case x of Effect.PutCounters y -> Just y; _ -> Nothing),
       Arm.payload "RemoveCounters" RemoveCounters.codec Effect.RemoveCounters (\x -> case x of Effect.RemoveCounters y -> Just y; _ -> Nothing),
@@ -148,4 +150,5 @@ codec cardCodec =
     createCodec = Create.codec cardCodec
     replaceCodec = Replace.codec (codec cardCodec)
     preventCodec = PreventNextDamage.codec (codec cardCodec)
+    preventAllCodec = PreventAllDamage.codec (codec cardCodec)
     forEachCodec = ForEach.codec (codec cardCodec)

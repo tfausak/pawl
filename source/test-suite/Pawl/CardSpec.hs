@@ -170,6 +170,7 @@ import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
+import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.Printing as Printing
@@ -735,8 +736,8 @@ effectCounts effect = case effect of
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- CR 615.5's rider is an effect list a card authors, so its Counts are this
   -- card's Counts -- the same recursion Create takes into a minted token.
-  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ quantity rider) -> durationCounts duration <> quantityCounts quantity <> concatMap effectCounts rider
-  Effect.PreventAllDamage (DurationRef.MkDurationRef duration _) -> durationCounts duration
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ quantity rider) -> durationCounts duration <> quantityCounts quantity <> concatMap effectCounts rider
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ rider) -> durationCounts duration <> concatMap effectCounts rider
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ _ _) -> durationCounts duration
   -- CR 708.2's listed characteristics are card data, so the listed power and
   -- toughness are walked for the reason Create's minted face is. The listed type
@@ -1096,7 +1097,7 @@ replacementEntryEffects replacement = case replacement of
 
 -- CR 615.5: the additional effect a replacement PRINTS -- DamageR's riders, and
 -- nothing else, since no other arm has a field to carry one. The card-authored
--- twin of Effect.PreventNextDamage's `riders`, and swept everywhere that one is.
+-- twin of the two prevention opcodes' `riders`, and swept everywhere those are.
 replacementEffectRiders :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> [Effect.Effect Card.Type.Card]
 replacementEffectRiders replacement = case replacement of
   ReplacementEffect.DamageR (DamageR.MkDamageR _ _ riders) -> Foldable.toList riders
@@ -1159,10 +1160,10 @@ effectReplacements effect = case effect of
   Effect.DecreaseSpeed _ -> []
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- CR 615.5's rider can carry an Effect.Replace, so this descends.
-  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ rider) -> concatMap effectReplacements rider
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ rider) -> concatMap effectReplacements rider
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ rider) -> concatMap effectReplacements rider
   -- CR 608.2f's body can too, for the same reason.
   Effect.ForEach (ForEach.MkForEach _ _ body) -> concatMap effectReplacements body
-  Effect.PreventAllDamage {} -> []
   Effect.RedirectDamage {} -> []
   -- CR 708.2's listed characteristics hold no replacement effect (gap #1667).
   Effect.TurnFaceDown _ -> []
@@ -1741,10 +1742,10 @@ effectMintedFaces effect = case effect of
   Effect.DecreaseSpeed _ -> []
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- CR 615.5's rider can mint a token or emblem of its own, so this descends.
-  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ rider) -> concatMap effectMintedFaces rider
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ rider) -> concatMap effectMintedFaces rider
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ rider) -> concatMap effectMintedFaces rider
   -- CR 608.2f's body can too, for the same reason.
   Effect.ForEach (ForEach.MkForEach _ _ body) -> concatMap effectMintedFaces body
-  Effect.PreventAllDamage {} -> []
   Effect.RedirectDamage {} -> []
   -- CR 708.2's listed characteristics are not a minted FACE: they replace an
   -- existing object's, and Pawl.Engine.Card.faceDownFace supplies every field
@@ -2955,9 +2956,10 @@ effectFilters effect = case effect of
   -- The rider's Filters too, for CR 615.5. This is the traversal that dropped
   -- landwalk's payload once, so a nested effect list is exactly what it must not
   -- stop at.
-  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration ref quantity rider) ->
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ ref quantity rider) ->
     unframed (durationFilters duration <> objectRefFilters ref <> quantityFilters quantity) <> concatMap effectFilters rider
-  Effect.PreventAllDamage (DurationRef.MkDurationRef duration ref) -> unframed (durationFilters duration <> objectRefFilters ref)
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ ref rider) ->
+    unframed (durationFilters duration <> objectRefFilters ref) <> concatMap effectFilters rider
   -- BOTH refs, or a Filter inside a redirect's destination escapes this lint.
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ srcRef destRef) ->
     unframed (durationFilters duration <> objectRefFilters srcRef <> objectRefFilters destRef)

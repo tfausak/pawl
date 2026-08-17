@@ -9,10 +9,10 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- cast under it.
 --
 -- SPUN OUT of Pawl.Types.DurationRef, which that type's own haddock asks for as
--- soon as one sharer needs a field the others do not (#1305): PreventAllDamage
--- and GainControl have nothing to say about mana, and a Maybe bolted onto the
--- shared record would have made the field's absence into the tag telling the
--- three arms apart.
+-- soon as one sharer needs a field the others do not (#1305): GainControl has
+-- nothing to say about mana, and a Maybe bolted onto the shared record would
+-- have made the field's absence into the tag telling the arms apart.
+-- Pawl.Types.PreventAllDamage was spun out for the same reason afterwards.
 --
 -- `spending` is CR 118.14's "and mana of any type can be spent to cast that
 -- spell", printed on Dire Fleet Daredevil beside the permission itself. It rides
