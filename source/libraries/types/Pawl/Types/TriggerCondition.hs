@@ -154,9 +154,9 @@ data TriggerCondition
     -- attacking, and CR 508.4 says such a creature never attacked. So this matches
     -- GameEvent.AttackerDeclared, which only the declaration appends, and never
     -- the combat record. No attack TARGET is compared against by THIS arm; CR
-    -- 508.3a's second sentence is CreatureAttacksYou below, and
-    -- SelfAttacksPlayerWithMostLife reads the target for rule 702.105a's own
-    -- comparison rather than as a general form. What the
+    -- 508.3a's second sentence is CreatureAttacksYou below, which compares the
+    -- DEFENDING PLAYER instead, and SelfAttacksPlayerWithMostLife reads the target
+    -- for rule 702.105a's own comparison rather than as a general form. What the
     -- event does carry alongside the attacker is CR 508.5's defending player, whom
     -- Pawl.Engine.Event.eventBindings binds under
     -- Pawl.Engine.Binding.triggerPlayer for CR 702.86a's annihilator to read --
