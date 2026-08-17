@@ -51,16 +51,21 @@
 -- Pawl.Engine.Resolve. The effect mints no event and goes through no funnel,
 -- which is CR 702.26d.
 --
+-- CR 702.26n's second sentence is the third thing this module maintains, and the
+-- one schedule that is not read off the untap step's own player: a permanent
+-- that phased out under a player who has since LEFT phases in "during the next
+-- untap step after that player's next turn would have begun". `orphanSchedule`
+-- is the moment CR 800.4k decides that turn does not begin, and the
+-- PhasedOut.Orphaned row it writes is what `phasingIn` then takes at whatever
+-- untap step comes next. Rule 702.26n's first sentence needs nothing here:
+-- CR 702.26k's clause is Pawl.Engine.Game.removeFromZones, and CR 800.4a's exile
+-- clause is vacuous for a phased-out permanent, which no battlefield walk finds.
+--
 -- WHAT IS NOT IMPLEMENTED, none of which the pool can reach:
 --
 --   * CR 702.26e/f, the continuous-effect consequences of being gone (#930).
 --   * CR 702.26h's own half of `phaseOutSet`'s tie-break, which needs an effect
 --     that phases out a permanent and its own Equipment together (#1723).
---   * CR 702.26n's second sentence: a permanent that phased out under a player
---     who has since LEFT the game phases in "during the next untap step after
---     that player's next turn would have begun", a schedule for a turn that never
---     happens (#931). Rule 702.26k's own clause -- such a permanent leaves the
---     game with its owner -- IS implemented, in Pawl.Engine.Game.removeFromZones.
 module Pawl.Engine.Phasing where
 
 import qualified Data.Map.Strict as Map
@@ -217,10 +222,17 @@ heldBy pid oid gs = Maybe.fromMaybe pid (Projection.controllerOf oid gs)
 -- No keyword test on either side. A permanent that phased out because an effect
 -- said so has no phasing ability, and CR 702.26a still phases it back in; the
 -- keyword decides who LEAVES, never who returns.
+--
+-- The orphaned rows join the direct ones WHOEVER'S untap step this is, which is
+-- CR 702.26n's own schedule: the turn their player would have begun did not
+-- (CR 800.4k), so the rule names the next untap step there is rather than one
+-- belonging to anybody. They are unioned into `onSchedule` before the closure
+-- rather than beside it, so an Aura that phased out indirectly on an orphaned
+-- host still rides back with that host (CR 702.26g).
 phasingIn :: PlayerId -> GameState -> [ObjectId]
 phasingIn pid gs =
   let rows = GameState.phasedOut gs
-      onSchedule = Map.keysSet (Map.filter (== PhasedOut.Directly pid) rows)
+      onSchedule = Map.keysSet (Map.filter (\row -> row == PhasedOut.Directly pid || isOrphaned row) rows)
       indirect = Map.keysSet (Map.filter isIndirect rows)
    in Set.toAscList (closeOver indirect onSchedule gs)
 
@@ -228,6 +240,31 @@ isIndirect :: PhasedOut.PhasedOut -> Bool
 isIndirect status = case status of
   PhasedOut.Directly _ -> False
   PhasedOut.Indirectly _ -> True
+  -- CR 702.26n reschedules a DIRECT row and changes nothing else about it.
+  PhasedOut.Orphaned _ -> False
+
+isOrphaned :: PhasedOut.PhasedOut -> Bool
+isOrphaned status = case status of
+  PhasedOut.Directly _ -> False
+  PhasedOut.Indirectly _ -> False
+  PhasedOut.Orphaned _ -> True
+
+-- | CR 702.26n's second sentence, at the moment CR 800.4k decides `pid`'s turn
+-- does not begin: every row on rule 702.26a's schedule for a player who has left
+-- is moved onto rule 702.26n's, and phases in at the next untap step that runs.
+--
+-- Called from Pawl.Engine.Engine's two CR 800.4k branches -- the seat walk and a
+-- departed player's spent extra turn -- which is where "would have begun" is
+-- decided, and is why this function does not test whether `pid` has left: its
+-- callers are already on the branch that answered that.
+--
+-- The INDIRECT rows are left alone, and rule 702.26g is why: such a row is not a
+-- schedule at all, so there is nothing to reschedule -- it rides back with its
+-- host, whose own row this function moves if that host is orphaned too.
+orphanSchedule :: PlayerId -> GameState -> GameState
+orphanSchedule pid gs =
+  let reschedule row = if row == PhasedOut.Directly pid then PhasedOut.Orphaned pid else row
+   in gs {GameState.phasedOut = Map.map reschedule (GameState.phasedOut gs)}
 
 -- CR 702.26b: status becomes "phased out", and -- the rule's own last sentence,
 -- restating CR 506.4 -- the permanent is removed from combat.
@@ -276,6 +313,9 @@ phaseIn _ oid gs =
       unattaching = case phasedOutStatus oid gs of
         Just (PhasedOut.Directly _) -> not (hostRemains oid gs)
         Just (PhasedOut.Indirectly _) -> False
+        -- An orphaned row IS a direct row (CR 702.26n reschedules it and
+        -- nothing more), so rule 702.26i names it and it takes the same test.
+        Just (PhasedOut.Orphaned _) -> not (hostRemains oid gs)
         Nothing -> False
       detach o = o {Object.attachedTo = Nothing}
    in gs

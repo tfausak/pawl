@@ -24,12 +24,15 @@
 -- never been printed. Goblin Piker is its host, and its own phase-out is what
 -- distinguishes CR 702.26a's "the keyword decides who leaves, never who returns".
 --
+-- Ray of Command joins them in the Departure group, where CR 702.26n needs a
+-- permanent whose owner and controller come apart: "untap target creature an
+-- opponent controls and gain control of it until end of turn" is the pool's way
+-- to phase out a creature under a player who does not own it.
+--
 -- What is NOT asserted, because no card in the pool can reach it: CR 702.26e/f's
--- continuous-effect consequences (#930), CR 702.26h's directly-and-indirectly
+-- continuous-effect consequences (#930), and CR 702.26h's directly-and-indirectly
 -- tie-break, which needs an effect naming a permanent and its own Equipment at
--- once (#1723), and CR 702.26n's schedule for a permanent phased out under a
--- player who has since left the game (#931) -- CR 702.26k's own clause is
--- asserted below.
+-- once (#1723).
 module Pawl.PhasingSpec where
 
 import qualified Control.Monad as Monad
@@ -167,6 +170,35 @@ equippedBoard island piker bonesplitter ripple =
     let (host, withHost) = S.addCreature piker S.alice gs
         (equip, withEquip) = S.addCreature bonesplitter S.alice withHost
      in ((host, equip), S.attach equip host withEquip)
+
+-- Three seats, bob with two Goblin Pikers, and alice holding a Ray of Command
+-- and two Reality Ripples with the mana for all three: {3}{U} and {1}{U} twice
+-- is EXACTLY eight Islands, so a board that could not pay would leave a spell
+-- behind and the assertions downstream would pass for the wrong reason. Three
+-- seats because CR 800.1 ends a two-player game the moment one player leaves, and
+-- CR 800.4a -- which CR 702.26n's first sentence cross-references -- never runs.
+--
+-- Returns bob's two Pikers, then the three spells in alice's hand.
+borrowedBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  ( ObjectId.ObjectId,
+    ObjectId.ObjectId,
+    ObjectId.ObjectId,
+    ObjectId.ObjectId,
+    ObjectId.ObjectId,
+    GameState.GameState
+  )
+borrowedBoard island piker ripple command =
+  let base = S.landsFor island S.alice 8 (Setup.emptyGame S.threePlayers)
+      (victim, withOne) = S.addCreature piker S.bob base
+      (bystander, withTwo) = S.addCreature piker S.bob withOne
+      (borrow, withCommand) = S.addHandCard command S.alice withTwo
+      (first, withFirst) = S.addHandCard ripple S.alice withCommand
+      (second, board) = S.addHandCard ripple S.alice withFirst
+   in (victim, bystander, borrow, first, second, board)
 
 -- Is `oid` in CR 508.1's attacking-creatures record? Membership in Combat.attackers
 -- is what Pawl.Engine.Projection reads for Filter.IsAttacking, so it is the same
@@ -549,7 +581,7 @@ nonexistenceSpec s registry = Spec.describe s "Nonexistence" $ do
     -- unchanged, so a version that consulted it would answer True to all three.
     Spec.assertEqWith s "even though its zone still says battlefield" (zoneOf crocId gone) (Just Zone.Battlefield)
 
-departureSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+departureSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 departureSpec s registry = Spec.describe s "Departure" $ do
   -- CR 702.26k: "phased-out permanents owned by a player who leaves the game also
   -- leave the game." One of the two rules on the far side of CR 702.26b's
@@ -575,6 +607,60 @@ departureSpec s registry = Spec.describe s "Departure" $ do
     Spec.assertEqWith s "the game continued without her" (GameState.result after) Nothing
     Spec.assertEqWith s "the object is gone" (Maybe.isJust (Game.lookupObject crocId after)) False
     Spec.assertEqWith s "and so is its phased-out row" (Phasing.isPhasedOut crocId after) False
+  -- CR 702.26n's second sentence: "if a phased-out permanent phased out under the
+  -- control of a player who has left the game, that permanent phases in during
+  -- the next untap step after that player's next turn would have begun."
+  --
+  -- alice borrows bob's Piker with Ray of Command, phases it out with Reality
+  -- Ripple while she controls it, and concedes. CR 800.4a's first clause does not
+  -- reach it (bob owns it) and its exile clause does not either -- the control
+  -- effect ends before that clause runs, and a phased-out permanent is on no
+  -- battlefield walk anyway -- so the row survives, keyed to a player CR 800.4k
+  -- gives no further turn.
+  --
+  -- The MINIMAL PAIR is bob's own untap step before and after alice's seat is
+  -- walked past: same player, same board, differing only in whether the turn she
+  -- would have begun has been passed. That is what tells rule 702.26n's schedule
+  -- from "orphan it at the departure", which would bring the Piker back a full
+  -- rotation early, and from "any untap step brings back any row".
+  --
+  -- bob's SECOND Piker is the positive control, phased out under bob himself in
+  -- the same event. It comes back at the first of those untap steps, so a
+  -- negative that passed because the untap step never ran at all is caught.
+  Spec.it s "CR 702.26n a permanent phased out under a departed player phases in anyway" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ripple <- S.printingOf s registry "Reality Ripple"
+    command <- S.printingOf s registry "Ray of Command"
+    let (victim, bystander, borrow, first, second, board) = borrowedBoard island piker ripple command
+        -- alice takes the Piker, phases it out under her own control, and phases
+        -- bob's other one out under his.
+        borrowed = rippleAt victim borrow board
+        gone = rippleAt bystander second (rippleAt victim first borrowed)
+        left = S.runPure S.identityAnswer gone (Departure.leaveGame Departure.Type.Conceded S.alice)
+        handoff gs = S.runPure S.identityAnswer gs Engine.handoffTurn
+        bobs = untapStep S.bob (handoff left)
+        carols = untapStep S.carol (handoff bobs)
+        walked = handoff carols
+        back = untapStep S.bob walked
+    Spec.assertEqWith s "setup: bob owns the Piker alice took" (fmap Object.owner (Game.lookupObject victim borrowed)) (Just S.bob)
+    Spec.assertEqWith s "and alice controls it" (Projection.controllerOf victim borrowed) (Just S.alice)
+    Spec.assertEqWith s "so it phased out under ALICE" (Phasing.phasedOutStatus victim gone) (Just (PhasedOut.Directly S.alice))
+    Spec.assertEqWith s "while bob's other Piker phased out under BOB" (Phasing.phasedOutStatus bystander gone) (Just (PhasedOut.Directly S.bob))
+    Spec.assertEqWith s "the game continued without alice" (GameState.result left) Nothing
+    Spec.assertEqWith s "her leaving does not take the Piker bob owns" (Maybe.isJust (Game.lookupObject victim left)) True
+    Spec.assertEqWith s "which is still phased out" (Phasing.isPhasedOut victim left) True
+    -- Neither of the two untap steps before her seat comes round is "after that
+    -- player's next turn would have begun".
+    Spec.assertEqWith s "bob's untap step brings back his own Piker" (onBattlefield bystander bobs) True
+    Spec.assertEqWith s "but not the one that phased out under alice" (onBattlefield victim bobs) False
+    Spec.assertEqWith s "nor does carol's" (onBattlefield victim carols) False
+    -- CR 800.4k: alice's turn does not begin, and the walk passes her seat.
+    Spec.assertEqWith s "the walk skips her seat back to bob" (GameState.activePlayer walked) S.bob
+    Spec.assertEqWith s "the row is on rule 702.26n's schedule now" (Phasing.phasedOutStatus victim walked) (Just (PhasedOut.Orphaned S.alice))
+    Spec.assertEqWith s "still saying who it phased out under" (Phasing.phasedOutUnder victim walked) (Just S.alice)
+    Spec.assertEqWith s "and it phases in at that untap step" (onBattlefield victim back) True
+    Spec.assertEqWith s "with no row left" (Phasing.isPhasedOut victim back) False
 
 -- CR 702.26i, the DIRECTLY phased-out attachment. Bonesplitter is the fixture and
 -- Reality Ripple is what reaches it: an Equipment is an artifact (CR 301.5), so
