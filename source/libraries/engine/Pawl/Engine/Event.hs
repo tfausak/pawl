@@ -7364,11 +7364,11 @@ looksBack condition = case condition of
 -- unscanned (#1411).
 --
 -- Two holes are left in the BATTLEFIELD half of that reading, and last known
--- information fills both. A
--- permanent that left WITHIN its own group is missing from that group's sample, the
--- sample being taken as the last of the group's members is recorded and CR 704.3's
--- whole destruction batch being one group; and a group nothing sampled has no
--- reading but the live board, which the departed are not on either.
+-- information fills both. A permanent that left WITHIN its own group is missing
+-- from that group's sample, the sample being taken as the last of the group's
+-- members is recorded and CR 704.3's whole destruction batch being one group; and
+-- a group nothing sampled has no reading but the live board, which the departed
+-- are not on either.
 --
 -- So each event ALSO contributes the permanents that left the battlefield at a
 -- LATER EVENT GROUP in the same batch, read from CR 608.2h last known information
@@ -7777,12 +7777,13 @@ eventTriggers events gs =
       --
       -- `functionsIn Zone.Graveyard` is CR 113.6k's own gate, as it is for
       -- `inGraveyards` and not for `leftBattlefield`: without it a departed Doomed
-      -- Traveler would be offered its dies trigger from a graveyard. A regression
-      -- fence rather than a proved behaviour: removing it leaves the suite green,
-      -- and no board can observe it today for a RULES reason rather than for want
-      -- of a card -- a battlefield-only trigger on a departed graveyard card would
-      -- have to see an event this source does not offer it, the arrival being the
-      -- only one, which is the same residue #1732 records.
+      -- Traveler would be offered its dies trigger from a graveyard, and a
+      -- "whenever another creature dies" watcher would be offered ITS trigger for
+      -- the very move that buried it -- CR 400.7 having minted a fresh id, the
+      -- "another" test compares two different ids and passes. A regression fence
+      -- rather than a proved behaviour: removing it leaves the suite green, since
+      -- observing it needs a permanent that dies and leaves its graveyard in one
+      -- batch, and no card in the pool does both (gap #1751).
       --
       -- Disjoint from `inGraveyards` by construction, not by Map.unions' bias: an
       -- id in `lastKnown` is one the same write deleted from GameState.objects,
@@ -8025,7 +8026,7 @@ eventTriggers events gs =
       -- `inGraveyards` genuinely overlaps `cycledCard` on purpose -- a card
       -- cycled into a graveyard is honestly a member of both -- and the winner
       -- offers that card's printed abilities unfiltered, a superset either way.
-      -- `arrivedInGraveyard` overlaps neither: it answers only for an id
+      -- `arrivedInGraveyard` overlaps nothing: it answers only for an id
       -- `lastKnown` holds, which is one no longer in GameState.objects and so in
       -- no player's graveyard and no player's hand, so its position beside
       -- `inGraveyards` is documentation rather than arbitration.

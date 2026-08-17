@@ -7463,9 +7463,8 @@ graveyardTriggerSpec s registry =
         -- gives the opposite answer. The trigger can only have come from CR 608.2h
         -- last known information.
         Spec.it s "CR 603.10 Corpse Churn mills Narcomoeba and returns it in one resolution; the trigger still fires" $ do
-          board <- corpseChurnBoard
-          let (gs, spellId) = board
-              cast = S.runPure returnsIt gs (S.cast S.alice spellId)
+          (gs, spellId) <- corpseChurnBoard
+          let cast = S.runPure returnsIt gs (S.cast S.alice spellId)
               resolved = S.runPure returnsIt cast Stack.resolveTop
               -- The NARROW path: the scan itself, no priority loop and no settle,
               -- which cannot tell "never triggered" from "triggered and swept".
