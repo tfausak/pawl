@@ -71,5 +71,9 @@ codec =
       Arm.payload "ControlChanged" ControlChanged.codec GameEvent.ControlChanged (\x -> case x of GameEvent.ControlChanged y -> Just y; _ -> Nothing),
       Arm.payload "VentureMarkerEntered" VentureMarkerEntered.codec GameEvent.VentureMarkerEntered (\x -> case x of GameEvent.VentureMarkerEntered y -> Just y; _ -> Nothing),
       Arm.payload "BecameTarget" BecameTarget.codec GameEvent.BecameTarget (\x -> case x of GameEvent.BecameTarget y -> Just y; _ -> Nothing),
-      Arm.payload "LeftTheGame" ObjectId.codec GameEvent.LeftTheGame (\x -> case x of GameEvent.LeftTheGame y -> Just y; _ -> Nothing)
+      Arm.payload "LeftTheGame" ObjectId.codec GameEvent.LeftTheGame (\x -> case x of GameEvent.LeftTheGame y -> Just y; _ -> Nothing),
+      Arm.payload "Scried" PlayerId.codec GameEvent.Scried (\x -> case x of GameEvent.Scried y -> Just y; _ -> Nothing),
+      Arm.payload "Surveiled" PlayerId.codec GameEvent.Surveiled (\x -> case x of GameEvent.Surveiled y -> Just y; _ -> Nothing),
+      Arm.payload "Plotted" ObjectId.codec GameEvent.Plotted (\x -> case x of GameEvent.Plotted y -> Just y; _ -> Nothing),
+      Arm.payload "Explored" ObjectId.codec GameEvent.Explored (\x -> case x of GameEvent.Explored y -> Just y; _ -> Nothing)
     ]

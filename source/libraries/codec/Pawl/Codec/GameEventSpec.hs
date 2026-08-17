@@ -332,3 +332,35 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Milled (Milled.MkMilled (PlayerId.MkPlayerId 1) (Seq.fromList [ObjectId.MkObjectId 3, ObjectId.MkObjectId 4])))
       """ {"type":"Milled","value":{"player":1,"cards":[3,4]}} """
+  -- CR 701.22d. One player id, BecameMonarch's payload: a scry names the player
+  -- who scried and nothing else, the cards never leaving their library.
+  Spec.it s "Scried" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.Scried (PlayerId.MkPlayerId 1))
+      """ {"type":"Scried","value":1} """
+  -- CR 701.25d, Scried's twin. A DISTINCT tag, since CR 701.25a's graveyard half
+  -- is what a card telling the two apart reads about.
+  Spec.it s "Surveiled" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.Surveiled (PlayerId.MkPlayerId 2))
+      """ {"type":"Surveiled","value":2} """
+  -- CR 702.170a. The id is the CR 400.7 incarnation in exile, not the one that
+  -- was in the hand.
+  Spec.it s "Plotted" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.Plotted (ObjectId.MkObjectId 5))
+      """ {"type":"Plotted","value":5} """
+  -- CR 701.44b. The explorer alone: CR 701.44c makes last known information
+  -- answer who controlled it, so no seat rides along.
+  Spec.it s "Explored" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.Explored (ObjectId.MkObjectId 6))
+      """ {"type":"Explored","value":6} """

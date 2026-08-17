@@ -1185,4 +1185,40 @@ data TriggerCondition
     -- of Pawl.Types.Face.rooms, which is why Pawl.Types.DungeonRoom carries a bare
     -- Modal rather than a whole TriggeredAbility.
     RoomEntered RoomIndex.RoomIndex
+  | -- | CR 701.22d: "whenever you scry" -- Matoya, Archon Elder's first branch.
+    -- Matched against GameEvent.Scried, whose PlayerId is the player who
+    -- scried; the PlayerRelation reads that player against CR 109.5's "you",
+    -- the ability's controller (CR 603.3a). PlayerBecomesMonarch's shape: the
+    -- bearer contributes only the seat the relation is read from, and
+    -- "whenever an opponent scries" is the same event read from the other one.
+    --
+    -- Counts SCRIES rather than cards, which is the whole reason it reads its
+    -- own event: CR 701.22a's reorder moves cards inside one library and
+    -- records nothing, and a scry that moved nothing still fires this
+    -- (CR 701.22d). CR 701.22b's scry 0 records no event and so fires nothing.
+    PlayerScries PlayerRelation.PlayerRelation
+  | -- | CR 701.25d, PlayerScries' twin and Matoya, Archon Elder's second
+    -- branch. Matched against GameEvent.Surveiled, and a surveil that put
+    -- nothing into a graveyard fires it just the same -- which is what keeps
+    -- this apart from a condition built on the zone changes CR 701.25a's
+    -- graveyard half records. CR 701.25c's surveil 0 fires nothing.
+    PlayerSurveils PlayerRelation.PlayerRelation
+  | -- | CR 702.170e: "when this card becomes plotted" -- Aloe Alchemist's.
+    -- Matched against GameEvent.Plotted naming the bearer.
+    --
+    -- SELF-scoped and nullary, SelfCycled's shape: the ability is printed on
+    -- the card that becomes plotted, and CR 702.170a functions it in the hand,
+    -- so no bystander form is in print. It is watched for from EXILE, where CR
+    -- 702.170b's special action leaves the card -- Pawl.Engine.Event's
+    -- zonesTriggeredFrom is where that is said.
+    SelfBecomesPlotted
+  | -- | CR 701.44b: "whenever a creature you control explores" -- Wildgrowth
+    -- Walker's. Matched against GameEvent.Explored, with the Filter applied to
+    -- the EXPLORER rather than to the bearer -- PermanentDies' posture, and
+    -- through last known information for that arm's reason and CR 701.44c's.
+    --
+    -- Fires once per completed explore, including one whose library was empty
+    -- (CR 701.44b), which is what keeps it apart from a condition built on the
+    -- reveal, the counter or the bin CR 701.44a's steps record.
+    PermanentExplores (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)
