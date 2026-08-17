@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.MovedBetweenSpec where
 
 import qualified Pawl.Codec.MovedBetween as MovedBetween
@@ -17,5 +15,5 @@ spec s = Spec.describe s "Pawl.Codec.MovedBetween" $ do
       s
       MovedBetween.codec
       (MovedBetween.MkMovedBetween {MovedBetween.from = Zone.Battlefield, MovedBetween.to = Zone.Graveyard})
-      """ {"from":{"type":"Battlefield"},"to":{"type":"Graveyard"}} """
+      " {\"from\":{\"type\":\"Battlefield\"},\"to\":{\"type\":\"Graveyard\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s MovedBetween.codec

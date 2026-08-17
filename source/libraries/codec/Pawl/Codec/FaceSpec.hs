@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.FaceSpec where
 
 import qualified Data.List.NonEmpty as NonEmpty
@@ -289,7 +287,7 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
       encodeFace
       decodeFace
       minimalFace
-      """ {"name":"Mountain","typeLine":{"types":[{"type":"Land"}]}} """
+      " {\"name\":\"Mountain\",\"typeLine\":{\"types\":[{\"type\":\"Land\"}]}} "
   Spec.it s "MkFace, every required field present and every optional field absent" $
     Common.assertJsonCodec s encodeFace decodeFace baseFace baseFaceJson
   -- Most defaulted fields also get their own absent-key assertion below, not
@@ -539,5 +537,5 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
     Common.assertFromJson
       s
       decodeFace
-      """ {"name":"Mountain","typeLine":{"supertypes":[{"type":"Basic"}],"types":[{"type":"Land"}],"subtypes":[{"type":"Mountain"}]},"manaCost":null,"power":null,"toughness":null,"keywords":[],"staticAbilities":[],"activatedAbilities":[],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[],"spell":{"modes":[{"clauses":[],"targetSlots":{}}],"selection":{"type":"ChooseExactly","value":1}}} """
+      " {\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]},\"manaCost\":null,\"power\":null,\"toughness\":null,\"keywords\":[],\"staticAbilities\":[],\"activatedAbilities\":[],\"replacementEffects\":[],\"triggeredAbilities\":[],\"castingPermissions\":[],\"spell\":{\"modes\":[{\"clauses\":[],\"targetSlots\":{}}],\"selection\":{\"type\":\"ChooseExactly\",\"value\":1}}} "
       mountainFace

@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.FaceDownCharacteristicsSpec where
 
 import qualified Data.Set as Set
@@ -20,7 +18,7 @@ spec s = Spec.describe s "Pawl.Codec.FaceDownCharacteristics" $ do
       s
       FaceDownCharacteristics.codec
       FaceDownCharacteristics.defaultValue
-      """ {} """
+      " {} "
   -- Cyber Conversion's "it's a 2/2 Cyberman artifact creature": the type line is
   -- listed and the 2/2 is CR 708.2a's own, so only the one key is written.
   Spec.it s "a listed type line writes that key alone" $
@@ -35,5 +33,5 @@ spec s = Spec.describe s "Pawl.Codec.FaceDownCharacteristics" $ do
                 TypeLine.subtypes = Set.singleton Subtype.Cyberman
               }
         }
-      """ {"typeLine":{"subtypes":[{"type":"Cyberman"}],"types":[{"type":"Artifact"},{"type":"Creature"}]}} """
+      " {\"typeLine\":{\"subtypes\":[{\"type\":\"Cyberman\"}],\"types\":[{\"type\":\"Artifact\"},{\"type\":\"Creature\"}]}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s FaceDownCharacteristics.codec

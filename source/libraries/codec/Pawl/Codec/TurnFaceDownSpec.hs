@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.TurnFaceDownSpec where
 
 import qualified Data.Set as Set
@@ -22,7 +20,7 @@ spec s = Spec.describe s "Pawl.Codec.TurnFaceDown" $ do
       s
       TurnFaceDown.codec
       (TurnFaceDown.MkTurnFaceDown (SlotName.MkSlotName (Text.pack "target")) FaceDownCharacteristics.defaultValue)
-      """ {"slot":"target"} """
+      " {\"slot\":\"target\"} "
   -- Cyber Conversion: CR 708.2's listed set, written.
   Spec.it s "MkTurnFaceDown, a listed set: the key is written" $
     Common.assertCodec
@@ -39,5 +37,5 @@ spec s = Spec.describe s "Pawl.Codec.TurnFaceDown" $ do
                   }
             }
       )
-      """ {"characteristics":{"typeLine":{"subtypes":[{"type":"Cyberman"}],"types":[{"type":"Artifact"},{"type":"Creature"}]}},"slot":"target"} """
+      " {\"characteristics\":{\"typeLine\":{\"subtypes\":[{\"type\":\"Cyberman\"}],\"types\":[{\"type\":\"Artifact\"},{\"type\":\"Creature\"}]}},\"slot\":\"target\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s TurnFaceDown.codec

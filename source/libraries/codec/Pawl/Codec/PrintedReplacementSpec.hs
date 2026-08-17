@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.PrintedReplacementSpec where
 
 import qualified Pawl.Codec.Card as Card
@@ -29,7 +27,7 @@ spec s = Spec.describe s "Pawl.Codec.PrintedReplacement" $ do
             PrintedReplacement.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate
           }
       )
-      """ {"effect":{"type":"DestructionR","value":{"type":"Regenerate"}}} """
+      " {\"effect\":{\"type\":\"DestructionR\",\"value\":{\"type\":\"Regenerate\"}}} "
   -- Jared Carthalion, True Heir's "while you're the monarch", the case that
   -- writes the key.
   Spec.it s "MkPrintedReplacement, condition written" $
@@ -49,7 +47,7 @@ spec s = Spec.describe s "Pawl.Codec.PrintedReplacement" $ do
             PrintedReplacement.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate
           }
       )
-      """ {"condition":{"type":"Compares","value":{"measured":{"type":"IsMonarch","value":{"type":"Relative","value":{"type":"You"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":1}}},"effect":{"type":"DestructionR","value":{"type":"Regenerate"}}} """
+      " {\"condition\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"IsMonarch\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}},\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":1}}},\"effect\":{\"type\":\"DestructionR\",\"value\":{\"type\":\"Regenerate\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec
   where
     -- The effect codec the card boundary would pass in (CR 615.5's riders ride

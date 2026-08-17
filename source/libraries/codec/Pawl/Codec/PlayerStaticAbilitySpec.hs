@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.PlayerStaticAbilitySpec where
 
 import qualified Pawl.Codec.PlayerStaticAbility as PlayerStaticAbility
@@ -16,5 +14,5 @@ spec s = Spec.describe s "Pawl.Codec.PlayerStaticAbility" $ do
       s
       PlayerStaticAbility.codec
       (PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.EachPlayer (PlayerEffect.CantCastMoreThan 1))
-      """ {"scope":{"type":"EachPlayer"},"effect":{"type":"CantCastMoreThan","value":1}} """
+      " {\"scope\":{\"type\":\"EachPlayer\"},\"effect\":{\"type\":\"CantCastMoreThan\",\"value\":1}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s PlayerStaticAbility.codec

@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.TurnWindowSpec where
 
 import qualified Pawl.Codec.TurnWindow as TurnWindow
@@ -17,18 +15,18 @@ spec s = Spec.describe s "Pawl.Codec.TurnWindow" $ do
       s
       TurnWindow.codec
       TurnWindow.AnyTurn
-      """ {"type":"AnyTurn"} """
+      " {\"type\":\"AnyTurn\"} "
   Spec.it s "ControllersNextTurn" $
     Common.assertCodec
       s
       TurnWindow.codec
       TurnWindow.ControllersNextTurn
-      """ {"type":"ControllersNextTurn"} """
+      " {\"type\":\"ControllersNextTurn\"} "
   Spec.it s "OnTurn carries the settled turn number" $
     Common.assertCodec
       s
       TurnWindow.codec
       (TurnWindow.OnTurn 7)
-      """ {"type":"OnTurn","value":7} """
+      " {\"type\":\"OnTurn\",\"value\":7} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s TurnWindow.codec

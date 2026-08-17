@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ForEachSpec where
 
 import qualified Data.Sequence as Seq
@@ -32,7 +30,7 @@ spec s = Spec.describe s "Pawl.Codec.ForEach" $ do
             ForEach.body = Seq.fromList [Text.pack "first", Text.pack "second"]
           }
       )
-      """ {"ref":{"type":"InSlot","value":"victims"},"slot":"victim","body":["first","second"]} """
+      " {\"ref\":{\"type\":\"InSlot\",\"value\":\"victims\"},\"slot\":\"victim\",\"body\":[\"first\",\"second\"]} "
   -- An empty body is representable rather than rejected: the codec's `required`
   -- keys are about a key being ABSENT, and CR 101.3 already makes an
   -- instruction that does nothing a no-op rather than an error.
@@ -46,5 +44,5 @@ spec s = Spec.describe s "Pawl.Codec.ForEach" $ do
             ForEach.body = Seq.empty
           }
       )
-      """ {"ref":{"type":"EachPlayer"},"slot":"victim","body":[]} """
+      " {\"ref\":{\"type\":\"EachPlayer\"},\"slot\":\"victim\",\"body\":[]} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

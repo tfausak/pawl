@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.AddActivationCostSpec where
 
 import qualified Pawl.Codec.AddActivationCost as AddActivationCost
@@ -24,5 +22,5 @@ spec s = Spec.describe s "Pawl.Codec.AddActivationCost" $ do
             AddActivationCost.components = [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.HasCardType CardType.Land))]
           }
       )
-      """ {"whichAbilities":{"type":"And","value":[{"type":"HasSubtype","value":{"type":"Rebel"}},{"type":"Not","value":{"type":"IsToken"}}]},"components":[{"type":"Sacrifice","value":{"count":1,"whichPermanents":{"type":"HasCardType","value":{"type":"Land"}}}}]} """
+      " {\"whichAbilities\":{\"type\":\"And\",\"value\":[{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Rebel\"}},{\"type\":\"Not\",\"value\":{\"type\":\"IsToken\"}}]},\"components\":[{\"type\":\"Sacrifice\",\"value\":{\"count\":1,\"whichPermanents\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}]} "
   Spec.it s "has a schema" $ Common.assertHasSchema s AddActivationCost.codec

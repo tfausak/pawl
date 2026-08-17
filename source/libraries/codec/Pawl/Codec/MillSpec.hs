@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.MillSpec where
 
 import qualified Data.Text as Text
@@ -24,7 +22,7 @@ spec s = Spec.describe s "Pawl.Codec.Mill" $ do
       s
       Mill.codec
       (Mill.MkMill (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 3) Nothing)
-      """ {"player":{"type":"Relative","value":{"type":"You"}},"quantity":{"type":"Literal","value":3}} """
+      " {\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"quantity\":{\"type\":\"Literal\",\"value\":3}} "
   Spec.it s "MkMill, CR 728.1's tally: the key is written" $
     Common.assertCodec
       s
@@ -34,5 +32,5 @@ spec s = Spec.describe s "Pawl.Codec.Mill" $ do
           (Quantity.Literal 2)
           (Just (MillTally.MkMillTally (SlotName.MkSlotName (Text.pack "milled")) (Filter.Not (Filter.HasCardType CardType.Land))))
       )
-      """ {"player":{"type":"Relative","value":{"type":"You"}},"quantity":{"type":"Literal","value":2},"tally":{"slot":"milled","filter":{"type":"Not","value":{"type":"HasCardType","value":{"type":"Land"}}}}} """
+      " {\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"quantity\":{\"type\":\"Literal\",\"value\":2},\"tally\":{\"slot\":\"milled\",\"filter\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Mill.codec

@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.CounterRSpec where
 
 import qualified Pawl.Codec.CounterR as CounterR
@@ -32,5 +30,5 @@ spec s = Spec.describe s "Pawl.Codec.CounterR" $ do
             CounterR.scaling = Scaling.AddMore 1
           }
       )
-      """ {"matching":{"whichKind":{"type":"PlusOnePlusOne"},"whose":{"type":"Yours"},"onWhat":{"type":"HasCardType","value":{"type":"Creature"}}},"scaling":{"type":"AddMore","value":1}} """
+      " {\"matching\":{\"whichKind\":{\"type\":\"PlusOnePlusOne\"},\"whose\":{\"type\":\"Yours\"},\"onWhat\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"scaling\":{\"type\":\"AddMore\",\"value\":1}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s CounterR.codec

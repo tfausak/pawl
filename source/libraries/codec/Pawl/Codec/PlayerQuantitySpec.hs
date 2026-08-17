@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.PlayerQuantitySpec where
 
 import qualified Pawl.Codec.PlayerQuantity as PlayerQuantity
@@ -20,5 +18,5 @@ spec s = Spec.describe s "Pawl.Codec.PlayerQuantity" $ do
       s
       PlayerQuantity.codec
       (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2))
-      """ {"player":{"type":"Relative","value":{"type":"You"}},"quantity":{"type":"Literal","value":2}} """
+      " {\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"quantity\":{\"type\":\"Literal\",\"value\":2}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s PlayerQuantity.codec

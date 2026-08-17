@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.TurnScopeSpec where
 
 import qualified Pawl.Codec.TurnScope as TurnScope
@@ -14,19 +12,19 @@ spec s = Spec.describe s "Pawl.Codec.TurnScope" $ do
       s
       TurnScope.codec
       TurnScope.EachTurn
-      """ {"type":"EachTurn"} """
+      " {\"type\":\"EachTurn\"} "
   Spec.it s "ControllersTurn" $
     Common.assertCodec
       s
       TurnScope.codec
       TurnScope.ControllersTurn
-      """ {"type":"ControllersTurn"} """
+      " {\"type\":\"ControllersTurn\"} "
   Spec.it s "OpponentsTurn" $
     Common.assertCodec
       s
       TurnScope.codec
       TurnScope.OpponentsTurn
-      """ {"type":"OpponentsTurn"} """
+      " {\"type\":\"OpponentsTurn\"} "
   -- Exhaustive where the literals above are representative: Arm.enum derives
   -- the arm list from the type, so this is what would catch a constructor the
   -- derivation missed or two that encode alike.

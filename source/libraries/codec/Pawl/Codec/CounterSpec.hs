@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.CounterSpec where
 
 import qualified Data.Text as Text
@@ -21,7 +19,7 @@ spec s = Spec.describe s "Pawl.Codec.Counter" $ do
       s
       Counter.codec
       (Counter.MkCounter (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) Nothing)
-      """ {"ref":{"type":"InSlot","value":"spell"}} """
+      " {\"ref\":{\"type\":\"InSlot\",\"value\":\"spell\"}} "
   -- Swift Silence's "counter all other spells. Draw a card for each spell
   -- countered this way".
   Spec.it s "MkCounter, a swept set and a bound slot" $
@@ -29,5 +27,5 @@ spec s = Spec.describe s "Pawl.Codec.Counter" $ do
       s
       Counter.codec
       (Counter.MkCounter (ObjectRef.EachSpell (Filter.Not Filter.IsSource)) (Just (SlotName.MkSlotName (Text.pack "countered"))))
-      """ {"ref":{"type":"EachSpell","value":{"type":"Not","value":{"type":"IsSource"}}},"slot":"countered"} """
+      " {\"ref\":{\"type\":\"EachSpell\",\"value\":{\"type\":\"Not\",\"value\":{\"type\":\"IsSource\"}}},\"slot\":\"countered\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Counter.codec

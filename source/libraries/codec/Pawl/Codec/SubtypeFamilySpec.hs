@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.SubtypeFamilySpec where
 
 import qualified Pawl.Codec.SubtypeFamily as SubtypeFamily
@@ -14,13 +12,13 @@ spec s = Spec.describe s "Pawl.Codec.SubtypeFamily" $ do
       s
       SubtypeFamily.codec
       SubtypeFamily.BasicLandType
-      """ {"type":"BasicLandType"} """
+      " {\"type\":\"BasicLandType\"} "
   Spec.it s "CreatureType" $
     Common.assertCodec
       s
       SubtypeFamily.codec
       SubtypeFamily.CreatureType
-      """ {"type":"CreatureType"} """
+      " {\"type\":\"CreatureType\"} "
   -- Exhaustive where the literals above are representative: Arm.enum derives
   -- the arm list from the type, so this is what would catch a constructor the
   -- derivation missed or two that encode alike.

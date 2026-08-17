@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ModeSpec where
 
 import qualified Data.Map.Strict as Map
@@ -49,7 +47,7 @@ spec s = Spec.describe s "Pawl.Codec.Mode" $ do
           (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Attach (SlotName.MkSlotName (Text.pack "target"))))))
           (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just (Filter.ControlledBy PlayerRelation.You))))
       )
-      """ {"clauses":[{"effects":[{"type":"Attach","value":"target"}]}],"targetSlots":{"target":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}} """
+      " {\"clauses\":[{\"effects\":[{\"type\":\"Attach\",\"value\":\"target\"}]}],\"targetSlots\":{\"target\":{\"pool\":{\"type\":\"Creatures\"},\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}}}} "
   -- A mode with no clauses or targetSlots is what a card that says nothing
   -- extra means, and it round-trips through the empty object.
   Spec.it s "omits every default field" $
@@ -58,4 +56,4 @@ spec s = Spec.describe s "Pawl.Codec.Mode" $ do
       toJson
       fromJson
       (Mode.MkMode Seq.empty Map.empty)
-      """ {} """
+      " {} "

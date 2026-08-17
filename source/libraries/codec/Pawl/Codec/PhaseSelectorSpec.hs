@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.PhaseSelectorSpec where
 
 import qualified Pawl.Codec.PhaseSelector as PhaseSelector
@@ -16,24 +14,24 @@ spec s = Spec.describe s "Pawl.Codec.PhaseSelector" $ do
       s
       PhaseSelector.codec
       (PhaseSelector.Step (Phase.Beginning BeginningStep.DrawStep))
-      """ {"type":"Step","value":{"type":"Beginning","value":{"type":"DrawStep"}}} """
+      " {\"type\":\"Step\",\"value\":{\"type\":\"Beginning\",\"value\":{\"type\":\"DrawStep\"}}} "
   Spec.it s "BeginningPhase" $
     Common.assertCodec
       s
       PhaseSelector.codec
       PhaseSelector.BeginningPhase
-      """ {"type":"BeginningPhase"} """
+      " {\"type\":\"BeginningPhase\"} "
   Spec.it s "CombatPhase" $
     Common.assertCodec
       s
       PhaseSelector.codec
       PhaseSelector.CombatPhase
-      """ {"type":"CombatPhase"} """
+      " {\"type\":\"CombatPhase\"} "
   Spec.it s "EndingPhase" $
     Common.assertCodec
       s
       PhaseSelector.codec
       PhaseSelector.EndingPhase
-      """ {"type":"EndingPhase"} """
+      " {\"type\":\"EndingPhase\"} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s PhaseSelector.codec

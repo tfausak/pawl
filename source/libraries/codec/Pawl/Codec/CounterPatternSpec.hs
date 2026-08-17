@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.CounterPatternSpec where
 
 import qualified Pawl.Codec.CounterPattern as CounterPattern
@@ -25,7 +23,7 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
           CounterPattern.onWhat = Filter.HasCardType CardType.Creature,
           CounterPattern.onWho = Nothing
         }
-      """ {"whichKind":{"type":"PlusOnePlusOne"},"whose":{"type":"Yours"},"onWhat":{"type":"HasCardType","value":{"type":"Creature"}}} """
+      " {\"whichKind\":{\"type\":\"PlusOnePlusOne\"},\"whose\":{\"type\":\"Yours\"},\"onWhat\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   -- whichKind = Nothing means ANY kind, never "no kind", and the trivial filter
   -- matches every permanent. An omitted key is what that Nothing means.
   Spec.it s "Doubling Season (any kind, the trivial filter)" $
@@ -39,7 +37,7 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
           CounterPattern.onWhat = Filter.And [],
           CounterPattern.onWho = Nothing
         }
-      """ {"whose":{"type":"Yours"},"onWhat":{"type":"And","value":[]}} """
+      " {\"whose\":{\"type\":\"Yours\"},\"onWhat\":{\"type\":\"And\",\"value\":[]}} "
   -- CR 109.5: whichKind's Nothing and whose's Anyones are both what a pattern
   -- that says nothing means, so only the required onWhat key survives.
   Spec.it s "an all-default value omits every optional key" $
@@ -53,7 +51,7 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
           CounterPattern.onWhat = Filter.And [],
           CounterPattern.onWho = Nothing
         }
-      """ {"onWhat":{"type":"And","value":[]}} """
+      " {\"onWhat\":{\"type\":\"And\",\"value\":[]}} "
   -- CR 122.6: Vorinclex, Monstrous Raider's halving clause -- narrowed by who is
   -- PUTTING the counters, and reaching players as well as permanents.
   Spec.it s "Vorinclex (a putter relation, and players too)" $
@@ -67,5 +65,5 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
           CounterPattern.onWhat = Filter.And [],
           CounterPattern.onWho = Just ControllerRelation.Anyones
         }
-      """ {"byWhom":{"type":"Opponents"},"onWhat":{"type":"And","value":[]},"onWho":{"type":"Anyones"}} """
+      " {\"byWhom\":{\"type\":\"Opponents\"},\"onWhat\":{\"type\":\"And\",\"value\":[]},\"onWho\":{\"type\":\"Anyones\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s CounterPattern.codec

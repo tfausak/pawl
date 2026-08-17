@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.DurationRefSpec where
 
 import qualified Data.Text as Text
@@ -25,5 +23,5 @@ spec s = Spec.describe s "Pawl.Codec.DurationRef" $ do
             DurationRef.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))
           }
       )
-      """ {"duration":{"type":"UntilEndOfTurn"},"ref":{"type":"InSlot","value":"target"}} """
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s DurationRef.codec

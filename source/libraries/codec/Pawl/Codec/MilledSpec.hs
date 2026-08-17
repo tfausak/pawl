@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.MilledSpec where
 
 import qualified Data.Sequence as Seq
@@ -23,5 +21,5 @@ spec s = Spec.describe s "Pawl.Codec.Milled" $ do
             Milled.cards = Seq.fromList [ObjectId.MkObjectId 7, ObjectId.MkObjectId 8]
           }
       )
-      """ {"player":0,"cards":[7,8]} """
+      " {\"player\":0,\"cards\":[7,8]} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Milled.codec

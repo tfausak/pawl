@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.TakeExtraTurnSpec where
 
 import qualified Data.Set as Set
@@ -24,7 +22,7 @@ spec s = Spec.describe s "Pawl.Codec.TakeExtraTurn" $ do
             TakeExtraTurn.skips = Set.empty
           }
       )
-      """ {"player":{"type":"Relative","value":{"type":"You"}},"skips":[]} """
+      " {\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"skips\":[]} "
   Spec.it s "MkTakeExtraTurn, skipped phases are written in order" $
     Common.assertCodec
       s
@@ -34,5 +32,5 @@ spec s = Spec.describe s "Pawl.Codec.TakeExtraTurn" $ do
             TakeExtraTurn.skips = Set.fromList [PhaseSelector.CombatPhase, PhaseSelector.BeginningPhase]
           }
       )
-      """ {"player":{"type":"Relative","value":{"type":"You"}},"skips":[{"type":"BeginningPhase"},{"type":"CombatPhase"}]} """
+      " {\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"skips\":[{\"type\":\"BeginningPhase\"},{\"type\":\"CombatPhase\"}]} "
   Spec.it s "has a schema" $ Common.assertHasSchema s TakeExtraTurn.codec

@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.PlusSpec where
 
 import qualified Pawl.Codec.Plus as Plus
@@ -27,5 +25,5 @@ spec s = Spec.describe s "Pawl.Codec.Plus" $ do
             Plus.right = Quantity.Star
           }
       )
-      """ {"left":{"type":"Literal","value":1},"right":{"type":"Star"}} """
+      " {\"left\":{\"type\":\"Literal\",\"value\":1},\"right\":{\"type\":\"Star\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

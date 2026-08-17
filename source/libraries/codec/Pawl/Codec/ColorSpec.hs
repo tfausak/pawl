@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ColorSpec where
 
 import qualified Pawl.Codec.Color as Color
@@ -16,31 +14,31 @@ spec s = Spec.describe s "Pawl.Codec.Color" $ do
       s
       Color.codec
       Color.White
-      """ {"type":"White"} """
+      " {\"type\":\"White\"} "
   Spec.it s "Blue" $
     Common.assertCodec
       s
       Color.codec
       Color.Blue
-      """ {"type":"Blue"} """
+      " {\"type\":\"Blue\"} "
   Spec.it s "Black" $
     Common.assertCodec
       s
       Color.codec
       Color.Black
-      """ {"type":"Black"} """
+      " {\"type\":\"Black\"} "
   Spec.it s "Red" $
     Common.assertCodec
       s
       Color.codec
       Color.Red
-      """ {"type":"Red"} """
+      " {\"type\":\"Red\"} "
   Spec.it s "Green" $
     Common.assertCodec
       s
       Color.codec
       Color.Green
-      """ {"type":"Green"} """
+      " {\"type\":\"Green\"} "
   Spec.it s "unknown tag fails" $
     Spec.assertBool s (either (const True) (const False) (Codec.decode Color.codec (Value.object []))) "left"
   -- Exhaustive where the literals above are representative: Arm.enum derives

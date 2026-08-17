@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.StaticAbilitySpec where
 
 import qualified Data.List.NonEmpty as NonEmpty
@@ -42,7 +40,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
       s
       codec
       (StaticAbility.MkStaticAbility Affected.Attached Nothing Nothing (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying)))
-      """ {"affected":{"type":"Attached"},"modifications":[{"type":"GainKeyword","value":{"type":"Flying"}}]} """
+      " {\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Flying\"}}]} "
   -- Humility's shape: several parts under one affected set (CR 613.6).
   Spec.it s "several parts" $
     Common.assertCodec
@@ -54,7 +52,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
           Nothing
           (Modification.LoseAllAbilities NonEmpty.:| [Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1))])
       )
-      """ {"affected":{"type":"Attached"},"modifications":[{"type":"LoseAllAbilities"},{"type":"SetBasePowerToughness","value":{"power":{"type":"Literal","value":1},"toughness":{"type":"Literal","value":1}}}]} """
+      " {\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"LoseAllAbilities\"},{\"type\":\"SetBasePowerToughness\",\"value\":{\"power\":{\"type\":\"Literal\",\"value\":1},\"toughness\":{\"type\":\"Literal\",\"value\":1}}}]} "
   -- CR 604.2's "as long as" gate, Kird Ape's shape: the same ability plus a
   -- condition, so the key is present exactly when the clause is. The two cases
   -- above pin the absent half -- an encoder that always emitted the key would
@@ -77,7 +75,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
           Nothing
           (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying))
       )
-      """ {"affected":{"type":"Attached"},"condition":{"type":"Compares","value":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":{"zone":{"type":"Battlefield"},"player":{"type":"EachPlayer"}}},"filter":{"type":"HasSubtype","value":{"type":"Forest"}},"aggregation":{"type":"Members"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":1}}},"modifications":[{"type":"GainKeyword","value":{"type":"Flying"}}]} """
+      " {\"affected\":{\"type\":\"Attached\"},\"condition\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"Count\",\"value\":{\"scope\":{\"type\":\"InZone\",\"value\":{\"zone\":{\"type\":\"Battlefield\"},\"player\":{\"type\":\"EachPlayer\"}}},\"filter\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Forest\"}},\"aggregation\":{\"type\":\"Members\"}}},\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":1}}},\"modifications\":[{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Flying\"}}]} "
   -- Titania's Song's second sentence: CR 604.2's other override, and optional
   -- for the condition's reason -- absent means the effect ends with its
   -- permanent, which is every other ability in the pool.
@@ -91,7 +89,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
           (Just Duration.UntilEndOfTurn)
           (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying))
       )
-      """ {"affected":{"type":"Attached"},"lingers":{"type":"UntilEndOfTurn"},"modifications":[{"type":"GainKeyword","value":{"type":"Flying"}}]} """
+      " {\"affected\":{\"type\":\"Attached\"},\"lingers\":{\"type\":\"UntilEndOfTurn\"},\"modifications\":[{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Flying\"}}]} "
   -- CR 613.6 is why a static ability is one affected set and one or more parts, so
   -- the wire format is an array -- and an array can be empty. An ability with
   -- no parts does nothing, which no card means, so it is a decode FAILURE

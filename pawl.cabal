@@ -1,8 +1,8 @@
 cabal-version: 3.0
 -- cabal-gild: version
--- Generated with cabal-gild version 1.8.4.1
+-- Generated with cabal-gild version 1.8.4.2
 name: pawl
-version: 0.2026.8.15
+version: 0.2026.8.17
 synopsis: Magic: the Gathering rules engine
 description:
   Pawl is a Magic: the Gathering rules engine.
@@ -26,7 +26,7 @@ flag pedantic
   manual: True
 
 common library
-  build-depends: base ^>=4.22.0
+  build-depends: base ^>=4.20.2
   default-language: Haskell2010
   ghc-options:
     -Weverything
@@ -54,7 +54,7 @@ common executable
 library codec
   import: library
   build-depends:
-    containers ^>=0.8,
+    containers ^>=0.7,
     pawl:json,
     pawl:json-codec,
     pawl:spec,
@@ -588,7 +588,7 @@ library decimal
 library engine
   import: library
   build-depends:
-    containers ^>=0.8,
+    containers ^>=0.7,
     pawl:extra,
     pawl:types,
     text ^>=2.1.3,
@@ -745,7 +745,7 @@ library json
 library json-codec
   import: library
   build-depends:
-    containers ^>=0.8,
+    containers ^>=0.7,
     parsec ^>=3.1.18,
     pawl:decimal,
     pawl:extra,
@@ -790,7 +790,7 @@ library json-pointer
 library json-schema
   import: library
   build-depends:
-    containers ^>=0.8,
+    containers ^>=0.7,
     pawl:extra,
     pawl:json,
     pawl:json-pointer,
@@ -814,8 +814,8 @@ library registry
   import: library
   build-depends:
     bytestring ^>=0.12.2,
-    containers ^>=0.8,
-    directory ^>=1.3.10,
+    containers ^>=0.7,
+    directory ^>=1.3.8,
     pawl:codec,
     pawl:exceptions,
     pawl:json-codec,
@@ -857,7 +857,7 @@ library spec
 library types
   import: library
   build-depends:
-    containers ^>=0.8,
+    containers ^>=0.7,
     text ^>=2.1.3,
     transformers ^>=0.6.1,
 
@@ -1216,8 +1216,8 @@ test-suite pawl-test-suite
   import: executable
   build-depends:
     bytestring ^>=0.12.2,
-    containers ^>=0.8,
-    directory ^>=1.3.10,
+    containers ^>=0.7,
+    directory ^>=1.3.8,
     pawl:codec,
     pawl:decimal,
     pawl:engine,
@@ -1309,7 +1309,7 @@ test-suite pawl-test-suite
 benchmark pawl-benchmark
   import: executable
   build-depends:
-    containers ^>=0.8,
+    containers ^>=0.7,
     pawl:engine,
     pawl:registry,
     pawl:types,

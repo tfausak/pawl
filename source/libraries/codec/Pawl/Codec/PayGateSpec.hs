@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.PayGateSpec where
 
 import qualified Data.Either as Either
@@ -37,7 +35,7 @@ spec s = Spec.describe s "Pawl.Codec.PayGate" $ do
       s
       PayGate.codec
       manaLeak
-      """ {"payer":"spell","cost":{"mana":[{"type":"Generic","value":3}]},"branch":{"type":"IfNotPaid"}} """
+      " {\"payer\":\"spell\",\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]},\"branch\":{\"type\":\"IfNotPaid\"}} "
   -- CR 118.12's other branch, Merfolk Seer's: the same three keys, and only the
   -- branch differs.
   Spec.it s "MkPayGate, Merfolk Seer's clause" $
@@ -45,7 +43,7 @@ spec s = Spec.describe s "Pawl.Codec.PayGate" $ do
       s
       PayGate.codec
       manaLeak {PayGate.branch = PayBranch.IfPaid}
-      """ {"payer":"spell","cost":{"mana":[{"type":"Generic","value":3}]},"branch":{"type":"IfPaid"}} """
+      " {\"payer\":\"spell\",\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]},\"branch\":{\"type\":\"IfPaid\"}} "
   -- CR 118.12's mandatory limb, Standstill's, and the shared offer, Don't Make
   -- a Sound's second clause -- the two keys that are elided everywhere else.
   Spec.it s "MkPayGate, Standstill's mandatory sacrifice" $
@@ -53,13 +51,13 @@ spec s = Spec.describe s "Pawl.Codec.PayGate" $ do
       s
       PayGate.codec
       manaLeak {PayGate.branch = PayBranch.IfPaid, PayGate.obligation = PayObligation.Mandatory}
-      """ {"payer":"spell","cost":{"mana":[{"type":"Generic","value":3}]},"branch":{"type":"IfPaid"},"obligation":{"type":"Mandatory"}} """
+      " {\"payer\":\"spell\",\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]},\"branch\":{\"type\":\"IfPaid\"},\"obligation\":{\"type\":\"Mandatory\"}} "
   Spec.it s "MkPayGate, a clause hanging off an earlier clause's offer" $
     Common.assertCodec
       s
       PayGate.codec
       manaLeak {PayGate.branch = PayBranch.IfPaid, PayGate.offeredAt = Just (ClauseIndex.MkClauseIndex 0)}
-      """ {"payer":"spell","cost":{"mana":[{"type":"Generic","value":3}]},"branch":{"type":"IfPaid"},"offeredAt":0} """
+      " {\"payer\":\"spell\",\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]},\"branch\":{\"type\":\"IfPaid\"},\"offeredAt\":0} "
   -- The first three keys are required: none has a default an absent key could
   -- mean.
   Spec.it s "an omitted payer field is a decode error" $

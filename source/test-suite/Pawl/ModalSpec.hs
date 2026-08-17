@@ -9,6 +9,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
@@ -456,6 +457,7 @@ chooseTwo idxs picks p = case p of
   Prompt.ChooseTargets _ _ _ sets -> Map.mapWithKey pickFor sets
   _ -> S.identityAnswer p
   where
+    pickFor :: SlotName.SlotName -> (Natural, Set.Set Recipient.Recipient) -> Set.Set Recipient.Recipient
     pickFor slot (_, legal) = case lookup slot picks of
       Just recipient -> Set.singleton recipient
       Nothing -> maybe Set.empty Set.singleton (Set.lookupMin legal)
@@ -956,6 +958,7 @@ insistOneOrBoth idxs boneId forestId p = case p of
   Prompt.ChooseTargets _ _ _ sets -> Map.mapWithKey aimAt sets
   _ -> S.identityAnswer p
   where
+    aimAt :: SlotName.SlotName -> (Natural, Set.Set Recipient.Recipient) -> Set.Set Recipient.Recipient
     aimAt slot _
       | slot == artifactSlot = Set.singleton (Recipient.ToObject boneId)
       | slot == landSlot = Set.singleton (Recipient.ToObject forestId)

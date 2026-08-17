@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.CounterabilitySpec where
 
 import qualified Pawl.Codec.Counterability as Counterability
@@ -14,13 +12,13 @@ spec s = Spec.describe s "Pawl.Codec.Counterability" $ do
       s
       Counterability.codec
       Counterability.Counterable
-      """ {"type":"Counterable"} """
+      " {\"type\":\"Counterable\"} "
   Spec.it s "CantBeCountered" $
     Common.assertCodec
       s
       Counterability.codec
       Counterability.CantBeCountered
-      """ {"type":"CantBeCountered"} """
+      " {\"type\":\"CantBeCountered\"} "
   -- Exhaustive where the literals above are representative: Arm.enum derives
   -- the arm list from the type, so this is what would catch a constructor the
   -- derivation missed or two that encode alike.

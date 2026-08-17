@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ReinforceSpec where
 
 import qualified Pawl.Codec.Keyword as Keyword
@@ -30,5 +28,5 @@ spec s = Spec.describe s "Pawl.Codec.Reinforce" $ do
             Reinforce.cost = Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]), Cost.components = []}
           }
       )
-      """ {"amount":2,"cost":{"mana":[{"type":"Generic","value":1}]}} """
+      " {\"amount\":2,\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

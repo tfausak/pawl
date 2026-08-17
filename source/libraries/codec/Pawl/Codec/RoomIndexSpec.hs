@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.RoomIndexSpec where
 
 import qualified Data.Either as Either
@@ -17,7 +15,7 @@ spec s = Spec.describe s "Pawl.Codec.RoomIndex" $ do
       s
       RoomIndex.codec
       (RoomIndex.MkRoomIndex 3)
-      """ 3 """
+      " 3 "
 
   Spec.it s "has a schema" $
     Common.assertHasSchema s RoomIndex.codec
@@ -27,5 +25,5 @@ spec s = Spec.describe s "Pawl.Codec.RoomIndex" $ do
   Spec.it s "rejects a negative number" $
     Spec.assertBool
       s
-      (Either.isLeft (Common.parse (Text.pack """ -1 """) >>= Codec.decode RoomIndex.codec))
+      (Either.isLeft (Common.parse (Text.pack " -1 ") >>= Codec.decode RoomIndex.codec))
       "expected a decode failure"

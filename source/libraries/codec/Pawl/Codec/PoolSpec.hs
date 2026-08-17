@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.PoolSpec where
 
 import qualified Pawl.Codec.Pool as Pool
@@ -16,31 +14,31 @@ spec s = Spec.describe s "Pawl.Codec.Pool" $ do
       s
       Pool.codec
       Pool.Creatures
-      """ {"type":"Creatures"} """
+      " {\"type\":\"Creatures\"} "
   Spec.it s "Players" $
     Common.assertCodec
       s
       Pool.codec
       Pool.Players
-      """ {"type":"Players"} """
+      " {\"type\":\"Players\"} "
   Spec.it s "AnyTarget" $
     Common.assertCodec
       s
       Pool.codec
       Pool.AnyTarget
-      """ {"type":"AnyTarget"} """
+      " {\"type\":\"AnyTarget\"} "
   Spec.it s "Permanents" $
     Common.assertCodec
       s
       Pool.codec
       Pool.Permanents
-      """ {"type":"Permanents"} """
+      " {\"type\":\"Permanents\"} "
   Spec.it s "Spells" $
     Common.assertCodec
       s
       Pool.codec
       Pool.Spells
-      """ {"type":"Spells"} """
+      " {\"type\":\"Spells\"} "
   -- CR 113.9: activated and triggered abilities on the stack, disjoint from
   -- Spells.
   Spec.it s "Abilities" $
@@ -48,20 +46,20 @@ spec s = Spec.describe s "Pawl.Codec.Pool" $ do
       s
       Pool.codec
       Pool.Abilities
-      """ {"type":"Abilities"} """
+      " {\"type\":\"Abilities\"} "
   Spec.it s "SpellsAndPermanents" $
     Common.assertCodec
       s
       Pool.codec
       Pool.SpellsAndPermanents
-      """ {"type":"SpellsAndPermanents"} """
+      " {\"type\":\"SpellsAndPermanents\"} "
   -- CR 404.1: the cards in a graveyard, tagged with WHOSE.
   Spec.it s "CardsInGraveyard" $
     Common.assertCodec
       s
       Pool.codec
       (Pool.CardsInGraveyard (GraveyardScope.Scoped PlayerScope.You))
-      """ {"type":"CardsInGraveyard","value":{"type":"Scoped","value":{"type":"You"}}} """
+      " {\"type\":\"CardsInGraveyard\",\"value\":{\"type\":\"Scoped\",\"value\":{\"type\":\"You\"}}} "
   -- CR 406.1: the cards in the exile zone. Nullary, since exile has no
   -- per-player copy.
   Spec.it s "CardsInExile" $
@@ -69,7 +67,7 @@ spec s = Spec.describe s "Pawl.Codec.Pool" $ do
       s
       Pool.codec
       Pool.CardsInExile
-      """ {"type":"CardsInExile"} """
+      " {\"type\":\"CardsInExile\"} "
   -- The battlefield and CR 404.1's graveyard in one slot, so the graveyard half's
   -- scope is what the payload carries.
   Spec.it s "CreaturesAndCardsInGraveyard" $
@@ -77,5 +75,5 @@ spec s = Spec.describe s "Pawl.Codec.Pool" $ do
       s
       Pool.codec
       (Pool.CreaturesAndCardsInGraveyard (GraveyardScope.Scoped PlayerScope.EachPlayer))
-      """ {"type":"CreaturesAndCardsInGraveyard","value":{"type":"Scoped","value":{"type":"EachPlayer"}}} """
+      " {\"type\":\"CreaturesAndCardsInGraveyard\",\"value\":{\"type\":\"Scoped\",\"value\":{\"type\":\"EachPlayer\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Pool.codec

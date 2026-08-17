@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.BlockPermissionSpec where
 
 import qualified Pawl.Codec.BlockPermission as BlockPermission
@@ -30,7 +28,7 @@ spec s = Spec.describe s "Pawl.Codec.BlockPermission" $ do
       s
       BlockPermission.codec
       (BlockPermission.MkBlockPermission Affected.Attached (Just (Quantity.Literal 1)) Nothing)
-      """ {"affected":{"type":"Attached"},"additional":{"type":"Literal","value":1}} """
+      " {\"affected\":{\"type\":\"Attached\"},\"additional\":{\"type\":\"Literal\",\"value\":1}} "
   -- Palace Guard's: "any number of creatures", an explicit null rather than an
   -- absent key.
   Spec.it s "an unbounded permission" $
@@ -38,7 +36,7 @@ spec s = Spec.describe s "Pawl.Codec.BlockPermission" $ do
       s
       BlockPermission.codec
       (BlockPermission.MkBlockPermission (Affected.Matching Filter.IsSource) Nothing Nothing)
-      """ {"affected":{"type":"Matching","value":{"type":"IsSource"}},"additional":null} """
+      " {\"affected\":{\"type\":\"Matching\",\"value\":{\"type\":\"IsSource\"}},\"additional\":null} "
   -- Entourage of Trest's: CR 604.2's "as long as you're the monarch" (CR 725.1).
   Spec.it s "a gated permission" $
     Common.assertCodec
@@ -49,7 +47,7 @@ spec s = Spec.describe s "Pawl.Codec.BlockPermission" $ do
           (Just (Quantity.Literal 1))
           (Just (Condition.Compares (Compares.MkCompares (Quantity.IsMonarch (PlayerRef.Relative PlayerRelation.You)) Comparison.AtLeast (Quantity.Literal 1))))
       )
-      """ {"affected":{"type":"Matching","value":{"type":"IsSource"}},"additional":{"type":"Literal","value":1},"while":{"type":"Compares","value":{"measured":{"type":"IsMonarch","value":{"type":"Relative","value":{"type":"You"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":1}}}} """
+      " {\"affected\":{\"type\":\"Matching\",\"value\":{\"type\":\"IsSource\"}},\"additional\":{\"type\":\"Literal\",\"value\":1},\"while\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"IsMonarch\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}},\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":1}}}} "
   -- Kemba's Legion's: the arity itself is counted (CR 301.5a), so "additional"
   -- holds a whole Quantity rather than a number.
   Spec.it s "a counted permission" $
@@ -69,5 +67,5 @@ spec s = Spec.describe s "Pawl.Codec.BlockPermission" $ do
           )
           Nothing
       )
-      """ {"affected":{"type":"Matching","value":{"type":"IsSource"}},"additional":{"type":"Count","value":{"aggregation":{"type":"Members"},"filter":{"type":"And","value":[{"type":"HasSubtype","value":{"type":"Equipment"}},{"type":"IsAttachedToSource"}]},"scope":{"type":"InZone","value":{"zone":{"type":"Battlefield"},"player":{"type":"EachPlayer"}}}}}} """
+      " {\"affected\":{\"type\":\"Matching\",\"value\":{\"type\":\"IsSource\"}},\"additional\":{\"type\":\"Count\",\"value\":{\"aggregation\":{\"type\":\"Members\"},\"filter\":{\"type\":\"And\",\"value\":[{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Equipment\"}},{\"type\":\"IsAttachedToSource\"}]},\"scope\":{\"type\":\"InZone\",\"value\":{\"zone\":{\"type\":\"Battlefield\"},\"player\":{\"type\":\"EachPlayer\"}}}}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s BlockPermission.codec

@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.DiscardCardsSpec where
 
 import qualified Pawl.Codec.DiscardCards as DiscardCards
@@ -30,7 +28,7 @@ spec s = Spec.describe s "Pawl.Codec.DiscardCards" $ do
             DiscardCards.whichCards = Filter.HasCardType CardType.Land
           }
       )
-      """ {"count":1,"whichCards":{"type":"HasCardType","value":{"type":"Land"}}} """
+      " {\"count\":1,\"whichCards\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}} "
   -- Cathartic Reunion's "discard two cards", which names none.
   Spec.it s "MkDiscardCards, a filter that admits everything" $
     Common.assertCodec
@@ -41,5 +39,5 @@ spec s = Spec.describe s "Pawl.Codec.DiscardCards" $ do
             DiscardCards.whichCards = Filter.And []
           }
       )
-      """ {"count":2,"whichCards":{"type":"And","value":[]}} """
+      " {\"count\":2,\"whichCards\":{\"type\":\"And\",\"value\":[]}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

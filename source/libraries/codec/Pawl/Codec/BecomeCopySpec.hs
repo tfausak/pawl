@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.BecomeCopySpec where
 
 import qualified Data.Text as Text
@@ -26,5 +24,5 @@ spec s = Spec.describe s "Pawl.Codec.BecomeCopy" $ do
             BecomeCopy.subject = ObjectRef.EachMatching Filter.IsSource
           }
       )
-      """ {"original":{"type":"InSlot","value":"became"},"subject":{"type":"EachMatching","value":{"type":"IsSource"}}} """
+      " {\"original\":{\"type\":\"InSlot\",\"value\":\"became\"},\"subject\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s BecomeCopy.codec

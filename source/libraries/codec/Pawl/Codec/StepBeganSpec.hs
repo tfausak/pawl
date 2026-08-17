@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.StepBeganSpec where
 
 import qualified Pawl.Codec.StepBegan as StepBegan
@@ -22,5 +20,5 @@ spec s = Spec.describe s "Pawl.Codec.StepBegan" $ do
             StepBegan.player = PlayerId.MkPlayerId 1
           }
       )
-      """ {"phase":{"type":"Beginning","value":{"type":"Upkeep"}},"player":1} """
+      " {\"phase\":{\"type\":\"Beginning\",\"value\":{\"type\":\"Upkeep\"}},\"player\":1} "
   Spec.it s "has a schema" $ Common.assertHasSchema s StepBegan.codec

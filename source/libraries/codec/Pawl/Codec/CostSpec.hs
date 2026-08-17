@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.CostSpec where
 
 import qualified Data.Either as Either
@@ -30,14 +28,14 @@ spec s = Spec.describe s "Pawl.Codec.Cost" $ do
         { Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]),
           Cost.components = [CostComponent.TapThis, CostComponent.SacrificeThis]
         }
-      """ {"mana":[{"type":"Generic","value":4}],"components":[{"type":"TapThis"},{"type":"SacrificeThis"}]} """
+      " {\"mana\":[{\"type\":\"Generic\",\"value\":4}],\"components\":[{\"type\":\"TapThis\"},{\"type\":\"SacrificeThis\"}]} "
   -- CR 118.5a: {0} is a real, payable cost, and ManaCost's empty list IS {0}.
   Spec.it s "MkCost, {0} and no components" $
     Common.assertCodec
       s
       codec
       Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost []), Cost.components = []}
-      """ {"mana":[]} """
+      " {\"mana\":[]} "
   -- CR 118.6: Nothing (unpayable) and Just (MkManaCost []) ({0}) are both real,
   -- distinct values, so 'mana' is REQUIRED rather than defaulted -- an omitted
   -- key has no single value it could mean. A card file that lost its mana field
@@ -55,6 +53,6 @@ spec s = Spec.describe s "Pawl.Codec.Cost" $ do
       s
       codec
       Cost.MkCost {Cost.mana = Nothing, Cost.components = []}
-      """ {"mana":null} """
+      " {\"mana\":null} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s codec

@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ZoneChangeSpec where
 
 import qualified Pawl.Codec.ZoneChange as ZoneChange
@@ -26,7 +24,7 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChange" $ do
             ZoneChange.to = Zone.Graveyard
           }
       )
-      """ {"departed":1,"object":2,"from":{"type":"Battlefield"},"to":{"type":"Graveyard"}} """
+      " {\"departed\":1,\"object\":2,\"from\":{\"type\":\"Battlefield\"},\"to\":{\"type\":\"Graveyard\"}} "
   -- The same id on both sides, which is what a library-to-graveyard mill writes
   -- (CR 113.6k): the shape the engine reads when nothing "became" anything.
   Spec.it s "MkZoneChange, the same id throughout" $
@@ -40,5 +38,5 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChange" $ do
             ZoneChange.to = Zone.Graveyard
           }
       )
-      """ {"departed":3,"object":3,"from":{"type":"Library"},"to":{"type":"Graveyard"}} """
+      " {\"departed\":3,\"object\":3,\"from\":{\"type\":\"Library\"},\"to\":{\"type\":\"Graveyard\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ZoneChange.codec

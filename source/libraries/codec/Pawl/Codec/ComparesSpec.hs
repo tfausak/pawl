@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ComparesSpec where
 
 import qualified Pawl.Codec.Compares as Compares
@@ -19,5 +17,5 @@ spec s = Spec.describe s "Pawl.Codec.Compares" $ do
       s
       Compares.codec
       (Compares.MkCompares (Quantity.Literal 3) Comparison.AtLeast (Quantity.Literal 5))
-      """ {"measured":{"type":"Literal","value":3},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":5}} """
+      " {\"measured\":{\"type\":\"Literal\",\"value\":3},\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":5}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Compares.codec

@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.TriggeredAbilitySpec where
 
 import qualified Data.Map.Strict as Map
@@ -78,7 +76,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
             TriggeredAbility.limit = TriggerLimit.Unlimited
           }
       )
-      """ {"condition":{"type":"SelfEnters"},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Create","value":{"quantity":{"type":"Literal","value":1},"card":"Zombie Token"}}]}]}]}} """
+      " {\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{\"clauses\":[{\"effects\":[{\"type\":\"Create\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":1},\"card\":\"Zombie Token\"}}]}]}]}} "
   -- CR 603.4's intervening "if" clause is emitted only when the ability states
   -- one, so this case writes the key and the one above omits it.
   Spec.it s "MkTriggeredAbility, Sarcomancy's upkeep trigger (an intervening if)" $
@@ -104,7 +102,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
             TriggeredAbility.limit = TriggerLimit.Unlimited
           }
       )
-      """ {"condition":{"type":"StepBegins","value":{"phase":{"type":"Beginning","value":{"type":"Upkeep"}},"scope":{"type":"ControllersTurn"}}},"modal":{"modes":[{"clauses":[{"effects":[{"type":"DealDamage","value":{"ref":{"type":"InSlot","value":"you"},"quantity":{"type":"Literal","value":1}}}]}]}]},"intervening":{"type":"Compares","value":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":{"zone":{"type":"Battlefield"},"player":{"type":"EachPlayer"}}},"filter":{"type":"HasSubtype","value":{"type":"Zombie"}},"aggregation":{"type":"Members"}}},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}}}} """
+      " {\"condition\":{\"type\":\"StepBegins\",\"value\":{\"phase\":{\"type\":\"Beginning\",\"value\":{\"type\":\"Upkeep\"}},\"scope\":{\"type\":\"ControllersTurn\"}}},\"modal\":{\"modes\":[{\"clauses\":[{\"effects\":[{\"type\":\"DealDamage\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"you\"},\"quantity\":{\"type\":\"Literal\",\"value\":1}}}]}]}]},\"intervening\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"Count\",\"value\":{\"scope\":{\"type\":\"InZone\",\"value\":{\"zone\":{\"type\":\"Battlefield\"},\"player\":{\"type\":\"EachPlayer\"}}},\"filter\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Zombie\"}},\"aggregation\":{\"type\":\"Members\"}}},\"comparison\":{\"type\":\"Exactly\"},\"threshold\":{\"type\":\"Literal\",\"value\":0}}}} "
   -- CR 603.7: Face.delayedAbilities is a name-keyed map, rendered as a JSON
   -- OBJECT keyed by the name in ascending order. The two entries are inserted in
   -- DESCENDING name order, so a trip that emitted the map's incidental traversal
@@ -139,7 +137,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
             )
           ]
       )
-      """ {"each combat":{"condition":{"type":"StepBegins","value":{"phase":{"type":"Combat","value":{"type":"BeginningOfCombat"}},"scope":{"type":"EachTurn"}}},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Untap","value":{"type":"EachMatching","value":{"type":"AttackedThisTurn"}}}]}]}]}},"sacrifice it":{"condition":{"type":"StepBegins","value":{"phase":{"type":"Ending","value":{"type":"EndStep"}},"scope":{"type":"EachTurn"}}},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Sacrifice","value":"token"}]}]}]}}} """
+      " {\"each combat\":{\"condition\":{\"type\":\"StepBegins\",\"value\":{\"phase\":{\"type\":\"Combat\",\"value\":{\"type\":\"BeginningOfCombat\"}},\"scope\":{\"type\":\"EachTurn\"}}},\"modal\":{\"modes\":[{\"clauses\":[{\"effects\":[{\"type\":\"Untap\",\"value\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"AttackedThisTurn\"}}}]}]}]}},\"sacrifice it\":{\"condition\":{\"type\":\"StepBegins\",\"value\":{\"phase\":{\"type\":\"Ending\",\"value\":{\"type\":\"EndStep\"}},\"scope\":{\"type\":\"EachTurn\"}}},\"modal\":{\"modes\":[{\"clauses\":[{\"effects\":[{\"type\":\"Sacrifice\",\"value\":\"token\"}]}]}]}}} "
   -- CR 603.4: an ability stating no intervening "if" leaves only the two
   -- required keys.
   Spec.it s "an all-default value omits every optional key" $
@@ -156,4 +154,4 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
-      """ {"condition":{"type":"SelfEnters"},"modal":{"modes":[{}]}} """
+      " {\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}} "

@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.HalvedSpec where
 
 import qualified Pawl.Codec.Halved as Halved
@@ -28,5 +26,5 @@ spec s = Spec.describe s "Pawl.Codec.Halved" $ do
             Halved.quantity = Quantity.Power
           }
       )
-      """ {"rounding":{"type":"Up"},"quantity":{"type":"Power"}} """
+      " {\"rounding\":{\"type\":\"Up\"},\"quantity\":{\"type\":\"Power\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

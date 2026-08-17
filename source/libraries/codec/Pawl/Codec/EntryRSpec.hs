@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.EntryRSpec where
 
 import qualified Pawl.Codec.Card as Card
@@ -23,5 +21,5 @@ spec s = Spec.describe s "Pawl.Codec.EntryR" $ do
             EntryR.rewrite = EntryRewrite.Tapped
           }
       )
-      """ {"matching":{"type":"IsSource"},"rewrite":{"type":"Tapped"}} """
+      " {\"matching\":{\"type\":\"IsSource\"},\"rewrite\":{\"type\":\"Tapped\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s (EntryR.codec (Effect.codec Card.codec))

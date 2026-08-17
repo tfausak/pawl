@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.DamagePreventedSpec where
 
 import qualified Pawl.Codec.DamagePrevented as DamagePrevented
@@ -21,5 +19,5 @@ spec s = Spec.describe s "Pawl.Codec.DamagePrevented" $ do
             DamagePrevented.amount = 3
           }
       )
-      """ {"recipient":{"type":"ToPlayer","value":0},"amount":3} """
+      " {\"recipient\":{\"type\":\"ToPlayer\",\"value\":0},\"amount\":3} "
   Spec.it s "has a schema" $ Common.assertHasSchema s DamagePrevented.codec

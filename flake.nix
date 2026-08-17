@@ -1,12 +1,17 @@
 {
   inputs = {
+    cabal-gild.inputs.nixpkgs.follows = "nixpkgs";
+    cabal-gild.url = "github:tfausak/cabal-gild-nix";
+    claude-code-nix.inputs.nixpkgs.follows = "nixpkgs";
     claude-code-nix.url = "github:sadjow/claude-code-nix";
+    hooky.inputs.nixpkgs.follows = "nixpkgs";
     hooky.url = "github:tfausak/hooky-nix";
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
   };
 
   outputs =
     {
+      cabal-gild,
       claude-code-nix,
       hooky,
       nixpkgs,
@@ -40,7 +45,7 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
-          pawl = pkgs.lib.pipe (pkgs.haskell.packages.ghc9141.callCabal2nix "pawl" source { }) [
+          pawl = pkgs.lib.pipe (pkgs.haskellPackages.callCabal2nix "pawl" source { }) [
             pkgs.haskell.lib.compose.doBenchmark
             (pkgs.haskell.lib.compose.enableCabalFlag "pedantic")
             (pkgs.haskell.lib.compose.overrideCabal (old: {
@@ -92,8 +97,7 @@
           '';
 
           gild =
-            pkgs.runCommand "pawl-gild-check"
-              { nativeBuildInputs = [ pkgs.haskellPackages.cabal-gild_1_8_4_1 ]; }
+            pkgs.runCommand "pawl-gild-check" { nativeBuildInputs = [ cabal-gild.packages.${system}.default ]; }
               ''
                 cd ${source}
                 cabal-gild --mode check pawl.cabal
@@ -127,6 +131,7 @@
         {
           default = pkgs.mkShell {
             nativeBuildInputs = [
+              cabal-gild.packages.${system}.default
               claude-code-nix.packages.${system}.default
               hooky.packages.${system}.default
               pkgs.bash
@@ -134,9 +139,8 @@
               pkgs.coreutils
               pkgs.fzf
               pkgs.gh
+              pkgs.ghc
               pkgs.git
-              pkgs.haskell.compiler.native-bignum.ghc9141
-              pkgs.haskellPackages.cabal-gild_1_8_4_1
               pkgs.hlint
               pkgs.jq
               pkgs.nixfmt

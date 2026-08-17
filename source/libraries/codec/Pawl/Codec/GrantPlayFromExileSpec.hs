@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.GrantPlayFromExileSpec where
 
 import qualified Data.Text as Text
@@ -27,7 +25,7 @@ spec s = Spec.describe s "Pawl.Codec.GrantPlayFromExile" $ do
             GrantPlayFromExile.spending = ManaSpending.AsProduced
           }
       )
-      """ {"duration":{"type":"UntilEndOfTurn"},"ref":{"type":"InSlot","value":"exiled"}} """
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"}} "
   -- Dire Fleet Daredevil's: CR 118.14's clause written out.
   Spec.it s "MkGrantPlayFromExile, CR 118.14's rider" $
     Common.assertCodec
@@ -39,7 +37,7 @@ spec s = Spec.describe s "Pawl.Codec.GrantPlayFromExile" $ do
             GrantPlayFromExile.spending = ManaSpending.AnyType
           }
       )
-      """ {"duration":{"type":"UntilEndOfTurn"},"ref":{"type":"InSlot","value":"exiled"},"spending":{"type":"AnyType"}} """
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"spending\":{\"type\":\"AnyType\"}} "
   Spec.it s "a missing spending key decodes as AsProduced" $
     Common.assertFromJson
       s

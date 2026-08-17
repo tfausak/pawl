@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.CastOfferSpec where
 
 import qualified Pawl.Codec.CastOffer as CastOffer
@@ -21,13 +19,13 @@ spec s = Spec.describe s "Pawl.Codec.CastOffer" $ do
       s
       CastOffer.codec
       CastOffer.MkCastOffer {CastOffer.transformed = True, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing}
-      """ {"transformed":true,"withoutPayingManaCost":true} """
+      " {\"transformed\":true,\"withoutPayingManaCost\":true} "
   Spec.it s "MkCastOffer, an ordinary cast omits both keys" $
     Common.assertCodec
       s
       CastOffer.codec
       CastOffer.defaultValue
-      """ {} """
+      " {} "
   -- The two riders are independent (CR 712.11a is about a face, CR 118.9 about a
   -- cost), so each must survive on its own -- which is also what makes the
   -- elision above unambiguous.
@@ -36,13 +34,13 @@ spec s = Spec.describe s "Pawl.Codec.CastOffer" $ do
       s
       CastOffer.codec
       CastOffer.MkCastOffer {CastOffer.transformed = True, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Nothing}
-      """ {"transformed":true} """
+      " {\"transformed\":true} "
   Spec.it s "MkCastOffer, free alone" $
     Common.assertCodec
       s
       CastOffer.codec
       CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing}
-      """ {"withoutPayingManaCost":true} """
+      " {\"withoutPayingManaCost\":true} "
   -- CR 702.94a's own offer: the alternative cost STATED, which is the rider
   -- withoutPayingManaCost cannot express -- miracle pays something.
   Spec.it s "MkCastOffer, a stated alternative cost" $
@@ -50,7 +48,7 @@ spec s = Spec.describe s "Pawl.Codec.CastOffer" $ do
       s
       CastOffer.codec
       CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Just (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Red)])) [])}
-      """ {"payingInstead":{"mana":[{"type":"OfType","value":{"type":"Colored","value":{"type":"Red"}}}]}} """
+      " {\"payingInstead\":{\"mana\":[{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}}}]}} "
   Spec.describe s "defaultValue" $ do
     Spec.it s "carries neither rider" $
       Spec.assertEq s CastOffer.defaultValue CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Nothing}

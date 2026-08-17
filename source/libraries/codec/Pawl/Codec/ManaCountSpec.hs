@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ManaCountSpec where
 
 import qualified Pawl.Codec.ManaCount as ManaCount
@@ -20,7 +18,7 @@ spec s = Spec.describe s "Pawl.Codec.ManaCount" $ do
       s
       ManaCount.codec
       (ManaCount.MkManaCount (PlayerRef.Relative PlayerRelation.You) (ManaFilter.OfType (ManaType.Colored Color.Green)))
-      """ {"player":{"type":"Relative","value":{"type":"You"}},"filter":{"type":"OfType","value":{"type":"Colored","value":{"type":"Green"}}}} """
+      " {\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"filter\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}}} "
   -- The other end of both fields, so a codec that dropped either payload would
   -- round-trip one of these and not both.
   Spec.it s "MkManaCount, every player's whole pool" $
@@ -28,5 +26,5 @@ spec s = Spec.describe s "Pawl.Codec.ManaCount" $ do
       s
       ManaCount.codec
       (ManaCount.MkManaCount PlayerRef.EachPlayer ManaFilter.Any)
-      """ {"player":{"type":"EachPlayer"},"filter":{"type":"Any"}} """
+      " {\"player\":{\"type\":\"EachPlayer\"},\"filter\":{\"type\":\"Any\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ManaCount.codec

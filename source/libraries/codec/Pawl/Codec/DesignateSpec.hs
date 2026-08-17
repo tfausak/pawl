@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.DesignateSpec where
 
 import qualified Data.Text as Text
@@ -22,5 +20,5 @@ spec s = Spec.describe s "Pawl.Codec.Designate" $ do
             Designate.slot = SlotName.MkSlotName (Text.pack "self")
           }
       )
-      """ {"designation":{"type":"Suspected"},"slot":"self"} """
+      " {\"designation\":{\"type\":\"Suspected\"},\"slot\":\"self\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Designate.codec

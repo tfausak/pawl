@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.UsesSpec where
 
 import qualified Pawl.Codec.Uses as Uses
@@ -14,13 +12,13 @@ spec s = Spec.describe s "Pawl.Codec.Uses" $ do
       s
       Uses.codec
       Uses.Unlimited
-      """ {"type":"Unlimited"} """
+      " {\"type\":\"Unlimited\"} "
   Spec.it s "Once" $
     Common.assertCodec
       s
       Uses.codec
       Uses.Once
-      """ {"type":"Once"} """
+      " {\"type\":\"Once\"} "
   -- Exhaustive where the literals above are representative: Arm.enum derives
   -- the arm list from the type, so this is what would catch a constructor the
   -- derivation missed or two that encode alike.

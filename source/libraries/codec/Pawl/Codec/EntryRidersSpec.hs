@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.EntryRidersSpec where
 
 import qualified Data.Map.Strict as Map
@@ -19,7 +17,7 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
       s
       EntryRiders.codec
       EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = True, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
-      """ {"tapped":{"type":"Tapped"},"attacking":true} """
+      " {\"tapped\":{\"type\":\"Tapped\"},\"attacking\":true} "
   -- CR 712.14a's rider, which no other rider implies: a card returned
   -- transformed is not tapped and not attacking by that fact.
   Spec.it s "MkEntryRiders, transformed alone" $
@@ -27,7 +25,7 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
       s
       EntryRiders.codec
       EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = True, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
-      """ {"transformed":true} """
+      " {\"transformed\":true} "
   -- CR 110.5b's default written out means every key elided: an untapped,
   -- non-attacking, untransformed entry is what an EMPTY object means.
   Spec.it s "MkEntryRiders, the CR 110.5b default omits every key" $
@@ -35,7 +33,7 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
       s
       EntryRiders.codec
       EntryRiders.defaultValue
-      """ {} """
+      " {} "
   -- CR 122.6a's counters, as a multiset: the kind appears once per counter, so
   -- two of one kind is that tag twice.
   Spec.it s "MkEntryRiders, the counters an object enters with" $
@@ -43,7 +41,7 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
       s
       EntryRiders.codec
       EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.fromList [(CounterKind.PlusOnePlusOne, 2), (CounterKind.MinusOneMinusOne, 1)], EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
-      """ {"counters":[{"type":"PlusOnePlusOne"},{"type":"PlusOnePlusOne"},{"type":"MinusOneMinusOne"}]} """
+      " {\"counters\":[{\"type\":\"PlusOnePlusOne\"},{\"type\":\"PlusOnePlusOne\"},{\"type\":\"MinusOneMinusOne\"}]} "
   -- CR 110.2a's exception, which is independent of every other rider: undying
   -- returns its bearer under its owner's control and untapped.
   Spec.it s "MkEntryRiders, underOwner alone" $
@@ -51,7 +49,7 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
       s
       EntryRiders.codec
       EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = True, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
-      """ {"underOwner":true} """
+      " {\"underOwner\":true} "
   -- CR 406.3's rider, which is the one rider about a zone that is not the
   -- battlefield: Ignorant Bliss exiles face down and says nothing else.
   Spec.it s "MkEntryRiders, exiledFaceDown alone" $
@@ -59,7 +57,7 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
       s
       EntryRiders.codec
       EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = True, EntryRiders.faceDown = False}
-      """ {"exiledFaceDown":true} """
+      " {\"exiledFaceDown\":true} "
   -- CR 708.3's rider, and the one above it are two different keys because they
   -- are two different rules (CR 110.5d): Soul Summons manifests and says nothing
   -- else, so `exiledFaceDown` stays absent alongside it.
@@ -68,7 +66,7 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
       s
       EntryRiders.codec
       EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = True}
-      """ {"faceDown":true} """
+      " {\"faceDown\":true} "
   Spec.describe s "defaultValue" $ do
     Spec.it s "is untapped, not attacking and not transformed" $
       Spec.assertEq s EntryRiders.defaultValue EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}

@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.AfterTurnSpec where
 
 import qualified Pawl.Codec.AfterTurn as AfterTurn
@@ -21,5 +19,5 @@ spec s = Spec.describe s "Pawl.Codec.AfterTurn" $ do
             AfterTurn.turn = 7
           }
       )
-      """ {"player":1,"turn":7} """
+      " {\"player\":1,\"turn\":7} "
   Spec.it s "has a schema" $ Common.assertHasSchema s AfterTurn.codec

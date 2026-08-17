@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.AffectedUnlessSpec where
 
 import qualified Pawl.Codec.AffectedUnless as AffectedUnless
@@ -27,7 +25,7 @@ spec s = Spec.describe s "Pawl.Codec.AffectedUnless" $ do
             AffectedUnless.unless = Nothing
           }
       )
-      """ {"affected":{"type":"Matching","value":{"type":"HasCardType","value":{"type":"Creature"}}}} """
+      " {\"affected\":{\"type\":\"Matching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   Spec.it s "MkAffectedUnless, unless written" $
     Common.assertCodec
       s
@@ -40,5 +38,5 @@ spec s = Spec.describe s "Pawl.Codec.AffectedUnless" $ do
                   (Compares.MkCompares (Quantity.Literal 1) Comparison.AtLeast (Quantity.Literal 1))
           }
       )
-      """ {"affected":{"type":"Attached"},"unless":{"type":"Compares","value":{"measured":{"type":"Literal","value":1},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":1}}}} """
+      " {\"affected\":{\"type\":\"Attached\"},\"unless\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"Literal\",\"value\":1},\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":1}}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s AffectedUnless.codec

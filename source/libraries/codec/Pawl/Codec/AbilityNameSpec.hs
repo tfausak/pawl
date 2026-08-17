@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.AbilityNameSpec where
 
 import qualified Data.Either as Either
@@ -17,14 +15,14 @@ spec s = Spec.describe s "Pawl.Codec.AbilityName" $ do
       s
       AbilityName.codec
       (AbilityName.MkAbilityName (Text.pack "a"))
-      """ "a" """
+      " \"a\" "
 
   Spec.it s "MkAbilityName, a second name" $
     Common.assertCodec
       s
       AbilityName.codec
       (AbilityName.MkAbilityName (Text.pack "b"))
-      """ "b" """
+      " \"b\" "
 
   Spec.it s "has a schema" $
     Common.assertHasSchema s AbilityName.codec
@@ -32,5 +30,5 @@ spec s = Spec.describe s "Pawl.Codec.AbilityName" $ do
   Spec.it s "rejects a non-string" $
     Spec.assertBool
       s
-      (Either.isLeft (Common.parse (Text.pack """ 1 """) >>= Codec.decode AbilityName.codec))
+      (Either.isLeft (Common.parse (Text.pack " 1 ") >>= Codec.decode AbilityName.codec))
       "expected a decode failure"

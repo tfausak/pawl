@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.TurnUpRSpec where
 
 import qualified Pawl.Codec.TurnUpR as TurnUpR
@@ -28,5 +26,5 @@ spec s = Spec.describe s "Pawl.Codec.TurnUpR" $ do
                   }
           }
       )
-      """ {"matching":{"type":"IsSource"},"rewrite":{"type":"WithCounters","value":{"kind":{"type":"PlusOnePlusOne"},"amount":1}}} """
+      " {\"matching\":{\"type\":\"IsSource\"},\"rewrite\":{\"type\":\"WithCounters\",\"value\":{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"amount\":1}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s TurnUpR.codec

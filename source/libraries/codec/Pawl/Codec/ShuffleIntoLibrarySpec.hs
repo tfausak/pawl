@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ShuffleIntoLibrarySpec where
 
 import qualified Data.Text as Text
@@ -24,7 +22,7 @@ spec s = Spec.describe s "Pawl.Codec.ShuffleIntoLibrary" $ do
             ShuffleIntoLibrary.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))
           }
       )
-      """ {"ref":{"type":"InSlot","value":"target"}} """
+      " {\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
   -- CR 701.24c's named library -- Dwell on the Past's "their library", which
   -- is shuffled whether or not any of the named cards arrive.
   Spec.it s "MkShuffleIntoLibrary, library named" $
@@ -36,5 +34,5 @@ spec s = Spec.describe s "Pawl.Codec.ShuffleIntoLibrary" $ do
             ShuffleIntoLibrary.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "cards"))
           }
       )
-      """ {"library":{"type":"InSlot","value":"player"},"ref":{"type":"InSlot","value":"cards"}} """
+      " {\"library\":{\"type\":\"InSlot\",\"value\":\"player\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"cards\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ShuffleIntoLibrary.codec

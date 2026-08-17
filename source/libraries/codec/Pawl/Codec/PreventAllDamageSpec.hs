@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.PreventAllDamageSpec where
 
 import qualified Data.Sequence as Seq
@@ -36,7 +34,7 @@ spec s = Spec.describe s "Pawl.Codec.PreventAllDamage" $ do
             PreventAllDamage.riders = Seq.empty
           }
       )
-      """ {"duration":{"type":"UntilEndOfTurn"},"ref":{"type":"InSlot","value":"you"}} """
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"you\"}} "
   -- Inkshield's "all COMBAT damage" and Brace for Impact's CR 615.5 clause,
   -- together.
   Spec.it s "MkPreventAllDamage, kind and riders written" $
@@ -50,5 +48,5 @@ spec s = Spec.describe s "Pawl.Codec.PreventAllDamage" $ do
             PreventAllDamage.riders = Seq.singleton (Text.pack "a rider")
           }
       )
-      """ {"duration":{"type":"UntilEndOfTurn"},"kind":{"type":"Combat"},"ref":{"type":"InSlot","value":"target"},"riders":["a rider"]} """
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"kind\":{\"type\":\"Combat\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"riders\":[\"a rider\"]} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

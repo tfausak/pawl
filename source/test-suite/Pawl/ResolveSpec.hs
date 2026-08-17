@@ -7896,6 +7896,7 @@ portOfKarfellSpec s registry =
               maidenId = case Game.zoneMembers Zone.Graveyard S.alice gs of
                 [_, _, third] -> Just third
                 _ -> Nothing
+              choosing :: ObjectId.ObjectId -> Prompt.Prompt r -> r
               choosing wanted p = case p of
                 Prompt.ChooseCardInGraveyard {} -> wanted
                 _ -> S.identityAnswer p
@@ -8031,6 +8032,7 @@ blossomingTortoiseSpec s registry = Spec.describe s "BlossomingTortoise" $ do
         wanted = case Game.zoneMembers Zone.Graveyard S.alice gs of
           [_, _, third] -> Just third
           _ -> Nothing
+        choosing :: ObjectId.ObjectId -> Prompt.Prompt r -> r
         choosing chosen p = case p of
           Prompt.ChooseCardInGraveyard {} -> chosen
           _ -> S.identityAnswer p
@@ -8345,6 +8347,7 @@ bloodForBonesSpec s registry =
                   ]
               -- FIRST the Sentry, and then the Sentry AGAIN -- which the second
               -- return cannot grant, so the fallback is the pinned Piker.
+              choosing :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
               choosing sentryId pikerId p = case p of
                 Prompt.ChooseCardInGraveyard _ _ _ offered ->
                   if List.elem sentryId (NonEmpty.toList offered) then sentryId else pikerId
@@ -8680,6 +8683,7 @@ elvishPiperSpec s registry =
       -- Says yes to the printed "may" and names `wanted` when a hand choice is
       -- put. Answering the "may" is what makes the ability do anything at all --
       -- S.identityAnswer declines it.
+      taking :: ObjectId.ObjectId -> Prompt.Prompt r -> r
       taking wanted p = case p of
         Prompt.ChooseOptional {} -> OptionalDecision.Exercises
         Prompt.ChooseCardInHand {} -> wanted
@@ -8977,9 +8981,10 @@ communeWithLavaSpec s registry =
         let g1 = List.foldl' (\g p -> snd (S.addLibraryCard p S.alice g)) (S.landsInPlay mountain 6) stocked
             g2 = snd (S.addLibraryCard sentry S.bob g1)
             (withSpell, spell) = S.handOne commune g2
+            announced = x :: Natural
             announcing :: Prompt.Prompt r -> r
             announcing p = case p of
-              Prompt.ChooseX {} -> x
+              Prompt.ChooseX {} -> announced
               _ -> S.identityAnswer p
             afterCast = S.runPure announcing withSpell (S.cast S.alice spell)
         pure (S.runPure announcing afterCast Engine.priorityLoop)
@@ -10275,6 +10280,7 @@ randomRevealSpec s registry =
       -- fields: an answerer that hunted for "a legal card" would go on answering
       -- legally after a mutation broke which card the engine honours, and these
       -- cases would stay green over it.
+      rolling :: Int -> Prompt.Prompt r -> r
       rolling i p = case p of
         Prompt.RandomObject offered -> case List.drop (min i (length (NonEmpty.toList offered) - 1)) (NonEmpty.toList offered) of
           h : _ -> h
@@ -10753,9 +10759,7 @@ stolenArmyBoard s registry = do
       amassed = resolveOne S.identityAnswer (resolveFor S.bob S.identityAnswer g5 musterId) firstId
   case S.tokensOf amassed of
     [bobArmy, aliceArmy] -> pure (bobArmy, aliceArmy, S.giveControl bobArmy S.alice amassed, secondId)
-    other -> do
-      Spec.assertFailure s ("expected exactly two tokens, got " <> show (length other))
-      pure (S.noSource, S.noSource, amassed, secondId)
+    other -> Spec.assertFailure s ("expected exactly two tokens, got " <> show (length other))
 
 -- resolveOne for a seat other than alice's: bob casts and the spell resolves.
 resolveFor :: PlayerId.PlayerId -> (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
@@ -11194,9 +11198,7 @@ activateBlighting s wanted oid gs = case Projection.abilitiesOf oid gs of
   surveil : _ -> do
     Spec.assertBool s (Activate.activatable S.alice oid surveil gs) "the ability is activatable"
     pure (S.runPure (blighting wanted) gs (Activate.activateAbility S.alice oid surveil))
-  [] -> do
-    Spec.assertFailure s "expected the permanent to carry an activated ability"
-    pure gs
+  [] -> Spec.assertFailure s "expected the permanent to carry an activated ability"
 
 -- Answers Prompt.ChooseBlight with a named creature and Prompt.ChooseToPay with
 -- Pays, deferring everything else to S.identityAnswer. Both halves are PINNED, so

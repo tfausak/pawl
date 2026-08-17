@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.AttackerBlockedSpec where
 
 import qualified Pawl.Codec.AttackerBlocked as AttackerBlocked
@@ -21,5 +19,5 @@ spec s = Spec.describe s "Pawl.Codec.AttackerBlocked" $ do
             AttackerBlocked.defender = PlayerId.MkPlayerId 1
           }
       )
-      """ {"attacker":1,"defender":1} """
+      " {\"attacker\":1,\"defender\":1} "
   Spec.it s "has a schema" $ Common.assertHasSchema s AttackerBlocked.codec

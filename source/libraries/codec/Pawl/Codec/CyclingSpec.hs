@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.CyclingSpec where
 
 import qualified Pawl.Codec.Cycling as Cycling
@@ -30,5 +28,5 @@ spec s = Spec.describe s "Pawl.Codec.Cycling" $ do
             Cycling.searchFor = Nothing
           }
       )
-      """ {"cost":{"mana":[{"type":"Generic","value":2}]},"searchFor":null} """
+      " {\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]},\"searchFor\":null} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

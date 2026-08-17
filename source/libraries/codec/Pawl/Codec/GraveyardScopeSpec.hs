@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.GraveyardScopeSpec where
 
 import qualified Data.Text as Text
@@ -17,11 +15,11 @@ spec s = Spec.describe s "Pawl.Codec.GraveyardScope" $ do
       s
       GraveyardScope.codec
       (GraveyardScope.Scoped PlayerScope.You)
-      """ {"type":"Scoped","value":{"type":"You"}} """
+      " {\"type\":\"Scoped\",\"value\":{\"type\":\"You\"}} "
   Spec.it s "InSlot" $
     Common.assertCodec
       s
       GraveyardScope.codec
       (GraveyardScope.InSlot (SlotName.MkSlotName (Text.pack "player")))
-      """ {"type":"InSlot","value":"player"} """
+      " {\"type\":\"InSlot\",\"value\":\"player\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s GraveyardScope.codec

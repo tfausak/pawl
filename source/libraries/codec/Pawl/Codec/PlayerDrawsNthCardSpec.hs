@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.PlayerDrawsNthCardSpec where
 
 import qualified Pawl.Codec.PlayerDrawsNthCard as PlayerDrawsNthCard
@@ -21,5 +19,5 @@ spec s = Spec.describe s "Pawl.Codec.PlayerDrawsNthCard" $ do
             PlayerDrawsNthCard.nth = 2
           }
       )
-      """ {"player":{"type":"You"},"nth":2} """
+      " {\"player\":{\"type\":\"You\"},\"nth\":2} "
   Spec.it s "has a schema" $ Common.assertHasSchema s PlayerDrawsNthCard.codec

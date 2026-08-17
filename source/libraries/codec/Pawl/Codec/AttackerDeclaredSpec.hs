@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.AttackerDeclaredSpec where
 
 import qualified Pawl.Codec.AttackerDeclared as AttackerDeclared
@@ -22,5 +20,5 @@ spec s = Spec.describe s "Pawl.Codec.AttackerDeclared" $ do
             AttackerDeclared.count = 2
           }
       )
-      """ {"attacker":1,"defender":1,"count":2} """
+      " {\"attacker\":1,\"defender\":1,\"count\":2} "
   Spec.it s "has a schema" $ Common.assertHasSchema s AttackerDeclared.codec

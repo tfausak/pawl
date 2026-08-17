@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.RegenerabilitySpec where
 
 import qualified Pawl.Codec.Regenerability as Regenerability
@@ -14,13 +12,13 @@ spec s = Spec.describe s "Pawl.Codec.Regenerability" $ do
       s
       Regenerability.codec
       Regenerability.Regenerable
-      """ {"type":"Regenerable"} """
+      " {\"type\":\"Regenerable\"} "
   Spec.it s "CantBeRegenerated" $
     Common.assertCodec
       s
       Regenerability.codec
       Regenerability.CantBeRegenerated
-      """ {"type":"CantBeRegenerated"} """
+      " {\"type\":\"CantBeRegenerated\"} "
   -- Exhaustive where the literals above are representative: Arm.enum derives
   -- the arm list from the type, so this is what would catch a constructor the
   -- derivation missed or two that encode alike.

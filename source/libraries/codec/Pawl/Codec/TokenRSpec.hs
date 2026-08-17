@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.TokenRSpec where
 
 import qualified Pawl.Codec.TokenR as TokenR
@@ -22,5 +20,5 @@ spec s = Spec.describe s "Pawl.Codec.TokenR" $ do
             TokenR.scaling = Scaling.Multiply 2
           }
       )
-      """ {"matching":{"whose":{"type":"Yours"}},"scaling":{"type":"Multiply","value":2}} """
+      " {\"matching\":{\"whose\":{\"type\":\"Yours\"}},\"scaling\":{\"type\":\"Multiply\",\"value\":2}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s TokenR.codec

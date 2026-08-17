@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ManaFilterSpec where
 
 import qualified Pawl.Codec.ManaFilter as ManaFilter
@@ -17,20 +15,20 @@ spec s = Spec.describe s "Pawl.Codec.ManaFilter" $ do
       s
       ManaFilter.codec
       ManaFilter.Any
-      """ {"type":"Any"} """
+      " {\"type\":\"Any\"} "
   -- CR 106.1a / Omnath, Locus of Mana's "unspent green mana".
   Spec.it s "OfType, a colour" $
     Common.assertCodec
       s
       ManaFilter.codec
       (ManaFilter.OfType (ManaType.Colored Color.Green))
-      """ {"type":"OfType","value":{"type":"Colored","value":{"type":"Green"}}} """
+      " {\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}} "
   -- CR 106.1b's sixth type, which is not a colour.
   Spec.it s "OfType, colorless" $
     Common.assertCodec
       s
       ManaFilter.codec
       (ManaFilter.OfType ManaType.Colorless)
-      """ {"type":"OfType","value":{"type":"Colorless"}} """
+      " {\"type\":\"OfType\",\"value\":{\"type\":\"Colorless\"}} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s ManaFilter.codec

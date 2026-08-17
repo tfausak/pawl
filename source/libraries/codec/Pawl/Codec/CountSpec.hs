@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.CountSpec where
 
 import qualified Data.Text as Text
@@ -34,7 +32,7 @@ spec s = Spec.describe s "Pawl.Codec.Count" $ do
           (Filter.And [Filter.HasSubtype Subtype.Swamp, Filter.ControlledBy PlayerRelation.You])
           Aggregation.Members
       )
-      """ {"scope":{"type":"InZone","value":{"zone":{"type":"Battlefield"},"player":{"type":"EachPlayer"}}},"filter":{"type":"And","value":[{"type":"HasSubtype","value":{"type":"Swamp"}},{"type":"ControlledBy","value":{"type":"You"}}]},"aggregation":{"type":"Members"}} """
+      " {\"scope\":{\"type\":\"InZone\",\"value\":{\"zone\":{\"type\":\"Battlefield\"},\"player\":{\"type\":\"EachPlayer\"}}},\"filter\":{\"type\":\"And\",\"value\":[{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Swamp\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]},\"aggregation\":{\"type\":\"Members\"}} "
   -- CR 608.2i's look-back-in-time domain.
   Spec.it s "MkCount, scoped to the event history" $
     Common.assertCodec
@@ -45,7 +43,7 @@ spec s = Spec.describe s "Pawl.Codec.Count" $ do
           (Filter.HasCardType CardType.Creature)
           Aggregation.DistinctCardTypes
       )
-      """ {"scope":{"type":"InHistory","value":{"type":"MovedBetween","value":{"from":{"type":"Battlefield"},"to":{"type":"Graveyard"}}}},"filter":{"type":"HasCardType","value":{"type":"Creature"}},"aggregation":{"type":"DistinctCardTypes"}} """
+      " {\"scope\":{\"type\":\"InHistory\",\"value\":{\"type\":\"MovedBetween\",\"value\":{\"from\":{\"type\":\"Battlefield\"},\"to\":{\"type\":\"Graveyard\"}}}},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"aggregation\":{\"type\":\"DistinctCardTypes\"}} "
   Spec.it s "MkCount, scoped to a slot" $
     Common.assertCodec
       s
@@ -55,5 +53,5 @@ spec s = Spec.describe s "Pawl.Codec.Count" $ do
           (Filter.And [])
           Aggregation.Members
       )
-      """ {"scope":{"type":"InZone","value":{"zone":{"type":"Hand"},"player":{"type":"InSlot","value":"target"}}},"filter":{"type":"And","value":[]},"aggregation":{"type":"Members"}} """
+      " {\"scope\":{\"type\":\"InZone\",\"value\":{\"zone\":{\"type\":\"Hand\"},\"player\":{\"type\":\"InSlot\",\"value\":\"target\"}}},\"filter\":{\"type\":\"And\",\"value\":[]},\"aggregation\":{\"type\":\"Members\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s (Count.codec Common.integer)
