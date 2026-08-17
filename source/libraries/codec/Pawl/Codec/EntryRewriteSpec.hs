@@ -78,6 +78,14 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       (EntryRewrite.codec (Effect.codec Card.codec))
       EntryRewrite.ChooseBasicLandType
       " {\"type\":\"ChooseBasicLandType\"} "
+  -- CR 614.1c / 102.1: an as-enters player choice, payload-free because every
+  -- player in the game is the offer and no card narrows it.
+  Spec.it s "ChoosePlayer (Stuffy Doll)" $
+    Common.assertCodec
+      s
+      (EntryRewrite.codec (Effect.codec Card.codec))
+      EntryRewrite.ChoosePlayer
+      " {\"type\":\"ChoosePlayer\"} "
   -- CR 614.1c / 201.4a: an as-enters name choice, carrying the restriction on
   -- which cards' names may be chosen -- Null Chamber's "other than a basic land
   -- card name", which is a supertype and a card type together.

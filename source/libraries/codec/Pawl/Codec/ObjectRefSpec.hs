@@ -73,6 +73,14 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.codec
       ObjectRef.EachPlayer
       " {\"type\":\"EachPlayer\"} "
+  -- Nullary like EachPlayer above, and for a rule: CR 614.12a made the choice as
+  -- the source entered, so the ref names it rather than restating it.
+  Spec.it s "ChosenPlayer" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      ObjectRef.ChosenPlayer
+      " {\"type\":\"ChosenPlayer\"} "
   -- Nullary like EachPlayer above, and for a rule rather than an economy: CR
   -- 400.2 makes a hand hidden, so this arm names only the resolving
   -- controller's own and carries neither a player nor a filter.
@@ -207,10 +215,13 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
   -- card's chosen return into a mass one. The two HAND arms are a second such
   -- pair now -- a chosen card and a random one over the same zone -- and a
   -- copied tag there would turn randomness into a player's decision.
-  Spec.it s "the eleven arms carry eleven distinct tags" $
+  -- The two PLAYER arms are a third such pair: a sweep of every seat and the one
+  -- seat the source chose, so a copied tag would spray Stuffy Doll's damage over
+  -- the table.
+  Spec.it s "every arm carries a distinct tag" $
     Spec.assertEqWith
       s
-      "a slot, a battlefield sweep, a graveyard sweep, the hand sweep, the linked exile sweep, the stack sweep, the player sweep, a library's top card, a chosen graveyard card, a chosen card in hand and a random card in hand all encode differently"
+      "a slot, a battlefield sweep, a graveyard sweep, the hand sweep, the linked exile sweep, the stack sweep, the player sweep, the chosen player, a library's top card, a chosen graveyard card, a chosen card in hand and a random card in hand all encode differently"
       ( length
           ( List.nub
               [ Codec.encode ObjectRef.codec (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
@@ -220,6 +231,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardExiledWithSource Nothing),
                 Codec.encode ObjectRef.codec (ObjectRef.EachSpell (Filter.Not Filter.IsSource)),
                 Codec.encode ObjectRef.codec ObjectRef.EachPlayer,
+                Codec.encode ObjectRef.codec ObjectRef.ChosenPlayer,
                 Codec.encode ObjectRef.codec (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 3))),
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature))),
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (PlayerRef.Relative PlayerRelation.You) (Filter.HasCardType CardType.Creature))),
@@ -227,7 +239,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
               ]
           )
       )
-      11
+      12
   -- A tag the decoder does not know is an error rather than a silent slot.
   Spec.it s "an unknown tag is rejected" $
     Spec.assertBool

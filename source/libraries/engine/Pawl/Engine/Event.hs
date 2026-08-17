@@ -554,6 +554,7 @@ createEmblem pid card =
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
             Object.chosenNames = Set.empty,
+            Object.chosenPlayer = Nothing,
             Object.timestamp = ts,
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
@@ -944,6 +945,48 @@ apply batch candidate event =
         Replacement.consume (ReplacementCandidate.identity candidate)
         State.modify' $ \g ->
           let stamp o = o {Object.chosenSubtype = Just picked}
+           in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
+        pure (Just event)
+      -- CR 614.1c: Stuffy Doll's as-enters player choice. The two arms above ask
+      -- unconditionally because rules 105.1 and 305.6 fix their offers; this one
+      -- asks the BOARD who is available, so it can be elided in the one case those
+      -- two never reach -- a single player still in the game, where CR 102.1's
+      -- offer has one member and nothing is left to decide.
+      --
+      -- Written to Object.chosenPlayer, NOT to the copiable snapshot -- see
+      -- EntryRewrite.ChoosePlayer.
+      EntryRewrite.ChoosePlayer -> do
+        gs <- State.get
+        let candidates = Game.stillPlaying gs
+        picked <- case (Projection.controllerOf oid gs, NonEmpty.nonEmpty candidates) of
+          -- Nobody left to choose from, a board CR 104.2a has already ended the
+          -- game on. Chooses nobody rather than conjuring a seat, the posture
+          -- designateProtector takes for a battle with no legal protector.
+          (_, Nothing) -> pure Nothing
+          -- Unreachable, and defensive for ChoiceOf's reason: the object is
+          -- materialized on the battlefield before this loop runs, so
+          -- controllerOf falls back to its owner. Chooses NOBODY rather than
+          -- conjuring a seat the way ChooseColor's arm conjures white, because a
+          -- player is a real board object where a colour is not -- and CR 101.3
+          -- already ignores the share of a later instruction that names nobody.
+          (Nothing, _) -> pure Nothing
+          (Just controller, Just offer)
+            -- One candidate is one outcome, so the options are indistinguishable
+            -- and the engine decides nothing by not asking.
+            | null (NonEmpty.tail offer) -> pure (Just (NonEmpty.head offer))
+            | otherwise -> do
+                let decider = Decide.deciderFor controller gs
+                answer <- Game.choose (Prompt.ChoosePlayer decider controller oid offer)
+                -- Filters rather than trusts the answer, Battle.designateProtector's
+                -- posture: an interpreter naming a player who is not in the game
+                -- gets the head of the offer instead of an illegal designation.
+                pure . Just $
+                  if List.elem answer candidates
+                    then answer
+                    else NonEmpty.head offer
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        State.modify' $ \g ->
+          let stamp o = o {Object.chosenPlayer = picked}
            in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
         pure (Just event)
       -- CR 614.1c with CR 201.4: Null Chamber's as-enters name choices. Unlike
@@ -3215,6 +3258,7 @@ createTokens controller card copy n tapped entering = do
                     Object.chosenColor = Nothing,
                     Object.chosenSubtype = Nothing,
                     Object.chosenNames = Set.empty,
+                    Object.chosenPlayer = Nothing,
                     Object.timestamp = ts,
                     Object.face = Nothing,
                     Object.turnedOverAt = Nothing,

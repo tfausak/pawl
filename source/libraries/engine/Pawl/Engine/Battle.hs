@@ -207,8 +207,9 @@ needsProtector pc controller playing attacked designated = case designated of
 -- pick. Nothing means the rules offer no legal protector, which both callers
 -- answer by putting the battle into its owner's graveyard (CR 704.5x, CR 704.5y).
 --
--- The one place the question is asked, shared by CR 310.9a's as-enters route
--- (Pawl.Engine.Event's EntryRewrite.ChooseProtector arm) and CR 704.5x/704.5y's
+-- The one place the question is asked, shared by CR 310.9a's as-enters
+-- designation (Pawl.Engine.Event.designateProtector, which is not a replacement
+-- effect -- see that function) and CR 704.5x/704.5y's
 -- state-based re-choice (Pawl.Engine.Sba). Sharing it is what keeps the candidate
 -- rule in one place: a re-choice must offer exactly what the entry choice offered.
 --

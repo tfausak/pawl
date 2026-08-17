@@ -276,6 +276,9 @@ objectRefSlots ref = case ref of
   ObjectRef.EachCardExiledWithSource {} -> Map.empty
   ObjectRef.EachSpell _ -> Map.empty
   ObjectRef.EachPlayer -> Map.empty
+  -- The seat is read off the source's own entry choice (CR 614.12a) rather than
+  -- out of a slot, so this names none either.
+  ObjectRef.ChosenPlayer -> Map.empty
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player count) -> joinTwo (playerRefSlots player) (quantitySlots count)
   -- A PlayerScope names players by their relation to the effect's controller (CR
   -- 109.5) rather than out of a slot, so whose graveyards are drawn from names
@@ -324,6 +327,7 @@ objectRefQuantities ref = case ref of
   ObjectRef.EachCardExiledWithSource {} -> []
   ObjectRef.EachSpell _ -> []
   ObjectRef.EachPlayer -> []
+  ObjectRef.ChosenPlayer -> []
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary _ count) -> [count]
   ObjectRef.ChosenCardInGraveyard {} -> []
   ObjectRef.ChosenCardInHand {} -> []
@@ -2115,6 +2119,9 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- ObjectRef-taking opcode but DealDamage reads objects only, and the same
   -- empty answer is what a slot holding a player already gives them.
   ObjectRef.EachPlayer -> []
+  -- Names one player and so no objects either, the arm above's answer for its
+  -- reason.
+  ObjectRef.ChosenPlayer -> []
   -- CR 401.2's ordered pile, whose head Pawl.Engine.Game.insertIntoZone and
   -- Pawl.Engine.Event.drawCard both already treat as the top (CR 121.1). The
   -- depth is taken from EACH named library, top first, and a library holding
@@ -2369,6 +2376,15 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   -- the active player -- so a player CR 800.4 has taken out of the turn order is
   -- already not in it.
   ObjectRef.EachPlayer -> fmap Recipient.ToPlayer (Game.apnapOrder gs)
+  -- CR 120.3a again, one seat wide: the player the SOURCE chose as it entered
+  -- (CR 614.12a). Read off `source` -- CR 113.7a's source permanent -- and not
+  -- off `resolving`, which for a triggered ability is the ability object on the
+  -- stack and never carries the choice.
+  --
+  -- Yields nothing at all where the source has left the battlefield or never
+  -- chose anybody, which CR 101.3 ignores rather than failing over.
+  ObjectRef.ChosenPlayer ->
+    Maybe.maybeToList (fmap Recipient.ToPlayer (Game.lookupObject source gs >>= Object.chosenPlayer))
   -- No recipients, because there is no answer to give without asking the chooser
   -- and this function cannot: objectRefObjects' own note explains where the real
   -- answer is made, and why an opcode that is not MoveToZone reading this ref is
@@ -3654,6 +3670,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- Players, and no card moves one to a zone. objectRefObjects' empty
             -- answer, so the move is a no-op rather than a rejected card.
             ObjectRef.EachPlayer -> pure []
+            -- One player, and no card moves one to a zone either: the arm above's
+            -- answer for its reason.
+            ObjectRef.ChosenPlayer -> pure []
             -- Count on Luck's "exile the top card of your library" and Act on
             -- Impulse's "exile the top three cards of your library", read from
             -- the pre-move state exactly as the swept set above is: the whole
