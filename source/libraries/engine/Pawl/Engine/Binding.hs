@@ -189,9 +189,11 @@ became = SlotName.MkSlotName (Text.pack "became")
 -- Read out of Pawl.Types.GameState.ambientAmounts too, and written there by
 -- Pawl.Engine.Resolve.runPreventionRider, which is CR 615.5's own channel: a
 -- rider whose shielded recipient is a player has no object at all to be bound
--- on. No writer puts this slot on a BATTLEFIELD permanent -- the two object
--- writers reach a resolving object or an effect's source -- so the ambient read
--- being last cannot shadow either of them.
+-- on. Nothing writes THIS name onto a battlefield permanent any more: the
+-- prevention stamp was the one such writer and it is gone, and
+-- Resolve.bindAmountSlot -- the writer that can reach a permanent -- only ever
+-- writes a slot the CARD authored, which the reserved-name sweeps forbid being
+-- this one. So the ambient read, coming last, shadows nothing.
 --
 -- Not a target (nothing was chosen), so the same CR 608.2b posture and the same
 -- "no card's targetSlots may name it" sweep as `you`, `thatPlayer` and `became`.

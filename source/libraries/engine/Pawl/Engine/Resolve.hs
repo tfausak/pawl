@@ -5816,11 +5816,13 @@ runPreventionRiders = do
 -- Inkling per point -- and the installing spell cannot stand in for it either,
 -- since CR 400.7 replaced that object with a new one in a graveyard.
 --
--- Saved and RESTORED rather than cleared, because a rider whose own effects
--- reach this slot must see the same value throughout. Nesting cannot occur
--- inside one call: runPreventionRiders empties the queue before running it, so a
--- rider whose damage is itself prevented appends to a fresh queue that a later
--- call drains.
+-- Restored to whatever was there rather than cleared, so this cannot clobber an
+-- outer amount if a rider ever runs inside another. It cannot today: within one
+-- call runPreventionRiders empties the queue before running it, so a rider whose
+-- own damage is prevented appends to a fresh queue that a later call drains, and
+-- the map is empty at every priority window. The restore is not a fence --
+-- deleting it reddens Pawl.ReplacementSpec's inkshieldSpec, which asserts the
+-- channel is empty afterwards.
 --
 -- `resolving` and `source` are both the rider's own source (CR 113.7), which for
 -- a floating row is the dead installing spell and for a static ability is the
@@ -5866,9 +5868,8 @@ runEntryEffects = do
 -- `resolving` and `source` are both the permanent, runPreventionRider's posture:
 -- nothing is resolving from the stack, and both ids are the effect's own source
 -- (CR 113.7), which every Filter.IsSource in the effects resolves against. The
--- slot maps are empty
--- because a static ability targets nothing (CR 115.10a), so there is no chosen
--- target for an effect to name.
+-- slot maps are empty because a static ability targets nothing (CR 115.10a), so
+-- there is no chosen target for an effect to name.
 runEntryEffect :: PendingEntryEffect.PendingEntryEffect -> Game ()
 runEntryEffect pending =
   Foldable.traverse_
