@@ -134,9 +134,9 @@ data CostComponent keyword
     -- ExileCardsFromGraveyard's: the cards are chosen, so the criterion narrows
     -- what may be offered rather than picking anything.
     --
-    -- The Filter is matched against the PRINTED card and never a projection,
+    -- The Filter is matched against the card's own CR 613 projection,
     -- ExileCardsFromGraveyard's reading below and for its reason -- see
-    -- Pawl.Engine.Cost.discardCandidates for what that misses (#160).
+    -- Pawl.Engine.Cost.discardCandidates.
     -- DiscardThis below states the rest of what reading a hand costs, for both
     -- of the components that do.
     DiscardCards (DiscardCards.DiscardCards keyword)
@@ -278,11 +278,9 @@ data CostComponent keyword
     -- rules fact rather than an oversight -- see that function for why CR 113.6m
     -- does not reach a cost that moves cards other than the object it is on.
     --
-    -- The Filter is matched against the PRINTED card and never a projection,
-    -- which is the difference from Sacrifice's note above.
-    --
-    -- Not implemented: a graveyard candidate does have a projection, so a
-    -- continuous effect that changed what this Filter reads is missed (#160).
+    -- The Filter is matched against the graveyard card's own CR 613 projection
+    -- (Pawl.Engine.Cost.exileCandidates), which rule 613.1 gives it exactly as it
+    -- gives one to a permanent.
     --
     -- "YOUR graveyard", per CR 400.3 and CR 108.4: a graveyard is a per-player
     -- zone whose members are its OWNER's, so the candidates are the paying

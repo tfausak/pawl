@@ -867,15 +867,16 @@ viewOfCard face =
 -- viewOfCard for a card that IS an object in some zone, so a
 -- characteristic-defining power can be evaluated: CR 604.3 and CR 208.2a make a
 -- CDA function in all zones, so Tarmogoyf in a library has the power its count
--- says. The view a cost criterion and a mill tally take for an off-battlefield
--- card; viewOfCard survives for the FACE-only callers, and as the off-battlefield
--- half of candidateView below.
+-- says. The view a mill tally and an explore's land test take for an
+-- off-battlefield card; viewOfCard survives for the FACE-only callers, and as the
+-- off-battlefield half of candidateView below.
 --
--- Not implemented: those readers take this view for a card that IS an object, so
--- they read it as printed where the object has a CR 613 projection of its own
--- (#160). viewUpTo above is the reader that no longer does, and neither does
--- Resolve's library search -- Imperial Recruiter's "creature card with power 2
--- or less" reads a full projection there, CDA power and all.
+-- Not implemented: those two readers take this view for a card that IS an object,
+-- so they read it as printed where the object has a CR 613 projection of its own
+-- (#160). viewUpTo above is the reader that no longer does, and neither do
+-- Resolve's library search or Cost's discard and graveyard-exile criteria --
+-- Imperial Recruiter's "creature card with power 2 or less" reads a full
+-- projection there, CDA power and all.
 --
 -- The power and toughness axes differ, CR 208.2a naming both, and so does the
 -- one axis that is not a characteristic at all: having an id is what lets CR
@@ -933,8 +934,8 @@ characteristicToughnessIn gs oid face = case seedCharacteristicPT face of
 -- battlefield half that carries it. fullView descends into the CR 613 fold, and
 -- the fold never comes back here: every count it evaluates reads viewUpTo, whose
 -- layer bound strictly decreases (see projectDeciding), and the only door into
--- this function is viewOfCardIn, whose three callers -- a cost criterion, a mill
--- tally, a land test -- all sit outside the fold. So the descent is one hop deep
+-- this function is viewOfCardIn, whose two callers -- a mill tally and an
+-- explore's land test -- both sit outside the fold. So the descent is one hop deep
 -- whatever the board holds. Injecting viewOfCardIn instead would not be: a CDA
 -- reading a candidate's POWER would re-enter this function on each candidate, and
 -- Tarmogoyf's sweep of every graveyard makes a Tarmogoyf in a graveyard one of

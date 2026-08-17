@@ -1,0 +1,84 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Morph",
+          "value": {
+            "cost": {
+              "components": [
+                {
+                  "type": "DiscardCards",
+                  "value": {
+                    "count": 1,
+                    "whichCards": {
+                      "type": "HasSubtype",
+                      "value": {
+                        "type": "Zombie"
+                      }
+                    }
+                  }
+                }
+              ],
+              "mana": []
+            },
+            "variant": {
+              "type": "Plain"
+            }
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Putrid Raptor",
+      "power": {
+        "type": "Literal",
+        "value": 4
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 4
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Beast"
+          },
+          {
+            "type": "Dinosaur"
+          },
+          {
+            "type": "Zombie"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

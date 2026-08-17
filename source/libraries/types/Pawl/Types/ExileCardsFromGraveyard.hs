@@ -12,8 +12,8 @@ import qualified Pawl.Types.Filter as Filter
 --
 -- count is Pawl.Types.Sacrifice's reading and not
 -- Pawl.Types.TapForTotalPower's: the cards are chosen and counted exactly. The
--- Filter is matched against the PRINTED card, which is the CostComponent arm's
--- note rather than this record's.
+-- Filter is matched against the card's CR 613 projection, which is the
+-- CostComponent arm's note rather than this record's.
 data ExileCardsFromGraveyard keyword = MkExileCardsFromGraveyard
   { count :: Natural.Natural,
     whichCards :: Filter.Filter keyword
