@@ -851,6 +851,27 @@ data Prompt r where
   -- case to elide. Replacement's arm has an unreachable no-controller fallback
   -- beside it; see there.
   ChooseColor :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt Color.Color
+  -- | CR 105.4 with CR 106.3: which mana a resolving spell or ability adds when
+  -- the type it names is not settled ("add one mana of any color" -- Quirion
+  -- Sentinel). The PlayerId is the player the effect instructs to add it, whose
+  -- pool CR 106.4 then holds it; the ObjectId is the resolving object.
+  --
+  -- CARRIES ITS CANDIDATES, where ChooseColor above carries none: the offer is
+  -- Pawl.Engine.Mana.producedTypes' answer for THIS production, CR 105.1's five
+  -- colours for AnyColor and a different list for a production that names one.
+  --
+  -- Its own prompt rather than a reuse of ChooseColor above or of ChooseManaYield,
+  -- by ChoosePlayer's argument. ChooseColor asks CR 614.1c's as-enters question,
+  -- whose answer CR 607.2d links to "the chosen color" and which no resolution
+  -- makes; ChooseManaYield pairs an activation's COST with its yield (CR 602.2b),
+  -- and a resolving ability has no cost. Answered with a ManaType rather than a
+  -- Color, the AnnounceHybridHalf posture: the answer IS the unit that lands in
+  -- the pool, so nothing downstream re-reads the production to learn it.
+  --
+  -- Asked only when there are two or more candidates, the elision ChooseProtector
+  -- and ChoosePlayer take: one type is one outcome, so the options are
+  -- indistinguishable and there is nothing to decide.
+  ChooseManaType :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ManaType.ManaType -> Prompt ManaType.ManaType
   -- | CR 201.4 / 614.1c: as an object enters, a player chooses a card name ("you
   -- and an opponent each choose a card name other than a basic land card name"
   -- -- Null Chamber). The PlayerId is the CHOOSER, who is the entering object's

@@ -829,6 +829,32 @@ combatReplaySpec s =
             "the head"
             (Replay.defaultAnswer (Prompt.ChooseBolster decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])))
             (ObjectId.MkObjectId 7)
+        -- CR 105.4: which colour a resolving ability's recipient added is a
+        -- decision, so it has to survive a transcript like any other.
+        Spec.it s "ChooseManaType round-trips through the transcript" $ do
+          let a = ManaType.Colored Color.White
+              b = ManaType.Colored Color.Blue
+              p = Prompt.ChooseManaType decider S.alice oid (a NonEmpty.:| [b])
+          Spec.assertEqWith s "adding the second round trips" (Replay.decode p (Replay.encode p b)) (Just b)
+          -- Discriminating: a decode that ignored the response and returned the
+          -- head would pass one leg by accident.
+          Spec.assertEqWith s "adding the first round trips" (Replay.decode p (Replay.encode p a)) (Just a)
+        Spec.it s "a mana-type choice does not decode as a hybrid-half announcement" $ do
+          -- Discriminating: fails if ChooseManaType reuses AnnouncedHybridHalf
+          -- rather than getting its own ManaType-shaped constructor. The two are
+          -- the same SHAPE -- a Prompt over one ManaType, answered from a NonEmpty
+          -- of them -- so nothing but a distinct constructor keeps a transcript of
+          -- one from replaying as the other.
+          let p = Prompt.ChooseManaType decider S.alice oid (ManaType.Colored Color.White NonEmpty.:| [ManaType.Colored Color.Blue])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.AnnouncedHybridHalf (ManaType.Colored Color.White))) Nothing
+        Spec.it s "a short mana-type transcript returns the first candidate offered" $
+          -- CR 105.4: every offered type is one Mana.producedTypes offered, so the
+          -- head is legal.
+          Spec.assertEqWith
+            s
+            "the head"
+            (Replay.defaultAnswer (Prompt.ChooseManaType decider S.alice oid (ManaType.Colored Color.White NonEmpty.:| [ManaType.Colored Color.Blue])))
+            (ManaType.Colored Color.White)
         -- CR 701.47a: which Army an amassing player put the counters on is a
         -- decision, so it has to survive a transcript like any other.
         Spec.it s "ChooseAmass round-trips through the transcript" $ do

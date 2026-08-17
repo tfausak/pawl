@@ -2362,6 +2362,95 @@ poolOf :: PlayerId.PlayerId -> GameState.GameState -> [ManaUnit.ManaUnit]
 poolOf pid gs = case Game.poolOf pid gs of
   Mana.Type.MkMana units -> units
 
+-- CR 105.4's half of the same arm: an ability that adds mana whose TYPE is not
+-- settled. Quirion Sentinel ({1}{G} 2/1 Creature -- Elf Druid, "When this
+-- creature enters, add one mana of any color") is the printing, and CR 605.1b
+-- keeps it off the mana-ability path for Burning-Tree Emissary's reason -- it
+-- triggers from neither a mana ability nor mana being added, so CR 603.3 puts it
+-- on the stack and Resolve's Effect.AddMana arm adds the mana.
+--
+-- Nothing is omitted from the card, so pawl's Sentinel is neither stricter nor
+-- weaker than printed.
+--
+-- The answer is pinned to BLUE, which is not the head of CR 105.1's five (the
+-- offer is white, blue, black, red, green): an implementation that picks for the
+-- player, or a transcript that ran out and fell back to Replay.defaultAnswer,
+-- adds white and fails here.
+quirionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+quirionSpec s registry = Spec.describe s "Quirion Sentinel" $ do
+  Spec.it s "CR 105.4 the resolving trigger offers the five colours and adds the one answered" $ do
+    quirion <- S.printingOf s registry "Quirion Sentinel"
+    spy <- S.printingOf s registry "Merfolk Spy"
+    let placed = snd (quirionPlaced quirion spy)
+        offers = State.execState (Engine.runGame (recordingManaTypes (ManaType.Colored Color.Blue)) placed Stack.resolveTop) []
+    Spec.assertEqWith s "asked once, with CR 105.1's five colours" offers [fmap ManaType.Colored [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green]]
+    Spec.assertEqWith s "and alice's pool holds the blue that was answered" (poolUnits (quirionResolved (ManaType.Colored Color.Blue) placed)) [plainColor Color.Blue]
+
+  -- The pair that separates "the engine read the answer" from "the engine picked
+  -- something". Two boards differing in ONE thing -- the colour answered -- and a
+  -- third reading, the CR 105.4 elision, would leave both pools empty.
+  Spec.it s "CR 105.4 a different answer is a different pool" $ do
+    quirion <- S.printingOf s registry "Quirion Sentinel"
+    spy <- S.printingOf s registry "Merfolk Spy"
+    let placed = snd (quirionPlaced quirion spy)
+    Spec.assertEqWith s "answering red adds red" (poolUnits (quirionResolved (ManaType.Colored Color.Red) placed)) [plainColor Color.Red]
+    Spec.assertEqWith s "the stack is empty again" (length (GameState.stack (quirionResolved (ManaType.Colored Color.Red) placed))) 0
+
+  -- Gameplay level: the added mana is ordinary mana, and WHICH colour it is
+  -- decides what it pays for. Merfolk Spy costs {U} and the two boards share
+  -- seats, timing, priority and the Spy in alice's hand -- the answered colour is
+  -- the only difference, and there is no land and no other mana source anywhere.
+  Spec.it s "CR 106.4 the blue answer casts a {U} spell and the red one does not" $ do
+    quirion <- S.printingOf s registry "Quirion Sentinel"
+    spy <- S.printingOf s registry "Merfolk Spy"
+    let (spyId, placed) = quirionPlaced quirion spy
+        blue = quirionResolved (ManaType.Colored Color.Blue) placed
+        red = quirionResolved (ManaType.Colored Color.Red) placed
+    Spec.assertBool s (any (S.isCastOf spyId) (Action.legalActions S.alice blue)) "the Spy is castable off the blue"
+    Spec.assertBool s (not (any (S.isCastOf spyId) (Action.legalActions S.alice red))) "and is not castable off the red"
+
+-- One Quirion Sentinel entering under alice with its CR 603.6a enters event and
+-- that trigger placed on the stack, plus a Merfolk Spy in alice's hand -- alice
+-- being active with priority in her precombat main phase (S.handOne). No land and
+-- no other mana source is on the board, so the only mana anywhere is what the
+-- trigger will add.
+--
+-- Stops BEFORE the resolution, unlike burningTreeResolved, so the cases below can
+-- resolve the one board under several answers.
+quirionPlaced :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+quirionPlaced quirion spy =
+  let (base, spyId) = S.handOne spy (Setup.emptyGame S.bothPlayers)
+      (_, entered) = S.entersWithTrigger quirion S.alice base
+   in (spyId, snd (Engine.runGamePure S.identityAnswer entered Engine.placePendingTriggers))
+
+-- That board with the trigger resolved, every Prompt.ChooseManaType answered
+-- `manaType`.
+quirionResolved :: ManaType.ManaType -> GameState.GameState -> GameState.GameState
+quirionResolved manaType placed = snd (Engine.runGamePure (answeringManaType manaType) placed Stack.resolveTop)
+
+-- Answers Prompt.ChooseManaType with a NAMED type, deferring everything else to
+-- S.identityAnswer. PINNED BY NAME rather than picked out of the candidates, so a
+-- mutation to the offer cannot quietly repair the answer.
+answeringManaType :: ManaType.ManaType -> Prompt.Prompt r -> r
+answeringManaType manaType p = case p of
+  Prompt.ChooseManaType {} -> manaType
+  _ -> S.identityAnswer p
+
+-- answeringManaType, recording the candidates of every Prompt.ChooseManaType --
+-- recordingManaSources' shape, and what tells "asked once with five options" from
+-- "asked with one" and from "never asked".
+recordingManaTypes :: ManaType.ManaType -> Prompt.Prompt r -> State.State [[ManaType.ManaType]] r
+recordingManaTypes manaType p = case p of
+  Prompt.ChooseManaType _ _ _ candidates -> do
+    State.modify' (<> [NonEmpty.toList candidates])
+    pure manaType
+  _ -> pure (S.identityAnswer p)
+
+-- One mana of `color` carrying no production tag, plainRed's and plainGreen's
+-- generalisation: CR 107.4h reads the SOURCE, and Quirion Sentinel is not snow.
+plainColor :: Color.Color -> ManaUnit.ManaUnit
+plainColor color = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty}
+
 -- These printings on the battlefield under alice's control, untapped and settled.
 alicePermanents :: [Printing.Printing] -> GameState.GameState
 alicePermanents = foldr (\p gs -> snd (S.addCreature p S.alice gs)) (Setup.emptyGame S.bothPlayers)
@@ -2417,6 +2506,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   chromaticSpec s registry
   burningTreeSpec s registry
   shizukoSpec s registry
+  quirionSpec s registry
 
 -- Icehide Golem's whole printed cost. Restated rather than read off the card,
 -- for the reason javelinCost gives; Pawl.CardsSpec pins it against

@@ -93,6 +93,7 @@ encode p answer = case p of
   Prompt.ChoosePayLifeOnEntry {} -> Response.ChosePayLifeOnEntry answer
   Prompt.ChooseRevealOnEntry {} -> Response.ChoseRevealOnEntry answer
   Prompt.ChooseColor {} -> Response.ChoseColor answer
+  Prompt.ChooseManaType {} -> Response.ChoseManaType answer
   Prompt.ChooseCardName {} -> Response.ChoseCardName answer
   Prompt.ChooseOpponent {} -> Response.ChoseOpponent answer
   Prompt.ChooseProtector {} -> Response.ChoseProtector answer
@@ -266,6 +267,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseColor {} -> case response of
     Response.ChoseColor c -> Just c
+    _ -> Nothing
+  Prompt.ChooseManaType {} -> case response of
+    Response.ChoseManaType t -> Just t
     _ -> Nothing
   Prompt.ChooseCardName {} -> case response of
     Response.ChoseCardName n -> Just n
@@ -558,6 +562,10 @@ defaultAnswer p = case p of
   Prompt.ChooseRevealOnEntry {} -> Nothing
   -- CR 105.1: any of the five colours is a legal answer.
   Prompt.ChooseColor {} -> Color.White
+  -- CR 105.4: every candidate is a type Mana.producedTypes offered, so the head
+  -- is legal -- the same filter-not-trust fallback Resolve's arm applies to a
+  -- wrong answer.
+  Prompt.ChooseManaType _ _ _ candidates -> NonEmpty.head candidates
   -- THE ONE ILLEGAL ANSWER, deliberately. CR 201.4 offers every card in the
   -- Oracle card reference and no card is called "", so this names nothing -- and
   -- CR 201.2a is why naming nothing is harmless: an object with no name doesn't
