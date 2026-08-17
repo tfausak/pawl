@@ -1148,12 +1148,17 @@ jaredCarthalionSpec s registry = Spec.describe s "Jared Carthalion, True Heir (C
 -- Fog and Selfless Squire install prevention rows too, but CR 615.7's remaining
 -- amount is what clause 3 is about, and Mending Hands is its one producer.
 --
--- Two of the rule's three clauses, which are the two that are reachable: the
--- damage is dealt in full though an applicable shield is there, and "existing
--- damage prevention shields won't be reduced by damage that can't be prevented".
--- The middle clause -- the applied effect's additional effect still happening --
--- is not implemented: a row can carry one (CR 615.5, testOfFaithSpec above), but
--- `inertPrevention` short-circuits before it could fire (#1106).
+-- The rule's first and third clauses: the damage is dealt in full though an
+-- applicable shield is there, and "existing damage prevention shields won't be
+-- reduced by damage that can't be prevented" -- the shield read here is the
+-- countdown amount that sentence names, and every case below asserts it
+-- untouched, which is what keeps the middle clause's application from
+-- over-reaching into it. The MIDDLE clause is shieldCounterSpec's, where CR
+-- 122.1c's amount-independent counter removal makes it observable.
+--
+-- Not implemented: CR 615.5's authored rider, the other thing that clause would
+-- carry (testOfFaithSpec above). No rider in the pool is amount-independent, so
+-- nothing here can see it (#1695).
 --
 -- EVERY case here has a CONTROL on a board that differs in Spider-Punk and in
 -- nothing else, so no assertion can pass because the damage would have got
@@ -1241,8 +1246,10 @@ spiderPunkSpec s registry = Spec.describe s "Spider-Punk (CR 615.12)" $ do
   -- sources deal damage to the shielded creature at the same time, and the rule
   -- gives its controller the choice of which the shield prevents -- but only
   -- when that choice can change the board. It cannot here, since an
-  -- unpreventable batch costs the shield nothing in any order, so nothing is
-  -- asked and the whole 8 lands either way.
+  -- unpreventable batch costs THIS shield nothing in any order (CR 615.12's last
+  -- sentence), so nothing is asked and the whole 8 lands either way. A CR 122.1c
+  -- shield counter is the opposite and is asked about, since the rule's middle
+  -- clause spends it either way -- shieldCounterSpec's CR 101.4c pair.
   Spec.it s "CR 615.12 / 615.7 an unpreventable batch asks the shielded creature's controller nothing"
     . withBoard
     $ \build -> do
@@ -5041,6 +5048,18 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
       hit src recipient n =
         DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
       amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
+      -- alice's Palace Guard with `n` shield counters written onto it, bob's
+      -- Spider-Punk beside it when `withPunk`, and two Mountains for the Bolt the
+      -- CR 615.12 cases below aim at it. A 1/4 rather than the bird because a
+      -- permanent that DIES to the unprevented damage reads 0 counters under
+      -- either reading of the rule (CR 122.2), which tells them apart not at all.
+      guardBoard withPunk n = do
+        mountain <- S.printingOf s registry "Mountain"
+        guardPrinting <- S.printingOf s registry "Palace Guard"
+        punkPrinting <- S.printingOf s registry "Spider-Punk"
+        let (guard_, g1) = S.addCreature guardPrinting S.alice (S.landsInPlay mountain 2)
+            shielded = S.addCounter CounterKind.Shield n guard_ g1
+        pure (guard_, if withPunk then snd (S.addCreature punkPrinting S.bob shielded) else shielded)
       -- Spend the counter on `src`'s hit first (CR 101.4c), keyed on the SOURCE
       -- id rather than on a batch position, so the assertion does not depend on
       -- the order the batch was gathered in.
@@ -5284,18 +5303,14 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
   -- discriminating twin is the first Bolt case above: same bird, same Bolt, and the
   -- only difference is Spider-Punk on the board.
   --
-  -- It is also the pool's one GAMEPLAY route to CR 122.1c's "as the result of an
-  -- effect": the Bolt lands with the counter still on the bird, so CR 704.5g's
-  -- state-based action destroys a shielded permanent -- and the shield must not
-  -- replace that. Mutating Replacement.admits' cause test reddens this case as well
-  -- as the door-pair one above.
-  --
-  -- Not implemented: the rule's middle clause takes the counter off anyway ("if a
-  -- permanent with a shield counter is dealt unpreventable damage, that damage will
-  -- be dealt and a shield counter will still be removed"), which the CR 615.12
-  -- short-circuit runs before (#1106). That divergence is what leaves the counter on
-  -- the bird for CR 704.5g to find here; with the clause implemented this board
-  -- reaches the same place with the counter gone.
+  -- The rule's MIDDLE clause takes the bird's counter off with it ("if a permanent
+  -- with a shield counter is dealt unpreventable damage, that damage will be dealt
+  -- and a shield counter will still be removed"), so the bird reaches CR 704.5g
+  -- with nothing left to replace anything. The counter is unreadable after the
+  -- fact here -- CR 122.2 -- which is why the cases below use a body that
+  -- survives; the GAMEPLAY route to CR 122.1c's "as the result of an effect" is
+  -- the last of them, where two Bolts leave a still-shielded permanent facing CR
+  -- 704.5g.
   Spec.it s "CR 615.12 an unpreventable Bolt kills the shielded bird" $ do
     bolt <- S.printingOf s registry "Lightning Bolt"
     (bird, entered) <- board ["Mountain"] (Just ("Spider-Punk", S.bob))
@@ -5305,3 +5320,108 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
         let once = S.settleSba (castAt oid bolt entered)
         Spec.assertEqWith s "setup: the bird still entered with its counter" (shields oid entered) 1
         Spec.assertBool s (not (Set.member oid (GameState.battlefield once))) "and the Bolt killed it through the shield"
+  -- CR 615.12's MIDDLE clause -- "those effects won't prevent any damage, but any
+  -- additional effects they have will take place" -- over CR 122.1c's "prevent
+  -- that damage and remove a shield counter from it". The removal is
+  -- amount-INDEPENDENT, which is what tells this reading from "an inert prevention
+  -- does nothing at all": the Bolt lands in full AND the counter comes off.
+  --
+  -- THE CONTROL is the same board minus Spider-Punk, one difference and nothing
+  -- else, so no assertion here can pass on a board whose shield was inapplicable:
+  -- the control's shield prevents the whole 3.
+  Spec.it s "CR 615.12 an unpreventable Bolt is prevented not at all and takes the counter anyway" $ do
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    (guard_, punked) <- guardBoard True 1
+    (controlGuard, unpunked) <- guardBoard False 1
+    let once = S.settleSba (castAt guard_ bolt punked)
+        control = S.settleSba (castAt controlGuard bolt unpunked)
+    Spec.assertEqWith s "setup: one shield counter on the 1/4, on both boards" (shields guard_ punked) 1
+    Spec.assertEqWith s "the whole 3 is marked: the shield prevented none of it" (S.damageOf guard_ once) (Just 3)
+    Spec.assertBool s (Set.member guard_ (GameState.battlefield once)) "and the 1/4 lived through it, so its counters are still readable"
+    Spec.assertEqWith s "the counter came off anyway (CR 615.12's middle clause)" (shields guard_ once) 0
+    Spec.assertEqWith s "control: without Spider-Punk the same Bolt is prevented whole" (S.damageOf controlGuard control) (Just 0)
+    Spec.assertEqWith s "control: spending the same one counter" (shields controlGuard control) 0
+  -- The same divergence where it reaches the BOARD rather than the bookkeeping,
+  -- as its own case so that it fails on its own: a counter wrongly left on would
+  -- go on to replace the next destruction (CR 122.1c's first sentence).
+  Spec.it s "CR 122.1c the counter the unpreventable Bolt spent no longer replaces a destruction" $ do
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    (guard_, punked) <- guardBoard True 1
+    let once = S.settleSba (castAt guard_ bolt punked)
+        destroyed = S.runPure S.identityAnswer once (Event.destroy Regenerability.Regenerable [guard_])
+    Spec.assertBool s (Set.member guard_ (GameState.battlefield once)) "setup: the 1/4 survived the Bolt"
+    Spec.assertBool s (not (Set.member guard_ (GameState.battlefield destroyed))) "and an effect's destruction then goes unreplaced"
+  -- CR 615.12a: "a prevention effect is applied to any particular unpreventable
+  -- damage event just once". The inert application does not re-invoke itself, so
+  -- one of the two counters comes off and not both -- the same "only one shield
+  -- counter is removed" the preventing path obeys, which is what makes the CR
+  -- 616.1 applied-set load-bearing here: the event survives the application, so
+  -- the loop goes round again and re-collects this very row.
+  --
+  -- One difference from the pair of cases above -- the number of counters -- and
+  -- the same seats, spell, lands and body.
+  Spec.it s "CR 615.12a the unpreventable Bolt's one application takes one counter, not both" $ do
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    (guard_, punked) <- guardBoard True 2
+    let once = S.settleSba (castAt guard_ bolt punked)
+        destroyed = S.runPure S.identityAnswer once (Event.destroy Regenerability.Regenerable [guard_])
+    Spec.assertEqWith s "setup: two shield counters" (shields guard_ punked) 2
+    Spec.assertEqWith s "the whole 3 is still marked" (S.damageOf guard_ once) (Just 3)
+    Spec.assertEqWith s "one counter came off, not both" (shields guard_ once) 1
+    Spec.assertBool s (Set.member guard_ (GameState.battlefield destroyed)) "and the survivor still replaces a destruction"
+  -- The pool's GAMEPLAY route to CR 122.1c's "as the result of an EFFECT", which
+  -- the case above's counter arithmetic is what makes reachable: three counters
+  -- and two unpreventable Bolts leave 6 marked on a 1/4 with a counter still on
+  -- it, so CR 704.5g's state-based action destroys a SHIELDED permanent -- and a
+  -- rule's destruction is not one the pair may replace. Reaching this any other
+  -- way is impossible while a counter is there, since the prevention half stops
+  -- the damage being marked; the door-pair case above proves the same gate
+  -- without gameplay.
+  --
+  -- No settle between the two Bolts, or CR 704.5g would run on the first one's 3.
+  Spec.it s "CR 122.1c a rule's destruction is not replaced, though a counter is still there" $ do
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    (guard_, punked) <- guardBoard True 3
+    let bolted = castAt guard_ bolt (castAt guard_ bolt punked)
+        twice = S.settleSba bolted
+    Spec.assertEqWith s "setup: one counter per Bolt came off, leaving one" (shields guard_ bolted) 1
+    Spec.assertEqWith s "setup: and 6 is marked on the 1/4, which CR 704.5g calls lethal" (S.damageOf guard_ bolted) (Just 6)
+    Spec.assertBool s (not (Set.member guard_ (GameState.battlefield twice))) "and CR 704.5g destroyed it anyway"
+  -- CR 101.4c over CR 615.12: once an inert application spends a counter, an
+  -- UNPREVENTABLE event competes for that counter exactly as a preventable one
+  -- does, so the one counter facing one of each is contested and its controller
+  -- says which event gets it. The CR 615.7 shield's opposite is excruciatorSpec's
+  -- mixed batch, which asks nothing: that shield is not reduced by unpreventable
+  -- damage at all (CR 615.12's last sentence), so the Excruciator's event is no
+  -- claim on it.
+  --
+  -- The two answers leave DIFFERENT boards, which is what makes the choice
+  -- observable: the counter on the Excruciator's 3 removes it and prevents
+  -- nothing, so the Piker's 2 lands too and the 1/4 takes 5; the counter on the
+  -- Piker's 2 prevents that event whole and leaves 3 marked on a survivor. Every
+  -- number distinct -- 3, 2, toughness 4, one counter.
+  Spec.it s "CR 101.4c an unpreventable event contests the shield counter it would spend" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    guardPrinting <- S.printingOf s registry "Palace Guard"
+    excruciator <- S.printingOf s registry "Excruciator"
+    let (guard_, g1) = S.addCreature guardPrinting S.alice (S.landsInPlay plains 1)
+        (avatar, g2) = S.addCreature excruciator S.bob g1
+        (piker, g3) = S.addCreature pikerPrinting S.bob g2
+        shielded = S.addCounter CounterKind.Shield 1 guard_ g3
+        batch = [hit avatar (Recipient.ToCreature guard_) 3, hit piker (Recipient.ToCreature guard_) 2]
+        tookTheAvatar = settleDamage (counterFirst avatar) shielded batch
+        tookThePiker = settleDamage (counterFirst piker) shielded batch
+    Spec.assertEqWith s "setup: one counter, and two events it cannot both reach" (shields guard_ shielded) 1
+    Spec.assertBool
+      s
+      (wasAskedToOrderDamage (answersFor S.identityAnswer shielded (Damage.applyDamage batch)))
+      "alice was asked which of the two the counter goes to"
+    Spec.assertEqWith s "spent on the unpreventable 3, it prevents nothing and both events happen" (amounts tookTheAvatar) [3, 2]
+    Spec.assertEqWith s "so the 1/4 takes 5" (S.damageOf guard_ tookTheAvatar) (Just 5)
+    Spec.assertBool s (not (Set.member guard_ (GameState.battlefield (S.settleSba tookTheAvatar)))) "and CR 704.5g destroys it"
+    Spec.assertEqWith s "spent on the Piker's 2 instead, that event never happens" (amounts tookThePiker) [3]
+    Spec.assertEqWith s "so only the unpreventable 3 is marked" (S.damageOf guard_ tookThePiker) (Just 3)
+    Spec.assertBool s (Set.member guard_ (GameState.battlefield (S.settleSba tookThePiker))) "and it survives"
+    Spec.assertEqWith s "one counter spent either way" (shields guard_ tookTheAvatar) 0
+    Spec.assertEqWith s "one counter spent either way" (shields guard_ tookThePiker) 0
