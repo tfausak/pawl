@@ -2382,11 +2382,11 @@ everbarkShamanSpec s registry =
       Spec.assertBool s (Activate.activatable S.alice shamanId ability gs) "activatable"
       Spec.assertBool s (any (isActivateOf shamanId) (Action.legalActions S.alice gs)) "and menued"
       let after = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice shamanId ability)
-      Spec.assertEqWith s "CR 118.8 the Piker was exiled to pay" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
+      Spec.assertEqWith s "CR 602.2b the Piker was exiled to pay" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
       Spec.assertEqWith s "and the graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
     -- The negative half, differing in exactly one permanent: no Nexus. Same
     -- graveyard, same Shaman, same empty mana cost.
-    Spec.it s "CR 701.23a without the Nexus the printed Goblin is no Treefolk and the cost is unpayable" $ do
+    Spec.it s "CR 118.3 without the Nexus the printed Goblin is no Treefolk and the cost is unpayable" $ do
       shaman <- S.printingOf s registry "Everbark Shaman"
       nexus <- S.printingOf s registry "Maskwood Nexus"
       piker <- S.printingOf s registry "Goblin Piker"
