@@ -2015,6 +2015,61 @@ sharedVictimBoard s registry victims = do
 paysGeneric :: Natural -> GameState.GameState -> Bool
 paysGeneric n = Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.Generic n])
 
+-- CR 118.3's "fully" over the UNTAPPED permanents, which is sharedVictimSpec's
+-- question on the other axis (Pawl.Types.ClaimAxis). Two Springleaf Drums ("{T},
+-- Tap an untapped creature you control: Add one mana of any color") beside ONE
+-- untapped creature are one mana and not two: whichever Drum is activated first
+-- taps the creature, and the other one's cost then has no candidate. Tapping
+-- stated no claim, so the supply model counted the creature twice and menued a
+-- two-mana cast (#1718).
+--
+-- Goblin Piker makes no mana, so every mana on these boards comes through a Drum.
+-- What separates the halves of each case is ONE Piker and nothing else. Neither
+-- Drum is a creature, so CR 302.6 gates nothing here and S.addCreature settles
+-- every permanent besides.
+sharedTapSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+sharedTapSpec s registry = Spec.describe s "Two tapping costs over one creature" $ do
+  Spec.it s "CR 118.3 one creature cannot pay for both Drums" $ do
+    one <- sharedTapBoard s registry 1
+    two <- sharedTapBoard s registry 2
+    -- The POSITIVES first: a refusal that came from the Drums not being sources at
+    -- all would fail here, which is what keeps the negatives from passing
+    -- vacuously.
+    Spec.assertBool s (paysGeneric 1 one) "one creature buys one Drum's mana"
+    Spec.assertBool s (paysGeneric 2 two) "a second creature buys the second Drum's"
+    Spec.assertBool s (not (paysGeneric 2 one)) "and one creature does not buy both"
+    Spec.assertBool s (not (paysGeneric 3 two)) "nor do two creatures make a third mana"
+
+  -- The gameplay-level proof (design.md section 4), and it has to be the OFFER
+  -- rather than the outcome: sharedVictimSpec's argument unchanged -- a payment
+  -- that follows a bad offer just fails at CR 601.2h, so what the bug did was menu
+  -- a cast that could not be paid. Mindcrank is a plain {2} artifact.
+  Spec.it s "CR 601.2g a {2} spell is not offered off one creature" $ do
+    mindcrank <- S.printingOf s registry "Mindcrank"
+    one <- sharedTapBoard s registry 1
+    two <- sharedTapBoard s registry 2
+    Spec.assertBool s (not (offersCast mindcrank one)) "not offered"
+    Spec.assertBool s (offersCast mindcrank two) "offered once a second creature can pay the second Drum"
+
+  -- The AXES must not cross, which is the whole reason the tapping claim is not a
+  -- claim on Zone.Battlefield. Village Rites ("{B}", "As an additional cost to
+  -- cast this spell, sacrifice a creature") beside one Drum and one Piker is
+  -- legal: CR 601.2g's window taps the Piker for the {B}, and CR 601.2h's payment
+  -- then sacrifices the tapped Piker. Keying the tap claim as a removal from the
+  -- battlefield merges the two pools and refuses this cast.
+  Spec.it s "CR 601.2h a creature tapped for mana can still be sacrificed" $ do
+    rites <- S.printingOf s registry "Village Rites"
+    drum <- S.printingOf s registry "Springleaf Drum"
+    piker <- S.printingOf s registry "Goblin Piker"
+    Spec.assertBool s (offersCast rites (alicePermanents [drum, piker])) "offered"
+
+-- Alice's two Springleaf Drums and `creatures` Goblin Pikers.
+sharedTapBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m GameState.GameState
+sharedTapBoard s registry creatures = do
+  drum <- S.printingOf s registry "Springleaf Drum"
+  piker <- S.printingOf s registry "Goblin Piker"
+  pure (alicePermanents (drum : drum : replicate creatures piker))
+
 -- CR 118.3's "fully" across a cost's OWN components and its mana SOURCES, which
 -- is the same rule one level up from sharedVictimSpec. Village Rites ("{B}", "As
 -- an additional cost to cast this spell, sacrifice a creature") beside Phyrexian
@@ -2357,6 +2412,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   phyrexianAltarSpec s registry
   treasonousOgreSpec s registry
   sharedVictimSpec s registry
+  sharedTapSpec s registry
   villageRitesSpec s registry
   chromaticSpec s registry
   burningTreeSpec s registry

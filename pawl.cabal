@@ -916,6 +916,7 @@ library types
     Pawl.Types.ChosenCardInGraveyard
     Pawl.Types.ChosenCardInHand
     Pawl.Types.Claim
+    Pawl.Types.ClaimAxis
     Pawl.Types.Clause
     Pawl.Types.ClauseIndex
     Pawl.Types.Color

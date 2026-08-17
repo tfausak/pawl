@@ -714,9 +714,10 @@ monocoloredHybridGeneric = 2
 -- whose components spend no life, which is every cost that reached here before
 -- one did.
 --
--- `claimed` is the same thing for objects: the components' own claims on a zone,
--- which every route offered here has to be payable alongside (#1134). Empty for a
--- cost whose components take nothing out of a zone.
+-- `claimed` is the same thing for objects: the components' own claims on a zone's
+-- contents or on the untapped permanents (Pawl.Types.ClaimAxis), which every route
+-- offered here has to be payable alongside (#1134). Empty for a cost whose
+-- components spend no object.
 --
 -- `spending` is CR 118.14's permission, riding through to the payability
 -- question below for the reason `outside` and `claimed` do: a route this
@@ -885,15 +886,15 @@ canPay capacity pid = canPayCommitting capacity ManaSpending.AsProduced pid 0 []
 -- already spoken for: `spending`, which `relax` applies to the demands;
 -- `committed` life, which CR 119.4's floor must still admit alongside whatever
 -- the rest of this cost costs; and `claimed`, the objects the rest of this cost
--- will take out of a zone.
+-- will spend, whether by taking them out of a zone or by tapping them
+-- (Pawl.Types.ClaimAxis).
 --
 -- Two callers commit life: `announce`, for CR 118.13a's choices -- both those
 -- already made and those a `completions` entry is standing in for -- and
 -- Pawl.Engine.Cost's canPay and canPaySomeCompletion(Given), for the CR 119.4
 -- payments the cost's COMPONENTS owe.
 --
--- The same callers claim objects, and only from the components
--- (Cost.removalClaim):
+-- The same callers claim objects, and only from the components (Cost.claimOf):
 -- Village Rites' "sacrifice a creature" and Phyrexian Tower's are one demand on
 -- one creature under CR 118.3, exactly as two sources' are (#1134). Zero and
 -- empty everywhere else, which is what `canPay` is.
@@ -910,12 +911,12 @@ canPayCommittingGiven capacity spending sources pcs pid committed claimed cost g
 -- One source's contribution to the supply side, as the OPTIONS it offers: one
 -- option per group of yields (see the collapse below), and each option is that
 -- group -- read as one supply per mana it adds -- repeated as many times as it is
--- taken, paired with what those activations SPEND: the claims they make on a zone,
--- and the life they pay (manaSuppliesGiven). payableResolutions picks exactly ONE
--- option per source.
+-- taken, paired with what those activations SPEND: the claims they make on objects
+-- (Pawl.Types.ClaimAxis), and the life they pay (manaSuppliesGiven).
+-- payableResolutions picks exactly ONE option per source.
 --
 -- How many times is enumerated, 0 up to the ceiling, for an option that SPENDS
--- something a board is measured against -- a claim on a zone, or CR 119.4's life
+-- something a board is measured against -- a claim on objects, or CR 119.4's life
 -- -- and fixed at the ceiling for one that spends neither. That asymmetry is the
 -- whole of #1126: the clauses payableResolutions asks of a board only ever grow as
 -- supplies are added, so a free source is never worth taking fewer times -- but a
@@ -1093,10 +1094,12 @@ payableResolutions capacity spending pid committed claimed cost gs =
 -- are several claims on one pool, so CR 118.3's "fully" reaches across the
 -- sources exactly as it reaches across one cost's components -- one creature
 -- cannot be sacrificed to both Ashnod's Altar and Phyrexian Tower, and counting
--- each source alone against the untouched board said it could (#1126).
+-- each source alone against the untouched board said it could (#1126). One
+-- untapped creature cannot pay for two Springleaf Drums either, which is the same
+-- reading on Pawl.Types.ClaimAxis' tapping axis.
 --
 -- `claimed` joins them, which is the same rule one level up: the cost being paid
--- has components of its own that take objects out of a zone, and CR 601.2g's mana
+-- has components of its own that spend objects, and CR 601.2g's mana
 -- window comes BEFORE CR 601.2h's payment, so both happen and both need their own
 -- object. Village Rites beside Phyrexian Tower and one creature is the printed
 -- case -- the creature buys the {B} or pays the additional cost, not both
