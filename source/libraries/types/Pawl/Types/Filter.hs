@@ -481,7 +481,10 @@ data Filter keyword
     -- Filter admits -- Crown of the Ages' "target Aura attached to a creature"
     -- (`AttachedTo (HasCardType Creature)`), Aura Graft's "target Aura that's
     -- attached to a permanent" (`AttachedTo (And [])`), and Miracle Worker's
-    -- "target Aura attached to a creature you control".
+    -- "target Aura attached to a creature you control". Bride's Gown's "as long
+    -- as an Equipment named Groom's Finery is attached to a creature you
+    -- control" is the same atom in a CR 604.2 condition rather than a target
+    -- slot, which is the position the CR 613 layer fold evaluates.
     --
     -- Uncharacteristic for IsAttacking's reason -- attachment is a rules concept
     -- the closed half owns (CR 301.5, 303.4, 701.3, Object.attachedTo) -- while
