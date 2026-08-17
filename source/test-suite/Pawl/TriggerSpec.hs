@@ -68,6 +68,9 @@
 -- -- `meleeSpec`. CR 702.105 dethrone, the first whose whole content is its
 -- CONDITION -- a comparison of every player's life total, not a fact about the
 -- declaration -- with Enraged Revolutionary at three seats -- `dethroneSpec`.
+-- CR 508.3a's second sentence, the first condition to read whom a declaration
+-- attacked from a BYSTANDER's seat, with Marchesa's Decree at three seats --
+-- `marchesasDecreeSpec`.
 -- CR 702.134 mentor, the first keyword whose
 -- minted ability TARGETS -- a slot chosen under CR 603.3d and narrowed by a power
 -- comparison against its own source -- with Blade Instructor -- `mentorSpec`.
@@ -7053,6 +7056,69 @@ dethroneSpec s registry =
           Spec.assertEqWith s "dethrone held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Dethrone 2)) [Keyword.dethrone, Keyword.dethrone]
           Spec.assertEqWith s "and once is one" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Dethrone 1)) [Keyword.dethrone]
 
+-- CR 508.3a's second sentence, the first condition to read WHOM a declaration
+-- attacked from a bystander's seat rather than from the attacker's.
+--
+-- Marchesa's Decree {3}{B} Enchantment is the card: "whenever a creature attacks
+-- you or a planeswalker you control, that creature's controller loses 1 life".
+-- CR 508.5/508.5a make that one test on GameEvent.AttackerDeclared's defending
+-- player, so the condition never reads the board.
+--
+-- THREE SEATS, and load-bearing: at two players the defending player, "an
+-- opponent" and the attacking creature's controller are all one seat, so a
+-- condition that fired on every declaration and a payload that hit the wrong
+-- player would both pass. alice is active and attacks, bob holds the Decree, and
+-- carol is the second opponent whose leg separates the two readings.
+--
+-- Every leg reads all three life totals, since "that creature's controller"
+-- (alice) and CR 109.5's "you" (bob) are different seats on this board.
+--
+-- TWO attackers, because CR 508.3a's arity is per declared attacker: one life per
+-- creature, not one per declaration (CR 508.3b, gap #538).
+marchesasDecreeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+marchesasDecreeSpec s registry =
+  let board = do
+        decree <- S.printingOf s registry "Marchesa's Decree"
+        piker <- S.printingOf s registry "Goblin Piker"
+        pure (S.threePlayerCombat [piker, piker] [decree] [])
+      attacking :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+      attacking who p = case p of
+        Prompt.ChooseDefender {} -> who
+        _ -> S.aggressiveAnswer p
+      -- The same board with the declaration itself declined, which is the leg
+      -- that separates "a creature attacked you" from "the step began".
+      standingStill :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+      standingStill who p = case p of
+        Prompt.DeclareAttackers {} -> []
+        _ -> attacking who p
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+      lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
+   in Spec.describe s "Marchesa's Decree" $ do
+        -- The proving test. Two of alice's Pikers attack bob, so the Decree fires
+        -- twice and ALICE is down 2 -- bob, whose enchantment it is, loses nothing.
+        Spec.it s "CR 508.3a/508.5 whole card: each creature attacking you costs its controller 1 life" $ do
+          (gs, _, _, _) <- board
+          Spec.assertEqWith s "alice lost 1 per attacker, bob and carol nothing" (lives (atBlockers (attacking S.bob) gs)) (Just 18, Just 20, Just 20)
+        -- The same declaration aimed at the other opponent. CR 508.5 makes carol
+        -- the defending player, so the Decree is silent -- the falsifier for a
+        -- condition that fired on any declaration, which a two-seat board cannot
+        -- see.
+        Spec.it s "CR 508.5 a creature attacking the other opponent does not trigger it" $ do
+          (gs, ours, _, _) <- board
+          let after = atBlockers (attacking S.carol) gs
+          case ours of
+            piker : _ -> Spec.assertEqWith s "CR 508.1b the Piker really did attack carol" (Map.lookup piker (Combat.Type.attackers (GameState.combat after))) (Just (AttackTarget.OfPlayer S.carol))
+            _ -> Spec.assertFailure s "fixture should give alice two Goblin Pikers"
+          Spec.assertEqWith s "and nobody lost life" (lives after) (Just 20, Just 20, Just 20)
+        -- No declaration at all, on the same board and against the same defending
+        -- player: the falsifier for a condition that fired on the step rather than
+        -- on CR 508.1a's declaration.
+        Spec.it s "CR 508.3a a declare attackers step with no attackers triggers nothing" $ do
+          (gs, _, _, _) <- board
+          let after = atBlockers (standingStill S.bob) gs
+          Spec.assertEqWith s "nothing was declared" (Combat.Type.attackers (GameState.combat after)) Map.empty
+          Spec.assertEqWith s "and nobody lost life" (lives after) (Just 20, Just 20, Just 20)
+
 -- CR 702.23 rampage, whose rule text is a triggered ability,
 -- and the first whose bonus multiplies a printed N by a number read off the
 -- board.
@@ -9145,6 +9211,11 @@ representativeEvents cond =
         -- alone -- and the ATTACKER is what this one binds, where SelfAttacks
         -- above binds the defending player off the very same event.
         TriggerCondition.CreatureAttacksAlone _ -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol 1))
+        -- The same declaration event again, and the ATTACKER is what this one
+        -- binds too -- CR 508.5's defending player is the thing it MATCHES on, so
+        -- an arm that bound that player instead would disagree with
+        -- eventBindingSlots here.
+        TriggerCondition.CreatureAttacksYou -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol 1))
         -- The same declaration event once more. Rule 702.105a binds NOTHING off
         -- it, SelfAttacksWithAnother's case: the player it compares is read from
         -- Combat.attackers and then never named again.
@@ -9320,6 +9391,7 @@ everyTriggerCondition =
     TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
     TriggerCondition.SelfAttacksWithAnother (Filter.Type.And []),
     TriggerCondition.CreatureAttacksAlone (Filter.Type.And []),
+    TriggerCondition.CreatureAttacksYou,
     TriggerCondition.SelfAttacksPlayerWithMostLife,
     TriggerCondition.SelfBlocks,
     TriggerCondition.SelfBlocksAtLeast 2,
@@ -12479,6 +12551,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   afflictSpec s registry
   meleeSpec s registry
   dethroneSpec s registry
+  marchesasDecreeSpec s registry
   rampageSpec s registry
   cyclingTriggerSpec s registry
   graveyardTriggerSpec s registry
