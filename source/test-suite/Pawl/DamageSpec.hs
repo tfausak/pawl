@@ -891,8 +891,8 @@ saunaName = CardName.MkCardName (Text.pack "Steaming Sauna")
 
 -- CR 709.5c: give a Room permanent these unlocked designations directly. The
 -- names a Room projects are one per UNLOCKED door (CR 709.4a, via
--- Pawl.Engine.Card.roomNames), so this is what makes a permanent multi-named --
--- the only way in the pool for two legend groups to share a member set. Set
+-- Pawl.Engine.Card.roomNames), so this is what makes a permanent multi-named,
+-- which is what two legend groups need to share a member set. Set
 -- rather than cast-and-unlock because the doors cost {1}{R} and {3}{U}{U} apiece
 -- and this group's subject is the grouping, not the unlocking; Pawl.RoomSpec
 -- covers the end-to-end route and asserts against this same field.
@@ -1081,9 +1081,9 @@ legendRuleSpec s registry =
     -- with two names is asked about once, not once per name.
     --
     -- CR 709.5 gives a Room permanent one name per unlocked door (CR 709.4a), so
-    -- two Rooms with both doors open are same-named through BOTH names: the
-    -- pool's only board where keying the groups by name and keying them by
-    -- member set disagree. Leyline of Singularity supplies the supertype.
+    -- two Rooms with both doors open are same-named through BOTH names, which is
+    -- what makes keying the groups by name and keying them by member set
+    -- disagree. Leyline of Singularity supplies the supertype.
     --
     -- Asked twice about the same pair, the two answers are independent, and
     -- keeping one Room under the first name and the OTHER under the second

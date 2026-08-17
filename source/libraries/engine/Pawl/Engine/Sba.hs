@@ -360,9 +360,9 @@ stillLegalEnchant pcs gs source slot recipient = case (slot, recipient) of
 -- ONE ENTRY PER NAME the permanent has, not one per permanent, which is CR
 -- 709.4a's "an object has the chosen name if ONE OF ITS NAMES is the chosen
 -- name" read through "the same name": a permanent with two names is same-named
--- as anything sharing either. A Room with both doors unlocked is the pool's
--- multi-named permanent (CR 709.5), and Leyline of Singularity is what makes one
--- legendary, so two of them under one controller really do land in two keys.
+-- as anything sharing either. A Room with both doors unlocked has two names (CR
+-- 709.5), and Leyline of Singularity grants the supertype, so two of them under
+-- one controller really do land in two keys.
 --
 -- Deduplicated ON THE MEMBER SET, which is where CR 704.5j's "chooses one of
 -- them, and the rest" would otherwise be broken: two fully unlocked Rooms are
