@@ -1344,6 +1344,47 @@ aspectOfWolfSpec s registry = Spec.describe s "Aspect of Wolf" $ do
     aspect <- S.printingOf s registry "Aspect of Wolf"
     let (_, after, giantId) = wolfOn forest hillGiant aspect 4
     Spec.assertEqWith s "no fraction to round" (S.powerToughnessOf giantId after) (Just (5, 5))
+  -- CR 612.1 at the last carrier of an object's rules text (#711): the "for each
+  -- Forest you control" inside a layer-7c P/T modification is printed in the
+  -- text box exactly as Kird Ape's "as long as" clause is, so a Magical Hack
+  -- aimed at the AURA moves which land the Aura counts.
+  --
+  -- NO TWO READINGS AGREE ON THIS BOARD. alice has 5 Forests and 3 Swamps, bob 2
+  -- Forests and 1 Swamp, so "Forests you control" is 5 (+2/+3), "Swamps you
+  -- control" 3 (+1/+2), "Forests anyone controls" 7 (+3/+4) and "Swamps anyone
+  -- controls" 4 (+2/+2). On a 3/3 Hill Giant those are 5/6, 4/5, 6/7 and 5/5.
+  --
+  -- Forest -> SWAMP rather than Forest -> Island, for the Kird Ape group's
+  -- reason: alice's lone Island is the {U} that pays the Hack, so hacking into
+  -- Island would count a land the test did not put there on purpose.
+  --
+  -- The Aura is put onto the battlefield attached rather than cast, so the Hack
+  -- is the only spell and alice's Island is certainly untapped when it is paid.
+  --
+  -- THE NEGATIVE is the same board and the same spell with one word changed:
+  -- Plains -> Swamp. The Aura's clause spells no Plains, so it stays 5/6 -- which
+  -- a rewrite that blanked or greedily replaced the quantity would fail.
+  Spec.it s "CR 612.1 a Magical Hack moves which land Aspect of Wolf counts" $ do
+    forest <- S.printingOf s registry "Forest"
+    swamp <- S.printingOf s registry "Swamp"
+    island <- S.printingOf s registry "Island"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    aspect <- S.printingOf s registry "Aspect of Wolf"
+    magicalHack <- S.printingOf s registry "Magical Hack"
+    let lands = S.landsFor swamp S.bob 1 (S.landsFor forest S.bob 2 (S.landsFor island S.alice 1 (S.landsFor swamp S.alice 3 (S.landsInPlay forest 5))))
+        (giantId, withGiant) = S.addCreature hillGiant S.bob lands
+        (auraId, withAura) = S.addCreature aspect S.alice withGiant
+        attached = S.attach auraId giantId withAura
+        (withHack, hackSpell) = S.handOne magicalHack attached
+        hackTo from to =
+          let cast = S.runPure (hackAt auraId from to) withHack (S.cast S.alice hackSpell)
+           in S.runPure (hackAt auraId from to) cast Stack.resolveTop
+        hacked = hackTo Subtype.Forest Subtype.Swamp
+        unhacked = hackTo Subtype.Plains Subtype.Swamp
+    Spec.assertEqWith s "the Aura really attached, so the count genuinely runs (CR 303.4m)" (length (ridersOn giantId attached)) 1
+    Spec.assertEqWith s "half of alice's five Forests, as printed" (S.powerToughnessOf giantId attached) (Just (5, 6))
+    Spec.assertEqWith s "hacked, it counts alice's three Swamps" (S.powerToughnessOf giantId hacked) (Just (4, 5))
+    Spec.assertEqWith s "the same Hack naming Plains reaches nothing in the clause" (S.powerToughnessOf giantId unhacked) (Just (5, 6))
 
 -- alice with `n` Forests and Aspect of Wolf in hand, bob with a Hill Giant and
 -- TWO Forests of his own; alice casts the Aura on the Giant and it resolves.

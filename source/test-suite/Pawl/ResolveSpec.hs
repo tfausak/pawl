@@ -3001,6 +3001,44 @@ bitterblossomChain s registry swap = do
       after = S.runPure S.identityAnswer onStack Engine.priorityLoop
   pure (S.tokensOf after, after)
 
+-- alice's Ajani, Adversary of Tyrants at seven loyalty, optionally with an
+-- Artificial Evolution resolved AT IT first; then she activates the ultimate,
+-- the emblem arrives in the command zone, and her end step begins so the
+-- emblem's own trigger fires and resolves. Returns the tokens and the state.
+--
+-- The loyalty is a fixture rather than seven turns of +1, for
+-- Pawl.TriggerSpec's reason: CR 306.5b's counters are what the cost pays, and
+-- how they got there is no part of what this asks.
+--
+-- The ability is taken from Projection.abilitiesOf and NOT from the printed
+-- face, which is the whole mechanism under test: the layer-3 swap is what puts
+-- the rewritten CreateEmblem in front of the activation.
+ajaniEmblemChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe (Subtype.Subtype, Subtype.Subtype) -> m ([ObjectId.ObjectId], GameState.GameState)
+ajaniEmblemChain s registry swap = do
+  island <- S.printingOf s registry "Island"
+  ajani <- S.printingOf s registry "Ajani, Adversary of Tyrants"
+  artificialEvolution <- S.printingOf s registry "Artificial Evolution"
+  let (ajaniId, g1) = S.addCreature ajani S.alice (S.landsInPlay island 1)
+      armed = S.addCounter CounterKind.Loyalty 7 ajaniId g1
+      (evolutionId, g2) = S.addHandCard artificialEvolution S.alice armed
+      evolved = case swap of
+        Nothing -> g2
+        Just (from, to) ->
+          S.runPure (evolveAt ajaniId from to) g2 $ do
+            S.cast S.alice evolutionId
+            Stack.resolveTop
+      used = case drop 2 (Projection.abilitiesOf ajaniId evolved) of
+        ability : _ -> S.runPure S.identityAnswer evolved (do Activate.activateAbility S.alice ajaniId ability; Stack.resolveTop)
+        [] -> evolved
+      endStep = Phase.Ending EndingStep.EndStep
+      begun =
+        Event.recordEvent
+          (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice))
+          (used {GameState.phase = endStep, GameState.activePlayer = S.alice})
+      onStack = S.runPure S.identityAnswer begun Engine.settleForPriority
+      after = S.runPure S.identityAnswer onStack Engine.priorityLoop
+  pure (S.tokensOf after, after)
+
 -- CR 612.2a's third carrier, and the one whose word is the RULEBOOK's: alice
 -- controls a Ministrant of Obligation ({2}{W} Creature -- Human Cleric 2/1 whose
 -- whole text box is "Afterlife 2", checked against Scryfall), optionally has an
@@ -3196,6 +3234,46 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
     -- word and not the mint.
     mapM_ (\oid -> Spec.assertEqWith s "still 1/1" (Projection.powerOf oid after, Projection.toughnessOf oid after) (Just (1 :: Integer), Just (1 :: Integer))) tokens
     mapM_ (\oid -> Spec.assertBool s (Projection.hasKeyword Keyword.Flying oid after) "and still flying") tokens
+
+  -- CR 612.2a's fourth carrier, and the one that forces the walk to be
+  -- unconditional: an EMBLEM. CR 114.3 leaves it "no characteristics other than
+  -- the abilities defined by the effect that created it", so a rewrite gated on
+  -- the type line -- which is how the token faces above are reached -- finds
+  -- nothing on an emblem's own face and stops before the ability two levels down
+  -- where the word actually is.
+  --
+  -- Ajani, Adversary of Tyrants' "-7: You get an emblem with 'At the beginning
+  -- of your end step, create three 1/1 white Cat creature tokens with lifelink'"
+  -- (checked against Scryfall). The Evolution is resolved at the AJANI, before
+  -- the ultimate is activated, so the swap reaches the CreateEmblem effect
+  -- through the projected activated ability.
+  --
+  -- Cat -> WURM, not Cat -> Wall: the Evolution's own text forbids Wall.
+  --
+  -- The control first, so neither case can pass on a chain that minted nothing.
+  Spec.it s "CR 114.2 an unevolved Ajani's emblem mints three Cat Tokens" $ do
+    (tokens, after) <- ajaniEmblemChain s registry Nothing
+    Spec.assertEqWith s "three tokens" (length tokens) 3
+    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Cat" (Projection.subtypesOf oid after) (Set.singleton Subtype.Cat)) tokens
+    mapM_ (\oid -> Spec.assertEqWith s "named Cat Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Cat Token")))) tokens
+
+  Spec.it s "CR 612.1 an evolved Ajani's emblem mints Wurms rather than Cats" $ do
+    (tokens, after) <- ajaniEmblemChain s registry (Just (Subtype.Cat, Subtype.Wurm))
+    Spec.assertEqWith s "three tokens" (length tokens) 3
+    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Wurm" (Projection.subtypesOf oid after) (Set.singleton Subtype.Wurm)) tokens
+    mapM_ (\oid -> Spec.assertEqWith s "named Wurm Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Wurm Token")))) tokens
+    -- The rest of the minted card is untouched, so what moved is the one word.
+    mapM_ (\oid -> Spec.assertEqWith s "still 1/1" (Projection.powerOf oid after, Projection.toughnessOf oid after) (Just (1 :: Integer), Just (1 :: Integer))) tokens
+    mapM_ (\oid -> Spec.assertBool s (Projection.hasKeyword Keyword.Lifelink oid after) "and still lifelinking") tokens
+
+  -- The second negative, and the one that pins the swap to the WORD rather than
+  -- to the emblem being walked at all: the same board with the Evolution naming
+  -- a pair the emblem does not spell.
+  Spec.it s "CR 612.2 an Evolution naming a word the emblem lacks leaves the Cats alone" $ do
+    (tokens, after) <- ajaniEmblemChain s registry (Just (Subtype.Goblin, Subtype.Wurm))
+    Spec.assertEqWith s "three tokens" (length tokens) 3
+    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Cat" (Projection.subtypesOf oid after) (Set.singleton Subtype.Cat)) tokens
+    mapM_ (\oid -> Spec.assertEqWith s "named Cat Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Cat Token")))) tokens
 
   -- The falsifier for a word-blind rewrite, on the same board with one word
   -- changed: Human is printed on the Ministrant and nowhere in rule 702.135a, so
