@@ -7549,9 +7549,10 @@ zonesTriggeredFrom cond = case cond of
   -- reader in any zone; stateTriggers below gathers them from the battlefield.
   TriggerCondition.StateIs _ -> battlefield
   TriggerCondition.SelfDealsCombatDamageToPlayer -> battlefield
-  -- CR 113.6's default again, and CR 120.3's own reason on top of it: only a
-  -- permanent can be dealt damage, so the bearer of an enrage trigger is on the
-  -- battlefield whenever its event can occur at all.
+  -- CR 113.6's default again, and the match's own shape on top of it: this arm
+  -- compares the bearer against the event's RECIPIENT, and CR 120.3's recipient is
+  -- a player or a permanent -- so a bearer anywhere but the battlefield can never
+  -- be the one damaged.
   TriggerCondition.SelfIsDealtDamage -> battlefield
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> battlefield
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> battlefield

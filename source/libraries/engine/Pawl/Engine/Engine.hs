@@ -1027,15 +1027,17 @@ placeBorne srcId pending = do
       --
       -- CR 603.7c: a delayed ability's CAPTURED environment (its "it") rides
       -- alongside the targets/modes chosen now for THIS placement; the source
-      -- slot is stamped over the top regardless. The two DO collide: the
-      -- captured environment is built by the same Binding.fromChoices the arming
-      -- spell used, so it carries that spell's OWN reserved slots (chosenModes,
-      -- variableX). Binding.mergeBinding is left-biased per FIELD, so
-      -- placement-time bindings must be the LEFT argument -- they are this
-      -- ability's own choices; the captured environment's only job is to carry
-      -- forward object references placement-time can never supply. Getting the
-      -- order backwards silently substitutes the arming spell's chosen mode or X
-      -- for this ability's own.
+      -- slot is stamped over the top regardless. Event.delayedPending has already
+      -- stamped CR 603.2's event slots onto that same map, so what arrives here is
+      -- both -- False Cure's "that player" as well as an arming spell's "it". The
+      -- two DO collide: the captured environment is built by the same
+      -- Binding.fromChoices the arming spell used, so it carries that spell's OWN
+      -- reserved slots (chosenModes, variableX). Binding.mergeBinding is
+      -- left-biased per FIELD, so placement-time bindings must be the LEFT
+      -- argument -- they are this ability's own choices; what arrives from the
+      -- entry carries forward the references placement-time can never supply.
+      -- Getting the order backwards silently substitutes the arming spell's chosen
+      -- mode or X for this ability's own.
       --
       -- unionWith mergeBinding rather than a left-biased Map.union, which would
       -- drop the WHOLE captured entry on a name collision: the two sides can now

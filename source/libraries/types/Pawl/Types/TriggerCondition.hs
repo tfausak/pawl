@@ -653,7 +653,10 @@ data TriggerCondition
     -- than 0 match, whatever its size -- but it is part of the EVENT, which is why
     -- Pawl.Engine.Event.eventBindings binds it under
     -- Pawl.Engine.Binding.eventAmount for Sanguine Bond's "that much" to read.
-    -- Ajani's Pridemate names no number and simply ignores the slot.
+    -- Ajani's Pridemate names no number and simply ignores the slot. The gaining
+    -- PLAYER rides alongside it under Pawl.Engine.Binding.triggerPlayer for the
+    -- same reason -- False Cure's "that player" is whoever the event named, which
+    -- under AnyPlayer is not CR 109.5's "you".
     --
     -- LOSING life is not the negative of this condition but a different event
     -- entirely (GameEvent.LifeLost), so a card bearing this stays silent for a

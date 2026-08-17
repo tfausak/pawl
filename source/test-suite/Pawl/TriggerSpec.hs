@@ -11579,9 +11579,10 @@ enrageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 enrageSpec s registry =
   let resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
       settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
-      -- CR 604.1's own path for a noncombat event: Damage.applyDamage records the
-      -- DamageDealt entries, the settle gathers what they triggered, and the
-      -- priority loop resolves it. The narrowest path that shows the behaviour.
+      -- A noncombat event's own path: Damage.applyDamage records the DamageDealt
+      -- entries, the settle gathers what they triggered and puts it on the stack
+      -- (CR 603.3), and the priority loop resolves it. The narrowest path that
+      -- shows the behaviour.
       dealing events gs = resolveAll (settle (S.runPure S.identityAnswer gs (Damage.applyDamage events)))
       -- alice's library is stocked, or CR 104.3c decks her before the assertion
       -- runs.

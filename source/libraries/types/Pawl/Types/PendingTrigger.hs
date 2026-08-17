@@ -21,8 +21,10 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 -- the environment the trigger arrives with: what CR 603.7 captured when a
 -- delayed ability was armed -- how "it" and "that card" (CR 603.7c) are
 -- remembered, and how CR 725.2's crown steal remembers the damaging creature --
--- or, for an event-matched one, what Event.eventBindings read off the event
--- itself (CR 603.6a's entrant, under Binding.became). Empty for a state trigger
+-- together with what Event.eventBindings read off the event itself (CR 603.6a's
+-- entrant, under Binding.became). A delayed entry gets both, its captured
+-- environment under the firing event's slots; an object's trigger has only the
+-- second. Empty for a state trigger
 -- (CR 603.8), which has no event to read; the SOURCE binding is stamped later
 -- either way, by Engine.placeOne at placement.
 data PendingTrigger = MkPendingTrigger
