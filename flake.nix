@@ -36,7 +36,7 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
-          pawl = pkgs.lib.pipe (pkgs.haskell.packages.ghc9141.callCabal2nix "pawl" source { }) [
+          pawl = pkgs.lib.pipe (pkgs.haskellPackages.callCabal2nix "pawl" source { }) [
             pkgs.haskell.lib.compose.doBenchmark
             (pkgs.haskell.lib.compose.enableCabalFlag "pedantic")
             (pkgs.haskell.lib.compose.overrideCabal (old: {
@@ -129,7 +129,7 @@
               pkgs.fzf
               pkgs.gh
               pkgs.git
-              pkgs.haskell.compiler.native-bignum.ghc9141
+              pkgs.ghc
               pkgs.haskellPackages.cabal-gild_1_8_4_1
               pkgs.hlint
               pkgs.hooky

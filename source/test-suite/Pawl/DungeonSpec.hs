@@ -165,6 +165,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Dungeon" $ do
     lostMine <- S.printingOf s registry "Lost Mine of Phandelver"
     let (doorId, base) = dungeonBoard island door lostMine 5
         (marker, gs) = S.addLibraryCard mountain S.alice base
+        answering :: ([ObjectId], [ObjectId]) -> Prompt.Prompt r -> r
         answering split p = case p of
           Prompt.ChooseScry {} -> split
           _ -> paying p

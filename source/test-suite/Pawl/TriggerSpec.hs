@@ -721,6 +721,7 @@ mayhemDevilSpec s registry =
       -- the Fire-Eater's own target is chosen as the ability is ACTIVATED, and
       -- the Devil's trigger's when the priority loop places it, so two answerers
       -- aim the two damage sources at two different players.
+      aimAt :: PlayerId.PlayerId -> Prompt.Prompt r -> r
       aimAt who p = case p of
         Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer who))) sets
         _ -> S.identityAnswer p
@@ -3569,6 +3570,7 @@ counterTriggerSpec s registry =
             (cancelId, gs) = S.addHandCard cancel S.bob onStack
          in (victimId, cancelId, gs)
       -- Targets the spell already on the stack, and takes rule 603.5's "may".
+      answerWith :: ObjectId.ObjectId -> Prompt.Prompt r -> r
       answerWith victimId p = case p of
         Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject victimId))) sets
         Prompt.ChooseOptional {} -> OptionalDecision.Exercises
@@ -5846,6 +5848,7 @@ arborColossusSpec s registry =
       -- The trigger TARGETS (CR 603.3d), so the answerer has to aim it; `victim`
       -- pins the choice rather than searching for a legal one, which is what lets
       -- the Piker case below fail rather than repair itself.
+      aimed :: ObjectId.ObjectId -> Prompt.Prompt r -> r
       aimed victim p = case p of
         Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter ((== Just victim) . Recipient.objectOf) legal) sets
         _ -> S.identityAnswer p
@@ -8286,6 +8289,7 @@ merenEndStepSpec s registry =
         pure (pikerId, thragtuskId, gs)
       -- The Piker by id rather than by S.identityAnswer's least Recipient, which
       -- would take whichever graveyard card sorts first.
+      aimAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
       aimAt oid p = case p of
         Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
         _ -> S.identityAnswer p
@@ -11365,6 +11369,7 @@ lifeGainTriggerSpec s registry =
       -- the damage on the PLAYER: bob's own Pridemate would otherwise block, and
       -- CR 120.3e's marked damage would leave his life total alone -- costing the
       -- lifelink case its "and bob lost two" control.
+      attacksWith :: ObjectId.ObjectId -> Prompt.Prompt r -> r
       attacksWith attacker p = case p of
         Prompt.DeclareAttackers _ _ ids -> filter (== attacker) ids
         Prompt.DeclareBlockers {} -> Map.empty
@@ -11489,6 +11494,7 @@ abilitiesWhenTriggeredSpec s registry =
       -- Pinned to the one recipient rather than searched for among the legal ones:
       -- a searching answerer would find the other creature again once the case
       -- under test broke.
+      aimAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
       aimAt victimId p = case p of
         Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature victimId))) sets
         _ -> S.identityAnswer p
@@ -11863,6 +11869,7 @@ lifeLossTriggerSpec s registry =
       -- Sign in Blood's one target slot, answered with `who` rather than left to
       -- identityAnswer's lowest-sorting candidate -- which is alice, and so is
       -- the control case rather than the positive one.
+      aimAt :: PlayerId.PlayerId -> Prompt.Prompt r -> r
       aimAt who p = case p of
         Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer who))) sets
         _ -> S.identityAnswer p
@@ -12007,6 +12014,7 @@ mindcrankSpec s registry =
   let resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
       -- Sign in Blood's one target slot, answered with `who` -- as the Exquisite
       -- Blood group's helper does, and for the same reason.
+      aimAt :: PlayerId.PlayerId -> Prompt.Prompt r -> r
       aimAt who p = case p of
         Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer who))) sets
         _ -> S.identityAnswer p
@@ -12315,6 +12323,7 @@ ezuriExperienceSpec s registry =
       -- Every target slot aimed at one object, where S.identityAnswer would take
       -- the least Recipient -- which on the first board below is one of the three
       -- Pikers rather than the permanent every assertion is about.
+      aimAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
       aimAt oid p = case p of
         Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature oid))) sets
         _ -> S.identityAnswer p
@@ -12463,6 +12472,7 @@ handOfThePraetorsSpec s registry =
       -- The trigger's one target slot, answered with `who` rather than left to
       -- S.identityAnswer, whose lowest-sorting candidate on this board is alice
       -- -- the caster, and so the wrong answer to prove anything with.
+      aimAt :: PlayerId.PlayerId -> Prompt.Prompt r -> r
       aimAt who p = case p of
         Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer who))) sets
         _ -> S.identityAnswer p

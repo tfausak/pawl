@@ -767,6 +767,7 @@ mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
       -- Order a contested batch by preferring the event from `src`, by SOURCE id
       -- rather than by position, so the assertion does not depend on the order
       -- the batch was gathered in.
+      shieldFirst :: ObjectId.ObjectId -> Prompt.Prompt r -> r
       shieldFirst src p = case p of
         Prompt.OrderDamage _ _ events ->
           let key e = (DamageEvent.source e /= src, DamageEvent.source e)
@@ -5083,6 +5084,7 @@ damageCountersSpec s registry = Spec.describe s "Counters damage causes (CR 120.
       -- either side neither attacks nor blocks and the boards differ in nothing but
       -- the replacement. With one blocker CR 510.1c forces the whole assignment, so
       -- no division is asked for.
+      fights :: ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
       fights rat blockers p = case p of
         Prompt.DeclareAttackers _ _ ids -> filter (== rat) ids
         Prompt.DeclareBlockers _ _ mine _ ->
@@ -5294,6 +5296,7 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
       -- Spend the counter on `src`'s hit first (CR 101.4c), keyed on the SOURCE
       -- id rather than on a batch position, so the assertion does not depend on
       -- the order the batch was gathered in.
+      counterFirst :: ObjectId.ObjectId -> Prompt.Prompt r -> r
       counterFirst src p = case p of
         Prompt.OrderDamage _ _ events ->
           let key e = (DamageEvent.source e /= src, DamageEvent.source e)

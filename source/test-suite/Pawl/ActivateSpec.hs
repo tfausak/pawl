@@ -1892,9 +1892,7 @@ tidalWarriorChain s registry hackWhere = do
         Just OnTheSpell -> resolveWarrior hackedSpell
         Just OnThePermanent -> hackPermanent (resolveWarrior onStack)
   case soleCreatureOf S.alice board >>= \permId -> fmap ((,) permId) (soleProjectedAbility permId board) of
-    Nothing -> do
-      Spec.assertFailure s "expected exactly one creature on the battlefield, carrying exactly one activated ability"
-      pure (forestId, board)
+    Nothing -> Spec.assertFailure s "expected exactly one creature on the battlefield, carrying exactly one activated ability"
     Just (permId, ability) ->
       pure (forestId, S.runPure S.identityAnswer board (do Activate.activateAbility S.alice permId ability; Stack.resolveTop))
 
@@ -1943,9 +1941,7 @@ withForestHackedToIsland hacked subjectId hackId gs =
 -- so it is the text-changed one a player would be offered.
 activateSole :: (Monad m) => Spec.Spec m n -> ObjectId.ObjectId -> GameState.GameState -> m GameState.GameState
 activateSole s oid gs = case soleProjectedAbility oid gs of
-  Nothing -> do
-    Spec.assertFailure s "expected the permanent to carry exactly one activated ability"
-    pure gs
+  Nothing -> Spec.assertFailure s "expected the permanent to carry exactly one activated ability"
   Just ability -> do
     Spec.assertBool s (Activate.activatable S.alice oid ability gs) "the ability is activatable"
     pure (S.runPure S.identityAnswer gs (do Activate.activateAbility S.alice oid ability; Stack.resolveTop))
