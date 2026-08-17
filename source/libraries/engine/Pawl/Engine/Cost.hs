@@ -580,8 +580,15 @@ totalWith adjustments cost = cost {Cost.mana = fmap (applyAdjustments adjustment
 -- the pool adds one -- CR 601.2b announces the variables of the cost as printed,
 -- and an increase that named an unannounced X would be an amount nobody chose --
 -- so this is a bound on the open half rather than an elision.
+--
+-- CR 606.5's combining runs here, once the additions are on: this is the single
+-- funnel both moments go through -- the gate (Pawl.Engine.Activate.payableCostAt)
+-- and the cost `Cost.pay` will charge (Pawl.Engine.Activate.activateAbility
+-- announces through it) -- so the combined cost is the one measured AND the one
+-- paid. `combineLoyalty` is the identity on every cost carrying at most one
+-- loyalty component, which is every printed one.
 plusComponents :: CostAdjustments.CostAdjustments -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
-plusComponents adjustments cost = cost {Cost.components = Cost.components cost <> CostAdjustments.components adjustments}
+plusComponents adjustments cost = cost {Cost.components = combineLoyalty (Cost.components cost <> CostAdjustments.components adjustments)}
 
 -- CR 601.2f's totalling of the MANA part alone, curried so that it is a function
 -- of one mana cost. `total` above is this fmapped over a whole Cost's mana part;
@@ -946,24 +953,67 @@ isLoyaltyCost :: Cost Keyword.Type.Keyword -> Bool
 isLoyaltyCost cost = any isLoyaltyComponent (Cost.components cost)
 
 isLoyaltyComponent :: CostComponent.CostComponent Keyword.Type.Keyword -> Bool
-isLoyaltyComponent component = case component of
-  CostComponent.AddLoyaltyToThis _ -> True
-  CostComponent.RemoveLoyaltyFromThis _ -> True
-  CostComponent.TapThis -> False
-  CostComponent.UntapThis -> False
-  CostComponent.SacrificeThis -> False
-  CostComponent.PayLife _ -> False
-  CostComponent.PayLifeX -> False
-  CostComponent.Sacrifice {} -> False
-  CostComponent.TapForTotalPower {} -> False
-  CostComponent.DiscardCards {} -> False
-  CostComponent.DiscardThis -> False
-  CostComponent.PayEnergy _ -> False
-  CostComponent.PutPlusOneCountersOnThis _ -> False
-  CostComponent.Blight _ -> False
-  CostComponent.ExileThisFromGraveyard -> False
-  CostComponent.ExileCardsFromGraveyard {} -> False
-  CostComponent.ExileTopFromGraveyard _ -> False
+isLoyaltyComponent = Maybe.isJust . loyaltyAmountOf
+
+-- The SIGNED amount of loyalty a component moves, positive for the adding half
+-- of CR 606.4 and negative for the removing half, or Nothing for a component
+-- that is not a loyalty cost at all. `isLoyaltyComponent` above is this asked
+-- without the number, so the two answers cannot drift apart.
+--
+-- An Integer and not a Natural: CR 606.5's combining sums the two halves against
+-- each other, and the intermediate is signed even though each component's own
+-- payload is not.
+--
+-- EXHAUSTIVE with no wildcard, `orderSensitive`'s posture and for its reason.
+loyaltyAmountOf :: CostComponent.CostComponent Keyword.Type.Keyword -> Maybe Integer
+loyaltyAmountOf component = case component of
+  CostComponent.AddLoyaltyToThis n -> Just (toInteger n)
+  CostComponent.RemoveLoyaltyFromThis n -> Just (negate (toInteger n))
+  CostComponent.TapThis -> Nothing
+  CostComponent.UntapThis -> Nothing
+  CostComponent.SacrificeThis -> Nothing
+  CostComponent.PayLife _ -> Nothing
+  CostComponent.PayLifeX -> Nothing
+  CostComponent.Sacrifice {} -> Nothing
+  CostComponent.TapForTotalPower {} -> Nothing
+  CostComponent.DiscardCards {} -> Nothing
+  CostComponent.DiscardThis -> Nothing
+  CostComponent.PayEnergy _ -> Nothing
+  CostComponent.PutPlusOneCountersOnThis _ -> Nothing
+  CostComponent.Blight _ -> Nothing
+  CostComponent.ExileThisFromGraveyard -> Nothing
+  CostComponent.ExileCardsFromGraveyard {} -> Nothing
+  CostComponent.ExileTopFromGraveyard _ -> Nothing
+
+-- CR 606.5: "If the total cost to activate a loyalty ability contains multiple
+-- costs to add or remove loyalty counters, those costs are combined into a single
+-- cost to add or remove loyalty counters, as appropriate." Carth the Lion's added
+-- [+1] on Jace Beleren's printed [-10] is one cost of -9, which 9 loyalty pays --
+-- where the pair asked separately is refused, since canPayComponent's CR 606.6
+-- arm measures each against the counters present before any of the cost is paid.
+-- The divergence it fixes runs pawl STRICTER than the rules.
+--
+-- ONE component whenever the cost had any, even at a net of zero, rather than
+-- dropping the pair. Three readers turn on it: rule 606.5 itself says "combined
+-- into a single cost" and not "into none"; CR 606.4 puts the counters on "that
+-- permanent", whose battlefield-and-control floor is canPayComponent's loyalty
+-- arms and would go unasked if nothing were emitted; and `isLoyaltyCost` stays
+-- true of the totalled cost. Paying AddLoyaltyToThis 0 adds no counters, so the
+-- choice is unobservable on the board -- it is the reading, not an outcome.
+--
+-- The combined component takes the FIRST loyalty component's position, so a cost
+-- printing one loyalty symbol beside other parts comes back in its printed order
+-- and CR 601.2h's prompt sees the same list it saw before.
+combineLoyalty :: [CostComponent.CostComponent Keyword.Type.Keyword] -> [CostComponent.CostComponent Keyword.Type.Keyword]
+combineLoyalty components = case break isLoyaltyComponent components of
+  (_, []) -> components
+  (before, _ : after) ->
+    let net = sum (Maybe.mapMaybe loyaltyAmountOf components)
+        combined =
+          if net < 0
+            then CostComponent.RemoveLoyaltyFromThis (Integer.toNaturalSaturating (negate net))
+            else CostComponent.AddLoyaltyToThis (Integer.toNaturalSaturating net)
+     in before <> (combined : filter (not . isLoyaltyComponent) after)
 
 -- CR 113.6m's COST half: "an ability whose cost or effect specifies that it
 -- moves the object it's on out of a particular zone functions only in that
