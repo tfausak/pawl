@@ -11683,7 +11683,7 @@ falseCureSpec s registry =
           let after = entering fountainId (Expiry.dropAtCleanup gs)
           Spec.assertEqWith s "bob gained his 2 and kept it" (S.lifeOf S.bob after) (Just 22)
           Spec.assertEqWith s "alice is untouched either way" (S.lifeOf S.alice after) (Just 20)
-        -- CR 603.2c inside ONE batch, which the two cases above cannot reach: the
+        -- CR 603.2c inside ONE batch, which the cases above cannot reach: the
         -- entry's trigger event occurs three times before the settle, and CR
         -- 603.7b's stated duration lifts the one shot, so 603.2c's "it can trigger
         -- repeatedly" applies and every seat pays 8. An entry taking the first
@@ -11710,10 +11710,11 @@ falseCureSpec s registry =
           Spec.assertEqWith s "bob gained 4 and lost 8" (S.lifeOf S.bob after) (Just 16)
           Spec.assertEqWith s "carol gained 4 and lost 8" (S.lifeOf S.carol after) (Just 16)
           Spec.assertEqWith s "dave gained 4 and lost 8" (S.lifeOf S.dave after) (Just 16)
-        -- The vacuity guard, not a prover: the SAME entry with no Cure armed leaves
-        -- every seat holding its 4. Without it a board where "each player gains 4"
-        -- quietly gained nobody anything reads as a passing 16 above.
-        Spec.it s "CR 608.2f with no entry armed, each of the three seats keeps its 4" $ do
+        -- The vacuity guard, not a prover: the same Peacemaker with NO Cure armed
+        -- leaves every seat holding its 4 (CR 119.3). Without it a board where
+        -- "each player gains 4" quietly gained nobody anything would read as a
+        -- passing 16 above, the drains never having happened either.
+        Spec.it s "CR 119.3 with no entry armed, each of the three seats keeps its 4" $ do
           peacemaker <- S.printingOf s registry "Centaur Peacemaker"
           let (peacemakerId, gs) = S.addCreature peacemaker S.alice S.threePlayerGame
               after = entering peacemakerId gs
