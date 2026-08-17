@@ -13,15 +13,17 @@ module Pawl.Types.PayBranch where
 -- Not a Bool, for Pawl.Types.Optionality's reason: @IfPaid@ says which half of
 -- the rule is in play where @True@ would say nothing.
 --
--- Not implemented: CR 118.12's mandatory limb. Both arms here describe a cost
--- its payer may decline, and Standstill's "sacrifice this enchantment. If you
--- do" is one they must pay if able (#1554).
+-- Orthogonal to CR 118.12's OTHER axis, Pawl.Types.PayObligation: which branch
+-- the instructions are is a separate question from whether the payer had a
+-- choice. Standstill is IfPaid and Mandatory; Merfolk Seer is IfPaid and
+-- Optional.
 --
 -- The "may" is not a separate question in either half. CR 118.12a's rewriting
 -- makes the "unless" cost an offer -- "[A player may do something else]" -- and
--- the positive half prints that "may" itself, so Pawl.Types.PayGate's own
--- Prompt.ChooseToPay IS the printed "may" and Pawl.Types.Clause.optionality
--- stays Mandatory on both. A card setting both would ask twice.
+-- the positive half generally prints that "may" itself, so Pawl.Types.PayGate's
+-- own Prompt.ChooseToPay IS the printed "may" and
+-- Pawl.Types.Clause.optionality stays Mandatory on both. A card setting both
+-- would ask twice.
 data PayBranch
   = -- | The instructions run when the cost WAS paid -- CR 118.12's "if [a
     -- player] does".

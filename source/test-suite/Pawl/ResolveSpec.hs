@@ -2245,6 +2245,209 @@ manaLeakSpec s registry = Spec.describe s "ManaLeak" $ do
     -- the exchange, this would read 6.
     Spec.assertEqWith s "only Cancel's three Islands are tapped" (S.tappedCount S.bob after) 3
 
+-- Puts every looked-at card where a look-and-split keyword action's FIRST list
+-- goes -- the bottom of the library for scry (CR 701.22a), the graveyard for
+-- surveil (CR 701.25a) -- so the action is observable on the BOARD and not only
+-- in the transcript. Everything else declines, S.identityAnswer's answer.
+digsAndDeclines :: Prompt.Prompt r -> r
+digsAndDeclines p = case p of
+  Prompt.ChooseScry _ _ looked -> (looked, [])
+  Prompt.ChooseSurveil _ _ looked -> (looked, [])
+  _ -> S.identityAnswer p
+
+-- digsAndDeclines' exact pair: the same dig, and bob pays whatever a resolving
+-- spell offers him. The two differ in NOTHING else, so a difference in outcome
+-- between them is CR 118.12's answer and nothing else.
+digsAndBobPays :: Prompt.Prompt r -> r
+digsAndBobPays p = case p of
+  Prompt.ChooseScry _ _ looked -> (looked, [])
+  Prompt.ChooseSurveil _ _ looked -> (looked, [])
+  _ -> bobPaysAnswer p
+
+-- manaLeakHand's board with Stymied Hopes in alice's hand instead, cast at bob's
+-- Piker, plus TWO cards in alice's library: CR 701.22a leaves nothing to ask
+-- about a lone card that is the whole library, so a one-card library would elide
+-- the scry prompt and the assertions below would read an unmoved library either
+-- way. Returns the Piker, the card that starts SECOND in alice's library, and
+-- the state after the cast.
+--
+-- bob keeps three untapped Islands against a {1}, so a refusal is his own answer
+-- and never CR 118.3's.
+stymiedBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+stymiedBoard island stymied piker =
+  let base = S.landsInPlay island 2
+      withBob = List.foldl' (\g _ -> snd (S.addCreature island S.bob g)) base [1 .. 3 :: Int]
+      (victimId, onStack) = S.spellOnStack piker S.bob withBob
+      (withHand, hopesId) = S.handOne stymied onStack
+      (deepId, oneDeep) = S.addLibraryCard piker S.alice withHand
+      (_topId, stocked) = S.addLibraryCard piker S.alice oneDeep
+   in (victimId, deepId, snd (Engine.runGamePure S.identityAnswer stocked (S.cast S.alice hopesId)))
+
+-- CR 118.12a scopes its rewriting to the INSTRUCTION the "unless" is attached to
+-- and not to the ability, so a gate over one clause leaves its neighbours to
+-- happen on both branches.
+--
+-- Stymied Hopes, {1}{U} Instant: "Counter target spell unless its controller
+-- pays {1}. Scry 1." Two clauses, and only the first carries a payGate. Mana
+-- Leak cannot tell the two readings apart -- it is one clause -- which is why
+-- this waited on a card rather than on the carrier.
+--
+-- The two cases run the SAME board and the SAME cast and differ in nothing but
+-- bob's answer. The load-bearing assertion is the LAST one in each: the same
+-- scry happened either way.
+stymiedHopesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+stymiedHopesSpec s registry = Spec.describe s "StymiedHopes" $ do
+  Spec.it s "CR 118.12a the controller declines, so the spell is countered -- and alice scries" $ do
+    island <- S.printingOf s registry "Island"
+    stymied <- S.printingOf s registry "Stymied Hopes"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (victimId, deepId, cast) = stymiedBoard island stymied piker
+    -- cast-gate-tests-pass-vacuously: a "was countered" assertion passes for a
+    -- spell that was never on the stack.
+    Spec.assertBool s (elem victimId (GameState.stack cast)) "setup: the Piker is on the stack"
+    let ((_, after), transcript) = Replay.record digsAndDeclines cast Stack.resolveTop
+    Spec.assertEqWith s "bob was asked exactly once, and declined" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Declines]
+    Spec.assertEqWith s "the Piker was countered into bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+    Spec.assertEqWith s "declining spent nothing" (S.tappedCount S.bob after) 0
+    Spec.assertEqWith s "and the scry happened: the card that was second is on top" (take 1 (Game.zoneMembers Zone.Library S.alice after)) [deepId]
+  Spec.it s "CR 118.12a the controller pays, so the spell survives -- and alice STILL scries" $ do
+    island <- S.printingOf s registry "Island"
+    stymied <- S.printingOf s registry "Stymied Hopes"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (victimId, deepId, cast) = stymiedBoard island stymied piker
+    Spec.assertBool s (elem victimId (GameState.stack cast)) "setup: the Piker is on the stack"
+    let ((_, after), transcript) = Replay.record digsAndBobPays cast Stack.resolveTop
+    Spec.assertEqWith s "bob was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
+    -- The falsifier for a mode-wide gate: the {1} really left bob.
+    Spec.assertEqWith s "the {1} cost bob one Island" (S.tappedCount S.bob after) 1
+    Spec.assertBool s (elem victimId (GameState.stack after)) "the Piker was NOT countered"
+    Spec.assertEqWith s "and the scry happened ANYWAY -- clause two carries no gate" (take 1 (Game.zoneMembers Zone.Library S.alice after)) [deepId]
+
+-- CR 118.12's MANDATORY limb: "the 'If [a player] [does, doesn't, or can't]'
+-- clause checks whether the player chose to pay an optional cost or STARTED TO
+-- PAY a mandatory cost". A mandatory cost leaves its payer nothing to choose, so
+-- Prompt.ChooseToPay is not raised at all.
+--
+-- Standstill, {1}{U} Enchantment: "When a player casts a spell, sacrifice this
+-- enchantment. If you do, each of that player's opponents draws three cards."
+-- No "may" anywhere, unlike Mana Leak (CR 118.12a supplies one) and Merfolk Seer
+-- (which prints one). Written as an optional gate its controller could decline
+-- and keep the enchantment -- weaker than printed, in their own favour.
+--
+-- THREE SEATS. At two players "each of that player's opponents" and "you" name
+-- the same person, so a two-handed board cannot tell PlayerRef.EachPlayerExcept
+-- thatPlayer from a wrong PlayerRef.Relative You. bob casts; alice and carol are
+-- the two who draw. (CR 102.2 makes every other player an opponent in a
+-- free-for-all, which is what lets the exclusion spell "that player's
+-- opponents".)
+--
+-- THE INTERPRETER DECLINES EVERYTHING (S.identityAnswer), which is what makes
+-- this discriminating: an optional gate would be declined, Standstill would
+-- survive and nobody would draw. Boil, {3}{R} Instant "Destroy all Islands", is
+-- bob's spell for kambalSpec's reason -- it targets nothing and nobody here
+-- controls an Island.
+standstillSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+standstillSpec s registry =
+  Spec.describe
+    s
+    "Standstill"
+    ( Spec.it s "CR 118.12 Standstill's controller is never offered the sacrifice" $ do
+        mountain <- S.printingOf s registry "Mountain"
+        standstill <- S.printingOf s registry "Standstill"
+        boil <- S.printingOf s registry "Boil"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addCreature mountain pid g')) g [1 .. (n :: Int)]
+            stock pid n g = List.foldl' (\g' _ -> snd (S.addLibraryCard piker pid g')) g [1 .. (n :: Int)]
+            (standstillId, withEnchantment) = S.addCreature standstill S.alice S.threePlayerGame
+            -- Four cards each for the two drawers, so CR 104.3c decks nobody.
+            stocked = stock S.carol 4 (stock S.alice 4 (addLands S.bob 4 withEnchantment))
+            board =
+              stocked
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.bob,
+                  GameState.priority = Just S.bob
+                }
+            (boilId, gs) = S.addHandCard boil S.bob board
+            exchange = S.cast S.bob boilId >> Engine.priorityLoop
+            ((_, after), transcript) = Replay.record S.identityAnswer gs exchange
+        Spec.assertBool s (Set.member standstillId (GameState.battlefield gs)) "setup: Standstill is on alice's battlefield"
+        Spec.assertEqWith s "setup: nobody is holding cards" (fmap (`S.handSize` gs) [S.alice, S.bob, S.carol]) [0, 1, 0]
+        -- THE assertion. A board check cannot tell "paid without asking" from "asked
+        -- and answered yes"; this transcript can, and under an interpreter that
+        -- declines every offer it also rules out an accidental payment.
+        Spec.assertEqWith s "no payment was ever offered" (payResponses transcript) []
+        Spec.assertBool s (not (Set.member standstillId (GameState.battlefield after))) "and Standstill was sacrificed anyway"
+        Spec.assertEqWith s "CR 701.21a: into its owner's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+        -- Both of bob's opponents, and not bob: the third seat is what separates
+        -- "that player's opponents" from "you".
+        Spec.assertEqWith s "so each of bob's opponents drew three, and bob drew none" (fmap (`S.handSize` after) [S.alice, S.bob, S.carol]) [3, 0, 3]
+    )
+
+-- manaLeakHand's board with Don't Make a Sound in alice's hand, cast at bob's
+-- Piker, and three cards in alice's library for the surveil to reach. `bobLands`
+-- is the whole variable: two Islands is exactly one payment's worth.
+dontMakeASoundBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
+dontMakeASoundBoard island sound piker bobLands =
+  let base = S.landsInPlay island 2
+      withBob = List.foldl' (\g _ -> snd (S.addCreature island S.bob g)) base [1 .. bobLands]
+      (victimId, onStack) = S.spellOnStack piker S.bob withBob
+      (withHand, soundId) = S.handOne sound onStack
+      stocked = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) withHand [1 .. 3 :: Int]
+   in (victimId, snd (Engine.runGamePure S.identityAnswer stocked (S.cast S.alice soundId)))
+
+-- CR 118.12 offers a resolution cost ONCE and reads the one answer, so two
+-- clauses hanging off one payment are one offer and one charge.
+--
+-- Don't Make a Sound, {1}{U} Instant: "Counter target spell unless its
+-- controller pays {2}. If they do, surveil 2." Stymied Hopes' shape with the
+-- second clause moved from ungated to IfPaid, and the two cards together are the
+-- minimal pair for the whole span question. The IfPaid clause names the IfNotPaid
+-- one through PayGate.offeredAt.
+--
+-- Divergent in BOTH directions without that, which is why the two boards differ
+-- only in bob's Islands: on two he cannot afford a second offer, so the surveil
+-- would not happen; on four he can, and he would be charged {4} for a {2}.
+dontMakeASoundSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+dontMakeASoundSpec s registry = Spec.describe s "DontMakeASound" $ do
+  Spec.it s "CR 118.12 one payment answers both clauses, on a board that can afford only one" $ do
+    island <- S.printingOf s registry "Island"
+    sound <- S.printingOf s registry "Don't Make a Sound"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (victimId, cast) = dontMakeASoundBoard island sound piker 2
+    Spec.assertBool s (elem victimId (GameState.stack cast)) "setup: the Piker is on the stack"
+    Spec.assertEqWith s "setup: alice's library holds three cards" (length (Game.zoneMembers Zone.Library S.alice cast)) 3
+    let ((_, after), transcript) = Replay.record digsAndBobPays cast Stack.resolveTop
+    Spec.assertEqWith s "bob was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
+    Spec.assertBool s (elem victimId (GameState.stack after)) "the Piker was NOT countered"
+    -- The IfPaid clause ran on the answer the IfNotPaid clause got. A second
+    -- offer would have found bob tapped out and taken CR 118.3's branch, leaving
+    -- this at three.
+    Spec.assertEqWith s "and alice surveilled 2: two cards left her library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
+  Spec.it s "CR 118.12 and bob is charged {2} once, on a board that could afford twice" $ do
+    island <- S.printingOf s registry "Island"
+    sound <- S.printingOf s registry "Don't Make a Sound"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (victimId, cast) = dontMakeASoundBoard island sound piker 4
+        ((_, after), transcript) = Replay.record digsAndBobPays cast Stack.resolveTop
+    Spec.assertBool s (elem victimId (GameState.stack cast)) "setup: the Piker is on the stack"
+    Spec.assertEqWith s "bob was asked exactly once" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
+    -- Two, not four. This is the assertion the four-Island board exists for: with
+    -- an offer per clause bob can afford both and pays twice.
+    Spec.assertEqWith s "and {2} cost him exactly two Islands" (S.tappedCount S.bob after) 2
+    Spec.assertEqWith s "the surveil still happened" (length (Game.zoneMembers Zone.Library S.alice after)) 1
+  Spec.it s "CR 118.12 declining counters the spell, and there is no surveil" $ do
+    island <- S.printingOf s registry "Island"
+    sound <- S.printingOf s registry "Don't Make a Sound"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (victimId, cast) = dontMakeASoundBoard island sound piker 4
+        ((_, after), transcript) = Replay.record digsAndDeclines cast Stack.resolveTop
+    Spec.assertBool s (elem victimId (GameState.stack cast)) "setup: the Piker is on the stack"
+    -- Once here too: the IfPaid clause reads the recorded refusal rather than
+    -- offering the {2} again, which bob could have afforded.
+    Spec.assertEqWith s "bob was asked exactly once, and declined" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Declines]
+    Spec.assertEqWith s "the Piker was countered into bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+    Spec.assertEqWith s "and alice's library is untouched" (length (Game.zoneMembers Zone.Library S.alice after)) 3
+
 -- Whipstitched Zombie and one untapped Swamp on alice's battlefield, her upkeep
 -- begun and the trigger settled onto the stack (CR 603.3b). Returns the Zombie,
 -- the Swamp and that state.
@@ -9529,6 +9732,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   soulsMajestySpec s registry
   counterSpec s registry
   manaLeakSpec s registry
+  stymiedHopesSpec s registry
+  standstillSpec s registry
+  dontMakeASoundSpec s registry
   whipstitchedZombieSpec s registry
   circlingVulturesSpec s registry
   merfolkSeerSpec s registry

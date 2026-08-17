@@ -1,8 +1,10 @@
 module Pawl.Types.PayGate where
 
+import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PayBranch as PayBranch
+import qualified Pawl.Types.PayObligation as PayObligation
 import qualified Pawl.Types.SlotName as SlotName
 
 -- | CR 118.12's cost, offered to a player as the spell or ability RESOLVES, plus
@@ -31,16 +33,14 @@ import qualified Pawl.Types.SlotName as SlotName
 -- out.
 --
 -- The clause is CR 608.2e's span, so a gate governing only some of an ability's
--- instructions is representable -- Condescend's "counter target spell unless its
--- controller pays {X}. Scry 2", where the scry happens either way. No card in the
--- pool prints that shape yet, and Condescend itself also wants {X} in a
--- resolution cost (CR 107.3, CR 118.4), so #703 stays open on the card rather
--- than on the carrier.
+-- instructions is representable -- Stymied Hopes' "counter target spell unless
+-- its controller pays {1}. Scry 1", where the scry happens either way and is a
+-- clause carrying no gate at all. Condescend is the same shape and still wants
+-- {X} in a resolution cost (CR 107.3, CR 118.4), which is #1501.
 --
--- Not implemented: two clauses hanging off ONE payment -- Divert Disaster's
--- "counter target spell unless its controller pays {2}. If they do, you create a
--- Lander token". A gate per clause is a prompt per clause, so that card would be
--- asked twice and charged twice (#1555).
+-- Two clauses hanging off ONE payment are `offeredAt` below: Don't Make a
+-- Sound's "counter target spell unless its controller pays {2}. If they do,
+-- surveil 2" is an IfNotPaid clause and an IfPaid clause over one offer.
 data PayGate = MkPayGate
   { -- | Which player is offered the cost. A SLOT rather than a
     -- Pawl.Types.PlayerRef, because the answer Mana Leak needs is "the
@@ -70,6 +70,28 @@ data PayGate = MkPayGate
     -- | Which of CR 118.12's branches this clause's instructions are. See
     -- Pawl.Types.PayBranch, and Pawl.Engine.Resolve.payGateAdmits for where the
     -- comparison is made.
-    branch :: PayBranch.PayBranch
+    branch :: PayBranch.PayBranch,
+    -- | CR 118.12's other axis: is this a cost the payer may decline, or one
+    -- they must pay if able? See Pawl.Types.PayObligation. Mana Leak's is
+    -- Optional (CR 118.12a's rewriting prints the "may"), Standstill's
+    -- Mandatory.
+    obligation :: PayObligation.PayObligation,
+    -- | Which clause of this mode MAKES the offer, when it is not this one --
+    -- CR 118.12 offers a resolution cost once and reads the one answer, so
+    -- Don't Make a Sound's second clause names its first rather than asking
+    -- again. Nothing is the unmarked case and means this clause is the offer.
+    --
+    -- An explicit ordinal (CR 608.2e's, Pawl.Types.ClauseIndex) rather than an
+    -- equality over gates: two adjacent clauses that coincidentally state the
+    -- same cost are two offers and must stay spellable apart from two clauses
+    -- sharing one.
+    --
+    -- The gate a sharing clause carries is a RESTATEMENT of the one it names,
+    -- and it is read rather than ignored: Pawl.Engine.Resolve.payGateAdmits
+    -- reuses the recorded answer when there is one and falls back to offering
+    -- this gate when there is not -- which is the case where the named clause
+    -- never reached its own gate, because its CR 701.46a "if" or its CR 603.5
+    -- "may" said no.
+    offeredAt :: Maybe ClauseIndex.ClauseIndex
   }
   deriving (Eq, Ord, Show)

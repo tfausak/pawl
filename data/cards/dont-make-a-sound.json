@@ -1,0 +1,105 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Don't Make a Sound",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "Counter",
+                    "value": {
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "spell"
+                      }
+                    }
+                  }
+                ],
+                "payGate": {
+                  "branch": {
+                    "type": "IfNotPaid"
+                  },
+                  "cost": {
+                    "mana": [
+                      {
+                        "type": "Generic",
+                        "value": 2
+                      }
+                    ]
+                  },
+                  "payer": "spell"
+                }
+              },
+              {
+                "effects": [
+                  {
+                    "type": "Surveil",
+                    "value": {
+                      "player": {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      "quantity": {
+                        "type": "Literal",
+                        "value": 2
+                      }
+                    }
+                  }
+                ],
+                "payGate": {
+                  "branch": {
+                    "type": "IfPaid"
+                  },
+                  "cost": {
+                    "mana": [
+                      {
+                        "type": "Generic",
+                        "value": 2
+                      }
+                    ]
+                  },
+                  "offeredAt": 0,
+                  "payer": "spell"
+                }
+              }
+            ],
+            "targetSlots": {
+              "spell": {
+                "pool": {
+                  "type": "Spells"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}

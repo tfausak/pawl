@@ -77,6 +77,7 @@ import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayGate as PayGate
+import qualified Pawl.Types.PayObligation as PayObligation
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
@@ -2382,7 +2383,16 @@ ward cost =
     }
   where
     clause = Clause.MkClause Nothing Optionality.Mandatory (Just gate) (Seq.singleton effect)
-    gate = PayGate.MkPayGate {PayGate.payer = Binding.targetingObject, PayGate.cost = cost, PayGate.branch = PayBranch.IfNotPaid}
+    -- PayObligation.Optional and no offeredAt: rule 702.21a's "unless that
+    -- player pays" is CR 118.12a's "may", and one clause makes its own offer.
+    gate =
+      PayGate.MkPayGate
+        { PayGate.payer = Binding.targetingObject,
+          PayGate.cost = cost,
+          PayGate.branch = PayBranch.IfNotPaid,
+          PayGate.obligation = PayObligation.Optional,
+          PayGate.offeredAt = Nothing
+        }
     effect = Effect.Counter (Counter.MkCounter (ObjectRef.InSlot Binding.targetingObject) Nothing)
 
 -- CR 702.147a's TRIGGERED half: "When this creature attacks, sacrifice it at end
@@ -2869,7 +2879,11 @@ fabricate n =
               },
           -- Rule 702.123a prints CR 118.12a's rewriting already done, so the
           -- Servos are the "if you don't" branch.
-          PayGate.branch = PayBranch.IfNotPaid
+          PayGate.branch = PayBranch.IfNotPaid,
+          -- PayObligation.Optional: rule 702.123a prints the "may" itself. No
+          -- offeredAt, one clause making its own offer.
+          PayGate.obligation = PayObligation.Optional,
+          PayGate.offeredAt = Nothing
         }
     spawn =
       Effect.Create

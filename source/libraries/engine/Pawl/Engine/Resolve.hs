@@ -140,6 +140,7 @@ import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayGate as PayGate
+import qualified Pawl.Types.PayObligation as PayObligation
 import qualified Pawl.Types.Payment as Payment
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PendingEntryEffect as PendingEntryEffect
@@ -1275,57 +1276,68 @@ resolveSpellWith runSubgame oid = do
                   -- CR 608.2e's clause is the unit all three gates cover, so they
                   -- are asked once per clause rather than once per mode --
                   -- between the preceding clause's instructions and this one's.
-                  Monad.forM_ (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode))) $ \(cIdx, clause) -> do
-                    -- CR 701.46a's printed "if" first: it precedes the
-                    -- instructions in written order (CR 608.2c), and a clause
-                    -- that cannot happen is no question to ask.
-                    -- The LIVE bindings, not the start-of-resolution ones, for the
-                    -- reason the gate is asked here at all (CR 608.2c): a slot an
-                    -- earlier clause of this resolution DEFINED is part of the
-                    -- state this clause is read against -- Into the Wilds' "if
-                    -- it's a land card" over the card its first clause looked at.
-                    -- Same re-read `applyOne` above makes, and it adds only
-                    -- defined slots: CR 608.2b's re-validation is still the one
-                    -- made once, as the resolution began.
-                    --
-                    -- A REGRESSION FENCE on this path rather than a proved
-                    -- behaviour: every card in the pool whose gate reads a
-                    -- mid-resolution slot is a triggered ability, so mutating
-                    -- this half back to the start-of-resolution map leaves the
-                    -- suite green. It is here because the two paths must read
-                    -- CR 608.2c the same way.
-                    gateBindings <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject oid)
-                    gated <- gateHolds effectController oid (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Binding.targetsOf gateBindings)) clause
-                    -- CR 603.5 / 608.2d: then the printed "may".
-                    taken <- if gated then exercises oid effectController idx cIdx clause else pure False
-                    -- CR 118.12: and then this clause's cost paid on resolution,
-                    -- offered only for a clause that is happening at all.
-                    -- The legal targets are the START-of-resolution ones,
-                    -- matching CR 608.2b's single re-validation; the
-                    -- per-effect re-read above adds only slots this resolution
-                    -- DEFINES, and the cost is offered before any of THIS
-                    -- clause's effects have run. A later clause's gate is asked
-                    -- after an earlier clause's effects, which no card reaches:
-                    -- the pool's payGate cards are all one-clause.
-                    --
-                    -- Both maps are projected into THIS instance's view (CR 700.2d):
-                    -- the legality is decided against the instance-named slot, then
-                    -- renamed to the printed one the mode's own text reads. Deciding
-                    -- it after the rename would look every slot up in `slots` and
-                    -- miss, and CR 608.2b's re-validation would silently pass.
-                    admitted <-
-                      if taken
-                        then
-                          let chosenAtStart = Binding.targetsOf (Object.bindings obj)
-                           in payGateAdmits
-                                oid
-                                oid
-                                idx
-                                cIdx
-                                (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Map.mapWithKey legalSlot chosenAtStart))
-                                clause
-                        else pure False
-                    Monad.when admitted (Monad.mapM_ applyOne (Clause.effects clause))
+                  -- The fold carries this mode INSTANCE's CR 118.12 answers
+                  -- (payGateAdmits), which is the one gate whose span may reach
+                  -- past its clause. Seeded per instance and not per resolution,
+                  -- which is CR 700.2d: a mode chosen twice "appeared that many
+                  -- times in sequence", so it makes its offer that many times.
+                  Monad.foldM_
+                    ( \answers (cIdx, clause) -> do
+                        -- CR 701.46a's printed "if" first: it precedes the
+                        -- instructions in written order (CR 608.2c), and a clause
+                        -- that cannot happen is no question to ask.
+                        -- The LIVE bindings, not the start-of-resolution ones, for the
+                        -- reason the gate is asked here at all (CR 608.2c): a slot an
+                        -- earlier clause of this resolution DEFINED is part of the
+                        -- state this clause is read against -- Into the Wilds' "if
+                        -- it's a land card" over the card its first clause looked at.
+                        -- Same re-read `applyOne` above makes, and it adds only
+                        -- defined slots: CR 608.2b's re-validation is still the one
+                        -- made once, as the resolution began.
+                        --
+                        -- A REGRESSION FENCE on this path rather than a proved
+                        -- behaviour: every card in the pool whose gate reads a
+                        -- mid-resolution slot is a triggered ability, so mutating
+                        -- this half back to the start-of-resolution map leaves the
+                        -- suite green. It is here because the two paths must read
+                        -- CR 608.2c the same way.
+                        gateBindings <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject oid)
+                        gated <- gateHolds effectController oid (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Binding.targetsOf gateBindings)) clause
+                        -- CR 603.5 / 608.2d: then the printed "may".
+                        taken <- if gated then exercises oid effectController idx cIdx clause else pure False
+                        -- CR 118.12: and then this clause's cost paid on resolution,
+                        -- offered only for a clause that is happening at all.
+                        -- The legal targets are the START-of-resolution ones,
+                        -- matching CR 608.2b's single re-validation; the
+                        -- per-effect re-read above adds only slots this resolution
+                        -- DEFINES, and the cost is offered before any of THIS
+                        -- clause's effects have run. A later clause's gate is asked
+                        -- after an earlier clause's effects -- Don't Make a Sound's
+                        -- surveil, which reuses the answer its counter clause got.
+                        --
+                        -- Both maps are projected into THIS instance's view (CR 700.2d):
+                        -- the legality is decided against the instance-named slot, then
+                        -- renamed to the printed one the mode's own text reads. Deciding
+                        -- it after the rename would look every slot up in `slots` and
+                        -- miss, and CR 608.2b's re-validation would silently pass.
+                        (admitted, answers') <-
+                          if taken
+                            then
+                              let chosenAtStart = Binding.targetsOf (Object.bindings obj)
+                               in payGateAdmits
+                                    oid
+                                    oid
+                                    idx
+                                    cIdx
+                                    (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Map.mapWithKey legalSlot chosenAtStart))
+                                    answers
+                                    clause
+                            else pure (False, answers)
+                        Monad.when admitted (Monad.mapM_ applyOne (Clause.effects clause))
+                        pure answers'
+                    )
+                    Map.empty
+                    (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode)))
                 finishSpell oid face effectController
 
 -- CR 608.2n / 715.3d: where the spell goes as the last part of its resolution.
@@ -1461,29 +1473,36 @@ resolveModes stackId srcId modes = do
                   applyEffect stackId srcId effectController (instanceView legalNow) (instanceView chosenNow) eff
              in -- CR 608.2e's clause is what each gate covers, so all three are
                 -- asked once per clause. Run only when `fizzles` is False, so no
-                -- question is asked about an ability that never resolves.
-                Monad.forM_ (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode))) $ \(cIdx, clause) -> do
-                  -- CR 701.46a: the printed "if" first, for the spell path's
-                  -- reason. Read against `srcId`, the source permanent, not the
-                  -- ability object -- CR 701.46a says "this permanent", which is
-                  -- also why `paid` is given `srcId`.
-                  -- The LIVE bindings off the STACK object, the spell path's own
-                  -- re-read and for its reason (CR 608.2c) -- and off that object
-                  -- rather than off `srcId`, because that is where this
-                  -- resolution's slots are bound (see bindSlot). Proved by
-                  -- Pawl.ResolveSpec's LookAt group, whose card is Into the
-                  -- Wilds.
-                  gateBindings <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject stackId)
-                  gated <- gateHolds effectController srcId (instanceView (Binding.targetsOf gateBindings)) clause
-                  -- CR 603.5 / 608.2d: then the printed "may", answered as this
-                  -- clause's instructions are applied.
-                  taken <- if gated then exercises stackId effectController idx cIdx clause else pure False
-                  -- CR 118.12: then the cost paid on resolution, against the
-                  -- START-of-resolution slots -- the spell path's own note says
-                  -- why it follows the "may", and why the gate is asked before
-                  -- this clause's effects have defined anything.
-                  admitted <- if taken then payGateAdmits stackId srcId idx cIdx (instanceView legal) clause else pure False
-                  Monad.when admitted (Monad.mapM_ applyOne (Clause.effects clause))
+                -- question is asked about an ability that never resolves. The
+                -- fold carries this mode's CR 118.12 answers, the spell path's
+                -- own shape.
+                Monad.foldM_
+                  ( \answers (cIdx, clause) -> do
+                      -- CR 701.46a: the printed "if" first, for the spell path's
+                      -- reason. Read against `srcId`, the source permanent, not the
+                      -- ability object -- CR 701.46a says "this permanent", which is
+                      -- also why `paid` is given `srcId`.
+                      -- The LIVE bindings off the STACK object, the spell path's own
+                      -- re-read and for its reason (CR 608.2c) -- and off that object
+                      -- rather than off `srcId`, because that is where this
+                      -- resolution's slots are bound (see bindSlot). Proved by
+                      -- Pawl.ResolveSpec's LookAt group, whose card is Into the
+                      -- Wilds.
+                      gateBindings <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject stackId)
+                      gated <- gateHolds effectController srcId (instanceView (Binding.targetsOf gateBindings)) clause
+                      -- CR 603.5 / 608.2d: then the printed "may", answered as this
+                      -- clause's instructions are applied.
+                      taken <- if gated then exercises stackId effectController idx cIdx clause else pure False
+                      -- CR 118.12: then the cost paid on resolution, against the
+                      -- START-of-resolution slots -- the spell path's own note says
+                      -- why it follows the "may", and why the gate is asked before
+                      -- this clause's effects have defined anything.
+                      (admitted, answers') <- if taken then payGateAdmits stackId srcId idx cIdx (instanceView legal) answers clause else pure (False, answers)
+                      Monad.when admitted (Monad.mapM_ applyOne (Clause.effects clause))
+                      pure answers'
+                  )
+                  Map.empty
+                  (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode)))
        in do
             Monad.unless fizzles (Monad.forM_ modes resolveOne)
             State.modify' (Game.cease stackId)
@@ -1565,7 +1584,7 @@ exercises resolving controller idx cIdx clause = case Clause.optionality clause 
 -- actually occurred". That rule's Dermoplasm example is what a re-check of the
 -- world would get wrong -- the payment's intended consequence was replaced and
 -- the branch still ran. Nothing here looks at the target, at the payer's board or
--- at the mana that moved; it reads Prompt.ChooseToPay's answer.
+-- at the mana that moved; it reads the payer's intent.
 --
 -- FOUR ways the answer comes out, of which exactly one is "paid":
 --
@@ -1573,13 +1592,15 @@ exercises resolving controller idx cIdx clause = case Clause.optionality clause 
 --     or names an object that is gone, so there is nobody to offer the cost to
 --     and nobody has paid. Unreachable for Mana Leak, whose single target slot
 --     sends the whole spell through CR 608.2b's fizzle before this is asked.
---   * the payer CANNOT pay. The cost is a "may" -- CR 118.12a's rewriting makes
---     it one, and CR 118.12's other half prints it -- and CR 118.3 says "a
---     player can't pay a cost without having the necessary resources to pay it
---     fully", so declining is the only possible answer and there is nothing to
---     ask. Not asked; see Prompt.ChooseToPay.
---   * the payer declines.
---   * the payer chose to pay. Whether the payment then went THROUGH is the one
+--   * the payer CANNOT pay. CR 118.3 says "a player can't pay a cost without
+--     having the necessary resources to pay it fully", so there is nothing to
+--     ask on either limb: an optional cost can only be declined, and a mandatory
+--     one cannot be started. Standstill exiled in response is CR 118.12's own
+--     example of the second. Not asked; see Prompt.ChooseToPay.
+--   * the payer declines, which only an OPTIONAL cost reaches
+--     (Pawl.Types.PayObligation) -- a mandatory one is not offered.
+--   * the payer chose to pay, or the cost was mandatory. Whether the payment
+--     then went THROUGH is the one
 --     place the answer is not the raw choice, and it is the reading that leaves
 --     the game where it started: Pawl.Engine.Cost.pay restores the entry state,
 --     so an Unpaid result is a complete no-op and no cost was paid to read a
@@ -1593,12 +1614,33 @@ exercises resolving controller idx cIdx clause = case Clause.optionality clause 
 -- 113.7a keeps the source on the permanent, which is what a component naming
 -- "this" must reach. The two are the same object for a spell.
 --
--- CR 118.13b's announcement -- how a symbol payable in multiple ways is being
--- paid, chosen immediately before this payment -- is not made (#702).
-payGateAdmits :: ObjectId -> ObjectId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Clause.Clause Card.Type.Card -> Game Bool
-payGateAdmits resolving source idx cIdx legal clause = case Clause.payGate clause of
-  Nothing -> pure True
-  Just gate -> fmap (branchTaken (PayGate.branch gate)) (payGatePaid resolving source idx cIdx legal gate)
+-- ONE offer per payment, which is CR 118.12 read literally: the rule offers the
+-- cost and the "if [a player] does" clause reads THAT answer. Don't Make a
+-- Sound's two clauses hang off one {2}, so the second names the first
+-- (PayGate.offeredAt) and this reuses the recorded answer rather than asking
+-- again. `answers` is keyed on the offering clause's own ordinal and threaded
+-- through the mode's clause fold, so it is per mode and per resolution -- two
+-- clauses that coincidentally state the same cost name no one another and stay
+-- two offers.
+--
+-- A clause naming an offer that was never made falls through and makes the
+-- offer itself. That is not a fallback but the honest reading: the named clause
+-- failed its own CR 701.46a "if" or its CR 603.5 "may", so no answer exists for
+-- CR 118.12 to read and this clause's cost is the one still printed.
+--
+-- Not implemented: CR 118.13b's announcement -- how a symbol payable in
+-- multiple ways is being paid, chosen immediately before this payment. #702
+-- closed as a duplicate of the live issue (#373).
+payGateAdmits :: ObjectId -> ObjectId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Map.Map ClauseIndex Bool -> Clause.Clause Card.Type.Card -> Game (Bool, Map.Map ClauseIndex Bool)
+payGateAdmits resolving source idx cIdx legal answers clause = case Clause.payGate clause of
+  Nothing -> pure (True, answers)
+  Just gate ->
+    let offerAt = Maybe.fromMaybe cIdx (PayGate.offeredAt gate)
+     in case Map.lookup offerAt answers of
+          Just wasPaid -> pure (branchTaken (PayGate.branch gate) wasPaid, answers)
+          Nothing -> do
+            wasPaid <- payGatePaid resolving source idx cIdx legal gate
+            pure (branchTaken (PayGate.branch gate) wasPaid, Map.insert offerAt wasPaid answers)
 
 -- Which branch of CR 118.12 a payment outcome selects. The whole of the rule's
 -- polarity, in one comparison and off the classification a card states -- never
@@ -1610,6 +1652,13 @@ branchTaken branch wasPaid = case branch of
 
 -- The offer itself: was this gate's cost paid? The four outcomes payGateAdmits
 -- above lists, with the branch left to it.
+--
+-- CR 118.12's MANDATORY limb is not offered, and that is the rule rather than an
+-- elision: the clause "checks whether the player chose to pay an optional cost or
+-- STARTED TO PAY a mandatory cost", so a mandatory cost the payer can afford
+-- leaves them nothing to choose. CR 118.3 is still asked first, above, so an
+-- unpayable mandatory cost takes the "can't" branch without a prompt either.
+-- Standstill's controller sacrifices it; they are never asked whether to.
 payGatePaid :: ObjectId -> ObjectId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> PayGate.PayGate -> Game Bool
 payGatePaid resolving source idx cIdx legal gate = do
   gs <- State.get
@@ -1620,7 +1669,9 @@ payGatePaid resolving source idx cIdx legal gate = do
       if not (Cost.canPay payer source cost gs)
         then pure False
         else do
-          decision <- Game.choose (Prompt.ChooseToPay (Decide.deciderFor payer gs) payer resolving idx cIdx cost)
+          decision <- case PayGate.obligation gate of
+            PayObligation.Mandatory -> pure PaymentDecision.Pays
+            PayObligation.Optional -> Game.choose (Prompt.ChooseToPay (Decide.deciderFor payer gs) payer resolving idx cIdx cost)
           case decision of
             PaymentDecision.Declines -> pure False
             PaymentDecision.Pays -> do

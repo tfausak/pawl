@@ -54,13 +54,18 @@ data Clause card = MkClause
     -- span is the carrier and an individual instruction is not -- nothing about
     -- one instruction distinguishes the two cases.
     optionality :: Optionality.Optionality,
-    -- | CR 118.12's cost paid on resolution, covering the same span, together
-    -- with which of that rule's branches this clause's effects are: Mana Leak's
-    -- "unless its controller pays {3}" (CR 118.12a's rewriting, so the effects
-    -- are the "if they don't" branch) and Merfolk Seer's "you may pay {1}{U}. If
-    -- you do" alike. Nothing for every card that states no such cost. The
-    -- payment need not spend a resource -- CR 701.63a's endure puts +1/+1
-    -- counters on instead (Fortress Kin-Guard).
+    -- | CR 118.12's cost paid on resolution, together with which of that rule's
+    -- branches this clause's effects are: Mana Leak's "unless its controller
+    -- pays {3}" (CR 118.12a's rewriting, so the effects are the "if they don't"
+    -- branch) and Merfolk Seer's "you may pay {1}{U}. If you do" alike. Nothing
+    -- for every card that states no such cost. The payment need not spend a
+    -- resource -- CR 701.63a's endure puts +1/+1 counters on instead (Fortress
+    -- Kin-Guard).
+    --
+    -- The ONE rider whose span is not exactly this clause. CR 118.12 offers a
+    -- cost once and reads the one answer, so Don't Make a Sound's two clauses
+    -- hang off one {2} -- see Pawl.Types.PayGate.offeredAt. Stymied Hopes is the
+    -- other end of the same question, a gate over one clause of two.
     --
     -- The three riders are independent, and Pawl.Engine.Resolve asks them in
     -- printed order: `condition` first (CR 701.46a prints its "if" ahead of the
