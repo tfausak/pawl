@@ -1929,8 +1929,8 @@ rewriteEffect pairs effect = case effect of
   -- CR 114.3 leaves an emblem no type line and no name, so its ABILITIES are the
   -- whole of what CR 612.1 can reach -- which makes the emblem the case that
   -- forces rewriteFace's ability walk to run on a face whose type line spells
-  -- nothing. Proven by Pawl.ResolveSpec's "CR 612.1 an Evolved Ajani mints Wurms
-  -- rather than Cats".
+  -- nothing. Proven by Pawl.ResolveSpec's "CR 612.1 an evolved Ajani's emblem
+  -- mints Wurms rather than Cats".
   Effect.CreateEmblem card -> Effect.CreateEmblem (rewriteCard pairs card)
   Effect.BecomeMonarch {} -> effect
   Effect.Designate (Designate.MkDesignate _ _) -> effect
@@ -2011,10 +2011,10 @@ rewriteObjectRef pairs ref = case ref of
 -- 612.1 reaches the text box whatever the type line says, and an emblem is the
 -- proof -- CR 114.3 leaves it no type line at all, so a gate over the type line
 -- would leave the one object whose entire content is rules text untouched. The
--- same walk the projection applies to a permanent's own printed abilities at
--- layer 3 (applyModification's ChangeSubtypeWord arm), reused so the two cannot
--- drift, and CR 612.4 says in as many words that a token's rules text is the
--- creating ability's to define.
+-- same carriers the projection walks on a permanent's own printed text at layer
+-- 3 (applyModification's ChangeSubtypeWord arm), through the same helpers, plus
+-- the spell and the statics a permanent reads elsewhere. CR 612.4 says in as
+-- many words that a token's rules text is the creating ability's to define.
 --
 -- Recursive, since a defined card's own effects can define a further card:
 -- rewriteFace -> rewriteModal -> rewriteEffect -> rewriteCard. It terminates
@@ -2051,10 +2051,13 @@ rewriteFace pairs face = List.foldl' apply1 face pairs
                   }
        in renamed
             { -- CR 702.14a's land-type word inside a landwalk, which is what
-              -- Coral Barrier's Squid token carries. Set.map rather than the
-              -- permanent path's Map.mapKeysWith (+), since a face's keywords are
-              -- a Set and a collision there is already one membership.
+              -- Goblin Scouts' token carries. Set.map rather than the permanent
+              -- path's Map.mapKeysWith (+), since a face's keywords are a Set and
+              -- a collision there is already one membership.
               Face.keywords = Set.map (Filter.rewriteKeyword pair) (Face.keywords renamed),
+              -- CR 208.2a's star, the same carrier PC.characteristicPT is at
+              -- layer 3, and unevaluated for the same reason.
+              Face.characteristicPT = fmap (rewriteQuantity pair) (Face.characteristicPT renamed),
               Face.spell = rewriteModal pair (Face.spell renamed),
               Face.activatedAbilities = fmap (rewriteActivatedAbility pair) (Face.activatedAbilities renamed),
               Face.triggeredAbilities = fmap (rewriteTriggeredAbility pair) (Face.triggeredAbilities renamed),

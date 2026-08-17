@@ -1423,8 +1423,7 @@ textChangedLandwalkSpec s registry = Spec.describe s "TextChangedLandwalk" $ do
     Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' (Set.singleton wraith')) onIsland)) "an Island stops it now"
   -- The THIRD carrier, and the one that needed the walk into a defined card's
   -- keywords (see #643): a landwalk printed on a TOKEN, by the spell that mints
-  -- it.
-  -- Goblin Scouts {3}{R}{R} Sorcery, whole text "Create three 1/1 red Goblin
+  -- it. Goblin Scouts {3}{R}{R} Sorcery, whole text "Create three 1/1 red Goblin
   -- Scout creature tokens with mountainwalk" (checked against Scryfall), hacked
   -- ON THE STACK so CR 612.2a's swap reaches the card the Create defines.
   --
