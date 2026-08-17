@@ -8677,7 +8677,7 @@ stateTriggers gs
 -- under whoever controlled the spell that created it even once that spell's source
 -- is gone.
 --
--- `fires` matches its condition only against EVENTS, never live game state -- the
+-- `matching` matches its condition only against EVENTS, never live game state -- the
 -- turn number `armed` reads is CR 603.7a's arming gate, which can only withhold a
 -- match. So a stored entry whose condition is StateIs would never fire, and
 -- without a stated duration would never leave the store. Not a live gap: no card
@@ -8706,24 +8706,35 @@ delayedPending events gs =
         -- EQUALITY, not a floor: CR 603.7a is a claim about ONE named turn, so the
         -- window has an upper end and not merely a lower one.
         TurnWindow.OnTurn n -> n == GameState.turnNumber gs
-      -- WHICH event fired the entry, rather than merely whether one did: the
+      -- WHICH events fired the entry, rather than merely whether one did: the
       -- payload reads CR 603.2's event through eventBindings below, so the match
-      -- has to hand the event forward.
-      --
-      -- The FIRST match among simultaneous ones. CR 603.7b gives an entry with no
-      -- stated duration's controller the choice of which event triggers it, and
-      -- makes an entry WITH one trigger per occurrence; neither is implemented
-      -- (#1711), and one match per group is what the store did before the event was
-      -- carried at all.
-      firedBy entry =
+      -- has to hand each event forward.
+      matching entry =
         let cond = TriggeredAbility.condition (DelayedTrigger.ability entry)
          in -- The entry's own bindings, which is CR 603.7c's captured environment:
             -- TriggerCondition.LoseControlOfBound asks about an object named as the
             -- arming spell resolved, and the store is the only thing that still
             -- remembers it.
             if armed entry
-              then List.find (matchesTriggerGiven (DelayedTrigger.bindings entry) gs (DelayedTrigger.source entry) (DelayedTrigger.controller entry) cond) events
-              else Nothing
+              then filter (matchesTriggerGiven (DelayedTrigger.bindings entry) gs (DelayedTrigger.source entry) (DelayedTrigger.controller entry) cond) events
+              else []
+      -- CR 603.7b's exception, read through CR 603.2c. A stated duration lifts the
+      -- one shot, and 603.2c then applies unmodified -- "it can trigger repeatedly
+      -- if one event contains multiple occurrences" -- so every occurrence in the
+      -- batch fires the entry once. Centaur Peacemaker's "each player gains 4 life"
+      -- is that batch for False Cure, and TriggerSpec's three-seat board proves the
+      -- count.
+      --
+      -- Without a duration, `take 1` is CR 603.7b's first sentence and is CORRECT
+      -- for occurrences the engine records in sequence: the ability triggers the
+      -- NEXT time its event occurs, which is the earliest match in the batch. The
+      -- controller's choice the rule's second sentence gives is not implemented
+      -- (#1711); it applies only to occurrences that are SIMULTANEOUS, and reaching
+      -- it needs both an event whose occurrences share an EventGroup (#1726) and a
+      -- delayedPending that takes grouped events rather than this flat list.
+      firedBy entry
+        | Maybe.isJust (DelayedTrigger.expiry entry) = matching entry
+        | otherwise = take 1 (matching entry)
       pend entry event =
         PendingTrigger.MkPendingTrigger
           (TriggerSource.OfObject (DelayedTrigger.source entry))
@@ -8737,15 +8748,13 @@ delayedPending events gs =
           (Map.union (eventBindings (TriggeredAbility.condition (DelayedTrigger.ability entry)) event) (DelayedTrigger.bindings entry))
       store = GameState.delayedTriggers gs
       -- CR 603.2 plus CR 603.4: the event matched AND the intervening "if" held,
-      -- which together are what "triggered" means.
-      triggered entry = case firedBy entry of
-        Nothing -> Nothing
-        Just event ->
-          let pending = pend entry event
-           in if interveningHolds gs pending then Just pending else Nothing
+      -- which together are what "triggered" means. Per occurrence, since CR 603.4
+      -- is a claim about the moment the event occurs and the paragraph above says
+      -- an occurrence it rejects spends nothing.
+      triggered entry = filter (interveningHolds gs) (fmap (pend entry) (firedBy entry))
       -- Triggering spends the one shot only for an entry with no stated duration.
-      spent entry = Maybe.isJust (triggered entry) && Maybe.isNothing (DelayedTrigger.expiry entry)
-   in (Maybe.mapMaybe triggered (Foldable.toList store), Seq.filter (not . spent) store)
+      spent entry = not (null (triggered entry)) && Maybe.isNothing (DelayedTrigger.expiry entry)
+   in (concatMap triggered store, Seq.filter (not . spent) store)
 
 -- CR 603.7a: the printed Onset as the game first stores it. The delayed-trigger
 -- twin of Expiry.arm, deliberately blind to the board -- unlike a duration, an

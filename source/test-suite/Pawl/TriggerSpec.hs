@@ -11607,6 +11607,9 @@ lifeGainAmountSpec s registry =
 --     the same reading.
 --   * CR 603.7b's stated duration, which keeps the entry armed through firing:
 --     the second gain, alice's own, is a different seat and a different amount.
+--   * CR 603.2c's repeat WITHIN one batch, which the two gains above cannot show
+--     because they arrive in batches of one. Centaur Peacemaker, on its own
+--     board below, puts every seat's gain in a single batch.
 --
 -- The doubling is Quantity.Plus of the slot with itself, Pawl.Types.Quantity
 -- having no multiply -- exact for "2 life for each 1 life", and what makes the
@@ -11636,6 +11639,20 @@ falseCureSpec s registry =
             (pikerId, withPiker) = S.addCreature piker S.carol withWarden
             (spellId, withSpell) = S.addHandCard falseCure S.alice withPiker
         pure (fountainId, pikerId, resolveAll (snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))))
+      -- The Cure armed on `base` with Centaur Peacemaker, {1}{G}{W} Creature --
+      -- Centaur Cleric 3/3, "When this creature enters, each player gains 4
+      -- life." ONE resolution records a LifeGained per seat, so the whole board's
+      -- gains reach the CR 117.5 settle as one batch. Its OWN minimal board: the
+      -- Soul Warden above would see the Peacemaker enter and add a gain that is
+      -- not part of the batch under test.
+      peacemakerArmed base = do
+        swamp <- S.printingOf s registry "Swamp"
+        falseCure <- S.printingOf s registry "False Cure"
+        peacemaker <- S.printingOf s registry "Centaur Peacemaker"
+        let lands = S.landsFor swamp S.alice 2 base
+            (peacemakerId, withPeacemaker) = S.addCreature peacemaker S.alice lands
+            (spellId, withSpell) = S.addHandCard falseCure S.alice withPeacemaker
+        pure (peacemakerId, resolveAll (snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))))
    in Spec.describe s "CR 603.7 False Cure" $ do
         -- The gain that is NOT the caster's. bob gains 2 and loses 4 -- and alice's
         -- and carol's totals are asserted untouched, which is the whole of #826: an
@@ -11666,6 +11683,43 @@ falseCureSpec s registry =
           let after = entering fountainId (Expiry.dropAtCleanup gs)
           Spec.assertEqWith s "bob gained his 2 and kept it" (S.lifeOf S.bob after) (Just 22)
           Spec.assertEqWith s "alice is untouched either way" (S.lifeOf S.alice after) (Just 20)
+        -- CR 603.2c inside ONE batch, which the two cases above cannot reach: the
+        -- entry's trigger event occurs three times before the settle, and CR
+        -- 603.7b's stated duration lifts the one shot, so 603.2c's "it can trigger
+        -- repeatedly" applies and every seat pays 8. An entry taking the first
+        -- match out of the batch drains alice alone and leaves bob and carol at 24.
+        Spec.it s "CR 603.2c three seats gain in one batch, so the entry fires three times" $ do
+          (peacemakerId, gs) <- peacemakerArmed S.threePlayerGame
+          let after = entering peacemakerId gs
+          Spec.assertEqWith s "alice starts at 20" (S.lifeOf S.alice gs) (Just 20)
+          Spec.assertEqWith s "bob starts at 20" (S.lifeOf S.bob gs) (Just 20)
+          Spec.assertEqWith s "carol starts at 20" (S.lifeOf S.carol gs) (Just 20)
+          Spec.assertEqWith s "alice gained 4 and lost 8" (S.lifeOf S.alice after) (Just 16)
+          Spec.assertEqWith s "bob gained 4 and lost 8" (S.lifeOf S.bob after) (Just 16)
+          Spec.assertEqWith s "carol gained 4 and lost 8" (S.lifeOf S.carol after) (Just 16)
+        -- The other half of the pair, differing in exactly one thing -- how many
+        -- occurrences the batch holds. FOUR seats, so the firing count is four and
+        -- not the three above: a fixed number of firings, or one per batch, passes
+        -- at most one of the two boards. Four rather than two, since two seats
+        -- would collapse "that player" onto the one opponent.
+        Spec.it s "CR 603.2c a fourth seat in the batch is a fourth firing" $ do
+          (peacemakerId, gs) <- peacemakerArmed S.fourPlayerGame
+          let after = entering peacemakerId gs
+          Spec.assertEqWith s "dave starts at 20" (S.lifeOf S.dave gs) (Just 20)
+          Spec.assertEqWith s "alice gained 4 and lost 8" (S.lifeOf S.alice after) (Just 16)
+          Spec.assertEqWith s "bob gained 4 and lost 8" (S.lifeOf S.bob after) (Just 16)
+          Spec.assertEqWith s "carol gained 4 and lost 8" (S.lifeOf S.carol after) (Just 16)
+          Spec.assertEqWith s "dave gained 4 and lost 8" (S.lifeOf S.dave after) (Just 16)
+        -- The vacuity guard, not a prover: the SAME entry with no Cure armed leaves
+        -- every seat holding its 4. Without it a board where "each player gains 4"
+        -- quietly gained nobody anything reads as a passing 16 above.
+        Spec.it s "CR 608.2f with no entry armed, each of the three seats keeps its 4" $ do
+          peacemaker <- S.printingOf s registry "Centaur Peacemaker"
+          let (peacemakerId, gs) = S.addCreature peacemaker S.alice S.threePlayerGame
+              after = entering peacemakerId gs
+          Spec.assertEqWith s "alice is at 24" (S.lifeOf S.alice after) (Just 24)
+          Spec.assertEqWith s "bob is at 24" (S.lifeOf S.bob after) (Just 24)
+          Spec.assertEqWith s "carol is at 24" (S.lifeOf S.carol after) (Just 24)
 
 -- CR 120.3's event read by its RECIPIENT, which no condition could ask for
 -- before: every damage arm beside this one watches a permanent DEALING damage.
