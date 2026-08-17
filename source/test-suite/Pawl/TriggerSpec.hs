@@ -11903,11 +11903,8 @@ mindcrankSpec s registry =
 -- is printed.
 --
 -- The card's third ability -- "when The Master of Lake-town dies, draw a card for
--- each graveyard with seven or more cards in it" -- is not implemented and the
--- card file omits it (#1656). A Scope.OverPlayers count admits only
--- Filter.IsPlayer and Filter.ControlsMoreThanYou over its player candidates, and
--- neither asks how big a graveyard is. The omission is in the STRICTER direction:
--- the missing clause draws its controller cards.
+-- each graveyard with seven or more cards in it" -- is masterOfLaketownDeathSpec
+-- below.
 --
 -- THREE SEATS, for the reason Mindcrank's fixture gives and one more. On a
 -- two-seat board "a player" is "you and your opponent", so the widened relation is
@@ -11978,6 +11975,95 @@ masterOfLaketownSpec s registry =
             Foldable.for_ (List.filter (/= victim) [S.alice, S.bob, S.carol]) $ \bystander -> do
               Spec.assertEqWith s "an untouched seat lost no life" (S.lifeOf bystander after) (S.lifeOf bystander gs)
               Spec.assertEqWith s "and milled nothing" (graveyardSize bystander after) 0
+
+-- CR 700.4 / 404.1 / 608.2h: The Master of Lake-town's THIRD ability -- "when
+-- The Master of Lake-town dies, draw a card for each graveyard with seven or
+-- more cards in it". masterOfLaketownSpec above is the same card's CR 102.1
+-- clause; this is the clause that folds PLAYERS by a fact about a zone they own,
+-- which Filter.CardsInGraveyardAtLeast is the first atom to ask and
+-- Pawl.Engine.Count.bakePerspective the site that answers it.
+--
+-- THREE SEATS holding 7, 6 and 8 AT THE MOMENT OF THE COUNT, so the answer is 2
+-- and no other reading of the sentence agrees: "more than seven" and "each
+-- opponent's graveyard" each answer 1, "six or more" and "every player" answer
+-- 3, a sum of cards answers 21, and an atom left unbaked answers 0. The three
+-- sizes are pairwise distinct, so a fold reading the wrong seat's graveyard
+-- cannot land on the right number by luck.
+--
+-- The counted sizes are NOT the stocked ones, which is CR 404.1 doing real work:
+-- the Bolt is an instant that finished resolving and the Master is a destroyed
+-- permanent, so both are already in alice's graveyard when the trigger resolves.
+-- She is stocked 5 and counted 7 -- and 7 exactly is what tells >= from >.
+--
+-- The second case is the paired negative, differing in exactly two stocking
+-- numbers: all three graveyards hold 6 at the count. It asserts the trigger
+-- reached the stack and resolved, so a zero cannot mean "nothing happened".
+--
+-- Every library holds twenty against a maximum draw of two, so CR 104.3c never
+-- decides a case before its assertions run.
+masterOfLaketownDeathSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+masterOfLaketownDeathSpec s registry =
+  let graveyardSize pid gs = length (Game.zoneMembers Zone.Graveyard pid gs)
+      librarySize pid gs = length (Game.zoneMembers Zone.Library pid gs)
+      -- FILTERED out of the offered set, for masterOfLaketownSpec's reason: a
+      -- hand-built recipient is dropped at CR 608.2b with no error, and an
+      -- answerer that took whatever was legal could aim elsewhere after a
+      -- mutation and keep the case green.
+      aimedAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+      aimedAt oid p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToCreature oid) . snd) sets
+        _ -> S.identityAnswer p
+      board master mountain swamp bolt aliceBin carolBin =
+        let withLand = S.landsFor mountain S.alice 1 S.threePlayerGame
+            (masterId, withMaster) = S.addCreature master S.alice withLand
+            stockLib pid g = List.foldl' (\b _ -> snd (S.addLibraryCard swamp pid b)) g [1 .. (20 :: Int)]
+            stocked = List.foldl' (flip stockLib) withMaster [S.alice, S.bob, S.carol]
+            bin pid n g = List.foldl' (\b _ -> snd (S.addGraveyardCard swamp pid b)) g [1 .. (n :: Int)]
+            (gs, spellId) = S.handOne bolt (bin S.carol carolBin (bin S.bob 6 (bin S.alice aliceBin stocked)))
+         in (masterId, gs, spellId)
+      -- diesTriggerSpec's sequence: cast the Bolt, resolve it onto the 3/2,
+      -- settle -- CR 704.5g destroys the Master and the CR 117.5 settle's own
+      -- scan gathers the dies trigger -- then resolve that trigger.
+      kill (masterId, gs, spellId) =
+        let cast = S.runPure (aimedAt masterId) gs (S.cast S.alice spellId)
+            damaged = S.runPure (aimedAt masterId) cast Stack.resolveTop
+            settled = S.runPure (aimedAt masterId) damaged Engine.settleForPriority
+         in (settled, S.runPure (aimedAt masterId) settled Stack.resolveTop)
+      printings = do
+        master <- S.printingOf s registry "The Master of Lake-town"
+        mountain <- S.printingOf s registry "Mountain"
+        swamp <- S.printingOf s registry "Swamp"
+        bolt <- S.printingOf s registry "Lightning Bolt"
+        pure (master, mountain, swamp, bolt)
+   in Spec.describe s "The Master of Lake-town counts the graveyards as it dies" $ do
+        Spec.it s "CR 404.1 two of the three graveyards reach seven, so alice draws two" $ do
+          (master, mountain, swamp, bolt) <- printings
+          let (settled, after) = kill (board master mountain swamp bolt 5 8)
+          -- The board the count actually sees, pinned so a later edit cannot make
+          -- two readings agree by accident.
+          Spec.assertEqWith s "alice's graveyard: five stocked, the Bolt, the Master" (graveyardSize S.alice settled) 7
+          Spec.assertEqWith s "bob's stays one short" (graveyardSize S.bob settled) 6
+          Spec.assertEqWith s "carol's is over" (graveyardSize S.carol settled) 8
+          Spec.assertEqWith s "the dies trigger reached the stack in that settle" (length (GameState.stack settled)) 1
+          Spec.assertEqWith s "so she drew two: her own seven and carol's eight, not bob's six" (S.handSize S.alice after) 2
+          Spec.assertEqWith s "off her own library" (librarySize S.alice after) 18
+          Spec.assertEqWith s "everything resolved" (GameState.stack after) []
+          -- The clause draws its CONTROLLER cards, however many graveyards it
+          -- counted -- "for each graveyard" is the number, not the drawer.
+          Spec.assertEqWith s "bob drew nothing" (S.handSize S.bob after) 0
+          Spec.assertEqWith s "and carol nothing" (S.handSize S.carol after) 0
+          Spec.assertEqWith s "bob's library is whole" (librarySize S.bob after) 20
+          Spec.assertEqWith s "and carol's" (librarySize S.carol after) 20
+        Spec.it s "CR 404.1 no graveyard reaches seven, so she draws nothing" $ do
+          (master, mountain, swamp, bolt) <- printings
+          let (settled, after) = kill (board master mountain swamp bolt 4 6)
+          Spec.assertEqWith s "alice's graveyard: four stocked, the Bolt, the Master" (graveyardSize S.alice settled) 6
+          Spec.assertEqWith s "bob's" (graveyardSize S.bob settled) 6
+          Spec.assertEqWith s "carol's" (graveyardSize S.carol settled) 6
+          Spec.assertEqWith s "the dies trigger still reached the stack" (length (GameState.stack settled)) 1
+          Spec.assertEqWith s "and resolved" (GameState.stack after) []
+          Spec.assertEqWith s "drawing nothing" (S.handSize S.alice after) 0
+          Spec.assertEqWith s "and touching no library" (librarySize S.alice after) 20
 
 -- CR 508.3a / 603.3d: Anafenza, the Foremost's OTHER ability -- "whenever this
 -- creature attacks, put a +1/+1 counter on another target tapped creature you
@@ -13092,6 +13178,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   lifeLossTriggerSpec s registry
   mindcrankSpec s registry
   masterOfLaketownSpec s registry
+  masterOfLaketownDeathSpec s registry
   anafenzaAttackSpec s registry
   ezuriExperienceSpec s registry
   youngPyromancerSpec s registry

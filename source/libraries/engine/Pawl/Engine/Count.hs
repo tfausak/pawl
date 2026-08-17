@@ -40,6 +40,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
+import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- The characteristics of a candidate, as of the layers the CALLER has already
@@ -175,6 +176,20 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   -- admitting every one.
   Filter.Type.IsControllerOfBound slot ->
     truth (Just candidate == (Map.lookup slot (Filter.slotObjects context) >>= viewOf >>= Filter.controller))
+  -- CR 400.1 / 404.1: how big is THIS candidate's graveyard? Baked here for the
+  -- two atoms above's reason, one rule further out -- the question is about a
+  -- ZONE rather than about the candidate's characteristics, and
+  -- Pawl.Engine.Filter holds no game state to size one with.
+  --
+  -- OWNER-SLICED, which is right here where it is wrong for the battlefield
+  -- (#161): rule 400.1 gives each player their own graveyard and CR 404.1 puts
+  -- an object on top of its OWNER's, so Game.zoneMembers asks exactly the rule's
+  -- question rather than approximating it, and the projected control
+  -- controlledMatching below reads has nothing to say about a card in a
+  -- graveyard. CR 608.2h fixes the moment: the answer is determined once, as the
+  -- effect is applied, which is when this fold runs.
+  Filter.Type.CardsInGraveyardAtLeast n ->
+    truth (toInteger (length (Game.zoneMembers Zone.Graveyard candidate gs)) >= toInteger n)
   Filter.Type.And fs -> Filter.Type.And (fmap recur fs)
   Filter.Type.Or fs -> Filter.Type.Or (fmap recur fs)
   Filter.Type.Not f -> Filter.Type.Not (recur f)

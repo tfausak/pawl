@@ -3269,6 +3269,12 @@ filterReads f = case f of
   -- projection with no way to say "another object's". Nothing in the pool puts
   -- this atom in an affected set -- Oreskos Explorer writes it into a count.
   Filter.Type.ControlsMoreThanYou g -> Set.insert Controller (filterReads g)
+  -- Reads a ZONE's size, which CR 109.3 counts among no object's
+  -- characteristics and no Modification writes -- GameState.graveyard changes
+  -- only through a zone change, and every zone change happens between
+  -- projections. So CR 613.8a's clause (b) can never hold on this atom's
+  -- account. IsToken's answer, and HasCounters'.
+  Filter.Type.CardsInGraveyardAtLeast _ -> Set.empty
   Filter.Type.IsAttacking -> Set.empty
   -- Reads nothing, for IsAttacking's reason: Combat.blockers is the same kind of
   -- record, written by the CR 509.1 declaration, edited by CR 506.4's removals and
