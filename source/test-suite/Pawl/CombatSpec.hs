@@ -2295,6 +2295,45 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton wall (Set.singleton second)) gs) "so is blocking the second"
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty gs)) "declining is not"
       _ -> Spec.assertFailure s "fixture should have two attackers and a Screen"
+  Spec.it s "CR 509.1c two requirements on ONE pair count twice" $ do
+    -- CR 509.1c counts REQUIREMENTS being obeyed, not the (blocker, attacker)
+    -- pairs they name. The board above, plus a Lure on the SECOND attacker:
+    --
+    --   Screen's "blocks each combat if able"  -> (Screen, first), (Screen, second)
+    --   Lure on the second attacker            -> (Screen, second)
+    --
+    -- so (Screen, second) carries TWO requirements and (Screen, first) one. CR
+    -- 509.1a caps the Screen at one attacker, so the maximum obtainable is two
+    -- and only blocking the Lured attacker attains it.
+    --
+    -- The Lure goes on the SECOND attacker deliberately. Ties in
+    -- blockCeilingGiven's fold go to the earlier declaration in enumeration
+    -- order, so under a pair-counting reading -- where both blocks obey one --
+    -- the forced declaration names the FIRST attacker. Putting the Lure last
+    -- makes the third assertion discriminate; on the first attacker it would
+    -- agree with both readings.
+    --
+    -- Both boards are built here rather than leaning on the case above, so the
+    -- pair cannot drift: `plain` and `lured` differ in the Lure and nothing
+    -- else. Blocking the second attacker is legal on BOTH (it obeys the
+    -- maximum either way), which is the anti-vacuity leg -- the Screen really
+    -- is an able blocker of both attackers, so the illegality below is the
+    -- count and not an unrelated CR 509.1b refusal.
+    screen <- S.printingOf s registry "Razorgrass Screen"
+    piker <- S.printingOf s registry "Goblin Piker"
+    lure <- S.printingOf s registry "Lure"
+    let (plain, mine, theirs) = attacking [piker, piker] [screen]
+    case (mine, theirs) of
+      ([first, second], [wall]) -> do
+        let (aura, withAura) = S.addCreature lure S.alice plain
+            lured = S.attach aura second withAura
+            blocks attacker = Map.singleton wall (Set.singleton attacker)
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (blocks first) plain) "without the Lure, blocking the first attacker is legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (blocks second) plain) "and so is blocking the second"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (blocks second) lured) "with the Lure, blocking the Lured attacker obeys both requirements"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (blocks first) lured)) "but blocking the plain one obeys only one, so it is illegal"
+        Spec.assertEqWith s "and the forced declaration names the Lured attacker" (Combat.forcedBlockDeclaration S.bob lured) (blocks second)
+      _ -> Spec.assertFailure s "fixture should have two attackers and a Screen"
   Spec.it s "CR 702.3b the Screen still can't attack" $ do
     -- The card's other line, and the control that keeps the new axis from being
     -- read as a permission to attack.

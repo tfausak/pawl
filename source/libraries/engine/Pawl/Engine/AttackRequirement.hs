@@ -25,9 +25,14 @@ import Pawl.Types.ObjectId (ObjectId)
 -- OBEYED by a particular declaration, so each one must stay identifiable
 -- against the declaration it is checked against. One instance per CREATURE, not
 -- per ability: CR 508.1d checks each creature the active player controls, so
--- one Curse over three able creatures is three requirements. Two Curses over
--- the SAME creature collapse to one instance and cost no answer: a declaration
--- obeys both or neither.
+-- one Curse over three able creatures is three requirements.
+--
+-- NOT IMPLEMENTED: two requirements over the SAME creature collapse to one
+-- instance here, where CR 508.1d counts requirements. Harmless while every
+-- restriction is per creature -- a declaration obeys both or neither -- but a
+-- set-shaped restriction (CR 508.1c) falsifies that, and then the collapse
+-- changes an answer (#1705). BlockRequirement.instances is the twin that counts
+-- them.
 --
 -- `candidates` is CR 508.1a's chosen-from set, and it carries the "if able" of
 -- "attacks each combat if able". Passed IN rather than computed here, as
