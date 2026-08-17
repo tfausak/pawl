@@ -20,8 +20,9 @@ import Pawl.Types.Claim (Claim)
 data Activations = MkActivations
   { -- | CR 118.3: how many times in a row this player could pay the cost.
     times :: Natural,
-    -- | What one activation takes out of a zone (CR 701.21a's sacrifice, a
-    -- discard, an exile from a graveyard).
+    -- | What one activation spends out of a pool of objects, on whichever axis it
+    -- spends it (Pawl.Types.ClaimAxis): CR 701.21a's sacrifice, a discard, an
+    -- exile from a graveyard, or the untapped-ness a tapping cost takes.
     claims :: [Claim],
     -- | CR 119.4: the life one activation pays.
     life :: Natural
