@@ -81,6 +81,7 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
+import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.Supertype as Supertype
@@ -2868,6 +2869,17 @@ levelerSpec s registry = Spec.describe s "Leveler" $ do
     Spec.assertEqWith s "not on bob's turn" (levelUpsOf oid gs {GameState.activePlayer = S.bob}) []
     Spec.assertBool s (elem spellId (GameState.stack withSpell)) "the stack really is occupied"
     Spec.assertEqWith s "not with a spell on the stack" (levelUpsOf oid withSpell) []
+
+  -- CR 302.6 reaches an ability only through a tap or untap symbol in its cost,
+  -- and rule 702.87a writes none -- where rule 702.107a's outlast does. So a
+  -- Student that arrived this turn can level up, and Pawl.ActivateSpec's
+  -- Disowned Ancestor case is the other half of the contrast. Same board, sick
+  -- and settled, so nothing but the sickness varies.
+  Spec.it s "CR 302.6 a Student that arrived this turn can still level up" $ do
+    (oid, gs) <- studentBoard s registry 1
+    let sick = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
+    Spec.assertBool s (not (null (levelUpsOf oid sick))) "offered while summoning sick"
+    Spec.assertBool s (not (null (levelUpsOf oid gs))) "and once it has settled"
 
   -- CR 702.87a's payload makes level up a family-bearing keyword, and
   -- Pawl.Engine.Keyword.familyOf answering Nothing for it would compile. The
