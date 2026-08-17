@@ -791,8 +791,7 @@ viewOfCard face =
           -- describes a printed FACE, which the turn's mills name nothing of.
           -- viewOfCardIn below is the caller that holds an id and answers.
           Filter.milledThisTurn = False,
-          Filter.attachedToCreature = False,
-          Filter.attachedToPermanent = False,
+          Filter.attachedToView = Nothing,
           Filter.attachedTo = Nothing,
           -- CR 701.3a: only Pawl.Engine.Resolve's AttachTarget arm fills this field, and
           -- its candidates are battlefield permanents, so a card in a library or a
@@ -1048,27 +1047,35 @@ viewOfCharacteristics oid pc controller counters gs =
       -- mill left the card as, and a later move would have minted another.
       Filter.milledThisTurn = any (milledIt oid . snd) (GameState.events gs),
       -- CR 701.3a: also not a characteristic, so the attachment comes off
-      -- Object.attachedTo -- but the HOST's creature-ness is projected (layer 4
-      -- can make a land a creature), so it goes through isCreatureOf. That is why
-      -- this field must stay lazy: `affects` calls this function from inside a
-      -- projection, and forcing a second one would recurse. A player host answers
-      -- False, which is Recipient.objectOf's Nothing.
-      Filter.attachedToCreature = case Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf of
-        Nothing -> False
-        Just host -> isCreatureOf host gs,
-      -- CR 303.4 / 110.1: the same attachment, asked whether it names an object
-      -- on the battlefield. The membership test rules out a stale attachment to a
-      -- host that has already left -- CR 704.5m buries such an Aura, but only on
-      -- the next pass. No projection of another object, so no recursion hazard.
-      Filter.attachedToPermanent = case Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf of
-        Nothing -> False
-        Just host -> Set.member host (GameState.battlefield gs),
-      -- CR 701.3a / 301.5a: the same attachment a third time, kept as the HOST'S ID
-      -- rather than collapsed to a Bool -- IsAttachedToSource compares it against
-      -- the match's source, which this builder does not know. Deliberately NOT
-      -- narrowed to a host on the battlefield the way `attachedToPermanent` above
-      -- is: an id is answered or it is not, and the atom's own comparison against a
-      -- source already rules out a host that has left.
+      -- Object.attachedTo -- but AttachedTo's nest asks about the HOST, whose
+      -- characteristics are projected (layer 4 can make a land a creature), so
+      -- the host arrives as a whole view of its own.
+      --
+      -- CR 303.4 / 110.1: narrowed to a host that is an object ON THE
+      -- BATTLEFIELD. A player host answers Nothing, which is
+      -- Recipient.objectOf's; the membership test rules out a stale attachment to
+      -- a host that has already left, which CR 704.5m buries only on the next
+      -- pass. Both are what make `AttachedTo (And [])` mean "attached to a
+      -- permanent" and not "attached to anything".
+      --
+      -- The view under the Just must stay lazy -- `affects` calls this function
+      -- from inside a projection, and forcing a second one would recurse -- and
+      -- deciding Just from Nothing forces no projection at all, so a nest that
+      -- names no characteristic costs none.
+      Filter.attachedToView =
+        fmap
+          (\host -> viewOfObject host gs)
+          ( Game.lookupObject oid gs
+              >>= Object.attachedTo
+              >>= Recipient.objectOf
+              >>= \host -> if Set.member host (GameState.battlefield gs) then Just host else Nothing
+          ),
+      -- CR 701.3a / 301.5a: the same attachment again, kept as the HOST'S ID rather
+      -- than as a view -- IsAttachedToSource compares it against the match's
+      -- source, which this builder does not know. Deliberately NOT narrowed to a
+      -- host on the battlefield the way `attachedToView` above is: an id is
+      -- answered or it is not, and the atom's own comparison against a source
+      -- already rules out a host that has left.
       Filter.attachedTo = Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf,
       -- CR 701.3a: filled only by Resolve's AttachTarget arm, the one place that
       -- knows what is being moved. "Could the subject be attached here" is not a
@@ -3271,17 +3278,18 @@ filterReads f = case f of
   Filter.Type.AttackedThisTurn -> Set.empty
   -- Reads nothing, for AttackedThisTurn's reason and off the same log.
   Filter.Type.MilledThisTurn -> Set.empty
-  -- Declared as reading Types even though the types are the HOST's. Aspect names
-  -- an aspect of ONE object's projection, so there is no way to say "another
-  -- object's card types"; over-declaring is the conservative direction. Nothing in
-  -- the pool puts this atom in an affected set (#357).
-  Filter.Type.IsAttachedToCreature -> Set.singleton Types
-  -- Reads nothing, unlike its sibling above, which is why the two are separate
-  -- atoms: this one stops at Object.attachedTo (CR 303.4), and no Modification
-  -- writes that field -- CR 701.3's attach is a keyword action performed by a
-  -- resolution.
-  Filter.Type.IsAttachedToPermanent -> Set.empty
-  -- Reads nothing, for IsAttachedToPermanent's reason: it stops at
+  -- The nest's own reads, declared as if they were the CANDIDATE's even though
+  -- they are the HOST's: Aspect names an aspect of ONE object's projection, so
+  -- there is no way to say "another object's card types", and over-declaring is
+  -- the conservative direction. Nothing in the pool puts this atom in an affected
+  -- set (#357).
+  --
+  -- The attachment itself reads nothing -- it stops at Object.attachedTo (CR
+  -- 303.4) plus battlefield membership (CR 110.1), and no Modification writes
+  -- either, CR 701.3's attach being a keyword action performed by a resolution. So
+  -- `AttachedTo (And [])` declares nothing, which is exactly right.
+  Filter.Type.AttachedTo g -> filterReads g
+  -- Reads nothing, for the attachment's reason above: it stops at
   -- Object.attachedTo and compares an id, and no Modification writes that field.
   Filter.Type.IsAttachedToSource -> Set.empty
   -- Over-declared deliberately: the characteristics behind this atom are the

@@ -206,8 +206,14 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.IsBlocked -> predicate
   Filter.Type.AttackedThisTurn -> predicate
   Filter.Type.MilledThisTurn -> predicate
-  Filter.Type.IsAttachedToCreature -> predicate
-  Filter.Type.IsAttachedToPermanent -> predicate
+  -- NOT descended into, unlike And/Or/Not above, and that is the load-bearing
+  -- call rather than an omission: `candidate` here is a PLAYER (the sole caller
+  -- folds this over Filter.playerView), and CR 303.4b makes a player enchanted by
+  -- an Aura rather than attached to one, so Pawl.Engine.Filter answers this atom
+  -- False for a player candidate whatever the nest says and never evaluates it.
+  -- Baking the nest against this candidate would bake a question about the HOST
+  -- against a player who is not it.
+  Filter.Type.AttachedTo _ -> predicate
   Filter.Type.IsAttachedToSource -> predicate
   Filter.Type.CanHostSubject -> predicate
   Filter.Type.IsToken -> predicate
@@ -524,8 +530,9 @@ viewOfSnapshot mController isToken snapshot =
       -- CR 701.17a mills a CARD, and this view describes a snapshot rather than
       -- an object -- there is no id here for the turn's mills to have named.
       Filter.milledThisTurn = False,
-      Filter.attachedToCreature = False,
-      Filter.attachedToPermanent = False,
+      -- CR 303.4 / 110.1: a snapshot is not an object on the battlefield and
+      -- carries no attachment, so there is no host here for AttachedTo's nest.
+      Filter.attachedToView = Nothing,
       Filter.attachedTo = Nothing,
       Filter.canHostSubject = False,
       -- CR 111.6: "A token isn't a card", which is a fact about the OBJECT and

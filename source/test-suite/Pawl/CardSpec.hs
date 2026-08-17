@@ -2008,8 +2008,11 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsBlocked -> 0
   Filter.Type.AttackedThisTurn -> 0
   Filter.Type.MilledThisTurn -> 0
-  Filter.Type.IsAttachedToCreature -> 0
-  Filter.Type.IsAttachedToPermanent -> 0
+  -- A DESCENT and not a zero, unlike every other atom here: CR 303.4's atom
+  -- carries the host's description, which a card author writes exactly as they
+  -- write any other filter. Zero would under-count against jsonAtoms, which counts
+  -- the tag at any depth, and turn a legitimate card into a reported offence.
+  Filter.Type.AttachedTo f -> canHostSubjects f
   Filter.Type.IsAttachedToSource -> 0
   Filter.Type.IsToken -> 0
   Filter.Type.IsTapped -> 0

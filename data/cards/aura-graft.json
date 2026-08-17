@@ -59,7 +59,11 @@
                       }
                     },
                     {
-                      "type": "IsAttachedToPermanent"
+                      "type": "AttachedTo",
+                      "value": {
+                        "type": "And",
+                        "value": []
+                      }
                     }
                   ]
                 },

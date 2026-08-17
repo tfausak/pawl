@@ -46,7 +46,13 @@
                       }
                     },
                     {
-                      "type": "IsAttachedToCreature"
+                      "type": "AttachedTo",
+                      "value": {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Creature"
+                        }
+                      }
                     }
                   ]
                 },
