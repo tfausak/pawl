@@ -6801,8 +6801,8 @@ eventBindings cond event = case (cond, event) of
   -- player". The same reserved slot CR 615.13's prevention and CR 119.9's life
   -- gain stamp (see Binding.eventAmount), and the same reading -- the AMOUNT the
   -- event recorded, never the damager's power or the bearer's: CR 702.19b lets a
-  -- trampler split its power across a blocker and a player, and a Prodigal
-  -- Sorcerer's ping is 1 whatever anyone's power is.
+  -- trampler split its power across a blocker and a player, and CR 120.3 admits
+  -- noncombat damage whose amount its source's power never named at all.
   --
   -- ONE event's amount, not a batch's: CR 510.2 deals a combat damage step's
   -- damage simultaneously and Pawl.Engine.Damage records a DamageDealt per
@@ -6817,7 +6817,7 @@ eventBindings cond event = case (cond, event) of
   -- Binding.combatDamager is the slot it would take, but no printing points at it
   -- under this condition: a Scryfall sweep of "is dealt damage" against "the
   -- source" / "that source" matches nothing at all, so unlike the damaged player
-  -- of the bystander arm below (#1175) this one has no card waiting on it. The
+  -- of the bystander arm above (#1175) this one has no card waiting on it. The
   -- RECIPIENT needs no slot either -- matchesTrigger has just proved it is the
   -- bearer, whom CR 113.7a's source slot already names.
   (TriggerCondition.SelfIsDealtDamage, GameEvent.DamageDealt ev) ->

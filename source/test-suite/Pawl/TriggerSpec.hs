@@ -11603,12 +11603,13 @@ falseCureSpec s registry =
 --     do: a noncombat event and a CR 510.2 combat event each draw one.
 --   * CR 510.2's simultaneity, which is the reading a naive once-per-batch arm
 --     gets wrong: two blockers deal two events and draw TWO cards.
---   * the AMOUNT the event carried, which the payload reads back as CR 120.3's
---     "that much" -- Coalhauler Swine, below, where the Raptor reads no number at
---     all.
+--   * the AMOUNT the event carried, which the Swine's payload reads back as CR
+--     120.3's "that much": a pair of boards carrying different numbers, and a
+--     second pair separating a per-event read from a per-batch one.
 --
--- Hand size is asserted BEFORE and AFTER every time. "alice holds one card" alone
--- passes on a board she drew for turn on.
+-- The observable is asserted BEFORE and AFTER every time -- hand size for the
+-- Raptor, life totals for the Swine. "alice holds one card" alone passes on a
+-- board she drew for turn on.
 enrageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 enrageSpec s registry =
   let resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
