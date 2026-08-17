@@ -1988,8 +1988,7 @@ swapWordIn family pairs word = List.foldl' step word pairs
 -- "each player" and "all cards from your hand" have none. TopOfLibrary names a
 -- POSITION and a depth: its PlayerRef names a player, and the Quantity beside it
 -- goes through rewriteQuantity, since a Count nested in it carries a Filter that
--- is card text like any other.
--- EachCardExiledWithSource carries one only where a printing narrows
+-- is card text like any other. EachCardExiledWithSource carries one only where a printing narrows
 -- the linked set with its own words (Karn Liberated's "non-Aura"): CR 607.2a's
 -- set is named by which object exiled the cards, so the bare arm has no subtype
 -- to change.

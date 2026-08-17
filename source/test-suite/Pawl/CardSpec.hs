@@ -712,10 +712,11 @@ effectCounts effect = case effect of
   Effect.Destroy {} -> []
   Effect.Sacrifice _ -> []
   -- A Quantity nested in the ObjectRef: rule 701.20a's reveal, rule 701.20e's
-  -- look and a zone move each name their cards through one, and
-  -- ObjectRef.TopOfLibrary's depth is a Quantity that may hold a Count (Commune
-  -- with Lava's X). Resolve.objectRefQuantities is what recovers it, so a second
-  -- ObjectRef arm gaining a Quantity answers there rather than here.
+  -- look, a zone move and CR 608.2f's ForEach each name their cards through one,
+  -- and ObjectRef.TopOfLibrary's depth is a Quantity that may hold a Count.
+  -- Resolve.objectRefQuantities is what recovers it, so a second ObjectRef arm
+  -- gaining a Quantity answers there rather than here -- and that function is
+  -- also where the four opcodes that route their ref are named.
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> refCounts ref
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.Mill (Mill.MkMill _ quantity _) -> quantityCounts quantity
@@ -2344,7 +2345,8 @@ objectRefFilters ref = case ref of
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard _ _ f) -> [f]
   -- Elvish Piper's "a creature card from your hand"; its PlayerRef names the
   -- choosers, who are also the hands' owners (CR 402.3), so the Filter is the
-  -- whole of what there is to lint -- the chosen graveyard card's answer.
+  -- whole of what there is to lint -- the chosen graveyard card's arm's answer,
+  -- for its reason.
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand _ f) -> [f]
 
 -- The Filter a Count folds over (CR 608.2h). Delegated to the *Counts family

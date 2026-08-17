@@ -626,10 +626,10 @@ conditionSlots condition = case condition of
 -- failure. Fields are spelled out wherever hlint's record-pattern rule allows
 -- it; the `{}` arms below all answer a constant, so a new FIELD on one of those
 -- is the one change this case will not force. That is exactly what a Quantity
--- nested in an ObjectRef would have slipped past, which is why the three
+-- nested in an ObjectRef would have slipped past, which is why four of the
 -- ObjectRef-taking opcodes below name their ref and go through
 -- objectRefQuantities instead: a second ObjectRef arm gaining a Quantity has to
--- answer there.
+-- answer there. Which four, and why not all of them, is on objectRefQuantities.
 slotsAreExhaustive :: Effect Card.Type.Card -> Bool
 slotsAreExhaustive effect = case effect of
   Effect.DealDamage (DealDamage.MkDealDamage _ quantity _) -> Quantity.slotsAreExhaustive quantity
@@ -655,8 +655,9 @@ slotsAreExhaustive effect = case effect of
   Effect.TurnFaceDown _ -> True
   Effect.RemoveFromCombat _ -> True
   Effect.BecomesBlocked _ -> True
-  -- The three ObjectRef-taking opcodes whose ref may nest a Quantity of its own
-  -- (ObjectRef.TopOfLibrary's depth), which objectRefQuantities is what recovers.
+  -- Three of the four opcodes whose ref may nest a Quantity of its own
+  -- (ObjectRef.TopOfLibrary's depth), which objectRefQuantities is what recovers;
+  -- ForEach is the fourth, at the bottom of this case.
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> all Quantity.slotsAreExhaustive (objectRefQuantities ref)
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Mill (Mill.MkMill _ quantity _) -> Quantity.slotsAreExhaustive quantity
@@ -743,8 +744,10 @@ slotsAreExhaustive effect = case effect of
   Effect.ShuffleIntoLibrary {} -> True
   Effect.OfferCast {} -> True
   Effect.GrantPlayFromExile grant -> durationSlotsAreExhaustive (GrantPlayFromExile.duration grant)
-  -- PreventNextDamage's answer: the ref is reported by slotsOf, so only the
-  -- body can hide a read, and each of its effects answers for itself.
+  -- PreventNextDamage's answer for the body -- each of its effects answers for
+  -- itself -- plus the fourth ObjectRef-taking opcode's own ref: slotsOf reports
+  -- the ref's slots, but a PlayerRef nested inside the DEPTH is one it cannot
+  -- see, which is the gap objectRefQuantities closes.
   Effect.ForEach (ForEach.MkForEach ref _ body) -> all Quantity.slotsAreExhaustive (objectRefQuantities ref) && all slotsAreExhaustive body
 
 -- CR 611.2b: only ForAsLongAs reads anything, through its Condition.
@@ -776,9 +779,10 @@ conditionSlotsAreExhaustive condition = case condition of
 -- OPCODE the compiler does force, this case being exhaustive over constructors;
 -- widening an existing one it does not, since an arm already written `{} ->
 -- False` keeps compiling and keeps answering False about a quantity it now
--- carries. The three ObjectRef-taking opcodes go through objectRefQuantities for
--- that reason: an ObjectRef arm gaining a Quantity answers there rather than
--- needing three arms here changed.
+-- carries. The four ObjectRef-taking opcodes that route their ref go through
+-- objectRefQuantities for that reason: an ObjectRef arm gaining a Quantity
+-- answers there rather than needing four arms here changed. Which four, and why
+-- not all of them, is on objectRefQuantities.
 readsX :: [Effect Card.Type.Card] -> Bool
 readsX = any effectReadsX
   where
@@ -807,9 +811,9 @@ readsX = any effectReadsX
       Effect.RemoveFromCombat _ -> False
       Effect.BecomesBlocked _ -> False
       -- Commune with Lava's "exile the top X cards of your library": the X is
-      -- inside the ObjectRef rather than beside it, so these three go through
-      -- objectRefQuantities. Without them the CR 107.3 lint would call the card
-      -- an unread announcement and the depth would evaluate against no X at all.
+      -- inside the ObjectRef rather than beside it, so these three -- and ForEach
+      -- at the bottom of this case -- go through objectRefQuantities. Without them
+      -- the CR 107.3 lint would call the card an unread announcement.
       Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> any Quantity.readsX (objectRefQuantities ref)
       Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Mill (Mill.MkMill _ quantity _) -> Quantity.readsX quantity
@@ -873,7 +877,8 @@ readsX = any effectReadsX
       Effect.OfferCast {} -> False
       Effect.GrantPlayFromExile {} -> False
       -- CR 608.2f's body is an effect list like any other, so an X inside it is
-      -- an X this card reads -- PreventNextDamage's rider, one opcode over.
+      -- an X this card reads -- PreventNextDamage's rider, one opcode over. The
+      -- ref it iterates is the fourth that may nest an X in a library depth.
       Effect.ForEach (ForEach.MkForEach ref _ body) -> any Quantity.readsX (objectRefQuantities ref) || readsX (Foldable.toList body)
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
