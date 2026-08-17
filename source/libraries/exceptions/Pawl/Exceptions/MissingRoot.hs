@@ -6,6 +6,6 @@ import qualified Control.Exception as Exception
 newtype MissingRoot = MkMissingRoot
   { path :: FilePath
   }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 instance Exception.Exception MissingRoot

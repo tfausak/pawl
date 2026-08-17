@@ -56,4 +56,4 @@ data DelayedTrigger = MkDelayedTrigger
     window :: TurnWindow.TurnWindow,
     expiry :: Maybe Expiry.Expiry
   }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)

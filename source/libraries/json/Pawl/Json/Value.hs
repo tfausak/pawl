@@ -21,7 +21,7 @@ data Value
   | String String.String
   | Array (Array.Array Value)
   | Object (Object.Object Value)
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 null :: Value
 null = Null $ Null.MkNull ()

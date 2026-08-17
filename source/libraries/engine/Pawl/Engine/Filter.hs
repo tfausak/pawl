@@ -276,7 +276,7 @@ data View = MkView
     -- affected-set filter that used it would recurse.
     nonManaActivatedAbility :: Bool
   }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 -- The view of a PLAYER candidate: no card types, no colours, no controller --
 -- a player is not an object (CR 109.1) and has none of those. Only the player's
@@ -429,7 +429,7 @@ data Context = MkContext
     -- the sweep sourcePower's and defendingPlayer's siblings each have.
     slotNames :: Map.Map SlotName.SlotName (Set.Set CardName.CardName)
   }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 -- A Context for every match whose Filter cannot name a context-relative atom --
 -- that is, every match but a target slot's, CR 702.149a's trigger condition and

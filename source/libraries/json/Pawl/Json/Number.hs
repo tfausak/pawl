@@ -9,7 +9,7 @@ import qualified Text.Parsec as Parsec
 newtype Number = MkNumber
   { unwrap :: Decimal.Decimal
   }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 decode :: (Parsec.Stream s m Char) => Parsec.ParsecT s u m Number
 decode = do
