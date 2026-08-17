@@ -10241,6 +10241,92 @@ cookbookSpec s registry = Spec.describe s "TheUnderworldCookbook" $ do
     Spec.assertEqWith s "one search, offering nothing" searches [[]]
     Spec.assertEqWith s "and alice's hand is empty" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
 
+-- Merfolk Spy is the card: {U} Creature -- Merfolk Rogue 1/1, "Islandwalk /
+-- Whenever this creature deals combat damage to a player, that player reveals a
+-- card at random from their hand." It is the pool's first Effect.Reveal inside a
+-- triggered ability, and the first over somebody else's hand.
+--
+-- "At random" is not a property of any one outcome, since the engine does not
+-- roll: it is "asked Prompt.RandomObject over the whole hand and honoured the
+-- answer". So no single board can tell a random pick from a fixed one, and the
+-- PAIR of boards below -- identical but for the index the interpreter answered
+-- with -- is the whole proof. Revealing the head unasked passes the second and
+-- fails the first.
+randomRevealSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+randomRevealSpec s registry =
+  let -- alice attacks with an unblocked Spy; bob holds `cards` and no blocker.
+      -- THREE distinct printings in the hand, stocked in this order, so index 0
+      -- is the first and index 2 the last (Game.zoneMembers hands back the
+      -- zone's own order, CR 400.5). Three rather than one because a one-card
+      -- hand elides the ask entirely, and rather than two because two would make
+      -- the pinned index a coin flip.
+      board spy cards = case S.combatBoardOf [spy] [] of
+        (base, ours, yours) -> (ours, yours, List.foldl' (\g p -> snd (S.addHandCard p S.bob g)) base cards)
+      -- Answers Prompt.RandomObject by INDEX into the offer, attacking with
+      -- everything otherwise. Pinned by index rather than read off the prompt's
+      -- fields: an answerer that hunted for "a legal card" would go on answering
+      -- legally after a mutation broke which card the engine honours, and these
+      -- cases would stay green over it.
+      rolling i p = case p of
+        Prompt.RandomObject offered -> case List.drop (min i (length (NonEmpty.toList offered) - 1)) (NonEmpty.toList offered) of
+          h : _ -> h
+          [] -> NonEmpty.head offered
+        _ -> S.aggressiveAnswer p
+      -- Who showed what, by name. The SEAT is asserted alongside the name in
+      -- every leg: rule 701.20a's shower is the player carrying out the
+      -- instruction, which here is bob and not the trigger's controller alice,
+      -- and two seats are what tell those two readings apart.
+      revealed gs = fmap (fmap (List.sort . fmap (Text.unpack . CardName.unwrap) . Set.toList)) (S.revealsOf gs)
+      spyCards = ["Merfolk Spy", "Goblin Piker", "Bog Wraith", "Bird Maiden"]
+   in Spec.describe s "RandomReveal" $ do
+        Spec.it s "CR 701.20a a random reveal shows the card randomness named, not the first in hand" $ do
+          ps <- traverse (S.printingOf s registry) spyCards
+          case ps of
+            [spy, piker, wraith, maiden] -> case board spy [piker, wraith, maiden] of
+              ([attacker], [], gs) -> do
+                let after = S.runCombat (rolling 2) gs
+                Spec.assertBool s (S.onBattlefield attacker after) "the unblocked Spy survived combat"
+                Spec.assertEqWith s "CR 510.1c: its one damage reached bob" (S.lifeOf S.bob after) (Just 19)
+                Spec.assertEqWith s "the LAST card in bob's hand was revealed, by bob" (revealed after) [(S.bob, ["Goblin Piker"])]
+                Spec.assertEqWith s "CR 701.20b: revealing moved nothing" (S.handSize S.bob after) 3
+              _ -> Spec.assertFailure s "fixture should give alice one attacker and bob none"
+            _ -> Spec.assertFailure s "four printings"
+        -- The other half of the pair: the same board, the same everything, one
+        -- different answer.
+        Spec.it s "CR 701.20a the same board with a different roll reveals a different card" $ do
+          ps <- traverse (S.printingOf s registry) spyCards
+          case ps of
+            [spy, piker, wraith, maiden] -> case board spy [piker, wraith, maiden] of
+              ([_], [], gs) -> do
+                let after = S.runCombat (rolling 0) gs
+                Spec.assertEqWith s "the FIRST card this time" (revealed after) [(S.bob, ["Bird Maiden"])]
+                Spec.assertEqWith s "and nothing moved either way" (S.handSize S.bob after) 3
+              _ -> Spec.assertFailure s "fixture should give alice one attacker and bob none"
+            _ -> Spec.assertFailure s "four printings"
+        Spec.it s "CR 701.20a and the middle card, which no fixed reading of the hand reaches" $ do
+          ps <- traverse (S.printingOf s registry) spyCards
+          case ps of
+            [spy, piker, wraith, maiden] -> case board spy [piker, wraith, maiden] of
+              ([_], [], gs) -> do
+                let after = S.runCombat (rolling 1) gs
+                Spec.assertEqWith s "bob showed the Wraith" (revealed after) [(S.bob, ["Bog Wraith"])]
+              _ -> Spec.assertFailure s "fixture should give alice one attacker and bob none"
+            _ -> Spec.assertFailure s "four printings"
+        -- CR 101.3 and CR 609.3 at both ends. S.aggressiveAnswer is deliberate
+        -- here and nowhere above: it bottoms out in Replay.defaultAnswer, which
+        -- answers a RandomObject with the head of the offer -- so this leg
+        -- asserts only that a reveal happened, never which card it was.
+        Spec.it s "CR 609.3 a one-card hand is revealed with nothing to determine, and an empty hand reveals nothing" $ do
+          spy <- S.printingOf s registry "Merfolk Spy"
+          piker <- S.printingOf s registry "Goblin Piker"
+          case board spy [piker] of
+            ([_], [], one) -> case board spy [] of
+              ([_], [], none) -> do
+                Spec.assertEqWith s "the lone card was revealed" (revealed (S.runCombat S.aggressiveAnswer one)) [(S.bob, ["Goblin Piker"])]
+                Spec.assertEqWith s "an empty hand reveals nothing" (revealed (S.runCombat S.aggressiveAnswer none)) []
+              _ -> Spec.assertFailure s "fixture should give alice one attacker and bob none"
+            _ -> Spec.assertFailure s "fixture should give alice one attacker and bob none"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   targetSpec s registry
@@ -10326,6 +10412,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   actOnImpulseSpec s registry
   communeWithLavaSpec s registry
   soulfireEruptionSpec s registry
+  randomRevealSpec s registry
 
 -- CR 601.2c's announcement, answered with a stated number for every variable
 -- slot -- where S.identityAnswer announces as many as the board allows.
