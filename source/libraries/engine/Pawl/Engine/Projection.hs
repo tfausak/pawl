@@ -4247,10 +4247,12 @@ colorsGiven pcs oid gs = PC.colors (projectGiven pcs oid gs)
 -- your speed is 4, this object has '[Ability]'" is an ability the object has or
 -- lacks, and every reader of an object's activated abilities goes through this
 -- pair. viewOfCharacteristics is the one place the same gate is asked from INSIDE
--- the fold, over a board bounded at that caller's layer instead. The layer system is asked first and this
--- second, which is the right order -- a Muraganda Raceway whose rules text CR
--- 305.7 stripped has no max speed ability to gate, whatever its controller's
--- speed, and CR 613.1f's LoseAllAbilities says the same of a creature.
+-- the fold, over a board bounded at that caller's layer instead.
+--
+-- The layer system is asked first and this second, which is the right order -- a
+-- Muraganda Raceway whose rules text CR 305.7 stripped has no max speed ability
+-- to gate, whatever its controller's speed, and CR 613.1f's LoseAllAbilities says
+-- the same of a creature.
 --
 -- The condition is re-asked on every read, not sampled: CR 604.1 makes a static
 -- ability "simply true", so speed falling would take the ability away with no
