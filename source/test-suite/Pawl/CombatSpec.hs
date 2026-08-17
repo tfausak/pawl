@@ -6143,7 +6143,7 @@ exertSpec s registry = Spec.describe s "Exert" $ do
         -- CR 502.3's turn-based action, called directly: that is the narrowest
         -- path to the prohibition, and alice is both the exerting player and the
         -- permanent's controller, so it is her untap step under either reading of
-        -- CR 701.43a (#1736).
+        -- CR 701.43a. The case below is the one that tells the two apart.
         untap g = S.runPure S.identityAnswer g (Engine.untapAll S.alice)
         exerted = S.runPure (exertAnswer OptionalDecision.Exercises) gs (Combat.declareAttackers S.alice)
         declined = S.runPure (exertAnswer OptionalDecision.Declines) gs (Combat.declareAttackers S.alice)
@@ -6161,6 +6161,37 @@ exertSpec s registry = Spec.describe s "Exert" $ do
         -- CR 701.43b: "each effect causing it not to untap expires during the same
         -- untap step", so ONE step is all it costs.
         Spec.assertEqWith s "CR 701.43b and untaps at the next untap step" (tapStateOf initiateId (untap (untap exerted))) (Just TapState.Untapped)
+      _ -> Spec.assertFailure s "the fixture should have put two attackers on the board"
+  -- The case the reading turns on. CR 701.43a says "your next untap step" of the
+  -- EXERTING player, so a control change between the declaration and the step
+  -- separates it from the untap step of whoever holds the permanent then -- and
+  -- bob's comes first, since alice exerted on her own turn.
+  --
+  -- S.giveControl is the fixture; the printed board it stands in for is bob's
+  -- Garland, Royal Kidnapper, which gains control of a creature the monarch
+  -- controls "for as long as they're the monarch" -- a duration that outlasts the
+  -- turn the creature was taken on.
+  Spec.it s "CR 701.43a the rider is the EXERTING player's untap step, not the new controller's" $ do
+    initiate <- S.printingOf s registry "Glory-Bound Initiate"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [initiate, piker] []
+        exerted = S.runPure (exertAnswer OptionalDecision.Exercises) gs (Combat.declareAttackers S.alice)
+        untapFor pid g = S.runPure S.identityAnswer g (Engine.untapAll pid)
+    case mine of
+      initiateId : pikerId : _ -> do
+        -- Both attackers change hands, so the two differ in exactly one thing:
+        -- alice exerted the Initiate and did not exert the Piker.
+        let stolen = S.giveControl pikerId S.bob (S.giveControl initiateId S.bob exerted)
+            bobUntapped = untapFor S.bob stolen
+        Spec.assertEqWith s "CR 701.43a alice's exert says nothing about bob's untap step" (tapStateOf initiateId bobUntapped) (Just TapState.Untapped)
+        Spec.assertEqWith s "and the Piker beside it untaps too" (tapStateOf pikerId bobUntapped) (Just TapState.Untapped)
+        -- CR 701.43b's expiry is keyed to the same player, so it happens at
+        -- alice's untap step even though bob is holding the permanent through it
+        -- -- and a creature handed back afterwards untaps on schedule.
+        let aliceUntapped = untapFor S.alice stolen
+            handedBack = S.giveControl initiateId S.alice aliceUntapped
+        Spec.assertEqWith s "CR 502.3 alice's untap step does not reach a permanent bob controls" (tapStateOf initiateId aliceUntapped) (Just TapState.Tapped)
+        Spec.assertEqWith s "CR 701.43b the rider expired at that step all the same" (tapStateOf initiateId (untapFor S.alice handedBack)) (Just TapState.Untapped)
       _ -> Spec.assertFailure s "the fixture should have put two attackers on the board"
 
 -- S.aggressiveAnswer with Prompt.ChooseExert pinned, on Support's `attackTo`

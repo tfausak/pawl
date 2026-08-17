@@ -187,7 +187,8 @@ createCard pid printing = do
             Object.kicked = False,
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
-            Object.doesNotUntapNext = False
+            Object.doesNotUntapNext = False,
+            Object.exertedBy = Set.empty
           }
       gs3 =
         gs2

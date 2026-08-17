@@ -262,7 +262,10 @@ dirtied pid object =
       Object.ringBearerFor = Just pid,
       Object.protector = Just pid,
       Object.unlockedHalves = Set.singleton (CardName.MkCardName (Text.pack "Steaming Sauna")),
-      Object.designations = Set.singleton Designation.Renowned
+      Object.designations = Set.singleton Designation.Renowned,
+      Object.detainedUntil = Set.singleton pid,
+      Object.doesNotUntapNext = True,
+      Object.exertedBy = Set.singleton pid
     }
 
 -- CR 400.7: has this object no memory of a previous existence? Applying the

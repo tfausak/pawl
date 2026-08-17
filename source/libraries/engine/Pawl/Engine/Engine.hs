@@ -207,32 +207,52 @@ checkSba = sampleWorldSince >> Sba.checkStateBasedActions
 -- the active player's permanents, and the printed sentence says "its controller's
 -- untap step" of that same player.
 --
--- TWO carriers, subtracted together. The printed static one above is re-derived
--- live from the battlefield every time this runs; Object.doesNotUntapNext is the
--- one-shot stored on the victim -- by a resolution (Effect.DoesNotUntapNext,
--- Elvish Hunter) or by CR 508.1g's exert payment (Combat.declareAttackers,
--- Glory-Bound Initiate) -- and this is where it both applies and ENDS. CR 701.43b puts its
--- expiry in the untap step it bites in -- "each effect causing it not to untap
--- expires during the same untap step" -- so the flag is cleared for every
--- candidate here, whether or not the permanent also stayed tapped for the
--- printed carrier's sake, and whether or not it was tapped at all.
+-- THREE carriers, subtracted together. The printed static one above is re-derived
+-- live from the battlefield every time this runs. The other two are stored on the
+-- victim, and this is where each both applies and ENDS -- CR 701.43b puts the
+-- expiry in the untap step it bites in ("each effect causing it not to untap
+-- expires during the same untap step"), so a flag is cleared whether or not the
+-- permanent also stayed tapped for the printed carrier's sake, and whether or not
+-- it was tapped at all.
 --
--- Clearing HERE, against `ids`, is what makes "its controller's" a live read
--- rather than a baked one: the effect never records a player, and the step that
--- consumes the flag is by construction the untap step of whoever controls the
--- permanent then. A control change between the resolution and the step needs
--- nothing rewritten, and no Pawl.Engine.Expiry sweep sees the flag at all.
+-- They differ in WHOSE untap step the sentence names, which is why they are two
+-- fields and not one:
+--
+-- - Object.doesNotUntapNext, written by a resolution (Effect.DoesNotUntapNext,
+--   Elvish Hunter), says "its controller's next untap step". Applied and cleared
+--   against `ids`, which is what makes that a live read rather than a baked one:
+--   the effect records no player, and the step that consumes the flag is by
+--   construction the untap step of whoever controls the permanent then.
+--
+-- - Object.exertedBy, written by CR 508.1g's exert payment
+--   (Combat.declareAttackers, Glory-Bound Initiate), says "YOUR next untap step"
+--   (CR 701.43a) -- the exerting player's. So `pid`'s own membership is what
+--   prohibits, and `pid` is dropped from EVERY permanent rather than from `ids`:
+--   the seat's untap step is the moment the rule expires it, and a permanent that
+--   changed hands in between is neither held back at its new controller's step
+--   nor left carrying a rider past the step that ends it.
+--
+-- Scanned before rebuilding for that last sweep, Expiry.clearedDetentions'
+-- posture and for its reason: almost every board has nothing exerted.
 untapAll :: PlayerId -> Game ()
 untapAll pid = do
   gs <- State.get
   let untap obj = obj {Object.tapped = TapState.Untapped}
       clear obj = obj {Object.doesNotUntapNext = False}
+      unexert obj = obj {Object.exertedBy = Set.delete pid (Object.exertedBy obj)}
       ids = Projection.controls pid gs
       prohibited = UntapRestriction.doesNotUntap ids gs
-      oneShot oid = maybe False Object.doesNotUntapNext (Game.lookupObject oid gs)
-      untapping = filter (\oid -> not (Set.member oid prohibited) && not (oneShot oid)) ids
+      asks f oid = maybe False f (Game.lookupObject oid gs)
+      oneShot = asks Object.doesNotUntapNext
+      exerted = asks (Set.member pid . Object.exertedBy)
+      untapping = filter (\oid -> not (Set.member oid prohibited) && not (oneShot oid) && not (exerted oid)) ids
       expiring = filter oneShot ids
-  State.put gs {GameState.objects = foldr (Map.adjust clear) (foldr (Map.adjust untap) (GameState.objects gs) untapping) expiring}
+      untapped = foldr (Map.adjust clear) (foldr (Map.adjust untap) (GameState.objects gs) untapping) expiring
+      objects =
+        if any (Set.member pid . Object.exertedBy) untapped
+          then Map.map unexert untapped
+          else untapped
+  State.put gs {GameState.objects = objects}
 
 -- CR 302.6: permanents the active player has controlled since their turn began
 -- are no longer summoning sick. The untap step is where that becomes true.
@@ -1007,7 +1027,8 @@ placeBorne srcId pending = do
             Object.kicked = False,
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
-            Object.doesNotUntapNext = False
+            Object.doesNotUntapNext = False,
+            Object.exertedBy = Set.empty
           }
   State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}
   if not (Modal.selectionPossible legal selection)

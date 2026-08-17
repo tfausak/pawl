@@ -197,7 +197,8 @@ placeInherent pending = do
             Object.kicked = False,
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
-            Object.doesNotUntapNext = False
+            Object.doesNotUntapNext = False,
+            Object.exertedBy = Set.empty
           }
   State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}
 

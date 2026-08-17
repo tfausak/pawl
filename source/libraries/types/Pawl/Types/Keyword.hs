@@ -1121,17 +1121,18 @@ data Keyword
   | -- | 701.43d: "you may exert this creature as it attacks" is an OPTIONAL COST
     -- TO ATTACK (CR 508.1g). A static ability, read by
     -- Pawl.Engine.Combat.declareAttackers at CR 508.1g and nowhere else --
-    -- exerting itself is rule 701.43a's keyword action, which writes
-    -- Pawl.Types.Object.doesNotUntapNext and is expired by
-    -- Pawl.Engine.Engine.untapAll under CR 701.43b.
+    -- exerting itself is rule 701.43a's keyword action, which adds the exerting
+    -- player to Pawl.Types.Object.exertedBy and is expired at that player's own
+    -- next untap step by Pawl.Engine.Engine.untapAll under CR 701.43b.
     --
     -- Nullary, because CR 701.43d's sentence takes no parameter: the whole first
     -- sentence of Glory-Bound Initiate IS the keyword, which is why Wizards' card
     -- data reports it as one. Multiplicity is not this type's problem here either
     -- -- CR 701.43b lets a permanent be exerted more than once, and the reader
     -- takes membership because a second instance of the ability would offer a
-    -- second declining-or-paying choice that changes nothing (the flag is a
-    -- Bool, #1653).
+    -- second declining-or-paying choice that changes nothing: the same player
+    -- exerting twice adds the seat Object.exertedBy already holds, and CR 701.43b
+    -- expires both at that one untap step.
     --
     -- The linked CR 607.2h "when you do" trigger is NOT minted from this
     -- constructor, unlike miracle's: CR 701.43d states that such a trigger may
