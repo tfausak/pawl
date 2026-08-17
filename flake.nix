@@ -1,10 +1,19 @@
 {
   inputs = {
+    cabal-gild.inputs.nixpkgs.follows = "nixpkgs";
+    cabal-gild.url = "github:tfausak/cabal-gild-nix";
+    claude-code-nix.inputs.nixpkgs.follows = "nixpkgs";
+    claude-code-nix.url = "github:sadjow/claude-code-nix";
+    hooky.inputs.nixpkgs.follows = "nixpkgs";
+    hooky.url = "github:tfausak/hooky-nix";
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
   };
 
   outputs =
     {
+      cabal-gild,
+      claude-code-nix,
+      hooky,
       nixpkgs,
       ...
     }:
@@ -88,8 +97,7 @@
           '';
 
           gild =
-            pkgs.runCommand "pawl-gild-check"
-              { nativeBuildInputs = [ pkgs.haskellPackages.cabal-gild_1_8_4_1 ]; }
+            pkgs.runCommand "pawl-gild-check" { nativeBuildInputs = [ cabal-gild.packages.${system}.default ]; }
               ''
                 cd ${source}
                 cabal-gild --mode check pawl.cabal
@@ -123,16 +131,17 @@
         {
           default = pkgs.mkShell {
             nativeBuildInputs = [
+              cabal-gild.packages.${system}.default
+              claude-code-nix.packages.${system}.default
+              hooky.packages.${system}.default
               pkgs.bash
               pkgs.cabal-install
               pkgs.coreutils
               pkgs.fzf
               pkgs.gh
-              pkgs.git
               pkgs.ghc
-              pkgs.haskellPackages.cabal-gild_1_8_4_1
+              pkgs.git
               pkgs.hlint
-              pkgs.hooky
               pkgs.jq
               pkgs.nixfmt
               pkgs.ormolu

@@ -788,9 +788,12 @@ data GameEvent
     -- action generally, so an effect that exerted a permanent outside a
     -- declaration would record this same event.
     --
-    -- The exerted permanent's id ALONE, Explored's shape and for its reason: the
-    -- exerting player is the permanent's controller (CR 508.1a already required
-    -- that of an attacker), so a reader gets both from the id.
+    -- The exerted permanent's id ALONE, Explored's shape and for its reason: at
+    -- the moment recorded, the exerting player is the permanent's controller (CR
+    -- 508.1a already required that of an attacker), and CR 603.2 matches the
+    -- trigger against the event as it happens. The PROHIBITION outlives that
+    -- moment and a control change can separate the two, so it records the player
+    -- itself in Object.exertedBy rather than re-deriving one from this id.
     --
     -- Distinct from the AttackerDeclared event the same step records, and the
     -- distinction is the point: every attacker records that one, and CR 701.43d's

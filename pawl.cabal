@@ -1,6 +1,6 @@
 cabal-version: 3.0
 -- cabal-gild: version
--- Generated with cabal-gild version 1.8.4.1
+-- Generated with cabal-gild version 1.8.4.2
 name: pawl
 version: 0.2026.8.17
 synopsis: Magic: the Gathering rules engine
