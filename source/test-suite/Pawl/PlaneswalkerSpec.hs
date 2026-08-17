@@ -467,6 +467,22 @@ combinedLoyaltyCostSpec s registry = Spec.describe s "CombinedLoyaltyCost" $ do
     Spec.assertEqWith s "3 + 3 with Carth" (S.counterOf CounterKind.Loyalty jaceId after) 6
     Spec.assertEqWith s "3 + 2 without him" (S.counterOf CounterKind.Loyalty jaceId without) 5
 
+  -- The net-zero combination, which Jace's -1 and Carth's +1 reach: the single
+  -- cost adjusts nothing, so the ability is free and the loyalty is untouched. A
+  -- FENCE rather than a proof of the choice Cost.combineLoyalty makes there --
+  -- emitting nothing instead of a zero component answers the same on every board
+  -- the rules admit, because the one place the two could differ is CR 606.6 at 0
+  -- loyalty and CR 704.5i has already buried a planeswalker there.
+  Spec.it s "CR 606.5 the -1 and the added +1 combine to a cost that adjusts nothing" $ do
+    island <- S.printingOf s registry "Island"
+    jace <- S.printingOf s registry "Jace Beleren"
+    carth <- S.printingOf s registry "Carth the Lion"
+    let (jaceId, board) = jaceOnBattlefield island jace
+        withCarth = snd (S.addCreature carth S.alice board)
+        after = useAbility minusOne jace jaceId withCarth
+    Spec.assertEqWith s "still 3, neither 2 nor 4" (S.counterOf CounterKind.Loyalty jaceId after) 3
+    Spec.assertEqWith s "and the ability did resolve: exactly one player drew" (S.handSize S.alice after + S.handSize S.bob after) 1
+
 -- CR 306.5a's printed loyalty is a number on every planeswalker but one. Nissa,
 -- Steward of Elements prints CR 107.3's X there, and CR 107.3m says what it is
 -- worth: the value chosen for the spell that became the permanent, "although the

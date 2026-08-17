@@ -569,7 +569,10 @@ totalWith adjustments cost = cost {Cost.mana = fmap (applyAdjustments adjustment
 --
 -- APPENDED, so a printed component is paid before an added one absent a payer's
 -- reordering -- and CR 601.2h makes the order the payer's anyway
--- (`payComponents` prompts for it whenever it is observable).
+-- (`payComponents` prompts for it whenever it is observable). The LOYALTY
+-- components are the exception, merged rather than appended by `combineLoyalty`
+-- below: CR 606.5 makes them one cost, so there is no order between them for CR
+-- 601.2h to offer.
 --
 -- A no-op for every SPELL cost, whose adjustments carry no components at all
 -- (Pawl.Engine.PlayerEffect.spellCostAdjustments).
@@ -1785,6 +1788,11 @@ canPayComponent pid oid component gs = case component of
   --
   -- "At least that many" is >=, so a -1 at exactly 1 loyalty IS activatable, and
   -- CR 704.5i then buries the planeswalker on the next state-based-action check.
+  --
+  -- Rule 606.6's "taking into account any additional costs" is already answered
+  -- by the time this is asked: `plusComponents` combined the printed symbol with
+  -- every added one into the single component per CR 606.5, so `n` here is the
+  -- total and not one half of it.
   CostComponent.RemoveLoyaltyFromThis n ->
     Set.member oid (GameState.battlefield gs)
       && Projection.controllerOf oid gs == Just pid
