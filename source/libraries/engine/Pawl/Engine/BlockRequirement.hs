@@ -10,8 +10,10 @@
 -- which card produced one, nor which carrier.
 module Pawl.Engine.BlockRequirement where
 
-import Data.Set (Set)
+import Data.Map (Map)
+import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
@@ -22,13 +24,27 @@ import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
 
 -- CR 509.1c: every requirement in force right now, INSTANTIATED as the
--- (blocker, attacker) pairs the defending player is required to declare.
+-- (blocker, attacker) pairs the defending player is required to declare, each
+-- carrying HOW MANY requirements name it.
 --
--- A pair and not a count, because CR 509.1c counts requirements being OBEYED by
--- a particular declaration, so each one must stay identifiable against the
--- declaration it is checked against. Per BLOCKER, not per ability: CR 509.1c
--- checks each creature the defending player controls, so one Lure over three
--- able creatures is three requirements.
+-- Keyed by the pair, because CR 509.1c counts requirements being OBEYED by a
+-- particular declaration, and a declaration obeys an instance exactly when it
+-- has that blocker blocking that attacker -- so each one must stay identifiable
+-- against the declaration it is checked against. Per BLOCKER, not per ability:
+-- CR 509.1c checks each creature the defending player controls, so one Lure
+-- over three able creatures is three requirements.
+--
+-- A MULTISET and not a set, because the rule counts requirements rather than
+-- pairs: a Razorgrass Screen ("this creature blocks each combat if able") under
+-- a Lure aimed at one of two attackers is two requirements on that pair and one
+-- on the other, so blocking the Lured attacker obeys two and blocking the plain
+-- one obeys a single requirement and is illegal. Proved by blockRequirementSpec's
+-- "two requirements on ONE pair count twice".
+--
+-- The multiplicity counts DISTINCT REQUIREMENTS, not gathering events: every
+-- source is walked once (the battlefield is a Set and the stored rows are their
+-- own carriers), and within a source `attackers` and `candidates` are duplicate-
+-- free, so a pair is emitted once per requirement that names it.
 --
 -- `able` is the caller's CR 509.1b restriction check, which is what Lure's
 -- "able to block" means. Passed IN rather than computed here, so this module
@@ -44,7 +60,7 @@ instances ::
   [ObjectId] ->
   [ObjectId] ->
   GameState ->
-  Set (ObjectId, ObjectId)
+  Map (ObjectId, ObjectId) Natural
 instances able candidates attackers gs =
   let -- Hoisted out of the walk as PlayerEffect.applying hoists them, and both
       -- unforced until some permanent actually declares a requirement.
@@ -144,10 +160,11 @@ instances able candidates attackers gs =
               attacker `elem` attackers,
               able blocker attacker
             ]
-   in -- NOT IMPLEMENTED: CR 509.1c counts REQUIREMENTS, and a Set counts pairs, so
-      -- two distinct requirements minting the same (blocker, attacker) pair
-      -- collapse into one (#1687).
-      Set.fromList
-        ( concatMap fromPermanent (Set.toList (GameState.battlefield gs))
-            <> concatMap fromStored (GameState.blockRequirements gs)
+   in Map.fromListWith
+        (+)
+        ( fmap
+            (\pair -> (pair, 1))
+            ( concatMap fromPermanent (Set.toList (GameState.battlefield gs))
+                <> concatMap fromStored (GameState.blockRequirements gs)
+            )
         )
