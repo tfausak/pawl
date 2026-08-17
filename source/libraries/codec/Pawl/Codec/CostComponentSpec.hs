@@ -16,6 +16,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
+import qualified Pawl.Types.TapPermanents as TapPermanents
 
 -- | Instantiated at 'Keyword.Keyword', the only concrete instantiation
 -- anywhere in the pool.
@@ -71,6 +72,14 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       (CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower 6 (Filter.HasCardType CardType.Creature)))
       """ {"type":"TapForTotalPower","value":{"totalPower":6,"whichPermanents":{"type":"HasCardType","value":{"type":"Creature"}}}} """
+  -- A COUNT and a Filter, Sacrifice's payload shape spelled over tapping --
+  -- Springleaf Drum's one untapped creature.
+  Spec.it s "TapPermanents" $
+    Common.assertCodec
+      s
+      codec
+      (CostComponent.TapPermanents (TapPermanents.MkTapPermanents 1 (Filter.HasCardType CardType.Creature)))
+      """ {"type":"TapPermanents","value":{"count":1,"whichPermanents":{"type":"HasCardType","value":{"type":"Creature"}}}} """
   Spec.it s "DiscardCards" $
     Common.assertCodec
       s

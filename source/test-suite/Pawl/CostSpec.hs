@@ -44,6 +44,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -61,6 +62,7 @@ import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Hybrid as Hybrid
+import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -72,6 +74,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
@@ -84,6 +87,7 @@ import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TapPermanents as TapPermanents
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
@@ -1611,6 +1615,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   longtuskCubSpec s registry
   thrastaSpec s registry
   omniscienceSpec s registry
+  springleafDrumSpec s registry
 
 -- alice holds `card` and controls `n` untapped Mountains, plus Omniscience when
 -- `granted` is True, with priority in her own precombat main phase so a sorcery
@@ -2120,3 +2125,121 @@ magmaticInsightSpec s registry =
       Spec.assertEqWith s "the hand is the same size as the payable board's" (S.handSize S.alice gs) 3
       Spec.assertBool s (not (any (\c -> Cost.canPay S.alice insight c gs) (Cost.costsFor (S.printingName magmaticInsight) insight gs))) "no offered cost is payable"
       Spec.assertBool s (not (any (S.isCastOf insight) (Action.legalActions S.alice gs))) "and no Cast is offered"
+
+-- Springleaf Drum {1} Artifact: "{T}, Tap an untapped creature you control: Add
+-- one mana of any color." The gate card for CostComponent's TapPermanents --
+-- CR 601.2f's "tapping permanents" with a COUNT, which CR 702.122a's threshold
+-- cannot express (it names no number of objects at all).
+--
+-- Alice's board is the Drum and TWO untapped creatures, one more than the cost
+-- wants, so the prompt is a real choice rather than an elided one. Hill Giant
+-- (3/3) and Blind-Spot Giant (4/1) are distinct printings and distinct
+-- creatures, so tapping the wrong one is visible.
+--
+-- Gameplay-level throughout, through Pawl.Engine.Cost.tapForMana: CR 605.3b
+-- keeps a mana ability off the stack, so Activate.activatable answers False for
+-- this ability on every board and no case may route through it.
+springleafBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+springleafBoard drum first second =
+  let (drumId, gs0) = S.addCreature drum S.alice (Setup.emptyGame S.bothPlayers)
+      (firstId, gs1) = S.addCreature first S.alice gs0
+      (secondId, gs2) = S.addCreature second S.alice gs1
+   in (drumId, firstId, secondId, gs2 {GameState.priority = Just S.alice})
+
+-- Answer Prompt.ChooseTaps with one named permanent, FILTERED against the
+-- offer rather than hand-built: an answer the engine did not offer is rejected
+-- by Cost.payComponent, so filtering is what keeps the assertion about the
+-- engine's own candidates.
+tapping :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+tapping wanted p = case p of
+  Prompt.ChooseTaps _ _ _ candidates _ -> Set.fromList (filter (== wanted) candidates)
+  _ -> S.identityAnswer p
+
+-- Answer Prompt.ChooseTaps with nothing at all, which is not a size-1 subset --
+-- the reject-not-repair probe.
+tappingNothing :: Prompt.Prompt r -> r
+tappingNothing p = case p of
+  Prompt.ChooseTaps {} -> Set.empty
+  _ -> S.identityAnswer p
+
+-- How many mana this source put in alice's pool. The observable that says the
+-- cost was PAID: Cost.pay restores the entry state for an unpaid one, so a
+-- refused payment adds nothing and taps nothing.
+pooledFrom :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> Int
+pooledFrom answer oid gs = case Game.poolOf S.alice (S.runPure answer gs (Cost.tapForMana oid)) of
+  Mana.Type.MkMana units -> length units
+
+isTapped :: ObjectId.ObjectId -> GameState.GameState -> Bool
+isTapped oid gs = fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Tapped
+
+-- The board after tapping the Drum for mana with `answer`.
+afterDrum :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+afterDrum answer drumId gs = S.runPure answer gs (Cost.tapForMana drumId)
+
+springleafDrumSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+springleafDrumSpec s registry = Spec.describe s "Springleaf Drum" $ do
+  -- CR 601.2f: the cost names HOW MANY permanents are tapped, and the payer
+  -- names WHICH. Two candidates and a count of one, so the prompt is raised.
+  Spec.it s "CR 601.2f the payer chooses which creature the cost taps" $ do
+    drum <- S.printingOf s registry "Springleaf Drum"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    blindSpot <- S.printingOf s registry "Blind-Spot Giant"
+    let (drumId, giantId, spotId, gs) = springleafBoard drum hillGiant blindSpot
+        after = afterDrum (tapping giantId) drumId gs
+    Spec.assertEqWith s "one mana" (pooledFrom (tapping giantId) drumId gs) 1
+    Spec.assertBool s (isTapped giantId after) "the chosen creature is tapped"
+    Spec.assertBool s (not (isTapped spotId after)) "the other one is not"
+    -- CR 107.5's own half of the cost, which is a separate component.
+    Spec.assertBool s (isTapped drumId after) "and the Drum itself is tapped"
+  -- The discriminating twin: the same board, one different answer. If the
+  -- engine picked a creature itself, both cases would pass.
+  Spec.it s "the choice is the player's: the other answer taps the other creature" $ do
+    drum <- S.printingOf s registry "Springleaf Drum"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    blindSpot <- S.printingOf s registry "Blind-Spot Giant"
+    let (drumId, giantId, spotId, gs) = springleafBoard drum hillGiant blindSpot
+        after = afterDrum (tapping spotId) drumId gs
+    Spec.assertEqWith s "one mana all the same" (pooledFrom (tapping spotId) drumId gs) 1
+    Spec.assertBool s (isTapped spotId after) "the chosen creature is tapped"
+    Spec.assertBool s (not (isTapped giantId after)) "the other one is not"
+  -- Reject-not-repair, Cost.payComponent's posture: an answer that is not a
+  -- size-1 subset of the offer leaves the whole cost unpaid, and CR 601.2h's
+  -- ban on partial payments is what makes the Drum untapped afterwards.
+  Spec.it s "CR 601.2h an answer of the wrong size pays nothing at all" $ do
+    drum <- S.printingOf s registry "Springleaf Drum"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    blindSpot <- S.printingOf s registry "Blind-Spot Giant"
+    let (drumId, giantId, spotId, gs) = springleafBoard drum hillGiant blindSpot
+        after = afterDrum tappingNothing drumId gs
+    Spec.assertEqWith s "no mana" (pooledFrom tappingNothing drumId gs) 0
+    Spec.assertBool s (not (isTapped giantId after)) "neither creature is tapped"
+    Spec.assertBool s (not (isTapped spotId after)) "nor the other"
+    Spec.assertBool s (not (isTapped drumId after)) "and the payment was rolled back whole"
+  -- The negative, built as a PAIR of boards differing in exactly one thing: the
+  -- lone creature's tap state. Same seats, same permanents, same ability.
+  Spec.it s "CR 118.3 no untapped creature means no payment" $ do
+    drum <- S.printingOf s registry "Springleaf Drum"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    let (drumId, giantId, spotId, payable) = springleafBoard drum hillGiant hillGiant
+        -- The ONE thing the pair varies: both creatures tapped, which leaves
+        -- the criterion's `Not IsTapped` with nothing to offer.
+        unpayable = S.tapObject spotId (S.tapObject giantId payable)
+        component = CostComponent.TapPermanents (TapPermanents.MkTapPermanents 1 (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.ControlledBy PlayerRelation.You, Filter.Type.Not Filter.Type.IsTapped]))
+    Spec.assertBool s (Cost.canPayComponent S.alice drumId component payable) "two untapped creatures pay"
+    Spec.assertBool s (not (Cost.canPayComponent S.alice drumId component unpayable)) "two tapped ones do not"
+    Spec.assertEqWith s "and the ability adds no mana" (pooledFrom S.identityAnswer drumId unpayable) 0
+    Spec.assertBool s (not (isTapped drumId (afterDrum S.identityAnswer drumId unpayable))) "leaving the Drum untapped"
+  -- CR 302.6 and CR 107.5 gate on the tap SYMBOL in the creature's OWN
+  -- activation cost. This cost taps another creature by written instruction, so
+  -- summoning sickness has nothing to say about it -- and Cost.requiresSicknessCheck
+  -- must not grow this arm. Both creatures arrived this turn.
+  Spec.it s "CR 302.6 a creature that arrived this turn can still be tapped for the cost" $ do
+    drum <- S.printingOf s registry "Springleaf Drum"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    blindSpot <- S.printingOf s registry "Blind-Spot Giant"
+    let (drumId, giantId, spotId, gs0) = springleafBoard drum hillGiant blindSpot
+        sicken oid g = g {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects g)}
+        gs = sicken spotId (sicken giantId gs0)
+        after = afterDrum (tapping giantId) drumId gs
+    Spec.assertEqWith s "one mana" (pooledFrom (tapping giantId) drumId gs) 1
+    Spec.assertBool s (isTapped giantId after) "the summoning-sick creature is tapped"

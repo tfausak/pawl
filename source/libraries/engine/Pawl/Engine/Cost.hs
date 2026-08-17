@@ -86,6 +86,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
+import qualified Pawl.Types.TapPermanents as TapPermanents
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
@@ -664,6 +665,7 @@ substituteXInComponent x component = case component of
   CostComponent.SacrificeThis -> component
   CostComponent.Sacrifice {} -> component
   CostComponent.TapForTotalPower {} -> component
+  CostComponent.TapPermanents {} -> component
   CostComponent.DiscardCards {} -> component
   CostComponent.DiscardThis -> component
   CostComponent.PayEnergy _ -> component
@@ -705,6 +707,7 @@ componentHasVariable component = case component of
   CostComponent.SacrificeThis -> False
   CostComponent.Sacrifice {} -> False
   CostComponent.TapForTotalPower {} -> False
+  CostComponent.TapPermanents {} -> False
   CostComponent.DiscardCards {} -> False
   CostComponent.DiscardThis -> False
   CostComponent.PayEnergy _ -> False
@@ -915,11 +918,12 @@ reductionHalvesOf symbol = case symbol of
 -- untap symbol, from each of which CR 702.10c's haste grants the same exemption.
 -- Named for the RULE it answers rather than for one of the two symbols.
 --
--- CR 702.122a's TapForTotalPower is deliberately NOT here, and the omission is
--- the rule rather than an oversight: that component taps OTHER permanents, and
--- rule 302.6 gates a creature's own activated ability with the tap symbol in it.
--- A Vehicle that arrived this turn may be crewed; rule 302.6's second sentence
--- still stops it attacking.
+-- TapForTotalPower and TapPermanents are deliberately NOT here, and the omission
+-- is the rule rather than an oversight: those components tap OTHER permanents by
+-- written instruction, and rule 302.6 gates a creature's own activated ability
+-- with the tap SYMBOL in it. A Vehicle that arrived this turn may be crewed and a
+-- summoning-sick creature may be tapped for Springleaf Drum; rule 302.6's second
+-- sentence still stops either attacking.
 requiresSicknessCheck :: Cost Keyword.Type.Keyword -> Bool
 requiresSicknessCheck cost =
   any (\c -> elem c (Cost.components cost)) [CostComponent.TapThis, CostComponent.UntapThis]
@@ -979,6 +983,7 @@ loyaltyAmountOf component = case component of
   CostComponent.PayLifeX -> Nothing
   CostComponent.Sacrifice {} -> Nothing
   CostComponent.TapForTotalPower {} -> Nothing
+  CostComponent.TapPermanents {} -> Nothing
   CostComponent.DiscardCards {} -> Nothing
   CostComponent.DiscardThis -> Nothing
   CostComponent.PayEnergy _ -> Nothing
@@ -1058,6 +1063,9 @@ zoneOfComponent component = case component of
   -- CR 702.122a taps permanents on the battlefield and moves nothing out of any
   -- zone, so CR 113.6m says nothing and CR 113.6's default stands.
   CostComponent.TapForTotalPower {} -> Nothing
+  -- TapForTotalPower's answer for its reason: this taps permanents that stay on
+  -- the battlefield, so CR 113.6m says nothing about it either.
+  CostComponent.TapPermanents {} -> Nothing
   -- Nothing, and NOT Just Zone.Graveyard -- the one place this component parts
   -- from ExileThisFromGraveyard above. CR 113.6m is about an ability that "moves
   -- THE OBJECT IT'S ON out of a particular zone"; this one moves OTHER cards,
@@ -1170,9 +1178,9 @@ topExileCandidate :: PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> Game
 topExileCandidate pid criterion gs =
   Maybe.listToMaybe (reverse (exileCandidates pid criterion gs))
 
--- The permanents this player may tap to pay a TapForTotalPower component on
--- `oid`: every battlefield object matching the criterion, ascending, the order
--- Replacement.sacrificeCandidates offers its own in.
+-- The permanents this player may tap to pay a TapForTotalPower or TapPermanents
+-- component on `oid`: every battlefield object matching the criterion, ascending,
+-- the order Replacement.sacrificeCandidates offers its own in.
 --
 -- NOT Replacement.sacrificeCandidates, and the difference is the CONTEXT. That
 -- one matches with NO PERSPECTIVE, which makes ControlledBy vacuous, and
@@ -1201,7 +1209,7 @@ tapPower :: ObjectId -> GameState -> Integer
 tapPower candidate gs = Maybe.fromMaybe 0 (Projection.powerOf candidate gs)
 
 -- CR 701.26a: tap one permanent. A direct edit and not a funnel -- see
--- payComponent's TapThis arm for why -- shared by the two components that tap,
+-- payComponent's TapThis arm for why -- shared by the components that tap,
 -- so the day an Event.tap exists there is one call site to move.
 tapObject :: ObjectId -> Game ()
 tapObject target =
@@ -1269,6 +1277,14 @@ removalClaim pid oid component gs = case component of
   CostComponent.TapThis -> Nothing
   CostComponent.UntapThis -> Nothing
   CostComponent.TapForTotalPower {} -> Nothing
+  -- Nothing, TapForTotalPower's answer and for the reason stated above: a
+  -- tapped permanent stays on the battlefield, so this component takes nothing
+  -- out of any pool. Not implemented: two such components -- two Springleaf
+  -- Drums, or one cost carrying two -- therefore each count the SAME untapped
+  -- creature, so a board holding fewer untapped creatures than the tapping
+  -- costs that want them reads as payable, and the second payment goes Unpaid
+  -- at CR 601.2h (#1718).
+  CostComponent.TapPermanents {} -> Nothing
   CostComponent.PayLife _ -> Nothing
   CostComponent.PayLifeX -> Nothing
   CostComponent.PayEnergy _ -> Nothing
@@ -1482,8 +1498,8 @@ repeatsOf pid oid cost gs = case Cost.mana cost of
 -- tapped again to pay one, nor an untapped one untapped -- and for CR 606.4's
 -- loyalty, since CR 606.3 lets a player activate one loyalty ability of a
 -- permanent per turn whatever the counters allow. An UNDERSTATEMENT for CR
--- 107.14's energy, for a counter put on the source, and for TapForTotalPower's
--- other creatures, each of which a player with enough could pay several times
+-- 107.14's energy, for a counter put on the source, and for the two components
+-- that tap OTHER permanents, each of which a player with enough could pay several times
 -- over; `repeatsOf` above argues for understating (#1280).
 --
 -- EXHAUSTIVE with no wildcard, this module's posture for every CostComponent
@@ -1509,6 +1525,7 @@ uncountedCeiling component = case component of
   CostComponent.TapThis -> Just 1
   CostComponent.UntapThis -> Just 1
   CostComponent.TapForTotalPower {} -> Just 1
+  CostComponent.TapPermanents {} -> Just 1
   CostComponent.PayEnergy _ -> Just 1
   CostComponent.AddLoyaltyToThis _ -> Just 1
   CostComponent.RemoveLoyaltyFromThis _ -> Just 1
@@ -1637,6 +1654,7 @@ lifeOwedByComponent component = case component of
   CostComponent.SacrificeThis -> 0
   CostComponent.Sacrifice {} -> 0
   CostComponent.TapForTotalPower {} -> 0
+  CostComponent.TapPermanents {} -> 0
   CostComponent.DiscardCards {} -> 0
   CostComponent.DiscardThis -> 0
   CostComponent.PayEnergy _ -> 0
@@ -1717,6 +1735,18 @@ canPayComponent pid oid component gs = case component of
   -- simply does not need a special case.
   CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n criterion) ->
     sum (fmap (max 0 . (`tapPower` gs)) (tapCandidates pid oid criterion gs)) >= toInteger n
+  -- Payable iff the criterion admits at least `count` permanents, which is
+  -- Sacrifice's arm read over tapping rather than over sacrificing: the count is
+  -- HOW MANY, so the question is a size and not a sum. "Untapped" is not asked
+  -- here and is not missing -- CR 107.5's exclusion is not this component's, so
+  -- a card that wants it prints it, and Springleaf Drum's criterion carries
+  -- `Not IsTapped` itself.
+  --
+  -- This component ALONE, Sacrifice's caveat and for its reason -- except that
+  -- `jointlyPayable` cannot second it, since tapping states no claim
+  -- (`removalClaim`).
+  CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) ->
+    Natural.length (tapCandidates pid oid criterion gs) >= n
   -- CR 601.2f: payable only if the hand holds at least that many cards the
   -- criterion admits -- Magmatic Insight is uncastable out of a landless hand
   -- however many cards it holds.
@@ -1947,6 +1977,7 @@ orderSensitive component = case component of
   CostComponent.TapThis -> True
   CostComponent.UntapThis -> True
   CostComponent.TapForTotalPower {} -> True
+  CostComponent.TapPermanents {} -> True
   CostComponent.AddLoyaltyToThis _ -> True
   CostComponent.RemoveLoyaltyFromThis _ -> True
   CostComponent.PutPlusOneCountersOnThis _ -> True
@@ -2283,6 +2314,33 @@ payComponent pid oid component = case component of
     chosen <- Game.choose (Prompt.ChooseTapsForTotalPower decider pid oid candidates n)
     let totalPower = sum (fmap (`tapPower` gs) (Set.toAscList chosen))
     if Set.isSubsetOf chosen (Set.fromList candidates) && totalPower >= toInteger n
+      then do
+        Monad.mapM_ tapObject (Set.toAscList chosen)
+        pure Payment.Paid
+      else pure Payment.Unpaid
+  -- The payer chooses WHICH permanents to tap, so this is a prompt. Sacrifice's
+  -- posture rather than TapForTotalPower's: the count is exact, so exactly as
+  -- many candidates as the count leaves one legal answer and the prompt is
+  -- elided -- where a THRESHOLD would have left a choice among subsets. Two
+  -- untapped creatures and a count of one IS asked; they differ in power,
+  -- counters and attached auras, and the engine may not decide for the player.
+  --
+  -- Reject-not-repair, Sacrifice's posture again: an answer that is not a
+  -- size-`n` subset of the offered candidates makes the whole payment Unpaid,
+  -- which `pay`'s restore turns into a no-op. An already-tapped answer is
+  -- refused by the same clause wherever the criterion says `Not IsTapped`,
+  -- since `tapCandidates` never offered it.
+  --
+  -- The tap is a direct edit, TapThis' route and for TapThis' stated reason.
+  CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) -> do
+    gs <- State.get
+    let candidates = tapCandidates pid oid criterion gs
+        decider = Decide.deciderFor pid gs
+    chosen <-
+      if Natural.length candidates <= n
+        then pure (Set.fromList candidates)
+        else Game.choose (Prompt.ChooseTaps decider pid oid candidates n)
+    if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
       then do
         Monad.mapM_ tapObject (Set.toAscList chosen)
         pure Payment.Paid

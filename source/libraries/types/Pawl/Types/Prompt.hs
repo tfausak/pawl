@@ -1060,6 +1060,27 @@ data Prompt r where
   -- constructor rather than a reuse of ChoseSacrifices -- a transcript that
   -- taps creatures and one that sacrifices them are not the same transcript.
   ChooseTapsForTotalPower :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
+  -- | Which permanents to TAP to pay a cost that names HOW MANY of them
+  -- (CR 601.2f's "tapping permanents"). The ObjectId is the permanent whose
+  -- ability is being activated (Springleaf Drum); the [ObjectId] is the
+  -- battlefield objects matching the component's criterion, engine-pre-filtered
+  -- in ascending order; the Natural is how many of them must be tapped.
+  --
+  -- ChooseSacrifices' shape and posture, over the action ChooseTapsForTotalPower
+  -- above performs -- which is exactly why it is neither of them. That one's
+  -- Natural is a THRESHOLD on summed power and admits subsets of any size, so
+  -- its answer cannot be validated against a count; this one's is a SIZE, which
+  -- Pawl.Engine.Cost matches exactly.
+  --
+  -- ELIDED at exactly as many candidates as the count, ChooseSacrifices' rule
+  -- and not its neighbour's: with an exact size there is then one legal answer,
+  -- where a threshold would still leave a choice among subsets.
+  --
+  -- A Set, for ChooseSacrifices' reason: one permanent cannot be tapped twice
+  -- for one payment. Answers as Response.ChoseTaps, shared with the arm above --
+  -- a transcript records which permanents were tapped, and the two prompts ask
+  -- that same question of the same pool.
+  ChooseTaps :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
   -- | CR 701.3a: where an effect that moves an already-attached permanent puts it.
   -- The first ObjectId is the permanent being moved (Crown of the Ages' targeted
   -- Aura); the NonEmpty is the destinations its card text admits.
