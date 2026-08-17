@@ -2353,7 +2353,7 @@ objectRefFilters ref = case ref of
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand _ f) -> [f]
   -- Merfolk Spy's "a card at random from their hand" carries no Filter at all,
   -- only the PlayerRef naming whose hand, so there is nothing here to lint
-  -- (#1742).
+  -- (gap #1742).
   ObjectRef.RandomCardInHand _ -> []
 
 -- The Filter a Count folds over (CR 608.2h). Delegated to the *Counts family

@@ -194,7 +194,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       (Either.isLeft (Common.parse (Text.pack """ {"type":"ChosenCardInHand","value":{"type":"InSlot","value":"target"}} """) >>= Codec.decode ObjectRef.codec))
       "expected a decode failure"
   -- Merfolk Spy's "that player reveals a card at random from their hand": the
-  -- chosen arm's PlayerRef with no filter beside it (#1742), and the slot is the
+  -- chosen arm's PlayerRef with no filter beside it (gap #1742), and the slot is the
   -- one the trigger bound to the damaged player.
   Spec.it s "RandomCardInHand" $
     Common.assertCodec

@@ -10286,7 +10286,7 @@ randomRevealSpec s registry =
               ([attacker], [], gs) -> do
                 let after = S.runCombat (rolling 2) gs
                 Spec.assertBool s (S.onBattlefield attacker after) "the unblocked Spy survived combat"
-                Spec.assertEqWith s "CR 510.1c: its one damage reached bob" (S.lifeOf S.bob after) (Just 19)
+                Spec.assertEqWith s "CR 510.1b: its one damage reached bob" (S.lifeOf S.bob after) (Just 19)
                 Spec.assertEqWith s "the LAST card in bob's hand was revealed, by bob" (revealed after) [(S.bob, ["Goblin Piker"])]
                 Spec.assertEqWith s "CR 701.20b: revealing moved nothing" (S.handSize S.bob after) 3
               _ -> Spec.assertFailure s "fixture should give alice one attacker and bob none"
