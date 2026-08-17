@@ -46,7 +46,9 @@ data CostAdjustments = MkCostAdjustments
     -- all: the additional non-mana components an effect adds to the cost
     -- (Brutal Suppression's @Sacrifice a land@). Appended to the cost's own
     -- components by Pawl.Engine.Cost.plusComponents, so an added component is
-    -- paid, gated and ordered by exactly the machinery a printed one is.
+    -- paid, gated and ordered by exactly the machinery a printed one is --
+    -- except an added LOYALTY component (Carth the Lion's @[+1]@), which CR 606.5
+    -- merges into the printed one instead of leaving beside it.
     --
     -- A LIST rather than one component, matching Pawl.Types.Cost.components:
     -- several effects can add to one cost at once, so even a vocabulary where
