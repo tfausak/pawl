@@ -263,6 +263,7 @@ import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -7330,10 +7331,16 @@ permanentEntersSpec s registry =
 -- is in a graveyard when it fires, never on the battlefield -- so the scan has
 -- to look somewhere other than the battlefield to find it.
 --
--- The proving pair is Tome Scour ("target player mills five cards") and
--- Narcomoeba; Soul Warden rides along in the same graveyard as the control,
--- because its CR 603.6a trigger functions ONLY on the battlefield and so must
--- stay silent even when a creature enters right in front of it.
+-- Two proving pairs, both with Narcomoeba as the bearer. Tome Scour ("target
+-- player mills five cards") leaves it in the graveyard, so the live boundary scan
+-- finds it; Soul Warden rides along in the same graveyard as the control, because
+-- its CR 603.6a trigger functions ONLY on the battlefield and so must stay silent
+-- even when a creature enters right in front of it.
+--
+-- Corpse Churn mills it and takes it back out in ONE resolution, so the boundary
+-- scan cannot see it at all and CR 603.10's first sentence has to be answered
+-- from CR 608.2h last known information -- Event.eventTriggers'
+-- `arrivedInGraveyard`.
 graveyardTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 graveyardTriggerSpec s registry =
   let -- alice: one Island in play (Tome Scour's {U}), Tome Scour in hand, and a
@@ -7371,6 +7378,31 @@ graveyardTriggerSpec s registry =
       namesIn zone pid gs =
         Set.fromList (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
       narcomoebaName = CardName.MkCardName $ Text.pack "Narcomoeba"
+      -- Corpse Churn {1}{B} Instant, "Mill three cards, then you may return a
+      -- creature card from your graveyard to your hand." (name, cost, type line
+      -- and oracle text checked against Scryfall.)
+      --
+      -- alice: two Swamps in play for the cost, Corpse Churn in hand, and a
+      -- ONE-CARD library holding Narcomoeba. CR 701.17b's "as many as possible"
+      -- mills exactly that card, so the milled count (1) differs from the printed
+      -- three and a reading that milled three would leave a different board.
+      corpseChurnBoard = do
+        swamp <- S.printingOf s registry "Swamp"
+        churn <- S.printingOf s registry "Corpse Churn"
+        narcomoeba <- S.printingOf s registry "Narcomoeba"
+        let base = S.landsInPlay swamp 2
+            (_, g1) = S.addLibraryCard narcomoeba S.alice base
+            (g2, spellId) = S.handOne churn g1
+        pure (g2 {GameState.priority = Just S.alice}, spellId)
+      -- Exercises Corpse Churn's OPTIONAL clause, pinned by clause index rather
+      -- than answered blanket-yes: clause 1 is the "you may return", clause 0 the
+      -- mandatory mill, and Narcomoeba's own printed "may" is a ChooseOptional too
+      -- -- a blanket yes would conflate the two.
+      returnsIt :: Prompt.Prompt r -> r
+      returnsIt p = case p of
+        Prompt.ChooseOptional _ _ _ _ clause
+          | clause == ClauseIndex.MkClauseIndex 1 -> OptionalDecision.Exercises
+        _ -> S.identityAnswer p
    in Spec.describe s "GraveyardTrigger" $ do
         -- The gameplay-level proof, cast to resolution.
         Spec.it s "CR 113.6k whole card: Tome Scour mills Narcomoeba and its trigger puts it onto the battlefield" $ do
@@ -7420,6 +7452,56 @@ graveyardTriggerSpec s registry =
               entered = S.runPure S.identityAnswer gs1 (Event.changeZone pikerCard Zone.Battlefield)
           Spec.assertBool s (Set.member (CardName.MkCardName $ Text.pack "Soul Warden") (namesIn Zone.Graveyard S.alice entered)) "the Warden is in the graveyard"
           Spec.assertEqWith s "and a creature entering fires nothing" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped entered) entered))) []
+        -- CR 603.10's first sentence against a card that is NOT in the graveyard
+        -- at the CR 117.5 boundary: Corpse Churn mills Narcomoeba and returns it
+        -- to the hand in one resolution, with no boundary in between.
+        --
+        -- The discriminator is the graveyard's contents, asserted as an equality:
+        -- at the boundary it holds Corpse Churn alone (CR 404.1's finished
+        -- instant), which is an Instant with no triggered ability, so
+        -- `inGraveyards` contributes NOTHING and the live reading of the board
+        -- gives the opposite answer. The trigger can only have come from CR 608.2h
+        -- last known information.
+        Spec.it s "CR 603.10 Corpse Churn mills Narcomoeba and returns it in one resolution; the trigger still fires" $ do
+          (gs, spellId) <- corpseChurnBoard
+          let cast = S.runPure returnsIt gs (S.cast S.alice spellId)
+              resolved = S.runPure returnsIt cast Stack.resolveTop
+              -- The NARROW path: the scan itself, no priority loop and no settle,
+              -- which cannot tell "never triggered" from "triggered and swept".
+              scanned = fst (Event.gatherTriggers (Event.unscannedGrouped resolved) resolved)
+          Spec.assertEqWith s "the graveyard holds only Corpse Churn at the boundary" (namesIn Zone.Graveyard S.alice resolved) (Set.singleton (CardName.MkCardName $ Text.pack "Corpse Churn"))
+          Spec.assertBool s (Set.member narcomoebaName (namesIn Zone.Hand S.alice resolved)) "Narcomoeba is in alice's hand instead"
+          Spec.assertEqWith s "exactly one trigger, from the departed graveyard card" (length scanned) 1
+          Spec.assertEqWith s "and it is Narcomoeba's condition" (fmap (TriggeredAbility.condition . PendingTrigger.ability) scanned) [TriggerCondition.SelfPutIntoGraveyardFromLibrary]
+          -- Gameplay level, through the real boundary.
+          let placed = S.runPure returnsIt resolved Engine.settleForPriority
+          Spec.assertEqWith s "the trigger reached the stack" (length (GameState.stack placed)) 1
+          -- CR 400.7 / CR 608.2h: the ability's source is the graveyard
+          -- incarnation, which no longer exists, so "put this onto the
+          -- battlefield" finds nothing and the card stays in the hand. The trigger
+          -- resolves and does nothing -- it is not a fizzle.
+          let after = S.runPure returnsIt placed Stack.resolveTop
+          Spec.assertBool s (not (Set.member narcomoebaName (namesIn Zone.Battlefield S.alice after))) "and nothing came back onto the battlefield"
+          Spec.assertBool s (Set.member narcomoebaName (namesIn Zone.Hand S.alice after)) "Narcomoeba is still in the hand"
+          Spec.assertEqWith s "and the ability left the stack" (length (GameState.stack after)) 0
+        -- The negative, and the pair for the case above: same spell, same mana,
+        -- same answerer, same Narcomoeba-ends-in-hand outcome. The ONE difference
+        -- is how Narcomoeba got into the graveyard -- here it was already there, so
+        -- there is no arrival event in this batch to name it, and the mill takes a
+        -- Swamp instead. "From your library" still has to do its work.
+        Spec.it s "CR 603.10 a card already in the graveyard that LEAVES it is not a candidate" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          churn <- S.printingOf s registry "Corpse Churn"
+          narcomoeba <- S.printingOf s registry "Narcomoeba"
+          let base = S.landsInPlay swamp 2
+              (_, g1) = S.addGraveyardCard narcomoeba S.alice base
+              (_, g2) = S.addLibraryCard swamp S.alice g1
+              (g3, spellId) = S.handOne churn g2
+              gs = g3 {GameState.priority = Just S.alice}
+              cast = S.runPure returnsIt gs (S.cast S.alice spellId)
+              resolved = S.runPure returnsIt cast Stack.resolveTop
+          Spec.assertBool s (Set.member narcomoebaName (namesIn Zone.Hand S.alice resolved)) "Narcomoeba left the graveyard for the hand"
+          Spec.assertEqWith s "and nothing triggered -- it never arrived from a library in this batch" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped resolved) resolved))) []
 
 -- Gaea's Blessing {1}{G} Sorcery, "Target player shuffles up to three target
 -- cards from their graveyard into their library. Draw a card. When this card is
