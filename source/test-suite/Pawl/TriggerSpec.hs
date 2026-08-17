@@ -161,6 +161,9 @@
 -- through the ordinary Pool + Filter target machinery, with Bitterblossom --
 -- `kindredSpec`. CR 701.9a's discard trigger, and CR 702.29d's
 -- "only once when a card is cycled", with Megrim -- `discardTriggerSpec`.
+-- The same rule read by the card that was DISCARDED, one ability whose two
+-- conditions function in different zones (CR 113.6k), with Bartered Cow --
+-- `selfDiscardTriggerSpec`.
 -- CR 121.1's draw read for WHICH draw of the turn it was, across a turn boundary
 -- so the count is shown to reset, with Erudite Wizard reading draws made by
 -- Think Twice -- `drawTriggerSpec`. CR 702.94a's miracle, whose reveal-as-drawn
@@ -3129,6 +3132,110 @@ discardTriggerSpec s registry =
       Spec.assertEqWith s "the controller's own discard costs him nothing" (S.lifeOf S.bob (settle byBob)) (S.lifeOf S.bob gs)
       Spec.assertEqWith s "and costs alice nothing either" (S.lifeOf S.alice (settle byBob)) (S.lifeOf S.alice gs)
       Spec.assertEqWith s "bob's discard put nothing on the stack at all" (GameState.stack (S.runPure S.identityAnswer byBob Engine.settleForPriority)) []
+
+-- The Food token Bartered Cow makes, by name, which is how the cases below read
+-- the trigger's whole payload off the board.
+foodTokenName :: CardName.CardName
+foodTokenName = CardName.MkCardName (Text.pack "Food Token")
+
+-- Which of alice's two cards CR 701.9b's choice discards, PINNED -- and filtered
+-- out of the set the prompt offered rather than built, so a mutation cannot be
+-- repaired by an answerer that goes looking for a legal pick.
+-- CR 601.2f's discard-as-a-cost, the door every non-cycling discard in the pool
+-- goes through, asked for one card with no criterion.
+discardOne :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+discardOne answer gs = S.runPure answer gs (Cost.payComponent S.alice S.noSource (CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.And []))))
+
+discardPick :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+discardPick wanted p = case p of
+  Prompt.ChooseDiscard _ _ held _ -> filter (== wanted) held
+  _ -> S.identityAnswer p
+
+-- CR 701.9a: "To discard a card, move it from its owner's hand to that player's
+-- graveyard." Bartered Cow, {3}{W} 3/3 Creature -- Ox, is the pool's first card
+-- to watch that happen to ITSELF: "When this creature dies and when you discard
+-- this card, create a Food token."
+--
+-- One ability with TWO trigger conditions, which is CR 113.6k's second sentence
+-- in as many words -- the dies half functions from the battlefield, the discard
+-- half from the graveyard rule 701.9a has just moved the card to -- and
+-- TriggerCondition.AnyOf in the card file. The payload is one Food token and
+-- nothing else, no target and no "may", so the only new thing any case below can
+-- be passing on is TriggerCondition.SelfDiscarded.
+--
+-- alice owns, holds and discards the Cow throughout, and that is not a two-seat
+-- collapse: CR 701.9a discards a card from its OWNER's hand and CR 113.8 makes
+-- that owner the controller of its ability in the graveyard, so no board can
+-- separate the two seats.
+selfDiscardTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+selfDiscardTriggerSpec s registry =
+  let settle gs = S.runPure S.identityAnswer gs Engine.priorityLoop
+      priorityTo gs = gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+   in Spec.describe s "SelfDiscardTrigger" $ do
+        -- The whole card, discard half: one card in hand, discarded to pay a
+        -- cost, and the Food is on the battlefield once the trigger resolves.
+        Spec.it s "CR 701.9a whole card: discarding the Cow creates a Food token" $ do
+          cow <- S.printingOf s registry "Bartered Cow"
+          let (gs, _) = S.handOne cow (Setup.emptyGame S.bothPlayers)
+              discarded = discardOne S.identityAnswer gs
+              placed = S.runPure S.identityAnswer discarded Engine.settleForPriority
+          Spec.assertEqWith s "the Cow reached alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice discarded)) 1
+          Spec.assertEqWith s "one trigger on the stack, and only one" (length (GameState.stack placed)) 1
+          Spec.assertEqWith s "and alice has one Food token afterwards" (S.countOnBattlefieldByName foodTokenName S.alice (settle discarded)) 1
+        -- THE discriminating pair, and the reason this condition is not
+        -- PlayerDiscards: one board, two cards in alice's hand, and only which
+        -- one CR 701.9b discards differs. A condition that read the discarding
+        -- player rather than the discarded card would make a Food both times.
+        Spec.it s "CR 701.9a it is the DISCARDED card's own trigger, not its controller's" $ do
+          cow <- S.printingOf s registry "Bartered Cow"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (cowId, base) = S.addHandCard cow S.alice (Setup.emptyGame S.bothPlayers)
+              (pikerId, gs0) = S.addHandCard piker S.alice base
+              gs = priorityTo gs0
+              run wanted = settle (discardOne (discardPick wanted) gs)
+          Spec.assertEqWith s "discarding the Cow makes a Food" (S.countOnBattlefieldByName foodTokenName S.alice (run cowId)) 1
+          Spec.assertEqWith s "discarding the Piker instead makes none" (S.countOnBattlefieldByName foodTokenName S.alice (run pikerId)) 0
+          Spec.assertEqWith s "though exactly one card was discarded either way" (fmap (length . Game.zoneMembers Zone.Graveyard S.alice . run) [cowId, pikerId]) [1, 1]
+        -- The same point from the graveyard, which is the board the candidate
+        -- scan cannot dismiss: the Cow is ALREADY in alice's graveyard, so
+        -- eventTriggers' CR 113.6k source genuinely offers its ability, and
+        -- another card's discard still has to leave it silent.
+        Spec.it s "CR 113.6k a Cow already in the graveyard ignores another card's discard" $ do
+          cow <- S.printingOf s registry "Bartered Cow"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (_, withCow) = S.addGraveyardCard cow S.alice (Setup.emptyGame S.bothPlayers)
+              (gs, _) = S.handOne piker withCow
+              after = settle (discardOne S.identityAnswer gs)
+          Spec.assertEqWith s "both cards are in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 2
+          Spec.assertEqWith s "and no Food was created" (S.countOnBattlefieldByName foodTokenName S.alice after) 0
+        -- CR 702.29a: cycling IS discarding, so the cause the event carries is
+        -- one this condition must not read -- where TriggerCondition.SelfCycled
+        -- one arm over reads nothing else. No printing carries both this
+        -- condition and cycling (a Scryfall sweep for "you discard this card"
+        -- returns this card, Edgar's Awakening and Titanbones, none of them a
+        -- cycler), so the two causes are driven through Event.discard, the one
+        -- funnel every discard in the engine shares. The same board, one
+        -- DiscardCause apart.
+        Spec.it s "CR 702.29a a cycling discard fires it too, and CR 702.29d once" $ do
+          cow <- S.printingOf s registry "Bartered Cow"
+          let (gs, cowId) = S.handOne cow (Setup.emptyGame S.bothPlayers)
+              run cause = S.runPure S.identityAnswer gs (Event.discard cause S.alice cowId)
+              stackAfter g = length (GameState.stack (S.runPure S.identityAnswer g Engine.settleForPriority))
+          Spec.assertEqWith s "an ordinary discard makes one Food" (S.countOnBattlefieldByName foodTokenName S.alice (settle (run DiscardCause.Ordinary))) 1
+          Spec.assertEqWith s "a cycling discard makes one too" (S.countOnBattlefieldByName foodTokenName S.alice (settle (run DiscardCause.ToPayCyclingCost))) 1
+          Spec.assertEqWith s "and the cycle placed ONE trigger, not two" (stackAfter (run DiscardCause.ToPayCyclingCost)) 1
+        -- The dies half, which shares the ability with the discard half: it still
+        -- fires, and the graveyard card the Cow becomes does not fire a second
+        -- time on the way. CR 700.4's "dies" is the battlefield-to-graveyard
+        -- move, so this is the AnyOf's other branch and nothing else.
+        Spec.it s "CR 700.4 the dies half fires once, and the discard half not at all" $ do
+          cow <- S.printingOf s registry "Bartered Cow"
+          let (cowId, base) = S.addCreature cow S.alice (Setup.emptyGame S.bothPlayers)
+              gs = priorityTo base
+              killed = S.settleSba (S.markDamage cowId 3 gs)
+              after = settle killed
+          Spec.assertBool s (not (S.onBattlefield cowId after)) "the Cow took lethal damage and died"
+          Spec.assertEqWith s "exactly one Food token" (S.countOnBattlefieldByName foodTokenName S.alice after) 1
 
 -- CR 121.1's draw, counted. "Whenever you draw your second card each turn" is the
 -- pool's reader of WHICH draw of the turn a draw was, and Erudite Wizard, {2}{U}
@@ -9284,6 +9391,13 @@ representativeEvents cond =
         -- CR 702.94a's cause, so the event is one this condition genuinely
         -- admits; an Ordinary reveal would pin nothing.
         TriggerCondition.SelfRevealedForMiracle -> one (GameEvent.Revealed (Revealed.MkRevealed S.alice departed RevealCause.ForMiracle S.emptyCharacteristics))
+        -- BOTH causes, which is this condition's whole difference from
+        -- SelfCycled above: CR 702.29a makes cycling a discard, so an ordinary
+        -- discard and a cycle are each an event it genuinely admits, and an arm
+        -- that read the cause would pin nothing for one of them.
+        TriggerCondition.SelfDiscarded ->
+          GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary)
+            NonEmpty.:| [GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.ToPayCyclingCost)]
         TriggerCondition.PlayerDiscards _ -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary))
         -- The ordinal matches the condition's own, so the event is one this
         -- condition genuinely admits -- an event it rejected would pin nothing,
@@ -9501,6 +9615,7 @@ everyTriggerCondition =
     TriggerCondition.OpponentLostLifeDuringYourTurn,
     TriggerCondition.SelfCycled,
     TriggerCondition.SelfRevealedForMiracle,
+    TriggerCondition.SelfDiscarded,
     TriggerCondition.PlayerDiscards PlayerRelation.Opponent,
     TriggerCondition.PlayerDrawsNthCard (PlayerDrawsNthCard.MkPlayerDrawsNthCard PlayerRelation.You 2),
     TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
@@ -13381,6 +13496,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   aetherFlashSpec s registry
   kindredSpec s registry
   discardTriggerSpec s registry
+  selfDiscardTriggerSpec s registry
   drawTriggerSpec s registry
   miracleSpec s registry
   controllerAtTriggerSpec s registry

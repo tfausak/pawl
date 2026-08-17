@@ -2230,6 +2230,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.OpponentLostLifeDuringYourTurn -> condition
   TriggerCondition.SelfCycled -> condition
   TriggerCondition.SelfRevealedForMiracle -> condition
+  TriggerCondition.SelfDiscarded -> condition
   TriggerCondition.SelfCast -> condition
   TriggerCondition.SelfBecomesTargeted _ -> condition
   TriggerCondition.PlayerDiscards _ -> condition

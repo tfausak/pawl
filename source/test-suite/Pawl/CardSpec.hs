@@ -641,6 +641,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfAttacksUnblocked -> []
   TriggerCondition.SelfCycled -> []
   TriggerCondition.SelfRevealedForMiracle -> []
+  TriggerCondition.SelfDiscarded -> []
   -- CR 701.9a's discard condition is a PlayerRelation, which holds no Count.
   TriggerCondition.PlayerDiscards _ -> []
   TriggerCondition.PlayerDrawsNthCard {} -> []
@@ -2631,6 +2632,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfAttacksUnblocked -> []
   TriggerCondition.SelfCycled -> []
   TriggerCondition.SelfRevealedForMiracle -> []
+  TriggerCondition.SelfDiscarded -> []
   TriggerCondition.PlayerDiscards _ -> []
   TriggerCondition.PlayerDrawsNthCard {} -> []
   -- CR 725.1's crowning condition is a PlayerRelation, which holds no Filter.

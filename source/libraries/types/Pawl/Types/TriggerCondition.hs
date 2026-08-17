@@ -135,13 +135,29 @@ data TriggerCondition
     -- hand as they draw, and CR 113.8 makes the card's owner the ability's
     -- controller, so "you" and the revealer are the same seat by construction.
     SelfRevealedForMiracle
+  | -- | CR 701.9a: "when you discard this card" -- Bartered Cow's second trigger
+    -- condition. Self-scoped like SelfCycled: the bearer is the card that was
+    -- discarded, which CR 701.9a has already moved to its owner's graveyard, so
+    -- the event's CR 400.7 incarnation is the object the scan offers.
+    --
+    -- The CAUSE is deliberately not read, where SelfCycled reads it. CR 702.29a
+    -- makes cycling a discard, so a card discarded to pay a cycling cost fires
+    -- this too; CR 702.29d then bounds it to once, which the single
+    -- GameEvent.Discarded funnel supplies by construction. No printing carries
+    -- both this condition and cycling, so only Pawl.TriggerSpec's direct drive of
+    -- Event.discard reaches the cycling half.
+    --
+    -- No PlayerRelation. CR 701.9a discards from the card's OWNER's hand, and CR
+    -- 113.8 makes that owner the ability's controller, so "you" and the
+    -- discarding player are the same seat by construction -- SelfRevealedForMiracle's
+    -- argument one rule over.
+    SelfDiscarded
   | -- | CR 701.9a: "whenever [a player] discards a card" -- Megrim's. Matched
     -- against GameEvent.Discarded, whose PlayerId is the discarding player; the
     -- PlayerRelation reads that player against CR 109.5's "you", the ability's
-    -- controller (CR 603.3a). NOT self-scoped, unlike SelfCycled above: the bearer
-    -- is a bystander watching someone else's hand. Bartered Cow's "when you
-    -- discard this card" is the self-scoped sibling, and does not exist yet
-    -- (#319).
+    -- controller (CR 603.3a). NOT self-scoped, unlike SelfCycled and
+    -- SelfDiscarded above: the bearer is a bystander watching someone else's
+    -- hand.
     --
     -- The DiscardCause is deliberately not part of this condition. CR 702.29a
     -- makes cycling a discard, so a cycled card must fire this; CR 702.29d bounds

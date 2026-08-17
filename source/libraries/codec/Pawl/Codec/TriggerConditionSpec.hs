@@ -116,6 +116,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.SelfRevealedForMiracle
       """ {"type":"SelfRevealedForMiracle"} """
+  -- CR 701.9a's discard, self-scoped: Bartered Cow's "when you discard this
+  -- card". Nullary, SelfCycled's shape -- the ability is printed on the card that
+  -- is discarded, so there is nothing left to say.
+  Spec.it s "SelfDiscarded" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.SelfDiscarded
+      """ {"type":"SelfDiscarded"} """
   -- CR 701.9a's discard. Both relations, since the PlayerRelation is the whole
   -- content of the "whenever an opponent discards" phrasing.
   Spec.it s "PlayerDiscards round-trips both relations" $ do

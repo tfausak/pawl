@@ -3883,6 +3883,55 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
+  -- CR 701.9a: the bearer IS the card that was discarded. SelfCycled's shape
+  -- above with the CAUSE dropped, which is the whole difference between the two:
+  -- CR 702.29a makes cycling a discard, so "when you discard this card" fires on
+  -- a cycle as well as on an ordinary discard, where rule 702.29c's "to pay an
+  -- activation cost of a cycling ability" admits only the one cause.
+  --
+  -- The discarding player is not compared against anything. CR 701.9a moves the
+  -- card from its OWNER's hand, and CR 113.8 makes that owner the controller of
+  -- an ability of a card in a graveyard, so the two seats coincide by
+  -- construction and there is no PlayerRelation to read.
+  TriggerCondition.SelfDiscarded -> case event of
+    GameEvent.Discarded (Discarded.MkDiscarded _ oid _) -> oid == bearer
+    GameEvent.Drew {} -> False
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Exerted _ -> False
   -- CR 701.9a: a card was discarded, by a player the relation admits. The
   -- discarding player comes from the event; CR 109.5 fixes "you" as the
   -- ability's controller (CR 603.3a), and PlayerRelation.holds is what each arm
@@ -6546,6 +6595,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.OpponentLostLifeDuringYourTurn -> False
   TriggerCondition.SelfCycled -> False
   TriggerCondition.SelfRevealedForMiracle -> False
+  TriggerCondition.SelfDiscarded -> False
   TriggerCondition.PlayerDiscards _ -> False
   -- CR 121.1's draw is something that happens to a player, not an ability
   -- triggering.
@@ -6939,6 +6989,10 @@ eventBindings cond event = case (cond, event) of
   -- SelfExerted's "it" is the bearer, which CR 113.7a's source slot already
   -- names. eventBindingSlots claims nothing for any of them; see that function's
   -- arms.
+  --
+  -- And so does SelfDiscarded, for SelfCycled's reason: CR 701.9a's discarded
+  -- card is the bearer, whom CR 113.7a's source slot already names, and its owner
+  -- is CR 113.8's controller, whom Binding.setYou already names.
   _ -> Map.empty
 
 -- Which slots eventBindings above can stamp for a condition, as a set. A
@@ -7052,6 +7106,10 @@ eventBindingSlots cond = case cond of
   -- source, and the revealing player is its owner -- the same seat CR 113.8 makes
   -- the ability's controller, whom Binding.setYou already names.
   TriggerCondition.SelfRevealedForMiracle -> Set.empty
+  -- CR 701.9a's discarded card is the bearer itself, already bound as CR 113.7's
+  -- source, and the discarding player is its owner -- the same seat CR 113.8 makes
+  -- the ability's controller, whom Binding.setYou already names.
+  TriggerCondition.SelfDiscarded -> Set.empty
   -- CR 701.9a's discarding player, which is nobody the bearer already names --
   -- Megrim's "that player" is the opponent whose hand the card left.
   TriggerCondition.PlayerDiscards _ -> Set.singleton Binding.triggerPlayer
@@ -7421,6 +7479,7 @@ looksBack condition = case condition of
   TriggerCondition.OpponentLostLifeDuringYourTurn -> False
   TriggerCondition.SelfCycled -> False
   TriggerCondition.SelfRevealedForMiracle -> False
+  TriggerCondition.SelfDiscarded -> False
   TriggerCondition.PlayerDiscards _ -> False
   TriggerCondition.PlayerDrawsNthCard {} -> False
   TriggerCondition.SelfAttacks _ -> False
@@ -8358,6 +8417,16 @@ zonesTriggeredFrom cond = case cond of
   -- battlefield at all and the hand is the one zone it can. eventTriggers'
   -- `revealedInHand` is what serves it.
   TriggerCondition.SelfRevealedForMiracle -> Set.singleton Zone.Hand
+  -- CR 113.6k's fifth reader, and the same argument SelfCycled's arm above makes:
+  -- a card cannot be discarded from the battlefield -- CR 701.9a discards from a
+  -- HAND -- so this condition can never trigger from there, and the graveyard CR
+  -- 701.9a moves the card to is the one zone the scan meets it in.
+  --
+  -- eventTriggers' `inGraveyards` is what serves it, gated on exactly this
+  -- answer. No source of its own is owed: `cycledCard` recovers a card the
+  -- CYCLING cause named, and rule 702.29c is why that one is narrower than this
+  -- condition rather than a gap under it.
+  TriggerCondition.SelfDiscarded -> Set.singleton Zone.Graveyard
   -- CR 113.6's default: the bearer watches from the battlefield, so a card in a
   -- graveyard does not see an opponent discard.
   TriggerCondition.PlayerDiscards _ -> battlefield
@@ -8532,6 +8601,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
   TriggerCondition.SelfCycled -> False
   TriggerCondition.SelfRevealedForMiracle -> False
+  TriggerCondition.SelfDiscarded -> False
   TriggerCondition.PlayerDiscards _ -> False
   TriggerCondition.PlayerDrawsNthCard {} -> False
   -- CR 508.1a makes this the ACTIVE player's turn, which is not the same thing:
@@ -8711,6 +8781,7 @@ stateTriggers gs
               TriggerCondition.SelfAttacksUnblocked -> False
               TriggerCondition.SelfCycled -> False
               TriggerCondition.SelfRevealedForMiracle -> False
+              TriggerCondition.SelfDiscarded -> False
               TriggerCondition.PlayerDiscards _ -> False
               TriggerCondition.PlayerDrawsNthCard {} -> False
               TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
