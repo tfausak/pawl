@@ -467,9 +467,10 @@ data Context = MkContext
     -- Pawl.Engine.Stack for CR 608.2a's re-check of that same clause, and
     -- Pawl.Engine.Resolve.objectRefObjects for an effect naming the host.
     --
-    -- NOT lazy, unlike sourcePower and defendingPlayer: filling it is a map lookup
-    -- and a Recipient read, with no projection behind it at all, so there is
-    -- nothing for a filter that omits the atom to avoid paying.
+    -- No laziness ARGUMENT, unlike sourcePower and defendingPlayer: filling it is a
+    -- map lookup and a Recipient read (Pawl.Engine.Projection.hostOf), with no
+    -- projection behind it at all, so a filter that omits the atom saves nothing by
+    -- leaving it unforced.
     --
     -- Nothing wherever the atom cannot appear, which contextFor below is the
     -- spelling of -- the posture every context-relative atom here takes. What keeps

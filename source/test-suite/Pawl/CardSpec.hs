@@ -3012,10 +3012,12 @@ blockPermissionFilters permission =
     <> foldMap quantityFilters (BlockPermission.additional permission)
     <> foldMap conditionFilters (BlockPermission.while permission)
 
--- WHICH position of a card's text a Filter sits in, for the two lints that are
+-- WHICH position of a card's text a Filter sits in, for the three lints that are
 -- about position rather than about the atom. Each atom they police is answered
--- off a field that exactly one caller fills -- a Filter.View's for CR 701.3a, a
--- Filter.Context's for CR 709.4a -- so the position IS the soundness question.
+-- off a field only certain callers fill -- a Filter.View's for CR 701.3a, a
+-- Filter.Context's for CR 709.4a and for CR 303.4b -- so the position IS the
+-- soundness question. Two of the three name ONE position; CR 303.4b's names three,
+-- which is why this is a tag on the position rather than a Bool.
 --
 --   * AttachDestination -- Effect.AttachTarget's destination, the one position
 --     evaluated against a view whose `canHostSubject` is filled in

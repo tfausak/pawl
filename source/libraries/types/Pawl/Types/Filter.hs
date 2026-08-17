@@ -512,7 +512,8 @@ data Filter keyword
     --
     -- Context-relative like IsSource, and the same comparison in the other
     -- direction: IsSource asks whether the candidate IS the source, this whether
-    -- its host is. Vacuously False where the candidate is attached to nothing or
+    -- its host is, and IsHostOfSource below whether the SOURCE's host is the
+    -- candidate. Vacuously False where the candidate is attached to nothing or
     -- to a player (CR 303.4's other destination), and where no source frames the
     -- match.
     --
