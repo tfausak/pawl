@@ -788,6 +788,13 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       let slot = SlotName.MkSlotName (Text.pack "victim")
       Spec.assertEqWith s "the slot the host's description names" (Filter.boundSlots (Filter.Type.AttachedTo (Filter.Type.ControlledByBound slot))) (Set.singleton slot)
 
+    -- CR 612.1's word swap reaches the host's description too, and for the same
+    -- reason nothing in the pool observes it: no card narrows an attachment by a
+    -- subtype. This is that arm's only observer.
+    Spec.it s "CR 612.1 rewrites a subtype inside the nest" $ do
+      let swapped = Filter.rewrite [(Subtype.Swamp, Subtype.Island)] (Filter.Type.AttachedTo (Filter.Type.HasSubtype Subtype.Swamp))
+      Spec.assertEqWith s "the host's subtype word is swapped" swapped (Filter.Type.AttachedTo (Filter.Type.HasSubtype Subtype.Island))
+
   Spec.describe s "IsAttachedToSource" $ do
     -- CR 701.3a / 301.5a: the candidate's HOST against the match's source. Object
     -- 7 is the source throughout, so the three cases below differ only in what the
