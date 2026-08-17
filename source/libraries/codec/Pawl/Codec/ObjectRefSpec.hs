@@ -12,6 +12,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
+import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -154,14 +155,31 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       (Either.isLeft (Common.parse (Text.pack """ {"type":"ChosenCardInGraveyard","value":[{"type":"You"},{"type":"HasCardType","value":{"type":"Creature"}}]} """) >>= Codec.decode ObjectRef.codec))
       "expected a decode failure"
   -- Karn Liberated's "+4: target player exiles a card from their hand". One
-  -- PlayerRef and no record, since CR 402.3 makes the chooser and the hand's
-  -- owner the same player -- and the slot it names is the one Karn targets.
+  -- PlayerRef, since CR 402.3 makes the chooser and the hand's owner the same
+  -- player -- and the slot it names is the one Karn targets. Karn states no
+  -- characteristic, so its filter is the always-matching one.
   Spec.it s "ChosenCardInHand" $
     Common.assertCodec
       s
       ObjectRef.codec
-      (ObjectRef.ChosenCardInHand (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
-      """ {"type":"ChosenCardInHand","value":{"type":"InSlot","value":"target"}} """
+      (ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Filter.And [])))
+      """ {"type":"ChosenCardInHand","value":{"player":{"type":"InSlot","value":"target"},"filter":{"type":"And","value":[]}}} """
+  -- Elvish Piper's "a creature card from your hand": the same arm with the
+  -- Filter stating a characteristic, which is the pair Karn's unfiltered wording
+  -- cannot tell apart.
+  Spec.it s "ChosenCardInHand carries the filter Elvish Piper needs" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (PlayerRef.Relative PlayerRelation.You) (Filter.HasCardType CardType.Creature)))
+      """ {"type":"ChosenCardInHand","value":{"player":{"type":"Relative","value":{"type":"You"}},"filter":{"type":"HasCardType","value":{"type":"Creature"}}}} """
+  -- The filter is REQUIRED rather than defaulted, so a card written before it
+  -- existed is a decode failure rather than a silently unnarrowed choice.
+  Spec.it s "ChosenCardInHand rejects the bare player reference that preceded the filter" $
+    Spec.assertBool
+      s
+      (Either.isLeft (Common.parse (Text.pack """ {"type":"ChosenCardInHand","value":{"type":"InSlot","value":"target"}} """) >>= Codec.decode ObjectRef.codec))
+      "expected a decode failure"
   -- Guards against a decoder that read every payload as one arm. The arms are
   -- all objects, so only the tag separates them, and a duplicated tag would
   -- collapse two of these. The two graveyard arms are the pair it really
@@ -182,7 +200,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec ObjectRef.EachPlayer,
                 Codec.encode ObjectRef.codec (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) 3)),
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature))),
-                Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInHand (PlayerRef.Relative PlayerRelation.You))
+                Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (PlayerRef.Relative PlayerRelation.You) (Filter.HasCardType CardType.Creature)))
               ]
           )
       )

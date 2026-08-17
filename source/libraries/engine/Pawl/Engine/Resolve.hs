@@ -63,6 +63,7 @@ import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
+import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.Clause as Clause
 import Pawl.Types.ClauseIndex (ClauseIndex)
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
@@ -280,8 +281,9 @@ objectRefSlots ref = case ref of
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser _ _) -> chooserSlots chooser
   -- The choosers, who are also the hands' owners (CR 402.3), so the one
   -- PlayerRef is the whole read -- Karn Liberated's "+4: TARGET player exiles a
-  -- card from their hand" names its seat with a target slot.
-  ObjectRef.ChosenCardInHand player -> playerRefSlots player
+  -- card from their hand" names its seat with a target slot. The Filter beside it
+  -- names no slot, exactly as the graveyard arms' Filters do not.
+  ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player _) -> playerRefSlots player
 
 -- The slots a MonarchTarget reads: only the targeted arm names one. Written out
 -- rather than routed through playerRefSlots because MonarchTarget is its own
@@ -2130,6 +2132,24 @@ handChoosers legal controller gs player =
   let named = playerRefPlayers legal controller gs player
    in filter (`elem` named) (Game.apnapOrder gs)
 
+-- The cards in ONE player's hand matching the filter: graveyardCardsOf one zone
+-- over, and Elvish Piper's "a creature card from your hand" is what needs it.
+--
+-- The filter is matched against the projection in THIS EFFECT's context, so
+-- `controller` is CR 109.5's "you" rather than whoever is choosing -- exactly the
+-- reading graveyardCardsOf takes, and for its reason. A card in a hand has no
+-- controller, so Filter.ControlledBy is vacuously False for every candidate.
+--
+-- NOT sorted, where the graveyard sibling sorts: the candidates are offered in
+-- the zone's own order, which is what the unfiltered gather already did and which
+-- no rule reads (CR 400.5). Narrowing the offer must not reorder it.
+handCardsOf :: PlayerId -> ObjectId -> GameState -> PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
+handCardsOf controller source gs pid filter_ =
+  let context = Filter.contextFor (Just controller) (Just source)
+   in filter
+        (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_)
+        (Game.zoneMembers Zone.Hand pid gs)
+
 -- CR 401.2 and CR 401.4: turn the effect's LibraryPlacement into the END each
 -- moving object arrives at, and hand back the batch in the order the moves must
 -- then be PERFORMED in.
@@ -3619,15 +3639,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- opponent it names does the choosing -- the controller never sees
             -- the hand, and pawl's engine never picks for them.
             --
-            -- Unfiltered, so the candidates are the whole hand: Game.zoneMembers
-            -- in the zone's own order, which is the order the EachCardInYourHand
-            -- sweep takes and which no rule reads (CR 400.5).
+            -- The candidates are the matching cards in that hand, in the zone's
+            -- own order (handCardsOf) -- Elvish Piper's "a creature card from
+            -- your hand" narrows the OFFER, and Karn's unfiltered wording writes
+            -- the always-matching filter and so keeps the whole hand. Narrowing
+            -- the candidate set is not the engine choosing: it is the card's own
+            -- words saying which cards were ever legal answers (CR 608.2d), and
+            -- the player is still asked wherever two of them match.
             --
             -- Elided at one card and skipped at none, ChooseCardInGraveyard's
-            -- rule (CR 101.3, CR 609.3): a one-card hand leaves nothing to decide
-            -- and an empty one nothing to do. Neither elision leaks anything --
-            -- the card was going to a public zone either way.
-            ObjectRef.ChosenCardInHand player -> do
+            -- rule (CR 101.3, CR 609.3): a hand with one matching card leaves
+            -- nothing to decide and one with none nothing to do. Neither elision
+            -- leaks anything -- the card was going to a public zone either way.
+            ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player filter_) -> do
               gs <- State.get
               let ask asked candidates = case candidates of
                     [] -> pure []
@@ -3636,7 +3660,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       let offered = first NonEmpty.:| (second : more)
                       answer <- Game.choose (Prompt.ChooseCardInHand (Decide.deciderFor asked gs) asked source offered)
                       pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
-              fmap concat . Monad.mapM (\pid -> ask pid (Game.zoneMembers Zone.Hand pid gs)) $
+              fmap concat . Monad.mapM (\pid -> ask pid (handCardsOf controller source gs pid filter_)) $
                 handChoosers legal controller gs player
           arrived <- Monad.mapM moveOne =<< settleArrivals zone placement targets
           Monad.mapM_ (\slot -> bindArrivals slot (Maybe.catMaybes arrived)) mSlot

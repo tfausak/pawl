@@ -82,6 +82,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
+import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
@@ -2326,9 +2327,10 @@ objectRefFilters ref = case ref of
   -- its Chooser name players, so the Filter is the whole of what there is to
   -- lint, exactly as for the graveyard sweep above.
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard _ _ f) -> [f]
-  -- Karn Liberated's "a card from their hand": one PlayerRef and no Filter at
-  -- all, so there is nothing here to lint.
-  ObjectRef.ChosenCardInHand _ -> []
+  -- Elvish Piper's "a creature card from your hand"; its PlayerRef names the
+  -- choosers, who are also the hands' owners (CR 402.3), so the Filter is the
+  -- whole of what there is to lint -- the chosen graveyard card's answer.
+  ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand _ f) -> [f]
 
 -- The Filter a Count folds over (CR 608.2h). Delegated to the *Counts family
 -- above rather than re-walked: those traversals are already the project's answer
@@ -4460,7 +4462,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- choosers: Karn Liberated's targeted seat exiles one card, and "each
           -- player" would be one each. The same per-seat count TopOfLibrary
           -- takes of its own PlayerRef, which is why they share namesOneSeat.
-          ObjectRef.ChosenCardInHand player -> namesOneSeat player
+          ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player _) -> namesOneSeat player
         -- Does this PlayerRef name at most ONE seat? A per-player count over it
         -- -- a library's top card, a card chosen out of a hand -- moves at most
         -- one object exactly when it does.

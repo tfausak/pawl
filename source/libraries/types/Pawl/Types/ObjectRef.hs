@@ -1,10 +1,10 @@
 module Pawl.Types.ObjectRef where
 
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
+import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 
@@ -82,9 +82,11 @@ data ObjectRef
     -- a hidden zone, so an arm reaching anyone else's would owe a visibility
     -- question this one never asks -- CR 109.5's "you" is the resolving
     -- controller, who may already look at their own hand. NO FILTER: a filtered
-    -- sweep of a hidden zone is the same question, since matching would reveal
-    -- which cards matched, and nothing needs to be told apart when EVERY card
-    -- goes (#1309).
+    -- SWEEP of a hidden zone is the same question, since which cards matched is
+    -- then read off what left the zone, and nothing needs to be told apart when
+    -- EVERY card goes (#1309). ChosenCardInHand below does carry a Filter, and
+    -- that is not this arm's question: one card chosen out of a hand tells nobody
+    -- which of the others matched.
     --
     -- Not a target and never one (CR 115.10a) -- a hidden zone has no target pool
     -- at all (#559) -- and swept when the effect executes (CR 608.2c), the two
@@ -262,7 +264,7 @@ data ObjectRef
     -- sibling over the hidden zone CR 400.2 makes a hand, and the hidden half is
     -- the whole difference between them.
     --
-    -- ONE PlayerRef, where the graveyard arm needs a Pawl.Types.Chooser beside a
+    -- ONE PlayerRef beside the Filter, where the graveyard arm needs a Pawl.Types.Chooser beside a
     -- Pawl.Types.PlayerScope, because for a hand those two questions have one
     -- answer: CR 402.3 lets a player look at their own hand and at nobody else's,
     -- so the player who chooses IS the player whose hand is looked in. The ref
@@ -273,11 +275,12 @@ data ObjectRef
     -- one targeted seat; `Relative You` is the resolving controller choosing in
     -- their own hand.
     --
-    -- UNFILTERED, where the graveyard arm carries a Filter, and NOT for
-    -- EachCardInYourHand's visibility reason: a filter narrowing a hand only its
-    -- own owner is shown reveals nothing to anybody else. "A card from their
-    -- hand" simply needs no filter to say, and a narrowed hand choice waits for a
-    -- printing that asks for one. Not implemented (#1635).
+    -- FILTERED, exactly as the graveyard arm is, and the hidden zone is no bar to
+    -- it: EachCardInYourHand's visibility argument does not reach here, because a
+    -- filter narrowing a hand only its own owner is shown reveals nothing to
+    -- anybody else (CR 402.3). Elvish Piper's "a creature card from your hand" is
+    -- the printing that narrows one; Karn's "a card from their hand" states no
+    -- characteristic and writes the always-matching filter.
     --
     -- NOT A TARGET, which the zone settles here rather than CR 115.1's "target"
     -- test settling it as it does for the graveyard arm: pawl has no target pool
@@ -293,5 +296,5 @@ data ObjectRef
     -- read, so only Pawl.Engine.Resolve's MoveToZone arm can carry it out --
     -- ChosenCardInGraveyard's note above describes what a card writing it under
     -- any other opcode gets, and why that inert answer earns no lint.
-    ChosenCardInHand PlayerRef.PlayerRef
+    ChosenCardInHand ChosenCardInHand.ChosenCardInHand
   deriving (Eq, Ord, Show)

@@ -8602,6 +8602,163 @@ skullwinderSpec s registry =
           Spec.assertEqWith s "the opponent was chosen, the card was not asked about" (opponentChoices responses, cardChoices responses) (1, 0)
           Spec.assertEqWith s "and carol's only card came back anyway" (namesIn Zone.Hand S.carol after, namesIn Zone.Graveyard S.carol after) ([named "Benalish Hero"], [])
 
+-- The FILTER on ObjectRef.ChosenCardInHand: which cards in a hand the choice is
+-- offered over. CR 402.3 is what licenses one over a zone CR 400.2 makes hidden
+-- -- the chooser is the hand's own owner, so narrowing what they are offered
+-- reveals nothing to anybody -- and Karn Liberated's unfiltered "a card from
+-- their hand" cannot tell the two readings apart.
+--
+-- Elvish Piper {3}{G} Creature -- Elf Shaman 1/1 -- "{G}, {T}: You may put a
+-- creature card from your hand onto the battlefield." (name, cost, type line, P/T
+-- and Oracle text checked against api.scryfall.com). Its whole printed text is
+-- that one ability, so nothing else on the card can be what these assertions
+-- read.
+--
+-- The proof is the CANDIDATE SET rather than the answer, which is what the
+-- response count reads: the prompt is raised only at two or more candidates, so
+-- "how many matched" is observable without trusting an answerer that could pick
+-- the right card under either reading. The pinned answer names a card the filter
+-- excludes, so an unfiltered gather would offer it and put it onto the
+-- battlefield.
+--
+-- The board tells apart the readings a wrong or missing filter would take:
+--
+--   * CREATURE CARDS versus every card. alice's hand holds one creature card
+--     beside a land and an instant, all three distinct printings.
+--   * YOUR hand versus each player's. bob holds a creature card of his own, which
+--     must stay in his hand -- and carol is the third seat, so "an opponent" is
+--     not collapsed onto the only other player.
+--   * A HAND at all versus a graveyard or a library. Nothing is in either.
+elvishPiperSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+elvishPiperSpec s registry =
+  let -- alice controls three Forests and one untapped Elvish Piper, and holds
+      -- `mine`; bob holds `theirs`. Returns the Piper's id and each of alice's
+      -- hand cards, in the order given.
+      board piper forest mine theirs =
+        let mana = S.landsFor forest S.alice 3 S.threePlayerGame
+            (piperId, withPiper) = S.addCreature piper S.alice mana
+            (withMine, mineIds) =
+              List.foldl'
+                (\(g, ids) printing -> let (oid, g') = S.addHandCard printing S.alice g in (g', ids <> [oid]))
+                (withPiper, [])
+                mine
+            withTheirs = List.foldl' (\g printing -> snd (S.addHandCard printing S.bob g)) withMine theirs
+         in (piperId, mineIds, withTheirs {GameState.priority = Just S.alice})
+      -- Activate the Piper's one ability and resolve it, keeping the RESPONSES
+      -- beside the board -- portOfKarfellSpec's run, one card over.
+      run :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> Maybe (GameState.GameState, [Response.Response])
+      run answer piperId gs = case Activate.abilitiesFor piperId gs of
+        [ability] ->
+          let ((_, after), responses) = Replay.record answer gs (Activate.activateAbility S.alice piperId ability >> Stack.resolveTop)
+           in Just (after, responses)
+        _ -> Nothing
+      -- How many times a player was asked which card in their hand to take. ZERO
+      -- is the observation that pins the candidate set: one matching card is
+      -- elided (CR 101.3), so a gather that offered the whole hand would ask.
+      handChoices responses = length [() | Response.ChoseCardInHand _ <- responses]
+      named = Just . CardName.MkCardName . Text.pack
+      -- alice's battlefield minus the Forests: the Piper, plus whatever the
+      -- ability put there. By NAME, since CR 400.7 mints a fresh id at the
+      -- destination.
+      arrivals gs =
+        List.sort
+          [ nm
+          | oid <- Set.toList (GameState.battlefield gs),
+            Projection.controllerOf oid gs == Just S.alice,
+            let nm = fmap S.nameOf (Game.cardOf oid gs),
+            nm /= named "Forest"
+          ]
+      -- Says yes to the printed "may" and names `wanted` when a hand choice is
+      -- put. Answering the "may" is what makes the ability do anything at all --
+      -- S.identityAnswer declines it.
+      taking wanted p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        Prompt.ChooseCardInHand {} -> wanted
+        _ -> S.identityAnswer p
+   in Spec.describe s "ElvishPiper" $ do
+        -- The headline. The pinned answer is the MOUNTAIN, which the filter
+        -- excludes: an unfiltered gather offers it, asks, and puts a land onto the
+        -- battlefield, where the filtered one offers only the Piker, asks nothing
+        -- and puts the Piker there.
+        Spec.it s "CR 402.3 only the creature cards in your own hand are offered" $ do
+          piper <- S.printingOf s registry "Elvish Piper"
+          forest <- S.printingOf s registry "Forest"
+          piker <- S.printingOf s registry "Goblin Piker"
+          mountain <- S.printingOf s registry "Mountain"
+          growth <- S.printingOf s registry "Giant Growth"
+          wolves <- S.printingOf s registry "Russet Wolves"
+          let (piperId, mineIds, gs) = board piper forest [piker, mountain, growth] [wolves]
+          case mineIds of
+            [_, mountainId, _] -> case run (taking mountainId) piperId gs of
+              Just (after, responses) -> do
+                Spec.assertEqWith s "one candidate matched, so nothing was asked" (handChoices responses) 0
+                Spec.assertEqWith
+                  s
+                  "the Goblin Piker is on the battlefield beside the Piper, and the Mountain the answer named is not"
+                  (arrivals after)
+                  (List.sort [named "Elvish Piper", named "Goblin Piker"])
+                Spec.assertEqWith
+                  s
+                  "the two cards the filter excluded are still in her hand"
+                  (List.sort (namesIn Zone.Hand S.alice after))
+                  (List.sort [named "Mountain", named "Giant Growth"])
+                Spec.assertEqWith s "bob's creature card stayed in bob's hand" (namesIn Zone.Hand S.bob after) [named "Russet Wolves"]
+                Spec.assertEqWith s "and carol was not asked to give anything up" (S.handSize S.carol after) 0
+              Nothing -> Spec.assertFailure s "Elvish Piper's ability did not resolve"
+            _ -> Spec.assertFailure s "the fixture did not put three cards in alice's hand"
+        -- Narrowing the candidates must not turn the choice into the engine's.
+        -- TWO creature cards match, so the prompt is real, and the pair of legs
+        -- differs only in the answer: the pinned one takes the Wolves, the default
+        -- takes the Piker.
+        Spec.it s "CR 608.2d the player still chooses when two creature cards match" $ do
+          piper <- S.printingOf s registry "Elvish Piper"
+          forest <- S.printingOf s registry "Forest"
+          piker <- S.printingOf s registry "Goblin Piker"
+          wolves <- S.printingOf s registry "Russet Wolves"
+          mountain <- S.printingOf s registry "Mountain"
+          let (piperId, mineIds, gs) = board piper forest [piker, wolves, mountain] []
+              -- The control leg keeps the "may" and drops only the hand answer,
+              -- so the default takes the first candidate offered instead -- which
+              -- is the Russet Wolves, the pinned leg's answer being the Piker.
+              defaulting p = case p of
+                Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+                _ -> S.identityAnswer p
+          case mineIds of
+            [pikerId, _, _] -> case (run (taking pikerId) piperId gs, run defaulting piperId gs) of
+              (Just (after, responses), Just (control, controlResponses)) -> do
+                Spec.assertEqWith s "two candidates matched, so alice was asked" (handChoices responses, handChoices controlResponses) (1, 1)
+                Spec.assertEqWith
+                  s
+                  "the Goblin Piker she named is what entered"
+                  (arrivals after)
+                  (List.sort [named "Elvish Piper", named "Goblin Piker"])
+                Spec.assertEqWith s "and the Wolves she did not name is still in hand" (List.sort (namesIn Zone.Hand S.alice after)) (List.sort [named "Russet Wolves", named "Mountain"])
+                Spec.assertEqWith
+                  s
+                  "the engine does not pick: the default answer brings the OTHER creature card in"
+                  (arrivals control)
+                  (List.sort [named "Elvish Piper", named "Russet Wolves"])
+              _ -> Spec.assertFailure s "Elvish Piper's ability did not resolve"
+            _ -> Spec.assertFailure s "the fixture did not put three cards in alice's hand"
+        -- No candidate at all. CR 609.3 and CR 101.3: the instruction does as much
+        -- as possible, which is nothing, and the "may" was still offered. An
+        -- unfiltered gather would offer the land and the instant and put one of
+        -- them onto the battlefield.
+        Spec.it s "CR 609.3 a hand holding no creature card offers nothing" $ do
+          piper <- S.printingOf s registry "Elvish Piper"
+          forest <- S.printingOf s registry "Forest"
+          mountain <- S.printingOf s registry "Mountain"
+          growth <- S.printingOf s registry "Giant Growth"
+          let (piperId, mineIds, gs) = board piper forest [mountain, growth] []
+          case mineIds of
+            [mountainId, _] -> case run (taking mountainId) piperId gs of
+              Just (after, responses) -> do
+                Spec.assertEqWith s "nothing was asked" (handChoices responses) 0
+                Spec.assertEqWith s "only the Piper is on her battlefield" (arrivals after) [named "Elvish Piper"]
+                Spec.assertEqWith s "and both cards are still in her hand" (List.sort (namesIn Zone.Hand S.alice after)) (List.sort [named "Mountain", named "Giant Growth"])
+              Nothing -> Spec.assertFailure s "Elvish Piper's ability did not resolve"
+            _ -> Spec.assertFailure s "the fixture did not put two cards in alice's hand"
+
 -- CR 401.2's ordered pile named by POSITION rather than by characteristics:
 -- ObjectRef.TopOfLibrary, the arm no Filter could stand in for.
 --
@@ -10015,6 +10172,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   exhumeSpec s registry
   bloodForBonesSpec s registry
   skullwinderSpec s registry
+  elvishPiperSpec s registry
   trumpetBlastSpec s registry
   auraThiefSpec s registry
   baneOfProgressSpec s registry

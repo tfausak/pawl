@@ -147,6 +147,8 @@ library codec
     Pawl.Codec.ChooserSpec
     Pawl.Codec.ChosenCardInGraveyard
     Pawl.Codec.ChosenCardInGraveyardSpec
+    Pawl.Codec.ChosenCardInHand
+    Pawl.Codec.ChosenCardInHandSpec
     Pawl.Codec.Clause
     Pawl.Codec.ClauseIndex
     Pawl.Codec.ClauseIndexSpec
@@ -912,6 +914,7 @@ library types
     Pawl.Types.ChooseBetween
     Pawl.Types.Chooser
     Pawl.Types.ChosenCardInGraveyard
+    Pawl.Types.ChosenCardInHand
     Pawl.Types.Claim
     Pawl.Types.Clause
     Pawl.Types.ClauseIndex

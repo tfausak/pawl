@@ -37,6 +37,7 @@ import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
+import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
@@ -1979,11 +1980,14 @@ swapWordIn family pairs word = List.foldl' step word pairs
 -- CR 612.1 through an ObjectRef. InSlot names an object chosen at cast time
 -- rather than a word on the card; the sweeping arms' Filters and the chosen
 -- card's are card text like any other, and a graveyard arm's PlayerScope and
--- Chooser name players rather than subtypes. EachPlayer, TopOfLibrary and
+-- Chooser name players rather than subtypes -- as does a hand arm's PlayerRef,
+-- whose Filter beside it is rewritten like every other. EachPlayer and
 -- EachCardInYourHand carry no word at all -- CR 612.1 changes subtype words, and
--- "each player", "the top card of your library" and "all cards from your hand"
--- have none, and neither does ChosenCardInHand, whose PlayerRef names a player
--- and which carries no Filter. EachCardExiledWithSource carries one only where a printing narrows
+-- "each player" and "all cards from your hand" have none. TopOfLibrary names a
+-- POSITION and a depth: its PlayerRef names a player, and the Quantity beside it
+-- goes through rewriteQuantity, since a Count nested in it carries a Filter that
+-- is card text like any other.
+-- EachCardExiledWithSource carries one only where a printing narrows
 -- the linked set with its own words (Karn Liberated's "non-Aura"): CR 607.2a's
 -- set is named by which object exiled the cards, so the bare arm has no subtype
 -- to change.
@@ -1998,7 +2002,7 @@ rewriteObjectRef pairs ref = case ref of
   ObjectRef.EachPlayer -> ref
   ObjectRef.TopOfLibrary {} -> ref
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s f) -> ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s (Filter.rewrite pairs f))
-  ObjectRef.ChosenCardInHand _ -> ref
+  ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand p f) -> ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand p (Filter.rewrite pairs f))
 
 -- CR 612.1/612.2a through the CARD an Effect.Create or an Effect.CreateEmblem
 -- defines its token or emblem with. Three groups of fields: the type line, the

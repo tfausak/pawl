@@ -362,7 +362,9 @@ data Prompt r where
   -- Pawl.Types.ObjectRef.ChosenCardInHand -- Karn Liberated's "+4: target player
   -- exiles a card from their hand". ChooseCardInGraveyard's payload exactly: the
   -- PlayerId is the chooser, the ObjectId the ability being resolved, the
-  -- NonEmpty the candidates in the zone's own order.
+  -- NonEmpty the candidates in the zone's own order -- the cards matching the
+  -- ref's own Filter, which is Karn's whole hand and Elvish Piper's creature
+  -- cards.
   --
   -- THE CHOOSER OWNS THE HAND, which the graveyard prompt above never has to say
   -- and this one cannot avoid: CR 400.2 makes a hand hidden and CR 402.3 gives
@@ -377,9 +379,9 @@ data Prompt r where
   -- not replay as the other.
   --
   -- Raised only for TWO OR MORE candidates and not at all for zero,
-  -- ChooseCardInGraveyard's rule and reason: a one-card hand is the whole of "a
-  -- card from their hand", and an empty one makes the instruction impossible and
-  -- so ignored (CR 101.3, CR 609.3).
+  -- ChooseCardInGraveyard's rule and reason: one matching card is the whole of "a
+  -- creature card from your hand", and none at all makes the instruction
+  -- impossible and so ignored (CR 101.3, CR 609.3).
   ChooseCardInHand :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 309.5a \/ 701.49b: which arrow a venturing player follows. The ObjectId is
   -- the dungeon card their marker is on; the NonEmpty is the rooms the arrows out
