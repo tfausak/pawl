@@ -569,7 +569,8 @@ createEmblem pid card =
             Object.kicked = False,
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
-            Object.doesNotUntapNext = False
+            Object.doesNotUntapNext = False,
+            Object.exertedBy = Set.empty
           }
    in placeObject pid mkObj Zone.Command LibraryPosition.defaultValue
 
@@ -3229,7 +3230,8 @@ createTokens controller card copy n tapped entering = do
                     Object.kicked = False,
                     Object.announcedX = Nothing,
                     Object.detainedUntil = Set.empty,
-                    Object.doesNotUntapNext = False
+                    Object.doesNotUntapNext = False,
+                    Object.exertedBy = Set.empty
                   }
           ids <- Monad.replicateM (Natural.toIntSaturating count) (placeObject owner mkObj Zone.Battlefield LibraryPosition.defaultValue)
           -- CR 122.6a: the counters the EFFECT says these tokens enter with, placed

@@ -605,12 +605,11 @@ data Object = MkObject
     -- which is right: rule 701.35a states a duration and not a count.
     detainedUntil :: Set.Set PlayerId.PlayerId,
     -- | CR 502.3 / CR 611.2: a ONE-SHOT untap prohibition standing over this
-    -- permanent -- "that creature doesn't untap during its controller's next
-    -- untap step" (Elvish Hunter), and CR 701.43a's exert. Written by TWO
-    -- carriers, since the rules give the prohibition two routes: by
-    -- Effect.DoesNotUntapNext as a spell or ability resolves, and by
-    -- Pawl.Engine.Combat.declareAttackers paying CR 508.1g's optional cost to
-    -- attack, which is a keyword action and never goes on the stack.
+    -- permanent, said of ITS CONTROLLER's next untap step -- "that creature
+    -- doesn't untap during its controller's next untap step" (Elvish Hunter).
+    -- Written by Effect.DoesNotUntapNext as a spell or ability resolves, and by
+    -- nothing else: CR 701.43a's exert names a PLAYER rather than "its
+    -- controller", so it rides exertedBy below instead.
     --
     -- Pawl.Types.UntapRestriction's stored counterpart, and it is a field on the
     -- AFFECTED permanent where that one is a field on the PRINTING that forbids.
@@ -638,7 +637,36 @@ data Object = MkObject
     -- prohibiting the same untap both expire at that one step, so they cannot
     -- stack. Telekinesis' "next TWO untap steps" is the shape a Bool cannot hold,
     -- and no card in the pool prints it (gap #1653).
-    doesNotUntapNext :: Bool
+    doesNotUntapNext :: Bool,
+    -- | CR 701.43a: the players who have EXERTED this permanent -- "you choose to
+    -- have it not untap during your next untap step". Written by
+    -- Pawl.Engine.Combat.declareAttackers paying CR 508.1g's optional cost to
+    -- attack, which is a keyword action and never goes on the stack, and read and
+    -- emptied of a seat by Pawl.Engine.Engine.untapAll at that seat's untap step.
+    -- Empty for every permanent nobody has exerted, which is almost all of them.
+    --
+    -- SEPARATE from doesNotUntapNext above rather than folded into it, because
+    -- the two sentences name different untap steps and only coincide while the
+    -- exerter still controls the permanent. Rule 701.43a says "YOUR next untap
+    -- step", so the prohibition is keyed to a player and survives a control
+    -- change; Elvish Hunter's says "its controller's", which is a live read of
+    -- whoever controls the permanent at the step. One field could hold only one
+    -- of those readings.
+    --
+    -- A SET OF PLAYERS, detainedUntil's argument in the same shape: CR 701.43b
+    -- lets a permanent be exerted more than once, two exerts by the SAME player
+    -- collapse for free (the rule states a duration, not a count) and two by
+    -- DIFFERENT players -- alice exerts it, bob takes control and exerts it in
+    -- turn -- run to two different untap steps, so the later one has to outlast
+    -- the earlier.
+    --
+    -- Per-incarnation like everything above it: CR 400.7 forgets it, and CR
+    -- 701.43c ("an object that isn't on the battlefield can't be exerted") is why
+    -- nothing writes it back. It needs no Pawl.Engine.Expiry sweep and no
+    -- departure sweep either -- untapAll is the only reader, and it asks only
+    -- about the seat whose untap step is running, so a seat that has left the
+    -- game (CR 800.4m) leaves an entry no step can ever read.
+    exertedBy :: Set.Set PlayerId.PlayerId
   }
   deriving (Eq, Ord, Show)
 
@@ -709,5 +737,8 @@ newIncarnation object =
       -- CR 400.7 forgets the prohibition with everything else, and no rule
       -- writes it back: the effect named a permanent, and the object that
       -- returns to the battlefield is not that permanent.
-      doesNotUntapNext = False
+      doesNotUntapNext = False,
+      -- CR 400.7 with CR 701.43c: the permanent that leaves the battlefield and
+      -- comes back is a new object, and nobody exerted that one.
+      exertedBy = Set.empty
     }

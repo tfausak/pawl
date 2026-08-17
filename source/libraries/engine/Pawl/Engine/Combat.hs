@@ -1587,11 +1587,18 @@ declareAttackers pid = do
         -- touches a keyword today, so the re-read is a fence rather than a
         -- difference this pool can show.
         --
-        -- CR 701.43a's keyword action is the write itself: Object.doesNotUntapNext
-        -- on the exerted permanent, which Pawl.Engine.Engine.untapAll applies and
-        -- then expires under CR 701.43b. NOT routed through
-        -- Effect.DoesNotUntapNext, which is a resolving effect (Elvish Hunter);
-        -- exerting is a cost payment and never goes on the stack.
+        -- CR 701.43a's keyword action is the write itself: `pid` joins
+        -- Object.exertedBy on the exerted permanent, which
+        -- Pawl.Engine.Engine.untapAll applies at that seat's untap step and then
+        -- expires under CR 701.43b. NOT routed through Effect.DoesNotUntapNext,
+        -- which is a resolving effect (Elvish Hunter); exerting is a cost payment
+        -- and never goes on the stack.
+        --
+        -- The PLAYER is recorded because rule 701.43a names one -- "your next
+        -- untap step", said by the exerting player of themselves, where Elvish
+        -- Hunter's sentence is said of the victim's controller. `pid` is that
+        -- player: CR 508.1a makes the attackers the active player's, and CR
+        -- 508.1g has the active player choose which optional costs to pay.
         --
         -- The whole step sits after `before`, so CR 508.1's preamble undoes an
         -- exert along with the declaration when the CR 508.1j payment fails.
@@ -1604,10 +1611,6 @@ declareAttackers pid = do
         -- to attack, whose cost is tapping a filtered untapped creature rather
         -- than a yes-or-no and whose trigger reads that creature's power (#877).
         --
-        -- CR 701.43a says "your next untap step", meaning the EXERTING player's,
-        -- where untapAll clears the flag at the permanent's controller's. The two
-        -- coincide on every board a printed exert card can reach, CR 508.1a having
-        -- required the attacker to be the active player's (#1736).
         Monad.forM_ attacking $ \oid -> do
           gsExert <- State.get
           Monad.when (Projection.hasKeyword Keyword.Exert oid gsExert) $ do
@@ -1615,7 +1618,7 @@ declareAttackers pid = do
                 exert g =
                   Event.recordEvent
                     (GameEvent.Exerted oid)
-                    g {GameState.objects = Map.adjust (\o -> o {Object.doesNotUntapNext = True}) oid (GameState.objects g)}
+                    g {GameState.objects = Map.adjust (\o -> o {Object.exertedBy = Set.insert pid (Object.exertedBy o)}) oid (GameState.objects g)}
             answer <- Game.choose (Prompt.ChooseExert exertDecider pid oid)
             Monad.when (answer == OptionalDecision.Exercises) (State.modify' exert)
         gs1 <- State.get
