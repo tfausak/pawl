@@ -470,28 +470,30 @@ candidateAttackDeclarations candidates =
 -- admit.
 --
 -- The CLOSED FORM is the required creatures, minus whichever ones CR 508.1d's
--- cost clause excuses. Multiplicity leaves that DECLARATION alone: it is still
--- every required creature that attacks freely, and it still maximizes -- no
--- declaration over those creatures contains more of them, and a multiplicity is
--- never negative, so none can sum higher. What multiplicity changes is only how
--- the sum is read off it, which is attackRequirementsMet's business.
--- It is exact when no set-shaped restriction reaches a candidate,
--- because then every restriction pawl models is per creature (CR 508.1a's own
--- clauses, CR 702.3b's defender, CR 508.1c's printed
+-- cost clause excuses. It is exact when no set-shaped restriction reaches a
+-- candidate, because then every restriction pawl models is per creature (CR
+-- 508.1a's own clauses, CR 702.3b's defender, CR 508.1c's printed
 -- CombatRestriction.CantAttack), and canAttack has already applied all of them to
 -- `candidates` -- so declaring every required creature at once disobeys nothing
 -- and is maximal by construction. A cost to attack does not break that: CR 508.1h
 -- totals the whole declaration at once, so no creature's presence can make
 -- another's attack ILLEGAL, only dearer.
 --
+-- MULTIPLICITY leaves that declaration alone. It is still every required
+-- creature that attacks freely, and it still maximizes, for the same reason it
+-- did when a creature was worth one requirement: no declaration over those
+-- creatures contains more of them, and a multiplicity is never negative, so none
+-- can sum higher. What multiplicity changes is how the sum is READ OFF the
+-- answer, which is attackRequirementsMet's business rather than this one's.
+--
 -- That argument is what a set-shaped restriction falsifies: it makes a
 -- declaration illegal for what it CONTAINS (a lone Bonded Construct) or for how
 -- BIG it is (three creatures under a Silent Arbiter), so "all of the required
 -- creatures at once" can be a declaration no player may make, and the maximum
 -- stops being the whole instance multiset. The ENUMERATION is then
--- blockCeiling's search,
--- at blockCeiling's exponential cost -- #342's shape on the attacking side,
--- where nothing is capped and nothing is sampled for #342's reason (#714).
+-- blockCeiling's search, at blockCeiling's exponential cost -- #342's shape on
+-- the attacking side, where nothing is capped and nothing is sampled for #342's
+-- reason (#714).
 --
 -- Keeping the closed form on the boards that admit it is an optimization and NOT
 -- a second rules reading, and the guard is exactly the statement that this board
