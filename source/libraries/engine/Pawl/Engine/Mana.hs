@@ -1099,10 +1099,12 @@ payableResolutions capacity spending pid committed claimed cost gs =
 -- reading on Pawl.Types.ClaimAxis' tapping axis.
 --
 -- `claimed` joins them, which is the same rule one level up: the cost being paid
--- has components of its own that spend objects, and CR 601.2g's mana
--- window comes BEFORE CR 601.2h's payment, so both happen and both need their own
--- object. Village Rites beside Phyrexian Tower and one creature is the printed
--- case -- the creature buys the {B} or pays the additional cost, not both
+-- has components of its own that spend objects, and CR 601.2g's mana window comes
+-- BEFORE CR 601.2h's payment, so both happen and both need their own object --
+-- unless they spend on different axes, which is what lets a creature tapped for
+-- the Drum's mana still be sacrificed. Village Rites beside Phyrexian Tower and
+-- one creature is the printed case -- the creature buys the {B} or pays the
+-- additional cost, not both
 -- (#1134). It is the whole cost's claims and not the remainder's, which is
 -- exact: `Cost.canPay` asks this before any part of the cost is paid.
 payableResolutionsGiven :: Capacity -> ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> [([Demand], Natural, Natural)]

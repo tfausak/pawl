@@ -1230,13 +1230,14 @@ tapObject target =
 -- tapped permanent is still on the battlefield, so tapping takes nothing out of
 -- anybody's zone -- keying its claim as a Removal from Zone.Battlefield would
 -- merge it with Sacrifice's pool and REFUSE costs the rules allow. What it does
--- spend is the candidates' UNTAPPED-ness, so it claims on
--- ClaimAxis.Tapping instead, where CR 118.3's own example ("a permanent that's
--- already tapped can't be tapped to pay a cost") is the scarcity.
+-- spend is the candidates' UNTAPPED-ness, so it claims on ClaimAxis.Tapping
+-- instead, where CR 118.3's own example ("a permanent that's already tapped can't
+-- be tapped to pay a cost") is the scarcity.
 --
 -- TapForTotalPower is Nothing for a different reason, and not this one: its
 -- Natural is a THRESHOLD on an aggregate rather than a count of objects, so it
--- has no claim of this shape to state.
+-- names no number of objects to claim -- see its own arm for the bound it could
+-- state instead.
 --
 -- The ZONE alone is a sound key for a Removal even though a hand and a graveyard
 -- are per-player (CR 400.3, CR 108.4): every such claim below is on `pid`'s own
@@ -1357,16 +1358,15 @@ claimOf pid oid component gs = case component of
 -- Pawl.Engine.Claim.satisfiable is the reading, and it carries the per-axis
 -- grouping and Hall's condition; what is this module's is which components make
 -- a claim at all, and on which axis (claimOf). The same reading is asked across
--- the SOURCES of one mana payment
--- (Pawl.Engine.Mana.payableResolutionsGiven), which is why it lives there rather
--- than here.
+-- the SOURCES of one mana payment (Pawl.Engine.Mana.payableResolutionsGiven),
+-- which is why it lives there rather than here.
 jointlyPayable :: PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> GameState -> Bool
 jointlyPayable pid oid components gs = Claim.satisfiable (claimsOf pid oid components gs)
 
 -- Everything these components will spend out of a pool of objects, on whichever
--- axis each spends it (Pawl.Types.ClaimAxis). What `jointlyPayable`
--- asks Hall's condition of, and what the MANA side is handed so it can ask the
--- same question of these claims and its sources' together (#1134).
+-- axis each spends it (Pawl.Types.ClaimAxis). What `jointlyPayable` asks Hall's
+-- condition of, and what the MANA side is handed so it can ask the same question
+-- of these claims and its sources' together (#1134).
 claimsOf :: PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> GameState -> [Claim]
 claimsOf pid oid components gs = Maybe.mapMaybe (\component -> claimOf pid oid component gs) components
 
@@ -1393,10 +1393,9 @@ claimsOf pid oid components gs = Maybe.mapMaybe (\component -> claimOf pid oid c
 -- from a zone cannot both claim the one Bayou, nor two that each tap a permanent
 -- the one untapped creature, which is again CR 118.3's "fully" read over the whole
 -- cost. Which components contend with which is `claimOf`'s axis. CR 118.10 is NOT
--- that rule and never was -- it
--- governs two DIFFERENT spells or abilities each paying its own cost, and says
--- nothing about two parts of one. CR 601.2h's "partial payments are not allowed"
--- is the other half of the reading.
+-- that rule and never was -- it governs two DIFFERENT spells or abilities each
+-- paying its own cost, and says nothing about two parts of one. CR 601.2h's
+-- "partial payments are not allowed" is the other half of the reading.
 --
 -- The objects are handed ACROSS the two halves for the same reason the life is,
 -- and CR 601.2g is why they have to be: the mana window comes before CR 601.2h's
