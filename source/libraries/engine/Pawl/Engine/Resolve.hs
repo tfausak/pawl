@@ -5476,11 +5476,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- the empty list and phase nothing out.
       --
       -- The whole set goes to Phasing.phaseOutSet in one call rather than one call
-      -- per victim, because CR 702.26h's tie-break between phasing out directly
-      -- and indirectly asks whether a permanent's HOST is leaving in this same
-      -- event: Teferi's Protection phasing out a creature and the Equipment on it
-      -- must give the Equipment an indirect row, and per-victim calls could not
-      -- see that.
+      -- per victim, because CR 702.26g and CR 702.26h both ask whether a
+      -- permanent's HOST is leaving in this same event: an effect phasing out a
+      -- creature and the Equipment on it must give the Equipment an indirect row,
+      -- and per-victim calls could not see that.
       --
       -- Nothing about the row is read off `controller`. Rule 702.26a schedules a
       -- phased-out permanent's return by who controlled IT, not by who cast the

@@ -54,6 +54,8 @@
 -- WHAT IS NOT IMPLEMENTED, none of which the pool can reach:
 --
 --   * CR 702.26e/f, the continuous-effect consequences of being gone (#930).
+--   * CR 702.26h's own half of `phaseOutSet`'s tie-break, which needs an effect
+--     that phases out a permanent and its own Equipment together (#1723).
 --   * CR 702.26n's second sentence: a permanent that phased out under a player
 --     who has since LEFT the game phases in "during the next untap step after
 --     that player's next turn would have begun", a schedule for a turn that never
@@ -107,15 +109,20 @@ phasingEvent pid gs =
 -- controller for an effect. Unreachable either way: everything in `leaving` is on
 -- the battlefield at this moment, which is what makes heldBy answer.
 --
--- Takes the SET in one call, and must: rule 702.26h asks whether a permanent's
--- host is leaving in this same event, so a per-victim call could not tell an
--- Equipment whose creature is also going from one whose creature is staying.
+-- Takes the SET in one call, and must: rules 702.26g and 702.26h ask whether a
+-- permanent's host is leaving in this same event, so a per-victim call could not
+-- tell an Equipment whose creature is also going from one whose creature is
+-- staying.
 phaseOutSet :: PlayerId -> Set.Set ObjectId -> GameState -> GameState
 phaseOutSet fallback hosts gs =
   let leaving = draggedAlong hosts gs
       -- CR 702.26h: an object that would phase out both ways just phases out
       -- indirectly, which is exactly "its host is leaving too" -- so this is
-      -- the rule and not a tie-break invented for it.
+      -- the rule and not a tie-break invented for it. It is also CR 702.26g for
+      -- everything the closure added, the two rules being one expression here.
+      -- Rule 702.26h's own half -- an object named by the effect AND dragged in the
+      -- same event -- is not implemented in the sense of being unobservable, no
+      -- producer phasing out such a set (#1723).
       status oid
         | maybe False (`Set.member` leaving) (hostOf oid gs) = PhasedOut.Indirectly (heldBy fallback oid gs)
         -- CR 702.26a schedules the return by who controlled the permanent when it
@@ -298,11 +305,18 @@ phaseIn _ oid gs =
 --
 -- Attached to nothing at all answers True: rule 702.26i has nothing to say about
 -- it, and there is no attachment to lose.
+--
+-- The PLAYER arm has no producer and no test that discriminates it: a permanent
+-- attached to a player is an Aura (CR 702.5d), which Reality Ripple cannot target
+-- and which no printing gives phasing, so nothing can phase one out directly. It
+-- is rule 702.26i's own second clause written out rather than elided, and a
+-- regression fence rather than a proof.
 hostRemains :: ObjectId -> GameState -> Bool
 hostRemains oid gs = case Game.lookupObject oid gs >>= Object.attachedTo of
   Nothing -> True
   Just recipient -> case Recipient.playerOf recipient of
-    -- "or that player is still in the game" -- CR 104.2a's roster.
+    -- "or that player is still in the game" -- the roster Game.stillPlaying
+    -- answers, which CR 800.4 empties as players leave.
     Just pid -> pid `elem` Game.stillPlaying gs
     Nothing ->
       maybe

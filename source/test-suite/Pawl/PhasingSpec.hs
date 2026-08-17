@@ -25,9 +25,11 @@
 -- distinguishes CR 702.26a's "the keyword decides who leaves, never who returns".
 --
 -- What is NOT asserted, because no card in the pool can reach it: CR 702.26e/f's
--- continuous-effect consequences (#930), and CR 702.26n's schedule for a
--- permanent phased out under a player who has since left the game (#931) -- CR
--- 702.26k's own clause is asserted below.
+-- continuous-effect consequences (#930), CR 702.26h's directly-and-indirectly
+-- tie-break, which needs an effect naming a permanent and its own Equipment at
+-- once (#1723), and CR 702.26n's schedule for a permanent phased out under a
+-- player who has since left the game (#931) -- CR 702.26k's own clause is
+-- asserted below.
 module Pawl.PhasingSpec where
 
 import qualified Control.Monad as Monad
@@ -205,7 +207,7 @@ effectSpec s registry = Spec.describe s "Effect" $ do
              in ((a, b), g2)
         after = rippleAt victim spell board
     Spec.assertEqWith s "setup: both of bob's Pikers are on the battlefield" (fmap (`onBattlefield` board) [victim, bystander]) [True, True]
-    Spec.assertEqWith s "setup: and neither has phasing" (fmap (`Phasing.isPhasedOut` board) [victim, bystander]) [False, False]
+    Spec.assertEqWith s "setup: and neither is phased out" (fmap (`Phasing.isPhasedOut` board) [victim, bystander]) [False, False]
     Spec.assertEqWith s "the one it targeted is phased out" (Phasing.isPhasedOut victim after) True
     Spec.assertEqWith s "directly, under BOB, who controls it" (Phasing.phasedOutStatus victim after) (Just (PhasedOut.Directly S.bob))
     Spec.assertEqWith s "and gone from the battlefield" (onBattlefield victim after) False
@@ -217,7 +219,8 @@ effectSpec s registry = Spec.describe s "Effect" $ do
     -- exists. Both are what CR 702.26i's host test later reads.
     Spec.assertEqWith s "its zone still says battlefield" (zoneOf victim after) (Just Zone.Battlefield)
   -- CR 702.26b's "can't be affected by anything else in the game", at the one
-  -- reader a spell goes through: CR 115.10's legality. A second Reality Ripple
+  -- reader a spell goes through: CR 601.2c's choice of targets, which admits only
+  -- legal candidates. A second Reality Ripple
   -- cannot aim at the permanent the first one sent away, though it can still aim
   -- at the one beside it.
   Spec.it s "CR 702.26b a phased-out permanent is not a legal target" $ do
@@ -256,10 +259,11 @@ effectSpec s registry = Spec.describe s "Effect" $ do
         alices = untapStep S.alice gone
         bobs = untapStep S.bob alices
     Spec.assertEqWith s "setup: it is phased out" (Phasing.isPhasedOut victim gone) True
-    Spec.assertEqWith s "alice's untap step brings it back" (onBattlefield victim alices) False
-    Spec.assertEqWith s "bob's does" (onBattlefield victim bobs) True
+    Spec.assertEqWith s "alice's untap step does not bring it back" (onBattlefield victim alices) False
+    Spec.assertEqWith s "bob's, the controller's, does" (onBattlefield victim bobs) True
     Spec.assertEqWith s "with no row left" (Phasing.isPhasedOut victim bobs) False
-    -- CR 702.26p's other side: it never had phasing, so bob's untap step does not
+    -- CR 702.26a's first sentence, the other way round: only a permanent WITH
+    -- phasing phases out on the schedule, so bob's untap step does not
     -- send it straight back out again.
     Spec.assertEqWith s "and it does not phase out again at once" (Phasing.phasedOutStatus victim bobs) Nothing
   -- CR 506.4, restated as CR 702.26b's last sentence: "a permanent that phases out
@@ -580,7 +584,7 @@ attachedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n 
 attachedSpec s registry = Spec.describe s "Attached" $ do
   -- CR 702.26b's "treated as though it does not exist", read off the equipped
   -- creature rather than off a flag: while the Equipment is away its static ability
-  -- generates nothing, so CR 613.1c's layer has no +2/+0 to apply. The projection
+  -- generates nothing, so CR 613.4c's layer has no +2/+0 to apply. The projection
   -- gets that from GameState.battlefield membership without knowing phasing exists.
   Spec.it s "CR 702.26b a phased-out Equipment's static ability stops applying" $ do
     island <- S.printingOf s registry "Island"
@@ -594,11 +598,17 @@ attachedSpec s registry = Spec.describe s "Attached" $ do
     Spec.assertEqWith s "the Equipment phased out" (Phasing.isPhasedOut equip gone) True
     Spec.assertEqWith s "and the Piker is 2/1 again" (Projection.powerOf host gone) (Just 2)
     Spec.assertEqWith s "CR 702.26c: 4/1 once more when it phases in" (Projection.powerOf host back) (Just 4)
-  -- CR 702.26h: "if an object would simultaneously phase out directly and
-  -- indirectly, it just phases out indirectly." The pair that proves the tie-break
-  -- is one board aimed two ways -- at the Equipment, which is CR 702.26a's direct
-  -- row, and at its HOST, where CR 702.26g drags the Equipment along instead.
-  Spec.it s "CR 702.26h the same Equipment phases out directly or indirectly by what was targeted" $ do
+  -- CR 702.26g on the effect path, as the pair that tells its two rows apart: one
+  -- board aimed two ways -- at the Equipment, which is rule 702.26b's direct
+  -- phase-out, and at its HOST, where rule 702.26g drags the Equipment along and
+  -- the row says Indirectly instead.
+  --
+  -- NOT CR 702.26h, whose tie-break needs an object that would phase out BOTH ways
+  -- at once -- an effect naming a permanent and its own Equipment in one event.
+  -- Reality Ripple has one target, and no printing in the pool sweeps a set that
+  -- way, so that branch of Pawl.Engine.Phasing.phaseOutSet is not implemented in
+  -- the sense of being unobservable (#1723).
+  Spec.it s "CR 702.26g the same Equipment phases out directly or indirectly by what was targeted" $ do
     island <- S.printingOf s registry "Island"
     piker <- S.printingOf s registry "Goblin Piker"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
