@@ -1225,4 +1225,21 @@ data TriggerCondition
     -- (CR 701.44b), which is what keeps it apart from a condition built on the
     -- reveal, the counter or the bin CR 701.44a's steps record.
     PermanentExplores (Filter.Filter Keyword.Keyword)
+  | -- | CR 701.43d \/ 607.2h: "when you do" beside "you may exert this creature
+    -- as it attacks" -- Glory-Bound Initiate's. Matched against
+    -- GameEvent.Exerted by an id comparison, SelfEvolves' shape.
+    --
+    -- SELF-scoped and nullary because CR 701.43d states the linked form and
+    -- nothing else: the trigger is printed in the same paragraph as the static
+    -- ability, so its subject is always the bearer. A card printing "whenever a
+    -- creature you control is exerted" would earn the filtered form, and none
+    -- is in print.
+    --
+    -- CR 607.2h's linkage holds by construction rather than by a link field:
+    -- the event is recorded only by the CR 508.1g payment on THIS permanent, so
+    -- "actions taken as a result of the static ability" is the only thing this
+    -- can match. The one gap that leaves is a card bearing two exert paragraphs,
+    -- whose two triggers would each see both exerts -- CR 701.43d makes that a
+    -- second static ability, and nothing in print has one.
+    SelfExerted
   deriving (Eq, Ord, Show)

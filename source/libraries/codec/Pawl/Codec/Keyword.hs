@@ -107,5 +107,6 @@ codec =
       Arm.payload "Toxic" Common.natural Keyword.Toxic (\x -> case x of Keyword.Toxic y -> Just y; _ -> Nothing),
       Arm.payload "Plot" (Cost.codec codec) Keyword.Plot (\x -> case x of Keyword.Plot y -> Just y; _ -> Nothing),
       Arm.payload "Foretell" (Cost.codec codec) Keyword.Foretell (\x -> case x of Keyword.Foretell y -> Just y; _ -> Nothing),
-      Arm.nullary "StartYourEngines" Keyword.StartYourEngines
+      Arm.nullary "StartYourEngines" Keyword.StartYourEngines,
+      Arm.nullary "Exert" Keyword.Exert
     ]

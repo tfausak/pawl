@@ -606,8 +606,11 @@ data Object = MkObject
     detainedUntil :: Set.Set PlayerId.PlayerId,
     -- | CR 502.3 / CR 611.2: a ONE-SHOT untap prohibition standing over this
     -- permanent -- "that creature doesn't untap during its controller's next
-    -- untap step" (Elvish Hunter), and CR 701.43a's exert. Set by
-    -- Effect.DoesNotUntapNext as a spell or ability resolves.
+    -- untap step" (Elvish Hunter), and CR 701.43a's exert. Written by TWO
+    -- carriers, since the rules give the prohibition two routes: by
+    -- Effect.DoesNotUntapNext as a spell or ability resolves, and by
+    -- Pawl.Engine.Combat.declareAttackers paying CR 508.1g's optional cost to
+    -- attack, which is a keyword action and never goes on the stack.
     --
     -- Pawl.Types.UntapRestriction's stored counterpart, and it is a field on the
     -- AFFECTED permanent where that one is a field on the PRINTING that forbids.

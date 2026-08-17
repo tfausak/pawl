@@ -9478,6 +9478,11 @@ representativeEvents cond =
         -- CR 701.44b's own event, and the only one this condition admits, on
         -- `departed` for the arm above's reason.
         TriggerCondition.PermanentExplores _ -> one (GameEvent.Explored departed)
+        -- CR 701.43a's own event, and the only one this condition admits, on
+        -- `departed` for SelfEvolves' reason: the pair does not match, which pins
+        -- the floor for a matching pair too, this condition binding nothing
+        -- either way.
+        TriggerCondition.SelfExerted -> one (GameEvent.Exerted departed)
 
 -- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
 -- eventBindings and eventBindingSlots both ignore them, which is itself part of
@@ -9576,7 +9581,8 @@ everyTriggerCondition =
     TriggerCondition.PlayerSurveils PlayerRelation.You,
     TriggerCondition.PlayerSurveils PlayerRelation.Opponent,
     TriggerCondition.SelfBecomesPlotted,
-    TriggerCondition.PermanentExplores (Filter.Type.And [])
+    TriggerCondition.PermanentExplores (Filter.Type.And []),
+    TriggerCondition.SelfExerted
   ]
 
 -- CR 603.6c's penultimate sentence -- "An ability that attempts to do something
