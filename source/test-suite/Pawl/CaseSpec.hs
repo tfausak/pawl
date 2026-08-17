@@ -19,6 +19,14 @@
 -- CR 719.1 and CR 719.2 are frame rules with no rules meaning, so nothing here
 -- asserts about the layout.
 --
+-- What is NOT proven here is CR 719.3a's "and this Case is not solved". The card
+-- carries the limb because the rule prints it, but deleting it leaves every case
+-- below green: Object.designations is a Set and Pawl.Engine.Resolve's Designate
+-- arm writes only on a transition, so a to-solve trigger that fired again at a
+-- later end step would change nothing and emit nothing. That is the same fence
+-- Resolve's own comment records for renown and monstrosity, and it is a fence
+-- here too rather than coverage.
+--
 -- CR 719.3c makes the Solved ability not EXIST while the Case is unsolved, and
 -- the card writes it as an ability that exists and declines to trigger (CR
 -- 603.4). The two are observably identical on this producer: CR 719.3b makes

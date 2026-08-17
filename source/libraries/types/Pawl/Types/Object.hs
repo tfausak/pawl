@@ -498,24 +498,26 @@ data Object = MkObject
     -- enters.
     unlockedHalves :: Set.Set CardName.CardName,
     -- | Every designation this permanent has: CR 702.112b's renowned, CR 701.37b's
-    -- monstrous and CR 701.60b's suspected, which Pawl.Types.Designation holds as
-    -- one type because the three rules word the mark identically.
+    -- monstrous, CR 701.60b's suspected and CR 719.3b's solved, which
+    -- Pawl.Types.Designation holds as one type because those rules word the mark
+    -- identically.
     --
-    -- A Set where ringBearerFor above is a Maybe PlayerId, because none of the
-    -- three rules names a player: each is a mark on the permanent alone, and
+    -- A Set where ringBearerFor above is a Maybe PlayerId, because none of those
+    -- rules names a player: each is a mark on the permanent alone, and
     -- nothing ends one on a change of control the way CR 701.54a ends the
     -- Ring-bearer's.
     --
-    -- STORED rather than projected, and all three rules say why outright --
+    -- STORED rather than projected, and every one of those rules says why outright --
     -- "neither an ability nor part of the permanent's copiable values". So no CR
     -- 613 layer writes this, and a Clone of a renowned creature is not renowned,
     -- for the reason ringBearerFor's note gives.
     --
     -- Per-incarnation state, like damage and counters: cleared by newIncarnation.
     -- That IS rule 702.112b's "once a permanent becomes renowned, it stays renowned
-    -- until it leaves the battlefield", rule 701.37b's same sentence for monstrous
-    -- and rule 701.60a's "until it leaves the battlefield" for suspected -- the
-    -- designation ends with the incarnation, so there is no sweep to run.
+    -- until it leaves the battlefield", rule 701.37b's and rule 719.3b's same
+    -- sentence for monstrous and for solved, and rule 701.60a's "until it leaves
+    -- the battlefield" for suspected -- the designation ends with the
+    -- incarnation, so there is no sweep to run.
     --
     -- Suspected is the one member with rules meaning of its own: CR 701.60c gives
     -- the permanent menace and "this creature can't block" for as long as it is

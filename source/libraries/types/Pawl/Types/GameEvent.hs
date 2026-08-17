@@ -538,16 +538,17 @@ data GameEvent
     -- HalfUnlocked's emission applies the same gate to its own designation.
     --
     -- The designation as a payload for Pawl.Types.Designation's reason, and one
-    -- event rather than three because one opcode writes all three.
+    -- event rather than one per mark because one opcode writes them all.
     -- TriggerCondition.PermanentBecomesDesignated carries the same payload, so
     -- "when this creature becomes monstrous" (Arbor Colossus) reads this event
     -- without matching a permanent that became renowned.
     --
     -- The PERMANENT by id and nothing else, for TurnedFaceUp's reasons. No player:
-    -- none of the three rules names one, and CR 603.3a reads a watcher's controller
-    -- off its own source.
+    -- none of the rules that mint a designation names one, and CR 603.3a reads a
+    -- watcher's controller off its own source.
     --
-    -- One DIRECTION only. For renowned and monstrous the rules make it the only one:
+    -- One DIRECTION only. For renowned, monstrous and solved the rules make it the
+    -- only one:
     -- "it stays renowned until it leaves the battlefield" leaves nothing to undo, and
     -- CR 400.7's new object is not a permanent losing a designation. CR 701.60a does
     -- let suspected end, and Effect.Unsuspect emits nothing -- no printed card
