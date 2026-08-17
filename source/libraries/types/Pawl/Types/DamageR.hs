@@ -23,8 +23,8 @@ data DamageR effect = MkDamageR
     -- written as an empty array.
     --
     -- Here rather than on a floating row's carrier because THIS is the one a
-    -- card writes: Pawl.Types.ActiveReplacement.rider carries the shield an
-    -- Effect.PreventNextDamage installed, whose targets and CR 109.5 "you" had
+    -- card writes: Pawl.Types.ActiveReplacement.rider carries the shield either
+    -- prevention opcode installed, whose targets and CR 109.5 "you" had
     -- to be snapshotted at resolution (see Pawl.Types.PreventionRider). A
     -- permanent's static ability snapshots neither -- its source is on the
     -- battlefield to be asked -- so it needs only the program, and
