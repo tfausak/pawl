@@ -4,8 +4,8 @@
 -- is a layer, and Pawl.Engine.Projection sees none of them.
 --
 -- The only reader of Pawl.Types.AttackRequirement. Pawl.Engine.Combat asks for
--- requirement INSTANCES -- bare creature ids -- and never learns which card
--- produced one.
+-- requirement INSTANCES -- bare creature ids, with a count apiece -- and never
+-- learns which card produced one.
 module Pawl.Engine.AttackRequirement where
 
 import Data.Map (Map)
