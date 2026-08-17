@@ -1106,9 +1106,9 @@ legendRuleSpec s registry =
       Spec.assertEqWith s "the first Room projects BOTH door names" (Projection.namesOf p board) bothDoors
       Spec.assertEqWith s "and so does the second" (Projection.namesOf q board) bothDoors
       Spec.assertBool s (inPlay p before && inPlay q before) "without the Leyline both survive"
-      Spec.assertEqWith s "the legend rule asked exactly once" asked 1
       Spec.assertBool s (inPlay p after || inPlay q after) "alice is left with a Room, whatever she answered"
       Spec.assertEqWith s "and exactly one Room was buried" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+      Spec.assertEqWith s "the legend rule asked exactly once" asked 1
 
     -- The other side of the same design call: groups that OVERLAP are still two
     -- groups. Three Rooms unlocked {Roaring Furnace}, both, {Steaming Sauna} are
