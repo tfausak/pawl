@@ -1119,7 +1119,9 @@ removeLoyalty n obj =
 -- permanent is: Maskwood Nexus makes every creature card its controller owns
 -- every creature type (CR 613.1d), and Putrid Raptor's "discard a Zombie card"
 -- morph cost is then payable with a creature card printed as something else --
--- Pawl.CostSpec's Putrid Raptor pair proves it.
+-- Pawl.CostSpec's Putrid Raptor pair proves it. exileCandidates' note on the
+-- dropped card-less-candidate guard is this one's too, CR 704.5d reaching a hand
+-- as well.
 discardCandidates :: PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 discardCandidates pid oid criterion gs =
   let context = Filter.contextFor (Just pid) Nothing
@@ -1141,6 +1143,11 @@ discardCandidates pid oid criterion gs =
 -- Pawl.CostSpec's Everbark Shaman pair proves it. CR 208.2a's
 -- characteristic-defining power rides along at layer 7a, which is what
 -- Pawl.CostSpec's Frail Exhumation cases read.
+--
+-- No "a candidate with no card behind it matches nothing" guard, and dropping it
+-- changed no answer: CR 111.7 with CR 704.5d makes a token in a graveyard cease
+-- to exist, and an ability exists only on the stack (CR 113.7a), so every member
+-- of this pool has a face. Resolve's library search took the same posture.
 --
 -- The context carries the
 -- payer as its perspective and no source -- the criterion narrows a card by its
