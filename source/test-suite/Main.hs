@@ -30,6 +30,7 @@ import qualified Pawl.Codec.AttackRequirementSpec
 import qualified Pawl.Codec.AttackerBlockedSpec
 import qualified Pawl.Codec.AttackerDeclaredSpec
 import qualified Pawl.Codec.BecameDesignatedSpec
+import qualified Pawl.Codec.BecomeCopySpec
 import qualified Pawl.Codec.BeginningStepSpec
 import qualified Pawl.Codec.BindingSpec
 import qualified Pawl.Codec.BlockPermissionSpec
@@ -426,6 +427,7 @@ spec s registry = do
   Pawl.Codec.AttackerBlockedSpec.spec s
   Pawl.Codec.AttackerDeclaredSpec.spec s
   Pawl.Codec.BecameDesignatedSpec.spec s
+  Pawl.Codec.BecomeCopySpec.spec s
   Pawl.Codec.BeginningStepSpec.spec s
   Pawl.Codec.BindingSpec.spec s
   Pawl.Codec.BlockPermissionSpec.spec s

@@ -109,6 +109,9 @@ zoneFunctionedFrom effect = case effect of
   Effect.DecreaseSpeed {} -> Nothing
   Effect.Create {} -> Nothing
   Effect.CreateCopy {} -> Nothing
+  -- CR 707.4 changes a permanent's copiable values while it stays on the
+  -- battlefield, so nothing leaves a zone and this functions from none.
+  Effect.BecomeCopy {} -> Nothing
   Effect.Replace {} -> Nothing
   Effect.SkipNextPhase {} -> Nothing
   -- CR 615.5's rider is not descended into, and the answer stands: the rider

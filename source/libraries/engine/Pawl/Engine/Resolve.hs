@@ -57,6 +57,7 @@ import qualified Pawl.Types.Amass as Amass.Type
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
+import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastOffer as CastOffer
@@ -426,6 +427,9 @@ slotsOf effect = case effect of
   -- Watchful Radstag. Both are reads; only the first is a target (CR 115.10a).
   -- Its Quantity is a read like Create's.
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> joinTwo (quantitySlots quantity) (objectRefSlots ref)
+  -- Both refs, RequireBlock's reason: either may name a slot. Unstable
+  -- Shapeshifter reads `became` through the first and nothing through the second.
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) -> joinTwo (objectRefSlots original) (objectRefSlots subject)
   -- The ReplacementEffect carries no Quantity, but the Duration and Condition each
   -- carry two, and a Quantity.InSlot inside either is a slot read. No card writes
   -- one, but a dangling one would slip past the lint as ModifyTarget's would.
@@ -686,6 +690,9 @@ slotsAreExhaustive effect = case effect of
   Effect.Create (Create.MkCreate quantity _ _ _) -> Quantity.slotsAreExhaustive quantity
   -- The ObjectRef is reported by slotsOf, so only the count can hide a slot.
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> Quantity.slotsAreExhaustive quantity
+  -- No Quantity and no Duration beside the two refs slotsOf already reports, so
+  -- that report is the whole of what this opcode reads.
+  Effect.BecomeCopy {} -> True
   -- The ReplacementEffect holds no Quantity and no reference, so slotsOf's two
   -- unions are the whole of it once their quantities check out.
   Effect.Replace (Replace.MkReplace duration _ _ condition _) ->
@@ -839,6 +846,7 @@ readsX = any effectReadsX
       Effect.DecreaseSpeed d -> Quantity.readsX (SpeedDecrease.quantity d)
       Effect.Create (Create.MkCreate quantity _ _ _) -> Quantity.readsX quantity
       Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> Quantity.readsX quantity
+      Effect.BecomeCopy {} -> False
       Effect.Replace {} -> False
       Effect.SkipNextPhase {} -> False
       -- CR 601.2b's X reaches the rider too, an X-cost shield's rider being
@@ -938,6 +946,7 @@ searchesLibrary effect = case effect of
   Effect.DecreaseSpeed {} -> False
   Effect.Create {} -> False
   Effect.CreateCopy {} -> False
+  Effect.BecomeCopy {} -> False
   Effect.Replace {} -> False
   Effect.SkipNextPhase {} -> False
   -- Neither is descended into for CR 615.5's rider, because this classification
@@ -1051,6 +1060,9 @@ boundSlots effect = case effect of
   Effect.Create (Create.MkCreate _ _ _ mSlot) -> foldMap Set.singleton mSlot
   -- Binds nothing: no card in the pool names the token copy it minted.
   Effect.CreateCopy {} -> Set.empty
+  -- Binds nothing: the permanent it rewrites is already named by whatever slot
+  -- the subject ref reads, and no new object comes into existence.
+  Effect.BecomeCopy {} -> Set.empty
   -- CR 729.1b: the subgame's winner, reported by the nested game rather than chosen.
   Effect.PlaySubgame slot -> Set.singleton slot
   -- CR 608.2d: the opponent this effect chose, so a later effect naming the slot
@@ -4638,6 +4650,44 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- enter simultaneously and none of them may copy a sibling.
                 Monad.void (Event.createTokens controller card (Just (Event.copiedSnapshotWithLastKnown src gs)) (Integer.toNaturalSaturating n) TapState.Untapped Map.empty)
       _ -> pure ()
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy originalRef subjectRef) ->
+    State.modify' $ \gs ->
+      -- CR 707.4: each named subject becomes a copy of the named original while
+      -- staying on the battlefield. Both sides are enumerated ONCE, off the same
+      -- `gs`, which is CR 608.2f's simultaneity and CreateCopy's posture above --
+      -- so an illegal slot (CR 608.2b), a player recipient and a set that matched
+      -- nothing all arrive as the empty list and copy nothing.
+      --
+      -- ONE original, and the guard is the rule rather than convenience: CR 707.2
+      -- copies the values of "the original object", singular, and no printing
+      -- names a set on that side. A ref that named two would have no answer to
+      -- give, so it gives none.
+      --
+      -- Event.copiedSnapshotWithLastKnown, exactly as CreateCopy reads it: the
+      -- COPIABLE values (CR 707.2 -- neither counters nor other effects), CR
+      -- 202.3b's back-face override folded in, and CR 608.2h's last-known record
+      -- for an original that has already left. The snapshot is a VALUE, so CR
+      -- 707.2b holds by construction: the original changing later cannot reach it.
+      --
+      -- Written to Binding.copyOf, the one place Projection.copiableCharacteristics
+      -- reads and the same slot the CR 707.5 entry replacement and CreateCopy
+      -- write. That is what CR 707.3's last sentence asks for -- "objects that copy
+      -- the object will use the new copiable values" -- and it is why the change
+      -- lands at layer 1 (CR 613.1a): layers 2-7 re-apply over the new base, which
+      -- is CR 707.4's "doesn't change any noncopy effects presently affecting the
+      -- permanent". Its other rider needs no code either, since nothing here moves
+      -- a zone for an enters- or leaves-the-battlefield ability to see.
+      --
+      -- Not implemented: CR 707.9a's "except it has this ability", which every
+      -- printed producer carries (#1292); pawl's copy is stricter, losing the
+      -- ability that made it. Nor a stated duration (#1753).
+      case objectRefObjects legal resolving controller source gs originalRef of
+        [original] ->
+          let snapshot = Event.copiedSnapshotWithLastKnown original gs
+              write o = o {Object.bindings = Binding.setCopy snapshot (Object.bindings o)}
+              subjects = objectRefObjects legal resolving controller source gs subjectRef
+           in gs {GameState.objects = foldr (Map.adjust write) (GameState.objects gs) subjects}
+        _ -> gs
   Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger name onset duration) -> do
     gs <- State.get
     -- CR 608.2h's last-known fallback, and NOT belt and braces: the source can
