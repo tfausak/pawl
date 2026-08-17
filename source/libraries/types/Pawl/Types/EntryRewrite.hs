@@ -13,7 +13,8 @@ import qualified Pawl.Types.WithCounters as WithCounters
 -- (CR 707.5, and a real "may" -- declining is legal) and, with CR 707.9's
 -- exceptions attached, Quicksilver Gargantuan; ChoiceOf is Primal Plasma
 -- (CR 208.2b); ChooseColor is Painter's Servant (CR 614.1c);
--- ChooseBasicLandType is Convincing Mirage (CR 614.1c); ChooseCardNames is Null
+-- ChooseBasicLandType is Convincing Mirage (CR 614.1c); ChoosePlayer is Stuffy
+-- Doll (CR 614.1c); ChooseCardNames is Null
 -- Chamber (CR 614.1c with CR 201.4); WithCounters is CR 306.5b's intrinsic
 -- loyalty; UnderSourceControl is Gather Specimens (CR 616.1b); Tapped is Zof
 -- Bloodbog and Headless Skaab (CR 614.1d); PayLifeOrTapped is Razorgrass Field
@@ -58,6 +59,21 @@ data EntryRewrite effect
     -- Written to Object.chosenSubtype rather than into the copiable snapshot,
     -- for ChooseColor's reason.
     ChooseBasicLandType
+  | -- | CR 614.1c a third time, with a PLAYER instead of a colour or a subtype:
+    -- "As this creature enters, choose a player" (Stuffy Doll). Nullary -- CR
+    -- 102.1 makes every player in the game the offer, and no card narrows them.
+    --
+    -- The candidates are therefore a property of the BOARD rather than of the
+    -- card, which is the one thing that separates this from ChooseColor and
+    -- ChooseBasicLandType above: rules 105.1 and 305.6 fix their five options, so
+    -- their prompts carry none, while Prompt.ChoosePlayer carries the seats still
+    -- in the game (CR 800.4 takes a player who has left out of them).
+    --
+    -- Written to Object.chosenPlayer rather than into the copiable snapshot
+    -- AsCopy and ChoiceOf write to, for ChooseColor's reason: CR 707.2's copiable
+    -- values are characteristics and a player is not one, and CR 707.6 makes a
+    -- copy's controller choose afresh.
+    ChoosePlayer
   | -- | CR 614.1c with CR 201.4: as this object enters, its controller AND one
     -- opponent each choose a card name ("As this enchantment enters, you and an
     -- opponent each choose a card name other than a basic land card name" --

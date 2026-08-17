@@ -226,6 +226,11 @@ data Response
     -- Prompt.ChooseProtector gives: a battle with no battle types takes its own
     -- controller, so this does not always carry an opponent.
     ChoseProtector PlayerId.PlayerId
+  | -- | CR 614.1c / 614.12a: the player chosen as a permanent entered ("As this
+    -- creature enters, choose a player" -- Stuffy Doll). Distinct from
+    -- ChoseOpponent and ChoseProtector above for the reason Prompt.ChoosePlayer
+    -- gives: "a player" offers every seat, the chooser included.
+    ChosePlayer PlayerId.PlayerId
   | -- | CR 603.3b: the order a player chose for their simultaneous triggers, as
     -- a permutation of the offered indices.
     OrderedTriggers [Natural.Natural]

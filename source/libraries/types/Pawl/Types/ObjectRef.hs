@@ -182,6 +182,30 @@ data ObjectRef
     -- flying and each player") has to be written as two DealDamage
     -- instructions, so its one CR 608.2f batch becomes two (#1285).
     EachPlayer
+  | -- | The player this effect's SOURCE chose as it entered the battlefield --
+    -- Stuffy Doll's "it deals that much damage to the chosen player". EachPlayer's
+    -- sibling one seat wide, and here for that arm's reason: the arm names no
+    -- object at all, and it is an ObjectRef because Effect.DealDamage's ref is one
+    -- (CR 120.3a makes a player a damage recipient).
+    --
+    -- Read off Object.chosenPlayer of the effect's SOURCE, which is CR 113.7a's
+    -- source permanent rather than the resolving ability object -- the direction
+    -- EachCardExiledWithSource already reads for CR 607.2a, and the only one that
+    -- works: the choice was made as the permanent entered (CR 614.12a), long
+    -- before the ability that reads it was put on the stack.
+    --
+    -- Payload-free rather than carrying a slot or a PlayerRef, ChooseColor's
+    -- position: the card says "the chosen player", which names the one choice its
+    -- own entry replacement recorded. A permanent that chose nobody -- because it
+    -- has no such replacement, or because it was put onto the battlefield by
+    -- something that never ran one -- names nobody, and CR 101.3 ignores that
+    -- share of the instruction.
+    --
+    -- Not a target and never one (CR 115.10a): the choice was made on entry, not
+    -- announced on the stack, so CR 608.2b has nothing to re-validate. Read when
+    -- the effect executes (CR 608.2c), so a designation the source lost by
+    -- changing zones (CR 400.7) is already gone.
+    ChosenPlayer
   | -- | The cards on top of a library, deepest named last -- Count on Luck's "the
     -- top card of your library" and Act on Impulse's "the top three cards of your
     -- library". A library is a per-player zone (CR 400.1) kept as an ordered pile

@@ -175,10 +175,10 @@ data Object = MkObject
     -- Per-incarnation state, like damage and counters: reset by newIncarnation,
     -- because CR 400.7 makes the moved object a new one.
     --
-    -- One of THREE `chosen` fields; chosenSubtype and chosenNames below are the
-    -- others. What makes those three a family is not that the choice is made as
-    -- the object enters -- `protector` below is made then too -- but that each is
-    -- read back by a MODIFICATION off the effect's source. A protector is a
+    -- One of FOUR `chosen` fields; chosenSubtype, chosenNames and chosenPlayer
+    -- below are the others. What makes those four a family is not that the choice
+    -- is made as the object enters -- `protector` below is made then too -- but
+    -- that each is read back OFF THE EFFECT'S SOURCE. A protector is a
     -- designation rule 310 reads directly, so it is a sibling of ringBearerFor
     -- instead.
     chosenColor :: Maybe Color.Color,
@@ -207,9 +207,10 @@ data Object = MkObject
     -- `Map ChoiceKind ChoiceValue` would need a sum over colour, subtype and
     -- name, which every reader would then have to re-narrow at a site where the
     -- wrong arm is unrepresentable today; three typed fields keep each read
-    -- total. A fourth would not change that either -- and CR 310.9a's protector
-    -- is evidence for the prediction rather than against it: it arrived as its
-    -- own field too, for the reason chosenColor's note gives.
+    -- total. The fourth did not change that either -- chosenPlayer below arrived
+    -- as its own field on the same argument -- and CR 310.9a's protector is
+    -- evidence for the prediction rather than against it: it arrived as its own
+    -- field too, for the reason chosenColor's note gives.
     --
     -- A SET rather than one name or a name per chooser. Null Chamber has two
     -- players each name a card, and its prohibition asks only whether a name is
@@ -223,6 +224,27 @@ data Object = MkObject
     -- Per-incarnation state: reset by newIncarnation, because CR 400.7 makes the
     -- moved object a new one.
     chosenNames :: Set.Set CardName.CardName,
+    -- | CR 614.1c: a player this object's controller chose as it entered ("As
+    -- this creature enters, choose a player" -- Stuffy Doll). Read by
+    -- Pawl.Engine.Resolve's ObjectRef.ChosenPlayer arm off the effect's SOURCE,
+    -- the same direction Modification.AddChosenColor reads chosenColor.
+    --
+    -- The FOURTH `chosen` field, and still a sibling rather than the generalized
+    -- choice map three arrivals did not force either -- chosenNames' note above
+    -- gives the argument, and predicted this. What it did not predict is that the
+    -- reader would not be a Modification: the Doll's payload is a triggered
+    -- ability's DealDamage rather than a static ability's projection, so the read
+    -- happens in Pawl.Engine.Resolve instead. That widens the family's shared
+    -- property from "read by a Modification" to "read off the effect's source",
+    -- which is what still separates all four from `protector` below (a
+    -- designation rule 310 reads directly).
+    --
+    -- NOT a copiable value, for chosenColor's reason (CR 707.2, CR 707.6): CR
+    -- 707.2's copiable values are characteristics, and a player is not one.
+    --
+    -- Per-incarnation state: reset by newIncarnation, because CR 400.7 makes the
+    -- moved object a new one.
+    chosenPlayer :: Maybe PlayerId.PlayerId,
     -- | CR 613.7d: when this object entered its current zone. A static ability's
     -- continuous effect shares this timestamp (CR 613.7a); stamped fresh on every
     -- zone change (CR 400.7 makes each a new object). Read by the projection when
@@ -412,9 +434,10 @@ data Object = MkObject
     -- dies and returns is a different creature, and no longer designated.
     ringBearerFor :: Maybe PlayerId.PlayerId,
     -- | CR 310.9: the player designated as this battle's protector. Chosen as the
-    -- battle enters (CR 310.9a) by the CR 614.12a as-enters route every other
-    -- choice-on-entry takes, which is why it is an Object field and not a
-    -- projection: CR 310.9g keeps the designation across the permanent ceasing to
+    -- battle enters (CR 310.9a), though NOT by a replacement effect the way the
+    -- four `chosen` fields above are -- Pawl.Engine.Event.designateProtector says
+    -- why rule 310.9a is a bare instruction instead. It is an Object field and not
+    -- a projection because CR 310.9g keeps the designation across the permanent ceasing to
     -- be a battle or becoming a copy of another one, so nothing a layer computes
     -- may be allowed to move it.
     --
@@ -713,6 +736,7 @@ newIncarnation object =
       chosenColor = Nothing,
       chosenSubtype = Nothing,
       chosenNames = Set.empty,
+      chosenPlayer = Nothing,
       face = Nothing,
       turnedOverAt = Nothing,
       worldSince = Nothing,

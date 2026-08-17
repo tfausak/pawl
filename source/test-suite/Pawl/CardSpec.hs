@@ -2477,6 +2477,9 @@ objectRefFilters ref = case ref of
   ObjectRef.EachSpell f -> [f]
   -- Molten Disaster's "each player" holds no Filter to lint.
   ObjectRef.EachPlayer -> []
+  -- Stuffy Doll's "the chosen player" holds none either: the seat was named by a
+  -- choice made on entry, never by characteristics.
+  ObjectRef.ChosenPlayer -> []
   -- Count on Luck's "the top card of your library" names a POSITION, so it states
   -- no Filter of its own, and its PlayerRef names players. Its DEPTH is a
   -- Quantity, which reaches one through a Count -- "the top X cards" where X is
@@ -2905,6 +2908,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChoiceOf _ -> []
   EntryRewrite.ChooseColor -> []
   EntryRewrite.ChooseBasicLandType -> []
+  EntryRewrite.ChoosePlayer -> []
   EntryRewrite.WithCounters {} -> []
   EntryRewrite.UnderSourceControl -> []
   EntryRewrite.Riot -> []
@@ -4659,6 +4663,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           ObjectRef.EachCardExiledWithSource {} -> False
           ObjectRef.EachSpell _ -> False
           ObjectRef.EachPlayer -> False
+          -- Names a player and so moves no object at all, the arm above's answer.
+          ObjectRef.ChosenPlayer -> False
           ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player depth) -> case depth of
             Quantity.Type.Literal n -> n <= 1 && namesOneSeat player
             _ -> False

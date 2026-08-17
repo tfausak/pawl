@@ -101,6 +101,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Response as Response
+import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
@@ -3062,6 +3063,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   bloodthirstSpec s registry
   brineElementalSpec s registry
   coldsteelHeartSpec s registry
+  stuffyDollSpec s registry
   vorinclexSpec s registry
   damageCountersSpec s registry
   entryCountersSpec s registry
@@ -4904,6 +4906,126 @@ coldsteelHeartSpec s registry = Spec.describe s "Coldsteel Heart (CR 616.1)" $ d
     -- migrated to ReplacementEntry, not to prove anything about #74.
     assertBoth "tapped first" (pickRewrite EntryRewrite.Tapped)
     assertBoth "colour first" (pickRewrite EntryRewrite.ChooseColor)
+
+-- CR 614.1c with CR 120.3a. Stuffy Doll, {5} Artifact Creature -- Construct 0/1,
+-- whole text: "Indestructible / As this creature enters, choose a player. /
+-- Whenever this creature is dealt damage, it deals that much damage to the chosen
+-- player. / {T}: This creature deals 1 damage to itself." (oracle checked on
+-- Scryfall)
+--
+-- The first card whose as-enters choice is a PLAYER, and the first whose payload
+-- reads one back. Both halves are proved by ONE observable -- whose life total
+-- moved -- so a stamp with no reader, and a reader with no stamp, both fail.
+--
+-- THREE SEATS, and the pair of boards differs in exactly one thing: WHOM the
+-- ChoosePlayer answer names. Two seats would collapse "the chosen player" onto
+-- the only opponent, and the assertion would pass under a hard-coded "an
+-- opponent" as happily as under the field.
+--
+-- The amount is 3, which is neither the Doll's power (0) nor its toughness (1)
+-- nor the {T} ability's 1, so a payload reading a characteristic instead of CR
+-- 603.2's captured binding fails rather than passing by luck.
+stuffyDollSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+stuffyDollSpec s registry =
+  let resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      settleAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      -- A noncombat event's own path, enrageSpec's: applyDamage records the
+      -- DamageDealt entries, the settle puts what they triggered on the stack
+      -- (CR 603.3), and the priority loop resolves it.
+      dealing events gs = resolveAll (settleAll (S.runPure S.identityAnswer gs (Damage.applyDamage events)))
+      noncombat src target amount = DamageEvent.MkDamageEvent src (Recipient.ToCreature target) amount False False False 0 Nothing DamageKind.Noncombat
+      lives g = (S.lifeOf S.alice g, S.lifeOf S.bob g, S.lifeOf S.carol g)
+      chosenOn oid g = Game.lookupObject oid g >>= Object.chosenPlayer
+      -- alice casts the Doll off five Mountains on a three-seat board and answers
+      -- CR 614.12a's choice with `who`. The Doll must be CAST: S.addCreature puts
+      -- an object straight onto the battlefield without running the entry loop,
+      -- so it would choose nobody.
+      --
+      -- The answer is pinned to a PlayerId by identity rather than by an index
+      -- into the offer: an answerer that searched the candidate list for a legal
+      -- seat would find a different one after a mutation and repair the assertion.
+      castDoll :: Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> (GameState.GameState, Maybe ObjectId.ObjectId)
+      castDoll doll mountain who =
+        let (withCard, oid) = S.handOne doll (S.landsFor mountain S.alice 5 S.threePlayerGame)
+            step :: Prompt.Prompt r -> r
+            step p = case p of
+              Prompt.ChoosePlayer {} -> who
+              _ -> S.identityAnswer p
+            after = snd (Engine.runGamePure step withCard (S.cast S.alice oid >> Stack.resolveTop))
+            entered = case Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield withCard)) of
+              o : _ -> Just o
+              [] -> Nothing
+         in (after, entered)
+   in Spec.describe s "Stuffy Doll (CR 614.1c)" $ do
+        -- THE PROVING CASE, and a pair of boards differing only in the answer.
+        Spec.it s "CR 614.1c the chosen player, and only they, take the damage" $ do
+          doll <- S.printingOf s registry "Stuffy Doll"
+          mountain <- S.printingOf s registry "Mountain"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let hit who = case castDoll doll mountain who of
+                (gs, Just dollId) ->
+                  let (pikerId, board) = S.addCreature piker S.bob gs
+                   in Just (board, dollId, dealing [noncombat pikerId dollId 3] board)
+                _ -> Nothing
+          case (hit S.bob, hit S.carol) of
+            (Just (before, dollId, chosenBob), Just (_, _, chosenCarol)) -> do
+              Spec.assertEqWith s "all three seats start at 20" (lives before) (Just 20, Just 20, Just 20)
+              Spec.assertEqWith s "CR 120.3a bob was chosen, so bob loses 3" (lives chosenBob) (Just 20, Just 17, Just 20)
+              -- The same board and the same amount, one different answer.
+              Spec.assertEqWith s "carol chosen instead, so carol loses 3" (lives chosenCarol) (Just 20, Just 20, Just 17)
+              -- CR 120.3e: the damage really landed on the Doll, so the two
+              -- assertions above are this trigger and not bookkeeping.
+              Spec.assertEqWith s "CR 120.3e and the 3 is marked on the Doll" (fmap Object.damage (Game.lookupObject dollId chosenBob)) (Just 3)
+              -- CR 702.12b: 3 over a toughness of 1 is lethal, and indestructible
+              -- keeps it on the battlefield anyway.
+              Spec.assertBool s (Set.member dollId (GameState.battlefield chosenBob)) "CR 702.12b indestructible: still on the battlefield"
+            _ -> Spec.assertFailure s "the Doll did not reach the battlefield"
+        -- The STAMP, asserted independently of the payload, so a JSON typo in the
+        -- trigger cannot hide behind a green read-back -- and the other way round.
+        Spec.it s "CR 614.12a the choice is made before the permanent enters" $ do
+          doll <- S.printingOf s registry "Stuffy Doll"
+          mountain <- S.printingOf s registry "Mountain"
+          case castDoll doll mountain S.carol of
+            (gs, Just dollId) -> Spec.assertEqWith s "CR 614.1c the Doll remembers carol" (chosenOn dollId gs) (Just S.carol)
+            _ -> Spec.assertFailure s "the Doll did not reach the battlefield"
+        -- CR 400.7: a NEW object forgets the choice. Object.newIncarnation is a
+        -- record UPDATE, so omitting the field there compiles and silently carries
+        -- a chosen player across a zone change; -Werror cannot name that site, and
+        -- this is what stands in its place. Mirrors Pawl.GameSpec's Painter's
+        -- Servant chosenColor case.
+        Spec.it s "CR 400.7 a new incarnation has chosen nobody" $ do
+          doll <- S.printingOf s registry "Stuffy Doll"
+          mountain <- S.printingOf s registry "Mountain"
+          case castDoll doll mountain S.bob of
+            (gs, Just dollId) -> do
+              -- The discriminator: without it an assertion over an object that
+              -- never chose anybody would pass whatever newIncarnation does.
+              Spec.assertEqWith s "the object going in genuinely carried a chosen player" (chosenOn dollId gs) (Just S.bob)
+              Spec.assertEqWith
+                s
+                "CR 400.7 the rebuilt object forgot the player it chose"
+                (fmap (Object.chosenPlayer . Object.newIncarnation) (Game.lookupObject dollId gs))
+                (Just Nothing)
+            _ -> Spec.assertFailure s "the Doll did not reach the battlefield"
+        -- The fourth clause, and the one that makes the card self-contained: {T}
+        -- deals 1 to itself, which re-enters the trigger with a DIFFERENT number.
+        -- 1 against the case above's 3 separates "reads the event" from "reads a
+        -- constant".
+        Spec.it s "CR 120.1 the Doll's own {T} ability feeds its own trigger" $ do
+          doll <- S.printingOf s registry "Stuffy Doll"
+          mountain <- S.printingOf s registry "Mountain"
+          case castDoll doll mountain S.bob of
+            (gs, Just dollId) -> do
+              -- CR 302.6: the Doll was cast this turn, so its {T} ability is
+              -- unactivatable until its controller's next turn begins. Settled by
+              -- hand rather than by driving a turn cycle, which would add a draw
+              -- step and CR 104.3c to a case about one printed clause.
+              let unsick g = g {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Settled S.alice}) dollId (GameState.objects g)}
+                  activated = S.runPure S.identityAnswer (unsick gs) (Activate.activateAbility S.alice dollId (theAbility doll))
+                  after = resolveAll (settleAll activated)
+              Spec.assertEqWith s "CR 120.3a bob loses exactly 1, not 3" (lives after) (Just 20, Just 19, Just 20)
+              Spec.assertEqWith s "CR 120.3e and 1 is marked on the Doll" (fmap Object.damage (Game.lookupObject dollId after)) (Just 1)
+            _ -> Spec.assertFailure s "the Doll did not reach the battlefield"
 
 -- CR 122.1 / 122.6 with CR 614.1: Vorinclex, Monstrous Raider ({4}{G}{G}
 -- Legendary Creature -- Phyrexian Praetor 6/6, "Trample, haste. If you would put

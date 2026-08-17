@@ -255,6 +255,7 @@ dirtied pid object =
       Object.chosenColor = Just Color.Blue,
       Object.chosenSubtype = Just Subtype.Forest,
       Object.chosenNames = Set.singleton (CardName.MkCardName (Text.pack "Mountain")),
+      Object.chosenPlayer = Just pid,
       Object.face = Just (CardName.MkCardName (Text.pack "Mountain")),
       Object.turnedOverAt = Just (Timestamp.MkTimestamp 1),
       Object.worldSince = Just (Timestamp.MkTimestamp 2),

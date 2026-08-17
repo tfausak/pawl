@@ -42,6 +42,7 @@ codec =
       Arm.optionalPayload "EachCardExiledWithSource" filterCodec ObjectRef.EachCardExiledWithSource (\x -> case x of ObjectRef.EachCardExiledWithSource y -> Just y; _ -> Nothing),
       Arm.payload "EachSpell" filterCodec ObjectRef.EachSpell (\x -> case x of ObjectRef.EachSpell y -> Just y; _ -> Nothing),
       Arm.nullary "EachPlayer" ObjectRef.EachPlayer,
+      Arm.nullary "ChosenPlayer" ObjectRef.ChosenPlayer,
       Arm.payload "TopOfLibrary" TopOfLibrary.codec ObjectRef.TopOfLibrary (\x -> case x of ObjectRef.TopOfLibrary y -> Just y; _ -> Nothing),
       Arm.payload "ChosenCardInGraveyard" ChosenCardInGraveyard.codec ObjectRef.ChosenCardInGraveyard (\x -> case x of ObjectRef.ChosenCardInGraveyard y -> Just y; _ -> Nothing),
       Arm.payload "ChosenCardInHand" ChosenCardInHand.codec ObjectRef.ChosenCardInHand (\x -> case x of ObjectRef.ChosenCardInHand y -> Just y; _ -> Nothing),

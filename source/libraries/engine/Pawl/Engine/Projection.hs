@@ -2084,9 +2084,9 @@ swapWordIn family pairs word = List.foldl' step word pairs
 -- card's are card text like any other, and a graveyard arm's PlayerScope and
 -- Chooser name players rather than subtypes -- as does a hand arm's PlayerRef,
 -- whose Filter beside it is rewritten like every other. EachPlayer,
--- EachCardInYourHand and RandomCardInHand carry no word at all -- CR 612.1
--- changes subtype words, and "each player", "all cards from your hand" and "a
--- card at random from their hand" have none -- the last because it carries no
+-- ChosenPlayer, EachCardInYourHand and RandomCardInHand carry no word at all --
+-- CR 612.1 changes subtype words, and "each player", "the chosen player", "all
+-- cards from your hand" and "a card at random from their hand" have none -- the last because it carries no
 -- Filter at all, only the PlayerRef naming whose hand. TopOfLibrary names a
 -- POSITION and a depth: its PlayerRef names a player, and the Quantity beside it
 -- goes through rewriteQuantity, since a Count nested in it carries a Filter that
@@ -2103,6 +2103,7 @@ rewriteObjectRef pairs ref = case ref of
   ObjectRef.EachCardExiledWithSource f -> ObjectRef.EachCardExiledWithSource (fmap (Filter.rewrite pairs) f)
   ObjectRef.EachSpell f -> ObjectRef.EachSpell (Filter.rewrite pairs f)
   ObjectRef.EachPlayer -> ref
+  ObjectRef.ChosenPlayer -> ref
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary p c) -> ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary p (rewriteQuantity pairs c))
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s f) -> ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s (Filter.rewrite pairs f))
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand p f) -> ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand p (Filter.rewrite pairs f))

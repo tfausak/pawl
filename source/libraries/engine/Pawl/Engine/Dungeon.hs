@@ -197,6 +197,7 @@ enter pid = do
                 Object.chosenColor = Nothing,
                 Object.chosenSubtype = Nothing,
                 Object.chosenNames = Set.empty,
+                Object.chosenPlayer = Nothing,
                 Object.timestamp = ts,
                 Object.face = Nothing,
                 Object.turnedOverAt = Nothing,
