@@ -6167,9 +6167,10 @@ exertSpec s registry = Spec.describe s "Exert" $ do
   -- separates it from the untap step of whoever holds the permanent then -- and
   -- bob's comes first, since alice exerted on her own turn.
   --
-  -- S.giveControl is the fixture, but the board is one the pool reaches: Garland,
-  -- Royal Kidnapper takes a creature "for as long as they're the monarch", which
-  -- outlasts the turn it was taken on.
+  -- S.giveControl is the fixture; the printed board it stands in for is bob's
+  -- Garland, Royal Kidnapper, which gains control of a creature the monarch
+  -- controls "for as long as they're the monarch" -- a duration that outlasts the
+  -- turn the creature was taken on.
   Spec.it s "CR 701.43a the rider is the EXERTING player's untap step, not the new controller's" $ do
     initiate <- S.printingOf s registry "Glory-Bound Initiate"
     piker <- S.printingOf s registry "Goblin Piker"

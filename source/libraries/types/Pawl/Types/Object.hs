@@ -627,15 +627,14 @@ data Object = MkObject
     --
     -- CLEARED WHERE IT APPLIES, by Engine.untapAll, which is why it needs no
     -- Pawl.Types.Expiry and takes no part in any Pawl.Engine.Expiry sweep. CR
-    -- 701.43b fixes the duration as the untap step the prohibition bites in --
-    -- "each effect causing it not to untap expires during the same untap step" --
-    -- and CR 502.3 runs that step for whoever controls the permanent THEN, so
-    -- application and expiry are one event and a control change between the
-    -- resolution and the step needs nothing baked and nothing rewritten.
+    -- 611.2a gives the effect the duration its own sentence states, and that
+    -- sentence names ONE untap step; CR 502.3 runs that step for whoever controls
+    -- the permanent THEN, so application and expiry are one event and a control
+    -- change between the resolution and the step needs nothing baked and nothing
+    -- rewritten.
     --
-    -- A Bool and not a count, which is CR 701.43b's own reading: two effects
-    -- prohibiting the same untap both expire at that one step, so they cannot
-    -- stack. Telekinesis' "next TWO untap steps" is the shape a Bool cannot hold,
+    -- A Bool and not a count, for the same reading: two such effects over one
+    -- permanent both expire at that one step, so they cannot stack. Telekinesis' "next TWO untap steps" is the shape a Bool cannot hold,
     -- and no card in the pool prints it (gap #1653).
     doesNotUntapNext :: Bool,
     -- | CR 701.43a: the players who have EXERTED this permanent -- "you choose to

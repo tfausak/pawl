@@ -124,7 +124,8 @@ spec s registry = Spec.describe s "UntapRestriction" $ do
   existenceSpec s registry
 
 -- CR 502.3 / CR 611.2's ONE-SHOT prohibition: Effect.DoesNotUntapNext, the flag
--- it writes, and CR 701.43b's expiry. CR 508.1g's exert writes a SEPARATE flag
+-- it writes, and CR 611.2a's expiry at the one untap step its sentence names. CR
+-- 508.1g's exert writes a SEPARATE flag
 -- (Object.exertedBy), keyed to the exerting player rather than to the victim's
 -- controller; Pawl.CombatSpec's Exert group is where that path is proved.
 oneShotSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
