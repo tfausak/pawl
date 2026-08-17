@@ -1421,6 +1421,78 @@ textChangedLandwalkSpec s registry = Spec.describe s "TextChangedLandwalk" $ do
     Spec.assertEqWith s "and the block sticks" (Combat.blockersOf wraith after) (Set.singleton blocker)
     (onIsland, wraith', blocker') <- wraithBoard True "Island"
     Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' (Set.singleton wraith')) onIsland)) "an Island stops it now"
+  -- The THIRD carrier, and the one that needed the walk into a defined card's
+  -- keywords (see #643): a landwalk printed on a TOKEN, by the spell that mints
+  -- it. Goblin Scouts {3}{R}{R} Sorcery, whole text "Create three 1/1 red Goblin
+  -- Scout creature tokens with mountainwalk" (checked against Scryfall), hacked
+  -- ON THE STACK so CR 612.2a's swap reaches the card the Create defines.
+  --
+  -- The word is in the KEYWORD alone: Mountain is a land type and the token's
+  -- type line spells Goblin Scout, so a rewrite gated on the type line -- which
+  -- is how #640 reached these faces -- finds nothing and stops. The token's
+  -- subtypes and name are asserted unchanged for exactly that reason.
+  let scoutBoard hacked land = do
+        landP <- S.printingOf s registry land
+        goblinScoutsBoard s registry hacked landP
+  Spec.it s "CR 702.14c an unhacked Goblin Scouts mints MOUNTAINwalkers" $ do
+    (onMountain, scout, blocker) <- scoutBoard False "Mountain"
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton scout)) onMountain)) "a Mountain stops the block"
+    (onSwamp, scout', blocker') <- scoutBoard False "Swamp"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' (Set.singleton scout')) onSwamp) "a Swamp does not"
+  Spec.it s "CR 612.1 a hacked Goblin Scouts mints SWAMPwalkers instead" $ do
+    (onMountain, scout, blocker) <- scoutBoard True "Mountain"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton scout)) onMountain) "a Mountain no longer stops the block"
+    let after = S.runPure S.aggressiveAnswer onMountain Combat.declareBlockers
+    Spec.assertEqWith s "and the block sticks" (Combat.blockersOf scout after) (Set.singleton blocker)
+    -- CR 612.2 held to the one word: Magical Hack swaps land types, so the
+    -- token's creature types and its derived name are untouched.
+    Spec.assertEqWith s "still a Goblin Scout" (Projection.subtypesOf scout onMountain) (Set.fromList [Subtype.Goblin, Subtype.Scout])
+    Spec.assertEqWith s "still named Goblin Scout Token" (Projection.namesOf scout onMountain) (Set.singleton (CardName.MkCardName (Text.pack "Goblin Scout Token")))
+    (onSwamp, scout', blocker') <- scoutBoard True "Swamp"
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' (Set.singleton scout')) onSwamp)) "a Swamp stops it now"
+
+-- alice casts Goblin Scouts, optionally has a Magical Hack resolved at the
+-- SORCERY ON THE STACK (Mountain -> Swamp), and then the sorcery resolves; the
+-- three tokens settle and attack into bob's Goblin Piker and one land of
+-- `defendersLand`. Returns the post-declaration state, one Scout and the
+-- blocker.
+--
+-- Five Mountains and an Island on alice's side, and the Island is deliberate for
+-- castHackAt's reason: CR 702.14c reads the DEFENDING player's lands, so nothing
+-- alice controls can satisfy the landwalk under test.
+--
+-- Engine.settleAll after the mint, because CR 302.6 would otherwise keep tokens
+-- created this turn out of the attack entirely and the fixture would prove
+-- nothing.
+goblinScoutsBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  Bool ->
+  Printing.Printing ->
+  m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+goblinScoutsBoard s registry hacked defendersLand = do
+  piker <- S.printingOf s registry "Goblin Piker"
+  mountain <- S.printingOf s registry "Mountain"
+  island <- S.printingOf s registry "Island"
+  goblinScouts <- S.printingOf s registry "Goblin Scouts"
+  magicalHack <- S.printingOf s registry "Magical Hack"
+  let (gs0, _, theirs) = S.combatBoardOf [] [piker]
+      gs1 = S.landsFor island S.alice 1 (S.landsFor mountain S.alice 5 gs0)
+      (_, gs2) = S.addCreature defendersLand S.bob gs1
+      (scoutsId, gs3) = S.addHandCard goblinScouts S.alice gs2
+      (hackId, gs4) = S.addHandCard magicalHack S.alice gs3
+      onStack = S.runPure S.identityAnswer (gs4 {GameState.priority = Just S.alice}) (S.cast S.alice scoutsId)
+      spellId = case GameState.stack onStack of
+        top : _ -> top
+        [] -> ObjectId.MkObjectId 999
+      swapped = if hacked then castHackAt hackId spellId Subtype.Mountain Subtype.Swamp onStack else onStack
+      minted = S.runPure S.identityAnswer swapped Stack.resolveTop
+      settled = S.runPure S.identityAnswer minted (Engine.settleAll S.alice)
+      attacked = S.runPure S.aggressiveAnswer settled (Combat.declareAttackers S.alice)
+  case (S.tokensOf attacked, theirs) of
+    (a : _, b : _) -> pure (attacked, a, b)
+    _ -> Spec.assertFailure s "fixture should have minted a Scout and left a blocker"
 
 -- CR 702.111: grant menace to `oid` with a stored continuous effect, withFear's
 -- twin. Used only by the CR 509.1b "after a legal block has been declared" case

@@ -1744,11 +1744,28 @@ rewriteModificationWith rewriteAbility pairs m =
         -- An ability wipe names nothing at all, and neither does a P/T switch.
         Modification.LoseAllAbilities -> acc
         Modification.SwitchPowerToughness -> acc
-        -- Not implemented: a Quantity.Count carries a Filter, and it is left
-        -- unrewritten, so a "+1/+1 for each Swamp you control" would keep
-        -- counting Swamps after a swap (#711).
-        Modification.SetBasePowerToughness {} -> acc
-        Modification.ModifyPowerToughness {} -> acc
+        -- CR 612.1 through both boxes: a Quantity.Count carries a Filter, and
+        -- "+X/+Y for each Forest you control" is printed in the text box like
+        -- any other clause, so a hacked Aspect of Wolf counts the new type.
+        -- rewriteQuantity is the same descent rewriteCondition and the CDA path
+        -- take, so the three cannot drift. Proven by Pawl.PowerToughnessSpec's
+        -- "CR 612.1 a Magical Hack moves which land Aspect of Wolf counts".
+        --
+        -- The pair reaches the quantity with no family gate restated, for
+        -- Filter.rewrite's own reason: a HasSubtype atom may name a word of
+        -- either family, so the word's use IS its family.
+        Modification.SetBasePowerToughness pt ->
+          Modification.SetBasePowerToughness
+            pt
+              { SetBasePowerToughness.power = rewriteQuantity [(from, to)] (SetBasePowerToughness.power pt),
+                SetBasePowerToughness.toughness = rewriteQuantity [(from, to)] (SetBasePowerToughness.toughness pt)
+              }
+        Modification.ModifyPowerToughness pt ->
+          Modification.ModifyPowerToughness
+            pt
+              { ModifyPowerToughness.power = rewriteQuantity [(from, to)] (ModifyPowerToughness.power pt),
+                ModifyPowerToughness.toughness = rewriteQuantity [(from, to)] (ModifyPowerToughness.toughness pt)
+              }
         -- CR 205.2a's card types are a different list from CR 205.3's subtypes,
         -- so this position holds no word a subtype pair could name. CR 205.4a's
         -- supertypes are a third list, and the two arms below hold one of those.
@@ -1909,10 +1926,12 @@ rewriteEffect pairs effect = case effect of
   -- Filter is subtype-shaped exactly as Untap's is.
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration blocker attacker) ->
     Effect.RequireBlock (RequireBlock.MkRequireBlock duration (rewriteObjectRef pairs blocker) (rewriteObjectRef pairs attacker))
-  -- Identity, not a rewriteCard call: CR 114.3 leaves an emblem no type line and
-  -- no name, the two things rewriteCard reaches. What CR 612.1 could reach on one
-  -- is its abilities, which nothing here walks (#643).
-  Effect.CreateEmblem {} -> effect
+  -- CR 114.3 leaves an emblem no type line and no name, so its ABILITIES are the
+  -- whole of what CR 612.1 can reach -- which makes the emblem the case that
+  -- forces rewriteFace's ability walk to run on a face whose type line spells
+  -- nothing. Proven by Pawl.ResolveSpec's "CR 612.1 an evolved Ajani's emblem
+  -- mints Wurms rather than Cats".
+  Effect.CreateEmblem card -> Effect.CreateEmblem (rewriteCard pairs card)
   Effect.BecomeMonarch {} -> effect
   Effect.Designate (Designate.MkDesignate _ _) -> effect
   Effect.Unsuspect ref -> Effect.Unsuspect (rewriteObjectRef pairs ref)
@@ -1972,7 +1991,9 @@ rewriteObjectRef pairs ref = case ref of
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s f) -> ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s (Filter.rewrite pairs f))
   ObjectRef.ChosenCardInHand _ -> ref
 
--- CR 612.2a through the CARD a Create defines its token with. Two fields.
+-- CR 612.1/612.2a through the CARD an Effect.Create or an Effect.CreateEmblem
+-- defines its token or emblem with. Three groups of fields: the type line, the
+-- name, and every carrier of the face's rules text.
 --
 -- The TYPE LINE is CR 612.1's, and the exact-match test is already CR 612.2's
 -- family gate for the reason applyModification's ChangeSubtypeWord arm gives.
@@ -1981,21 +2002,35 @@ rewriteObjectRef pairs ref = case ref of
 -- card name. CR 111.4 is why the exception exists: an unnamed token's name is its
 -- subtypes plus "Token", so the name holds those same words.
 --
--- Conditional on the type line, never unconditional: CR 612.2a licenses the name
--- change only where the word is being used as a creature type, so a Create whose
--- token name merely happens to contain the word falls under CR 612.2's
--- prohibition. Hence one membership test for both fields.
+-- The NAME's change is conditional on the type line, never unconditional: CR
+-- 612.2a licenses it only where the word is being used as a creature type, so a
+-- Create whose token name merely happens to contain the word falls under CR
+-- 612.2's prohibition. Hence one membership test for both of those fields.
 --
--- Not CR 612.4, which is a swap aimed at the token itself and reaches the
--- projected object rather than this card.
+-- The RULES TEXT is walked unconditionally, and that asymmetry is the point: CR
+-- 612.1 reaches the text box whatever the type line says, and an emblem is the
+-- proof -- CR 114.3 leaves it no type line at all, so a gate over the type line
+-- would leave the one object whose entire content is rules text untouched. The
+-- same carriers the projection walks on a permanent's own printed text at layer
+-- 3 (applyModification's ChangeSubtypeWord arm), through the same helpers, plus
+-- the spell and the statics a permanent reads elsewhere. CR 612.4 says in as
+-- many words that a token's rules text is the creating ability's to define.
 --
--- Not implemented: the swap does not reach the defined card's ability carriers,
--- so the card is walked rather than recursed into (#643). That also keeps
--- rewriteEffect non-recursive.
+-- Recursive, since a defined card's own effects can define a further card:
+-- rewriteFace -> rewriteModal -> rewriteEffect -> rewriteCard. It terminates
+-- because a Card is a finite first-order value, Effect is non-recursive except
+-- through its `card` parameter (docs/design.md section 1), and every step
+-- descends into a strict subterm.
 --
--- Every FACE, because a card's printed subtypes and name are per-face (CR
--- 712.8) and the swap is aimed at the card as a whole; the gate below then
--- leaves untouched any face whose type line lacks the word.
+-- Not CR 612.4's other half, a swap aimed at the token ITSELF: that one reaches
+-- the projected object rather than this card.
+--
+-- Not implemented: Face.replacementEffects keeps its printed word, which is the
+-- same carrier, one level down, that the permanent's own card leaves unrewritten
+-- (#635).
+--
+-- Every FACE, because a card's printed subtypes, name and text are per-face (CR
+-- 712.8) and the swap is aimed at the card as a whole.
 rewriteCard :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Card.Type.Card -> Card.Type.Card
 rewriteCard pairs card = card {Card.Type.faces = fmap (rewriteFace pairs) (Card.Type.faces card)}
 
@@ -2003,15 +2038,45 @@ rewriteFace :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Face.Face Card.
 rewriteFace pairs face = List.foldl' apply1 face pairs
   where
     apply1 f (from, to) =
-      let typeLine = Face.typeLine f
+      let pair = [(from, to)]
+          typeLine = Face.typeLine f
           subtypes = TypeLine.subtypes typeLine
-       in if Set.notMember from subtypes
-            then f
-            else
-              f
-                { Face.typeLine = typeLine {TypeLine.subtypes = Set.insert to (Set.delete from subtypes)},
-                  Face.name = rewriteTokenName from to (Face.name f)
-                }
+          renamed =
+            if Set.notMember from subtypes
+              then f
+              else
+                f
+                  { Face.typeLine = typeLine {TypeLine.subtypes = Set.insert to (Set.delete from subtypes)},
+                    Face.name = rewriteTokenName from to (Face.name f)
+                  }
+       in renamed
+            { -- CR 702.14a's land-type word inside a landwalk, which is what
+              -- Goblin Scouts' token carries. Set.map rather than the permanent
+              -- path's Map.mapKeysWith (+), since a face's keywords are a Set and
+              -- a collision there is already one membership.
+              Face.keywords = Set.map (Filter.rewriteKeyword pair) (Face.keywords renamed),
+              -- CR 208.2a's star, the same carrier PC.characteristicPT is at
+              -- layer 3, and unevaluated for the same reason.
+              Face.characteristicPT = fmap (rewriteQuantity pair) (Face.characteristicPT renamed),
+              Face.spell = rewriteModal pair (Face.spell renamed),
+              Face.activatedAbilities = fmap (rewriteActivatedAbility pair) (Face.activatedAbilities renamed),
+              Face.triggeredAbilities = fmap (rewriteTriggeredAbility pair) (Face.triggeredAbilities renamed),
+              Face.delayedAbilities = fmap (rewriteTriggeredAbility pair) (Face.delayedAbilities renamed),
+              Face.staticAbilities = fmap (rewriteStaticAbility pair) (Face.staticAbilities renamed)
+            }
+
+-- A whole static ability under CR 612.1, for the defined-card walk above. The
+-- permanent's own statics are reached piecemeal instead -- gatherStatic rewrites
+-- the affected clause and staticParts the modifications -- because those two are
+-- read at different layers; a defined card is rewritten once, before anything
+-- reads it at all.
+rewriteStaticAbility :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> StaticAbility.StaticAbility Card.Type.Card -> StaticAbility.StaticAbility Card.Type.Card
+rewriteStaticAbility pairs sa =
+  sa
+    { StaticAbility.affected = rewriteAffected pairs (StaticAbility.affected sa),
+      StaticAbility.condition = fmap (rewriteCondition pairs) (StaticAbility.condition sa),
+      StaticAbility.modifications = fmap (rewriteModification pairs) (StaticAbility.modifications sa)
+    }
 
 -- CR 612.2a's name half. Both words are looked up in CR 205.3m's list, since a
 -- name is TEXT and writing the new one needs the word itself, not just the family
@@ -2090,13 +2155,21 @@ rewriteModal pairs modal =
             -- why this is a record update rather than a Filter.rewriteCost call.
             Clause.condition = fmap (rewriteCondition pairs) (Clause.condition c)
           }
-      rewriteTargetSlot slot = slot {TargetSlot.filter = fmap (Filter.rewrite pairs) (TargetSlot.filter slot)}
       rewriteMode m =
         m
           { Mode.clauses = fmap rewriteClause (Mode.clauses m),
-            Mode.targetSlots = fmap rewriteTargetSlot (Mode.targetSlots m)
+            Mode.targetSlots = fmap (rewriteTargetSlot pairs) (Mode.targetSlots m)
           }
    in modal {Modal.modes = fmap rewriteMode (Modal.modes modal)}
+
+-- A single target slot under CR 612.1. Top-level rather than local to
+-- rewriteModal because Pawl.Engine.Resolve needs the same rewrite over a
+-- resolving SPELL's slots, which it reads off the printed face rather than
+-- through a Modal (CR 608.2b).
+--
+-- Only the Filter, and the Pool is not an omission: see rewriteModal's comment.
+rewriteTargetSlot :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> TargetSlot.TargetSlot -> TargetSlot.TargetSlot
+rewriteTargetSlot pairs slot = slot {TargetSlot.filter = fmap (Filter.rewrite pairs) (TargetSlot.filter slot)}
 
 -- CR 612.1 through a trigger's own condition. Exhaustive rather than a wildcard,
 -- so a later condition carrying a Filter fails to compile here instead of
