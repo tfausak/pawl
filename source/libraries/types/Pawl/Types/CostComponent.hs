@@ -6,6 +6,7 @@ import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
+import qualified Pawl.Types.TapPermanents as TapPermanents
 
 -- | One component of a Pawl.Types.Cost's non-mana part, alongside its mana part
 -- (CR 601.2f).
@@ -99,6 +100,31 @@ data CostComponent keyword
     --
     -- A Natural and not a Quantity, for PayLife's reason above.
     TapForTotalPower (TapForTotalPower.TapForTotalPower keyword)
+  | -- | Tap exactly this many permanents matching the Filter, chosen by the
+    -- payer. Springleaf Drum's "{T}, Tap an untapped creature you control" is
+    -- the printing, and the whole of "an untapped creature you control" rides
+    -- the Filter -- "untapped" is `Not IsTapped`, "you control" is
+    -- `ControlledBy You`, and a card printing "another" adds `Not IsSource`,
+    -- all three already in the vocabulary. CR 601.2f names it outright --
+    -- "costs may include paying mana, tapping permanents, sacrificing
+    -- permanents, discarding cards, and so on" -- so unlike the exile
+    -- components below this one needs no appeal to CR 118.1.
+    --
+    -- Sacrifice's shape (a count plus a criterion) rather than
+    -- TapForTotalPower's, and that is the whole reason for a third tapping arm:
+    -- CR 702.122a's threshold leaves the number of objects undetermined, so it
+    -- can express neither "exactly one" nor any other count. Narrowing that
+    -- component's Filter cannot close the gap either, since a Filter is a
+    -- predicate over ONE candidate.
+    --
+    -- NOT TapThis with a criterion: that one names the object the cost is on
+    -- and offers nothing to choose, which is SacrificeThis' distinction from
+    -- Sacrifice drawn again.
+    --
+    -- CR 302.6 does NOT reach it, so it does not join TapThis and UntapThis in
+    -- Pawl.Engine.Cost.requiresSicknessCheck -- see that function. The tapped
+    -- permanent may have arrived this turn.
+    TapPermanents (TapPermanents.TapPermanents keyword)
   | -- | CR 601.2f: discard this many cards matching the Filter from hand
     -- (Cathartic Reunion's two of any card, Magmatic Insight's one land card).
     -- CR 701.9b gives the choice to the discarding player, so this is a prompt

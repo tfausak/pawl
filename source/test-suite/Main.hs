@@ -230,6 +230,7 @@ import qualified Pawl.Codec.SubtypeSpec
 import qualified Pawl.Codec.SupertypeSpec
 import qualified Pawl.Codec.TakeExtraTurnSpec
 import qualified Pawl.Codec.TapForTotalPowerSpec
+import qualified Pawl.Codec.TapPermanentsSpec
 import qualified Pawl.Codec.TapStateSpec
 import qualified Pawl.Codec.TargetCountSpec
 import qualified Pawl.Codec.TargetSlotSpec
@@ -623,6 +624,7 @@ spec s registry = do
   Pawl.Codec.SupertypeSpec.spec s
   Pawl.Codec.TakeExtraTurnSpec.spec s
   Pawl.Codec.TapForTotalPowerSpec.spec s
+  Pawl.Codec.TapPermanentsSpec.spec s
   Pawl.Codec.TapStateSpec.spec s
   Pawl.Codec.TargetCountSpec.spec s
   Pawl.Codec.TargetSlotSpec.spec s
