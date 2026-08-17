@@ -4,12 +4,14 @@
 -- is a layer, and Pawl.Engine.Projection sees none of them.
 --
 -- The only reader of Pawl.Types.AttackRequirement. Pawl.Engine.Combat asks for
--- requirement INSTANCES -- bare creature ids -- and never learns which card
--- produced one.
+-- requirement INSTANCES -- bare creature ids, with a count apiece -- and never
+-- learns which card produced one.
 module Pawl.Engine.AttackRequirement where
 
-import Data.Set (Set)
+import Data.Map (Map)
+import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
@@ -19,20 +21,30 @@ import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
 
 -- CR 508.1d: every requirement in force right now, INSTANTIATED as the
--- creatures the active player is required to declare as attackers.
+-- creatures the active player is required to declare as attackers, each
+-- carrying HOW MANY requirements name it.
 --
--- A set of ids and not a count, because CR 508.1d counts requirements being
--- OBEYED by a particular declaration, so each one must stay identifiable
--- against the declaration it is checked against. One instance per CREATURE, not
--- per ability: CR 508.1d checks each creature the active player controls, so
--- one Curse over three able creatures is three requirements.
+-- Keyed by the creature and not a bare count, because CR 508.1d counts
+-- requirements being OBEYED by a particular declaration, and a declaration
+-- obeys an instance exactly when it attacks with that creature -- so each one
+-- must stay identifiable against the declaration it is checked against. One
+-- instance per CREATURE per requirement, not per ability: CR 508.1d checks each
+-- creature the active player controls, so one Curse over three able creatures
+-- is three requirements.
 --
--- NOT IMPLEMENTED: two requirements over the SAME creature collapse to one
--- instance here, where CR 508.1d counts requirements. Harmless while every
--- restriction is per creature -- a declaration obeys both or neither -- but a
--- set-shaped restriction (CR 508.1c) falsifies that, and then the collapse
--- changes an answer (#1705). BlockRequirement.instances is the twin that counts
--- them.
+-- A MULTISET and not a set, because the rule counts requirements rather than
+-- creatures: a Berserkers of Blood Ridge ("this creature attacks each combat if
+-- able") under a Curse of the Nightly Hunt is two requirements on that creature
+-- and one on each other creature the cursed player controls, so under a Silent
+-- Arbiter's bound of one only the Berserkers attains the maximum. Proved by
+-- boundedDeclarationSpec's "two requirements on ONE creature count twice".
+-- BlockRequirement.instances is the twin, on pairs.
+--
+-- The multiplicity counts DISTINCT REQUIREMENTS, not gathering events: the
+-- battlefield walk is over a Set, `candidates` is duplicate-free (Combat filters
+-- it from that same Set), and fromRequirement filters `candidates` once per
+-- requirement -- so a creature is emitted exactly once per requirement naming
+-- it, and two Curses are two sources and therefore two emissions.
 --
 -- `candidates` is CR 508.1a's chosen-from set, and it carries the "if able" of
 -- "attacks each combat if able". Passed IN rather than computed here, as
@@ -40,11 +52,11 @@ import Pawl.Types.ObjectId (ObjectId)
 -- restrictions. Pruning by it changes no answer -- a creature that cannot
 -- attack attacks in no legal declaration.
 --
--- What the instance set is NOT is CR 508.1d's maximum. It is an upper bound on
--- it, and Combat.attackCeiling is what turns the bound into the number: a
--- creature restricted by its declaration's SIZE (Bonded Construct) is a
--- candidate and mints an instance, yet the declaration obeying every instance at
--- once can be one no player may make. The bound and the maximum coincide on a
+-- What the instance multiset is NOT is CR 508.1d's maximum. Its total is an
+-- upper bound on it, and Combat.attackCeiling is what turns the bound into the
+-- number: a creature restricted by its declaration's SIZE (Bonded Construct) is
+-- a candidate and mints an instance, yet the declaration obeying every instance
+-- at once can be one no player may make. The bound and the maximum coincide on a
 -- board with no such card, which is what attackCeiling's closed form exploits.
 --
 -- No `able` predicate BESIDE the candidate list, where the blocking twin has
@@ -52,7 +64,7 @@ import Pawl.Types.ObjectId (ObjectId)
 -- be decided per blocker. Every attacking restriction pawl models is either per
 -- creature -- already inside Combat.canAttack -- or about the whole declaration,
 -- which no per-creature predicate could carry either.
-instances :: [ObjectId] -> GameState -> Set ObjectId
+instances :: [ObjectId] -> GameState -> Map ObjectId Natural
 instances candidates gs =
   let -- Hoisted out of the walk as BlockRequirement.instances hoists them, and
       -- both unforced until some permanent actually declares a requirement.
@@ -99,4 +111,6 @@ instances candidates gs =
       fromRequirement source changes requirement =
         let subject = AttackRequirement.subject requirement
          in filter (named source (if null changes then subject else Projection.rewriteAffected changes subject)) candidates
-   in Set.fromList (concatMap fromPermanent (Set.toList (GameState.battlefield gs)))
+   in Map.fromListWith
+        (+)
+        (fmap (\oid -> (oid, 1)) (concatMap fromPermanent (Set.toList (GameState.battlefield gs))))
