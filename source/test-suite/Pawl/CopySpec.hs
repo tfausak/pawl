@@ -594,7 +594,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   --
   -- Blind-Spot Giant is 4/3 deliberately: 4 /= 3, and neither is 0 or 1, so power
   -- and toughness cannot be swapped without the assertion seeing it, and 7/6
-  -- cannot be reached by any other pairing on this board. Goblin Piker (2/1) is
+  -- cannot be reached by any other pairing on this board -- including the 8/7 a
+  -- copy taken off the Giant's counter-boosted projection would give. Goblin Piker (2/1) is
   -- the SECOND creature, put down before the Giant so that the condition's
   -- "another creature" (Not IsSource) is a real restriction rather than trivially
   -- true -- and it is left alone, which is the check that the effect swept the
@@ -612,17 +613,25 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     let (shifterId, board0) = S.addCreature shapeshifter S.alice (S.landsInPlay forest 1)
         (pikerId, board) = S.addCreature piker S.alice board0
         grown = castAndResolve (targeting shifterId) growth board
-        (giantId, entered) = S.entersWithTrigger blindSpotGiant S.alice grown
+        (giantId, entered0) = S.entersWithTrigger blindSpotGiant S.alice grown
+        -- CR 707.2's exclusion, made observable: a +1/+1 counter takes the Giant's
+        -- PROJECTION to 5/4 while its copiable values stay 4/3, so the assertions
+        -- below tell the two reads apart. Without it both readings say 4/3 and the
+        -- test could not see a copy taken off the projection.
+        entered = S.addCounter CounterKind.PlusOnePlusOne 1 giantId entered0
         -- The settle puts the Shapeshifter's CR 603.6a trigger on the stack; the
         -- resolve runs it. The narrowest path that shows the behaviour.
         onStack = settle (targeting shifterId) entered
         after = resolveAndSettle (targeting shifterId) onStack
     Spec.assertBool s (not (null (GameState.stack onStack))) "the Shapeshifter's trigger really was on the stack"
     Spec.assertEqWith s "before: the printed 0/1 plus the Giant Growth" (S.powerToughnessOf shifterId onStack) $ Just (3, 4)
-    Spec.assertEqWith s "after: the copied 4/3 plus the SAME Giant Growth" (S.powerToughnessOf shifterId after) $ Just (7, 6)
-    Spec.assertEqWith s "and it is the Giant by name (CR 707.2)" (Projection.namesOf shifterId after) . Set.singleton . CardName.MkCardName $ Text.pack "Blind-Spot Giant"
-    Spec.assertEqWith s "the creature that entered is untouched" (S.powerToughnessOf giantId after) $ Just (4, 3)
+    -- Asserted BEFORE the Shapeshifter's own pair so that the two mutations stay
+    -- disjoint: swapping the refs reddens these two and leaves the Shapeshifter
+    -- at 3/4, while neutralising the stamp reddens only the pair below.
+    Spec.assertEqWith s "the creature that entered is untouched, counter and all" (S.powerToughnessOf giantId after) $ Just (5, 4)
     Spec.assertEqWith s "and so is the other creature already there" (S.powerToughnessOf pikerId after) $ Just (2, 1)
+    Spec.assertEqWith s "after: the copiable 4/3 -- not the counter-boosted 5/4 -- plus the SAME Giant Growth" (S.powerToughnessOf shifterId after) $ Just (7, 6)
+    Spec.assertEqWith s "and it is the Giant by name (CR 707.2)" (Projection.namesOf shifterId after) . Set.singleton . CardName.MkCardName $ Text.pack "Blind-Spot Giant"
     -- Not implemented: CR 707.9a's "except it has this ability" (#1292). pawl's
     -- Shapeshifter takes the Giant's abilities and only those, so it loses the
     -- trigger that copied and can never copy again -- STRICTER than printed, and

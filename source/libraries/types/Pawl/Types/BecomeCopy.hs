@@ -14,8 +14,9 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 --
 -- Each is an ObjectRef rather than a bare SlotName, for the reason CreateCopy's
 -- comment gives: `original` is a slot on every producer in the pool, while
--- `subject` is "this permanent" and so an EachMatching over IsSource, and
--- Mirrorweave's "each other creature" is the swept shape the same field takes.
+-- `subject` is "this permanent" and so an EachMatching over IsSource. Mirrorweave's
+-- "each other creature becomes a copy of target nonlegendary creature" is the
+-- swept shape the same field takes, and needs only a duration besides (#1753).
 --
 -- NO DURATION FIELD, and that is structural rather than an omission. This opcode
 -- writes the copiable values themselves (CR 707.2 / 613.1a layer 1) by stamping

@@ -1134,11 +1134,13 @@ countersOf oid gs = maybe Map.empty Object.counters (Game.lookupObject oid gs)
 -- otherwise. Base-or-snapshot only, so counters, pumps, control and ability
 -- grants are structurally never part of a copied object's copiable value.
 --
--- THREE writers of that snapshot, all of them layer 1 and all of them reaching it
--- through Binding.setCopy: the CR 707.5 entry replacement (EntryRewrite.AsCopy,
--- Clone), the CR 707.1 token mint (Effect.CreateCopy), and the CR 707.4 change of
--- a permanent already on the battlefield (Effect.BecomeCopy, Unstable
--- Shapeshifter). One reader for the three is what makes CR 707.3's last sentence
+-- Four writers of that snapshot, every one of them layer 1 and every one of them
+-- reaching it through Binding.setCopy: the CR 707.5 entry replacement
+-- (EntryRewrite.AsCopy, Clone), the CR 707.1 token mint (Effect.CreateCopy,
+-- Event.createTokens), CR 208.2b's chosen entry shape
+-- (Replacement.applyEntryOption, Primal Plasma), and the CR 707.4 change of a
+-- permanent already on the battlefield (Effect.BecomeCopy, Unstable
+-- Shapeshifter). One reader for the four is what makes CR 707.3's last sentence
 -- free -- "objects that copy the object will use the new copiable values" -- so a
 -- token copy of a Shapeshifter reads what the Shapeshifter copied.
 --
