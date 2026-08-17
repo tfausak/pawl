@@ -54,6 +54,7 @@ codec =
       Arm.nullary "SelfAttacksUnblocked" TriggerCondition.SelfAttacksUnblocked,
       Arm.nullary "SelfCycled" TriggerCondition.SelfCycled,
       Arm.nullary "SelfRevealedForMiracle" TriggerCondition.SelfRevealedForMiracle,
+      Arm.nullary "SelfDiscarded" TriggerCondition.SelfDiscarded,
       Arm.payload "PlayerDiscards" PlayerRelation.codec TriggerCondition.PlayerDiscards (\x -> case x of TriggerCondition.PlayerDiscards y -> Just y; _ -> Nothing),
       Arm.payload "PlayerDrawsNthCard" PlayerDrawsNthCard.codec TriggerCondition.PlayerDrawsNthCard (\x -> case x of TriggerCondition.PlayerDrawsNthCard y -> Just y; _ -> Nothing),
       Arm.nullary "SelfPutIntoGraveyardFromLibrary" TriggerCondition.SelfPutIntoGraveyardFromLibrary,

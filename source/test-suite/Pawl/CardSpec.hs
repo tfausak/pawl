@@ -641,6 +641,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfAttacksUnblocked -> []
   TriggerCondition.SelfCycled -> []
   TriggerCondition.SelfRevealedForMiracle -> []
+  TriggerCondition.SelfDiscarded -> []
   -- CR 701.9a's discard condition is a PlayerRelation, which holds no Count.
   TriggerCondition.PlayerDiscards _ -> []
   TriggerCondition.PlayerDrawsNthCard {} -> []
@@ -2631,6 +2632,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfAttacksUnblocked -> []
   TriggerCondition.SelfCycled -> []
   TriggerCondition.SelfRevealedForMiracle -> []
+  TriggerCondition.SelfDiscarded -> []
   TriggerCondition.PlayerDiscards _ -> []
   TriggerCondition.PlayerDrawsNthCard {} -> []
   -- CR 725.1's crowning condition is a PlayerRelation, which holds no Filter.
@@ -5153,7 +5155,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   --
   -- Swept over the pool, with the non-vacuity assertion its neighbours carry: a
   -- pool with no AnyOf at all would pass this without examining anything.
-  -- Balemurk Leech is the pool's one AnyOf, and it is ACCEPTED here.
+  -- The pool's AnyOf cards -- Balemurk Leech, Bartered Cow and their like -- are
+  -- all ACCEPTED here.
   Spec.it s "CR 603.2 no AnyOf mixes in a state trigger or nests another AnyOf" $ do
     ps <- S.allPrintings s
     let conditions c = fmap TriggeredAbility.condition (Face.triggeredAbilities c)
