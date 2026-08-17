@@ -162,8 +162,9 @@ data ObjectRef
     -- that has already left the stack is not in the set and one put there since
     -- the countering spell was cast is.
     EachSpell (Filter.Filter Keyword.Keyword)
-  | -- | Every PLAYER in the game -- Molten Disaster's "and each player". The one
-    -- arm that names no object at all, and it is here rather than on
+  | -- | Every PLAYER in the game -- Molten Disaster's "and each player". The
+    -- first of the two arms that name no object at all (ChosenPlayer below is the
+    -- other), and it is here rather than on
     -- Pawl.Types.PlayerRef because the opcode that needs it takes an ObjectRef:
     -- CR 120.3a makes a player a damage recipient, and Effect.DealDamage already
     -- reaches one through the InSlot arm. Every OTHER ObjectRef-taking opcode

@@ -4944,18 +4944,18 @@ stuffyDollSpec s registry =
       -- The answer is pinned to a PlayerId by identity rather than by an index
       -- into the offer: an answerer that searched the candidate list for a legal
       -- seat would find a different one after a mutation and repair the assertion.
-      castDoll :: Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> (GameState.GameState, Maybe ObjectId.ObjectId)
+      castDoll :: Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> (GameState.GameState, Maybe ObjectId.ObjectId, [Response.Response])
       castDoll doll mountain who =
         let (withCard, oid) = S.handOne doll (S.landsFor mountain S.alice 5 S.threePlayerGame)
             step :: Prompt.Prompt r -> r
             step p = case p of
               Prompt.ChoosePlayer {} -> who
               _ -> S.identityAnswer p
-            after = snd (Engine.runGamePure step withCard (S.cast S.alice oid >> Stack.resolveTop))
+            ((_, after), answers) = Replay.record step withCard (S.cast S.alice oid >> Stack.resolveTop)
             entered = case Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield withCard)) of
               o : _ -> Just o
               [] -> Nothing
-         in (after, entered)
+         in (after, entered, answers)
    in Spec.describe s "Stuffy Doll (CR 614.1c)" $ do
         -- THE PROVING CASE, and a pair of boards differing only in the answer.
         Spec.it s "CR 614.1c the chosen player, and only they, take the damage" $ do
@@ -4963,7 +4963,7 @@ stuffyDollSpec s registry =
           mountain <- S.printingOf s registry "Mountain"
           piker <- S.printingOf s registry "Goblin Piker"
           let hit who = case castDoll doll mountain who of
-                (gs, Just dollId) ->
+                (gs, Just dollId, _) ->
                   let (pikerId, board) = S.addCreature piker S.bob gs
                    in Just (board, dollId, dealing [noncombat pikerId dollId 3] board)
                 _ -> Nothing
@@ -4986,7 +4986,12 @@ stuffyDollSpec s registry =
           doll <- S.printingOf s registry "Stuffy Doll"
           mountain <- S.printingOf s registry "Mountain"
           case castDoll doll mountain S.carol of
-            (gs, Just dollId) -> Spec.assertEqWith s "CR 614.1c the Doll remembers carol" (chosenOn dollId gs) (Just S.carol)
+            (gs, Just dollId, answers) -> do
+              Spec.assertEqWith s "CR 614.1c the Doll remembers carol" (chosenOn dollId gs) (Just S.carol)
+              -- The SECOND INVARIANT, asserted directly: the engine did not pick a
+              -- seat, it asked. Three seats make CR 102.1's offer three wide, so
+              -- the prompt is a real question rather than an elided one.
+              Spec.assertBool s (List.elem (Response.ChosePlayer S.carol) answers) "CR 614.12a the engine raised a ChoosePlayer prompt"
             _ -> Spec.assertFailure s "the Doll did not reach the battlefield"
         -- CR 400.7: a NEW object forgets the choice. Object.newIncarnation is a
         -- record UPDATE, so omitting the field there compiles and silently carries
@@ -4997,7 +5002,7 @@ stuffyDollSpec s registry =
           doll <- S.printingOf s registry "Stuffy Doll"
           mountain <- S.printingOf s registry "Mountain"
           case castDoll doll mountain S.bob of
-            (gs, Just dollId) -> do
+            (gs, Just dollId, _) -> do
               -- The discriminator: without it an assertion over an object that
               -- never chose anybody would pass whatever newIncarnation does.
               Spec.assertEqWith s "the object going in genuinely carried a chosen player" (chosenOn dollId gs) (Just S.bob)
@@ -5015,7 +5020,7 @@ stuffyDollSpec s registry =
           doll <- S.printingOf s registry "Stuffy Doll"
           mountain <- S.printingOf s registry "Mountain"
           case castDoll doll mountain S.bob of
-            (gs, Just dollId) -> do
+            (gs, Just dollId, _) -> do
               -- CR 302.6: the Doll was cast this turn, so its {T} ability is
               -- unactivatable until its controller's next turn begins. Settled by
               -- hand rather than by driving a turn cycle, which would add a draw
