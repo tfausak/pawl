@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ModifyTargetSpec where
 
 import qualified Data.Text as Text
@@ -26,5 +24,5 @@ spec s = Spec.describe s "Pawl.Codec.ModifyTarget" $ do
             ModifyTarget.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))
           }
       )
-      """ {"duration":{"type":"UntilEndOfTurn"},"modification":{"type":"GainKeyword","value":{"type":"Flying"}},"ref":{"type":"InSlot","value":"target"}} """
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"modification\":{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Flying\"}},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ModifyTarget.codec

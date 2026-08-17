@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ArmDelayedTriggerSpec where
 
 import qualified Data.Text as Text
@@ -25,7 +23,7 @@ spec s = Spec.describe s "Pawl.Codec.ArmDelayedTrigger" $ do
             ArmDelayedTrigger.duration = Nothing
           }
       )
-      """ {"name":"sacrifice it"} """
+      " {\"name\":\"sacrifice it\"} "
   -- CR 603.7b's stated duration alone -- Full Throttle's "this turn".
   Spec.it s "MkArmDelayedTrigger, duration alone" $
     Common.assertCodec
@@ -37,7 +35,7 @@ spec s = Spec.describe s "Pawl.Codec.ArmDelayedTrigger" $ do
             ArmDelayedTrigger.duration = Just Duration.UntilEndOfTurn
           }
       )
-      """ {"name":"each combat","duration":{"type":"UntilEndOfTurn"}} """
+      " {\"name\":\"each combat\",\"duration\":{\"type\":\"UntilEndOfTurn\"}} "
   -- Meandering Towershell's "on your next turn": the onset alone. Under the
   -- positional payload this was the three-element form, and only its LENGTH
   -- separated it from the case above -- an onset and a duration are both
@@ -52,5 +50,5 @@ spec s = Spec.describe s "Pawl.Codec.ArmDelayedTrigger" $ do
             ArmDelayedTrigger.duration = Nothing
           }
       )
-      """ {"name":"return it","onset":{"type":"FromYourNextTurn"}} """
+      " {\"name\":\"return it\",\"onset\":{\"type\":\"FromYourNextTurn\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ArmDelayedTrigger.codec

@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.TapPermanentsSpec where
 
 import qualified Pawl.Codec.Keyword as Keyword
@@ -30,5 +28,5 @@ spec s = Spec.describe s "Pawl.Codec.TapPermanents" $ do
             TapPermanents.whichPermanents = Filter.HasCardType CardType.Creature
           }
       )
-      """ {"count":1,"whichPermanents":{"type":"HasCardType","value":{"type":"Creature"}}} """
+      " {\"count\":1,\"whichPermanents\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

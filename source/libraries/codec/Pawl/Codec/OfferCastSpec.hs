@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.OfferCastSpec where
 
 import qualified Data.Text as Text
@@ -24,7 +22,7 @@ spec s = Spec.describe s "Pawl.Codec.OfferCast" $ do
             OfferCast.offer = CastOffer.defaultValue
           }
       )
-      """ {"slot":"exiled"} """
+      " {\"slot\":\"exiled\"} "
   -- CR 310.12b's two riders, which is what stops the offer being elided.
   Spec.it s "MkOfferCast, offer written" $
     Common.assertCodec
@@ -40,5 +38,5 @@ spec s = Spec.describe s "Pawl.Codec.OfferCast" $ do
                 }
           }
       )
-      """ {"slot":"exiled","offer":{"transformed":true,"withoutPayingManaCost":true}} """
+      " {\"slot\":\"exiled\",\"offer\":{\"transformed\":true,\"withoutPayingManaCost\":true}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s OfferCast.codec

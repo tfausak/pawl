@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.PrintingSpec where
 
 import qualified Pawl.Codec.CardSpec as CardSpec
@@ -19,4 +17,4 @@ spec s =
       s
       Printing.codec
       (Printing.MkPrinting CardSpec.mountainCard)
-      """ {"faces":[{"name":"Mountain","typeLine":{"supertypes":[{"type":"Basic"}],"types":[{"type":"Land"}],"subtypes":[{"type":"Mountain"}]}}]} """
+      " {\"faces\":[{\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]}}]} "

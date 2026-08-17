@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.SetPowerToughnessSpec where
 
 import qualified Pawl.Codec.SetPowerToughness as SetPowerToughness
@@ -16,5 +14,5 @@ spec s = Spec.describe s "Pawl.Codec.SetPowerToughness" $ do
       s
       SetPowerToughness.codec
       (SetPowerToughness.MkSetPowerToughness {SetPowerToughness.power = 3, SetPowerToughness.toughness = 4})
-      """ {"power":3,"toughness":4} """
+      " {\"power\":3,\"toughness\":4} "
   Spec.it s "has a schema" $ Common.assertHasSchema s SetPowerToughness.codec

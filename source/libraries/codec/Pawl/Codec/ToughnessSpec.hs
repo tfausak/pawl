@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ToughnessSpec where
 
 import qualified Pawl.Codec.Toughness as Toughness
@@ -15,5 +13,5 @@ spec s = Spec.describe s "Pawl.Codec.Toughness" $ do
       s
       Toughness.codec
       (Toughness.MkToughness (Quantity.Literal 2))
-      """ {"type":"Literal","value":2} """
+      " {\"type\":\"Literal\",\"value\":2} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Toughness.codec

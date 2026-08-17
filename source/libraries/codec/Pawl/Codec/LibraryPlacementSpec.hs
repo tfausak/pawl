@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.LibraryPlacementSpec where
 
 import qualified Data.Either as Either
@@ -20,25 +18,25 @@ spec s = Spec.describe s "Pawl.Codec.LibraryPlacement" $ do
       s
       LibraryPlacement.codec
       (LibraryPlacement.Stated LibraryPosition.Top)
-      """ {"type":"Stated","value":{"type":"Top"}} """
+      " {\"type\":\"Stated\",\"value\":{\"type\":\"Top\"}} "
   Spec.it s "Stated Bottom" $
     Common.assertCodec
       s
       LibraryPlacement.codec
       (LibraryPlacement.Stated LibraryPosition.Bottom)
-      """ {"type":"Stated","value":{"type":"Bottom"}} """
+      " {\"type\":\"Stated\",\"value\":{\"type\":\"Bottom\"}} "
   Spec.it s "OwnerChooses" $
     Common.assertCodec
       s
       LibraryPlacement.codec
       LibraryPlacement.OwnerChooses
-      """ {"type":"OwnerChooses"} """
+      " {\"type\":\"OwnerChooses\"} "
   -- A bare position is no longer a placement, which is what keeps the schema's
   -- oneOf honest. It no longer has to tell a placement from a zone --- moveTail
   -- is gone (#1305) and the placement is a named key.
   Spec.it s "rejects a bare position" $
     Spec.assertBool
       s
-      (Either.isLeft (Common.parse (Text.pack """ {"type":"Top"} """) >>= Codec.decode LibraryPlacement.codec))
+      (Either.isLeft (Common.parse (Text.pack " {\"type\":\"Top\"} ") >>= Codec.decode LibraryPlacement.codec))
       "expected a decode failure"
   Spec.it s "has a schema" $ Common.assertHasSchema s LibraryPlacement.codec

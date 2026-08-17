@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.AgainstSlotSpec where
 
 import qualified Data.Text as Text
@@ -29,5 +27,5 @@ spec s = Spec.describe s "Pawl.Codec.AgainstSlot" $ do
             AgainstSlot.quantity = Quantity.Toughness
           }
       )
-      """ {"slot":"target","quantity":{"type":"Toughness"}} """
+      " {\"slot\":\"target\",\"quantity\":{\"type\":\"Toughness\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

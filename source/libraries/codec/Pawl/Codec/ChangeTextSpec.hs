@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ChangeTextSpec where
 
 import qualified Data.Set as Set
@@ -28,7 +26,7 @@ spec s = Spec.describe s "Pawl.Codec.ChangeText" $ do
             ChangeText.slot = SlotName.MkSlotName (Text.pack "target")
           }
       )
-      """ {"family":{"type":"BasicLandType"},"forbidden":[],"slot":"target"} """
+      " {\"family\":{\"type\":\"BasicLandType\"},\"forbidden\":[],\"slot\":\"target\"} "
   -- The set is ascending and deduplicated on the wire, which Common.set's
   -- decoder additionally rejects a repeat for.
   Spec.it s "MkChangeText, forbidden subtypes are written in order" $
@@ -41,5 +39,5 @@ spec s = Spec.describe s "Pawl.Codec.ChangeText" $ do
             ChangeText.slot = SlotName.MkSlotName (Text.pack "target")
           }
       )
-      """ {"family":{"type":"BasicLandType"},"forbidden":[{"type":"Forest"},{"type":"Island"}],"slot":"target"} """
+      " {\"family\":{\"type\":\"BasicLandType\"},\"forbidden\":[{\"type\":\"Forest\"},{\"type\":\"Island\"}],\"slot\":\"target\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ChangeText.codec

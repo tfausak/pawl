@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.AffectedPlayersSpec where
 
 import qualified Data.Text as Text
@@ -17,11 +15,11 @@ spec s = Spec.describe s "Pawl.Codec.AffectedPlayers" $ do
       s
       AffectedPlayers.codec
       (AffectedPlayers.Scoped PlayerScope.Opponents)
-      """ {"type":"Scoped","value":{"type":"Opponents"}} """
+      " {\"type\":\"Scoped\",\"value\":{\"type\":\"Opponents\"}} "
   Spec.it s "Named" $
     Common.assertCodec
       s
       AffectedPlayers.codec
       (AffectedPlayers.Named (SlotName.MkSlotName (Text.pack "target")))
-      """ {"type":"Named","value":"target"} """
+      " {\"type\":\"Named\",\"value\":\"target\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s AffectedPlayers.codec

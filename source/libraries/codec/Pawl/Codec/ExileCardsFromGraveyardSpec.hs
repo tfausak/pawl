@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ExileCardsFromGraveyardSpec where
 
 import qualified Pawl.Codec.ExileCardsFromGraveyard as ExileCardsFromGraveyard
@@ -29,5 +27,5 @@ spec s = Spec.describe s "Pawl.Codec.ExileCardsFromGraveyard" $ do
             ExileCardsFromGraveyard.whichCards = Filter.HasCardType CardType.Creature
           }
       )
-      """ {"count":1,"whichCards":{"type":"HasCardType","value":{"type":"Creature"}}} """
+      " {\"count\":1,\"whichCards\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

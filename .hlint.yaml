@@ -4,7 +4,6 @@
     - ApplicativeDo
     - FlexibleContexts
     - GADTs
-    - MultilineStrings
     - RankNTypes
     - ScopedTypeVariables
 

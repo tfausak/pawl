@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.PhaseSpec where
 
 import qualified Pawl.Codec.Phase as Phase
@@ -17,30 +15,30 @@ spec s = Spec.describe s "Pawl.Codec.Phase" $ do
       s
       Phase.codec
       (Phase.Beginning BeginningStep.Upkeep)
-      """ {"type":"Beginning","value":{"type":"Upkeep"}} """
+      " {\"type\":\"Beginning\",\"value\":{\"type\":\"Upkeep\"}} "
   Spec.it s "PrecombatMain" $
     Common.assertCodec
       s
       Phase.codec
       Phase.PrecombatMain
-      """ {"type":"PrecombatMain"} """
+      " {\"type\":\"PrecombatMain\"} "
   Spec.it s "Combat" $
     Common.assertCodec
       s
       Phase.codec
       (Phase.Combat CombatStep.DeclareBlockers)
-      """ {"type":"Combat","value":{"type":"DeclareBlockers"}} """
+      " {\"type\":\"Combat\",\"value\":{\"type\":\"DeclareBlockers\"}} "
   Spec.it s "PostcombatMain" $
     Common.assertCodec
       s
       Phase.codec
       Phase.PostcombatMain
-      """ {"type":"PostcombatMain"} """
+      " {\"type\":\"PostcombatMain\"} "
   Spec.it s "Ending" $
     Common.assertCodec
       s
       Phase.codec
       (Phase.Ending EndingStep.EndStep)
-      """ {"type":"Ending","value":{"type":"EndStep"}} """
+      " {\"type\":\"Ending\",\"value\":{\"type\":\"EndStep\"}} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Phase.codec

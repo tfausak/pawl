@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.BecameDesignatedSpec where
 
 import qualified Pawl.Codec.BecameDesignated as BecameDesignated
@@ -21,5 +19,5 @@ spec s = Spec.describe s "Pawl.Codec.BecameDesignated" $ do
             BecameDesignated.object = ObjectId.MkObjectId 1
           }
       )
-      """ {"designation":{"type":"Renowned"},"object":1} """
+      " {\"designation\":{\"type\":\"Renowned\"},\"object\":1} "
   Spec.it s "has a schema" $ Common.assertHasSchema s BecameDesignated.codec

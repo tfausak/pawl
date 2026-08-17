@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.AlternativeCostSpec where
 
 import qualified Pawl.Codec.AlternativeCost as AlternativeCost
@@ -30,7 +28,7 @@ spec s = Spec.describe s "Pawl.Codec.AlternativeCost" $ do
         { AlternativeCost.condition = Nothing,
           AlternativeCost.cost = Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost []), Cost.components = []}
         }
-      """ {"cost":{"mana":[]}} """
+      " {\"cost\":{\"mana\":[]}} "
   -- CR 604.2's "as long as" clause on one,
   -- Asmoranomardicadaistinaculdacar's: the condition is the payload a recursive
   -- decoder could lose, so it is round-tripped alongside a mana part that is not
@@ -55,5 +53,5 @@ spec s = Spec.describe s "Pawl.Codec.AlternativeCost" $ do
                 Cost.components = []
               }
         }
-      """ {"condition":{"type":"Compares","value":{"measured":{"type":"CardsDiscardedThisTurn","value":{"type":"Relative","value":{"type":"You"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":1}}},"cost":{"mana":[{"type":"Hybrid","value":{"left":{"type":"Colored","value":{"type":"Black"}},"right":{"type":"Colored","value":{"type":"Red"}}}}]}} """
+      " {\"condition\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"CardsDiscardedThisTurn\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}},\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":1}}},\"cost\":{\"mana\":[{\"type\":\"Hybrid\",\"value\":{\"left\":{\"type\":\"Colored\",\"value\":{\"type\":\"Black\"}},\"right\":{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}}}}]}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s AlternativeCost.codec

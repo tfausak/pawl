@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ExpirySpec where
 
 import qualified Pawl.Codec.Expiry as Expiry
@@ -26,14 +24,14 @@ spec s = Spec.describe s "Pawl.Codec.Expiry" $ do
       s
       Expiry.codec
       Expiry.AtCleanup
-      """ {"type":"AtCleanup"} """
+      " {\"type\":\"AtCleanup\"} "
   -- CR 611.2a: no sweep ends it.
   Spec.it s "Never" $
     Common.assertCodec
       s
       Expiry.codec
       Expiry.Never
-      """ {"type":"Never"} """
+      " {\"type\":\"Never\"} "
   -- CR 611.2b, baked with the concrete PlayerId CR 109.5's "you" resolves to.
   Spec.it s "While carries its player and condition" $
     Common.assertCodec
@@ -45,14 +43,14 @@ spec s = Spec.describe s "Pawl.Codec.Expiry" $ do
               While.condition = Condition.Compares (Compares.MkCompares (Quantity.Literal 0) Comparison.Exactly (Quantity.Literal 0))
             }
       )
-      """ {"type":"While","value":{"player":0,"condition":{"type":"Compares","value":{"measured":{"type":"Literal","value":0},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}}}}} """
+      " {\"type\":\"While\",\"value\":{\"player\":0,\"condition\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"Literal\",\"value\":0},\"comparison\":{\"type\":\"Exactly\"},\"threshold\":{\"type\":\"Literal\",\"value\":0}}}}} "
   -- CR 611.2a, as a concrete player.
   Spec.it s "AtTurnOf carries its player" $
     Common.assertCodec
       s
       Expiry.codec
       (Expiry.AtTurnOf (PlayerId.MkPlayerId 1))
-      """ {"type":"AtTurnOf","value":1} """
+      " {\"type\":\"AtTurnOf\",\"value\":1} "
   -- CR 611.2a's other phrasing, which needs the turn as well as the player: the
   -- effect ends at the end of the first turn of theirs numbered above it.
   Spec.it s "AtEndOfTurnOf carries its player and turn" $
@@ -65,7 +63,7 @@ spec s = Spec.describe s "Pawl.Codec.Expiry" $ do
               AfterTurn.turn = 3
             }
       )
-      """ {"type":"AtEndOfTurnOf","value":{"player":1,"turn":3}} """
+      " {\"type\":\"AtEndOfTurnOf\",\"value\":{\"player\":1,\"turn\":3}} "
   -- CR 500.5, carrying the PhaseSelector window. Both grains -- a stepless
   -- phase and a step -- because Pawl.Engine.Expiry.dropAtEndOf tells them apart
   -- by EQUALITY, so a codec that collapsed them would let the end of a combat
@@ -75,12 +73,12 @@ spec s = Spec.describe s "Pawl.Codec.Expiry" $ do
       s
       Expiry.codec
       (Expiry.AtEndOf PhaseSelector.CombatPhase)
-      """ {"type":"AtEndOf","value":{"type":"CombatPhase"}} """
+      " {\"type\":\"AtEndOf\",\"value\":{\"type\":\"CombatPhase\"}} "
     Common.assertCodec
       s
       Expiry.codec
       (Expiry.AtEndOf (PhaseSelector.Step (Phase.Combat CombatStep.EndOfCombat)))
-      """ {"type":"AtEndOf","value":{"type":"Step","value":{"type":"Combat","value":{"type":"EndOfCombat"}}}} """
+      " {\"type\":\"AtEndOf\",\"value\":{\"type\":\"Step\",\"value\":{\"type\":\"Combat\",\"value\":{\"type\":\"EndOfCombat\"}}}} "
     Spec.assertBool
       s
       (Codec.encode Expiry.codec (Expiry.AtEndOf PhaseSelector.CombatPhase) /= Codec.encode Expiry.codec (Expiry.AtEndOf (PhaseSelector.Step (Phase.Combat CombatStep.EndOfCombat))))

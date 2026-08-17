@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.LimitUnlessSpec where
 
 import qualified Pawl.Codec.LimitUnless as LimitUnless
@@ -20,7 +18,7 @@ spec s = Spec.describe s "Pawl.Codec.LimitUnless" $ do
       s
       LimitUnless.codec
       (LimitUnless.MkLimitUnless {LimitUnless.limit = 1, LimitUnless.unless = Nothing})
-      """ {"limit":1} """
+      " {\"limit\":1} "
   Spec.it s "MkLimitUnless, unless written" $
     Common.assertCodec
       s
@@ -33,5 +31,5 @@ spec s = Spec.describe s "Pawl.Codec.LimitUnless" $ do
                   (Compares.MkCompares (Quantity.Literal 1) Comparison.AtLeast (Quantity.Literal 1))
           }
       )
-      """ {"limit":2,"unless":{"type":"Compares","value":{"measured":{"type":"Literal","value":1},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":1}}}} """
+      " {\"limit\":2,\"unless\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"Literal\",\"value\":1},\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":1}}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s LimitUnless.codec

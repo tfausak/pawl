@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ComparisonSpec where
 
 import qualified Pawl.Codec.Comparison as Comparison
@@ -14,19 +12,19 @@ spec s = Spec.describe s "Pawl.Codec.Comparison" $ do
       s
       Comparison.codec
       Comparison.Exactly
-      """ {"type":"Exactly"} """
+      " {\"type\":\"Exactly\"} "
   Spec.it s "AtLeast" $
     Common.assertCodec
       s
       Comparison.codec
       Comparison.AtLeast
-      """ {"type":"AtLeast"} """
+      " {\"type\":\"AtLeast\"} "
   Spec.it s "AtMost" $
     Common.assertCodec
       s
       Comparison.codec
       Comparison.AtMost
-      """ {"type":"AtMost"} """
+      " {\"type\":\"AtMost\"} "
   -- Exhaustive where the literals above are representative: Arm.enum derives
   -- the arm list from the type, so this is what would catch a constructor the
   -- derivation missed or two that encode alike.

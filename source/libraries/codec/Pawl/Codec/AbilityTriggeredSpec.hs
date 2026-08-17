@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.AbilityTriggeredSpec where
 
 import qualified Pawl.Codec.AbilityTriggered as AbilityTriggered
@@ -23,5 +21,5 @@ spec s = Spec.describe s "Pawl.Codec.AbilityTriggered" $ do
             AbilityTriggered.condition = TriggerCondition.SelfEnters
           }
       )
-      """ {"source":1,"controller":0,"condition":{"type":"SelfEnters"}} """
+      " {\"source\":1,\"controller\":0,\"condition\":{\"type\":\"SelfEnters\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s AbilityTriggered.codec

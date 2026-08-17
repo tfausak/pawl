@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.CardNameSpec where
 
 import qualified Data.Either as Either
@@ -17,7 +15,7 @@ spec s = Spec.describe s "Pawl.Codec.CardName" $ do
       s
       CardName.codec
       (CardName.MkCardName (Text.pack "a"))
-      """ "a" """
+      " \"a\" "
 
   Spec.it s "has a schema" $
     Common.assertHasSchema s CardName.codec
@@ -25,5 +23,5 @@ spec s = Spec.describe s "Pawl.Codec.CardName" $ do
   Spec.it s "rejects a non-string" $
     Spec.assertBool
       s
-      (Either.isLeft (Common.parse (Text.pack """ 1 """) >>= Codec.decode CardName.codec))
+      (Either.isLeft (Common.parse (Text.pack " 1 ") >>= Codec.decode CardName.codec))
       "expected a decode failure"

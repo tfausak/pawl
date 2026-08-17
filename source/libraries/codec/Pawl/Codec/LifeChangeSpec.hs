@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.LifeChangeSpec where
 
 import qualified Pawl.Codec.LifeChange as LifeChange
@@ -17,5 +15,5 @@ spec s = Spec.describe s "Pawl.Codec.LifeChange" $ do
       s
       LifeChange.codec
       (LifeChange.MkLifeChange {LifeChange.player = PlayerId.MkPlayerId 0, LifeChange.amount = 3})
-      """ {"player":0,"amount":3} """
+      " {\"player\":0,\"amount\":3} "
   Spec.it s "has a schema" $ Common.assertHasSchema s LifeChange.codec

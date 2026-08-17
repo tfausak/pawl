@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.CharacteristicPTSpec where
 
 import qualified Pawl.Codec.CharacteristicPT as CharacteristicPT
@@ -23,5 +21,5 @@ spec s = Spec.describe s "Pawl.Codec.CharacteristicPT" $ do
             CharacteristicPT.toughness = Quantity.Plus (Plus.MkPlus (Quantity.Literal 1) Quantity.Star)
           }
       )
-      """ {"power":{"type":"Star"},"toughness":{"type":"Plus","value":{"left":{"type":"Literal","value":1},"right":{"type":"Star"}}}} """
+      " {\"power\":{\"type\":\"Star\"},\"toughness\":{\"type\":\"Plus\",\"value\":{\"left\":{\"type\":\"Literal\",\"value\":1},\"right\":{\"type\":\"Star\"}}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s CharacteristicPT.codec

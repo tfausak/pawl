@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ManaAdditionSpec where
 
 import qualified Data.Text as Text
@@ -27,7 +25,7 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
             ManaAddition.production = ManaProduction.OfType (ManaType.Colored Color.Green)
           }
       )
-      """ {"production":{"type":"OfType","value":{"type":"Colored","value":{"type":"Green"}}}} """
+      " {\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}}} "
   -- Shizuko, Caller of Autumn's "that player adds": the one printing that writes
   -- the key, over the slot CR 603.2b's step event bound.
   Spec.it s "MkManaAddition, a named recipient" $
@@ -39,5 +37,5 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
             ManaAddition.production = ManaProduction.OfType (ManaType.Colored Color.Green)
           }
       )
-      """ {"player":{"type":"InSlot","value":"thatPlayer"},"production":{"type":"OfType","value":{"type":"Colored","value":{"type":"Green"}}}} """
+      " {\"player\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"},\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ManaAddition.codec

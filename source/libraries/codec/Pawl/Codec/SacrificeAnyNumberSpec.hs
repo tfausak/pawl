@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.SacrificeAnyNumberSpec where
 
 import qualified Pawl.Codec.SacrificeAnyNumber as SacrificeAnyNumber
@@ -22,7 +20,7 @@ spec s = Spec.describe s "Pawl.Codec.SacrificeAnyNumber" $ do
             SacrificeAnyNumber.kind = Just CounterKind.PlusOnePlusOne
           }
       )
-      """ {"filter":{"type":"HasCardType","value":{"type":"Creature"}},"kind":{"type":"PlusOnePlusOne"}} """
+      " {\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"kind\":{\"type\":\"PlusOnePlusOne\"}} "
   -- The key is REQUIRED rather than elided: a null is a real answer here (the
   -- sacrifice places no counters), not an absence.
   Spec.it s "MkSacrificeAnyNumber, no counter kind" $
@@ -34,5 +32,5 @@ spec s = Spec.describe s "Pawl.Codec.SacrificeAnyNumber" $ do
             SacrificeAnyNumber.kind = Nothing
           }
       )
-      """ {"filter":{"type":"HasCardType","value":{"type":"Creature"}},"kind":null} """
+      " {\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"kind\":null} "
   Spec.it s "has a schema" $ Common.assertHasSchema s SacrificeAnyNumber.codec

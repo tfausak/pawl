@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.CombatRestrictionSpec where
 
 import qualified Pawl.Codec.CombatRestriction as CombatRestriction
@@ -34,14 +32,14 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
       s
       CombatRestriction.codec
       (CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless Affected.Attached Nothing))
-      """ {"type":"CantAttack","value":{"affected":{"type":"Attached"}}} """
+      " {\"type\":\"CantAttack\",\"value\":{\"affected\":{\"type\":\"Attached\"}}} "
   -- CR 509.1b, the blocking counterpart.
   Spec.it s "CantBlock carries its Affected" $
     Common.assertCodec
       s
       CombatRestriction.codec
       (CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless Affected.Attached Nothing))
-      """ {"type":"CantBlock","value":{"affected":{"type":"Attached"}}} """
+      " {\"type\":\"CantBlock\",\"value\":{\"affected\":{\"type\":\"Attached\"}}} "
   -- CR 509.1b's PAIRWISE arm, whose payload is the only one with a second Filter
   -- position: "blockers" beside "affected", never a second "affected", since the
   -- two describe opposite sides of the block.
@@ -50,7 +48,7 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
       s
       CombatRestriction.codec
       (CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy Affected.Attached Filter.PowerGreaterThanSource Nothing))
-      """ {"type":"CantBeBlockedBy","value":{"affected":{"type":"Attached"},"blockers":{"type":"PowerGreaterThanSource"}}} """
+      " {\"type\":\"CantBeBlockedBy\",\"value\":{\"affected\":{\"type\":\"Attached\"},\"blockers\":{\"type\":\"PowerGreaterThanSource\"}}} "
   -- CR 508.1c together with CR 506.5, the SET-SHAPED arm: the same payload as
   -- the two above, so the tag is the only thing that tells a reader this one is
   -- answered against a whole declaration.
@@ -59,7 +57,7 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
       s
       CombatRestriction.codec
       (CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless Affected.Attached Nothing))
-      """ {"type":"CantAttackAlone","value":{"affected":{"type":"Attached"}}} """
+      " {\"type\":\"CantAttackAlone\",\"value\":{\"affected\":{\"type\":\"Attached\"}}} "
   -- The SIZE-BOUNDING arms, whose payload spells "limit" where the three above
   -- spell "affected". They are here as much for the DECODER as for the shape:
   -- Pawl.Codec.CombatRestriction.fromJson dispatches on a string, so an arm
@@ -70,7 +68,7 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
       s
       CombatRestriction.codec
       (CombatRestriction.CantAttackMoreThan (LimitUnless.MkLimitUnless 1 Nothing))
-      """ {"type":"CantAttackMoreThan","value":{"limit":1}} """
+      " {\"type\":\"CantAttackMoreThan\",\"value\":{\"limit\":1}} "
   -- CR 509.1b, the blocking counterpart. A DIFFERENT limit from the one above,
   -- so a codec that crossed the two arms' payloads cannot pass both.
   Spec.it s "CantBlockMoreThan carries its limit" $
@@ -78,7 +76,7 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
       s
       CombatRestriction.codec
       (CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless 2 Nothing))
-      """ {"type":"CantBlockMoreThan","value":{"limit":2}} """
+      " {\"type\":\"CantBlockMoreThan\",\"value\":{\"limit\":2}} "
   -- CR 508.1c's second clause: the gated form.
   Spec.it s "CantAttack carries its condition" $
     Common.assertCodec

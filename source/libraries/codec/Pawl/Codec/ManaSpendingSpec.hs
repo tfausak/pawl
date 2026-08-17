@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ManaSpendingSpec where
 
 import qualified Pawl.Codec.ManaSpending as ManaSpending
@@ -14,13 +12,13 @@ spec s = Spec.describe s "Pawl.Codec.ManaSpending" $ do
       s
       ManaSpending.codec
       ManaSpending.AsProduced
-      """ {"type":"AsProduced"} """
+      " {\"type\":\"AsProduced\"} "
   Spec.it s "AnyType" $
     Common.assertCodec
       s
       ManaSpending.codec
       ManaSpending.AnyType
-      """ {"type":"AnyType"} """
+      " {\"type\":\"AnyType\"} "
   -- Exhaustive where the literals above are representative: Arm.enum derives the
   -- arm list from the type, so this is what would catch a constructor the
   -- derivation missed or two that encode alike.

@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.DefenseSpec where
 
 import qualified Data.Either as Either
@@ -17,7 +15,7 @@ spec s = Spec.describe s "Pawl.Codec.Defense" $ do
       s
       Defense.codec
       (Defense.MkDefense 5)
-      """ 5 """
+      " 5 "
 
   Spec.it s "has a schema" $
     Common.assertHasSchema s Defense.codec
@@ -27,5 +25,5 @@ spec s = Spec.describe s "Pawl.Codec.Defense" $ do
   Spec.it s "rejects a negative number" $
     Spec.assertBool
       s
-      (Either.isLeft (Common.parse (Text.pack """ -1 """) >>= Codec.decode Defense.codec))
+      (Either.isLeft (Common.parse (Text.pack " -1 ") >>= Codec.decode Defense.codec))
       "expected a decode failure"

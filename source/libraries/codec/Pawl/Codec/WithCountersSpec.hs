@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.WithCountersSpec where
 
 import qualified Pawl.Codec.WithCounters as WithCounters
@@ -16,5 +14,5 @@ spec s = Spec.describe s "Pawl.Codec.WithCounters" $ do
       s
       WithCounters.codec
       (WithCounters.MkWithCounters {WithCounters.kind = CounterKind.PlusOnePlusOne, WithCounters.amount = 2})
-      """ {"kind":{"type":"PlusOnePlusOne"},"amount":2} """
+      " {\"kind\":{\"type\":\"PlusOnePlusOne\"},\"amount\":2} "
   Spec.it s "has a schema" $ Common.assertHasSchema s WithCounters.codec

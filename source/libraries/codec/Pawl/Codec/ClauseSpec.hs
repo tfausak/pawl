@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ClauseSpec where
 
 import qualified Data.Sequence as Seq
@@ -53,7 +51,7 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
       toJson
       fromJson
       (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Attach (SlotName.MkSlotName (Text.pack "target")))))
-      """ {"effects":[{"type":"Attach","value":"target"}]} """
+      " {\"effects\":[{\"type\":\"Attach\",\"value\":\"target\"}]} "
   -- CR 603.5: an Optional clause is what a printed "may" encodes to, and the key
   -- is emitted only for that value.
   Spec.it s "an Optional clause's optionality key is present" $
@@ -62,7 +60,7 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
       toJson
       fromJson
       (Clause.MkClause Nothing Optionality.Optional Nothing Seq.empty)
-      """ {"optionality":{"type":"Optional"}} """
+      " {\"optionality\":{\"type\":\"Optional\"}} "
   -- CR 118.12a: Mana Leak's "unless its controller pays {3}" is what the
   -- payGate key encodes, and it is emitted only when there is one.
   Spec.it s "a clause carrying a resolution cost writes the key" $
@@ -84,7 +82,7 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
           )
           (Seq.singleton (Effect.Counter (Counter.MkCounter (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) Nothing)))
       )
-      """ {"effects":[{"type":"Counter","value":{"ref":{"type":"InSlot","value":"spell"}}}],"payGate":{"payer":"spell","cost":{"mana":[{"type":"Generic","value":3}]},"branch":{"type":"IfNotPaid"}}} """
+      " {\"effects\":[{\"type\":\"Counter\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"spell\"}}}],\"payGate\":{\"payer\":\"spell\",\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]},\"branch\":{\"type\":\"IfNotPaid\"}}} "
   -- CR 701.46a: adapt's "if this permanent has no +1/+1 counters on it".
   Spec.it s "a clause carrying a condition writes the key" $
     Common.assertJsonCodec
@@ -97,11 +95,11 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
           Nothing
           Seq.empty
       )
-      """ {"condition":{"type":"Compares","value":{"measured":{"type":"ObjectCounters","value":{"type":"PlusOnePlusOne"}},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}}}} """
+      " {\"condition\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"ObjectCounters\",\"value\":{\"type\":\"PlusOnePlusOne\"}},\"comparison\":{\"type\":\"Exactly\"},\"threshold\":{\"type\":\"Literal\",\"value\":0}}}} "
   Spec.it s "an empty clause omits every default field" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Clause.MkClause Nothing Optionality.Mandatory Nothing Seq.empty)
-      """ {} """
+      " {} "

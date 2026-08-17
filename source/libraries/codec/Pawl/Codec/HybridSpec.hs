@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.HybridSpec where
 
 import qualified Pawl.Codec.Hybrid as Hybrid
@@ -18,5 +16,5 @@ spec s = Spec.describe s "Pawl.Codec.Hybrid" $ do
       s
       Hybrid.codec
       (Hybrid.MkHybrid {Hybrid.left = ManaType.Colored Color.White, Hybrid.right = ManaType.Colored Color.Blue})
-      """ {"left":{"type":"Colored","value":{"type":"White"}},"right":{"type":"Colored","value":{"type":"Blue"}}} """
+      " {\"left\":{\"type\":\"Colored\",\"value\":{\"type\":\"White\"}},\"right\":{\"type\":\"Colored\",\"value\":{\"type\":\"Blue\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Hybrid.codec

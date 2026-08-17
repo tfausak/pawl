@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.SupertypeSpec where
 
 import qualified Pawl.Codec.Supertype as Supertype
@@ -14,35 +12,35 @@ spec s = Spec.describe s "Pawl.Codec.Supertype" $ do
       s
       Supertype.codec
       Supertype.Basic
-      """ {"type":"Basic"} """
+      " {\"type\":\"Basic\"} "
 
   Spec.it s "Legendary" $
     Common.assertCodec
       s
       Supertype.codec
       Supertype.Legendary
-      """ {"type":"Legendary"} """
+      " {\"type\":\"Legendary\"} "
 
   Spec.it s "Ongoing" $
     Common.assertCodec
       s
       Supertype.codec
       Supertype.Ongoing
-      """ {"type":"Ongoing"} """
+      " {\"type\":\"Ongoing\"} "
 
   Spec.it s "Snow" $
     Common.assertCodec
       s
       Supertype.codec
       Supertype.Snow
-      """ {"type":"Snow"} """
+      " {\"type\":\"Snow\"} "
 
   Spec.it s "World" $
     Common.assertCodec
       s
       Supertype.codec
       Supertype.World
-      """ {"type":"World"} """
+      " {\"type\":\"World\"} "
 
   -- Exhaustive where the literals above are representative: Arm.enum derives
   -- the arm list from the type, so this is what would catch a constructor the

@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ZoneChangeRSpec where
 
 import qualified Pawl.Codec.ZoneChangeR as ZoneChangeR
@@ -28,5 +26,5 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangeR" $ do
             ZoneChangeR.destination = Zone.Exile
           }
       )
-      """ {"matching":{"whenDestination":{"type":"Graveyard"}},"destination":{"type":"Exile"}} """
+      " {\"matching\":{\"whenDestination\":{\"type\":\"Graveyard\"}},\"destination\":{\"type\":\"Exile\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ZoneChangeR.codec

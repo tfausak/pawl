@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.MorphVariantSpec where
 
 import qualified Pawl.Codec.MorphVariant as MorphVariant
@@ -14,13 +12,13 @@ spec s = Spec.describe s "Pawl.Codec.MorphVariant" $ do
       s
       MorphVariant.codec
       MorphVariant.Plain
-      """ {"type":"Plain"} """
+      " {\"type\":\"Plain\"} "
   Spec.it s "Mega (CR 702.37b)" $
     Common.assertCodec
       s
       MorphVariant.codec
       MorphVariant.Mega
-      """ {"type":"Mega"} """
+      " {\"type\":\"Mega\"} "
   -- Exhaustive where the literals above are representative: Arm.enum derives
   -- the arm list from the type, so this is what would catch a constructor the
   -- derivation missed or two that encode alike.

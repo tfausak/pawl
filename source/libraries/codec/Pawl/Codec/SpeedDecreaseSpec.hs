@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.SpeedDecreaseSpec where
 
 import qualified Data.Text as Text
@@ -20,12 +18,12 @@ spec s = Spec.describe s "Pawl.Codec.SpeedDecrease" $ do
       s
       SpeedDecrease.codec
       (SpeedDecrease.MkSpeedDecrease (PlayerRef.ControllerOfBound (SlotName.MkSlotName (Text.pack "permanent"))) (Quantity.Literal 1) 1)
-      """ {"player":{"type":"ControllerOfBound","value":"permanent"},"quantity":{"type":"Literal","value":1},"floor":1} """
+      " {\"player\":{\"type\":\"ControllerOfBound\",\"value\":\"permanent\"},\"quantity\":{\"type\":\"Literal\",\"value\":1},\"floor\":1} "
   -- A card printing no floor sentence writes none, and 0 is what that means.
   Spec.it s "MkSpeedDecrease, no floor: the key is omitted" $
     Common.assertCodec
       s
       SpeedDecrease.codec
       (SpeedDecrease.MkSpeedDecrease PlayerRef.EachPlayer (Quantity.Literal 2) 0)
-      """ {"player":{"type":"EachPlayer"},"quantity":{"type":"Literal","value":2}} """
+      " {\"player\":{\"type\":\"EachPlayer\"},\"quantity\":{\"type\":\"Literal\",\"value\":2}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s SpeedDecrease.codec

@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.FilterSpec where
 
 import qualified Data.Text as Text
@@ -35,43 +33,43 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       s
       codec
       (Filter.HasCardType CardType.Creature)
-      """ {"type":"HasCardType","value":{"type":"Creature"}} """
+      " {\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}} "
   Spec.it s "HasSupertype" $
     Common.assertCodec
       s
       codec
       (Filter.HasSupertype Supertype.Basic)
-      """ {"type":"HasSupertype","value":{"type":"Basic"}} """
+      " {\"type\":\"HasSupertype\",\"value\":{\"type\":\"Basic\"}} "
   Spec.it s "HasColor" $
     Common.assertCodec
       s
       codec
       (Filter.HasColor Color.Black)
-      """ {"type":"HasColor","value":{"type":"Black"}} """
+      " {\"type\":\"HasColor\",\"value\":{\"type\":\"Black\"}} "
   Spec.it s "HasSubtype" $
     Common.assertCodec
       s
       codec
       (Filter.HasSubtype Subtype.Mountain)
-      """ {"type":"HasSubtype","value":{"type":"Mountain"}} """
+      " {\"type\":\"HasSubtype\",\"value\":{\"type\":\"Mountain\"}} "
   Spec.it s "HasName" $
     Common.assertCodec
       s
       codec
       (Filter.HasName (CardName.MkCardName (Text.pack "The Underworld Cookbook")))
-      """ {"type":"HasName","value":"The Underworld Cookbook"} """
+      " {\"type\":\"HasName\",\"value\":\"The Underworld Cookbook\"} "
   Spec.it s "HasKeyword" $
     Common.assertCodec
       s
       codec
       (Filter.HasKeyword Keyword.Flying)
-      """ {"type":"HasKeyword","value":{"type":"Flying"}} """
+      " {\"type\":\"HasKeyword\",\"value\":{\"type\":\"Flying\"}} "
   Spec.it s "HasKeywordFamily" $ do
     Common.assertCodec
       s
       codec
       (Filter.HasKeywordFamily KeywordFamily.Toxic)
-      """ {"type":"HasKeywordFamily","value":{"type":"Toxic"}} """
+      " {\"type\":\"HasKeywordFamily\",\"value\":{\"type\":\"Toxic\"}} "
     -- The two atoms must not share a wire shape: a card asking for the family
     -- and one asking for toxic 2 have to round-trip back to different filters.
     Spec.assertBool
@@ -83,37 +81,37 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       s
       codec
       (Filter.PowerAtLeast 4)
-      """ {"type":"PowerAtLeast","value":4} """
+      " {\"type\":\"PowerAtLeast\",\"value\":4} "
   Spec.it s "PowerAtMost" $
     Common.assertCodec
       s
       codec
       (Filter.PowerAtMost 2)
-      """ {"type":"PowerAtMost","value":2} """
+      " {\"type\":\"PowerAtMost\",\"value\":2} "
   Spec.it s "PowerLessThanSource" $
     Common.assertCodec
       s
       codec
       Filter.PowerLessThanSource
-      """ {"type":"PowerLessThanSource"} """
+      " {\"type\":\"PowerLessThanSource\"} "
   Spec.it s "PowerGreaterThanSource" $
     Common.assertCodec
       s
       codec
       Filter.PowerGreaterThanSource
-      """ {"type":"PowerGreaterThanSource"} """
+      " {\"type\":\"PowerGreaterThanSource\"} "
   Spec.it s "ControlledByDefendingPlayer" $
     Common.assertCodec
       s
       codec
       Filter.ControlledByDefendingPlayer
-      """ {"type":"ControlledByDefendingPlayer"} """
+      " {\"type\":\"ControlledByDefendingPlayer\"} "
   Spec.it s "ControlledByBound" $
     Common.assertCodec
       s
       codec
       (Filter.ControlledByBound (SlotName.MkSlotName (Text.pack "thatPlayer")))
-      """ {"type":"ControlledByBound","value":"thatPlayer"} """
+      " {\"type\":\"ControlledByBound\",\"value\":\"thatPlayer\"} "
   -- Runtime-only (Pawl.CardSpec lints it out of the pool), but round-tripped
   -- here for the reason its codec arm exists at all: the codec is total.
   Spec.it s "ControlledByPlayer" $
@@ -121,31 +119,31 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       s
       codec
       (Filter.ControlledByPlayer (PlayerId.MkPlayerId 1))
-      """ {"type":"ControlledByPlayer","value":1} """
+      " {\"type\":\"ControlledByPlayer\",\"value\":1} "
   Spec.it s "ControlledByRecipient" $
     Common.assertCodec
       s
       codec
       Filter.ControlledByRecipient
-      """ {"type":"ControlledByRecipient"} """
+      " {\"type\":\"ControlledByRecipient\"} "
   Spec.it s "ManaValueAtMost" $
     Common.assertCodec
       s
       codec
       (Filter.ManaValueAtMost 2)
-      """ {"type":"ManaValueAtMost","value":2} """
+      " {\"type\":\"ManaValueAtMost\",\"value\":2} "
   Spec.it s "ManaValueIsEven" $
     Common.assertCodec
       s
       codec
       Filter.ManaValueIsEven
-      """ {"type":"ManaValueIsEven"} """
+      " {\"type\":\"ManaValueIsEven\"} "
   Spec.it s "ControlledBy" $
     Common.assertCodec
       s
       codec
       (Filter.ControlledBy PlayerRelation.Opponent)
-      """ {"type":"ControlledBy","value":{"type":"Opponent"}} """
+      " {\"type\":\"ControlledBy\",\"value\":{\"type\":\"Opponent\"}} "
   -- CR 108.3, and the ONE arm this file must carry for: the decoder dispatches on
   -- a Text tag, so a missing arm there compiles and fails only when a card file
   -- is loaded.
@@ -154,19 +152,19 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       s
       codec
       (Filter.OwnedBy PlayerRelation.You)
-      """ {"type":"OwnedBy","value":{"type":"You"}} """
+      " {\"type\":\"OwnedBy\",\"value\":{\"type\":\"You\"}} "
   Spec.it s "IsPlayer" $
     Common.assertCodec
       s
       codec
       (Filter.IsPlayer PlayerRelation.Opponent)
-      """ {"type":"IsPlayer","value":{"type":"Opponent"}} """
+      " {\"type\":\"IsPlayer\",\"value\":{\"type\":\"Opponent\"}} "
   Spec.it s "IsControllerOfBound" $
     Common.assertCodec
       s
       codec
       (Filter.IsControllerOfBound (SlotName.MkSlotName (Text.pack "permanent")))
-      """ {"type":"IsControllerOfBound","value":"permanent"} """
+      " {\"type\":\"IsControllerOfBound\",\"value\":\"permanent\"} "
   -- Nested, unlike every atom above: the payload is a whole Filter, so this pins
   -- the recursion as well as the tag.
   Spec.it s "ControlsMoreThanYou" $
@@ -174,67 +172,67 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       s
       codec
       (Filter.ControlsMoreThanYou (Filter.HasCardType CardType.Land))
-      """ {"type":"ControlsMoreThanYou","value":{"type":"HasCardType","value":{"type":"Land"}}} """
+      " {\"type\":\"ControlsMoreThanYou\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}} "
   Spec.it s "CardsInGraveyardAtLeast" $
     Common.assertCodec
       s
       codec
       (Filter.CardsInGraveyardAtLeast 7)
-      """ {"type":"CardsInGraveyardAtLeast","value":7} """
+      " {\"type\":\"CardsInGraveyardAtLeast\",\"value\":7} "
   Spec.it s "IsSource" $
     Common.assertCodec
       s
       codec
       Filter.IsSource
-      """ {"type":"IsSource"} """
+      " {\"type\":\"IsSource\"} "
   Spec.it s "IsBound" $
     Common.assertCodec
       s
       codec
       (Filter.IsBound (SlotName.MkSlotName (Text.pack "looked")))
-      """ {"type":"IsBound","value":"looked"} """
+      " {\"type\":\"IsBound\",\"value\":\"looked\"} "
   Spec.it s "SameNameAsBound" $
     Common.assertCodec
       s
       codec
       (Filter.SameNameAsBound (SlotName.MkSlotName (Text.pack "castSpell")))
-      """ {"type":"SameNameAsBound","value":"castSpell"} """
+      " {\"type\":\"SameNameAsBound\",\"value\":\"castSpell\"} "
   Spec.it s "IsAttacking" $
     Common.assertCodec
       s
       codec
       Filter.IsAttacking
-      """ {"type":"IsAttacking"} """
+      " {\"type\":\"IsAttacking\"} "
   Spec.it s "IsBlocking" $
     Common.assertCodec
       s
       codec
       Filter.IsBlocking
-      """ {"type":"IsBlocking"} """
+      " {\"type\":\"IsBlocking\"} "
   Spec.it s "IsBlocked" $
     Common.assertCodec
       s
       codec
       Filter.IsBlocked
-      """ {"type":"IsBlocked"} """
+      " {\"type\":\"IsBlocked\"} "
   Spec.it s "AttackedThisTurn" $
     Common.assertCodec
       s
       codec
       Filter.AttackedThisTurn
-      """ {"type":"AttackedThisTurn"} """
+      " {\"type\":\"AttackedThisTurn\"} "
   Spec.it s "MilledThisTurn" $
     Common.assertCodec
       s
       codec
       Filter.MilledThisTurn
-      """ {"type":"MilledThisTurn"} """
+      " {\"type\":\"MilledThisTurn\"} "
   Spec.it s "AttachedTo" $
     Common.assertCodec
       s
       codec
       (Filter.AttachedTo (Filter.HasCardType CardType.Creature))
-      """ {"type":"AttachedTo","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
+      " {\"type\":\"AttachedTo\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   -- Aura Graft's "attached to a permanent", which the general atom spells as the
   -- trivial nest -- and the shape that would break a codec whose payload were
   -- optional rather than required.
@@ -243,86 +241,86 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       s
       codec
       (Filter.AttachedTo (Filter.And []))
-      """ {"type":"AttachedTo","value":{"type":"And","value":[]}} """
+      " {\"type\":\"AttachedTo\",\"value\":{\"type\":\"And\",\"value\":[]}} "
   Spec.it s "IsAttachedToSource" $
     Common.assertCodec
       s
       codec
       Filter.IsAttachedToSource
-      """ {"type":"IsAttachedToSource"} """
+      " {\"type\":\"IsAttachedToSource\"} "
   Spec.it s "CanHostSubject" $
     Common.assertCodec
       s
       codec
       Filter.CanHostSubject
-      """ {"type":"CanHostSubject"} """
+      " {\"type\":\"CanHostSubject\"} "
   Spec.it s "IsToken" $
     Common.assertCodec
       s
       codec
       Filter.IsToken
-      """ {"type":"IsToken"} """
+      " {\"type\":\"IsToken\"} "
   Spec.it s "IsTapped" $
     Common.assertCodec
       s
       codec
       Filter.IsTapped
-      """ {"type":"IsTapped"} """
+      " {\"type\":\"IsTapped\"} "
   Spec.it s "IsRingBearer" $
     Common.assertCodec
       s
       codec
       Filter.IsRingBearer
-      """ {"type":"IsRingBearer"} """
+      " {\"type\":\"IsRingBearer\"} "
   Spec.it s "HasNonManaActivatedAbility" $
     Common.assertCodec
       s
       codec
       Filter.HasNonManaActivatedAbility
-      """ {"type":"HasNonManaActivatedAbility"} """
+      " {\"type\":\"HasNonManaActivatedAbility\"} "
   Spec.it s "HasDesignation Renowned" $
     Common.assertCodec
       s
       codec
       (Filter.HasDesignation Designation.Renowned)
-      """ {"type":"HasDesignation","value":{"type":"Renowned"}} """
+      " {\"type\":\"HasDesignation\",\"value\":{\"type\":\"Renowned\"}} "
   Spec.it s "HasDesignation Monstrous" $
     Common.assertCodec
       s
       codec
       (Filter.HasDesignation Designation.Monstrous)
-      """ {"type":"HasDesignation","value":{"type":"Monstrous"}} """
+      " {\"type\":\"HasDesignation\",\"value\":{\"type\":\"Monstrous\"}} "
   Spec.it s "HasDesignation Suspected" $
     Common.assertCodec
       s
       codec
       (Filter.HasDesignation Designation.Suspected)
-      """ {"type":"HasDesignation","value":{"type":"Suspected"}} """
+      " {\"type\":\"HasDesignation\",\"value\":{\"type\":\"Suspected\"}} "
   -- CR 122.1's presence read, the one Filter atom with a CounterKind payload.
   Spec.it s "HasCounters" $
     Common.assertCodec
       s
       codec
       (Filter.HasCounters CounterKind.PlusOnePlusOne)
-      """ {"type":"HasCounters","value":{"type":"PlusOnePlusOne"}} """
+      " {\"type\":\"HasCounters\",\"value\":{\"type\":\"PlusOnePlusOne\"}} "
   Spec.it s "And" $
     Common.assertCodec
       s
       codec
       (Filter.And [Filter.HasCardType CardType.Land, Filter.HasSupertype Supertype.Basic])
-      """ {"type":"And","value":[{"type":"HasCardType","value":{"type":"Land"}},{"type":"HasSupertype","value":{"type":"Basic"}}]} """
+      " {\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},{\"type\":\"HasSupertype\",\"value\":{\"type\":\"Basic\"}}]} "
   Spec.it s "Or" $
     Common.assertCodec
       s
       codec
       (Filter.Or [Filter.HasCardType CardType.Creature, Filter.HasCardType CardType.Enchantment])
-      """ {"type":"Or","value":[{"type":"HasCardType","value":{"type":"Creature"}},{"type":"HasCardType","value":{"type":"Enchantment"}}]} """
+      " {\"type\":\"Or\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"HasCardType\",\"value\":{\"type\":\"Enchantment\"}}]} "
   Spec.it s "Not" $
     Common.assertCodec
       s
       codec
       (Filter.Not (Filter.HasColor Color.Black))
-      """ {"type":"Not","value":{"type":"HasColor","value":{"type":"Black"}}} """
+      " {\"type\":\"Not\",\"value\":{\"type\":\"HasColor\",\"value\":{\"type\":\"Black\"}}} "
   -- Nested And/Or/Not, exercising the recursion the per-constructor cases above
   -- do not.
   Spec.it s "nested And/Or/Not round-trips" $

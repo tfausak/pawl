@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 -- Covers Pawl.Codec.AttackCost and the two codecs only it dispatches to,
 -- Pawl.Codec.AttackCostScope and Pawl.Codec.PerAttacker. They share a spec
 -- rather than taking one each because neither is reachable on the wire except
@@ -42,7 +40,7 @@ spec s = Spec.describe s "Pawl.Codec.AttackCost" $ do
           (PerAttacker.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 2]))
           AttackCostScope.Controller
       )
-      """ {"perAttacker":{"type":"Fixed","value":[{"type":"Generic","value":2}]},"scope":{"type":"Controller"},"subject":{"type":"Matching","value":{"type":"HasCardType","value":{"type":"Creature"}}}} """
+      " {\"perAttacker\":{\"type\":\"Fixed\",\"value\":[{\"type\":\"Generic\",\"value\":2}]},\"scope\":{\"type\":\"Controller\"},\"subject\":{\"type\":\"Matching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   -- Sphere of Safety's half of the type: the wide scope and a counted share, the
   -- two arms Ghostly Prison's literal above does not reach.
   Spec.it s "MkAttackCost with a counted share and the wider scope" $
@@ -62,7 +60,7 @@ spec s = Spec.describe s "Pawl.Codec.AttackCost" $ do
           )
           AttackCostScope.ControllerAndPlaneswalkers
       )
-      """ {"perAttacker":{"type":"Counted","value":{"type":"Count","value":{"aggregation":{"type":"Members"},"filter":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Enchantment"}},{"type":"ControlledBy","value":{"type":"You"}}]},"scope":{"type":"InZone","value":{"player":{"type":"EachPlayer"},"zone":{"type":"Battlefield"}}}}}},"scope":{"type":"ControllerAndPlaneswalkers"},"subject":{"type":"Matching","value":{"type":"HasCardType","value":{"type":"Creature"}}}} """
+      " {\"perAttacker\":{\"type\":\"Counted\",\"value\":{\"type\":\"Count\",\"value\":{\"aggregation\":{\"type\":\"Members\"},\"filter\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Enchantment\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]},\"scope\":{\"type\":\"InZone\",\"value\":{\"player\":{\"type\":\"EachPlayer\"},\"zone\":{\"type\":\"Battlefield\"}}}}}},\"scope\":{\"type\":\"ControllerAndPlaneswalkers\"},\"subject\":{\"type\":\"Matching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   -- Exhaustive where the two literals above are representative: Arm.enum derives
   -- the scope's arm list from the type, so this is what would catch an arm the
   -- derivation missed or two that encode alike.

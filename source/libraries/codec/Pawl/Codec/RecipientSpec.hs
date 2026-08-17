@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.RecipientSpec where
 
 import qualified Pawl.Codec.Recipient as Recipient
@@ -16,7 +14,7 @@ spec s = Spec.describe s "Pawl.Codec.Recipient" $ do
       s
       Recipient.codec
       (Recipient.ToCreature (ObjectId.MkObjectId 1))
-      """ {"type":"ToCreature","value":1} """
+      " {\"type\":\"ToCreature\",\"value\":1} "
   -- CR 120.3c's recipient tag is a different arm of Recipient from ToObject
   -- (see Pawl.Types.Recipient's comment on it), so it gets its own case.
   Spec.it s "ToPlaneswalker" $
@@ -24,24 +22,24 @@ spec s = Spec.describe s "Pawl.Codec.Recipient" $ do
       s
       Recipient.codec
       (Recipient.ToPlaneswalker (ObjectId.MkObjectId 2))
-      """ {"type":"ToPlaneswalker","value":2} """
+      " {\"type\":\"ToPlaneswalker\",\"value\":2} "
   -- CR 120.3h's is a third, for CR 115.4's fourth kind of "any target".
   Spec.it s "ToBattle" $
     Common.assertCodec
       s
       Recipient.codec
       (Recipient.ToBattle (ObjectId.MkObjectId 5))
-      """ {"type":"ToBattle","value":5} """
+      " {\"type\":\"ToBattle\",\"value\":5} "
   Spec.it s "ToPlayer" $
     Common.assertCodec
       s
       Recipient.codec
       (Recipient.ToPlayer (PlayerId.MkPlayerId 3))
-      """ {"type":"ToPlayer","value":3} """
+      " {\"type\":\"ToPlayer\",\"value\":3} "
   Spec.it s "ToObject" $
     Common.assertCodec
       s
       Recipient.codec
       (Recipient.ToObject (ObjectId.MkObjectId 4))
-      """ {"type":"ToObject","value":4} """
+      " {\"type\":\"ToObject\",\"value\":4} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Recipient.codec

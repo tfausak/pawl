@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.MentoredSpec where
 
 import qualified Pawl.Codec.Mentored as Mentored
@@ -22,5 +20,5 @@ spec s = Spec.describe s "Pawl.Codec.Mentored" $ do
             Mentored.mentored = ObjectId.MkObjectId 2
           }
       )
-      """ {"mentor":1,"mentored":2} """
+      " {\"mentor\":1,\"mentored\":2} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Mentored.codec

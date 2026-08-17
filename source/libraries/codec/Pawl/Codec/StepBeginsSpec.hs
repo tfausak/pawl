@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.StepBeginsSpec where
 
 import qualified Pawl.Codec.StepBegins as StepBegins
@@ -23,7 +21,7 @@ spec s = Spec.describe s "Pawl.Codec.StepBegins" $ do
             StepBegins.scope = TurnScope.EachTurn
           }
       )
-      """ {"phase":{"type":"Ending","value":{"type":"EndStep"}},"scope":{"type":"EachTurn"}} """
+      " {\"phase\":{\"type\":\"Ending\",\"value\":{\"type\":\"EndStep\"}},\"scope\":{\"type\":\"EachTurn\"}} "
   -- CR 603.2a's "your upkeep". The scope is REQUIRED, not defaulted: "at the
   -- beginning of the upkeep" and "at the beginning of YOUR upkeep" are
   -- different cards, so there is no default an absent key could mean.
@@ -36,5 +34,5 @@ spec s = Spec.describe s "Pawl.Codec.StepBegins" $ do
             StepBegins.scope = TurnScope.ControllersTurn
           }
       )
-      """ {"phase":{"type":"Beginning","value":{"type":"Upkeep"}},"scope":{"type":"ControllersTurn"}} """
+      " {\"phase\":{\"type\":\"Beginning\",\"value\":{\"type\":\"Upkeep\"}},\"scope\":{\"type\":\"ControllersTurn\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s StepBegins.codec

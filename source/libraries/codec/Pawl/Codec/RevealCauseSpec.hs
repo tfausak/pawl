@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.RevealCauseSpec where
 
 import qualified Pawl.Codec.RevealCause as RevealCause
@@ -14,13 +12,13 @@ spec s = Spec.describe s "Pawl.Codec.RevealCause" $ do
       s
       RevealCause.codec
       RevealCause.Ordinary
-      """ {"type":"Ordinary"} """
+      " {\"type\":\"Ordinary\"} "
   Spec.it s "ForMiracle" $
     Common.assertCodec
       s
       RevealCause.codec
       RevealCause.ForMiracle
-      """ {"type":"ForMiracle"} """
+      " {\"type\":\"ForMiracle\"} "
   -- Exhaustive where the literals above are representative: Arm.enum derives
   -- the arm list from the type, so this is what would catch a constructor the
   -- derivation missed or two that encode alike.

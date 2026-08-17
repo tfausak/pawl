@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.DurationSpec where
 
 import qualified Pawl.Codec.Duration as Duration
@@ -18,40 +16,40 @@ spec s = Spec.describe s "Pawl.Codec.Duration" $ do
       s
       Duration.codec
       Duration.UntilEndOfTurn
-      """ {"type":"UntilEndOfTurn"} """
+      " {\"type\":\"UntilEndOfTurn\"} "
   -- CR 611.2a: for the rest of the game.
   Spec.it s "Indefinite" $
     Common.assertCodec
       s
       Duration.codec
       Duration.Indefinite
-      """ {"type":"Indefinite"} """
+      " {\"type\":\"Indefinite\"} "
   -- CR 611.2a: until your next turn.
   Spec.it s "UntilYourNextTurn" $
     Common.assertCodec
       s
       Duration.codec
       Duration.UntilYourNextTurn
-      """ {"type":"UntilYourNextTurn"} """
+      " {\"type\":\"UntilYourNextTurn\"} "
   -- CR 611.2a: until the END of your next turn, a whole turn later.
   Spec.it s "UntilEndOfYourNextTurn" $
     Common.assertCodec
       s
       Duration.codec
       Duration.UntilEndOfYourNextTurn
-      """ {"type":"UntilEndOfYourNextTurn"} """
+      " {\"type\":\"UntilEndOfYourNextTurn\"} "
   -- CR 611.2b, carrying its Condition.
   Spec.it s "ForAsLongAs carries its condition" $
     Common.assertCodec
       s
       Duration.codec
       (Duration.ForAsLongAs (Condition.Compares (Compares.MkCompares (Quantity.Literal 0) Comparison.Exactly (Quantity.Literal 0))))
-      """ {"type":"ForAsLongAs","value":{"type":"Compares","value":{"measured":{"type":"Literal","value":0},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}}}} """
+      " {\"type\":\"ForAsLongAs\",\"value\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"Literal\",\"value\":0},\"comparison\":{\"type\":\"Exactly\"},\"threshold\":{\"type\":\"Literal\",\"value\":0}}}} "
   -- CR 500.5a: until end of combat.
   Spec.it s "UntilEndOfCombat" $
     Common.assertCodec
       s
       Duration.codec
       Duration.UntilEndOfCombat
-      """ {"type":"UntilEndOfCombat"} """
+      " {\"type\":\"UntilEndOfCombat\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Duration.codec

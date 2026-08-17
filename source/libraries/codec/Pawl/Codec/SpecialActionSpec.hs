@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.SpecialActionSpec where
 
 import qualified Pawl.Codec.SpecialAction as SpecialAction
@@ -17,7 +15,7 @@ spec s = Spec.describe s "Pawl.Codec.SpecialAction" $ do
       s
       SpecialAction.codec
       SpecialAction.DiscardThisAnyTime
-      """ {"type":"DiscardThisAnyTime"} """
+      " {\"type\":\"DiscardThisAnyTime\"} "
   -- Leonin Arbiter's {2}, which is the whole of its ignore cost.
   Spec.it s "IgnoreThisUntilEndOfTurn" $
     Common.assertCodec
@@ -29,6 +27,6 @@ spec s = Spec.describe s "Pawl.Codec.SpecialAction" $ do
               Cost.components = []
             }
       )
-      """ {"type":"IgnoreThisUntilEndOfTurn","value":{"mana":[{"type":"Generic","value":2}]}} """
+      " {\"type\":\"IgnoreThisUntilEndOfTurn\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s SpecialAction.codec

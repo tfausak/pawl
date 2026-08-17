@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.DaytimeSpec where
 
 import qualified Pawl.Codec.Daytime as Daytime
@@ -14,13 +12,13 @@ spec s = Spec.describe s "Pawl.Codec.Daytime" $ do
       s
       Daytime.codec
       Daytime.Day
-      """ {"type":"Day"} """
+      " {\"type\":\"Day\"} "
   Spec.it s "Night" $
     Common.assertCodec
       s
       Daytime.codec
       Daytime.Night
-      """ {"type":"Night"} """
+      " {\"type\":\"Night\"} "
   -- Exhaustive where the literals above are representative: Arm.enum derives
   -- the arm list from the type, so this is what would catch a constructor the
   -- derivation missed or two that encode alike.

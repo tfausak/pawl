@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.VentureMarkerEnteredSpec where
 
 import qualified Pawl.Codec.VentureMarkerEntered as VentureMarkerEntered
@@ -24,5 +22,5 @@ spec s = Spec.describe s "Pawl.Codec.VentureMarkerEntered" $ do
             VentureMarkerEntered.room = RoomIndex.topmost
           }
       )
-      """ {"player":0,"dungeon":1,"room":0} """
+      " {\"player\":0,\"dungeon\":1,\"room\":0} "
   Spec.it s "has a schema" $ Common.assertHasSchema s VentureMarkerEntered.codec

@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.AttachTargetSpec where
 
 import qualified Data.Text as Text
@@ -23,5 +21,5 @@ spec s = Spec.describe s "Pawl.Codec.AttachTarget" $ do
             AttachTarget.filter = Filter.HasCardType CardType.Creature
           }
       )
-      """ {"slot":"target","filter":{"type":"HasCardType","value":{"type":"Creature"}}} """
+      " {\"slot\":\"target\",\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s AttachTarget.codec

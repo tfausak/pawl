@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.DestroySpec where
 
 import qualified Data.Text as Text
@@ -22,11 +20,11 @@ spec s = Spec.describe s "Pawl.Codec.Destroy" $ do
       s
       Destroy.codec
       (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)) Regenerability.Regenerable Nothing)
-      """ {"ref":{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}},"regenerability":{"type":"Regenerable"}} """
+      " {\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"regenerability\":{\"type\":\"Regenerable\"}} "
   Spec.it s "MkDestroy, a bound slot: the key is written" $
     Common.assertCodec
       s
       Destroy.codec
       (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.HasCardType CardType.Artifact)) Regenerability.Regenerable (Just (SlotName.MkSlotName (Text.pack "destroyed"))))
-      """ {"ref":{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Artifact"}}},"regenerability":{"type":"Regenerable"},"slot":"destroyed"} """
+      " {\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}}},\"regenerability\":{\"type\":\"Regenerable\"},\"slot\":\"destroyed\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Destroy.codec

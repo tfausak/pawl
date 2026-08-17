@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ProjectedCharacteristicsSpec where
 
 import qualified Data.Map.Strict as Map
@@ -92,4 +90,4 @@ spec s = Spec.describe s "Pawl.Codec.ProjectedCharacteristics" $ do
       s
       PC.codec
       minimalCharacteristics
-      """ {"names":["Mountain"],"cardTypes":[{"type":"Land"}]} """
+      " {\"names\":[\"Mountain\"],\"cardTypes\":[{\"type\":\"Land\"}]} "

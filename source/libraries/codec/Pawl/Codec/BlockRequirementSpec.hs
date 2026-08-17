@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.BlockRequirementSpec where
 
 import qualified Pawl.Codec.BlockRequirement as BlockRequirement
@@ -17,7 +15,7 @@ spec s = Spec.describe s "Pawl.Codec.BlockRequirement" $ do
       s
       BlockRequirement.codec
       (BlockRequirement.MkBlockRequirement Nothing (Just Affected.Attached))
-      """ {"attacker":{"type":"Attached"}} """
+      " {\"attacker\":{\"type\":\"Attached\"}} "
   -- Razorgrass Screen's shape: the requirement names its own source and no
   -- attacker, so the object axis is the absent one.
   Spec.it s "MkBlockRequirement with no attacker" $
@@ -25,5 +23,5 @@ spec s = Spec.describe s "Pawl.Codec.BlockRequirement" $ do
       s
       BlockRequirement.codec
       (BlockRequirement.MkBlockRequirement (Just Affected.Attached) Nothing)
-      """ {"subject":{"type":"Attached"}} """
+      " {\"subject\":{\"type\":\"Attached\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s BlockRequirement.codec

@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.PhasePatternSpec where
 
 import qualified Pawl.Codec.PhasePattern as PhasePattern
@@ -22,7 +20,7 @@ spec s = Spec.describe s "Pawl.Codec.PhasePattern" $ do
       s
       PhasePattern.codec
       PhasePattern.MkPhasePattern {PhasePattern.whichPhase = PhaseSelector.Step (Phase.Beginning BeginningStep.Upkeep), PhasePattern.whosePhase = Nothing}
-      """ {"whichPhase":{"type":"Step","value":{"type":"Beginning","value":{"type":"Upkeep"}}}} """
+      " {\"whichPhase\":{\"type\":\"Step\",\"value\":{\"type\":\"Beginning\",\"value\":{\"type\":\"Upkeep\"}}}} "
   -- The only Just Resolve's SkipNextPhase arm produces, never authored on a
   -- card (#437).
   Spec.it s "Fatigue's player-scoped whosePhase = Just" $
@@ -30,7 +28,7 @@ spec s = Spec.describe s "Pawl.Codec.PhasePattern" $ do
       s
       PhasePattern.codec
       PhasePattern.MkPhasePattern {PhasePattern.whichPhase = PhaseSelector.Step (Phase.Beginning BeginningStep.DrawStep), PhasePattern.whosePhase = Just (PlayerId.MkPlayerId 1)}
-      """ {"whichPhase":{"type":"Step","value":{"type":"Beginning","value":{"type":"DrawStep"}}},"whosePhase":1} """
+      " {\"whichPhase\":{\"type\":\"Step\",\"value\":{\"type\":\"Beginning\",\"value\":{\"type\":\"DrawStep\"}}},\"whosePhase\":1} "
   -- CR 500.1: the whole-phase arm, once Resolve has baked the player its
   -- resolution named.
   Spec.it s "Stonehorn Dignitary's whole-phase selector" $
@@ -38,14 +36,14 @@ spec s = Spec.describe s "Pawl.Codec.PhasePattern" $ do
       s
       PhasePattern.codec
       PhasePattern.MkPhasePattern {PhasePattern.whichPhase = PhaseSelector.CombatPhase, PhasePattern.whosePhase = Just (PlayerId.MkPlayerId 1)}
-      """ {"whichPhase":{"type":"CombatPhase"},"whosePhase":1} """
+      " {\"whichPhase\":{\"type\":\"CombatPhase\"},\"whosePhase\":1} "
   -- The defaulted field accepts an absent key and an explicit null alike, which
   -- is why its schema is nullable AND optional rather than one or the other.
   Spec.it s "reads an explicit null whosePhase" $
     Common.assertFromJson
       s
       (Codec.decode PhasePattern.codec)
-      """ {"whichPhase":{"type":"CombatPhase"},"whosePhase":null} """
+      " {\"whichPhase\":{\"type\":\"CombatPhase\"},\"whosePhase\":null} "
       PhasePattern.MkPhasePattern {PhasePattern.whichPhase = PhaseSelector.CombatPhase, PhasePattern.whosePhase = Nothing}
 
   Spec.it s "has a schema" $

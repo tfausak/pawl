@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.HalfUnlockedSpec where
 
 import qualified Data.Text as Text
@@ -23,7 +21,7 @@ spec s = Spec.describe s "Pawl.Codec.HalfUnlocked" $ do
             HalfUnlocked.fully = True
           }
       )
-      """ {"object":1,"name":"Trapped Entryway","fully":true} """
+      " {\"object\":1,\"name\":\"Trapped Entryway\",\"fully\":true} "
   -- The flag defaults to nothing: it is REQUIRED, since False is a real answer
   -- (a door that opened but left the other locked) rather than an absence.
   Spec.it s "MkHalfUnlocked, a door that does not" $
@@ -36,5 +34,5 @@ spec s = Spec.describe s "Pawl.Codec.HalfUnlocked" $ do
             HalfUnlocked.fully = False
           }
       )
-      """ {"object":1,"name":"Trapped Entryway","fully":false} """
+      " {\"object\":1,\"name\":\"Trapped Entryway\",\"fully\":false} "
   Spec.it s "has a schema" $ Common.assertHasSchema s HalfUnlocked.codec

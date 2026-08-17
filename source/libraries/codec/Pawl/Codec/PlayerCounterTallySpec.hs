@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.PlayerCounterTallySpec where
 
 import qualified Pawl.Codec.PlayerCounterTally as PlayerCounterTally
@@ -22,5 +20,5 @@ spec s = Spec.describe s "Pawl.Codec.PlayerCounterTally" $ do
             PlayerCounterTally.kind = PlayerCounterKind.Energy
           }
       )
-      """ {"player":{"type":"EachPlayer"},"kind":{"type":"Energy"}} """
+      " {\"player\":{\"type\":\"EachPlayer\"},\"kind\":{\"type\":\"Energy\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s PlayerCounterTally.codec

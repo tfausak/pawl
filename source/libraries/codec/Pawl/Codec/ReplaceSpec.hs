@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.ReplaceSpec where
 
 import qualified Pawl.Codec.Card as Card
@@ -34,7 +32,7 @@ spec s = Spec.describe s "Pawl.Codec.Replace" $ do
             Replace.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate
           }
       )
-      """ {"duration":{"type":"UntilEndOfTurn"},"uses":{"type":"Once"},"origin":{"type":"Other"},"effect":{"type":"DestructionR","value":{"type":"Regenerate"}}} """
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"uses\":{\"type\":\"Once\"},\"origin\":{\"type\":\"Other\"},\"effect\":{\"type\":\"DestructionR\",\"value\":{\"type\":\"Regenerate\"}}} "
   -- CR 614.15: Galvanic Blast's metalcraft gate, the case that writes the key.
   Spec.it s "MkReplace, condition written" $
     Common.assertCodec
@@ -48,7 +46,7 @@ spec s = Spec.describe s "Pawl.Codec.Replace" $ do
             Replace.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate
           }
       )
-      """ {"duration":{"type":"UntilEndOfTurn"},"uses":{"type":"Once"},"origin":{"type":"SelfReplacement"},"condition":{"type":"Compares","value":{"measured":{"type":"Literal","value":3},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":3}}},"effect":{"type":"DestructionR","value":{"type":"Regenerate"}}} """
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"uses\":{\"type\":\"Once\"},\"origin\":{\"type\":\"SelfReplacement\"},\"condition\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"Literal\",\"value\":3},\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":3}}},\"effect\":{\"type\":\"DestructionR\",\"value\":{\"type\":\"Regenerate\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec
   where
     -- The effect codec the card boundary would pass in (CR 615.5's riders ride

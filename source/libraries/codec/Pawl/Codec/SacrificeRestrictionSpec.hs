@@ -1,5 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
-
 module Pawl.Codec.SacrificeRestrictionSpec where
 
 import qualified Pawl.Codec.SacrificeRestriction as SacrificeRestriction
@@ -31,5 +29,5 @@ spec s = Spec.describe s "Pawl.Codec.SacrificeRestriction" $ do
               )
           )
       )
-      """ {"affected":{"type":"Matching","value":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Creature"}},{"type":"ControlledBy","value":{"type":"You"}},{"type":"Not","value":{"type":"OwnedBy","value":{"type":"You"}}}]}}} """
+      " {\"affected\":{\"type\":\"Matching\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},{\"type\":\"Not\",\"value\":{\"type\":\"OwnedBy\",\"value\":{\"type\":\"You\"}}}]}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s SacrificeRestriction.codec
