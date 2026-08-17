@@ -4011,6 +4011,54 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTarget {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
+  -- CR 508.3a's second sentence: some creature was declared as an attacker, and CR
+  -- 508.5's defending player for it is the bearer's controller. SelfAttacks' event
+  -- with the identity check moved from the ATTACKER to the DEFENDER.
+  --
+  -- "You or a planeswalker you control" needs no second test and no board read: CR
+  -- 508.5/508.5a already resolve an attacked planeswalker to its controller, and
+  -- Combat.declareAttackers stamped that player onto the event. Where
+  -- SelfAttacksPlayerWithMostLife below has to consult Combat.attackers -- rule
+  -- 702.105a says "the player", so an attacked planeswalker must not count -- this
+  -- condition wants exactly the field the event carries.
+  --
+  -- No Filter over the attacker and no count: CR 508.1a admits only creatures, and
+  -- this fires once per declared attacker (CR 508.3a), not once per declaration
+  -- (CR 508.3b, gap #538).
+  TriggerCondition.CreatureAttacksYou -> case event of
+    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared _ defending _) -> defending == you
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
   -- CR 702.105a: the bearer was declared attacking A PLAYER, and no player still in
   -- the game has more life than that one. SelfAttacks' event and its identity
   -- check, with the comparison added.
@@ -5871,6 +5919,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.SelfAttacks _ -> False
   TriggerCondition.SelfAttacksWithAnother _ -> False
   TriggerCondition.CreatureAttacksAlone _ -> False
+  TriggerCondition.CreatureAttacksYou -> False
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature -> False
@@ -6072,6 +6121,13 @@ eventBindings cond event = case (cond, event) of
   -- watches every creature its controller has. The defending player the event
   -- also carries is not bound, because rule 702.83a names no player.
   (TriggerCondition.CreatureAttacksAlone _, GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ _)) ->
+    Binding.setAttackingCreature attacker Map.empty
+  -- The same slot off the same event, for Marchesa's Decree's "that creature's
+  -- controller" -- again not the bearer, which is a bystanding enchantment. CR
+  -- 508.5's defending player goes unbound here where the SelfAttacks arm above
+  -- binds it: matchesTrigger has already required that player to be CR 109.5's
+  -- "you", so a slot would be a second name for a seat the ability has.
+  (TriggerCondition.CreatureAttacksYou, GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ _)) ->
     Binding.setAttackingCreature attacker Map.empty
   -- CR 702.130a's "defending player", the same phrase and the same reserved slot
   -- as the arm above -- CR 508.5 resolves it for an ability of an ATTACKING
@@ -6327,6 +6383,13 @@ eventBindingSlots cond = case cond of
   -- carries an ObjectId, and matchesTrigger has already required the count to be
   -- one.
   TriggerCondition.CreatureAttacksAlone _ -> Set.singleton Binding.attackingCreature
+  -- The attacker, CreatureAttacksAlone's slot above -- Marchesa's Decree's "that
+  -- creature's controller". CR 508.5's defending player is NOT bound alongside it:
+  -- the match has already pinned that player to be CR 109.5's "you".
+  --
+  -- Unconditional, as this classification has to be: every AttackerDeclared event
+  -- carries an ObjectId.
+  TriggerCondition.CreatureAttacksYou -> Set.singleton Binding.attackingCreature
   -- NOTHING, for SelfAttacksWithAnother's reason: rule 702.105a's payload names
   -- only "this creature", so the attacked player is compared and then never
   -- pointed at. That is also why this condition needs no arm in eventBindings.
@@ -6650,6 +6713,7 @@ looksBack condition = case condition of
   TriggerCondition.SelfAttacks _ -> False
   TriggerCondition.SelfAttacksWithAnother _ -> False
   TriggerCondition.CreatureAttacksAlone _ -> False
+  TriggerCondition.CreatureAttacksYou -> False
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature -> False
@@ -7432,6 +7496,7 @@ zonesTriggeredFrom cond = case cond of
   TriggerCondition.SelfAttacks _ -> battlefield
   TriggerCondition.SelfAttacksWithAnother _ -> battlefield
   TriggerCondition.CreatureAttacksAlone _ -> battlefield
+  TriggerCondition.CreatureAttacksYou -> battlefield
   TriggerCondition.SelfAttacksPlayerWithMostLife -> battlefield
   TriggerCondition.SelfBlocks -> battlefield
   TriggerCondition.SelfBlocksCreature -> battlefield
@@ -7619,6 +7684,10 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfAttacks _ -> False
   TriggerCondition.SelfAttacksWithAnother _ -> False
   TriggerCondition.CreatureAttacksAlone _ -> False
+  -- CR 506.2 makes this one an OPPONENT's turn every time, which is not the
+  -- controller's turn either -- StepBegins' OpponentsTurn arm above answers the
+  -- same way for the same reason.
+  TriggerCondition.CreatureAttacksYou -> False
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature -> False
@@ -7761,6 +7830,7 @@ stateTriggers gs
               TriggerCondition.SelfAttacks _ -> False
               TriggerCondition.SelfAttacksWithAnother _ -> False
               TriggerCondition.CreatureAttacksAlone _ -> False
+              TriggerCondition.CreatureAttacksYou -> False
               TriggerCondition.SelfAttacksPlayerWithMostLife -> False
               TriggerCondition.SelfBlocks -> False
               TriggerCondition.SelfBlocksCreature -> False
