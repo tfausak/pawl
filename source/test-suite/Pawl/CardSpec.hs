@@ -74,6 +74,7 @@ import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackCostScope as AttackCostScope
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
+import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.BlockPermission as BlockPermission
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
@@ -743,6 +744,9 @@ effectCounts effect = case effect of
   -- No embedded card -- the copied permanent supplies the text -- but the count
   -- is card data like Create's.
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> quantityCounts quantity
+  -- Neither a Quantity nor a Duration, so no Count can hide here; the refs'
+  -- Filters are effectFilters' business below.
+  Effect.BecomeCopy {} -> []
   -- The Condition is Galvanic Blast's "if you control three or more
   -- artifacts", and its Counts are as much card data as a Duration's.
   Effect.Replace (Replace.MkReplace duration _ _ condition replacement) -> durationCounts duration <> foldMap conditionCounts condition <> concatMap effectCounts (replacementEffectRiders replacement)
@@ -1145,6 +1149,7 @@ effectReplacements effect = case effect of
   Effect.Replace (Replace.MkReplace _ _ _ _ replacement) -> replacement : concatMap effectReplacements (replacementPrintedEffects replacement)
   Effect.Create (Create.MkCreate _ token _ _) -> overFaces cardReplacementEffects token
   Effect.CreateCopy {} -> []
+  Effect.BecomeCopy {} -> []
   Effect.CreateEmblem emblem -> overFaces cardReplacementEffects emblem
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> []
   Effect.ModifyTarget {} -> []
@@ -1725,6 +1730,8 @@ effectMintedFaces effect = case effect of
   Effect.Create (Create.MkCreate _ token _ _) -> fmap ((,) MintedToken) (NonEmpty.toList (Card.Type.faces token))
   -- Mints no face of its own: the token's text is the copied permanent's.
   Effect.CreateCopy {} -> []
+  -- Mints nothing at all: it rewrites an existing permanent's copiable values.
+  Effect.BecomeCopy {} -> []
   Effect.CreateEmblem emblem -> fmap ((,) MintedEmblem) (NonEmpty.toList (Card.Type.faces emblem))
   Effect.Replace (Replace.MkReplace _ _ _ _ replacement) -> concatMap effectMintedFaces (replacementEffectRiders replacement)
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> []
@@ -2991,6 +2998,8 @@ effectFilters effect = case effect of
   -- An EachMatching ref's Filter is card text like RequireBlock's below, and the
   -- count's Filters are as much card text as Create's.
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> unframed (quantityFilters quantity <> objectRefFilters ref)
+  -- BOTH refs, RequireBlock's arm below: each EachMatching Filter is card text.
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) -> unframed (objectRefFilters original <> objectRefFilters subject)
   Effect.Replace (Replace.MkReplace duration _ _ condition replacement) -> unframed (durationFilters duration <> foldMap conditionFilters condition <> replacementEffectFilters replacement) <> concatMap effectFilters (replacementEffectRiders replacement)
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- The rider's Filters too, for CR 615.5. This is the traversal that dropped

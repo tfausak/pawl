@@ -21,6 +21,7 @@ import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachTarget as AttachTarget
+import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastOffer as CastOffer.Type
@@ -623,6 +624,16 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Literal 5) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
       """ {"type":"CreateCopy","value":{"quantity":{"type":"Literal","value":5},"ref":{"type":"InSlot","value":"target"}}} """
+  -- Unstable Shapeshifter's own pair. The two refs take DIFFERENT shapes on
+  -- purpose: they are not interchangeable, and a codec that swapped them would
+  -- round-trip a symmetric fixture unnoticed.
+  Spec.it s "BecomeCopy" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "became"))) (ObjectRef.EachMatching Filter.IsSource)))
+      """ {"type":"BecomeCopy","value":{"original":{"type":"InSlot","value":"became"},"subject":{"type":"EachMatching","value":{"type":"IsSource"}}}} """
   Spec.it s "Replace" $
     Common.assertJsonCodec
       s
