@@ -290,8 +290,13 @@ data View = MkView
   }
 
 -- The view of a PLAYER candidate: no card types, no colours, no controller --
--- a player is not an object (CR 109.1) and has none of those. Only the player's
--- own identity is answerable, which is exactly what IsPlayer asks.
+-- a player is not an object (CR 109.1) and has none of those. The player's own
+-- identity is the only thing THIS VIEW can answer, which is exactly what
+-- IsPlayer asks. The other player-shaped atoms are answered elsewhere on
+-- purpose: ControlsMoreThanYou, IsControllerOfBound and CardsInGraveyardAtLeast
+-- each ask about the board or a zone, which a function taking nothing but a
+-- PlayerId cannot see, so Pawl.Engine.Count.bakePerspective bakes them against
+-- the game state before the match instead.
 playerView :: PlayerId.PlayerId -> View
 playerView pid =
   MkView
@@ -625,6 +630,12 @@ matches context view predicate = case predicate of
   -- holds no game state. An atom that survives to here is one in a position
   -- nothing bakes -- any filter but a Scope.OverPlayers count's.
   Filter.ControlsMoreThanYou _ -> False
+  -- CR 400.1's per-player graveyard, and False WHEREVER IT IS REACHED, for the
+  -- two atoms above's reason plus one of its own: this module holds no game
+  -- state to size a zone with, and CR 109.3 counts no zone among an OBJECT's
+  -- characteristics, so a candidate that is not a player has nothing to answer
+  -- with either. Pawl.Engine.Count.bakePerspective answers it for a player.
+  Filter.CardsInGraveyardAtLeast _ -> False
   -- CR 508.1k: a creature stays attacking until it is removed from combat or the
   -- combat phase ends, so this is a live read of the combat record, never a stamp
   -- on the object.
@@ -782,6 +793,10 @@ rewrite pairs predicate = case predicate of
   -- Untouched for IsPlayer's reason: CR 612.1 swaps a WORD in the text, and this
   -- atom names a slot rather than a subtype.
   Filter.IsControllerOfBound _ -> predicate
+  -- Untouched for IsPlayer's reason: CR 612.1 swaps a WORD in the text, and a
+  -- card count is a number rather than one. "Graveyard" is a zone name, which
+  -- rule 612.1 does not reach either.
+  Filter.CardsInGraveyardAtLeast _ -> predicate
   Filter.IsAttacking -> predicate
   Filter.IsBlocking -> predicate
   Filter.IsBlocked -> predicate
@@ -1103,6 +1118,9 @@ bakeBound players predicate = case predicate of
   -- holding an OBJECT -- there is nothing here to substitute.
   -- Pawl.Engine.Count.bakePerspective is where it is answered instead.
   Filter.IsControllerOfBound _ -> predicate
+  -- Untouched: the atom names no slot at all, so CR 603.2's map has nothing to
+  -- substitute into it. Baked one module out, as the atom above is.
+  Filter.CardsInGraveyardAtLeast _ -> predicate
   Filter.IsAttacking -> predicate
   Filter.IsBlocking -> predicate
   Filter.IsBlocked -> predicate
@@ -1176,6 +1194,9 @@ manaValueThresholds predicate = case predicate of
   Filter.SameNameAsBound _ -> []
   Filter.IsPlayer _ -> []
   Filter.IsControllerOfBound _ -> []
+  -- No threshold: the literal bounds a COUNT OF CARDS in a zone, not a mana
+  -- value, so CR 601.3a's sample has nothing to learn from it.
+  Filter.CardsInGraveyardAtLeast _ -> []
   Filter.IsAttacking -> []
   Filter.IsBlocking -> []
   Filter.IsBlocked -> []
@@ -1258,6 +1279,7 @@ statesAQuality predicate = case predicate of
   Filter.SameNameAsBound _ -> True
   Filter.IsPlayer _ -> True
   Filter.IsControllerOfBound _ -> True
+  Filter.CardsInGraveyardAtLeast _ -> True
   Filter.IsAttacking -> True
   Filter.IsBlocking -> True
   Filter.IsBlocked -> True

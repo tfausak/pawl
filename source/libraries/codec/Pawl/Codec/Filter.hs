@@ -62,6 +62,10 @@ codec keywordCodec =
       -- Recursive like Not below, and for the atom's own reason rather than the
       -- combinator's: the payload describes the permanents being counted.
       Arm.payload "ControlsMoreThanYou" (codec keywordCodec) Filter.ControlsMoreThanYou (\x -> case x of Filter.ControlsMoreThanYou y -> Just y; _ -> Nothing),
+      -- Natural rather than Common.integer above, so a negative literal is
+      -- rejected at decode instead of decoding into a vacuously true filter: a
+      -- zone holds no negative number of cards.
+      Arm.payload "CardsInGraveyardAtLeast" Common.natural Filter.CardsInGraveyardAtLeast (\x -> case x of Filter.CardsInGraveyardAtLeast y -> Just y; _ -> Nothing),
       Arm.nullary "IsSource" Filter.IsSource,
       Arm.payload "IsBound" SlotName.codec Filter.IsBound (\x -> case x of Filter.IsBound y -> Just y; _ -> Nothing),
       Arm.payload "SameNameAsBound" SlotName.codec Filter.SameNameAsBound (\x -> case x of Filter.SameNameAsBound y -> Just y; _ -> Nothing),

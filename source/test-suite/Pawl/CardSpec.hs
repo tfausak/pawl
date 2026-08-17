@@ -2019,6 +2019,9 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsBound _ -> 0
   Filter.Type.SameNameAsBound _ -> 0
   Filter.Type.IsControllerOfBound _ -> 0
+  -- Zero for the nullary atoms' reason, a payload over: CR 400.1's card count is
+  -- a Natural, which holds no Filter for a card author to reach.
+  Filter.Type.CardsInGraveyardAtLeast _ -> 0
   Filter.Type.IsAttacking -> 0
   Filter.Type.IsBlocking -> 0
   Filter.Type.IsBlocked -> 0

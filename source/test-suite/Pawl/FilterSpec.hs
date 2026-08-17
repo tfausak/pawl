@@ -460,6 +460,16 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.assertBool s (not (Filter.matches self aPlayer lands)) "player"
     Spec.assertBool s (not (Filter.matches self blackCreature lands)) "object"
 
+  -- CR 400.1's per-player graveyard, ControlsMoreThanYou's posture one atom over
+  -- and for its reason plus one: an OBJECT has no graveyard to size at all (CR
+  -- 109.3 counts no zone among its characteristics), so False is the answer for
+  -- both candidates rather than only for the unbaked position. Pawl.TriggerSpec's
+  -- The Master of Lake-town death group proves the BAKED answer.
+  Spec.it s "CardsInGraveyardAtLeast is False unbaked, for a player and for an object alike" $ do
+    let bin = Filter.Type.CardsInGraveyardAtLeast 7
+    Spec.assertBool s (not (Filter.matches self aPlayer bin)) "player"
+    Spec.assertBool s (not (Filter.matches self blackCreature bin)) "object"
+
   Spec.it s "ControlledBy You holds for own object" $ do
     Spec.assertBool s (Filter.matches self blackCreature (Filter.Type.ControlledBy PlayerRelation.You)) "you"
 
