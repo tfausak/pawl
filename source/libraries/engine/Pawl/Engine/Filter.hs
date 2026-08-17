@@ -133,34 +133,42 @@ data View = MkView
     -- Unlike `attacking` not even a present state: it is a look-back read of the
     -- turn-scoped GameEvent log.
     --
-    -- LAZY, like `attachedToCreature` below but for a plainer reason: filling it
+    -- LAZY, like `attachedToView` below but for a plainer reason: filling it
     -- folds the whole turn's event log, and nothing forces it unless a Filter
     -- actually contains AttackedThisTurn. That is a cost argument rather than
-    -- the recursion hazard the next field records.
+    -- the recursion hazard that field records.
     attackedThisTurn :: Bool,
     -- CR 701.17a: was this candidate MILLED earlier this turn? A look-back read
     -- of the same log `attackedThisTurn` above reads, and LAZY for that field's
     -- reason -- nothing forces it unless a Filter contains MilledThisTurn.
     milledThisTurn :: Bool,
-    -- CR 701.3a: is this candidate attached to a CREATURE right now? Not a
-    -- characteristic either (CR 109.3), so it is read from Object.attachedTo plus
-    -- the HOST's projected card types rather than from the candidate's own
-    -- projection.
+    -- CR 303.4 / 110.1 / 701.3a: the HOST this candidate is attached to, viewed
+    -- as a candidate in its own right, so that AttachedTo's nested Filter has
+    -- something to be evaluated against. Not a characteristic either (CR 109.3):
+    -- the attachment comes off Object.attachedTo, and only the host's half of
+    -- the answer is projected.
     --
-    -- LAZY, and load-bearingly so. Filling it costs a projection OF ANOTHER
-    -- OBJECT, and viewOfCharacteristics is itself called from inside
-    -- Projection.affects while a projection is being computed. Nothing forces
-    -- this field unless a Filter actually contains IsAttachedToCreature, and no
-    -- affected-set filter in the pool does; one that did would recurse back into
-    -- the projection that is asking. A fact about the pool's card data rather than
-    -- a guarantee this record enforces (#357).
-    attachedToCreature :: Bool,
-    -- CR 303.4: is this candidate attached to a PERMANENT right now? Read from
-    -- Object.attachedTo alone -- whether the attachment names an object rather
-    -- than a player, which is what Recipient.objectOf asks. Unlike
-    -- `attachedToCreature` this reads no second projection, so it needs no
-    -- laziness argument.
-    attachedToPermanent :: Bool,
+    -- Nothing where the candidate is attached to nothing, to a PLAYER (CR
+    -- 303.4's other destination, which Recipient.objectOf rejects), or to an
+    -- object that is no longer on the battlefield and so is no longer a
+    -- permanent -- the stale window CR 704.5m closes on the next
+    -- state-based-action pass.
+    --
+    -- Recursive, and therefore LAZY, load-bearingly so on both counts. Deciding
+    -- Just from Nothing costs no projection at all; only reaching INSIDE the
+    -- host's view does, and Projection.viewOfCharacteristics is itself called
+    -- from inside Projection.affects while a projection is being computed. So
+    -- `AttachedTo (And [])` forces nothing beyond the attachment, and a nest that
+    -- names a characteristic forces exactly one further projection per link. No
+    -- affected-set filter in the pool nests one; one that did would recurse back
+    -- into the projection that is asking (#357).
+    --
+    -- View has no derived Eq, Ord or Show, and this field is why: CR 303.4 lets
+    -- an effect momentarily produce a cycle of attachments before CR 704.5m's
+    -- pass, and a structural walk would not terminate on one. Nothing needed
+    -- them -- no type embeds a View, so no derived instance depended on them
+    -- either.
+    attachedToView :: Maybe View,
     -- CR 701.3a / 301.5a: WHICH object this candidate is attached to, for
     -- IsAttachedToSource to compare against Context.source -- the id and not a
     -- Bool, because the atom's answer depends on the match's source and this
@@ -168,8 +176,10 @@ data View = MkView
     --
     -- Nothing where Object.attachedTo is, and also where it names a PLAYER (CR
     -- 303.4's other destination), which is Recipient.objectOf's Nothing. Reads no
-    -- second projection, so unlike `attachedToCreature` it needs no laziness
-    -- argument -- an ObjectId is not a characteristic.
+    -- second projection, so unlike `attachedToView` it needs no laziness
+    -- argument -- an ObjectId is not a characteristic. Deliberately NOT narrowed
+    -- to a host on the battlefield the way `attachedToView` is; see
+    -- Pawl.Engine.Projection.viewOfCharacteristics.
     attachedTo :: Maybe ObjectId.ObjectId,
     -- CR 701.3a: could the SUBJECT of the attach now being performed -- the
     -- permanent an Effect.AttachTarget is moving -- legally be attached to this
@@ -270,7 +280,7 @@ data View = MkView
     -- test out of here: classifying an ability means importing
     -- Pawl.Engine.ManaAbility, and this module holds no abilities to classify.
     --
-    -- LAZY, for Pawl.Engine.Projection.viewOfCharacteristics' attachedToCreature
+    -- LAZY, for Pawl.Engine.Projection.viewOfCharacteristics' attachedToView
     -- reason: filling it re-asks CR 702.178a's grant condition, which reaches a
     -- second projection, and `affects` builds a view from inside a projection
     -- already. Nothing forces it unless a Filter actually contains the atom, and
@@ -278,7 +288,6 @@ data View = MkView
     -- affected-set filter that used it would recurse.
     nonManaActivatedAbility :: Bool
   }
-  deriving (Eq, Ord, Show)
 
 -- The view of a PLAYER candidate: no card types, no colours, no controller --
 -- a player is not an object (CR 109.1) and has none of those. Only the player's
@@ -319,12 +328,12 @@ playerView pid =
       milledThisTurn = False,
       -- CR 303.4b: a player an Aura is attached to is ENCHANTED by it; the
       -- player is not itself attached to anything, because Object.attachedTo is
-      -- a field of the ATTACHED permanent, and a player is not one.
-      attachedToCreature = False,
-      -- CR 303.4 again, for the same reason.
-      attachedToPermanent = False,
-      -- CR 303.4 a third time: a player is attached to nothing, so there is no
-      -- host id for IsAttachedToSource to compare.
+      -- a field of the ATTACHED permanent, and a player is not one. So there is
+      -- no host to evaluate AttachedTo's nest against, and the atom is vacuously
+      -- False for a player candidate however the nest is written.
+      attachedToView = Nothing,
+      -- CR 303.4 again: a player is attached to nothing, so there is no host id
+      -- for IsAttachedToSource to compare either.
       attachedTo = Nothing,
       -- CR 701.3a's question can be asked about a player (CR 702.5d), but not
       -- here: the only site that fills this field is Pawl.Engine.Resolve's
@@ -640,15 +649,15 @@ matches context view predicate = case predicate of
   -- candidate can stop EXISTING -- CR 400.7 mints a new object the moment the
   -- milled card moves again, and the new one was not milled.
   Filter.MilledThisTurn -> milledThisTurn view
-  -- CR 701.3a: a live read of Object.attachedTo and the host's projected types,
+  -- CR 701.3a: a live read of Object.attachedTo and of the host's own projection,
   -- never a stamp on the candidate -- an Aura whose host stops being a creature
   -- stops matching, and CR 704.5m buries it on the next state-based-action pass.
-  Filter.IsAttachedToCreature -> attachedToCreature view
-  -- CR 303.4: a live read of Object.attachedTo, and of nothing else -- whether the
-  -- attachment names an object rather than a player. An Aura buried by CR 704.5m
-  -- stops matching because it stops being attached, never because a stamp was
-  -- cleared.
-  Filter.IsAttachedToPermanent -> attachedToPermanent view
+  --
+  -- The nest is matched against the HOST's view and the SAME context, which is
+  -- what makes CR 109.5's "you" the ability's controller rather than the host's
+  -- (Miracle Worker). `And []` nests to "attached to a permanent" (CR 110.1),
+  -- because the field is Just only for a host on the battlefield.
+  Filter.AttachedTo f -> maybe False (\host -> matches context host f) (attachedToView view)
   -- CR 701.3a / 301.5a: IsSource's comparison in the other direction -- the
   -- candidate's HOST against the match's source, rather than the candidate itself.
   -- A live read of Object.attachedTo, so an Equipment unequipped by CR 704.5n
@@ -778,8 +787,10 @@ rewrite pairs predicate = case predicate of
   Filter.IsBlocked -> predicate
   Filter.AttackedThisTurn -> predicate
   Filter.MilledThisTurn -> predicate
-  Filter.IsAttachedToCreature -> predicate
-  Filter.IsAttachedToPermanent -> predicate
+  -- DESCENT, for ControlsMoreThanYou's reason above: the nested filter describes
+  -- the HOST ("attached to a Swamp"), so CR 612.1's word swap reaches it exactly
+  -- as it reaches the same description written at the top level.
+  Filter.AttachedTo f -> Filter.AttachedTo (rewrite pairs f)
   Filter.IsAttachedToSource -> predicate
   Filter.CanHostSubject -> predicate
   Filter.IsToken -> predicate
@@ -1097,8 +1108,11 @@ bakeBound players predicate = case predicate of
   Filter.IsBlocked -> predicate
   Filter.AttackedThisTurn -> predicate
   Filter.MilledThisTurn -> predicate
-  Filter.IsAttachedToCreature -> predicate
-  Filter.IsAttachedToPermanent -> predicate
+  -- DESCENT, for ControlsMoreThanYou's reason above: a ControlledByBound written
+  -- into the HOST's description is baked exactly as the same atom written at the
+  -- top level would be. Pawl.Engine.Filter.boundSlots descends to match, which is
+  -- the pairing that function's comment insists on.
+  Filter.AttachedTo f -> Filter.AttachedTo (bakeBound players f)
   Filter.IsAttachedToSource -> predicate
   Filter.CanHostSubject -> predicate
   Filter.IsToken -> predicate
@@ -1167,8 +1181,10 @@ manaValueThresholds predicate = case predicate of
   Filter.IsBlocked -> []
   Filter.AttackedThisTurn -> []
   Filter.MilledThisTurn -> []
-  Filter.IsAttachedToCreature -> []
-  Filter.IsAttachedToPermanent -> []
+  -- Descended into, which OVER-reports for ControlsMoreThanYou's reason: the
+  -- literals inside bound the HOST's mana value and never the candidate's. Only
+  -- widening CR 601.3a's sample is the safe direction.
+  Filter.AttachedTo f -> manaValueThresholds f
   Filter.IsAttachedToSource -> []
   Filter.CanHostSubject -> []
   Filter.IsToken -> []
@@ -1247,8 +1263,10 @@ statesAQuality predicate = case predicate of
   Filter.IsBlocked -> True
   Filter.AttackedThisTurn -> True
   Filter.MilledThisTurn -> True
-  Filter.IsAttachedToCreature -> True
-  Filter.IsAttachedToPermanent -> True
+  -- True whatever the nest says, for ControlsMoreThanYou's reason: "attached to
+  -- something" is itself a stated quality under CR 701.23b, so even the trivial
+  -- nest `And []` leaves this atom stating one and no descent could change it.
+  Filter.AttachedTo _ -> True
   Filter.IsAttachedToSource -> True
   Filter.CanHostSubject -> True
   Filter.IsToken -> True
@@ -1292,4 +1310,8 @@ boundSlots predicate = case predicate of
   -- keyword's own filter (CR 702.29e) is out of both functions' reach alike, so
   -- the pairing holds there by both sides declining.
   Filter.ControlsMoreThanYou f -> boundSlots f
+  -- Descended into for the atom above's reason and named explicitly for the same
+  -- one: `bakeBound` descends into the host's description, so the catch-all below
+  -- would silently bake a slot this function never reported.
+  Filter.AttachedTo f -> boundSlots f
   _ -> Set.empty

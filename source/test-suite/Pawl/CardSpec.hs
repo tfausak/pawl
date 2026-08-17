@@ -2012,8 +2012,11 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsBlocked -> 0
   Filter.Type.AttackedThisTurn -> 0
   Filter.Type.MilledThisTurn -> 0
-  Filter.Type.IsAttachedToCreature -> 0
-  Filter.Type.IsAttachedToPermanent -> 0
+  -- A DESCENT and not a zero, unlike every other atom here: CR 303.4's atom
+  -- carries the host's description, which a card author writes exactly as they
+  -- write any other filter. Zero would under-count against jsonAtoms, which counts
+  -- the tag at any depth, and turn a legitimate card into a reported offence.
+  Filter.Type.AttachedTo f -> canHostSubjects f
   Filter.Type.IsAttachedToSource -> 0
   Filter.Type.IsToken -> 0
   Filter.Type.IsTapped -> 0
@@ -5356,10 +5359,15 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             Filter.Type.Or [atom],
             Filter.Type.Not atom,
             buried,
-            Filter.Type.HasKeyword (Keyword.Cycling (Cycling.MkCycling (Cost.Type.MkCost Nothing []) (Just atom)))
+            Filter.Type.HasKeyword (Keyword.Cycling (Cycling.MkCycling (Cost.Type.MkCost Nothing []) (Just atom))),
+            -- CR 303.4's attachment atom, which carries the HOST's description and
+            -- is therefore a Filter position like the combinators above. No card
+            -- nests this atom there -- it would be nonsense text -- so this is the
+            -- only observer that descent has.
+            Filter.Type.AttachedTo atom
           ]
       )
-      [1, 1, 1, 1, 1, 1]
+      [1, 1, 1, 1, 1, 1, 1]
     -- The ACCEPTING direction, twice: the real card, and the buried atom in an
     -- AttachTarget destination grafted onto a card with no attach of its own --
     -- so the acceptance is about the POSITION and not about Aura Graft.
