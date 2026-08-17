@@ -1,12 +1,10 @@
 {
   inputs = {
-    hooky.url = "github:tfausak/hooky-nix";
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
   };
 
   outputs =
     {
-      hooky,
       nixpkgs,
       ...
     }:
@@ -125,7 +123,6 @@
         {
           default = pkgs.mkShell {
             nativeBuildInputs = [
-              hooky.packages.${system}.default
               pkgs.bash
               pkgs.cabal-install
               pkgs.coreutils
@@ -135,6 +132,7 @@
               pkgs.haskell.compiler.native-bignum.ghc9141
               pkgs.haskellPackages.cabal-gild_1_8_4_1
               pkgs.hlint
+              pkgs.hooky
               pkgs.jq
               pkgs.nixfmt
               pkgs.ormolu
