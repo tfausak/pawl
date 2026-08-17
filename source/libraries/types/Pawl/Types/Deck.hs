@@ -45,7 +45,7 @@ data Deck = MkDeck
     -- is nothing to ask. The multi-dungeon choice is unimplemented (#1335).
     dungeon :: Maybe Printing.Printing
   }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 -- | A deck with no commander and no dungeon -- every format but Commander, and
 -- every game nobody ventures in.

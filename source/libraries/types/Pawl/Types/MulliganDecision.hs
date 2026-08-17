@@ -4,4 +4,4 @@ module Pawl.Types.MulliganDecision where
 data MulliganDecision
   = Mulligan
   | Keep
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)

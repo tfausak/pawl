@@ -10,7 +10,7 @@ import qualified Text.Parsec as Parsec
 newtype Array a = MkArray
   { unwrap :: [a]
   }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 decode :: (Parsec.Stream s m Char) => Parsec.ParsecT s u m a -> Parsec.ParsecT s u m (Array a)
 decode p =

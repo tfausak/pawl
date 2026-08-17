@@ -13,7 +13,7 @@ data Example
   = Plain
   | Sized Integer
   | Loose (Maybe Integer)
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 -- | An all-nullary sum, for 'Arm.enum'. Separate from 'Example' because that
 -- one carries payloads and so cannot be 'Enum'.
@@ -21,7 +21,7 @@ data Flat
   = First
   | Middle
   | Last
-  deriving (Bounded, Enum, Eq, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)
 
 flatCodec :: Codec.Codec Flat
 flatCodec = Arm.enum

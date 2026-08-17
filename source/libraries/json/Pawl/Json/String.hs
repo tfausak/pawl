@@ -13,7 +13,7 @@ import qualified Text.Parsec as Parsec
 newtype String = MkString
   { unwrap :: Text.Text
   }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 decode :: (Parsec.Stream s m Char) => Parsec.ParsecT s u m Pawl.Json.String.String
 decode = MkString . Text.pack <$> Parsec.between (Parsec.char '"') (Parsec.char '"') (Parsec.many decodeChar)

@@ -12,7 +12,7 @@ import qualified Text.Parsec as Parsec
 newtype Object a = MkObject
   { unwrap :: [Pair.Pair a]
   }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 decode :: (Parsec.Stream s m Char) => Parsec.ParsecT s u m a -> Parsec.ParsecT s u m (Object a)
 decode p =

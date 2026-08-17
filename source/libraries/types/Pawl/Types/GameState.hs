@@ -499,4 +499,4 @@ data GameState = MkGameState
     -- Warp aimed at an opponent.
     turnAnchor :: Maybe PlayerId.PlayerId
   }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)

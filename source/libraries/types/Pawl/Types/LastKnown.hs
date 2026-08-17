@@ -68,4 +68,4 @@ data LastKnown = MkLastKnown
     -- other copy effects").
     copiable :: !ProjectedCharacteristics.ProjectedCharacteristics
   }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)

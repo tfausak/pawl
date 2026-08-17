@@ -11,4 +11,4 @@ module Pawl.Types.Payment where
 data Payment
   = Paid
   | Unpaid
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)

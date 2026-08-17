@@ -9,7 +9,7 @@ import qualified Pawl.Json.Value as Value
 newtype Schema = MkSchema
   { unwrap :: Value.Value
   }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 fromPairs :: [Pair.Pair Value.Value] -> Schema
 fromPairs = MkSchema . Value.object

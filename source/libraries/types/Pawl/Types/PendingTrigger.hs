@@ -31,4 +31,4 @@ data PendingTrigger = MkPendingTrigger
     ability :: TriggeredAbility.TriggeredAbility Card.Card,
     bindings :: Map.Map SlotName.SlotName Binding.Binding
   }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)

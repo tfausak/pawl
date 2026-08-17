@@ -1859,7 +1859,7 @@ textChangedAbilitySpec s registry = Spec.describe s "TextChangedActivatedAbility
 
 -- Which incarnation of the Warrior the Hack is aimed at.
 data HackTarget = OnTheSpell | OnThePermanent
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 -- Cast Tidal Warrior; optionally cast Magical Hack (Island -> Swamp) at the
 -- named incarnation; resolve the stack; settle alice's permanents (CR 302.6 --
