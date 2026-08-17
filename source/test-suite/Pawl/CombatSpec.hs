@@ -3548,6 +3548,50 @@ boundedDeclarationSpec s registry = Spec.describe s "BoundedDeclaration" $ do
         Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [first] control)) "without the Arbiter one Piker no longer attains it"
         Spec.assertBool s (Combat.legalAttackDeclaration S.alice [first, second] control) "and both together do"
       _ -> Spec.assertFailure s "fixture should have two creatures"
+  Spec.it s "CR 508.1d two requirements on ONE creature count twice" $ do
+    -- CR 508.1d counts REQUIREMENTS being obeyed, not the creatures they name.
+    -- Berserkers of Blood Ridge carries its own ("this creature attacks each
+    -- combat if able") AND the Curse's, so it is worth two; the Piker is worth
+    -- one. CR 508.1c's Silent Arbiter caps the declaration at one creature, so
+    -- the maximum obtainable is two and only the Berserkers attains it.
+    --
+    -- Without the Arbiter the two readings agree: the maximizing declaration is
+    -- both creatures either way, and multiplicity decides nothing. A SET-shaped
+    -- restriction is what forces the choice between them, which is why the case
+    -- above is this one's control rather than its equal -- there each Piker
+    -- carries one requirement and the multiset changes no answer.
+    --
+    -- The Berserkers is declared FIRST deliberately. candidateAttackDeclarations
+    -- folds so that the LATER candidate's singleton is enumerated first, and ties
+    -- in attackCeilingGiven's fold go to the earlier entry -- so under a
+    -- creature-counting reading `best` is the Piker alone, and the two
+    -- discriminating assertions bite. With the Berserkers last they would agree
+    -- with both readings.
+    berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    silentArbiter <- S.printingOf s registry "Silent Arbiter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = cursing curse S.alice [berserkers, piker] [silentArbiter]
+        (control, _, _) = cursing curse S.alice [berserkers, piker] []
+    case mine of
+      [bers, plain] -> do
+        -- Anti-vacuity: both really are able attackers under the Arbiter, so
+        -- nothing below is a CR 508.1a or CR 508.1c refusal in disguise. These
+        -- three pass on both readings of CR 508.1d, which is what makes them a
+        -- control rather than more of the same assertion.
+        Spec.assertEqWith s "both are offered" (Combat.legalAttackers S.alice gs) [bers, plain]
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [bers] gs) "attacking with the Berserkers attains the maximum"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] gs)) "declining obeys nothing"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [bers, plain] gs)) "both together is over the Arbiter's bound"
+        -- The proving assertion: one requirement where two were available.
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [plain] gs)) "but the Piker alone obeys one requirement where two were available"
+        -- The second discriminator, over attackCeilingGiven's tie-break.
+        let candidates = Combat.legalAttackers S.alice gs
+        Spec.assertEqWith s "and the forced declaration names the Berserkers" (Combat.forcedAttackDeclaration (Combat.attackCeiling candidates gs) candidates) [bers]
+        -- Control: strip the Arbiter and the two readings agree again.
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [bers, plain] control) "without the Arbiter, both together is legal"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [bers] control)) "and the Berserkers alone no longer attains the maximum"
+      _ -> Spec.assertFailure s "fixture should have two creatures"
   Spec.it s "CR 509.1c a Lure under a bound of one: the maximum is ONE blocker" $ do
     -- The blocking twin of the case above, over blockCeiling's fold. Lure makes
     -- every creature able to block the enchanted attacker do so, which is all
