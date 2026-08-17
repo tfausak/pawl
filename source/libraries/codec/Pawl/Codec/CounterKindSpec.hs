@@ -73,5 +73,12 @@ spec s = Spec.describe s "Pawl.Codec.CounterKind" $ do
       (CounterKind.codec Keyword.codec)
       CounterKind.Shield
       """ {"type":"Shield"} """
+  -- CR 711.2, the kind a leveler's level symbols read through a condition.
+  Spec.it s "Level" $
+    Common.assertCodec
+      s
+      (CounterKind.codec Keyword.codec)
+      CounterKind.Level
+      """ {"type":"Level"} """
   Spec.it s "has a schema" $
     Common.assertHasSchema s (CounterKind.codec Keyword.codec)

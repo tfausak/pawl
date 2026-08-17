@@ -158,6 +158,13 @@ spec s = Spec.describe s "Pawl.Codec.KeywordFamily" $ do
       KeywordFamily.Annihilator
       """ {"type":"Annihilator"} """
 
+  Spec.it s "LevelUp" $
+    Common.assertCodec
+      s
+      KeywordFamily.codec
+      KeywordFamily.LevelUp
+      """ {"type":"LevelUp"} """
+
   Spec.it s "Outlast" $
     Common.assertCodec
       s

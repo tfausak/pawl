@@ -85,6 +85,7 @@ codec =
       Arm.nullary "Undying" Keyword.Undying,
       Arm.nullary "Evolve" Keyword.Evolve,
       Arm.nullary "Dethrone" Keyword.Dethrone,
+      Arm.payload "LevelUp" (Cost.codec codec) Keyword.LevelUp (\x -> case x of Keyword.LevelUp y -> Just y; _ -> Nothing),
       Arm.payload "Outlast" (Cost.codec codec) Keyword.Outlast (\x -> case x of Keyword.Outlast y -> Just y; _ -> Nothing),
       Arm.nullary "Prowess" Keyword.Prowess,
       Arm.nullary "Menace" Keyword.Menace,

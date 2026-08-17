@@ -315,6 +315,17 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (miracle 2)
       """ {"type":"Miracle","value":{"mana":[{"type":"Generic","value":2}]}} """
     Spec.assertBool s (Codec.encode Keyword.codec (miracle 2) /= Codec.encode Keyword.codec (plotOf 2)) "the same cost under two keywords encodes differently"
+  -- CR 702.87a's payload is a Cost, and the tag must not collide with the level
+  -- COUNTER's -- CounterKind's "Level" and this keyword's "LevelUp" are two
+  -- different wire tags for the two halves of rule 711.
+  Spec.it s "LevelUp carries its cost" $ do
+    let levelUp n = Keyword.LevelUp (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    Common.assertCodec
+      s
+      Keyword.codec
+      (levelUp 1)
+      """ {"type":"LevelUp","value":{"mana":[{"type":"Generic","value":1}]}} """
+    Spec.assertBool s (Codec.encode Keyword.codec (levelUp 1) /= Codec.encode Keyword.codec (levelUp 4)) "the cost is part of the encoding"
   -- CR 702.107a's payload is a Cost too, Flashback's shape rather than Crew's
   -- Natural.
   Spec.it s "Outlast carries its cost" $ do
