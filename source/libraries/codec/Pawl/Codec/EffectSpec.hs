@@ -434,11 +434,11 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       ( Effect.LookAt
           ( LookAt.MkLookAt
-              (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) 1))
+              (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)))
               (SlotName.MkSlotName (Text.pack "looked"))
           )
       )
-      """ {"type":"LookAt","value":{"ref":{"type":"TopOfLibrary","value":{"count":1,"player":{"type":"Relative","value":{"type":"You"}}}},"slot":"looked"}} """
+      """ {"type":"LookAt","value":{"ref":{"type":"TopOfLibrary","value":{"count":{"type":"Literal","value":1},"player":{"type":"Relative","value":{"type":"You"}}}},"slot":"looked"}} """
   -- Both of Scry's PlayerRef shapes: Crystal Ball's controller scry and
   -- Kozilek's Command's "target player scries 2".
   Spec.it s "Scry" $ do

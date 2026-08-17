@@ -8933,6 +8933,106 @@ actOnImpulseSpec s registry =
           Spec.assertEqWith s "bob's library is still untouched" (namesIn Zone.Library S.bob after) [named "Ogre Sentry"]
           Spec.assertEqWith s "the game has no result" (GameState.result after) Nothing
 
+-- A COMPUTED depth on ObjectRef.TopOfLibrary: CR 601.2b's announced X, read as
+-- how deep into a library a move reaches. Act on Impulse's literal three above
+-- cannot tell "the depth is a number" from "the depth is a number the card
+-- computed"; Commune with Lava's X is the first printing that can.
+--
+-- Commune with Lava {X}{R}{R} Instant -- "Exile the top X cards of your library.
+-- Until the end of your next turn, you may play those cards." (name, cost, type
+-- line and Oracle text checked against api.scryfall.com). Its whole printed text
+-- is those two sentences.
+--
+-- The board tells the readings apart:
+--
+--   * The ANNOUNCED X versus any fixed number. Two legs on the same library and
+--     the same six Mountains announce X = 1 and X = 3 and must exile one card and
+--     three; a depth read as a literal, or as zero because nothing saw the X,
+--     gives both legs the same answer.
+--   * SIX Mountains on both legs, so the X = 3 leg is not proving something about
+--     affordability (cast-gate vacuity): X = 1 leaves four Mountains unspent.
+--   * YOUR library versus each player's. bob's library holds a printing alice
+--     never has, and it must be untouched.
+--   * CR 609.3: X = 3 against a two-card library exiles two rather than failing.
+communeWithLavaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+communeWithLavaSpec s registry =
+  let -- alice holds Commune with Lava over six Mountains, her library stocked with
+      -- `stock` DEEPEST FIRST -- S.addLibraryCard puts each card on top, so the
+      -- last name given is the top card. bob's library holds one Ogre Sentry, a
+      -- printing alice never has. `x` is what she announces.
+      board x stock = do
+        mountain <- S.printingOf s registry "Mountain"
+        commune <- S.printingOf s registry "Commune with Lava"
+        sentry <- S.printingOf s registry "Ogre Sentry"
+        stocked <- mapM (S.printingOf s registry) stock
+        let g1 = List.foldl' (\g p -> snd (S.addLibraryCard p S.alice g)) (S.landsInPlay mountain 6) stocked
+            g2 = snd (S.addLibraryCard sentry S.bob g1)
+            (withSpell, spell) = S.handOne commune g2
+            announcing :: Prompt.Prompt r -> r
+            announcing p = case p of
+              Prompt.ChooseX {} -> x
+              _ -> S.identityAnswer p
+            afterCast = S.runPure announcing withSpell (S.cast S.alice spell)
+        pure (S.runPure announcing afterCast Engine.priorityLoop)
+      named = Just . CardName.MkCardName . Text.pack
+      -- SORTED, because exile is a holding area with no order of its own (CR
+      -- 406.1) -- actOnImpulseSpec's reason.
+      exiledNames pid = List.sort . namesIn Zone.Exile pid
+      permissionsIn pid gs = fmap (Maybe.isJust . Object.playableFromExile) (Maybe.mapMaybe (\oid -> Game.lookupObject oid gs) (Game.zoneMembers Zone.Exile pid gs))
+      fiveCards = ["Goblin Piker", "Bird Maiden", "Benalish Hero", "Hill Giant", "Sabretooth Tiger"]
+   in Spec.describe s "CommuneWithLava" $ do
+        -- The pair, and the whole proof: one board, two announced values, two
+        -- depths.
+        Spec.it s "CR 601.2b the announced X is how deep the exile reaches" $ do
+          one <- board 1 fiveCards
+          three <- board 3 fiveCards
+          Spec.assertEqWith
+            s
+            "X=1 takes the top card alone and leaves the four under it, in order"
+            (exiledNames S.alice one, namesIn Zone.Library S.alice one)
+            ( [named "Sabretooth Tiger"],
+              [named "Hill Giant", named "Benalish Hero", named "Bird Maiden", named "Goblin Piker"]
+            )
+          Spec.assertEqWith
+            s
+            "X=3 takes the top three and leaves the two under them, in order"
+            (exiledNames S.alice three, namesIn Zone.Library S.alice three)
+            ( List.sort [named "Sabretooth Tiger", named "Hill Giant", named "Benalish Hero"],
+              [named "Bird Maiden", named "Goblin Piker"]
+            )
+          Spec.assertEqWith
+            s
+            "bob's library is untouched on both legs, so this is not each player's library"
+            (namesIn Zone.Library S.bob one, namesIn Zone.Library S.bob three)
+            ([named "Ogre Sentry"], [named "Ogre Sentry"])
+          Spec.assertEqWith
+            s
+            "every exiled card carries the play permission on both legs, so the move bound the whole group"
+            (permissionsIn S.alice one, permissionsIn S.alice three)
+            ([True], [True, True, True])
+        -- CR 609.3: fewer cards than the announced depth gives up what there is.
+        -- CR 104.3c takes nobody out of the game for it -- an empty library only
+        -- loses when its owner would DRAW from it, and this spell draws nothing.
+        Spec.it s "CR 609.3 X above the library's size exiles what it has" $ do
+          after <- board 3 ["Goblin Piker", "Bird Maiden"]
+          Spec.assertEqWith
+            s
+            "both cards were exiled and the library is empty"
+            (exiledNames S.alice after, namesIn Zone.Library S.alice after)
+            (List.sort [named "Goblin Piker", named "Bird Maiden"], [])
+          Spec.assertEqWith s "and both carry the permission" (permissionsIn S.alice after) [True, True]
+          Spec.assertEqWith s "the game has no result: an empty library is not itself a loss" (GameState.result after) Nothing
+        -- X = 0, which is a legal announcement (CR 107.3) and the floor the clamp
+        -- shares with an unevaluable depth: the spell resolves and exiles nothing.
+        Spec.it s "CR 107.3 X=0 exiles nothing and is not an error" $ do
+          after <- board 0 fiveCards
+          Spec.assertEqWith
+            s
+            "nothing was exiled and the library is whole"
+            (exiledNames S.alice after, length (namesIn Zone.Library S.alice after))
+            ([], 5)
+          Spec.assertEqWith s "the game has no result" (GameState.result after) Nothing
+
 -- alice is mid-combat with one creature per printing in `mine`, bob defends with
 -- one per printing in `theirs`, and alice holds a Trumpet Blast plus exactly the
 -- three Mountains that pay for it. The board sits at the declare attackers step
@@ -10187,6 +10287,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   blightCostSpec s registry
   countOnLuckSpec s registry
   actOnImpulseSpec s registry
+  communeWithLavaSpec s registry
   soulfireEruptionSpec s registry
 
 -- CR 601.2c's announcement, answered with a stated number for every variable

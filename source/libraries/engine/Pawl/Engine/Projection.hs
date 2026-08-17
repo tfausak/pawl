@@ -119,6 +119,7 @@ import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import Pawl.Types.Timestamp (Timestamp)
+import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
@@ -2000,7 +2001,7 @@ rewriteObjectRef pairs ref = case ref of
   ObjectRef.EachCardExiledWithSource f -> ObjectRef.EachCardExiledWithSource (fmap (Filter.rewrite pairs) f)
   ObjectRef.EachSpell f -> ObjectRef.EachSpell (Filter.rewrite pairs f)
   ObjectRef.EachPlayer -> ref
-  ObjectRef.TopOfLibrary {} -> ref
+  ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary p c) -> ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary p (rewriteQuantity pairs c))
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s f) -> ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s (Filter.rewrite pairs f))
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand p f) -> ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand p (Filter.rewrite pairs f))
 

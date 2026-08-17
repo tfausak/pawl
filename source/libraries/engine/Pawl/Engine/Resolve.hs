@@ -263,7 +263,8 @@ chooserSlots chooser = case chooser of
 -- object reference is a set declares no target slot and CR 608.2b has nothing to
 -- fizzle (CR 115.10a). TopOfLibrary names no object slot either -- it reads a
 -- POSITION -- but the PlayerRef saying whose library may name a player slot, and
--- that read is playerRefSlots' already.
+-- that read is playerRefSlots' already; its DEPTH is a Quantity, which may name
+-- one too (Commune with Lava's X), and that read is quantitySlots'.
 objectRefSlots :: ObjectRef -> Map.Map SlotName SlotArity
 objectRefSlots ref = case ref of
   ObjectRef.InSlot slot -> Map.singleton slot SlotArity.Many
@@ -273,7 +274,7 @@ objectRefSlots ref = case ref of
   ObjectRef.EachCardExiledWithSource {} -> Map.empty
   ObjectRef.EachSpell _ -> Map.empty
   ObjectRef.EachPlayer -> Map.empty
-  ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player _) -> playerRefSlots player
+  ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player count) -> joinTwo (playerRefSlots player) (quantitySlots count)
   -- A PlayerScope names players by their relation to the effect's controller (CR
   -- 109.5) rather than out of a slot, so whose graveyards are drawn from names
   -- none. WHO CHOOSES may: Skullwinder's chosen opponent is read out of the slot
@@ -284,6 +285,28 @@ objectRefSlots ref = case ref of
   -- card from their hand" names its seat with a target slot. The Filter beside it
   -- names no slot, exactly as the graveyard arms' Filters do not.
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player _) -> playerRefSlots player
+
+-- The Quantities an ObjectRef carries. ONE arm does: TopOfLibrary's depth, which
+-- is Commune with Lava's X and Act on Impulse's literal three. Everything else
+-- names objects by slot, by characteristics or by a player, and holds no number.
+--
+-- Exhaustive over the constructors, no wildcard, because this is the function
+-- slotsAreExhaustive, readsX and Pawl.CardSpec's Count traversal all reach a
+-- nested Quantity THROUGH -- their own arms for the ObjectRef-taking opcodes are
+-- written `{}` and answer a constant, so a second ObjectRef arm gaining a
+-- Quantity would be invisible to all three unless it must answer here.
+objectRefQuantities :: ObjectRef -> [Quantity.Type.Quantity]
+objectRefQuantities ref = case ref of
+  ObjectRef.InSlot _ -> []
+  ObjectRef.EachMatching _ -> []
+  ObjectRef.EachCardInGraveyard {} -> []
+  ObjectRef.EachCardInYourHand -> []
+  ObjectRef.EachCardExiledWithSource {} -> []
+  ObjectRef.EachSpell _ -> []
+  ObjectRef.EachPlayer -> []
+  ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary _ count) -> [count]
+  ObjectRef.ChosenCardInGraveyard {} -> []
+  ObjectRef.ChosenCardInHand {} -> []
 
 -- The slots a MonarchTarget reads: only the targeted arm names one. Written out
 -- rather than routed through playerRefSlots because MonarchTarget is its own
@@ -585,8 +608,12 @@ conditionSlots condition = case condition of
 -- new opcode must answer HERE as well as in slotsOf. A wildcard defaulting to
 -- True would hand a future nested payload an unsound elision instead of a build
 -- failure. Fields are spelled out wherever hlint's record-pattern rule allows
--- it; the four `{}` arms below all answer a constant, so a new FIELD on one of
--- those is the one change this case will not force.
+-- it; the `{}` arms below all answer a constant, so a new FIELD on one of those
+-- is the one change this case will not force. That is exactly what a Quantity
+-- nested in an ObjectRef would have slipped past, which is why the three
+-- ObjectRef-taking opcodes below name their ref and go through
+-- objectRefQuantities instead: a second ObjectRef arm gaining a Quantity has to
+-- answer there.
 slotsAreExhaustive :: Effect Card.Type.Card -> Bool
 slotsAreExhaustive effect = case effect of
   Effect.DealDamage (DealDamage.MkDealDamage _ quantity _) -> Quantity.slotsAreExhaustive quantity
@@ -612,11 +639,13 @@ slotsAreExhaustive effect = case effect of
   Effect.TurnFaceDown _ -> True
   Effect.RemoveFromCombat _ -> True
   Effect.BecomesBlocked _ -> True
-  Effect.MoveToZone {} -> True
+  -- The three ObjectRef-taking opcodes whose ref may nest a Quantity of its own
+  -- (ObjectRef.TopOfLibrary's depth), which objectRefQuantities is what recovers.
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> all Quantity.slotsAreExhaustive (objectRefQuantities ref)
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Mill (Mill.MkMill _ quantity _) -> Quantity.slotsAreExhaustive quantity
-  Effect.Reveal {} -> True
-  Effect.LookAt {} -> True
+  Effect.Reveal ref -> all Quantity.slotsAreExhaustive (objectRefQuantities ref)
+  Effect.LookAt (LookAt.MkLookAt ref _) -> all Quantity.slotsAreExhaustive (objectRefQuantities ref)
   Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
@@ -730,7 +759,9 @@ conditionSlotsAreExhaustive condition = case condition of
 -- OPCODE the compiler does force, this case being exhaustive over constructors;
 -- widening an existing one it does not, since an arm already written `{} ->
 -- False` keeps compiling and keeps answering False about a quantity it now
--- carries.
+-- carries. The three ObjectRef-taking opcodes go through objectRefQuantities for
+-- that reason: an ObjectRef arm gaining a Quantity answers there rather than
+-- needing three arms here changed.
 readsX :: [Effect Card.Type.Card] -> Bool
 readsX = any effectReadsX
   where
@@ -758,11 +789,15 @@ readsX = any effectReadsX
       Effect.TurnFaceDown _ -> False
       Effect.RemoveFromCombat _ -> False
       Effect.BecomesBlocked _ -> False
-      Effect.MoveToZone {} -> False
+      -- Commune with Lava's "exile the top X cards of your library": the X is
+      -- inside the ObjectRef rather than beside it, so these three go through
+      -- objectRefQuantities. Without them the CR 107.3 lint would call the card
+      -- an unread announcement and the depth would evaluate against no X at all.
+      Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> any Quantity.readsX (objectRefQuantities ref)
       Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Mill (Mill.MkMill _ quantity _) -> Quantity.readsX quantity
-      Effect.Reveal {} -> False
-      Effect.LookAt {} -> False
+      Effect.Reveal ref -> any Quantity.readsX (objectRefQuantities ref)
+      Effect.LookAt (LookAt.MkLookAt ref _) -> any Quantity.readsX (objectRefQuantities ref)
       Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
@@ -2044,8 +2079,23 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- and CR 101.4 fixes the order any per-object question is then asked in. That
   -- also drops a player CR 800.4 has taken out of the game, whose library
   -- playerRefPlayers would otherwise still be able to name.
-  ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player depth) ->
+  --
+  -- The depth is a Quantity, evaluated HERE and so when the effect executes (CR
+  -- 608.2c) -- Commune with Lava's X, read off the announcement CR 601.2b left on
+  -- the resolving object, which is why `resolving` rather than `source` is the
+  -- announcedOn id (the reason applyOneEffect's own note gives). The view and the
+  -- context are built the way every Quantity-reading arm builds them, from the
+  -- four ids this function already takes, so nothing had to be threaded in.
+  --
+  -- ONE evaluation for the whole ref rather than one per seat: the depth is a
+  -- number the card computed, not a per-recipient amount, and no printing writes a
+  -- per-library depth. A depth that will not evaluate, or evaluates negative, is
+  -- ZERO cards (CR 107.1b) -- the same nothing an empty library gives.
+  ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player count) ->
     let named = playerRefPlayers legal controller gs player
+        viewOf = Projection.viewWithLastKnown source gs
+        context = effectContext controller source legal
+        depth = maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf context gs resolving source count)
      in concatMap
           (\pid -> List.genericTake depth (Game.zoneMembers Zone.Library pid gs))
           (filter (`elem` named) (Game.apnapOrder gs))

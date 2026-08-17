@@ -19,6 +19,7 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
+import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
@@ -107,18 +108,30 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
     Common.assertCodec
       s
       ObjectRef.codec
-      (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) 3))
-      """ {"type":"TopOfLibrary","value":{"player":{"type":"Relative","value":{"type":"You"}},"count":3}} """
+      (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 3)))
+      """ {"type":"TopOfLibrary","value":{"player":{"type":"Relative","value":{"type":"You"}},"count":{"type":"Literal","value":3}}} """
+  -- Commune with Lava's "the top X cards of your library": the same arm with a
+  -- computed depth, which is what a bare number could never say.
+  Spec.it s "TopOfLibrary carries the computed depth Commune with Lava needs" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) (Quantity.InSlot (SlotName.MkSlotName (Text.pack "X")))))
+      """ {"type":"TopOfLibrary","value":{"player":{"type":"Relative","value":{"type":"You"}},"count":{"type":"InSlot","value":"X"}}} """
   Spec.it s "TopOfLibrary rejects a bare player reference with no depth" $
     Spec.assertBool
       s
       (Either.isLeft (Common.parse (Text.pack """ {"type":"TopOfLibrary","value":{"type":"Relative","value":{"type":"You"}}} """) >>= Codec.decode ObjectRef.codec))
       "expected a decode failure"
-  -- CR 401.2 counts cards, so a negative depth is not a number of them.
-  Spec.it s "TopOfLibrary rejects a negative depth" $
+  -- The depth was a bare number before it became a Quantity, so a card file
+  -- written against that shape fails to decode rather than reading as a literal.
+  -- A NEGATIVE depth is no longer a decode failure -- Quantity.Literal takes an
+  -- Integer -- and is clamped to zero where it is read instead (CR 107.1b),
+  -- which Pawl.Engine.Resolve.objectRefObjects' own note records.
+  Spec.it s "TopOfLibrary rejects a bare number as a depth" $
     Spec.assertBool
       s
-      (Either.isLeft (Common.parse (Text.pack """ {"type":"TopOfLibrary","value":[{"type":"Relative","value":{"type":"You"}},-1]} """) >>= Codec.decode ObjectRef.codec))
+      (Either.isLeft (Common.parse (Text.pack """ {"type":"TopOfLibrary","value":{"player":{"type":"Relative","value":{"type":"You"}},"count":3}} """) >>= Codec.decode ObjectRef.codec))
       "expected a decode failure"
   -- The graveyard's OTHER arm: a card somebody chooses rather than the whole
   -- matching set. Its scope and filter are EachCardInGraveyard's exactly, so
@@ -198,7 +211,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardExiledWithSource Nothing),
                 Codec.encode ObjectRef.codec (ObjectRef.EachSpell (Filter.Not Filter.IsSource)),
                 Codec.encode ObjectRef.codec ObjectRef.EachPlayer,
-                Codec.encode ObjectRef.codec (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) 3)),
+                Codec.encode ObjectRef.codec (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 3))),
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature))),
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (PlayerRef.Relative PlayerRelation.You) (Filter.HasCardType CardType.Creature)))
               ]

@@ -189,17 +189,22 @@ data ObjectRef
     -- hidden pile (CR 400.2).
     --
     -- The PlayerRef is WHOSE library, so "the top card of target player's library"
-    -- is the same arm through its InSlot. The Natural is HOW MANY off the top of
+    -- is the same arm through its InSlot. The Quantity is HOW MANY off the top of
     -- EACH library it names, so a depth of three over "each player" is three per
     -- seat rather than three in total -- which is what "exile the top three cards
     -- of each player's library" would say. A library holding fewer cards than the
     -- depth gives up what it has (CR 609.3), and an empty one gives nothing.
     --
-    -- A Natural rather than a Pawl.Types.Quantity, the choice
-    -- Pawl.Types.DamageRewrite made for the same reason: every printed depth in
-    -- the pool is a literal number. Not implemented: a card whose depth is X
-    -- (Monastery Raid's "exile the top X cards of your library instead") has no
-    -- spelling here (#1375).
+    -- A Pawl.Types.Quantity rather than a Natural, because a printed depth need
+    -- not be a literal: Commune with Lava's "exile the top X cards of your
+    -- library" reads CR 601.2b's announced X, where Act on Impulse's three is a
+    -- Quantity.Literal. The depth is evaluated ONCE for the whole ref and clamped
+    -- to zero if it will not evaluate or evaluates negative (CR 107.1b) --
+    -- Pawl.Engine.Resolve.objectRefObjects is where both happen. A nested Quantity
+    -- is also a static-analysis surface: it may name a slot
+    -- (Pawl.Engine.Resolve.objectRefSlots) and it may read X
+    -- (Pawl.Engine.Resolve.readsX), and both reach it through
+    -- Pawl.Engine.Resolve.objectRefQuantities.
     --
     -- Not a target and never one (CR 115.10a) -- the player may be targeted, the
     -- cards are not -- so CR 608.2b has nothing to fizzle. Read when the effect
