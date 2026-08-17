@@ -1113,18 +1113,17 @@ removeLoyalty n obj =
 -- Replacement.sacrificeCandidates: Game.zoneMembers already returns a hand in a
 -- fixed order, which Prompt.ChooseDiscard offers it in.
 --
--- Matched against the PRINTED card and never a projection, exileCandidates'
--- reading below and its context -- the payer as perspective, no source -- for
--- its reasons.
---
--- Not implemented: a card in a hand has a projection too, so a continuous effect
--- that changed the axis this criterion reads is missed here (#160).
+-- Matched through the card's own CR 613 projection, exileCandidates' reading
+-- below and its context -- the payer as perspective, no source -- for its
+-- reasons. Rule 613.1 names no zone, so a card in a hand is folded exactly as a
+-- permanent is: Maskwood Nexus makes every creature card its controller owns
+-- every creature type (CR 613.1d), and Putrid Raptor's "discard a Zombie card"
+-- morph cost is then payable with a creature card printed as something else --
+-- Pawl.CostSpec's Putrid Raptor pair proves it.
 discardCandidates :: PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 discardCandidates pid oid criterion gs =
   let context = Filter.contextFor (Just pid) Nothing
-      matches candidate = case Game.faceOf candidate gs of
-        Nothing -> False
-        Just face -> Filter.matches context (Projection.viewOfCardIn gs candidate face) criterion
+      matches candidate = Filter.matches context (Projection.viewOfObject candidate gs) criterion
    in filter (\candidate -> candidate /= oid && matches candidate) (Game.zoneMembers Zone.Hand pid gs)
 
 -- The cards this player may exile to pay an ExileCardsFromGraveyard component:
@@ -1134,13 +1133,15 @@ discardCandidates pid oid criterion gs =
 -- zone, and a card in one has no controller for a control-shaped gate to read,
 -- so Game.zoneMembers Zone.Graveyard pid is the whole of "your graveyard".
 --
--- Matched against the PRINTED card and never a projection: Projection.viewOfCardIn
--- is the view -- printed on every axis but CR 208.2a's characteristic-defining
--- power, which functions in a graveyard too -- and a candidate whose card cannot
--- be found matches nothing.
+-- Matched through the card's own CR 613 projection: rule 613.1 starts from the
+-- actual object and names no zone, so a graveyard card is folded exactly as a
+-- permanent is, and Maskwood Nexus's creature-card set (CR 613.1d, layer 4)
+-- reaches one. Everbark Shaman's "exile a Treefolk card from your graveyard" is
+-- then payable with a creature card printed as something else --
+-- Pawl.CostSpec's Everbark Shaman pair proves it. CR 208.2a's
+-- characteristic-defining power rides along at layer 7a, which is what
+-- Pawl.CostSpec's Frail Exhumation cases read.
 --
--- Not implemented: a graveyard card HAS a projection, so a continuous effect
--- that changed the axis this criterion reads is missed here (#160).
 -- The context carries the
 -- payer as its perspective and no source -- the criterion narrows a card by its
 -- own qualities, and CR 601.2a has already moved the spell being cast to the
@@ -1158,9 +1159,7 @@ discardCandidates pid oid criterion gs =
 exileCandidates :: PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 exileCandidates pid criterion gs =
   let context = Filter.contextFor (Just pid) Nothing
-      matches candidate = case Game.faceOf candidate gs of
-        Nothing -> False
-        Just face -> Filter.matches context (Projection.viewOfCardIn gs candidate face) criterion
+      matches candidate = Filter.matches context (Projection.viewOfObject candidate gs) criterion
    in filter matches (Game.zoneMembers Zone.Graveyard pid gs)
 
 -- The one card an ExileTopFromGraveyard component takes: the TOP matching card

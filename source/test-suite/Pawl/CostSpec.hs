@@ -25,9 +25,11 @@ import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
@@ -57,6 +59,7 @@ import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EventShape as EventShape
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -787,15 +790,18 @@ frailExhumationBoard swamp nightmare exhumation battlefield buried =
 -- land has to be described by its CR 613 projection rather than by its printed
 -- face.
 --
+-- It is also what pins CR 208.2a's power still ARRIVING now that the criterion
+-- reads Projection.viewOfObject: the number comes from layer 7a of the graveyard
+-- card's own fold rather than from Projection.characteristicPowerIn, and these
+-- five cases say it is the same number.
+--
 -- Why the card is synthetic: no printing exiles a graveyard card qualified by
--- POWER as a cost, and Cost.exileCandidates and the mill tally are the only two
--- readers left that could ask about a power through the printed-card view
--- (Projection.viewOfCardIn). Every printed power criterion over a graveyard --
--- Alesha's and Reveillark's "target creature card with power 2 or less" -- is a
--- TARGET, admitted off the full projection, and Imperial Recruiter's search reads
--- one too. Nothing in the CR forbids the card: CR 601.2f admits any additional
--- cost, CR 406.2 lets one move a card out of a graveyard, and Headless Skaab
--- above is the same component with the qualifier dropped.
+-- POWER as a cost. Every printed power criterion over a graveyard -- Alesha's and
+-- Reveillark's "target creature card with power 2 or less" -- is a TARGET,
+-- admitted off the full projection, and Imperial Recruiter's search reads one
+-- too. Nothing in the CR forbids the card: CR 601.2f admits any additional cost,
+-- CR 406.2 lets one move a card out of a graveyard, and Headless Skaab above is
+-- the same component with the qualifier dropped.
 frailExhumationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 frailExhumationSpec s registry =
   Spec.describe s "Synthetic Frail Exhumation" $ do
@@ -1605,6 +1611,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   altarsReapSpec s registry
   headlessSkaabSpec s registry
   frailExhumationSpec s registry
+  everbarkShamanSpec s registry
+  putridRaptorSpec s registry
   catharticReunionSpec s registry
   magmaticInsightSpec s registry
   safeholdSentrySpec s registry
@@ -2327,3 +2335,148 @@ morcantSpec s registry = Spec.describe s "High Perfect Morcant" $ do
     Spec.assertBool s (isTapped morcantId after) "Morcant paid this time"
     Spec.assertBool s (not (isTapped spared after)) "and the Elf left out is untapped"
     Spec.assertEqWith s "the ability is on the stack" (length (GameState.stack after)) 1
+
+-- alice with Everbark Shaman settled on the battlefield, `buried` in her own
+-- graveyard, and Maskwood Nexus beside the Shaman when `withNexus`. Priority in
+-- her own precombat main phase and an empty stack, on every board.
+--
+-- The Shaman's ability costs {T} and an exile, with an EMPTY mana part, so no
+-- case here can turn on mana. Maskwood Nexus is the only thing a case varies
+-- besides what is buried.
+everbarkBoard :: Printing.Printing -> Printing.Printing -> Bool -> [Printing.Printing] -> (ObjectId.ObjectId, GameState.GameState)
+everbarkBoard shaman nexus withNexus buried =
+  let (shamanId, gs0) = S.addCreature shaman S.alice (Setup.emptyGame S.bothPlayers)
+      gs1 = if withNexus then snd (S.addCreature nexus S.alice gs0) else gs0
+      gs2 = List.foldl' (\gs printing -> snd (S.addGraveyardCard printing S.alice gs)) gs1 buried
+   in ( shamanId,
+        gs2
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Everbark Shaman {4}{G} Creature -- Treefolk Shaman 3/5: "{T}, Exile a Treefolk
+-- card from your graveyard: Search your library for up to two Forest cards, put
+-- them onto the battlefield tapped, then shuffle."
+--
+-- The producer for CR 613.1 read by Cost.exileCandidates. Maskwood Nexus makes
+-- each creature card alice owns off the battlefield every creature type (CR
+-- 613.1d, layer 4), so a Goblin Piker in her graveyard is a Treefolk and pays a
+-- cost its printed type line refuses.
+everbarkShamanSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+everbarkShamanSpec s registry =
+  Spec.describe s "Everbark Shaman" $ do
+    -- Three readings the pair below separates. The Piker is a printed Goblin
+    -- Warrior, so "the card was always a Treefolk" pays on the Nexus-less board
+    -- too. It is buried before the Nexus is seated, so "the effect applied to it
+    -- as it arrived" pays on neither. Only a continuous effect applying to a card
+    -- sitting in a graveyard pays on exactly one.
+    Spec.it s "CR 613.1d Maskwood Nexus makes a graveyard Goblin a Treefolk, and Everbark Shaman's cost takes it" $ do
+      shaman <- S.printingOf s registry "Everbark Shaman"
+      nexus <- S.printingOf s registry "Maskwood Nexus"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (shamanId, gs) = everbarkBoard shaman nexus True [piker]
+          ability = theAbility shaman
+      Spec.assertEqWith s "the cost has no mana in it at all" (Cost.Type.mana (ActivatedAbility.cost ability)) (Just (ManaCost.MkManaCost []))
+      Spec.assertBool s (Activate.activatable S.alice shamanId ability gs) "activatable"
+      Spec.assertBool s (any (isActivateOf shamanId) (Action.legalActions S.alice gs)) "and menued"
+      let after = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice shamanId ability)
+      Spec.assertEqWith s "CR 118.8 the Piker was exiled to pay" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
+      Spec.assertEqWith s "and the graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+    -- The negative half, differing in exactly one permanent: no Nexus. Same
+    -- graveyard, same Shaman, same empty mana cost.
+    Spec.it s "CR 701.23a without the Nexus the printed Goblin is no Treefolk and the cost is unpayable" $ do
+      shaman <- S.printingOf s registry "Everbark Shaman"
+      nexus <- S.printingOf s registry "Maskwood Nexus"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (shamanId, gs) = everbarkBoard shaman nexus False [piker]
+      Spec.assertBool s (not (Activate.activatable S.alice shamanId (theAbility shaman) gs)) "not activatable"
+      Spec.assertBool s (not (any (isActivateOf shamanId) (Action.legalActions S.alice gs))) "and not menued"
+    -- The other discriminator, differing from the positive case in exactly one
+    -- buried card: Maskwood Nexus's set is CREATURE cards, so a Lightning Bolt in
+    -- the graveyard is outside it and stays no Treefolk. Rules out "the Nexus
+    -- makes every graveyard card every creature type".
+    Spec.it s "CR 613.1d the Nexus leaves an instant in that graveyard alone" $ do
+      shaman <- S.printingOf s registry "Everbark Shaman"
+      nexus <- S.printingOf s registry "Maskwood Nexus"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      let (shamanId, gs) = everbarkBoard shaman nexus True [bolt]
+      Spec.assertBool s (not (Activate.activatable S.alice shamanId (theAbility shaman) gs)) "not activatable"
+      Spec.assertEqWith s "and the Bolt is still buried" (length (Game.zoneMembers Zone.Graveyard S.alice gs)) 1
+
+-- alice with a face-down Putrid Raptor on the battlefield, `held` in hand, and
+-- Maskwood Nexus beside it when `withNexus`. Three Mountains pay CR 702.37a's
+-- {3} for the face-down cast; the morph cost itself has no mana in it, so the
+-- turn-up gate cannot be turning on mana. Nothing if the face-down cast did not
+-- land.
+raptorBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> [Printing.Printing] -> Maybe (ObjectId.ObjectId, GameState.GameState)
+raptorBoard mountain raptor nexus withNexus held =
+  let (gs0, card) = S.handOne raptor (S.landsInPlay mountain 3)
+      gs1 = if withNexus then snd (S.addCreature nexus S.alice gs0) else gs0
+      gs2 = List.foldl' (\gs printing -> snd (S.addHandCard printing S.alice gs)) gs1 held
+      before = Set.toList (GameState.battlefield gs2)
+      after =
+        S.runPure
+          S.identityAnswer
+          gs2
+          (Cast.castSpell S.alice card (S.printingName raptor) Facing.faceDown >> Stack.resolveTop)
+      entered = Set.lookupMin (Set.difference (GameState.battlefield after) (Set.fromList before))
+   in fmap (\permanent -> (permanent, after)) entered
+
+-- Putrid Raptor {4}{B}{B} Creature -- Zombie Dinosaur Beast 4/4: "Morph--Discard
+-- a Zombie card."
+--
+-- The producer for CR 613.1 read by Cost.discardCandidates. Maskwood Nexus makes
+-- each creature card alice owns off the battlefield every creature type (CR
+-- 613.1d, layer 4), so a Goblin Piker in her HAND is a Zombie and pays a morph
+-- cost its printed type line refuses.
+putridRaptorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+putridRaptorSpec s registry =
+  Spec.describe s "Putrid Raptor" $ do
+    -- The pair separates the same three readings the Shaman's does. The Piker is
+    -- a printed Goblin Warrior; it is in hand before the Nexus is seated; and the
+    -- Lightning Bolt beside it is a second card in hand on every board, so the
+    -- gate is not "the hand is empty".
+    Spec.it s "CR 613.1d Maskwood Nexus makes a Goblin card in hand a Zombie, and Putrid Raptor's morph cost takes it" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      raptor <- S.printingOf s registry "Putrid Raptor"
+      nexus <- S.printingOf s registry "Maskwood Nexus"
+      piker <- S.printingOf s registry "Goblin Piker"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      case raptorBoard mountain raptor nexus True [piker, bolt] of
+        Nothing -> Spec.assertFailure s "the morph cast of Putrid Raptor did not reach the battlefield"
+        Just (permanent, gs) -> do
+          Spec.assertEqWith s "CR 708.2a a 2/2 while face down" (S.powerToughnessOf permanent gs) (Just (2, 2))
+          Spec.assertEqWith s "CR 702.37e the action is available" (FaceDown.turnableFaceUp S.alice gs) [permanent]
+          let after = S.runPure S.identityAnswer gs (FaceDown.turnFaceUp S.alice permanent)
+          Spec.assertEqWith s "CR 702.37e it is face up" (fmap Object.facing (Game.lookupObject permanent after)) (Just Facing.FaceUp)
+          Spec.assertEqWith s "and the printed 4/4" (S.powerToughnessOf permanent after) (Just (4, 4))
+          Spec.assertEqWith s "CR 701.9a one card was discarded to pay" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    -- The negative half, differing in exactly one permanent: no Nexus. Same hand,
+    -- same face-down Raptor, same lands.
+    Spec.it s "CR 702.37e without the Nexus no card in that hand is a Zombie and the morph cost is unpayable" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      raptor <- S.printingOf s registry "Putrid Raptor"
+      nexus <- S.printingOf s registry "Maskwood Nexus"
+      piker <- S.printingOf s registry "Goblin Piker"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      case raptorBoard mountain raptor nexus False [piker, bolt] of
+        Nothing -> Spec.assertFailure s "the morph cast of Putrid Raptor did not reach the battlefield"
+        Just (permanent, gs) -> do
+          Spec.assertEqWith s "CR 708.2a a 2/2 while face down" (S.powerToughnessOf permanent gs) (Just (2, 2))
+          Spec.assertEqWith s "CR 702.37e the action is withheld" (FaceDown.turnableFaceUp S.alice gs) []
+          Spec.assertEqWith s "and the hand still holds both cards" (length (Game.zoneMembers Zone.Hand S.alice gs)) 2
+    -- The other discriminator, differing from the positive case in the hand's
+    -- contents alone: Maskwood Nexus's set is CREATURE cards, so a hand of two
+    -- Lightning Bolts is outside it even with the Nexus out.
+    Spec.it s "CR 613.1d the Nexus leaves the instants in that hand alone" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      raptor <- S.printingOf s registry "Putrid Raptor"
+      nexus <- S.printingOf s registry "Maskwood Nexus"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      case raptorBoard mountain raptor nexus True [bolt, bolt] of
+        Nothing -> Spec.assertFailure s "the morph cast of Putrid Raptor did not reach the battlefield"
+        Just (permanent, gs) -> do
+          Spec.assertEqWith s "CR 708.2a a 2/2 while face down" (S.powerToughnessOf permanent gs) (Just (2, 2))
+          Spec.assertEqWith s "CR 702.37e the action is withheld" (FaceDown.turnableFaceUp S.alice gs) []

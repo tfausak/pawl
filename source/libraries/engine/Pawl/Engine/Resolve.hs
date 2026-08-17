@@ -6302,10 +6302,12 @@ fatesealOne source n pid = do
 -- question is put, there being no card to bin.
 --
 -- The land test reads the PRINTED face through Projection.viewOfCardIn, which is
--- what Effect.Mill's tally and Effect.Search's filter do.
+-- what Effect.Mill's tally does too.
 --
--- Not implemented: those three readers all miss a continuous effect that changed
--- the card they read, the projection reaching a library card too (#160).
+-- Not implemented: both readers miss a continuous effect that changed the card
+-- they read, the projection reaching a library card too (#160). Effect.Search's
+-- filter and Cost's discard and graveyard-exile criteria were the same reader and
+-- now take Projection.viewOfObject.
 exploreOne :: ObjectId -> Game ()
 exploreOne oid = do
   gs <- State.get
