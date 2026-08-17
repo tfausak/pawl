@@ -733,6 +733,7 @@ powerWithLastKnownGiven pcs oid gs = case lastKnownOf oid gs of
 -- off-battlefield candidate the way viewOfCardIn did. That is CR 613.1's own
 -- order rather than a loss: the same count over a battlefield candidate has
 -- never seen it either.
+--
 -- CR 701.3a: an attached candidate's HOST is read at this same bound, which is
 -- what keeps a Filter.AttachedTo reached from inside the fold out of a loop --
 -- see viewOfCharacteristics for the argument.
@@ -3891,6 +3892,7 @@ projectDeciding admits cands = forObject
                         -- it reads are settled at layer 4, and the bounded view this
                         -- stands in for applies it too, so the two agree wherever
                         -- there is nothing at this layer to see.
+                        --
                         -- A HOST is read off the running board too, so an
                         -- AttachedTo nest sees the same partials the rest of this
                         -- view does (CR 701.3a). Recursive and terminating: the
