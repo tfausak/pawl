@@ -1276,8 +1276,11 @@ resolveSpellWith runSubgame oid = do
                   -- CR 608.2e's clause is the unit all three gates cover, so they
                   -- are asked once per clause rather than once per mode --
                   -- between the preceding clause's instructions and this one's.
-                  -- The fold carries this mode's CR 118.12 answers (payGateAdmits),
-                  -- which is the one gate whose span may reach past its clause.
+                  -- The fold carries this mode INSTANCE's CR 118.12 answers
+                  -- (payGateAdmits), which is the one gate whose span may reach
+                  -- past its clause. Seeded per instance and not per resolution,
+                  -- which is CR 700.2d: a mode chosen twice "appeared that many
+                  -- times in sequence", so it makes its offer that many times.
                   Monad.foldM_
                     ( \answers (cIdx, clause) -> do
                         -- CR 701.46a's printed "if" first: it precedes the
@@ -1625,8 +1628,9 @@ exercises resolving controller idx cIdx clause = case Clause.optionality clause 
 -- failed its own CR 701.46a "if" or its CR 603.5 "may", so no answer exists for
 -- CR 118.12 to read and this clause's cost is the one still printed.
 --
--- CR 118.13b's announcement -- how a symbol payable in multiple ways is being
--- paid, chosen immediately before this payment -- is not made (#702).
+-- Not implemented: CR 118.13b's announcement -- how a symbol payable in
+-- multiple ways is being paid, chosen immediately before this payment. #702
+-- closed as a duplicate of the live issue (#373).
 payGateAdmits :: ObjectId -> ObjectId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Map.Map ClauseIndex Bool -> Clause.Clause Card.Type.Card -> Game (Bool, Map.Map ClauseIndex Bool)
 payGateAdmits resolving source idx cIdx legal answers clause = case Clause.payGate clause of
   Nothing -> pure (True, answers)
