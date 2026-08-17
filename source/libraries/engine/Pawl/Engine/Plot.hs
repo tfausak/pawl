@@ -28,6 +28,7 @@ import qualified Pawl.Engine.Turn as Turn
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
@@ -115,9 +116,11 @@ plottable pid gs = filter (\oid -> canPlot pid oid gs) (Game.zoneMembers Zone.Ha
 -- 702.170a says only "exile this card", so the default facing stands and every
 -- player can see what was plotted.
 --
--- Not implemented: an event saying a card became plotted, which CR 702.170e's
--- "when this card becomes plotted" would trigger on -- only the move's own zone
--- change is logged (#1391).
+-- The GameEvent.Plotted entry rides the same `newId` and the same branch as the
+-- stamp, for that reason and one more: a move that was cancelled plotted
+-- nothing, so there is no event to record. It is what CR 702.170e's "when this
+-- card becomes plotted" reads, the exile's own zone change saying only that a
+-- card left a hand.
 plot :: PlayerId -> ObjectId -> Game ()
 plot pid oid = do
   before <- State.get
@@ -131,7 +134,7 @@ plot pid oid = do
           exiled <- Event.changeZoneReturning oid Zone.Exile
           case exiled of
             Nothing -> pure ()
-            Just newId -> State.modify' (stamp newId)
+            Just newId -> State.modify' (Event.recordEvent (GameEvent.Plotted newId) . stamp newId)
 
 -- CR 702.170a's "it becomes a plotted card", stamped with the turn the action was
 -- taken on -- which is what CR 702.170d's "any turn after the turn in which it

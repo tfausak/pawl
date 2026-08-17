@@ -235,6 +235,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Plot as Plot
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Saga as Saga
@@ -9377,6 +9378,24 @@ representativeEvents cond =
         -- condition binds nothing from the log, which is what
         -- Event.eventBindingSlots claims for it.
         TriggerCondition.RoomEntered _ -> one (GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered S.alice departed RoomIndex.topmost))
+        -- CR 701.22d's own event, and the only one this condition admits. bob
+        -- rather than the perspective player, on the PlayerBecomesMonarch arm's
+        -- reasoning: an arm that stamped CR 109.5's "you" instead of the scrying
+        -- player would still agree with eventBindingSlots here if the two
+        -- coincided.
+        TriggerCondition.PlayerScries _ -> one (GameEvent.Scried S.bob)
+        -- CR 701.25d's own event, the arm above's twin. A DISTINCT event, which
+        -- is what keeps this pin honest: an arm matching a scry here would claim
+        -- the floor for the wrong keyword action.
+        TriggerCondition.PlayerSurveils _ -> one (GameEvent.Surveiled S.bob)
+        -- CR 702.170e's own event, and the only one this condition admits. On
+        -- `departed`, which is not the bearer on the board below -- so the pair
+        -- does not match, which pins the floor for a matching pair too, this
+        -- condition binding nothing either way.
+        TriggerCondition.SelfBecomesPlotted -> one (GameEvent.Plotted departed)
+        -- CR 701.44b's own event, and the only one this condition admits, on
+        -- `departed` for the arm above's reason.
+        TriggerCondition.PermanentExplores _ -> one (GameEvent.Explored departed)
 
 -- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
 -- eventBindings and eventBindingSlots both ignore them, which is itself part of
@@ -9466,7 +9485,16 @@ everyTriggerCondition =
     TriggerCondition.PlayerBecomesMonarch PlayerRelation.You,
     TriggerCondition.PlayerBecomesMonarch PlayerRelation.Opponent,
     TriggerCondition.LoseControlOfBound (SlotName.MkSlotName (Text.pack "target")),
-    TriggerCondition.RoomEntered RoomIndex.topmost
+    TriggerCondition.RoomEntered RoomIndex.topmost,
+    -- BOTH relations for each of the two, on the PlayerBecomesMonarch pair's
+    -- reasoning: an eventBindings arm that had cased on the relation and stamped
+    -- nothing under one of them would go unseen if only one were listed.
+    TriggerCondition.PlayerScries PlayerRelation.You,
+    TriggerCondition.PlayerScries PlayerRelation.Opponent,
+    TriggerCondition.PlayerSurveils PlayerRelation.You,
+    TriggerCondition.PlayerSurveils PlayerRelation.Opponent,
+    TriggerCondition.SelfBecomesPlotted,
+    TriggerCondition.PermanentExplores (Filter.Type.And [])
   ]
 
 -- CR 603.6c's penultimate sentence -- "An ability that attempts to do something
@@ -12677,6 +12705,290 @@ rayOfCommandSpec s registry = Spec.describe s "RayOfCommand" $ do
       Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter ((== Just oid) . Recipient.objectOf) legal) sets
       _ -> S.identityAnswer p
 
+-- Matoya, Archon Elder {2}{U} Legendary Creature -- Human Warlock 1/4, "Whenever
+-- you scry or surveil, draw a card" -- CR 603.1b's AnyOf over
+-- TriggerCondition.PlayerScries and TriggerCondition.PlayerSurveils, so one card
+-- proves both of CR 701.22d and CR 701.25d.
+--
+-- The two firing sources are DIFFERENT cards already in the pool -- Crystal
+-- Ball's "{1}, {T}: Scry 2" and Curate's "Surveil 2. Draw a card." -- which is
+-- what keeps the two keyword actions apart: a condition that folded them would
+-- fire on the board its own half never touched, and each group below has the
+-- other card nowhere near it.
+--
+-- HAND SIZE is the reading throughout, and always against a PAIRED board that
+-- differs only in whether Matoya is on the battlefield. Curate draws a card of
+-- its own, so an absolute number would prove nothing about the trigger.
+matoyaTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+matoyaTriggerSpec s registry =
+  let -- alice's board: four Islands, a Crystal Ball, `stock` cards on her
+      -- library (top-first Goblin Piker then Bird Maiden), and Matoya only when
+      -- asked for. Her hand starts EMPTY, so every hand card below was drawn.
+      scryBoardFor withMatoya stock = do
+        island <- S.printingOf s registry "Island"
+        crystalBall <- S.printingOf s registry "Crystal Ball"
+        matoya <- S.printingOf s registry "Matoya, Archon Elder"
+        piker <- S.printingOf s registry "Goblin Piker"
+        maiden <- S.printingOf s registry "Bird Maiden"
+        let (ballId, placed) = S.addCreature crystalBall S.alice (S.landsInPlay island 4)
+            watched = if withMatoya then snd (S.addCreature matoya S.alice placed) else placed
+            deal g p = snd (S.addLibraryCard p S.alice g)
+            stocked = List.foldl' deal watched (reverse (take stock [piker, maiden]))
+        pure (ballId, stocked {GameState.priority = Just S.alice})
+      -- Activate the Ball and settle: the ability resolves, the scry happens and
+      -- any trigger it raised is placed and resolved in the same round. A board
+      -- offering any other number of abilities activates none, which fails every
+      -- assertion rather than passing one for a reason the case did not choose.
+      runBall who ballId gs = case Activate.abilitiesFor ballId gs of
+        [ability] ->
+          let activated = S.runPure keepAll gs (Activate.activateAbility who ballId ability)
+           in S.runPure keepAll activated Engine.priorityLoop
+        _ -> gs
+      -- Keeps every looked-at card on top, for both keyword actions. Pinned
+      -- rather than derived: what this group reads is the TRIGGER, and an
+      -- answerer that moved cards about would let a graveyard or a library order
+      -- stand in for the draw.
+      keepAll :: Prompt.Prompt r -> r
+      keepAll p = case p of
+        Prompt.ChooseScry _ _ looked -> ([], looked)
+        Prompt.ChooseSurveil _ _ looked -> ([], looked)
+        _ -> S.identityAnswer p
+      -- alice's board for the surveil half: two Islands, Curate in hand, four
+      -- cards on her library, Matoya only when asked for.
+      surveilBoardFor withMatoya = do
+        island <- S.printingOf s registry "Island"
+        curate <- S.printingOf s registry "Curate"
+        matoya <- S.printingOf s registry "Matoya, Archon Elder"
+        piker <- S.printingOf s registry "Goblin Piker"
+        maiden <- S.printingOf s registry "Bird Maiden"
+        mountain <- S.printingOf s registry "Mountain"
+        forest <- S.printingOf s registry "Forest"
+        let watched =
+              if withMatoya
+                then snd (S.addCreature matoya S.alice (S.landsInPlay island 2))
+                else S.landsInPlay island 2
+            deal g p = snd (S.addLibraryCard p S.alice g)
+            stocked = List.foldl' deal watched [forest, mountain, maiden, piker]
+            (board, spellId) = S.handOne curate stocked
+        pure (spellId, board {GameState.priority = Just S.alice})
+      runCurate spellId gs =
+        let cast = S.runPure keepAll gs (S.cast S.alice spellId)
+         in S.runPure keepAll cast Engine.priorityLoop
+   in Spec.describe s "MatoyaKeywordActionTrigger" $ do
+        -- CR 701.22d, the whole card on the scry side. The pair differs in
+        -- Matoya and in nothing else, so the one extra card in hand is the
+        -- trigger and cannot be Crystal Ball's doing -- rule 701.22a moves no
+        -- card out of the library at all.
+        Spec.it s "CR 701.22d Crystal Ball's scry draws Matoya's card" $ do
+          (ballId, board) <- scryBoardFor True 2
+          (bareBall, bare) <- scryBoardFor False 2
+          let after = runBall S.alice ballId board
+              baseline = runBall S.alice bareBall bare
+          Spec.assertEqWith s "alice's hand started empty" (S.handSize S.alice board) 0
+          Spec.assertBool s (elem (GameEvent.Scried S.alice) (S.eventsOf after)) "CR 701.22d the scry recorded its event"
+          Spec.assertEqWith s "Matoya drew her one card" (S.handSize S.alice after) 1
+          Spec.assertEqWith s "and without Matoya the same scry draws nothing" (S.handSize S.alice baseline) 0
+          Spec.assertEqWith s "the stack is empty, so the trigger really resolved" (GameState.stack after) []
+        -- CR 701.22d's "even if some or all of those actions were impossible",
+        -- and the case that discriminates WHERE the event is recorded: a library
+        -- of exactly one card gives scry 2 nothing to decide -- top and bottom
+        -- are one position -- so Resolve.scryOne asks no question and reorders
+        -- nothing. The scry happened all the same, and Matoya draws that card.
+        --
+        -- Recording the event inside scryOne's `decided` guard passes every
+        -- assertion in the case above and fails this one.
+        Spec.it s "CR 701.22d a scry with nothing to decide still draws Matoya's card" $ do
+          (ballId, board) <- scryBoardFor True 1
+          (bareBall, bare) <- scryBoardFor False 1
+          let after = runBall S.alice ballId board
+              baseline = runBall S.alice bareBall bare
+          Spec.assertBool s (elem (GameEvent.Scried S.alice) (S.eventsOf after)) "CR 701.22d the scry is still an event"
+          Spec.assertEqWith s "Matoya drew the lone card" (S.handSize S.alice after) 1
+          Spec.assertEqWith s "so alice's library is empty" (length (Game.zoneMembers Zone.Library S.alice after)) 0
+          Spec.assertEqWith s "and without Matoya nothing was drawn" (S.handSize S.alice baseline) 0
+          Spec.assertEqWith s "the card stayed on the library instead" (length (Game.zoneMembers Zone.Library S.alice baseline)) 1
+        -- CR 603.3a / 109.5: the relation is read against the ABILITY'S
+        -- CONTROLLER, so an opponent's scry is silence. The same Crystal Ball
+        -- activation as the first case, moved one seat over and nothing else.
+        Spec.it s "CR 109.5 bob's scry does not draw for alice's Matoya" $ do
+          island <- S.printingOf s registry "Island"
+          crystalBall <- S.printingOf s registry "Crystal Ball"
+          matoya <- S.printingOf s registry "Matoya, Archon Elder"
+          piker <- S.printingOf s registry "Goblin Piker"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          let (_, withMatoya) = S.addCreature matoya S.alice (S.landsInPlay island 4)
+              lands = S.landsFor island S.bob 4 withMatoya
+              (ballId, placed) = S.addCreature crystalBall S.bob lands
+              deal g p = snd (S.addLibraryCard p S.bob g)
+              stocked = List.foldl' deal placed [maiden, piker]
+              board = stocked {GameState.priority = Just S.bob}
+              after = runBall S.bob ballId board
+          Spec.assertBool s (elem (GameEvent.Scried S.bob) (S.eventsOf after)) "bob really scried, so there was an event to match"
+          Spec.assertEqWith s "alice, whose Matoya it is, drew nothing" (S.handSize S.alice after) 0
+          Spec.assertEqWith s "and bob drew nothing either, his scry moving no card out of his library" (S.handSize S.bob after) 0
+        -- CR 701.25d, the whole card on the surveil side. Curate draws a card
+        -- itself, which is exactly why the baseline board is here: two cards in
+        -- hand against one is the trigger.
+        Spec.it s "CR 701.25d Curate's surveil draws Matoya's card on top of its own" $ do
+          (spellId, board) <- surveilBoardFor True
+          (bareSpell, bare) <- surveilBoardFor False
+          let after = runCurate spellId board
+              baseline = runCurate bareSpell bare
+          Spec.assertBool s (elem (GameEvent.Surveiled S.alice) (S.eventsOf after)) "CR 701.25d the surveil recorded its event"
+          Spec.assertBool s (notElem (GameEvent.Scried S.alice) (S.eventsOf after)) "and a surveil is not a scry"
+          Spec.assertEqWith s "Curate's draw plus Matoya's" (S.handSize S.alice after) 2
+          Spec.assertEqWith s "against Curate's alone" (S.handSize S.alice baseline) 1
+          -- The answerer kept both looked-at cards, so nothing but Curate itself
+          -- is in the graveyard: this is #1342's own requirement that a surveil
+          -- which binned NOTHING still fires, and the assertion a trigger built
+          -- on CR 701.25a's zone changes would fail.
+          Spec.assertEqWith s "and nothing was binned, so the trigger is not counting cards moved" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+
+-- Aloe Alchemist {1}{G} Creature -- Plant Warlock 3/2, "Trample; When this card
+-- becomes plotted, target creature gets +3/+2 and gains trample until end of
+-- turn; Plot {1}{G}" -- the pool's producer for TriggerCondition
+-- SelfBecomesPlotted (CR 702.170e).
+--
+-- The one condition in the pool whose bearer is in EXILE when it fires: CR
+-- 702.170b's special action exiles the card as it becomes plotted, so
+-- Event.zonesTriggeredFrom has to answer Zone.Exile for it and Event.eventTriggers
+-- finds the bearer through its standing exile scan.
+--
+-- Distinct power/toughness on the two creatures (Goblin Piker 2/1, Bird Maiden
+-- 1/2) so +3/+2 cannot be read off the wrong one, and the Maiden is bob's, so a
+-- payload that hit every creature is visible.
+aloeAlchemistSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+aloeAlchemistSpec s registry =
+  let aimAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+      aimAt oid p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> S.preferring ((== Just oid) . Recipient.objectOf) sets
+        _ -> S.identityAnswer p
+      sorcerySpeed gs =
+        gs
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+   in Spec.describe s "AloeAlchemistPlotTrigger" $ do
+        -- The whole card: alice takes CR 116.2k's special action, the card lands
+        -- in exile as a plotted card, and the ability printed on it fires from
+        -- there.
+        Spec.it s "CR 702.170e plotting Aloe Alchemist pumps the targeted creature" $ do
+          forest <- S.printingOf s registry "Forest"
+          aloe <- S.printingOf s registry "Aloe Alchemist"
+          piker <- S.printingOf s registry "Goblin Piker"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          let (pikerId, g1) = S.addCreature piker S.alice (S.landsInPlay forest 2)
+              (maidenId, g2) = S.addCreature maiden S.bob g1
+              (aloeId, g3) = S.addHandCard aloe S.alice g2
+              gs = sorcerySpeed g3
+              plotted = S.runPure (aimAt pikerId) gs (Plot.plot S.alice aloeId)
+              after = S.runPure (aimAt pikerId) plotted Engine.priorityLoop
+          Spec.assertEqWith s "the Piker started 2/1" (S.powerToughnessOf pikerId gs) (Just (2, 1))
+          Spec.assertBool s (any isPlotted (S.eventsOf after)) "CR 702.170a the plot recorded its event"
+          Spec.assertEqWith s "CR 702.170e the targeted Piker is 5/3" (S.powerToughnessOf pikerId after) (Just (5, 3))
+          Spec.assertEqWith s "bob's untargeted Maiden is untouched" (S.powerToughnessOf maidenId after) (Just (1, 2))
+          Spec.assertEqWith s "the card is in exile" (length (GameState.exile after)) 1
+          Spec.assertEqWith s "and the stack is empty, so the trigger resolved" (GameState.stack after) []
+        -- The DISCRIMINATING negative: a plot event that names a DIFFERENT card.
+        -- Aloe Alchemist sits in exile the whole time -- so
+        -- Event.eventTriggers' exile scan really offers it, and the only thing
+        -- that keeps it quiet is the id on the event.
+        --
+        -- Djinn of Fool's Fall {3}{U} is the pool's other plot card and prints no
+        -- such trigger, which is what makes it the control.
+        Spec.it s "CR 702.170e plotting another card does not fire an exiled Aloe Alchemist" $ do
+          island <- S.printingOf s registry "Island"
+          aloe <- S.printingOf s registry "Aloe Alchemist"
+          djinn <- S.printingOf s registry "Djinn of Fool's Fall"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (pikerId, g1) = S.addCreature piker S.alice (S.landsInPlay island 4)
+              (_, g2) = S.addExiledCard aloe S.alice g1
+              (djinnId, g3) = S.addHandCard djinn S.alice g2
+              gs = sorcerySpeed g3
+              plotted = S.runPure (aimAt pikerId) gs (Plot.plot S.alice djinnId)
+              after = S.runPure (aimAt pikerId) plotted Engine.priorityLoop
+          Spec.assertBool s (any isPlotted (S.eventsOf after)) "the Djinn really became plotted, so there was an event to match"
+          Spec.assertEqWith s "both cards are in exile, so the Alchemist was there to be offered" (length (GameState.exile after)) 2
+          Spec.assertEqWith s "and the Piker is still 2/1" (S.powerToughnessOf pikerId after) (Just (2, 1))
+          Spec.assertEqWith s "with nothing waiting on the stack" (GameState.stack after) []
+
+-- Whether an event is CR 702.170a's plot, whichever card it names. The id is
+-- CR 400.7's exile incarnation, which no fixture can predict.
+isPlotted :: GameEvent.GameEvent -> Bool
+isPlotted event = case event of
+  GameEvent.Plotted _ -> True
+  _ -> False
+
+-- Wildgrowth Walker {1}{G} Creature -- Elemental 1/3, "Whenever a creature you
+-- control explores, put a +1/+1 counter on this creature and you gain 3 life" --
+-- the pool's producer for TriggerCondition.PermanentExplores (CR 701.44b).
+--
+-- Merfolk Branchwalker {1}{G} 2/1, "When this creature enters, it explores", is
+-- the firing source and was already in the pool. It takes a +1/+1 counter of its
+-- own on the nonland branch, so BOTH creatures are read in every case: a payload
+-- that grew the explorer rather than the watcher is otherwise invisible.
+--
+-- Three seats are not needed and two are: what the Filter says is "you control",
+-- and the paired board moves the Branchwalker from alice to bob and changes
+-- nothing else.
+wildgrowthWalkerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+wildgrowthWalkerSpec s registry =
+  let -- alice always controls the Walker; `explorer` controls the Branchwalker
+      -- and owns the stocked library, since CR 701.44a reveals off the
+      -- exploring permanent's controller's library.
+      board explorer deck = do
+        walker <- S.printingOf s registry "Wildgrowth Walker"
+        branchwalker <- S.printingOf s registry "Merfolk Branchwalker"
+        printings <- mapM (S.printingOf s registry) deck
+        let (walkerId, g1) = S.addCreature walker S.alice (Setup.emptyGame S.bothPlayers)
+            deal g p = snd (S.addLibraryCard p explorer g)
+            stocked = List.foldl' deal g1 (reverse printings)
+            (branchId, g2) = S.entersWithTrigger branchwalker explorer stocked
+        pure (walkerId, branchId, g2)
+      -- Bins the revealed card, so the explore's own zone change happens too --
+      -- which is what keeps this trigger from being read off a graveyard
+      -- arrival by accident.
+      binIt :: Prompt.Prompt r -> r
+      binIt p = case p of
+        Prompt.ChooseExplore {} -> OptionalDecision.Exercises
+        _ -> S.identityAnswer p
+      settle gs = S.runPure binIt gs Engine.priorityLoop
+   in Spec.describe s "WildgrowthWalkerExploreTrigger" $ do
+        -- The whole card. The Branchwalker's own +1/+1 counter and the Walker's
+        -- are read separately, so "a counter went somewhere" cannot pass for
+        -- "the counter went on the Walker".
+        Spec.it s "CR 701.44b a creature alice controls exploring grows her Walker" $ do
+          (walkerId, branchId, gs) <- board S.alice ["Goblin Piker", "Bird Maiden"]
+          let after = settle gs
+          Spec.assertEqWith s "the Walker started 1/3" (S.powerToughnessOf walkerId gs) (Just (1, 3))
+          Spec.assertBool s (elem (GameEvent.Explored branchId) (S.eventsOf after)) "CR 701.44b the explore recorded its event"
+          Spec.assertEqWith s "the Walker took its +1/+1 counter" (S.powerToughnessOf walkerId after) (Just (2, 4))
+          Spec.assertEqWith s "and the Branchwalker took its own, which is a different counter" (S.powerToughnessOf branchId after) (Just (3, 2))
+          Spec.assertEqWith s "alice gained 3" (S.lifeOf S.alice after) (Just 23)
+          Spec.assertEqWith s "bob gained none" (S.lifeOf S.bob after) (Just 20)
+          Spec.assertEqWith s "the stack is empty, so the trigger resolved" (GameState.stack after) []
+        -- The Filter's own half, CR 109.5's "you control": the same board with
+        -- the Branchwalker one seat over. It still explores -- its counter says
+        -- so -- and alice's Walker stays put.
+        Spec.it s "CR 109.5 bob's creature exploring does not grow alice's Walker" $ do
+          (walkerId, branchId, gs) <- board S.bob ["Goblin Piker", "Bird Maiden"]
+          let after = settle gs
+          Spec.assertBool s (elem (GameEvent.Explored branchId) (S.eventsOf after)) "bob's Branchwalker really explored"
+          Spec.assertEqWith s "so it took its own counter" (S.powerToughnessOf branchId after) (Just (3, 2))
+          Spec.assertEqWith s "but alice's Walker is still 1/3" (S.powerToughnessOf walkerId after) (Just (1, 3))
+          Spec.assertEqWith s "and alice gained no life" (S.lifeOf S.alice after) (Just 20)
+        -- CR 701.44b's "even if some or all of those actions were impossible":
+        -- an empty library reveals nothing, so nothing is a land card and
+        -- nothing is binned. The permanent explored all the same.
+        Spec.it s "CR 701.44b an explore off an empty library still grows the Walker" $ do
+          (walkerId, branchId, gs) <- board S.alice []
+          let after = settle gs
+          Spec.assertBool s (elem (GameEvent.Explored branchId) (S.eventsOf after)) "the explore is still an event"
+          Spec.assertEqWith s "the Walker grew" (S.powerToughnessOf walkerId after) (Just (2, 4))
+          Spec.assertEqWith s "alice gained 3" (S.lifeOf S.alice after) (Just 23)
+          Spec.assertEqWith s "and nothing was binned" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   logSpec s registry
@@ -12787,4 +13099,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   brinebornCutthroatSpec s registry
   handOfThePraetorsSpec s registry
   monarchTriggerSpec s registry
+  matoyaTriggerSpec s registry
+  aloeAlchemistSpec s registry
+  wildgrowthWalkerSpec s registry
   rayOfCommandSpec s registry

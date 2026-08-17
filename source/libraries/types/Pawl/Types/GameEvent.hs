@@ -733,4 +733,52 @@ data GameEvent
     -- a hand, a library, a graveyard, exile or on the stack. Those still file
     -- last known information; what they do not do is enter this log.
     LeftTheGame ObjectId.ObjectId
+  | -- | CR 701.22d: a player completed CR 701.22a's scry. Recorded AFTER the
+    -- reorder, and recorded even where nothing could move -- that rule's "even
+    -- if some or all of those actions were impossible" covers the empty library
+    -- and the lone-card library Pawl.Engine.Resolve.scryOne puts no question
+    -- for. CR 701.22b is the one case that is no scry at all, and Resolve's Scry
+    -- arm returns on a quantity of zero before scryOne is reached.
+    --
+    -- Nothing else in the log says a scry happened: CR 701.20e's look mints no
+    -- object and the reorder crosses no zone boundary, so this event has no
+    -- Moved entry beside it to be confused with.
+    Scried PlayerId.PlayerId
+  | -- | CR 701.25d, Scried's twin, with CR 701.25c as its own non-event.
+    --
+    -- Distinct from the Moved entries the graveyard half of CR 701.25a records,
+    -- and distinct from Milled for the reason that constructor's own comment
+    -- gives -- a surveil moves a card from the top of a library into a graveyard
+    -- WITHOUT milling it. A reader folding either would count cards binned
+    -- rather than surveils performed, and would miss a surveil that binned
+    -- nothing.
+    Surveiled PlayerId.PlayerId
+  | -- | CR 702.170a: a card became a plotted card. The ObjectId is the card AS
+    -- IT LANDED IN EXILE -- Pawl.Engine.Plot.plot's `newId` and not the object
+    -- that was in the hand -- because CR 400.7 mints a new object as it moves
+    -- and that new one is what bears the ability CR 702.170e's "when this card
+    -- becomes plotted" is printed on.
+    --
+    -- Distinct from the Moved entry the same exile records: a card exiled any
+    -- other way makes the same hand-to-exile zone change without becoming
+    -- plotted, so a reader matching the zone pair would admit both.
+    --
+    -- Not implemented: CR 702.170c's other route -- a spell or ability that
+    -- makes a card in exile become plotted -- which would record this same
+    -- event (#1390).
+    Plotted ObjectId.ObjectId
+  | -- | CR 701.44b: this permanent completed CR 701.44a's explore. Recorded
+    -- after the whole process, and "even if some or all of those actions were
+    -- impossible", so an explore off an empty library is still an explore.
+    --
+    -- The explorer's id ALONE, with no controller beside it. CR 701.44c makes
+    -- last known information answer both halves of "which object explored and
+    -- who controlled it", and a reader gets both from
+    -- Pawl.Engine.Projection.viewWithLastKnown -- the reading the PermanentDies
+    -- condition already gives a permanent that has left.
+    --
+    -- Distinct from the Revealed, Moved and CountersPut entries CR 701.44a's
+    -- own steps record: each of those describes one step, any of them can be
+    -- impossible, and none of them says an explore completed.
+    Explored ObjectId.ObjectId
   deriving (Eq, Ord, Show)

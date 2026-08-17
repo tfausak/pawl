@@ -637,6 +637,13 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 603.7's slot-named condition holds a SlotName, which is no Count.
   TriggerCondition.LoseControlOfBound _ -> []
   TriggerCondition.RoomEntered _ -> []
+  -- CR 701.22d and CR 701.25d carry a PlayerRelation and CR 702.170e nothing
+  -- at all, so none of the three holds a Count. CR 701.44b holds a Filter, and
+  -- a Filter holds no Count for PermanentEnters' reason above.
+  TriggerCondition.PlayerScries _ -> []
+  TriggerCondition.PlayerSurveils _ -> []
+  TriggerCondition.SelfBecomesPlotted -> []
+  TriggerCondition.PermanentExplores _ -> []
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> []
   TriggerCondition.SelfDies -> []
@@ -2458,6 +2465,14 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- the slot holds was selected by the arming spell's own target slot.
   TriggerCondition.LoseControlOfBound _ -> []
   TriggerCondition.RoomEntered _ -> []
+  -- CR 701.22d and CR 701.25d carry a PlayerRelation and CR 702.170e nothing,
+  -- so none of them holds a Filter.
+  TriggerCondition.PlayerScries _ -> []
+  TriggerCondition.PlayerSurveils _ -> []
+  TriggerCondition.SelfBecomesPlotted -> []
+  -- CR 701.44b DOES carry one, a predicate over the explorer -- Wildgrowth
+  -- Walker's "a creature you control" -- which the card lint must sweep.
+  TriggerCondition.PermanentExplores f -> [f]
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> []
   TriggerCondition.SelfDies -> []

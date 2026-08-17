@@ -553,4 +553,47 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.RoomEntered (RoomIndex.MkRoomIndex 3))
       """ {"type":"RoomEntered","value":3} """
+  -- CR 701.22d and CR 701.25d. Two TAGS rather than one carrying which keyword
+  -- action it was: Matoya, Archon Elder's "whenever you scry or surveil" is an
+  -- AnyOf of the two, and a codec that folded them would fire the card twice on
+  -- one scry. Both relations, for PlayerBecomesMonarch's reason.
+  Spec.it s "PlayerScries round-trips both relations" $ do
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerScries PlayerRelation.You)
+      """ {"type":"PlayerScries","value":{"type":"You"}} """
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerScries PlayerRelation.Opponent)
+      """ {"type":"PlayerScries","value":{"type":"Opponent"}} """
+  Spec.it s "PlayerSurveils round-trips both relations" $ do
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerSurveils PlayerRelation.You)
+      """ {"type":"PlayerSurveils","value":{"type":"You"}} """
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerSurveils PlayerRelation.Opponent)
+      """ {"type":"PlayerSurveils","value":{"type":"Opponent"}} """
+  -- CR 702.170e. Nullary, SelfCycled's shape: the ability is printed on the card
+  -- that becomes plotted, so there is nothing to select among.
+  Spec.it s "SelfBecomesPlotted round-trips" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.SelfBecomesPlotted
+      """ {"type":"SelfBecomesPlotted"} """
+  -- CR 701.44b. The Filter is Wildgrowth Walker's "a creature you control" and
+  -- describes the EXPLORER, so a codec that dropped it would grow the Walker off
+  -- an opponent's explore.
+  Spec.it s "PermanentExplores round-trips with its Filter" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PermanentExplores (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You]))
+      """ {"type":"PermanentExplores","value":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Creature"}},{"type":"ControlledBy","value":{"type":"You"}}]}} """
   Spec.it s "has a schema" $ Common.assertHasSchema s TriggerCondition.codec

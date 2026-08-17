@@ -476,6 +476,10 @@ snapshotView gs shape event = case event of
   -- CR 701.17a names its cards by id and snapshots no characteristics.
   GameEvent.Milled {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
+  GameEvent.Scried _ -> Nothing
+  GameEvent.Surveiled _ -> Nothing
+  GameEvent.Plotted _ -> Nothing
+  GameEvent.Explored _ -> Nothing
 
 -- The Filter.View a recorded snapshot yields, shared by every arm of
 -- snapshotView above so that two shapes of event cannot disagree about what a

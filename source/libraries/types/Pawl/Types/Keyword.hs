@@ -1084,8 +1084,11 @@ data Keyword
     -- Not implemented: CR 702.170c's other producers -- an effect that makes an
     -- exiled card plotted without this keyword (Jace Reawakened, Kellan Joins Up)
     -- -- and CR 702.170f's plot from a zone other than a hand (Fblthp, Lost on the
-    -- Range) (#1390). Nor CR 702.170e's "when this card becomes plotted" trigger
-    -- (#1391).
+    -- Range) (#1390).
+    --
+    -- CR 702.170e's "when this card becomes plotted" trigger reads
+    -- GameEvent.Plotted, which Pawl.Engine.Plot.plot records; Aloe Alchemist
+    -- prints it.
     Plot (Cost.Cost Keyword)
   | -- | 702.179a: "start your engines!". A STATIC ability whose whole content is
     -- a state-based action -- CR 704.5aa gives a player with no speed who controls
