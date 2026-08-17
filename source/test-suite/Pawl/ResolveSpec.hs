@@ -793,7 +793,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Quantity.Literal 1, Search.filter = basicLandFilter, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Quantity.Literal 1, Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
         (abilId, g2) = Game.freshObjectId g1
@@ -809,7 +809,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     mountain <- S.printingOf s registry "Mountain"
     let base = Setup.emptyGame S.bothPlayers
         (_, g1) = S.addLibraryCard mountain S.alice base
-        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Quantity.Literal 1, Search.filter = basicLandFilter, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing
+        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Quantity.Literal 1, Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj = Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp False 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty False Nothing Set.empty False
@@ -834,7 +834,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Quantity.Literal 1, Search.filter = basicLandFilter, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Quantity.Literal 1, Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
         (abilId, g2) = Game.freshObjectId g1
@@ -858,7 +858,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Quantity.Literal 1, Search.filter = basicLandFilter, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Quantity.Literal 1, Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
         (abilId, g2) = Game.freshObjectId g1
@@ -1139,6 +1139,55 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "carol's remaining cards came back reversed" (Game.zoneMembers Zone.Library S.carol settled) (reverse (filter (/= pinned) carolLib))
     Spec.assertEqWith s "alice's library kept its order -- hers was never shuffled" (Game.zoneMembers Zone.Library S.alice settled) aliceLib
     Spec.assertEqWith s "nor was bob's" (Game.zoneMembers Zone.Library S.bob settled) [bobCard]
+  -- Denying Wind -- "{7}{U}{U} Sorcery: Search target player's library for up to
+  -- seven cards and exile them. Then that player shuffles." Extract's card with
+  -- "up to" printed on it, which is the whole point: its filter is `And []` too,
+  -- so Filter.statesAQuality answers False for both and only Search.upTo can tell
+  -- them apart. Under CR 701.23d alone the search would find seven; the card's own
+  -- "up to" makes the count a ceiling the searcher chooses within.
+  --
+  -- Carol's library holds nine cards, so the cap (seven), the answer (two) and
+  -- the library size are three different numbers and no assertion can pass on a
+  -- coincidence.
+  Spec.it s "CR 701.23a whole card: Denying Wind's \"up to seven\" honours an answer of two" $ do
+    island <- S.printingOf s registry "Island"
+    denyingWind <- S.printingOf s registry "Denying Wind"
+    piker <- S.printingOf s registry "Goblin Piker"
+    altar <- S.printingOf s registry "Ashnod's Altar"
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    let (gs, spellId, bobCard, pinned) = denyingWindBoard island denyingWind piker altar forest mountain
+        carolLib = Game.zoneMembers Zone.Library S.carol gs
+        cast = snd (Engine.runGamePure (aliceFindingThese pinned) gs (S.cast S.alice spellId))
+        settled = snd (Engine.runGamePure (aliceFindingThese pinned) cast Engine.priorityLoop)
+    Spec.assertEqWith s "carol's library starts with nine cards" (length carolLib) 9
+    Spec.assertEqWith
+      s
+      "exactly the two cards alice named are in exile -- not the seven a quota would have completed"
+      (List.sort (namesIn Zone.Exile S.carol settled))
+      (List.sort (fmap (Just . CardName.MkCardName . Text.pack) ["Forest", "Mountain"]))
+    Spec.assertEqWith s "so carol kept the other seven" (length (Game.zoneMembers Zone.Library S.carol settled)) 7
+    Spec.assertEqWith s "and none of them is one of the two she lost" (namesIn Zone.Library S.carol settled) (replicate 7 (Just (CardName.MkCardName (Text.pack "Goblin Piker"))))
+    Spec.assertEqWith s "the searcher's own library is untouched -- she read carol's" (Game.zoneMembers Zone.Exile S.alice settled) []
+    Spec.assertEqWith s "and the third seat's" (Game.zoneMembers Zone.Library S.bob settled) [bobCard]
+  -- The same board answered "nothing". CR 701.23b's fail-to-find is what "up to"
+  -- grants at the bottom of its range, and Denying Wind states no quality, so
+  -- this case passes only because the flag is read. Its control is Extract, three
+  -- cases above: the same `And []` filter and the same declining answer, and it
+  -- must still exile a card under CR 701.23d.
+  Spec.it s "CR 701.23a whole card: Denying Wind may decline to find at all" $ do
+    island <- S.printingOf s registry "Island"
+    denyingWind <- S.printingOf s registry "Denying Wind"
+    piker <- S.printingOf s registry "Goblin Piker"
+    altar <- S.printingOf s registry "Ashnod's Altar"
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    let (gs, spellId, _, _) = denyingWindBoard island denyingWind piker altar forest mountain
+        carolLib = Game.zoneMembers Zone.Library S.carol gs
+        cast = snd (Engine.runGamePure aliceFindingNothing gs (S.cast S.alice spellId))
+        settled = snd (Engine.runGamePure aliceFindingNothing cast Engine.priorityLoop)
+    Spec.assertEqWith s "nothing was exiled" (Game.zoneMembers Zone.Exile S.carol settled) []
+    Spec.assertEqWith s "carol keeps every card, shuffled" (Set.fromList (Game.zoneMembers Zone.Library S.carol settled)) (Set.fromList carolLib)
   Spec.it s "CR 603/608.2n Rest in Peace's ETB exiles graveyards and ceases" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -1860,6 +1909,43 @@ aliceFinding wanted p = case p of
 aliceFindingNothing :: Prompt.Prompt r -> r
 aliceFindingNothing p = case p of
   Prompt.SearchLibrary {} -> []
+  _ -> atCarolTargeted p
+
+-- Denying Wind's board. Extract's, with the mana its {7}{U}{U} needs and a
+-- library big enough that "up to seven" is a real ceiling: nine cards, so the
+-- cap, the answer and the library size are all different numbers. Alice's own
+-- library is stocked too, so a search that read the wrong seat's would find
+-- something rather than nothing and the difference would be visible.
+-- Seven of carol's nine are Goblin Pikers and the other two are a Forest and a
+-- Mountain, which is what makes the find READABLE: an exiled card is a fresh
+-- incarnation with a fresh id (CR 400.7), so the two named cards can only be
+-- identified by name, and the seven the engine would complete with under CR
+-- 701.23d are named something else.
+denyingWindBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId])
+denyingWindBoard island denyingWind piker altar forest mountain =
+  let g0 = S.landsFor island S.alice 9 S.threePlayerGame
+      (_, g1) = S.addLibraryCard piker S.alice g0
+      (bobCard, g2) = S.addLibraryCard altar S.bob g1
+      g3 = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.carol g)) g2 [1 :: Int .. 7]
+      (carolForest, g4) = S.addLibraryCard forest S.carol g3
+      (carolMountain, g5) = S.addLibraryCard mountain S.carol g4
+      (gs, spellId) = S.handOne denyingWind g5
+   in (gs, spellId, bobCard, [carolForest, carolMountain])
+
+-- aliceFinding for a several-card find: the search is answered with exactly the
+-- ids named, which is how an answer SHORTER than the cap gets in front of the
+-- engine. Pinned by id rather than chosen from what is offered, so a mutation
+-- cannot repair the answer by finding a different legal one.
+aliceFindingThese :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+aliceFindingThese wanted p = case p of
+  Prompt.SearchLibrary _ pid _ _ -> if pid == S.alice then wanted else []
   _ -> atCarolTargeted p
 
 -- aliceFinding, plus a shuffle that REVERSES the library it is offered. Game

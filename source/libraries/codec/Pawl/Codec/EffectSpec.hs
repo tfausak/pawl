@@ -220,6 +220,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
               Search.owner = PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
               Search.quantity = Quantity.Literal 2,
               Search.filter = Filter.HasCardType CardType.Land,
+              Search.upTo = False,
               Search.destination = SearchDestination.BattlefieldTapped
             }
       )
