@@ -3,12 +3,18 @@
     {
       "attackCosts": [
         {
-          "perAttacker": [
-            {
-              "type": "Generic",
-              "value": 2
-            }
-          ],
+          "perAttacker": {
+            "type": "Fixed",
+            "value": [
+              {
+                "type": "Generic",
+                "value": 2
+              }
+            ]
+          },
+          "scope": {
+            "type": "Controller"
+          },
           "subject": {
             "type": "Matching",
             "value": {

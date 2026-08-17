@@ -98,6 +98,7 @@ library codec
     Pawl.Codec.AttachTarget
     Pawl.Codec.AttachTargetSpec
     Pawl.Codec.AttackCost
+    Pawl.Codec.AttackCostScope
     Pawl.Codec.AttackCostSpec
     Pawl.Codec.AttackerBlocked
     Pawl.Codec.AttackerBlockedSpec
@@ -376,6 +377,7 @@ library codec
     Pawl.Codec.PayGateSpec
     Pawl.Codec.PayObligation
     Pawl.Codec.PayObligationSpec
+    Pawl.Codec.PerAttacker
     Pawl.Codec.PermanentBecomesDesignated
     Pawl.Codec.PermanentBecomesDesignatedSpec
     Pawl.Codec.PermanentSacrificed
@@ -878,6 +880,7 @@ library types
     Pawl.Types.Asked
     Pawl.Types.AttachTarget
     Pawl.Types.AttackCost
+    Pawl.Types.AttackCostScope
     Pawl.Types.AttackerBlocked
     Pawl.Types.AttackerDeclared
     Pawl.Types.AttackRequirement
@@ -1060,6 +1063,7 @@ library types
     Pawl.Types.PayObligation
     Pawl.Types.PendingEntryEffect
     Pawl.Types.PendingTrigger
+    Pawl.Types.PerAttacker
     Pawl.Types.PermanentBecomesDesignated
     Pawl.Types.PermanentSacrificed
     Pawl.Types.Phase

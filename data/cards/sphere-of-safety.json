@@ -1,0 +1,84 @@
+{
+  "faces": [
+    {
+      "attackCosts": [
+        {
+          "perAttacker": {
+            "type": "Counted",
+            "value": {
+              "type": "Count",
+              "value": {
+                "aggregation": {
+                  "type": "Members"
+                },
+                "filter": {
+                  "type": "And",
+                  "value": [
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Enchantment"
+                      }
+                    },
+                    {
+                      "type": "ControlledBy",
+                      "value": {
+                        "type": "You"
+                      }
+                    }
+                  ]
+                },
+                "scope": {
+                  "type": "InZone",
+                  "value": {
+                    "player": {
+                      "type": "EachPlayer"
+                    },
+                    "zone": {
+                      "type": "Battlefield"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "scope": {
+            "type": "ControllerAndPlaneswalkers"
+          },
+          "subject": {
+            "type": "Matching",
+            "value": {
+              "type": "HasCardType",
+              "value": {
+                "type": "Creature"
+              }
+            }
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Sphere of Safety",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}
