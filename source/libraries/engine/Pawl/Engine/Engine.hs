@@ -209,8 +209,9 @@ checkSba = sampleWorldSince >> Sba.checkStateBasedActions
 --
 -- TWO carriers, subtracted together. The printed static one above is re-derived
 -- live from the battlefield every time this runs; Object.doesNotUntapNext is the
--- one-shot a resolution stored on the victim (Effect.DoesNotUntapNext, Elvish
--- Hunter), and this is where it both applies and ENDS. CR 701.43b puts its
+-- one-shot stored on the victim -- by a resolution (Effect.DoesNotUntapNext,
+-- Elvish Hunter) or by CR 508.1g's exert payment (Combat.declareAttackers,
+-- Glory-Bound Initiate) -- and this is where it both applies and ENDS. CR 701.43b puts its
 -- expiry in the untap step it bites in -- "each effect causing it not to untap
 -- expires during the same untap step" -- so the flag is cleared for every
 -- candidate here, whether or not the permanent also stayed tapped for the
@@ -901,6 +902,7 @@ abilityTriggeredOf event = case event of
   GameEvent.Surveiled _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
+  GameEvent.Exerted _ -> Nothing
 
 -- CR 603.3b's record of one ability triggering: its source (CR 113.7), its
 -- controller as it triggered (CR 603.3a) and its trigger condition.

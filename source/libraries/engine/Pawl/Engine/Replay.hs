@@ -70,6 +70,7 @@ encode p answer = case p of
   Prompt.ChooseLegend {} -> Response.ChoseLegend answer
   Prompt.DeclareAttackers {} -> Response.DeclaredAttackers answer
   Prompt.ChooseAttackTarget {} -> Response.ChoseAttackTarget answer
+  Prompt.ChooseExert {} -> Response.ChoseExert answer
   Prompt.DeclareBlockers {} -> Response.DeclaredBlockers answer
   Prompt.AssignCombatDamage {} -> Response.AssignedCombatDamage answer
   Prompt.ChooseTargets {} -> Response.ChoseTargets answer
@@ -210,6 +211,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseAttackTarget {} -> case response of
     Response.ChoseAttackTarget target -> Just target
+    _ -> Nothing
+  Prompt.ChooseExert {} -> case response of
+    Response.ChoseExert d -> Just d
     _ -> Nothing
   Prompt.DeclareBlockers {} -> case response of
     Response.DeclaredBlockers assignment -> Just assignment
@@ -470,6 +474,11 @@ defaultAnswer p = case p of
   -- Combat.announceAttackTarget degrades an out-of-list answer to, which the
   -- two must agree on: neither path can observe the other.
   Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
+  -- CR 508.1g: declining, for ChooseRiot's reason -- it is the half that adds
+  -- nothing to the game state, and exerting is the half that costs the attacker
+  -- its next untap step. A transcript that ran out of answers must not spend a
+  -- resource the player never agreed to spend.
+  Prompt.ChooseExert {} -> OptionalDecision.Declines
   -- Declining to BLOCK is not always legal either -- a CR 509.1c requirement
   -- (Lure) can make the empty declaration illegal -- and stays total the same
   -- way, through Combat.forcedBlockDeclaration.

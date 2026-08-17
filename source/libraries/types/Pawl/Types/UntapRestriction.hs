@@ -31,10 +31,10 @@ import qualified Pawl.Types.Affected as Affected
 -- THE STATIC HALF ONLY, and the "next" is what separates the two: this sentence
 -- forbids the untap for as long as the printing is on the battlefield, while
 -- Elvish Hunter's "doesn't untap during its controller's NEXT untap step" is a
--- one-shot a resolution leaves behind and outlives its source. That one is
--- Effect.DoesNotUntapNext writing Object.doesNotUntapNext, stored on the victim
--- and spent by Pawl.Engine.Engine.untapAll, which is the one place both carriers
--- are read.
+-- one-shot left behind and outliving its source. That one is
+-- Object.doesNotUntapNext, written by Effect.DoesNotUntapNext or by CR 508.1g's
+-- exert payment, stored on the victim and spent by
+-- Pawl.Engine.Engine.untapAll, which is the one place both carriers are read.
 --
 -- Open-half card data, classified rather than identified:
 -- Pawl.Engine.UntapRestriction is the only module that may read it, and it
