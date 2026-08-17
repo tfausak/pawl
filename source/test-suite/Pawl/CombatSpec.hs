@@ -5400,11 +5400,11 @@ runToTurnStep turn phase answer gs0 =
           else go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
    in go 64 gs0
 
--- A declare-attackers board with a real Ghostly Prison under `who`'s control and
--- `lands` untapped Forests under alice's. `cursing`'s twin on the cost side of CR
--- 508.1d: alice is active with one creature per printing in `mine`, and the
--- Prison's controller is the only thing that decides whether her attacks are
--- taxed at all.
+-- A declare-attackers board with a real taxing permanent -- Ghostly Prison, or
+-- Sphere of Safety -- under `who`'s control and `lands` untapped Forests under
+-- alice's. `cursing`'s twin on the cost side of CR 508.1d: alice is active with
+-- one creature per printing in `mine`, and the taxing permanent's controller is
+-- the only thing that decides whether her attacks are taxed at all.
 --
 -- The Forests are real Forests, so CR 305.6's intrinsic ability is what pays. A
 -- fixture that seeded a mana pool instead would prove nothing about CR 508.1i's
@@ -5439,11 +5439,12 @@ allUntapped oids gs = all (\oid -> tapStateOf oid gs == Just TapState.Untapped) 
 -- ("Creatures can't attack you unless their controller pays {2} for each creature
 -- they control that's attacking you") -- the pool's first cost to attack, and the
 -- first board on which a legal declaration can leave the active player unable to
--- comply with CR 508.1.
+-- comply with CR 508.1 -- and by Sphere of Safety, which is the same sentence
+-- widened to the planeswalkers its controller controls and with a {X} that counts
+-- the board where the Prison has a constant.
 --
--- Every case here is arithmetic rather than a threshold: the tax is {2} a
--- creature and a Forest makes one mana, so "how many Forests were tapped" reads
--- the total cost off the board directly.
+-- Every case here is arithmetic rather than a threshold: a Forest makes one mana,
+-- so "how many Forests were tapped" reads the total cost off the board directly.
 attackCostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
   Spec.it s "CR 508.1h/508.1j attacking under a Ghostly Prison costs {2}, and the mana is paid" $ do
@@ -5527,6 +5528,53 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
     Spec.assertBool s (allUntapped forests atJace) "attacking Jace: nothing was paid"
     Spec.assertEqWith s "attacking bob: the Piker was declared" (S.attackerDeclarationsOf atBob) mine
     Spec.assertBool s (allTapped forests atBob) "attacking bob: the {2} was paid"
+  Spec.it s "CR 306.6 Sphere of Safety taxes the attack on a planeswalker that Ghostly Prison lets through" $ do
+    -- The contrast with the case directly above, on the same board shape: Sphere
+    -- of Safety prints "you OR PLANESWALKERS YOU CONTROL", which is the "unless
+    -- some effect explicitly says otherwise" that Ghostly Prison's own ruling
+    -- leaves room for. bob controls one enchantment (the Sphere), so X = 1 and
+    -- attacking Jace costs {1}.
+    --
+    -- The discriminating half is the POSITIVE one -- the Forest went -- because a
+    -- creature refused an attack for an unrelated reason looks exactly like one
+    -- refused by this gate. The record naming the planeswalker is asserted
+    -- alongside it so that a Forest tapped for an attack on bob cannot pass.
+    sphere <- S.printingOf s registry "Sphere of Safety"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    jace <- S.printingOf s registry "Jace Beleren"
+    let (gs, _, jaceId) = jaceBoard jace [piker]
+        withSphere = snd (S.addCreature sphere S.bob gs)
+        (forests, board) = addForests forest 1 withSphere
+        atJace = S.runPure attackThePlaneswalker board (Combat.declareAttackers S.alice)
+    Spec.assertEqWith
+      s
+      "the record names the planeswalker"
+      (Map.elems (Combat.Type.attackers (GameState.combat atJace)))
+      [AttackTarget.OfPlaneswalker jaceId]
+    Spec.assertBool s (allTapped forests atJace) "and the {X} was paid for it"
+  Spec.it s "CR 508.1h Sphere of Safety's share is the enchantment count, not a constant" $ do
+    -- ONE card, two boards differing by exactly one inert enchantment. Megrim is
+    -- a bare {2}{B} Enchantment whose only ability triggers on a discard, so it
+    -- changes the count and nothing else about the combat.
+    --
+    -- No constant can produce both lines: with the Sphere alone X = 1 and one
+    -- Forest is the whole toll, and with Megrim beside it X = 2 and the same
+    -- single Piker owes two. An engine that had kept a literal share would fail
+    -- one line or the other whatever literal it picked.
+    sphere <- S.printingOf s registry "Sphere of Safety"
+    megrim <- S.printingOf s registry "Megrim"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (one, mine1, f1) = imprisoning sphere forest S.bob [piker] 1
+        after1 = S.runPure S.aggressiveAnswer one (Combat.declareAttackers S.alice)
+        (two0, mine2, f2) = imprisoning sphere forest S.bob [piker] 2
+        two = snd (S.addCreature megrim S.bob two0)
+        after2 = S.runPure S.aggressiveAnswer two (Combat.declareAttackers S.alice)
+    Spec.assertEqWith s "X = 1: the Piker was declared" (S.attackerDeclarationsOf after1) mine1
+    Spec.assertBool s (allTapped f1 after1) "X = 1: the one Forest paid"
+    Spec.assertEqWith s "X = 2: the same Piker was declared" (S.attackerDeclarationsOf after2) mine2
+    Spec.assertBool s (allTapped f2 after2) "X = 2: both Forests paid"
   Spec.it s "CR 508.1d a Curse of the Nightly Hunt does not force an attack a Ghostly Prison taxes" $ do
     -- THE COST CLAUSE: "if a creature can't attack unless a player pays a cost,
     -- that player is not required to pay that cost, even if attacking with that
