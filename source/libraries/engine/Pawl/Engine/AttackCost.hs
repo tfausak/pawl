@@ -99,7 +99,7 @@ costsOn attacker target gs =
             AttackTarget.OfPlaneswalker pw -> Projection.controllerOf pw gs == Just owner
             AttackTarget.OfBattle _ -> False
       -- CR 508.1h reads the share LIVE, here, from the board the caller handed
-      -- this function; the lock-in is Pawl.Engine.Combat.declareAttackers',
+      -- this function; the lock-in belongs to Pawl.Engine.Combat.declareAttackers,
       -- which binds totalCost's answer once. CR 109.5's "you" for the count is
       -- the taxing permanent's controller, the same player the guard above
       -- reads, and the source is the permanent itself so that a Filter.IsSource
