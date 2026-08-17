@@ -1421,6 +1421,11 @@ affectsBase source oid a gs = affectsGiven (baseView gs) source oid a (baseChara
 --
 -- Nothing for an id naming no object, like viewUpTo -- and like it, terminating
 -- because nothing under here folds: baseCharacteristics reads the printed face.
+--
+-- A regression fence rather than proven behaviour: swapping this for fullView
+-- leaves the whole suite green, since reaching it needs a card that sets a
+-- subtype on a filtered set of ATTACHED permanents and no printing does
+-- (gap #1757).
 baseView :: GameState -> Count.ViewOf
 baseView gs oid =
   if Map.member oid (GameState.objects gs)
@@ -3370,7 +3375,9 @@ filterReads f = case f of
   -- they are the HOST's: Aspect names an aspect of ONE object's projection, so
   -- there is no way to say "another object's card types", and over-declaring is
   -- the conservative direction. Nothing in the pool puts this atom in an affected
-  -- set (#357).
+  -- set (#357) -- Bride's Gown puts it in a CR 604.2 condition, and this
+  -- classification does not range over one: an affected set and a modification's
+  -- own quantities are the only things asked.
   --
   -- The attachment itself reads nothing -- it stops at Object.attachedTo (CR
   -- 303.4) plus battlefield membership (CR 110.1), and no Modification writes
@@ -3889,6 +3896,9 @@ projectDeciding admits cands = forObject
                         -- view does (CR 701.3a). Recursive and terminating: the
                         -- partials are already built, and the fallback is
                         -- `bounded`, whose own hosts stay at this layer's bound.
+                        -- A fence like baseView's: only a CR 613.8-movable layer
+                        -- reaches this reader, and no card puts an AttachedTo
+                        -- filter in one (gap #1757).
                         viewOfBoard board o = case Map.lookup o board of
                           Just (p, _) -> Just (viewOfCharacteristics (viewOfBoard board) o (noncreaturePT o gs p) (controllerOf o gs) (countersOf o gs) gs)
                           Nothing -> bounded o
