@@ -584,15 +584,17 @@ nonexistenceSpec s registry = Spec.describe s "Nonexistence" $ do
 departureSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 departureSpec s registry = Spec.describe s "Departure" $ do
   -- CR 702.26k: "phased-out permanents owned by a player who leaves the game also
-  -- leave the game." One of the two rules on the far side of CR 702.26b's
-  -- "except", so CR 800.4a's sweep has to name GameState.phasedOut and not only
-  -- the battlefield. Three seats, because CR 800.1 ends a two-player game the
-  -- moment one of them leaves and CR 800.4a never runs.
+  -- leave the game." One of the rules on the far side of CR 702.26b's "except",
+  -- so CR 800.4a's sweep has to name GameState.phasedOut and not only the
+  -- battlefield. Three seats, because CR 800.1 ends a two-player game the moment
+  -- one of them leaves and CR 800.4a never runs.
   --
   -- The falsifier for the row being left behind: without the deletion in
   -- Game.removeFromZones the object is gone from GameState.objects while its id
-  -- still sits in `phasedOut`, keyed to a player who will never have another
-  -- untap step.
+  -- still sits in `phasedOut`, and CR 702.26n's reschedule below would then have
+  -- an object that no longer exists to phase in. Rule 702.26k is what keeps the
+  -- two apart: it takes the ones the departing player OWNED, and rule 702.26n is
+  -- for the ones somebody else owns.
   --
   -- Rule 702.26k's SECOND sentence -- that this causes no zone-change ability to
   -- trigger -- is asserted in Pawl.DepartureSpec, where it is the paired

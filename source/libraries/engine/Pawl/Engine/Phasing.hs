@@ -18,12 +18,12 @@
 -- battlefield -- the projection, targeting, the state-based actions, combat,
 -- cost payment, the trigger gatherer -- gets rule 702.26b's answer without
 -- knowing phasing exists. Only the rules on the far side of the "except" name
--- the new field, and Pawl.Types.GameState.phasedOut enumerates all three: this
+-- the new field, and Pawl.Types.GameState.phasedOut enumerates all of them: this
 -- module, CR 702.26k's leaves-the-game clause in
--- Pawl.Engine.Game.removeFromZones, and CR 514.2's damage sweep -- which is on
--- that list by rule and not by code, since Pawl.Engine.Damage.removeAllDamage
--- clears every object rather than every permanent and so covers a phased-out one
--- without naming it.
+-- Pawl.Engine.Game.removeFromZones, CR 702.26n's reschedule below, and CR 514.2's
+-- damage sweep -- which is on that list by rule and not by code, since
+-- Pawl.Engine.Damage.removeAllDamage clears every object rather than every
+-- permanent and so covers a phased-out one without naming it.
 --
 -- The object itself does NOT move zones, which is CR 702.26d: Object.zone stays
 -- Zone.Battlefield, nothing goes through Pawl.Engine.Event's zone-change funnel,
@@ -36,8 +36,8 @@
 --
 -- CR 702.26g's indirect half is the second thing this module maintains, and it
 -- is why GameState.phasedOut holds a Pawl.Types.PhasedOut rather than a bare
--- player: a row says which of rule 702.26's two schedules its permanent is on,
--- and only the direct ones are read by CR 702.26a's phase-in half. Going OUT, the
+-- player: a row says which of rule 702.26's schedules its permanent is on, and
+-- only the direct ones are read by CR 702.26a's phase-in half. Going OUT, the
 -- attachment is not touched by either half -- CR 702.26i needs Object.attachedTo
 -- intact -- and nothing clears it meanwhile: Pawl.Engine.Sba's CR 704.5n/704.5p
 -- detach sweep classifies only battlefield permanents and so cannot see a
