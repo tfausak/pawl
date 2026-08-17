@@ -309,4 +309,4 @@ data Response
   | -- | CR 401.4's answer: the order an owner chose for the cards arriving at one
     -- end of their library, as a permutation of the offered indices.
     ArrangedLibraryArrivals [Natural.Natural]
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)

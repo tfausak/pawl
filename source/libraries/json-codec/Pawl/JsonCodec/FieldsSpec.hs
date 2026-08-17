@@ -14,7 +14,7 @@ data Example = MkExample
   { size :: Integer,
     label :: Maybe Integer
   }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 size' :: Codec.Codec Integer
 size' = Common.integer

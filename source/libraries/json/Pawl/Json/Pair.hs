@@ -11,7 +11,7 @@ data Pair a = MkPair
   { name :: String.String,
     value :: a
   }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 decode :: (Parsec.Stream s m Char) => Parsec.ParsecT s u m a -> Parsec.ParsecT s u m (Pair a)
 decode p =

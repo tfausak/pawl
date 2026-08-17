@@ -15,6 +15,6 @@ data InvalidCorpus = MkInvalidCorpus
   { root :: FilePath,
     problems :: [String]
   }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 instance Exception.Exception InvalidCorpus

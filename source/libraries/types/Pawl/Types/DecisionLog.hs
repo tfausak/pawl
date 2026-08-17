@@ -6,4 +6,4 @@ data DecisionLog = MkDecisionLog
   { seed :: Int,
     responses :: [Response.Response]
   }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)

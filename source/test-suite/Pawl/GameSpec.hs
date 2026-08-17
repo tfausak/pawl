@@ -2089,7 +2089,7 @@ data AskTag = MkAskTag
     askedGameHasSurvivor :: Bool,
     mainGameHasSurvivor :: Bool
   }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 -- Answers as subgameAnswer does, tagging each question with the game it came
 -- from. The distinguishing fact is whether that game's battlefield holds

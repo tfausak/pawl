@@ -105,4 +105,4 @@ data Player = MkPlayer
     -- rather than a stock of one.
     dungeon :: Maybe Printing.Printing
   }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
