@@ -5155,7 +5155,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   --
   -- Swept over the pool, with the non-vacuity assertion its neighbours carry: a
   -- pool with no AnyOf at all would pass this without examining anything.
-  -- Balemurk Leech is the pool's one AnyOf, and it is ACCEPTED here.
+  -- The pool's AnyOf cards -- Balemurk Leech, Bartered Cow and their like -- are
+  -- all ACCEPTED here.
   Spec.it s "CR 603.2 no AnyOf mixes in a state trigger or nests another AnyOf" $ do
     ps <- S.allPrintings s
     let conditions c = fmap TriggeredAbility.condition (Face.triggeredAbilities c)

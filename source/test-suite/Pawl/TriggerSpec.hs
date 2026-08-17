@@ -3182,10 +3182,13 @@ selfDiscardTriggerSpec s registry =
           Spec.assertEqWith s "the Cow reached alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice discarded)) 1
           Spec.assertEqWith s "one trigger on the stack, and only one" (length (GameState.stack placed)) 1
           Spec.assertEqWith s "and alice has one Food token afterwards" (S.countOnBattlefieldByName foodTokenName S.alice (settle discarded)) 1
-        -- THE discriminating pair, and the reason this condition is not
-        -- PlayerDiscards: one board, two cards in alice's hand, and only which
-        -- one CR 701.9b discards differs. A condition that read the discarding
-        -- player rather than the discarded card would make a Food both times.
+        -- The discriminating pair: one board, two cards in alice's hand, and only
+        -- which one CR 701.9b discards differs. What it pins is that the Food
+        -- follows the CARD -- an implementation firing on any discard by the
+        -- ability's controller would make one both times. Its negative half alone
+        -- would be weak, the Cow still being in a hand no scan reads for this
+        -- condition; the graveyard case below is the one that pins the bearer
+        -- check itself.
         Spec.it s "CR 701.9a it is the DISCARDED card's own trigger, not its controller's" $ do
           cow <- S.printingOf s registry "Bartered Cow"
           piker <- S.printingOf s registry "Goblin Piker"
