@@ -113,7 +113,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.SkipNextPhase {} -> Nothing
   -- CR 615.5's rider is not descended into, and the answer stands: the rider
   -- does not run as an effect of this ability at all, but from
-  -- Pawl.Engine.Resolve.runPreventionRiders against the shielded permanent, so
+  -- Pawl.Engine.Resolve.runPreventionRider against the effect's own source, so
   -- nothing it does can be this ability moving "the object it's on".
   Effect.PreventNextDamage {} -> Nothing
   Effect.PreventAllDamage {} -> Nothing

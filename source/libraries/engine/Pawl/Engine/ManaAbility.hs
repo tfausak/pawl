@@ -283,9 +283,9 @@ movesLibraryCard effect = case effect of
   Effect.Replace {} -> False
   Effect.SkipNextPhase {} -> False
   -- CR 615.5's rider is not descended into, the same stop `manaProduced` makes:
-  -- this asks what the effect ITSELF does, and Resolve.runPreventionRiders runs
-  -- the rider against the shielded permanent rather than as part of this
-  -- ability.
+  -- this asks what the effect ITSELF does, and Resolve.runPreventionRider runs
+  -- the rider against the effect's own source, later, rather than as part of
+  -- this ability.
   Effect.PreventNextDamage {} -> False
   Effect.PreventAllDamage {} -> False
   Effect.RedirectDamage {} -> False

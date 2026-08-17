@@ -69,11 +69,13 @@ evaluate viewOf context gs oid = evaluateFor viewOf context gs oid oid
 --     left its id naming nothing, and CR 113.7a is what lets the ability
 --     resolve regardless (#544).
 --
--- Quantity.InSlot asks `oid` FIRST and falls back to `announcedOn`, because it
--- has two writers: Resolve.bindAmountSlot writes to the effect's source
--- mid-resolution (Bane of Progress binds and reads one inside a TRIGGERED
--- ability, where the two ids differ), while Event.eventBindings writes to the
--- stack object as a trigger is gathered. See the arm itself.
+-- Quantity.InSlot asks `oid` FIRST, falls back to `announcedOn`, and then to
+-- GameState.ambientAmounts, because it has three writers:
+-- Resolve.bindAmountSlot writes to the effect's source mid-resolution (Bane of
+-- Progress binds and reads one inside a TRIGGERED ability, where the two ids
+-- differ), Event.eventBindings writes to the stack object as a trigger is
+-- gathered, and Resolve.runPreventionRider writes the ambient channel, which
+-- belongs to no object at all. See the arm itself.
 evaluateFor :: Count.ViewOf -> Filter.Context -> GameState -> ObjectId -> ObjectId -> Quantity -> Maybe Integer
 evaluateFor viewOf context gs announcedOn oid = evaluateAgainst viewOf context gs announcedOn (Just oid) (viewOf oid)
 
@@ -113,12 +115,13 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   Quantity.Power -> mView >>= Filter.power
   -- CR 208.1's other half, read off the same view and Nothing in the same places.
   Quantity.Toughness -> mView >>= Filter.toughness
-  -- A value bound into the slot, read off the effect's SOURCE and then off the
-  -- object on the stack. Nothing when neither holds an amount there: the
-  -- producing effect has not run, or bound nothing.
+  -- A value bound into the slot, read off the effect's SOURCE, then off the
+  -- object on the stack, and last out of the ambient channel. Nothing when none
+  -- of the three holds an amount: the producing effect has not run, or bound
+  -- nothing.
   --
-  -- TWO places because there are two writers, each of which binds where its value
-  -- belongs:
+  -- THREE places because there are three writers, each of which puts its value
+  -- where that value belongs:
   --
   --   * Resolve.bindAmountSlot writes to the SOURCE, mid-resolution -- Bane of
   --     Progress' "for each permanent destroyed this way".
@@ -128,6 +131,13 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   --     "that much", the amount a life gain (CR 119.9) or a life loss (CR 119.3)
   --     supplied; and Shroofus Sproutsire's "that many", the combat damage CR
   --     510.2 dealt a player.
+  --   * Resolve.runPreventionRider writes GameState.ambientAmounts, for the span
+  --     of one CR 615.5 rider -- Inkshield's "for each 1 damage prevented this
+  --     way". That writer has NO object to bind to: the shielded recipient can be
+  --     a player, and CR 400.7 replaced the installing spell. Read LAST, so
+  --     neither reading above is disturbed, and it can collide with neither: the
+  --     map is empty except while a rider runs, and a rider's own effects are the
+  --     only readers alive then.
   --
   -- The source is asked first so the existing reading is untouched, and the two
   -- cannot collide over one name: a mid-resolution bind names a slot the CARD
@@ -146,7 +156,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- permanent never carries the X its spell was cast for.
   Quantity.InSlot slot ->
     let boundOn holder = Game.lookupObject holder gs >>= Binding.amountOf slot . Object.bindings
-     in fmap toInteger ((mOid >>= boundOn) <|> boundOn announcedOn)
+     in fmap toInteger ((mOid >>= boundOn) <|> boundOn announcedOn <|> Map.lookup slot (GameState.ambientAmounts gs))
   -- CR 208.2: a bare star has no value of its own. Both readers of a
   -- characteristic-defining P/T substitute the object's quantity for it first,
   -- through Projection.seedCharacteristicPT -- the projection at its seed

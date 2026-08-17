@@ -31,6 +31,7 @@ import qualified Pawl.Types.Prevention as Prevention
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Types.RestartSignal as RestartSignal
 import qualified Pawl.Types.Result as Result
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Timestamp as Timestamp
 
 data GameState = MkGameState
@@ -241,8 +242,28 @@ data GameState = MkGameState
     -- puts on are on before CR 704.5g asks whether the creature died.
     --
     -- Empty at every priority window the engine reaches, so nothing else has to
-    -- know it exists.
+    -- know it exists. It is not the whole of CR 615.5's state -- `ambientAmounts`
+    -- below is the channel the amount travels on while a drained rider runs.
     pendingPreventionRiders :: Seq.Seq Prevention.Prevention,
+    -- | CR 615.5's amount channel: the amount bindings an effect running OUTSIDE
+    -- any object's environment can read, which today is a prevention's additional
+    -- effect and nothing else. Written and restored around one rider by
+    -- Resolve.runPreventionRider, and read LAST by Quantity's InSlot arm, after
+    -- both of that arm's object lookups.
+    --
+    -- Ambient rather than a binding on an object, which is what a rider's amount
+    -- used to be: CR 615.5's "the amount of damage that was prevented" has to
+    -- reach a rider whose shielded recipient is a PLAYER (Inkshield's "for each 1
+    -- damage prevented this way"), and a player has no Object to bind anything
+    -- to. The installing spell's object cannot stand in either -- CR 400.7 minted
+    -- a new object in its owner's graveyard, so its id names nothing.
+    --
+    -- A Map keyed by slot rather than a bare amount, so the reader stays an
+    -- ordinary slot lookup instead of hardcoding Pawl.Engine.Binding.eventAmount.
+    --
+    -- Empty at every priority window the engine reaches, exactly as the queue
+    -- above is: it is non-empty only for the span of one rider's effects.
+    ambientAmounts :: Map.Map SlotName.SlotName Natural.Natural,
     -- | CR 614.1c: as-enters rewrites whose effects have not run yet, oldest
     -- first. `pendingPreventionRiders` above one rule over, queued for the same
     -- reason and drained the same way: Pawl.Engine.Event applies the replacement

@@ -166,7 +166,7 @@ collect sources floating =
             -- CR 615.5, built rather than copied: the additional effect is
             -- printed on the ability (DamageR.riders) and the environment it
             -- runs in is read off the live board (see `printedRider`).
-            ReplacementCandidate.rider = printedRider (Projection.controllerOf src sources) re
+            ReplacementCandidate.rider = printedRider src (Projection.controllerOf src sources) re
           }
       fromFloating active =
         ReplacementCandidate.MkReplacementCandidate
@@ -209,8 +209,12 @@ collect sources floating =
 -- nothing (CR 115.10a), so there are no chosen targets to carry -- the slot map
 -- is empty. A source the board can no longer answer for has no "you", and gets
 -- no rider rather than one performed by nobody.
-printedRider :: Maybe PlayerId -> ReplacementEffect (Effect.Effect Card) -> Maybe PreventionRider.PreventionRider
-printedRider you re = case re of
+--
+-- `src` is CR 113.7's source, which for a static ability is the permanent that
+-- prints it -- so the rider runs against the same object today's shielded
+-- recipient is (Stormwild Capridor shields itself).
+printedRider :: ObjectId -> Maybe PlayerId -> ReplacementEffect (Effect.Effect Card) -> Maybe PreventionRider.PreventionRider
+printedRider src you re = case re of
   ReplacementEffect.DamageR damageR
     | not (Seq.null (DamageR.riders damageR)),
       Just controller <- you ->
@@ -218,7 +222,8 @@ printedRider you re = case re of
           PreventionRider.MkPreventionRider
             { PreventionRider.effects = DamageR.riders damageR,
               PreventionRider.targets = Map.empty,
-              PreventionRider.controller = controller
+              PreventionRider.controller = controller,
+              PreventionRider.source = src
             }
   _ -> Nothing
 
