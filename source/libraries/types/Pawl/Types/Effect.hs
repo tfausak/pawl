@@ -1098,11 +1098,14 @@ data Effect card
     -- becomes renowned", the second half of the ability Pawl.Engine.Keyword.renown
     -- mints; CR 701.37a's "and it becomes monstrous", authored beside a PutCounters
     -- in one clause whose condition is that rule's "if this permanent isn't
-    -- monstrous"; and CR 701.60a's suspect instruction, Person of Interest's "when
-    -- this creature enters, suspect it".
+    -- monstrous"; CR 701.60a's suspect instruction, Person of Interest's "when
+    -- this creature enters, suspect it"; and CR 719.3a's "this Case becomes
+    -- solved", Case of the Ransacked Lab's end-step trigger.
     --
-    -- ONE opcode over Pawl.Types.Designation and not three, because the three rules
-    -- word the write identically -- see that module. Casing on the designation is
+    -- ONE opcode over Pawl.Types.Designation and not one per mark, because every
+    -- rule that mints one words the write identically -- see that module. Case's
+    -- is what proves the shape holds: rule 719 needed no arm here at all. Casing
+    -- on the designation is
     -- not casing on an effect's identity: it is one payload of one opcode, the way
     -- ItBecomes below carries a Daytime.
     --

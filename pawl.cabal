@@ -1236,6 +1236,7 @@ test-suite pawl-test-suite
     Pawl.Cards
     Pawl.CardSpec
     Pawl.CardsSpec
+    Pawl.CaseSpec
     Pawl.CastSpec
     Pawl.CodecIntegrationSpec
     Pawl.ColorSpec

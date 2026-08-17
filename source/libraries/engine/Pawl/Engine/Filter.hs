@@ -240,8 +240,9 @@ data View = MkView
     -- Read by this module's own Filter.HasDesignation arm (Aragorn, Hornburg
     -- Hero's trigger, Rune-Brand Juggler's sacrifice cost) and by
     -- Pawl.Engine.Quantity's HasDesignation arm (renown's intervening "if",
-    -- monstrosity's clause condition, Repeat Offender's). What CR 701.60c hangs off
-    -- `Suspected` does NOT come through here:
+    -- monstrosity's clause condition, Repeat Offender's, and both of Case of the
+    -- Ransacked Lab's). What CR 701.60c hangs off `Suspected` does NOT come
+    -- through here:
     -- Pawl.Engine.Projection.designationGathered and
     -- Pawl.Engine.CombatRestriction.inForce hold no view and read the object
     -- directly.
@@ -339,8 +340,9 @@ playerView pid =
       -- player is not one -- the same shape CR 725.1's monarch has with the two
       -- sides swapped.
       ringBearerFor = Nothing,
-      -- CR 702.112b: "only permanents can be or become renowned", CR 701.37b and
-      -- CR 701.60b saying the same of the other two, and a player is not one.
+      -- CR 702.112b: "only permanents can be or become renowned", CR 701.37b,
+      -- CR 701.60b and CR 719.3b saying the same of the other marks, and a
+      -- player is not one.
       designations = Set.empty,
       kicked = False,
       -- CR 602.1: an activated ability is an ability OF AN OBJECT, and CR 109.1's
