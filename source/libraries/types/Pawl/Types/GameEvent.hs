@@ -782,9 +782,11 @@ data GameEvent
     -- impossible, and none of them says an explore completed.
     Explored ObjectId.ObjectId
   | -- | CR 701.43a: this permanent was EXERTED. Recorded by
-    -- Pawl.Engine.Combat.declareAttackers at CR 508.1g, the only place the rules
-    -- let a permanent be exerted, and what CR 701.43d's linked "when you do"
-    -- trigger watches for (TriggerCondition.SelfExerted).
+    -- Pawl.Engine.Combat.declareAttackers at CR 508.1g, the only place pawl
+    -- exerts anything, and what CR 701.43d's linked "when you do" trigger
+    -- watches for (TriggerCondition.SelfExerted). CR 701.43a states the keyword
+    -- action generally, so an effect that exerted a permanent outside a
+    -- declaration would record this same event.
     --
     -- The exerted permanent's id ALONE, Explored's shape and for its reason: the
     -- exerting player is the permanent's controller (CR 508.1a already required
