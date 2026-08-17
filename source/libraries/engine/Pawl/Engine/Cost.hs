@@ -1499,8 +1499,8 @@ repeatsOf pid oid cost gs = case Cost.mana cost of
 -- loyalty, since CR 606.3 lets a player activate one loyalty ability of a
 -- permanent per turn whatever the counters allow. An UNDERSTATEMENT for CR
 -- 107.14's energy, for a counter put on the source, and for the two components
--- that tap OTHER permanents, each of which a player with enough could pay several times
--- over; `repeatsOf` above argues for understating (#1280).
+-- that tap OTHER permanents, each of which a player with enough could pay
+-- several times over; `repeatsOf` above argues for understating (#1280).
 --
 -- EXHAUSTIVE with no wildcard, this module's posture for every CostComponent
 -- match: a new component owes an answer about how often it can be paid, and

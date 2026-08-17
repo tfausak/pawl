@@ -2134,8 +2134,8 @@ magmaticInsightSpec s registry =
 --
 -- Alice's board is the Drum and TWO untapped creatures, one more than the cost
 -- wants, so the prompt is a real choice rather than an elided one. Hill Giant
--- (3/3) and Blind-Spot Giant (4/1) are distinct printings and distinct
--- creatures, so tapping the wrong one is visible.
+-- and Blind-Spot Giant are distinct printings, so which one was tapped is
+-- visible.
 --
 -- Gameplay-level throughout, through Pawl.Engine.Cost.tapForMana: CR 605.3b
 -- keeps a mana ability off the stack, so Activate.activatable answers False for
@@ -2217,7 +2217,8 @@ springleafDrumSpec s registry = Spec.describe s "Springleaf Drum" $ do
     Spec.assertBool s (not (isTapped spotId after)) "nor the other"
     Spec.assertBool s (not (isTapped drumId after)) "and the payment was rolled back whole"
   -- The negative, built as a PAIR of boards differing in exactly one thing: the
-  -- lone creature's tap state. Same seats, same permanents, same ability.
+  -- creatures' tap state. Same seats, same permanents, same ability -- so an
+  -- unpayable component is the only thing that can withhold the mana.
   Spec.it s "CR 118.3 no untapped creature means no payment" $ do
     drum <- S.printingOf s registry "Springleaf Drum"
     hillGiant <- S.printingOf s registry "Hill Giant"
