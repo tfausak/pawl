@@ -8,9 +8,11 @@
 -- "any creature"), the P2 copy gate (Clone), and
 -- Pawl.Engine.Resolve's CreateCopy arm (CR 707.2's token copy, Cackling
 -- Counterpart and Watchful Radstag; its count, and the simultaneous entry that
--- count buys, kicked Rite of Replication). Gameplay-level: Clone enters via the
--- zone-change funnel, the Counterpart is cast and resolved and the Radstag
--- evolves, and their projected characteristics are asserted.
+-- count buys, kicked Rite of Replication) and its BecomeCopy arm (CR 707.4's
+-- change of a permanent already on the battlefield, Unstable Shapeshifter).
+-- Gameplay-level: Clone enters via the zone-change funnel, the Counterpart is
+-- cast and resolved, the Radstag evolves and the Shapeshifter's trigger resolves,
+-- and their projected characteristics are asserted.
 module Pawl.CopySpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -94,6 +96,17 @@ copyNewest p = case p of
 declineCopy :: Prompt.Prompt r -> r
 declineCopy p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
+  Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
+  Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
+  _ -> S.identityAnswer p
+
+-- Aims a spell's one target slot at ONE PINNED id, whatever else is legal, and
+-- orders any trigger batch as it arrives. Pinned rather than searched, `rites`'
+-- posture: an answerer that looked for a legal creature would find the other one
+-- after a mutation and repair the assertion.
+targeting :: ObjectId -> Prompt.Prompt r -> r
+targeting victim p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Set.singleton (Recipient.ToCreature victim))) sets
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   _ -> S.identityAnswer p
@@ -567,3 +580,51 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         resolved = castAndResolve (rites KickerDecision.Kicks cloneId) rite board
     Spec.assertEqWith s "five tokens entered, and every one copied the Giant rather than an entering sibling" (mintedTokens resolved) (replicate 5 (Set.singleton (CardName.MkCardName (Text.pack "Hill Giant")), Just (3, 3)))
     Spec.assertEqWith s "the copied Clone itself still copied nothing" (S.powerToughnessOf cloneId resolved) (Just (1, 1))
+
+  -- THE PROVING TEST for #313, and it is CR 707.4's own worked example: an
+  -- Unstable Shapeshifter under a Giant Growth becomes a copy of a creature that
+  -- enters later and "will still get +3/+3 from the Giant Growth". The rule's
+  -- three claims all read off one board:
+  --
+  --   * the copy happened, so the Shapeshifter is not its printed 0/1 any more;
+  --   * the copied values are the ORIGINAL's copiable ones (CR 707.2), 4/3;
+  --   * the noncopy effect presently affecting the permanent survives, so the
+  --     answer is 7/6 rather than 4/3 -- which is what putting the change at
+  --     layer 1 (CR 613.1a) buys, since layers 2-7 re-apply over the new base.
+  --
+  -- Blind-Spot Giant is 4/3 deliberately: 4 /= 3, and neither is 0 or 1, so power
+  -- and toughness cannot be swapped without the assertion seeing it, and 7/6
+  -- cannot be reached by any other pairing on this board. Goblin Piker (2/1) is
+  -- the SECOND creature, put down before the Giant so that the condition's
+  -- "another creature" (Not IsSource) is a real restriction rather than trivially
+  -- true -- and it is left alone, which is the check that the effect swept the
+  -- subject ref rather than the battlefield.
+  --
+  -- The entering Giant is asserted UNCHANGED, which is the other reading of the
+  -- rule: "the entrant becomes a copy of the Shapeshifter" produces a board this
+  -- one distinguishes, since the Giant would then be 0/1.
+  Spec.it s "Unstable Shapeshifter becomes a copy and keeps a noncopy effect (CR 707.4)" $ do
+    forest <- S.printingOf s registry "Forest"
+    shapeshifter <- S.printingOf s registry "Unstable Shapeshifter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    blindSpotGiant <- S.printingOf s registry "Blind-Spot Giant"
+    growth <- S.printingOf s registry "Giant Growth"
+    let (shifterId, board0) = S.addCreature shapeshifter S.alice (S.landsInPlay forest 1)
+        (pikerId, board) = S.addCreature piker S.alice board0
+        grown = castAndResolve (targeting shifterId) growth board
+        (giantId, entered) = S.entersWithTrigger blindSpotGiant S.alice grown
+        -- The settle puts the Shapeshifter's CR 603.6a trigger on the stack; the
+        -- resolve runs it. The narrowest path that shows the behaviour.
+        onStack = settle (targeting shifterId) entered
+        after = resolveAndSettle (targeting shifterId) onStack
+    Spec.assertBool s (not (null (GameState.stack onStack))) "the Shapeshifter's trigger really was on the stack"
+    Spec.assertEqWith s "before: the printed 0/1 plus the Giant Growth" (S.powerToughnessOf shifterId onStack) $ Just (3, 4)
+    Spec.assertEqWith s "after: the copied 4/3 plus the SAME Giant Growth" (S.powerToughnessOf shifterId after) $ Just (7, 6)
+    Spec.assertEqWith s "and it is the Giant by name (CR 707.2)" (Projection.namesOf shifterId after) . Set.singleton . CardName.MkCardName $ Text.pack "Blind-Spot Giant"
+    Spec.assertEqWith s "the creature that entered is untouched" (S.powerToughnessOf giantId after) $ Just (4, 3)
+    Spec.assertEqWith s "and so is the other creature already there" (S.powerToughnessOf pikerId after) $ Just (2, 1)
+    -- Not implemented: CR 707.9a's "except it has this ability" (#1292). pawl's
+    -- Shapeshifter takes the Giant's abilities and only those, so it loses the
+    -- trigger that copied and can never copy again -- STRICTER than printed, and
+    -- this is where that is observable.
+    Spec.assertEqWith s "it has the Giant's abilities and only those" (length (Projection.triggeredAbilitiesOf shifterId after)) 0
