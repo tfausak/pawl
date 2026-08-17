@@ -72,6 +72,7 @@ import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackCost as AttackCost
+import qualified Pawl.Types.AttackCostScope as AttackCostScope
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BlockPermission as BlockPermission
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
@@ -153,6 +154,7 @@ import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PerAttacker as PerAttacker
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
@@ -862,6 +864,13 @@ blockPermissionCounts permission =
   foldMap quantityCounts (BlockPermission.additional permission)
     <> foldMap conditionCounts (BlockPermission.while permission)
 
+-- CR 508.1h's per-attacker share. Only the Counted arm holds anything: the Fixed
+-- arm is mana symbols.
+perAttackerCounts :: PerAttacker.PerAttacker -> [Count.Type.Count Quantity.Type.Quantity]
+perAttackerCounts perAttacker = case perAttacker of
+  PerAttacker.Fixed _ -> []
+  PerAttacker.Counted quantity -> quantityCounts quantity
+
 -- Hand-maintained, with cardCounts' caveat: a NEW Face field holding effects
 -- must be added here too.
 cardResolutionEffects :: Face.Face Card.Type.Card -> [Effect.Effect Card.Type.Card]
@@ -916,6 +925,10 @@ cardCounts card =
     <> concatMap (quantityCounts . CostReduction.perEach) (Face.costReductions card)
     <> concatMap combatRestrictionCounts (Face.combatRestrictions card)
     <> concatMap blockPermissionCounts (Face.blockPermissions card)
+    -- CR 508.1h's counted share (Sphere of Safety's "the number of enchantments
+    -- you control"), the one Count a cost to attack can hold: its subject is an
+    -- Affected, which holds a Filter but no Count.
+    <> concatMap (perAttackerCounts . AttackCost.perAttacker) (Face.attackCosts card)
 
 -- CR 400.1: "each player has their own library, hand, and graveyard. The
 -- other zones are shared by all players." Battlefield/Stack/Exile/Command are
@@ -2254,6 +2267,14 @@ affectedFilters affected = case affected of
   Affected.Attached -> []
   Affected.AttachedPlayerControls f -> [f]
 
+-- CR 508.1h's per-attacker share. The Counted arm reaches a Filter through its
+-- Quantity -- Sphere of Safety counts "enchantments you control" -- where the
+-- Fixed arm is mana symbols and nothing else.
+perAttackerFilters :: PerAttacker.PerAttacker -> [Filter.Type.Filter Keyword.Keyword]
+perAttackerFilters perAttacker = case perAttacker of
+  PerAttacker.Fixed _ -> []
+  PerAttacker.Counted quantity -> quantityFilters quantity
+
 objectRefFilters :: ObjectRef.ObjectRef -> [Filter.Type.Filter Keyword.Keyword]
 objectRefFilters ref = case ref of
   ObjectRef.InSlot _ -> []
@@ -3024,7 +3045,8 @@ activatedAbilityFilters ability =
 --   * `combatRestrictions` (CR 508.1c / 509.1b), `sacrificeRestrictions` (CR
 --     701.21a / 101.2), `untapRestrictions` (CR 502.3 / 101.2),
 --     `attackRequirements` (CR 508.1d), `blockRequirements`
---     (CR 509.1c) and `attackCosts` (CR 508.1h) -- six more affected sets.
+--     (CR 509.1c) and `attackCosts` (CR 508.1h) -- six more affected sets, plus
+--     a cost to attack's Counted share, which is a Quantity.
 --   * `spell`, `activatedAbilities`, `triggeredAbilities`, `delayedAbilities` --
 --     every mode's target slots and effects, plus an activation cost, a
 --     trigger's own condition and its intervening clause.
@@ -3066,6 +3088,7 @@ cardFilters card =
         <> concatMap blockPermissionFilters (Face.blockPermissions card)
         <> concatMap (affectedFilters . AttackRequirement.subject) (Face.attackRequirements card)
         <> concatMap (affectedFilters . AttackCost.subject) (Face.attackCosts card)
+        <> concatMap (perAttackerFilters . AttackCost.perAttacker) (Face.attackCosts card)
         <> concatMap combatRestrictionFilters (Face.combatRestrictions card)
         <> concatMap (affectedFilters . SacrificeRestriction.affected) (Face.sacrificeRestrictions card)
         <> concatMap (affectedFilters . UntapRestriction.affected) (Face.untapRestrictions card)
@@ -4230,6 +4253,16 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             (anyFace cardOffendsSharedZoneScope . Printing.card)
             ps
     Spec.assertEqWith s "no shared-zone scope with a non-EachPlayer ref" (fmap (S.nameOf . Printing.card) offenders) []
+    -- The sweep above is vacuous on any Count position the traversal forgets, so
+    -- the newest one is asserted positively: Sphere of Safety's CR 508.1h share
+    -- counts "enchantments you control", the only Count a cost to attack can
+    -- hold, and cardCounts must see it.
+    sphere <- S.printingOf s registry "Sphere of Safety"
+    Spec.assertEqWith
+      s
+      "a cost to attack's counted share is in the sweep"
+      (fmap Count.Type.scope (cardCounts (S.combinedFace sphere)))
+      [Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)]
   Spec.it s "a card with no enchant ability declares no enchant slot" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let card = S.combinedFace piker
@@ -5191,7 +5224,21 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               base {Face.combatRestrictions = [CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless (Affected.Matching buried) Nothing)]}
             ),
             ( "CR 508.1h's cost to attack",
-              base {Face.attackCosts = [AttackCost.MkAttackCost (Affected.Matching buried) (ManaCost.MkManaCost [ManaSymbol.Generic 2])]}
+              base {Face.attackCosts = [AttackCost.MkAttackCost (Affected.Matching buried) (PerAttacker.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 2])) AttackCostScope.Controller]}
+            ),
+            ( "CR 508.1h's counted share",
+              base
+                { Face.attackCosts =
+                    [ AttackCost.MkAttackCost
+                        (Affected.Matching (Filter.Type.HasCardType CardType.Creature))
+                        ( PerAttacker.Counted
+                            ( Quantity.Type.Count
+                                (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) buried Aggregation.Members)
+                            )
+                        )
+                        AttackCostScope.Controller
+                    ]
+                }
             ),
             ( "CR 614.1's counter-placement pattern",
               base

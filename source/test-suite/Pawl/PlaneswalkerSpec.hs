@@ -3,7 +3,8 @@
 -- Covers CR 306, the planeswalker card type, across the six modules it reaches:
 -- Pawl.Engine.Projection's intrinsic CR 306.5b enters-with replacement and
 -- Pawl.Engine.Replacement's EntryR arm that carries it out, Pawl.Engine.Cost's
--- two CR 606.4 loyalty cost components, Pawl.Engine.Activate's CR 606.3 gate,
+-- two CR 606.4 loyalty cost components and CR 606.5's combining of them,
+-- Pawl.Engine.Activate's CR 606.3 gate,
 -- Pawl.Engine.Sba's CR 704.5i zero-loyalty state-based action, Pawl.Engine.Target's
 -- CR 115.4 "any target" pool, and Pawl.Engine.Damage's CR 306.8 / CR 120.3c
 -- loyalty removal.
@@ -21,6 +22,16 @@
 -- turns are what drive it to 0 for CR 704.5i. Lightning Bolt's 3 and Firebolt's 2
 -- are the burn half: the first takes exactly the printed loyalty (CR 704.5i
 -- follows), the second takes less (it does not).
+--
+-- Carth the Lion -- {2}{B}{G} Legendary Creature -- Human Warrior, 3/5 -- is the
+-- CombinedLoyaltyCost group's alone: it is the one card in the pool that adds a
+-- loyalty cost to somebody else's loyalty ability, which is what makes CR 606.5
+-- observable. Two things about pawl's Carth are not the printed card. Its
+-- triggered ability is not transcribed at all (gap #1699), and its "loyalty
+-- abilities" is transcribed as "abilities of a planeswalker", because
+-- AddActivationCost.whichAbilities filters the ability's source permanent rather
+-- than the ability (gap #1698). Both leave the tax at least as expensive as
+-- printed, so neither can make an activation legal that the real card refuses.
 module Pawl.PlaneswalkerSpec where
 
 import qualified Data.List as List
@@ -377,6 +388,100 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
     Spec.assertEqWith s "loyalty 1 after two" (S.counterOf CounterKind.Loyalty jaceId afterTwo) 1
     Spec.assertBool s (not (Set.member jaceId (GameState.battlefield afterThree))) "off the battlefield after three"
     Spec.assertEqWith s "in its owner's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice afterThree)) 1
+
+-- CR 606.5: "If the total cost to activate a loyalty ability contains multiple
+-- costs to add or remove loyalty counters, those costs are combined into a single
+-- cost to add or remove loyalty counters, as appropriate."
+--
+-- Every pair here is one board differing in exactly one permanent: Carth. The
+-- numbers are deliberately distinct -- printed loyalty 3, six added counters, 9
+-- on the permanent, a printed cost of -10, an added cost of +1, a combined -9 --
+-- so no two readings of the rule answer alike on this board.
+combinedLoyaltyCostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+combinedLoyaltyCostSpec s registry = Spec.describe s "CombinedLoyaltyCost" $ do
+  -- The direction that actually diverges: pawl was STRICTER than the rules here.
+  -- The -10 and the +1 asked separately refuse at 9 loyalty, because CR 606.6's
+  -- check reads the counters present before any of the cost is paid; combined,
+  -- the cost is -9 and 9 pays it.
+  Spec.it s "CR 606.5 Carth's added +1 makes Jace's -10 activatable at 9 loyalty" $ do
+    island <- S.printingOf s registry "Island"
+    jace <- S.printingOf s registry "Jace Beleren"
+    carth <- S.printingOf s registry "Carth the Lion"
+    let (jaceId, board) = jaceOnBattlefield island jace
+        atNine = S.addCounter CounterKind.Loyalty 6 jaceId board
+        withCarth = snd (S.addCreature carth S.alice atNine)
+    Spec.assertEqWith s "3 printed plus 6 is 9" (S.counterOf CounterKind.Loyalty jaceId withCarth) 9
+    Spec.assertBool s (not (null (activation jaceId minusTen jace))) "the -10 is a real ability"
+    Spec.assertBool
+      s
+      (all (`elem` Action.legalActions S.alice withCarth) (activation jaceId minusTen jace))
+      "the -10 is offered, because the total cost is -9"
+
+  -- The control, on the same fixture minus Carth alone. Without the addition the
+  -- cost is a bare -10 and CR 606.6 refuses it at 9 -- so the difference between
+  -- the two cases is Carth and nothing about mana, timing, seats or the log.
+  Spec.it s "CR 606.6 without Carth the same Jace at 9 loyalty is not offered its -10" $ do
+    island <- S.printingOf s registry "Island"
+    jace <- S.printingOf s registry "Jace Beleren"
+    let (jaceId, board) = jaceOnBattlefield island jace
+        atNine = S.addCounter CounterKind.Loyalty 6 jaceId board
+    Spec.assertEqWith s "the same 9 loyalty" (S.counterOf CounterKind.Loyalty jaceId atNine) 9
+    Spec.assertBool
+      s
+      (not (any (`elem` Action.legalActions S.alice atNine) (activation jaceId minusTen jace)))
+      "a bare -10 needs 10"
+    -- And the +2 still is, so the board's refusal is about this ability's cost
+    -- rather than about CR 606.3's window having closed.
+    Spec.assertBool
+      s
+      (all (`elem` Action.legalActions S.alice atNine) (activation jaceId plusTwo jace))
+      "while the +2 is offered on the very same board"
+
+  -- The PAYMENT and not just the gate. 9 - 10 + 1 is 0, so CR 704.5i buries Jace;
+  -- a fix that combined for the gate while paying the components one at a time
+  -- would leave the removal unpayable and the activation rejected outright.
+  Spec.it s "CR 606.5 / 704.5i paying the combined -9 spends all nine counters and buries Jace" $ do
+    island <- S.printingOf s registry "Island"
+    jace <- S.printingOf s registry "Jace Beleren"
+    carth <- S.printingOf s registry "Carth the Lion"
+    let (jaceId, board) = jaceOnBattlefield island jace
+        atNine = S.addCounter CounterKind.Loyalty 6 jaceId board
+        withCarth = snd (S.addCreature carth S.alice atNine)
+        after = useAbility minusTen jace jaceId withCarth
+    Spec.assertEqWith s "nine counters spent, not ten and not nine less one added back" (S.counterOf CounterKind.Loyalty jaceId after) 0
+    Spec.assertBool s (Set.member jaceId (GameState.battlefield after)) "CR 120.5: still there before the state-based action"
+    Spec.assertBool s (not (Set.member jaceId (GameState.battlefield (S.settleSba after)))) "CR 704.5i: loyalty 0, so buried"
+
+  -- Carth taxes the ADDING half too, which is the other side of "as appropriate":
+  -- +2 and +1 combine to a single +3, so one activation of the +2 leaves Jace at
+  -- 3 + 3 rather than 3 + 2. This is the case a fix that only ever emitted a
+  -- RemoveLoyaltyFromThis would fail.
+  Spec.it s "CR 606.5 the +2 and the added +1 combine to a single +3" $ do
+    island <- S.printingOf s registry "Island"
+    jace <- S.printingOf s registry "Jace Beleren"
+    carth <- S.printingOf s registry "Carth the Lion"
+    let (jaceId, board) = jaceOnBattlefield island jace
+        withCarth = snd (S.addCreature carth S.alice board)
+        after = useAbility plusTwo jace jaceId withCarth
+        without = useAbility plusTwo jace jaceId board
+    Spec.assertEqWith s "3 + 3 with Carth" (S.counterOf CounterKind.Loyalty jaceId after) 6
+    Spec.assertEqWith s "3 + 2 without him" (S.counterOf CounterKind.Loyalty jaceId without) 5
+
+  -- The net-zero combination, which Jace's -1 and Carth's +1 reach: the single
+  -- cost adjusts nothing, so the ability is free and the loyalty is untouched. A
+  -- FENCE rather than a proof of the choice Cost.combineLoyalty makes there --
+  -- emitting nothing instead of a zero component answers the same on every board
+  -- the rules admit, because the one place the two could differ is CR 606.6 at 0
+  -- loyalty and CR 704.5i has already buried a planeswalker there.
+  Spec.it s "CR 606.5 the -1 and the added +1 combine to a cost that adjusts nothing" $ do
+    island <- S.printingOf s registry "Island"
+    jace <- S.printingOf s registry "Jace Beleren"
+    carth <- S.printingOf s registry "Carth the Lion"
+    let (jaceId, board) = jaceOnBattlefield island jace
+        withCarth = snd (S.addCreature carth S.alice board)
+        after = useAbility minusOne jace jaceId withCarth
+    Spec.assertEqWith s "still 3, neither 2 nor 4" (S.counterOf CounterKind.Loyalty jaceId after) 3
+    Spec.assertEqWith s "and the ability did resolve: exactly one player drew" (S.handSize S.alice after + S.handSize S.bob after) 1
 
 -- CR 306.5a's printed loyalty is a number on every planeswalker but one. Nissa,
 -- Steward of Elements prints CR 107.3's X there, and CR 107.3m says what it is

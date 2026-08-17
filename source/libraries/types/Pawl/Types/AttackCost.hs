@@ -1,7 +1,8 @@
 module Pawl.Types.AttackCost where
 
 import qualified Pawl.Types.Affected as Affected
-import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.AttackCostScope as AttackCostScope
+import qualified Pawl.Types.PerAttacker as PerAttacker
 
 -- | CR 508.1c / CR 508.1h: one printed COST TO ATTACK (Ghostly Prison). CR 508.1c
 -- classifies it as a RESTRICTION -- the second arm of its parenthetical, whose
@@ -31,18 +32,9 @@ import qualified Pawl.Types.ManaCost as ManaCost
 -- Folding this into that type would either strike a payable attacker off the
 -- candidate list or teach a set of ids a cost it has nowhere to put.
 --
--- The "YOU" is IMPLICIT and is the source's controller (CR 109.5), and the thing
--- it names is the PLAYER. Pawl.Engine.AttackCost therefore charges an attack
--- exactly when its CR 508.1b announcement names that player, which is Ghostly
--- Prison's own ruling that a creature which can't attack you may still attack a
--- planeswalker you control.
---
--- That is the whole object axis this type has, and the wider one is not
--- representable: Baird, Steward of Argive, Norn's Annex, Sphere of Safety and
--- Archangel of Tithes all print "you or planeswalkers you control", which
--- charges an attack Ghostly Prison lets through (#598). Ghostly Prison's own
--- family -- Propaganda, Windborn Muse, Collective Restraint -- says "you" and
--- stops there. Checked against Scryfall 2026-08-02.
+-- The "YOU" is IMPLICIT and is the source's controller (CR 109.5). WHAT that
+-- player's "you" covers is the `scope` field below, and Pawl.Engine.AttackCost
+-- charges an attack exactly when its CR 508.1b announcement falls inside it.
 --
 -- Gathered LIVE from the battlefield on every read and never captured, the
 -- posture all five siblings take -- so a Ghostly Prison leaving the battlefield
@@ -56,7 +48,7 @@ data AttackCost = MkAttackCost
     -- Pawl.Types.CombatRestriction's field is one: the set is re-derived every
     -- time it is asked, so a creature that stops matching stops being taxed.
     --
-    -- Vacuous for the one printing that has it -- every creature matches, since
+    -- Vacuous for every printing in the pool -- every creature matches, since
     -- only a creature can be declared as an attacker (CR 508.1a) -- and carried
     -- anyway, so that the sentence stays card DATA rather than a fact the engine
     -- knows about Ghostly Prison. No printing of this family narrows it, so the
@@ -68,14 +60,15 @@ data AttackCost = MkAttackCost
     -- owes {6}; that rule only TOTALS, and the multiplying is the card's own "for
     -- each".
     --
-    -- FIXED, so a share that counts the board is unrepresentable: Collective
-    -- Restraint and Sphere of Safety are the same sentence with a
-    -- Pawl.Types.Quantity where this has a constant (#601).
-    --
-    -- A ManaCost and not a Pawl.Types.Cost, so it carries no components. CR
+    -- Mana only, and not a Pawl.Types.Cost, so it carries no components. CR
     -- 508.1h's list is wider than mana, but a cost to attack that is not mana has
-    -- no printing here (#599). Mana alone is also what makes CR 508.1i's window
-    -- plus CR 508.1j the whole payment, which Pawl.Engine.Cost.payMana is.
-    perAttacker :: ManaCost.ManaCost
+    -- no printing here (gap #599). Mana alone is also what makes CR 508.1i's
+    -- window plus CR 508.1j the whole payment, which Pawl.Engine.Cost.payMana is.
+    perAttacker :: PerAttacker.PerAttacker,
+    -- | Which attacks the cost is on -- CR 508.1b's announcement judged against
+    -- the source's controller. Ghostly Prison's family protects that player
+    -- alone; Sphere of Safety's protects their planeswalkers too. See
+    -- Pawl.Types.AttackCostScope.
+    scope :: AttackCostScope.AttackCostScope
   }
   deriving (Eq, Ord, Show)
