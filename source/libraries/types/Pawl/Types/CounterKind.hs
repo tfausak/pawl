@@ -101,4 +101,20 @@ data CounterKind keyword
     -- keyword. What the rule does with it is replace two events, and CR 614/615
     -- is where that lives.
     Shield
+  | -- | CR 711.2: the counters a leveler creature tracks its level with. Rule
+    -- 122.1 gives level counters no lettered clause of their own -- 122.1a-j
+    -- never name them -- so rule 711 is the whole citation, exactly as rule 714
+    -- is Lore's.
+    --
+    -- Contributes nothing to the CR 613 layer system, so
+    -- Pawl.Engine.Projection.counterGathered grants nothing for this kind. That
+    -- is the whole reason it is the Loyalty shape and not the Keyword shape: CR
+    -- 711.2a reads the tally through a level ability's "as long as" CONDITION,
+    -- which is ordinary card data (StaticAbility.condition), so the layer 6 and
+    -- 7b modifications come from the card and never from the counter.
+    --
+    -- CR 716.4 keeps this apart from a Class's level: "Level counters do not
+    -- interact with Class cards, and class levels do not interact with leveler
+    -- cards." A class level is not a counter at all, so it is not a kind here.
+    Level
   deriving (Eq, Ord, Show)

@@ -21,5 +21,6 @@ codec keywordCodec =
       Arm.nullary "Defense" CounterKind.Defense,
       Arm.nullary "Time" CounterKind.Time,
       Arm.nullary "Fade" CounterKind.Fade,
-      Arm.nullary "Shield" CounterKind.Shield
+      Arm.nullary "Shield" CounterKind.Shield,
+      Arm.nullary "Level" CounterKind.Level
     ]

@@ -84,6 +84,10 @@ data KeywordFamily
     Reinforce
   | -- | CR 702.86a: annihilator N.
     Annihilator
+  | -- | CR 702.87a: level up [cost]. The family a card writing "a creature with
+    -- level up" names, as against level up {W}; no card in the pool asks yet, and
+    -- it is owed at the keyword rather than at the first asker.
+    LevelUp
   | -- | CR 702.107a: outlast [cost].
     Outlast
   | -- | CR 702.112a: renown N.

@@ -216,6 +216,7 @@ abilitiesFor keyword count = case keyword of
   -- CR 702.105b says each instance triggers separately, so two instances put two
   -- counters on -- prowess' multiplicity rather than shadow's redundancy.
   Keyword.Dethrone -> List.genericReplicate count dethrone
+  Keyword.LevelUp _ -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> List.genericReplicate count prowess
   Keyword.Flanking -> List.genericReplicate count flanking
@@ -363,6 +364,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Dethrone -> []
+  Keyword.LevelUp _ -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> []
   Keyword.Infect -> []
@@ -574,6 +576,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Dethrone -> []
+  Keyword.LevelUp cost -> List.genericReplicate count (levelUp cost)
   Keyword.Outlast cost -> List.genericReplicate count (outlast cost)
   Keyword.Prowess -> []
   Keyword.Infect -> []
@@ -695,6 +698,45 @@ crew n =
             (Modification.AddCardType cardType)
             (ObjectRef.InSlot Binding.triggerSource)
         )
+
+-- CR 702.87a: "Level up [cost]" means "[Cost]: Put a level counter on this
+-- permanent. Activate only as a sorcery." Outlast's twin below, and the two are
+-- worth reading together for what differs.
+--
+-- THE COST is the printed one UNCHANGED -- rule 702.87a appends no ", {T}", so
+-- unlike outlast there is no CostComponent.TapThis and CR 302.6 does not reach
+-- this ability: a leveler that arrived this turn can level up.
+--
+-- THE EFFECT names the permanent through the engine-reserved
+-- Binding.triggerSource slot, so rule 702.87a's "this permanent" is named and
+-- never TARGETED (CR 115.10a), outlast's posture. One counter, always: rule
+-- 702.87a writes that number itself, so what this keyword's payload varies is
+-- the cost and never the count.
+--
+-- THE COUNTER grants nothing by itself
+-- (Pawl.Engine.Projection.counterGathered). CR 711.2a's level symbols are
+-- ordinary conditional static abilities on the card, reading this tally through
+-- Quantity.ObjectCounters, which is why the keyword mints only the counter and
+-- the card carries everything the level symbols say.
+--
+-- CR 602.5d is the timing clause and the ONLY restriction, outlast's again. The
+-- condition is Nothing because CR 711.4 says so outright: "each leveler
+-- permanent has its level up ability at all times; it may be activated
+-- regardless of how many level counters are on that permanent" -- so it is still
+-- offered past the last level symbol's range.
+levelUp :: Cost Keyword -> ActivatedAbility Card
+levelUp cost =
+  ActivatedAbility.MkActivatedAbility
+    { ActivatedAbility.cost = cost,
+      ActivatedAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton gain))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
+      ActivatedAbility.condition = Nothing
+    }
+  where
+    gain = Effect.PutCounters (PutCounters.MkPutCounters CounterKind.Level (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource))
 
 -- CR 702.107a: "Outlast [cost]" means "[Cost], {T}: Put a +1/+1 counter on this
 -- creature. Activate only as a sorcery." The card names the cost; every other
@@ -844,6 +886,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Dethrone -> []
+  Keyword.LevelUp _ -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> []
   Keyword.Infect -> []
@@ -1310,6 +1353,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Dethrone -> []
+  Keyword.LevelUp _ -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> []
   Keyword.Infect -> []
@@ -1472,6 +1516,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Dethrone -> []
+  Keyword.LevelUp _ -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> []
   Keyword.Infect -> []
@@ -1590,6 +1635,7 @@ familyOf keyword = case keyword of
   Keyword.Evolve -> Nothing
   -- CR 702.105a takes no parameter either, so dethrone has no family of its own.
   Keyword.Dethrone -> Nothing
+  Keyword.LevelUp _ -> Just KeywordFamily.LevelUp
   Keyword.Outlast _ -> Just KeywordFamily.Outlast
   Keyword.Prowess -> Nothing
   Keyword.Menace -> Nothing

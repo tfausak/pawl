@@ -1963,6 +1963,7 @@ canHostSubjects predicate = case predicate of
     CounterKind.Time -> 0
     CounterKind.Fade -> 0
     CounterKind.Shield -> 0
+    CounterKind.Level -> 0
   -- Zero and not a descent, unlike the atom above: a family is payload-free, so
   -- there is no Filter position inside it for a card author to reach.
   Filter.Type.HasKeywordFamily _ -> 0
@@ -2031,6 +2032,7 @@ counterKindFilters kind = case kind of
   CounterKind.Time -> []
   CounterKind.Fade -> []
   CounterKind.Shield -> []
+  CounterKind.Level -> []
 
 keywordFilters :: Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
 keywordFilters keyword = case keyword of
@@ -2139,6 +2141,7 @@ keywordFilters keyword = case keyword of
   -- into the keyword.
   Keyword.BattleCry -> []
   -- CR 702.107a's payload is a COST, and a cost's Filters are its components'.
+  Keyword.LevelUp cost -> costFilters cost
   Keyword.Outlast cost -> costFilters cost
   -- CR 702.108a names no quality either: the "+1/+1" and the noncreature-spell
   -- condition are written into the ability Pawl.Engine.Keyword mints, not into

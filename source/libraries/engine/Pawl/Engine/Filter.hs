@@ -802,6 +802,7 @@ rewrite pairs predicate = case predicate of
     CounterKind.Time -> kind
     CounterKind.Fade -> kind
     CounterKind.Shield -> kind
+    CounterKind.Level -> kind
 
 -- CR 612.1's word swap INSIDE a keyword. Rule 702 spells some keywords with a
 -- word in them: CR 702.14a has landwalk "appear within an object's rules text as
@@ -939,6 +940,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.BattleCry -> keyword
   Keyword.Type.Evolve -> keyword
   Keyword.Type.Dethrone -> keyword
+  Keyword.Type.LevelUp cost -> Keyword.Type.LevelUp (rewriteCost pairs cost)
   Keyword.Type.Outlast cost -> Keyword.Type.Outlast (rewriteCost pairs cost)
   Keyword.Type.Prowess -> keyword
   Keyword.Type.Menace -> keyword
