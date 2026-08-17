@@ -33,6 +33,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.CastingRestriction as CastingRestriction
 import Pawl.Types.Cost (Cost)
+import qualified Pawl.Types.DuringPhase as DuringPhase
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Expiry as Expiry
@@ -624,9 +625,23 @@ printedRestrictionsOk pid oid name gs = case proposedFace oid name gs of
 -- Does the game state satisfy this one printed clause?
 restrictionMet :: PlayerId -> GameState -> CastingRestriction.CastingRestriction -> Bool
 restrictionMet pid gs restriction = case restriction of
-  -- CR 500.1: a step or a stepless phase, compared against the one the game is
-  -- in.
-  CastingRestriction.DuringPhase phase -> GameState.phase gs == phase
+  -- CR 500.1's phases and steps: Turn.inWindow asks whether GameState.phase
+  -- falls inside the window the rider names. CONTAINMENT rather than equality,
+  -- since a rider may name a phase that has steps; Necrologia names one step of
+  -- the ending phase (CR 512.1), so the cleanup step of that same phase is
+  -- outside its window.
+  --
+  -- CR 109.5 supplies the second conjunct, a genuinely separate fact: Rally the
+  -- Troops names no turn (EachTurn -- the DEFENDING player casts it, on the
+  -- attacker's turn), while Necrologia's "your end step" is alice's and not
+  -- bob's. For a spell "you" is the would-be caster, which is `pid`.
+  --
+  -- The same two conjuncts Pawl.Engine.Activate.restrictionMet reads off the
+  -- same Pawl.Types.DuringPhase bundle; deliberately duplicated rather than
+  -- shared, since the two gates differ in what else they may read (CR 307.5).
+  CastingRestriction.DuringPhase (DuringPhase.MkDuringPhase window scope) ->
+    Turn.inWindow window (GameState.phase gs)
+      && Event.turnScopeAdmits scope (GameState.activePlayer gs) pid
   -- CR 508.3b's question, and it lives in Pawl.Engine.Combat because the ability
   -- side's clause of the same name asks exactly it: one question about the combat
   -- record, two gates that differ in what ELSE they may read (CR 307.5).

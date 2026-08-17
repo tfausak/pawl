@@ -1,40 +1,55 @@
 {
   "faces": [
     {
+      "additionalCosts": [
+        {
+          "type": "PayLifeX"
+        }
+      ],
       "castingRestrictions": [
         {
           "type": "DuringPhase",
           "value": {
             "scope": {
-              "type": "EachTurn"
+              "type": "ControllersTurn"
             },
             "window": {
               "type": "Step",
               "value": {
-                "type": "Combat",
+                "type": "Ending",
                 "value": {
-                  "type": "DeclareAttackers"
+                  "type": "EndStep"
                 }
               }
             }
           }
-        },
-        {
-          "type": "AttackedThisStep"
         }
       ],
       "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
         {
           "type": "OfType",
           "value": {
             "type": "Colored",
             "value": {
-              "type": "White"
+              "type": "Black"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
             }
           }
         }
       ],
-      "name": "Rally the Troops",
+      "name": "Necrologia",
       "spell": {
         "modes": [
           {
@@ -42,25 +57,17 @@
               {
                 "effects": [
                   {
-                    "type": "Untap",
+                    "type": "Draw",
                     "value": {
-                      "type": "EachMatching",
-                      "value": {
-                        "type": "And",
-                        "value": [
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Creature"
-                            }
-                          },
-                          {
-                            "type": "ControlledBy",
-                            "value": {
-                              "type": "You"
-                            }
-                          }
-                        ]
+                      "player": {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      "quantity": {
+                        "type": "InSlot",
+                        "value": "X"
                       }
                     }
                   }
