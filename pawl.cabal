@@ -999,6 +999,7 @@ library types
     Pawl.Types.ExtraTurn
     Pawl.Types.Face
     Pawl.Types.FaceDownCharacteristics
+    Pawl.Types.FaceDownReason
     Pawl.Types.Facing
     Pawl.Types.Filter
     Pawl.Types.ForEach
@@ -1178,6 +1179,7 @@ library types
     Pawl.Types.TriggerSource
     Pawl.Types.TurnFaceDown
     Pawl.Types.TurnScope
+    Pawl.Types.TurnUpProcedure
     Pawl.Types.TurnUpR
     Pawl.Types.TurnUpRewrite
     Pawl.Types.TurnWindow

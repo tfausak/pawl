@@ -2662,7 +2662,7 @@ offeredPlays pid gs =
         A.Pass -> False
         A.Cast {} -> False
         A.Activate _ _ -> False
-        A.TurnFaceUp _ -> False
+        A.TurnFaceUp {} -> False
         A.Unlock _ _ -> False
         A.DiscardFromHand _ -> False
         A.Plot _ -> False

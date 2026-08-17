@@ -1068,7 +1068,7 @@ isManaActivation action = case action of
   Action.Type.Activate _ _ -> False
   Action.Type.Cast {} -> False
   Action.Type.Play {} -> False
-  Action.Type.TurnFaceUp _ -> False
+  Action.Type.TurnFaceUp {} -> False
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
   Action.Type.Plot _ -> False
@@ -2196,7 +2196,7 @@ isActivateOf oid action = case action of
   Action.Type.ActivateManaAbility _ -> False
   Action.Type.Cast {} -> False
   Action.Type.Play {} -> False
-  Action.Type.TurnFaceUp _ -> False
+  Action.Type.TurnFaceUp {} -> False
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
   Action.Type.Plot _ -> False

@@ -72,6 +72,7 @@ import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
@@ -107,6 +108,7 @@ import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
+import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
@@ -4676,10 +4678,10 @@ brineArmed brine gs savorId brineId =
         S.runPure
           S.identityAnswer
           withSavor
-          (Cast.castSpell S.bob brineId (S.printingName brine) Facing.faceDown >> Stack.resolveTop)
+          (Cast.castSpell S.bob brineId (S.printingName brine) (Facing.faceDown FaceDownReason.Morphed) >> Stack.resolveTop)
    in do
         permanent <- arrivedOne withSavor down
-        pure (S.runPure S.identityAnswer down (FaceDown.turnFaceUp S.bob permanent >> Engine.priorityLoop), permanent)
+        pure (S.runPure S.identityAnswer down (FaceDown.turnFaceUp S.bob TurnUpProcedure.Morph permanent >> Engine.priorityLoop), permanent)
 
 -- The seven-turn timeline the two answering cases below share, plus carol's
 -- negative control alongside it: alice's own turn (1), Savor's extra turn (2),

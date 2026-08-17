@@ -59,6 +59,7 @@ import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EventShape as EventShape
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
@@ -92,6 +93,7 @@ import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapPermanents as TapPermanents
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.Zone as Zone
 
 -- The single activated ability of a printing. Total: the fallback is unreachable
@@ -2420,7 +2422,7 @@ raptorBoard mountain raptor nexus withNexus held =
         S.runPure
           S.identityAnswer
           gs2
-          (Cast.castSpell S.alice card (S.printingName raptor) Facing.faceDown >> Stack.resolveTop)
+          (Cast.castSpell S.alice card (S.printingName raptor) (Facing.faceDown FaceDownReason.Morphed) >> Stack.resolveTop)
       entered = Set.lookupMin (Set.difference (GameState.battlefield after) (Set.fromList before))
    in fmap (\permanent -> (permanent, after)) entered
 
@@ -2448,8 +2450,8 @@ putridRaptorSpec s registry =
         Nothing -> Spec.assertFailure s "the morph cast of Putrid Raptor did not reach the battlefield"
         Just (permanent, gs) -> do
           Spec.assertEqWith s "CR 708.2a a 2/2 while face down" (S.powerToughnessOf permanent gs) (Just (2, 2))
-          Spec.assertEqWith s "CR 702.37e the action is available" (FaceDown.turnableFaceUp S.alice gs) [permanent]
-          let after = S.runPure S.identityAnswer gs (FaceDown.turnFaceUp S.alice permanent)
+          Spec.assertEqWith s "CR 702.37e the action is available" (FaceDown.turnableFaceUp S.alice gs) [(permanent, TurnUpProcedure.Morph)]
+          let after = S.runPure S.identityAnswer gs (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph permanent)
           Spec.assertEqWith s "CR 702.37e it is face up" (fmap Object.facing (Game.lookupObject permanent after)) (Just Facing.FaceUp)
           Spec.assertEqWith s "and the printed 4/4" (S.powerToughnessOf permanent after) (Just (4, 4))
           Spec.assertEqWith s "CR 701.9a one card was discarded to pay" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1

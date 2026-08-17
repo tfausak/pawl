@@ -98,7 +98,7 @@ isPlay action = case action of
   Action.Type.Pass -> False
   Action.Type.Cast {} -> False
   Action.Type.Activate _ _ -> False
-  Action.Type.TurnFaceUp _ -> False
+  Action.Type.TurnFaceUp {} -> False
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
   Action.Type.Plot _ -> False
@@ -192,7 +192,7 @@ playing wanted action = case action of
   Action.Type.Pass -> False
   Action.Type.Cast {} -> False
   Action.Type.Activate _ _ -> False
-  Action.Type.TurnFaceUp _ -> False
+  Action.Type.TurnFaceUp {} -> False
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
   Action.Type.Plot _ -> False
@@ -207,7 +207,7 @@ casting wanted action = case action of
   Action.Type.Play _ _ -> False
   Action.Type.Pass -> False
   Action.Type.Activate _ _ -> False
-  Action.Type.TurnFaceUp _ -> False
+  Action.Type.TurnFaceUp {} -> False
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
   Action.Type.Plot _ -> False
