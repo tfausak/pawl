@@ -18,8 +18,8 @@ import qualified Pawl.Types.Filter as Filter
 -- optional. CR 701.9a's discard names a card either way, and one unconditional
 -- reading keeps Pawl.Engine.Cost.discardCandidates from having two.
 --
--- The Filter is matched against the PRINTED card, which is the CostComponent
--- arm's note rather than this record's.
+-- The Filter is matched against the card's CR 613 projection, which is the
+-- CostComponent arm's note rather than this record's.
 data DiscardCards keyword = MkDiscardCards
   { count :: Natural.Natural,
     whichCards :: Filter.Filter keyword
