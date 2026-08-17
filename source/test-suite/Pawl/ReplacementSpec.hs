@@ -1027,7 +1027,7 @@ onlyCreature oid p = case p of
 -- Creature -- Griffin 2/3, flying) prints "{1}{W}: Prevent the next 1 combat
 -- damage that would be dealt to you this turn" -- a counted shield (CR 615.7)
 -- over a PLAYER, with no CR 615.5 clause, so the kind is the only thing under
--- test.
+-- test. Inkshield below is the same recipient WITH the CR 615.5 clause.
 --
 -- The discrimination needs both halves and a control each. A group using only
 -- combat damage would pass identically on a shield that named no kind at all.
@@ -1226,7 +1226,7 @@ stormwildCapridorSpec s registry = Spec.describe s "Stormwild Capridor (CR 615.5
   let hit kind src recipient n =
         DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing kind
   -- The rider fires from the funnel a RESOLVING spell drains
-  -- (Resolve.runPreventionRiders), the same seam Test of Faith's shield uses --
+  -- (Resolve.runPreventionRider), the same seam Test of Faith's shield uses --
   -- so what is new here is only where the rider came from: the permanent's
   -- printed ability rather than a row a resolution installed.
   Spec.it s "CR 615.5 prevented noncombat damage becomes that many +1/+1 counters" $ do

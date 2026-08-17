@@ -910,7 +910,7 @@ cardResolutionEffects card =
     -- The effects a printed replacement ability carries, the sixth carrier: CR
     -- 615.5's additional effect beside a prevention (DamageR.riders) and CR
     -- 614.1c's as-enters instruction (EntryRewrite.RunEffects). Neither is a
-    -- resolution's effect at all -- one runs from Resolve.runPreventionRiders and
+    -- resolution's effect at all -- one runs from Resolve.runPreventionRider and
     -- the other from Resolve.runEntryEffects -- but both are card-authored effect
     -- lists, which is what every lint downstream of this function is about.
     <> concatMap (replacementPrintedEffects . PrintedReplacement.effect) (Face.replacementEffects card)
@@ -1110,7 +1110,14 @@ replacementEntryEffects replacement = case replacement of
 
 -- CR 615.5: the additional effect a replacement PRINTS -- DamageR's riders, and
 -- nothing else, since no other arm has a field to carry one. The card-authored
--- twin of the two prevention opcodes' `riders`, and swept everywhere those are.
+-- twin of the two prevention opcodes' `riders`.
+--
+-- Only THIS half reaches cardResolutionEffects. A rider a SPELL authors on
+-- Effect.PreventAllDamage or Effect.PreventNextDamage is invisible to every lint
+-- downstream of that function, because Card.allEffects and Modal.allEffects are
+-- flat over Clause.effects -- so Inkshield's nested token face is unswept by the
+-- CR 111.4 naming case below, and only Pawl.ReplacementSpec's inkshieldSpec
+-- catches a misnaming there (gap #1746).
 replacementEffectRiders :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> [Effect.Effect Card.Type.Card]
 replacementEffectRiders replacement = case replacement of
   ReplacementEffect.DamageR (DamageR.MkDamageR _ _ riders) -> Foldable.toList riders
