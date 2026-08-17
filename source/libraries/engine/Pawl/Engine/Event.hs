@@ -7171,7 +7171,7 @@ eventBindingSlots cond = case cond of
   -- Megrim's "that player" is the opponent whose hand the card left.
   TriggerCondition.PlayerDiscards _ -> Set.singleton Binding.triggerPlayer
   -- NOTHING, where the cause-blind sibling above binds the discarder. Prickly
-  -- Marmoset's payload says "this creature", which is CR 113.7a's source slot
+  -- Marmoset's payload says "this creature", which is CR 113.7's source slot
   -- the placement already stamps, and names no player; a printing under this
   -- condition that said "that player" is what would earn the slot. eventBindings
   -- has no arm for this condition, and the two must agree.
