@@ -160,9 +160,14 @@ resolveTopWith runSubgame = do
           -- one -- an entrant killed while the trigger waited is compared at the
           -- power and toughness it last had, which is the read this arm alone
           -- observes: at gather time the entrant is still there by construction.
+          --
+          -- CR 303.4b's host rides in beside the slots, and Event.interveningHolds
+          -- supplies it at the gather-time half for the reason the view above must
+          -- match: Ray of Frost's "if enchanted creature is red" would otherwise
+          -- pass one check and fail the other.
           case TriggeredAbility.intervening ability of
             Just cond
-              | not (Condition.holds (Projection.viewWithLastKnownAnywhere gs) (Filter.contextWithSlots (Just (Object.owner obj)) (Just srcId) (Binding.objectSlots (Object.bindings obj))) gs srcId cond) ->
+              | not (Condition.holds (Projection.viewWithLastKnownAnywhere gs) ((Filter.contextWithSlots (Just (Object.owner obj)) (Just srcId) (Binding.objectSlots (Object.bindings obj))) {Filter.sourceAttachedTo = Projection.hostOf srcId gs}) gs srcId cond) ->
                   State.modify' (Game.cease oid)
             _ ->
               let chosen = Binding.modesOf (Object.bindings obj)
@@ -197,6 +202,10 @@ resolveTopWith runSubgame = do
           -- way -- sound because an inherent ability's condition reads a PLAYER
           -- (CR 702.179d's "your speed"), never the object it hangs on, there
           -- being none to read.
+          --
+          -- CR 303.4b's host is left unsupplied here for that same reason: `oid` is
+          -- the ability object, which CR 303.4 never attaches to anything, so the
+          -- field would be Nothing however it was filled.
           case TriggeredAbility.intervening ability of
             Just cond
               | not (Condition.holds (Projection.viewWithLastKnownAnywhere gs) (Filter.contextWithSlots (Just (Object.owner obj)) (Just oid) (Binding.objectSlots (Object.bindings obj))) gs oid cond) ->

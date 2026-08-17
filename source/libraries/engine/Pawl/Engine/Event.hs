@@ -9142,7 +9142,11 @@ interveningHolds gs pending =
     (Just cond, TriggerSource.OfObject oid) ->
       Condition.holds
         (Projection.viewWithLastKnownAnywhere gs)
-        (Filter.contextWithSlots (Just (PendingTrigger.controller pending)) (Just oid) (Binding.objectSlots (PendingTrigger.bindings pending)))
+        -- CR 303.4b's host rides in beside the slots, for the reason they do:
+        -- Ray of Frost's "if enchanted creature is red" is about the SOURCE's
+        -- attachment rather than about the event, and Stack's CR 608.2a re-check
+        -- supplies the same field so the two checks cannot disagree.
+        ((Filter.contextWithSlots (Just (PendingTrigger.controller pending)) (Just oid) (Binding.objectSlots (PendingTrigger.bindings pending))) {Filter.sourceAttachedTo = Projection.hostOf oid gs})
         gs
         oid
         cond

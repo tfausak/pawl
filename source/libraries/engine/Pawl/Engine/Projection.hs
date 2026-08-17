@@ -528,7 +528,7 @@ affectsGiven peers source oid a partial gs = case a of
   -- A source attached to a PLAYER names no object, so the set is empty here too
   -- -- CR 702.5d's enchant-player Auras reach the battlefield through
   -- AttachedPlayerControls below instead.
-  Affected.Attached -> (Game.lookupObject source gs >>= Object.attachedTo >>= Recipient.objectOf) == Just oid
+  Affected.Attached -> hostOf source gs == Just oid
   Affected.Matching f ->
     let -- CR 109.5: "you" is the SOURCE's controller. Safe to force from any
         -- affected set, subtype-setting ones included, because controlGrants
@@ -1136,7 +1136,7 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- host on the battlefield the way `attachedToView` above is: an id is
       -- answered or it is not, and the atom's own comparison against a source
       -- already rules out a host that has left.
-      Filter.attachedTo = Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf,
+      Filter.attachedTo = hostOf oid gs,
       -- CR 701.3a: filled only by Resolve's AttachTarget arm, the one place that
       -- knows what is being moved. "Could the subject be attached here" is not a
       -- question about the candidate alone.
@@ -2547,9 +2547,12 @@ gather gs =
 -- widest one -- an ability wrongly kept there can only over-project the state a
 -- condition is judged against, never leave gather to re-enter itself.
 --
--- Not implemented: the CR 613.1f removal question the seed answers is therefore
--- asked of a conditional ability whose clause is false, as is abilityRemoval's
--- (#1528), and controlGrants reads the printed list without the gate at all
+-- The CR 613.1f removal question the seed answers is therefore asked of a
+-- conditional ability whose clause is false. That is sound HERE, for the reason
+-- above; the outside-the-fold readers ask the real gate instead, which is what
+-- abilityRemoval and abilityRemovalAfter below do.
+--
+-- Not implemented: controlGrants reads the printed list without the gate at all
 -- (#1529).
 alwaysFunctioning :: ObjectId -> Layer -> Condition.Type.Condition -> Bool
 alwaysFunctioning _ _ _ = True
@@ -2601,9 +2604,13 @@ anyConditional gs =
 -- CR 109.5: "you" is the SOURCE's controller, as it is for the affected set. The
 -- condition is evaluated AGAINST the source too, so a clause reading Quantity.Power
 -- reads the permanent the ability is printed on.
+-- CR 303.4b: one of the four sites that supply the source's host, so that Ray of
+-- Frost's "as long as enchanted creature is red" can name the creature it
+-- enchants. A live read off Object.attachedTo rather than anything the fold
+-- computed, so an Aura moved by CR 701.3a names its new host on the next pass.
 conditionHolds :: [Gathered] -> GameState -> ObjectId -> Layer -> Condition.Type.Condition -> Bool
 conditionHolds cands gs src lowest =
-  Condition.holds (viewUpTo lowest cands gs) (Filter.contextFor (controllerOf src gs) (Just src)) gs src
+  Condition.holds (viewUpTo lowest cands gs) ((Filter.contextFor (controllerOf src gs) (Just src)) {Filter.sourceAttachedTo = hostOf src gs}) gs src
 
 -- gather's body with both ability gates left open: `stripped` answers whether a
 -- permanent's abilities were removed by the time layer 6 finished, and
@@ -2852,14 +2859,41 @@ candidatesFor a gs = case a of
 -- the layer machine's only inputs are static abilities, stored continuous effects
 -- and counters, and a CR 613.10/613.11 effect is a sibling tier applied after it.
 -- The module graph enforces this -- Projection does not import PlayerEffect.
+--
+-- CR 604.2's "as long as" gate is ASKED, unlike inside gather: a Ray of Frost on a
+-- white creature removes nothing, and this reader is outside the fold, so it may
+-- answer the gate against the seed list the way setLandSubtypeEffects does rather
+-- than wiring it open. The gate narrows both the removers and the list they are
+-- judged against, which is the list the game actually has.
 abilityRemoval :: GameState -> ObjectId -> Bool
 abilityRemoval gs =
-  let ungated = gatherGiven (const False) alwaysFunctioning gs
+  let gated = gatedGather gs
    in -- Almost every board has no ability-removing effect, and then no projection
       -- is spent on the question.
-      if any (removesAbilities . gModification) ungated
-        then abilitiesRemoved ungated gs
+      if any (removesAbilities . gModification) gated
+        then abilitiesRemoved gated gs
         else const False
+
+-- gather's candidate list with CR 604.2's gate asked and CR 613.1f's layer-6 gate
+-- left open -- what the two outside-the-fold removal readers below share, and what
+-- setLandSubtypeEffects computes one field over.
+--
+-- The layer-6 gate stays open for abilityRemoval's stated reason: deciding whether
+-- a source's abilities were removed means projecting it no higher than layer 6, and
+-- such a projection cannot see the parts that gate drops. The CR 604.2 gate is a
+-- different question and is answered against the seed list, which is well-founded
+-- for gather's reason -- the seed is built with every gate open, so nothing here
+-- re-enters gather.
+--
+-- On a board with no conditional static ability at all the seed IS the answer, and
+-- no second walk is paid for; anyConditional is the same cheap structural test
+-- gather and setLandSubtypeEffects both ask.
+gatedGather :: GameState -> [Gathered]
+gatedGather gs =
+  let ungated = gatherGiven (const False) alwaysFunctioning gs
+   in if anyConditional gs
+        then gatherGiven (const False) (conditionHolds ungated gs) gs
+        else ungated
 
 -- abilityRemoval asked AT A TIMESTAMP: "were this object's abilities removed by a
 -- removal applied AFTER `ts`?" -- CR 613.1f's question ordered by CR 613.7.
@@ -2880,13 +2914,24 @@ abilityRemoval gs =
 -- decide here, and the boundary case cannot arise.
 --
 -- Hoisted over the whole game, and short-circuited on a board with no remover at
--- all, both for abilityRemoval's reasons. `ungated` is shared across every
--- timestamp asked about, so a per-permanent caller gathers once.
+-- all, both for abilityRemoval's reasons.
+-- CR 604.2's gate is asked here too, for abilityRemoval's reason and because
+-- Pawl.Engine.CombatRestriction.inForce reads the two on adjacent lines: one caller
+-- holding two different answers to "does a remover exist" would be worse than
+-- either answer. `gated` is shared across every timestamp asked about, so a
+-- per-permanent caller gathers once.
+--
+-- A REGRESSION FENCE rather than proved behaviour: rule 701.60c's "can't block" is
+-- this function's only reader, and reaching it needs a Designation.Suspected
+-- permanent holding a layer-6 grant with a later timestamp than the removal, on top
+-- of a conditional remover. No board in the pool arranges all three, so mutating
+-- this gate away leaves the suite green -- the sibling above is where the same
+-- change is proved.
 abilityRemovalAfter :: GameState -> Timestamp -> ObjectId -> Bool
 abilityRemovalAfter gs =
-  let ungated = gatherGiven (const False) alwaysFunctioning gs
-   in if any (removesAbilities . gModification) ungated
-        then \ts -> abilitiesRemovedBy ((> ts) . gTimestamp) ungated gs
+  let gated = gatedGather gs
+   in if any (removesAbilities . gModification) gated
+        then \ts -> abilitiesRemovedBy ((> ts) . gTimestamp) gated gs
         else \_ _ -> False
 
 -- CR 613.1f: does this modification remove abilities? Total: a new
@@ -2954,6 +2999,11 @@ abilitiesRemoved = abilitiesRemovedBy (const True)
 -- parameter is here rather than at the call site: `cands` is also what the object
 -- is projected THROUGH, so filtering it would answer the question against a board
 -- the game does not have.
+--
+-- Handing a CR 604.2-gated `cands` is not that (gatedGather, above): an ability
+-- whose "as long as" clause is false generates no continuous effect at all, so
+-- dropping it from the list is the board the game does have rather than a
+-- narrowing of it.
 --
 -- Layer 6 is applied before layer 7, so an ability removed there generates no
 -- layer-7 effect, and CR 613.6's rescue cannot reach one whose only parts are in
@@ -3414,6 +3464,9 @@ filterReads f = case f of
   -- Reads nothing, for the attachment's reason above: it stops at
   -- Object.attachedTo and compares an id, and no Modification writes that field.
   Filter.Type.IsAttachedToSource -> Set.empty
+  -- Reads nothing, for the atom above's reason and off the same field, read from
+  -- the source's end rather than the candidate's.
+  Filter.Type.IsHostOfSource -> Set.empty
   -- Over-declared deliberately: the characteristics behind this atom are the
   -- candidate's (CR 301.5) and the subject's (CR 702.5a), and Aspect cannot say
   -- "another object's". Declaring everything is the conservative direction, and no
@@ -4778,6 +4831,21 @@ controlGrants gs =
              in fmap toGrant (filter isControl (Face.staticAbilities face))
    in concatMap grantsOf (Set.toList (GameState.battlefield gs))
 
+-- CR 303.4b: WHICH object this one is attached to -- what an Aura "enchants".
+--
+-- Nothing where the object is attached to nothing and where it is attached to a
+-- PLAYER (CR 303.4's other destination, which Recipient.objectOf answers Nothing
+-- for), which is why Affected.Attached and Affected.AttachedPlayerControls are two
+-- arms rather than one.
+--
+-- No projection at all: a map lookup and a Recipient read, so a caller inside the
+-- layer fold may ask it (affectsGiven and controlNames both do). That is what lets
+-- Filter.IsHostOfSource be answered anywhere a source and a GameState are in hand
+-- -- see Pawl.Engine.Filter.Context's sourceAttachedTo for the four callers that
+-- hand it over.
+hostOf :: ObjectId -> GameState -> Maybe ObjectId
+hostOf oid gs = Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf
+
 -- CR 108.4 / 613.1b: an object's controller is its owner, overridden by layer-2
 -- control effects, last timestamp wins (CR 613.7). Two sources -- stored
 -- continuous effects and control-granting static abilities -- both carrying a
@@ -4838,7 +4906,7 @@ controlNames gs source a = case a of
   Affected.TheseObjects s -> s
   -- CR 303.4m: the source's own attachment. No projection needed, which is what
   -- keeps the fold reading this lean.
-  Affected.Attached -> maybe Set.empty Set.singleton (Game.lookupObject source gs >>= Object.attachedTo >>= Recipient.objectOf)
+  Affected.Attached -> maybe Set.empty Set.singleton (hostOf source gs)
   Affected.Matching _ -> Set.empty
   Affected.MatchingAnywhere _ -> Set.empty
   Affected.AttachedPlayerControls _ -> Set.empty
