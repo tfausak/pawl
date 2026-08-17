@@ -453,28 +453,30 @@ data Filter keyword
     -- the card in the graveyard is a different object from the one that came back
     -- to it.
     MilledThisTurn
-  | -- | CR 303.4b / 701.3a: the candidate is ATTACHED to a creature, which is what
-    -- Crown of the Ages' "target Aura attached to a creature" narrows by.
+  | -- | CR 303.4b / 701.3a: the candidate is ATTACHED to something the nested
+    -- Filter admits -- Crown of the Ages' "target Aura attached to a creature"
+    -- (`AttachedTo (HasCardType Creature)`), Aura Graft's "target Aura that's
+    -- attached to a permanent" (`AttachedTo (And [])`), and Miracle Worker's
+    -- "target Aura attached to a creature you control".
+    --
     -- Uncharacteristic for IsAttacking's reason -- attachment is a rules concept
-    -- the closed half owns (CR 301.5, 303.4, 701.3, Object.attachedTo).
+    -- the closed half owns (CR 301.5, 303.4, 701.3, Object.attachedTo) -- while
+    -- the nest asks about the HOST's characteristics, evaluated against the
+    -- host's own Pawl.Engine.Filter.View.
     --
-    -- Nullary and creature-specific rather than a recursive `AttachedTo Filter`:
-    -- the narrowest atom the one card in the pool needs. The generalization is
-    -- #356.
-    IsAttachedToCreature
-  | -- | CR 303.4 / 701.3a: the candidate is attached to a PERMANENT -- Aura Graft's
-    -- "target Aura that's attached to a permanent". Strictly wider than
-    -- IsAttachedToCreature above and strictly narrower than "attached to
-    -- anything": CR 303.4 attaches an Aura to an object or a player, and only one
-    -- of those is a permanent, so an enchant-player Aura is out.
+    -- The nest reads the host and the OUTER context: CR 109.5's "you" is the
+    -- ability's controller wherever it appears, so `AttachedTo (ControlledBy
+    -- You)` is "attached to something you control" and never "attached to
+    -- something its own controller controls". A consequence worth stating:
+    -- `AttachedTo IsSource` then asks nearly what IsAttachedToSource below asks,
+    -- and differs on exactly one board -- a source that has left the battlefield,
+    -- which this atom's own narrowing excludes and that one's does not.
     --
-    -- Nullary for IsAttachedToCreature's reason and one more of its own. #356's
-    -- general `AttachedTo Filter` needs a RECURSIVE Pawl.Engine.Filter.View -- a
-    -- candidate's view carrying its host's -- which would make that record's
-    -- derived Eq and Show diverge on a cyclic attachment. This atom needs neither:
-    -- being attached to a permanent is a question about the ATTACHMENT, not about
-    -- the host's characteristics, so it reads no second projection at all.
-    IsAttachedToPermanent
+    -- False for a candidate attached to a PLAYER (CR 303.4's other destination)
+    -- and for one whose host has left the battlefield (CR 110.1) -- the host
+    -- view is filled only for an object that is a permanent, which is the window
+    -- CR 704.5m closes on the next state-based-action pass.
+    AttachedTo (Filter keyword)
   | -- | CR 701.3a / 301.5a: the candidate is attached to the evaluation's SOURCE -- Kemba's
     -- Legion's "for each Equipment attached to this creature", where the Equipment
     -- is the candidate and the creature is the source. "Equipment attached to it"
@@ -487,11 +489,10 @@ data Filter keyword
     -- to a player (CR 303.4's other destination), and where no source frames the
     -- match.
     --
-    -- Nullary rather than an arm of #356's general `AttachedTo Filter`, and NOT a
-    -- third instalment of the two atoms above: host IDENTITY is not a host
-    -- QUALITY, so this reads no second projection and needs neither the recursive
-    -- Pawl.Engine.Filter.View that issue is about nor the laziness
-    -- `attachedToCreature` needs.
+    -- Nullary rather than an arm of AttachedTo above, and not a synonym for it
+    -- either: host IDENTITY is not a host QUALITY, so this reads an ObjectId off
+    -- the candidate's own view rather than the host's, and answers without any
+    -- projection of the host at all.
     IsAttachedToSource
   | -- | CR 701.3a's last sentence: the candidate is one the SUBJECT of the
     -- surrounding attach -- the permanent being moved -- could legally be attached

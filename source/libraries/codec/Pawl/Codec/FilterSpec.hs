@@ -223,18 +223,21 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.MilledThisTurn
       """ {"type":"MilledThisTurn"} """
-  Spec.it s "IsAttachedToCreature" $
+  Spec.it s "AttachedTo" $
     Common.assertCodec
       s
       codec
-      Filter.IsAttachedToCreature
-      """ {"type":"IsAttachedToCreature"} """
-  Spec.it s "IsAttachedToPermanent" $
+      (Filter.AttachedTo (Filter.HasCardType CardType.Creature))
+      """ {"type":"AttachedTo","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
+  -- Aura Graft's "attached to a permanent", which the general atom spells as the
+  -- trivial nest -- and the shape that would break a codec whose payload were
+  -- optional rather than required.
+  Spec.it s "AttachedTo with the trivial nest" $
     Common.assertCodec
       s
       codec
-      Filter.IsAttachedToPermanent
-      """ {"type":"IsAttachedToPermanent"} """
+      (Filter.AttachedTo (Filter.And []))
+      """ {"type":"AttachedTo","value":{"type":"And","value":[]}} """
   Spec.it s "IsAttachedToSource" $
     Common.assertCodec
       s
@@ -328,9 +331,16 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
         ravenousRats = Filter.IsPlayer PlayerRelation.Opponent
         killShot = Filter.IsAttacking
         relentlessAssault = Filter.AttackedThisTurn
-        crownOfTheAges = Filter.And [Filter.HasSubtype Subtype.Aura, Filter.IsAttachedToCreature]
+        crownOfTheAges = Filter.And [Filter.HasSubtype Subtype.Aura, Filter.AttachedTo (Filter.HasCardType CardType.Creature)]
         labyrinthOfSkophos = Filter.Or [Filter.IsAttacking, Filter.IsBlocking]
-        auraGraftTarget = Filter.And [Filter.HasSubtype Subtype.Aura, Filter.IsAttachedToPermanent]
+        auraGraftTarget = Filter.And [Filter.HasSubtype Subtype.Aura, Filter.AttachedTo (Filter.And [])]
+        -- Miracle Worker: two levels of nesting under the attachment, which no
+        -- other entry here reaches.
+        miracleWorker =
+          Filter.And
+            [ Filter.HasSubtype Subtype.Aura,
+              Filter.AttachedTo (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You])
+            ]
         auraGraftDestination = Filter.CanHostSubject
         oreskosExplorer = Filter.ControlsMoreThanYou (Filter.HasCardType CardType.Land)
         roundTrip f v = Spec.assertEqWith s "preserved" (Codec.decode codec (Codec.encode codec f)) (Right v)
@@ -350,6 +360,7 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
             crownOfTheAges,
             labyrinthOfSkophos,
             auraGraftTarget,
+            miracleWorker,
             auraGraftDestination,
             oreskosExplorer
           ]

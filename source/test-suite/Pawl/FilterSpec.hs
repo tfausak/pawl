@@ -51,8 +51,7 @@ blackCreature =
       Filter.blocked = False,
       Filter.attackedThisTurn = False,
       Filter.milledThisTurn = False,
-      Filter.attachedToCreature = False,
-      Filter.attachedToPermanent = False,
+      Filter.attachedToView = Nothing,
       Filter.attachedTo = Nothing,
       Filter.canHostSubject = False,
       Filter.token = False,
@@ -88,8 +87,7 @@ devoidBigCreature =
       Filter.blocked = False,
       Filter.attackedThisTurn = False,
       Filter.milledThisTurn = False,
-      Filter.attachedToCreature = False,
-      Filter.attachedToPermanent = False,
+      Filter.attachedToView = Nothing,
       Filter.attachedTo = Nothing,
       Filter.canHostSubject = False,
       Filter.token = False,
@@ -136,6 +134,29 @@ counteredCreature =
   blackCreature
     { Filter.counters = Map.fromList [(CounterKind.PlusOnePlusOne, 1), (CounterKind.Lore, 2)]
     }
+
+-- The HOST a candidate's attachment points at (CR 701.3a): an ordinary creature
+-- controlled by player 0, so AttachedTo's nest has both a card type and a
+-- controller to read. Off blackCreature, and with its own id, so the host is
+-- distinguishable from the candidate.
+aHost :: Filter.View
+aHost = blackCreature {Filter.identity = Just (ObjectId.MkObjectId 8)}
+
+-- The same host under the OTHER seat. Control is the only axis that varies, which
+-- is what makes "a creature you control" and "a creature an opponent controls"
+-- tellable apart by control and by nothing else (CR 109.5).
+theirHost :: Filter.View
+theirHost = aHost {Filter.controller = Just (PlayerId.MkPlayerId 1)}
+
+-- A host that is a LAND rather than a creature, for the card-type conjunct, and
+-- for the "on a permanent is wider than on a creature" pair (CR 303.4).
+aLandHost :: Filter.View
+aLandHost = aHost {Filter.cardTypes = Set.singleton CardType.Land}
+
+-- blackCreature attached to the given host. Off blackCreature for withKeyword's
+-- reason: the attachment is the only axis that varies.
+onHost :: Filter.View -> Filter.View
+onHost host = blackCreature {Filter.attachedToView = Just host}
 
 self :: Filter.Context
 self = Filter.contextFor (Just (PlayerId.MkPlayerId 0)) Nothing
@@ -694,50 +715,85 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.MilledThisTurn)) "player"
 
-  Spec.describe s "IsAttachedToCreature" $ do
-    Spec.it s "matches a view whose attachment says so" $ do
-      Spec.assertBool s (Filter.matches self (blackCreature {Filter.attachedToCreature = True}) Filter.Type.IsAttachedToCreature) "attached to a creature"
+  Spec.describe s "AttachedTo" $ do
+    -- Miracle Worker's "target Aura attached to a creature you control", which is
+    -- the composition no nullary atom expresses (CR 109.5, CR 303.4b).
+    let onYourCreature =
+          Filter.Type.AttachedTo
+            (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.ControlledBy PlayerRelation.You])
+        -- Crown of the Ages' "attached to a creature" and Aura Graft's "attached
+        -- to a permanent" respectively, both spelled in the general form.
+        onACreature = Filter.Type.AttachedTo (Filter.Type.HasCardType CardType.Creature)
+        onAPermanent = Filter.Type.AttachedTo (Filter.Type.And [])
 
-    Spec.it s "does not match a permanent attached to nothing" $ do
-      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.IsAttachedToCreature)) "unattached"
+    Spec.it s "matches an attachment whose host satisfies the nest" $ do
+      Spec.assertBool s (Filter.matches self (onHost aHost) onYourCreature) "on a creature you control"
+
+    -- The pair that makes the CONTROL conjunct do work: one candidate, one nest,
+    -- two hosts differing in controller and in nothing else. CR 109.5 makes "you"
+    -- the perspective, so the SAME board answers the other way from the other
+    -- seat -- without that a nest reading the CANDIDATE's controller would pass
+    -- the positive above, the candidate being player 0's too.
+    Spec.it s "does not match when the host is an opponent's" $ do
+      Spec.assertBool s (not (Filter.matches self (onHost theirHost) onYourCreature)) "on their creature"
+      Spec.assertBool s (Filter.matches other (onHost theirHost) onYourCreature) "and the other way round from their seat"
+
+    -- The pair that makes the CARD TYPE conjunct do work, on a host the
+    -- perspective does control.
+    Spec.it s "does not match when the host is not a creature" $ do
+      Spec.assertBool s (not (Filter.matches self (onHost aLandHost) onYourCreature)) "on a land you control"
+      Spec.assertBool s (Filter.matches self (onHost aLandHost) onAPermanent) "but it IS attached to something"
 
     -- CR 109.3 names "what an Aura enchants" among the things that are not
-    -- characteristics, so no characteristic axis can stand in for it: being
-    -- an Aura by subtype says nothing about whether it is on a creature.
+    -- characteristics, so no characteristic axis can stand in for it: being an
+    -- Aura by subtype says nothing about whether it is on anything.
     Spec.it s "is independent of every characteristic axis" $ do
-      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.subtypes = Set.singleton Subtype.Aura}) Filter.Type.IsAttachedToCreature)) "subtype does not imply attachment"
+      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.subtypes = Set.singleton Subtype.Aura}) onACreature)) "subtype does not imply attachment"
 
-    -- CR 303.4b: a player is enchanted BY an Aura, never attached to
-    -- anything -- Object.attachedTo is a field of the attached permanent,
-    -- and a player is not one.
-    Spec.it s "a player candidate is vacuously false" $ do
-      Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.IsAttachedToCreature)) "player"
+    -- CR 110.1: the host view is filled only for an object ON THE BATTLEFIELD, so
+    -- even the trivial nest is False for a candidate attached to nothing. This is
+    -- what makes `AttachedTo (And [])` Aura Graft's "attached to a permanent"
+    -- rather than "attached to anything".
+    Spec.it s "does not match a candidate attached to nothing" $ do
+      Spec.assertBool s (not (Filter.matches self blackCreature onACreature)) "unattached"
+      Spec.assertBool s (not (Filter.matches self blackCreature onAPermanent)) "not even the trivial nest"
 
-  Spec.describe s "IsAttachedToPermanent" $ do
-    Spec.it s "matches a view whose attachment says so" $ do
-      Spec.assertBool s (Filter.matches self (blackCreature {Filter.attachedToPermanent = True}) Filter.Type.IsAttachedToPermanent) "attached to a permanent"
+    -- The old nullary pair's discriminating case, kept in the general form: CR
+    -- 303.4 attaches an Aura to an object or a player, so "on a permanent" is
+    -- strictly wider than "on a creature" and the implication runs one way only.
+    Spec.it s "on a permanent is a wider question than on a creature" $ do
+      Spec.assertBool s (Filter.matches self (onHost aLandHost) onAPermanent) "on a land: attached to a permanent"
+      Spec.assertBool s (not (Filter.matches self (onHost aLandHost) onACreature)) "but not to a creature"
 
-    Spec.it s "does not match a permanent attached to nothing" $ do
-      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.IsAttachedToPermanent)) "unattached"
-
-    -- The pair that makes this a separate atom rather than a synonym: CR
-    -- 303.4 attaches an Aura to "an object or player", so being attached to a
-    -- permanent is strictly wider than being attached to a creature and the
-    -- implication runs one way only. Pawl.Engine.Projection fills both fields off the
-    -- same Object.attachedTo, so the views a real board produces never carry
-    -- the impossible combination -- but the matcher folds whatever it is
-    -- given, and each atom must read its own field.
-    Spec.it s "is a wider question than IsAttachedToCreature" $ do
-      let onLand = blackCreature {Filter.attachedToPermanent = True}
-      Spec.assertBool s (Filter.matches self onLand Filter.Type.IsAttachedToPermanent) "on a land: attached to a permanent"
-      Spec.assertBool s (not (Filter.matches self onLand Filter.Type.IsAttachedToCreature)) "but not to a creature"
-
-    -- CR 303.4b: a player is enchanted BY an Aura and is not itself attached
-    -- to anything, which is the case this atom exists to exclude -- Curse of
-    -- Death's Hold is attached to a player, so it is not a legal target for
+    -- CR 303.4b: a player is enchanted BY an Aura and is not itself attached to
+    -- anything -- Object.attachedTo is a field of the attached permanent, and a
+    -- player is not one. Curse of Death's Hold is therefore not a legal target for
     -- Aura Graft.
     Spec.it s "a player candidate is vacuously false" $ do
-      Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.IsAttachedToPermanent)) "player"
+      Spec.assertBool s (not (Filter.matches self aPlayer onYourCreature)) "player, narrow nest"
+      Spec.assertBool s (not (Filter.matches self aPlayer onAPermanent)) "player, trivial nest"
+
+    -- The nest reads the HOST and never the candidate: the candidate is black and
+    -- the host is not, so an evaluator that forgot to switch views would answer
+    -- the other way.
+    Spec.it s "reads the host and not the candidate" $ do
+      let colorlessHost = aHost {Filter.colors = Set.empty}
+      Spec.assertBool s (Filter.matches self blackCreature (Filter.Type.HasColor Color.Black)) "the candidate is black"
+      Spec.assertBool s (not (Filter.matches self (onHost colorlessHost) (Filter.Type.AttachedTo (Filter.Type.HasColor Color.Black)))) "its host is not"
+
+    -- Pawl.Engine.Filter.boundSlots must pair with bakeBound, both of which descend
+    -- into the nest. Nothing in the pool nests a ControlledByBound under an
+    -- attachment, so this unit case is the only observer that arm has.
+    Spec.it s "reports a bound slot nested under the attachment" $ do
+      let slot = SlotName.MkSlotName (Text.pack "victim")
+      Spec.assertEqWith s "the slot the host's description names" (Filter.boundSlots (Filter.Type.AttachedTo (Filter.Type.ControlledByBound slot))) (Set.singleton slot)
+
+    -- CR 612.1's word swap reaches the host's description too, and for the same
+    -- reason nothing in the pool observes it: no card narrows an attachment by a
+    -- subtype. This is that arm's only observer.
+    Spec.it s "CR 612.1 rewrites a subtype inside the nest" $ do
+      let swapped = Filter.rewrite [(Subtype.Swamp, Subtype.Island)] (Filter.Type.AttachedTo (Filter.Type.HasSubtype Subtype.Swamp))
+      Spec.assertEqWith s "the host's subtype word is swapped" swapped (Filter.Type.AttachedTo (Filter.Type.HasSubtype Subtype.Island))
 
   Spec.describe s "IsAttachedToSource" $ do
     -- CR 701.3a / 301.5a: the candidate's HOST against the match's source. Object
@@ -752,9 +808,9 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- creature, so Kemba's Legion does not count the Bonesplitter on another
     -- creature.
     Spec.it s "does not match a candidate attached to another object" $ do
-      let elsewhere = blackCreature {Filter.attachedTo = Just (ObjectId.MkObjectId 8), Filter.attachedToCreature = True, Filter.attachedToPermanent = True}
+      let elsewhere = (onHost aHost) {Filter.attachedTo = Just (ObjectId.MkObjectId 8)}
       Spec.assertBool s (not (Filter.matches framed elsewhere Filter.Type.IsAttachedToSource)) "on another creature"
-      Spec.assertBool s (Filter.matches framed elsewhere Filter.Type.IsAttachedToCreature) "still attached to a creature"
+      Spec.assertBool s (Filter.matches framed elsewhere (Filter.Type.AttachedTo (Filter.Type.HasCardType CardType.Creature))) "still attached to a creature"
 
     Spec.it s "does not match a candidate attached to nothing" $ do
       Spec.assertBool s (not (Filter.matches framed blackCreature Filter.Type.IsAttachedToSource)) "unattached"

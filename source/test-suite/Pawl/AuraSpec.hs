@@ -419,8 +419,8 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
   -- CR 702.5d's second sentence -- such Auras "can't target permanents and
   -- can't be attached to permanents" -- at the reattach door, and it needs no
   -- clause of its own: Crown of the Ages moves "target Aura attached to a
-  -- creature", and CR 701.3a's IsAttachedToCreature reads the attachment for
-  -- the OBJECT it names, which a player attachment does not name at all. So
+  -- creature", and CR 701.3a's AttachedTo reads the attachment for the OBJECT
+  -- it names, which a player attachment does not name at all. So
   -- the Curse is not a legal target and there is nothing to refuse later.
   Spec.it s "CR 702.5d: a Curse attached to a player is not an Aura attached to a creature" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -433,7 +433,7 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
         (onPlayer, g3) = S.addCreature curse S.alice g2
         (crownId, g4) = S.addCreature crown S.alice g3
         gs = S.attachTo onPlayer (Recipient.ToPlayer S.bob) (S.attach onCreature creature g4)
-    case crownTargetSlot crown of
+    case activatedTargetSlot crown of
       Nothing -> Spec.assertFailure s "the fixture wanted Crown of the Ages' one printed target slot"
       Just theSlot ->
         Spec.assertEqWith
@@ -559,6 +559,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   unattachableSpec s registry
   reattachSpec s registry
   auraGraftSpec s registry
+  miracleWorkerSpec s registry
   enchantPlayerSpec s registry
   chosenLandTypeSpec s registry
   twoEnchantSpec s registry
@@ -673,13 +674,24 @@ attachedTo host gs =
     (\oid -> (Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf) == Just host)
     (Set.toList (GameState.battlefield gs))
 
--- Crown of the Ages' one target slot, read off its printed activated ability --
--- the committed declaration, not a restatement of it, so a test asserting what it admits
--- is asserting what the card really says.
-crownTargetSlot :: Printing.Printing -> Maybe TargetSlot.TargetSlot
-crownTargetSlot printing = case Face.activatedAbilities (S.combinedFace printing) of
+-- The slot named "target" on a card's FIRST printed activated ability -- the
+-- committed declaration, not a restatement of it, so a test asserting what it admits
+-- is asserting what the card really says. Crown of the Ages and Miracle Worker are
+-- the two callers, each printing exactly one such ability.
+activatedTargetSlot :: Printing.Printing -> Maybe TargetSlot.TargetSlot
+activatedTargetSlot printing = case Face.activatedAbilities (S.combinedFace printing) of
   ability : _ -> Map.lookup (SlotName.MkSlotName (Text.pack "target")) (Modal.allTargetSlots (ActivatedAbility.modal ability))
   [] -> Nothing
+
+-- Answers Prompt.ChooseTargets by FILTERING the offered set down to the recipients
+-- that name one object, rather than constructing a recipient of its own: a
+-- hand-built Recipient.ToObject the pool never offered is dropped by CR 608.2b's
+-- re-read at resolution with no error, which is how a targeting test goes green
+-- and empty.
+aimAtOffered :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtOffered oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just oid) . Recipient.objectOf) . snd) sets
+  _ -> S.identityAnswer p
 
 -- CR 701.3 Attach, aimed at the effect's TARGET rather than at its source: an
 -- opcode that moves an Aura already on the battlefield, which the Auras unit left
@@ -742,8 +754,8 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
                 Spec.assertBool s (Set.member aura (GameState.battlefield settled)) "the Aura survives the state-based actions"
                 Spec.assertEqWith s "still on the Mammoth" (fmap Object.attachedTo (Game.lookupObject aura settled)) (Just (Just (Recipient.ToCreature second)))
   -- CR 303.4b through the target slot: "target Aura ATTACHED TO A CREATURE"
-  -- is Pool.Permanents narrowed by HasSubtype Aura and IsAttachedToCreature,
-  -- so the narrowing has to do real work. The same Aura is offered when it
+  -- is Pool.Permanents narrowed by `And [HasSubtype Aura, AttachedTo (HasCardType
+  -- Creature)]`, so the narrowing has to do real work. The same Aura is offered when it
   -- sits on the Piker and withheld when it sits on a Mountain -- nothing
   -- about the Aura itself differs between the two boards, which is what makes
   -- the pair discriminating.
@@ -764,7 +776,7 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
         (crownObj, g4) = S.addCreature crown S.alice g3
         onCreature = S.attach aura creature g4
         onLand = S.attach aura land g4
-        offered gs = fmap (\theSlot -> Target.legalRecipients (Just S.alice) crownObj theSlot gs) (crownTargetSlot crown)
+        offered gs = fmap (\theSlot -> Target.legalRecipients (Just S.alice) crownObj theSlot gs) (activatedTargetSlot crown)
         admits oid gs = fmap (Set.member (Recipient.ToObject oid)) (offered gs)
     Spec.assertEqWith s "on the Piker the Aura is a legal target" (admits aura onCreature) (Just True)
     Spec.assertEqWith s "on the Mountain it is not" (admits aura onLand) (Just False)
@@ -1005,9 +1017,13 @@ auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
     -- CR 704.5m: it landed on a creature, which its enchant ability admits.
     Spec.assertBool s (Set.member aura (GameState.battlefield settled)) "and it survives the state-based actions"
   -- "target Aura THAT'S ATTACHED TO A PERMANENT" (CR 601.2c), spelled
-  -- `And [HasSubtype Aura, IsAttachedToPermanent]`. Three boundaries at once,
+  -- `And [HasSubtype Aura, AttachedTo (And [])]` -- the TRIVIAL nest, which is
+  -- what makes "attached to a permanent" fall out of the general atom: the host
+  -- view is filled only for an object on the battlefield (CR 110.1), so the nest
+  -- has nothing left to say. Three boundaries at once,
   -- all four Auras on one board: an Aura on a noncreature permanent is in --
-  -- which is what makes the atom wider than the Crown's IsAttachedToCreature --
+  -- which is what makes the trivial nest wider than the Crown's
+  -- `AttachedTo (HasCardType Creature)` --
   -- an Aura on a PLAYER is out (CR 303.4: an Aura is attached to "an object or
   -- player", and only one of those is a permanent), and an unattached one is
   -- out.
@@ -1035,10 +1051,10 @@ auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
           S.attachTo onPlayer (Recipient.ToPlayer S.bob) $
             S.attach onLand land (S.attach onCreature creature gs)
         graftOffers oid = fmap (Set.member (Recipient.ToObject oid) . (\theSlot -> Target.legalRecipients (Just S.alice) graft theSlot attached)) (S.spellTargetSlot auraGraft)
-        crownOffers oid = fmap (Set.member (Recipient.ToObject oid) . (\theSlot -> Target.legalRecipients (Just S.alice) crownId theSlot attached)) (crownTargetSlot crown)
+        crownOffers oid = fmap (Set.member (Recipient.ToObject oid) . (\theSlot -> Target.legalRecipients (Just S.alice) crownId theSlot attached)) (activatedTargetSlot crown)
     Spec.assertEqWith s "an Aura on a creature is a legal target" (graftOffers onCreature) (Just True)
     Spec.assertEqWith s "and so is one on a land" (graftOffers onLand) (Just True)
-    -- The pair that makes IsAttachedToPermanent do work the Crown's atom
+    -- The pair that makes the trivial nest do work the Crown's creature nest
     -- cannot: one board, one Aura, two cards, two answers.
     Spec.assertEqWith s "which Crown of the Ages will not have" (crownOffers onLand) (Just False)
     Spec.assertEqWith s "an Aura on a PLAYER is not attached to a permanent" (graftOffers onPlayer) (Just False)
@@ -1161,6 +1177,90 @@ auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
     Spec.assertEqWith s "and was not restamped" (stampOf after) (stampOf stolen)
     Spec.assertEqWith s "but alice controls it" (Projection.controllerOf aura after) (Just S.alice)
     Spec.assertEqWith s "so the creature it holds is hers" (Projection.controllerOf host after) (Just S.alice)
+
+-- Miracle Worker, "{T}: Destroy target Aura attached to a creature you control",
+-- which is the first card in the pool whose attachment narrowing COMPOSES with a
+-- quality: `And [HasSubtype Aura, AttachedTo (And [HasCardType Creature,
+-- ControlledBy You])]`. No nullary atom expresses it, which is what the general
+-- Filter.AttachedTo is for.
+--
+-- CR 109.5 is the rule the composition rests on: "you" inside the nest is the
+-- player who ACTIVATED the ability, not the host's own controller and not the
+-- Aura's, so the nest is evaluated against the host's view and the OUTER context.
+miracleWorkerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+miracleWorkerSpec s registry = Spec.describe s "MiracleWorker" $ do
+  -- The target slot, read off the printed ability. BOTH Auras are alice's and both
+  -- hosts are creatures, so the only axis that varies is the HOST's controller --
+  -- which is what rules out the misreading "an Aura YOU control", under which the
+  -- two answers would agree. Crown of the Ages asks the same question without the
+  -- control conjunct and offers what the Worker refuses, on the same board, which
+  -- is what rules out a negative passing for an unrelated legality.
+  --
+  -- The Aura on a land is hand-built, as the Crown's and the Graft's own filter
+  -- tests hand-build theirs: CR 704.5m would bury it on the next
+  -- state-based-action pass.
+  Spec.it s "CR 109.5 Miracle Worker offers an Aura on your creature and not one on theirs" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    unholyStrength <- S.printingOf s registry "Unholy Strength"
+    crown <- S.printingOf s registry "Crown of the Ages"
+    worker <- S.printingOf s registry "Miracle Worker"
+    let base = Setup.emptyGame S.bothPlayers
+        (mine, g1) = S.addCreature piker S.alice base
+        (theirs, g2) = S.addCreature piker S.bob g1
+        (myLand, g3) = S.addCreature mountain S.alice g2
+        (onMine, g4) = S.addCreature unholyStrength S.alice g3
+        (onTheirs, g5) = S.addCreature unholyStrength S.alice g4
+        (onLand, g6) = S.addCreature unholyStrength S.alice g5
+        (loose, g7) = S.addCreature unholyStrength S.alice g6
+        (workerId, g8) = S.addCreature worker S.alice g7
+        (crownId, g9) = S.addCreature crown S.alice g8
+        board =
+          S.attach onLand myLand $
+            S.attach onTheirs theirs (S.attach onMine mine g9)
+        offers source slotOf oid =
+          fmap
+            (Set.member (Recipient.ToObject oid) . (\theSlot -> Target.legalRecipients (Just S.alice) source theSlot board))
+            slotOf
+        workerOffers = offers workerId (activatedTargetSlot worker)
+        crownOffers = offers crownId (activatedTargetSlot crown)
+    Spec.assertEqWith s "an Aura on alice's creature is a legal target" (workerOffers onMine) (Just True)
+    Spec.assertEqWith s "one on bob's creature is not" (workerOffers onTheirs) (Just False)
+    -- The pair that makes the composition do work no nullary atom can: one board,
+    -- one Aura, two cards, two answers.
+    Spec.assertEqWith s "which Crown of the Ages, asking only about creature-ness, will offer" (crownOffers onTheirs) (Just True)
+    -- The CARD TYPE conjunct, on a host alice does control -- so this negative
+    -- cannot be the control conjunct answering again.
+    Spec.assertEqWith s "an Aura on alice's LAND is not on a creature" (workerOffers onLand) (Just False)
+    Spec.assertEqWith s "nor is an unattached Aura attached to anything" (workerOffers loose) (Just False)
+    -- Not vacuous: the slot rejects a permanent that is not an Aura at all on the
+    -- very board where it accepts one that is.
+    Spec.assertEqWith s "and the Worker is not an Aura" (workerOffers workerId) (Just False)
+  -- design.md section 4's whole-card proof: activate the printed ability through
+  -- the real activation path (CR 602.2a), let it resolve, and see the Aura go to
+  -- its owner's graveyard (CR 701.8a). The Aura on bob's creature is the control:
+  -- it sits on the same board and is untouched.
+  Spec.it s "CR 701.8a whole card: Miracle Worker destroys the Aura on her own creature" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    unholyStrength <- S.printingOf s registry "Unholy Strength"
+    worker <- S.printingOf s registry "Miracle Worker"
+    let base = Setup.emptyGame S.bothPlayers
+        (mine, g1) = S.addCreature piker S.alice base
+        (theirs, g2) = S.addCreature piker S.bob g1
+        (onMine, g3) = S.addCreature unholyStrength S.alice g2
+        (onTheirs, g4) = S.addCreature unholyStrength S.alice g3
+        (workerId, g5) = S.addCreature worker S.alice g4
+        board = (S.attach onTheirs theirs (S.attach onMine mine g5)) {GameState.priority = Just S.alice}
+    case Face.activatedAbilities (S.combinedFace worker) of
+      [] -> Spec.assertFailure s "Miracle Worker should print one activated ability"
+      ability : _ -> do
+        let activated = snd (Engine.runGamePure (aimAtOffered onMine) board (Activate.activateAbility S.alice workerId ability))
+            after = snd (Engine.runGamePure (aimAtOffered onMine) activated Stack.resolveTop)
+            settled = S.settleSba (S.settleSba after)
+        Spec.assertBool s (not (Set.member onMine (GameState.battlefield settled))) "the Aura on her creature is destroyed"
+        Spec.assertBool s (Set.member onTheirs (GameState.battlefield settled)) "the one on bob's creature is untouched"
+        -- The cost was really paid rather than the activation silently failing.
+        Spec.assertEqWith s "and the Worker is tapped" (fmap Object.tapped (Game.lookupObject workerId settled)) (Just TapState.Tapped)
 
 auraSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 auraSpec s registry = Spec.describe s "Aura" $ do

@@ -9,12 +9,7 @@
                 "type": "TapThis"
               }
             ],
-            "mana": [
-              {
-                "type": "Generic",
-                "value": 4
-              }
-            ]
+            "mana": []
           },
           "modal": {
             "modes": [
@@ -23,15 +18,15 @@
                   {
                     "effects": [
                       {
-                        "type": "AttachTarget",
+                        "type": "Destroy",
                         "value": {
-                          "filter": {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Creature"
-                            }
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "target"
                           },
-                          "slot": "target"
+                          "regenerability": {
+                            "type": "Regenerable"
+                          }
                         }
                       }
                     ]
@@ -51,10 +46,21 @@
                         {
                           "type": "AttachedTo",
                           "value": {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Creature"
-                            }
+                            "type": "And",
+                            "value": [
+                              {
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Creature"
+                                }
+                              },
+                              {
+                                "type": "ControlledBy",
+                                "value": {
+                                  "type": "You"
+                                }
+                              }
+                            ]
                           }
                         }
                       ]
@@ -71,15 +77,36 @@
       ],
       "manaCost": [
         {
-          "type": "Generic",
-          "value": 2
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
         }
       ],
-      "name": "Crown of the Ages",
+      "name": "Miracle Worker",
+      "power": {
+        "type": "Literal",
+        "value": 1
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
       "typeLine": {
+        "subtypes": [
+          {
+            "type": "Cleric"
+          },
+          {
+            "type": "Human"
+          }
+        ],
         "types": [
           {
-            "type": "Artifact"
+            "type": "Creature"
           }
         ]
       }
