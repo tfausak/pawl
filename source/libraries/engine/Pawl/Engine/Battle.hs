@@ -2,7 +2,7 @@
 -- designated as it enters (CR 310.9a / 310.12a) together with the state-based
 -- actions that repair that designation (CR 704.5x / 704.5y), the intrinsic ability
 -- rule 310.12b gives a Siege -- both halves of its sentence -- and the state-based
--- action rule 310.7 / 704.5v performs on a battle at defense 0.
+-- actions rules 310.7 / 704.5v and 310.8 / 704.5w perform on a battle at defense 0.
 --
 -- Pawl.Engine.Saga's sibling, and kept apart from Pawl.Engine.Sba for the reason
 -- that module gives: Sba owns WHEN a state-based action is checked, not what any
@@ -326,7 +326,8 @@ defenseOn oid gs = case Game.lookupObject oid gs of
   Just obj -> Map.findWithDefault 0 CounterKind.Defense (Object.counters obj)
 
 -- CR 704.5v's exemption: is this battle "the source of an ability that has
--- triggered but not yet left the stack"?
+-- triggered but not yet left the stack"? Asked by `defeated` of a SIEGE only, since
+-- rule 704.5w carries no such clause.
 --
 -- Saga.awaitingChapter's twin, and TWO halves for its reason: the rule says
 -- "triggered" and not "is on the stack", and the engine has a window where exactly
@@ -345,7 +346,7 @@ defenseOn oid gs = case Game.lookupObject oid gs of
 -- "a chapter ability". The PENDING half is narrower than that: it recognizes only
 -- CR 310.12b's own trigger, because reading a general "would any of this
 -- permanent's abilities fire on any unscanned event" means the CR 603 matcher,
--- which lives above this module. NOT IMPLEMENTED: a battle at defense 0 owing some
+-- which lives above this module. NOT IMPLEMENTED: a Siege at defense 0 owing some
 -- OTHER triggered ability that has fired and not yet been placed (#902).
 --
 -- The unscanned events arrive as an ARGUMENT for awaitingChapter's reason:
@@ -362,13 +363,19 @@ awaitingAbility events gs oid =
         _ -> False
    in any onStack (GameState.stack gs) || any pending events
 
--- CR 310.7 / CR 704.5v: the battles put into their owners' graveyards -- defense 0,
--- and not the source of an ability still owed a resolution. The state-based
--- action's CLASSIFIER half, taking the pre-pass projection so Pawl.Engine.Sba can
--- judge it against the same board as every other CR 704.5 clause (CR 704.3).
+-- CR 310.7 / CR 704.5v and CR 310.8 / CR 704.5w: the battles put into their owners'
+-- graveyards at defense 0. The state-based action's CLASSIFIER half, taking the
+-- pre-pass projection so Pawl.Engine.Sba can judge it against the same board as
+-- every other CR 704.5 clause (CR 704.3).
 --
--- NOT IMPLEMENTED: CR 310.8 / 704.5w bury a NON-Siege battle at defense 0 with no
--- exemption at all, where the exemption below is applied to every battle (#1518).
+-- TWO rules, and the split is the battle TYPE: rule 704.5v exempts a Siege that is
+-- "the source of an ability that has triggered but not yet left the stack", and
+-- rule 704.5w gives a non-Siege battle defense 0 alone with no exemption at all.
+-- Gated on Battle.battleTypes rather than on PC.subtypes, so CR 205.3q's reading is
+-- stated once, and on the battle type rather than on whether CR 310.12b's ability
+-- actually survives -- rule 704.5v keys on "a Siege battle", so a Siege whose
+-- abilities layer 6 removed still gets the exemption and still reaches this clause
+-- once no ability is owed.
 --
 -- The card-type guard is load-bearing in Sba.zeroLoyalty's direction rather than in
 -- zeroToughness's: Object.counters is keyed by kind for EVERY permanent, so absent
@@ -378,11 +385,11 @@ awaitingAbility events gs oid =
 -- A battle that never received counters reads 0 here and is buried, which is the
 -- rule and not an accident: CR 310.4b gives a battle its counters as it enters.
 --
--- For a SIEGE this is normally unreachable, and that is CR 704.5v's whole design:
--- the counters hitting 0 fires CR 310.12b, the exemption holds the battle on the
--- battlefield while that ability resolves, and the ability exiles it. What reaches
--- this clause is a battle with no defeat ability to fire -- one with no battle types
--- (CR 310.9a's other branch), or a Siege whose ability layer 6 removed.
+-- For a SIEGE the graveyard is normally unreachable, and that is CR 704.5v's whole
+-- design: the counters hitting 0 fires CR 310.12b, the exemption holds the battle
+-- on the battlefield while that ability resolves, and the ability exiles it. What
+-- reaches this clause as a Siege is one with no defeat ability left to fire --
+-- layer 6 removed it, or it already resolved.
 --
 -- Ascending, for Saga.sacrificing's reason.
 defeated :: Map.Map ObjectId.ObjectId PC.ProjectedCharacteristics -> [GameEvent.GameEvent] -> GameState -> [ObjectId.ObjectId]
@@ -392,7 +399,7 @@ defeated pcs events gs =
         Just pc
           | isBattle pc,
             defenseOn oid gs == 0,
-            not (awaitingAbility events gs oid) ->
+            not (Set.member Subtype.Siege (battleTypes pc) && awaitingAbility events gs oid) ->
               Just oid
           | otherwise -> Nothing
    in Maybe.mapMaybe gone (Set.toAscList (GameState.battlefield gs))
