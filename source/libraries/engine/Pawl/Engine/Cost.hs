@@ -51,6 +51,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import Pawl.Types.Claim (Claim)
 import qualified Pawl.Types.Claim as Claim.Type
+import qualified Pawl.Types.ClaimAxis as ClaimAxis
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostAdjustments as CostAdjustments
@@ -806,7 +807,7 @@ announce spending pid oid total_ cost = case Cost.mana cost of
   Nothing -> pure cost
   Just manaCost -> do
     -- The components' claims are read here rather than inside Mana.announce,
-    -- which cannot reach removalClaim: this module imports that one, not the
+    -- which cannot reach claimOf: this module imports that one, not the
     -- other way about. Nothing announcing changes the board, so reading them once
     -- is the same answer every offer would have got.
     gs <- State.get
@@ -1216,26 +1217,35 @@ tapObject target =
   State.modify'
     (\gs -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) target (GameState.objects gs)})
 
--- What this component takes OUT of a zone: which zone it draws from, which
--- objects are in that pool for it, and how many of them it claims. Nothing for a
--- component that removes nothing, which is what leaves `jointlyPayable` below
--- asking only about the components that can actually contend for one object.
+-- What this component SPENDS out of a pool of objects: which resource it draws on
+-- (Pawl.Types.ClaimAxis), which objects are in that pool for it, and how many of
+-- them it claims. Nothing for a component that spends no object at all, which is
+-- what leaves `jointlyPayable` below asking only about the components that can
+-- actually contend for one.
 --
 -- TAPPING IS NOT A REMOVAL, and that is a rules fact rather than a scope cut. CR
 -- 601.2h pays a cost's parts "in any order", so a payer facing a cost that both
 -- taps and sacrifices taps first and sacrifices second; both payments are
--- performed, and CR 118.11 confirms a cost is paid by the actions it calls for.
--- A tapped permanent is still on the battlefield, so tapping takes nothing out
--- of anybody's pool -- counting it as a claim would REFUSE costs the rules
--- allow. TapForTotalPower is out for that reason and one more: its Natural is a
--- THRESHOLD on an aggregate rather than a count of objects, so it has no claim
--- of this shape to state at all.
+-- performed, and CR 118.11 confirms a cost is paid by the actions it calls for. A
+-- tapped permanent is still on the battlefield, so tapping takes nothing out of
+-- anybody's zone -- keying its claim as a Removal from Zone.Battlefield would
+-- merge it with Sacrifice's pool and REFUSE costs the rules allow. What it does
+-- spend is the candidates' UNTAPPED-ness, so it claims on ClaimAxis.Tapping
+-- instead, where CR 118.3's own example ("a permanent that's already tapped can't
+-- be tapped to pay a cost") is the scarcity.
 --
--- The ZONE alone is a sound key even though a hand and a graveyard are
--- per-player (CR 400.3, CR 108.4): every claim below is on `pid`'s own copy --
--- discardCandidates and exileCandidates read `pid`'s zone, and each `*This` arm
--- demands that `pid` control or own the object -- so two claims on one zone are
--- always two claims on one pool.
+-- TapForTotalPower is Nothing for a different reason, and not this one: its
+-- Natural is a THRESHOLD on an aggregate rather than a count of objects, so it
+-- names no number of objects to claim -- see its own arm for the bound it could
+-- state instead.
+--
+-- The ZONE alone is a sound key for a Removal even though a hand and a graveyard
+-- are per-player (CR 400.3, CR 108.4): every such claim below is on `pid`'s own
+-- copy -- discardCandidates and exileCandidates read `pid`'s zone, and each
+-- `*This` arm demands that `pid` control or own the object -- so two claims on one
+-- zone are always two claims on one pool. Tapping needs no such key: the
+-- battlefield is shared (CR 403.1) and every tapping claim below is on the
+-- permanents one criterion admits.
 --
 -- A `*This` arm whose own guard fails answers an EMPTY pool rather than Nothing,
 -- which keeps the two readings in agreement: canPayComponent refuses such a
@@ -1243,16 +1253,16 @@ tapObject target =
 -- quietly dropping the claim.
 --
 -- EXHAUSTIVE with no wildcard, this module's posture for every CostComponent
--- match: a new constructor that removes objects from a zone has to answer here,
+-- match: a new constructor that spends objects out of a pool has to answer here,
 -- and -Werror is what makes it.
-removalClaim :: PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Maybe Claim
-removalClaim pid oid component gs = case component of
+claimOf :: PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Maybe Claim
+claimOf pid oid component gs = case component of
   -- CR 701.21a: the permanents this player controls that match the criterion.
   CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) ->
-    claim Zone.Battlefield (Set.fromList (Replacement.sacrificeCandidates pid (Just oid) criterion gs)) n
+    claim (ClaimAxis.Removal Zone.Battlefield) (Set.fromList (Replacement.sacrificeCandidates pid (Just oid) criterion gs)) n
   CostComponent.SacrificeThis ->
     claim
-      Zone.Battlefield
+      (ClaimAxis.Removal Zone.Battlefield)
       -- CR 101.2's prohibition, exactly as canPayComponent reads it below --
       -- the two answers have to agree, since this arm's empty pool is how the
       -- joint check spells the same refusal.
@@ -1264,27 +1274,50 @@ removalClaim pid oid component gs = case component of
       )
       1
   CostComponent.DiscardCards (DiscardCards.MkDiscardCards n criterion) ->
-    claim Zone.Hand (Set.fromList (discardCandidates pid oid criterion gs)) n
-  CostComponent.DiscardThis -> claim Zone.Hand (itself (isOwnedIn Zone.Hand)) 1
+    claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (discardCandidates pid oid criterion gs)) n
+  CostComponent.DiscardThis -> claim (ClaimAxis.Removal Zone.Hand) (itself (isOwnedIn Zone.Hand)) 1
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) ->
-    claim Zone.Graveyard (Set.fromList (exileCandidates pid criterion gs)) n
+    claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (exileCandidates pid criterion gs)) n
   -- A pool of at most ONE, and the claim is on that one card rather than on a
   -- choice among several: CR 404.2's order picks it. An empty pool is how this
   -- arm spells the refusal canPayComponent gives below.
   CostComponent.ExileTopFromGraveyard criterion ->
-    claim Zone.Graveyard (Set.fromList (Maybe.maybeToList (topExileCandidate pid criterion gs))) 1
-  CostComponent.ExileThisFromGraveyard -> claim Zone.Graveyard (itself (isOwnedIn Zone.Graveyard)) 1
+    claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (Maybe.maybeToList (topExileCandidate pid criterion gs))) 1
+  CostComponent.ExileThisFromGraveyard -> claim (ClaimAxis.Removal Zone.Graveyard) (itself (isOwnedIn Zone.Graveyard)) 1
+  -- Nothing, though CR 107.5 makes {T} spend exactly the untapped-ness the
+  -- TapPermanents arm below claims. Not implemented: a claim of
+  -- `ClaimAxis.Tapping (itself ...) 1` here is the principled arm, and the reason
+  -- it is not written is a cost rather than a rule -- every land and every mana
+  -- creature carries {T}, and both Mana.sourceOptions' per-source enumeration and
+  -- Claim.satisfiable's subset walk go exponential in the number of CLAIMING
+  -- sources. So Springleaf Drum beside Llanowar Elves still reads as two mana
+  -- when it makes one (#1725).
   CostComponent.TapThis -> Nothing
+  -- Nothing, and no printing can observe it: CR 107.6's {Q} spends TAPPED-ness, a
+  -- third axis, and it names the object the cost is on -- so two such claims could
+  -- only come from one cost carrying {Q} twice.
   CostComponent.UntapThis -> Nothing
+  -- Nothing, for the THRESHOLD reason given above and not for tapping's. Not
+  -- implemented: CR 702.122a's payment does tap at least one untapped permanent
+  -- whenever the threshold is above 0, so a claim of 1 on ClaimAxis.Tapping is a
+  -- lower bound that could never over-refuse (#1744).
   CostComponent.TapForTotalPower {} -> Nothing
-  -- Nothing, TapForTotalPower's answer and for the reason stated above: a
-  -- tapped permanent stays on the battlefield, so this component takes nothing
-  -- out of any pool. Not implemented: two such components -- two Springleaf
-  -- Drums, or one cost carrying two -- therefore each count the SAME untapped
-  -- creature, so a board holding fewer untapped creatures than the tapping
-  -- costs that want them reads as payable, and the second payment goes Unpaid
-  -- at CR 601.2h (#1718).
-  CostComponent.TapPermanents {} -> Nothing
+  -- CR 601.2f's "tapping permanents", on the TAPPING axis rather than a zone's: a
+  -- tapped permanent is still on the battlefield, so this takes nothing out of any
+  -- zone -- what it spends is the candidates' UNTAPPED-ness, and CR 118.3's
+  -- "fully" is what stops two such costs spending one creature's twice. Keyed as a
+  -- removal from Zone.Battlefield it would merge with Sacrifice's pool and refuse
+  -- a cast CR 601.2h allows, since a creature tapped for one component is still
+  -- there to be sacrificed for another; ManaSpec's "a creature tapped for mana can
+  -- still be sacrificed" is the case that proves the axes stay apart.
+  --
+  -- The pool is every candidate the criterion admits, tapped ones included, which
+  -- is the PERMISSIVE reading where a criterion omits "untapped": an already-tapped
+  -- candidate spends no untapped-ness, so two components naming it do not contend.
+  -- Every printing in the pool says "untapped" (Springleaf Drum, High Perfect
+  -- Morcant), so nothing observes the difference.
+  CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) ->
+    claim ClaimAxis.Tapping (Set.fromList (tapCandidates pid oid criterion gs)) n
   CostComponent.PayLife _ -> Nothing
   CostComponent.PayLifeX -> Nothing
   CostComponent.PayEnergy _ -> Nothing
@@ -1297,7 +1330,7 @@ removalClaim pid oid component gs = case component of
   -- same creature, which is right: CR 122.6 stacks counters.
   CostComponent.Blight _ -> Nothing
   where
-    claim z p n = Just (Claim.Type.MkClaim {Claim.Type.zone = z, Claim.Type.pool = p, Claim.Type.count = n})
+    claim a p n = Just (Claim.Type.MkClaim {Claim.Type.axis = a, Claim.Type.pool = p, Claim.Type.count = n})
     itself condition = if condition then Set.singleton oid else Set.empty
     -- canPayComponent's own guard for the two `*This` arms that read a zone
     -- rather than control, and asked here for its reason: CR 108.4 gives a card
@@ -1318,19 +1351,24 @@ removalClaim pid oid component gs = case component of
 -- readings apart: each component alone finds a candidate, and there is only one
 -- land to give.
 --
--- Pawl.Engine.Claim.satisfiable is the reading, and it carries the per-zone
+-- Two Springleaf Drums beside one untapped creature are the same case one axis
+-- over: each Drum's "Tap an untapped creature you control" finds the creature
+-- alone, and only one of them can have it.
+--
+-- Pawl.Engine.Claim.satisfiable is the reading, and it carries the per-axis
 -- grouping and Hall's condition; what is this module's is which components make
--- a claim at all (removalClaim). The same reading is asked across the SOURCES of
--- one mana payment (Pawl.Engine.Mana.payableResolutionsGiven), which is why it
--- lives there rather than here.
+-- a claim at all, and on which axis (claimOf). The same reading is asked across
+-- the SOURCES of one mana payment (Pawl.Engine.Mana.payableResolutionsGiven),
+-- which is why it lives there rather than here.
 jointlyPayable :: PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> GameState -> Bool
 jointlyPayable pid oid components gs = Claim.satisfiable (claimsOf pid oid components gs)
 
--- Everything these components will take out of a zone. What `jointlyPayable`
--- asks Hall's condition of, and what the MANA side is handed so it can ask the
--- same question of these claims and its sources' together (#1134).
+-- Everything these components will spend out of a pool of objects, on whichever
+-- axis each spends it (Pawl.Types.ClaimAxis). What `jointlyPayable` asks Hall's
+-- condition of, and what the MANA side is handed so it can ask the same question
+-- of these claims and its sources' together (#1134).
 claimsOf :: PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> GameState -> [Claim]
-claimsOf pid oid components gs = Maybe.mapMaybe (\component -> removalClaim pid oid component gs) components
+claimsOf pid oid components gs = Maybe.mapMaybe (\component -> claimOf pid oid component gs) components
 
 -- CR 118.3: a player can't pay a cost without the resources to pay it fully. The
 -- mana part AND every component, measured against the CURRENT state -- before any
@@ -1352,11 +1390,12 @@ claimsOf pid oid components gs = Maybe.mapMaybe (\component -> removalClaim pid 
 --
 -- OBJECTS are the other resource measured across components rather than within
 -- each, and `jointlyPayable` is where: two components that each remove an object
--- from a zone cannot both claim the one Bayou, which is again CR 118.3's "fully"
--- read over the whole cost. CR 118.10 is NOT that rule and never was -- it
--- governs two DIFFERENT spells or abilities each paying its own cost, and says
--- nothing about two parts of one. CR 601.2h's "partial payments are not allowed"
--- is the other half of the reading.
+-- from a zone cannot both claim the one Bayou, nor two that each tap a permanent
+-- the one untapped creature, which is again CR 118.3's "fully" read over the whole
+-- cost. Which components contend with which is `claimOf`'s axis. CR 118.10 is NOT
+-- that rule and never was -- it governs two DIFFERENT spells or abilities each
+-- paying its own cost, and says nothing about two parts of one. CR 601.2h's
+-- "partial payments are not allowed" is the other half of the reading.
 --
 -- The objects are handed ACROSS the two halves for the same reason the life is,
 -- and CR 601.2g is why they have to be: the mana window comes before CR 601.2h's
@@ -1507,7 +1546,10 @@ repeatsOf pid oid cost gs = case Cost.mana cost of
 -- -Werror is what makes it.
 uncountedCeiling :: CostComponent.CostComponent Keyword.Type.Keyword -> Maybe Natural
 uncountedCeiling component = case component of
-  -- Counted by `objectCeiling`: every one of these has a removalClaim.
+  -- Counted by `objectCeiling`, which is to say `claimOf` states what each of
+  -- these spends and Pawl.Engine.Claim.repeats divides the pool by it.
+  -- TapPermanents states a claim too and is still capped at 1 below, for the
+  -- reason its own arm gives.
   CostComponent.Sacrifice {} -> Nothing
   CostComponent.SacrificeThis -> Nothing
   CostComponent.DiscardCards {} -> Nothing
@@ -1684,7 +1726,7 @@ canPayComponent pid oid component gs = case component of
   -- The prohibition is read in this module and not left to the funnel, because a
   -- cost announced as payable and then unpayable would spend an activation and
   -- leave the permanent alive; CR 118.3's "fully" is what forbids that. WHICH of
-  -- this module's two readings does it is not decided here: `removalClaim` above
+  -- this module's two readings does it is not decided here: `claimOf` above
   -- asks the same question and `canPay` conjoins both answers, so either alone
   -- refuses the cost. Stated twice for the Sacrifice arm's reason -- a component
   -- is asked about on its own terms here -- and the two must not disagree.
@@ -1742,9 +1784,10 @@ canPayComponent pid oid component gs = case component of
   -- a card that wants it prints it, and Springleaf Drum's criterion carries
   -- `Not IsTapped` itself.
   --
-  -- This component ALONE, Sacrifice's caveat and for its reason -- except that
-  -- `jointlyPayable` cannot second it, since tapping states no claim
-  -- (`removalClaim`).
+  -- This component ALONE, Sacrifice's caveat and for its reason: two of them can
+  -- each find the same untapped creature here, and `jointlyPayable` is what asks
+  -- them together, on the tapping axis `claimOf` puts them; ManaSpec's "one
+  -- creature cannot pay for both Drums" is the test.
   CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) ->
     Natural.length (tapCandidates pid oid criterion gs) >= n
   -- CR 601.2f: payable only if the hand holds at least that many cards the
@@ -1961,7 +2004,7 @@ orderObservable components = case filter orderSensitive components of
 --
 -- False for the per-player scalars, for `orderObservable`'s stated reason.
 --
--- EXHAUSTIVE with no wildcard, `removalClaim`'s posture and for its reason: a new
+-- EXHAUSTIVE with no wildcard, `claimOf`'s posture and for its reason: a new
 -- component has to answer here, and -Werror is what makes it. A component that
 -- involved a random element, or moved an object from a library to a public zone,
 -- would want CR 601.2h's second pass as well as an answer here.
