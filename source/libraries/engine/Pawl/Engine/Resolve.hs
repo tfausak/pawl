@@ -4819,7 +4819,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- is the CLAUSE's condition, read as Quantity.HasDesignation Monstrous before
   -- either of its effects runs, which is also what keeps a second monstrosity from
   -- putting counters on. CR 719.3a's "and this Case is not solved" is a third
-  -- intervening "if", Case of the Ransacked Lab's. Suspect CAN reach it -- Rune-Brand Juggler's "up to one
+  -- intervening "if", Case of the Ransacked Lab's. Suspect CAN reach it --
+  -- Rune-Brand Juggler's "up to one
   -- target creature you control" narrows by nothing else -- but the only thing the
   -- gate suppresses is the event, and no card reads a permanent becoming suspected
   -- (#1215), so there is nothing to assert on either side.

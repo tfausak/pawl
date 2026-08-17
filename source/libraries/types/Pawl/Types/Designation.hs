@@ -44,7 +44,7 @@ data Designation
     -- again.
     Suspected
   | -- | CR 719.3b: solved, the marker CR 719.3a's "to solve" trigger sets and
-    -- CR 719.3c's "Solved --" ability is gated on. Renowned's shape in every
-    -- respect -- set by the permanent's own trigger, and with no remover.
+    -- CR 719.3c's "Solved --" ability is gated on. Renowned's shape: set by a
+    -- trigger of the permanent's own, and with no remover.
     Solved
   deriving (Bounded, Enum, Eq, Ord, Show)

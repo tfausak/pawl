@@ -547,9 +547,9 @@ data GameEvent
     -- none of the rules that mint a designation names one, and CR 603.3a reads a
     -- watcher's controller off its own source.
     --
-    -- One DIRECTION only. For renowned, monstrous and solved the rules make it the
-    -- only one:
-    -- "it stays renowned until it leaves the battlefield" leaves nothing to undo, and
+    -- One DIRECTION only. For renowned, monstrous and solved the rules make it
+    -- the only one: "it stays renowned until it leaves the battlefield" leaves
+    -- nothing to undo, and
     -- CR 400.7's new object is not a permanent losing a designation. CR 701.60a does
     -- let suspected end, and Effect.Unsuspect emits nothing -- no printed card
     -- triggers on a permanent ceasing to be suspected.

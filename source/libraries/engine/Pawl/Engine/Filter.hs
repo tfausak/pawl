@@ -241,8 +241,8 @@ data View = MkView
     -- Hero's trigger, Rune-Brand Juggler's sacrifice cost) and by
     -- Pawl.Engine.Quantity's HasDesignation arm (renown's intervening "if",
     -- monstrosity's clause condition, Repeat Offender's, and both of Case of the
-    -- Ransacked Lab's). What CR 701.60c hangs off
-    -- `Suspected` does NOT come through here:
+    -- Ransacked Lab's). What CR 701.60c hangs off `Suspected` does NOT come
+    -- through here:
     -- Pawl.Engine.Projection.designationGathered and
     -- Pawl.Engine.CombatRestriction.inForce hold no view and read the object
     -- directly.

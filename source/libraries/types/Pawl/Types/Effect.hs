@@ -1103,9 +1103,9 @@ data Effect card
     -- solved", Case of the Ransacked Lab's end-step trigger.
     --
     -- ONE opcode over Pawl.Types.Designation and not one per mark, because every
-    -- rule that mints one words the write identically -- see that module. CR
-    -- 719.3a's "this Case becomes solved" is the fourth writer, and it needed no
-    -- arm here. Casing on the designation is
+    -- rule that mints one words the write identically -- see that module. Case's
+    -- is what proves the shape holds: rule 719 needed no arm here at all. Casing
+    -- on the designation is
     -- not casing on an effect's identity: it is one payload of one opcode, the way
     -- ItBecomes below carries a Daytime.
     --
