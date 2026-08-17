@@ -35,6 +35,7 @@ codec =
       Arm.payload "StepBegins" StepBegins.codec TriggerCondition.StepBegins (\x -> case x of TriggerCondition.StepBegins y -> Just y; _ -> Nothing),
       Arm.payload "StateIs" Condition.codec TriggerCondition.StateIs (\x -> case x of TriggerCondition.StateIs y -> Just y; _ -> Nothing),
       Arm.nullary "SelfDealsCombatDamageToPlayer" TriggerCondition.SelfDealsCombatDamageToPlayer,
+      Arm.nullary "SelfIsDealtDamage" TriggerCondition.SelfIsDealtDamage,
       Arm.payload "PermanentDealsCombatDamageToPlayer" filterCodec TriggerCondition.PermanentDealsCombatDamageToPlayer (\x -> case x of TriggerCondition.PermanentDealsCombatDamageToPlayer y -> Just y; _ -> Nothing),
       Arm.nullary "CreatureDealtCombatDamageToMonarch" TriggerCondition.CreatureDealtCombatDamageToMonarch,
       Arm.nullary "OpponentLostLifeDuringYourTurn" TriggerCondition.OpponentLostLifeDuringYourTurn,

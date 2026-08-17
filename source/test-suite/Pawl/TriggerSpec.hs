@@ -9152,11 +9152,12 @@ brinebornCutthroatSpec s registry =
 -- A NON-EMPTY LIST rather than one event, because Event.eventBindingSlots
 -- answers the guaranteed FLOOR -- the slots bound for every event a condition
 -- admits -- and a condition that binds a slot for some of its events and not
--- others cannot be pinned by any single one of them. Every condition but one is
+-- others cannot be pinned by any single one of them. Most conditions are
 -- represented by a one-element list, for which the floor is that event's exact
--- keyset. SelfLeavesTheBattlefield is the exception, and the two
--- destinations below are why: CR 400.7e binds `became` for the public one and
--- withholds it for the hidden one (CR 400.2).
+-- keyset. Two are not: SelfLeavesTheBattlefield, whose two destinations differ
+-- because CR 400.7e binds `became` for the public one and withholds it for the
+-- hidden one (CR 400.2), and SelfIsDealtDamage, which admits both of CR 120.3's
+-- damage kinds.
 --
 -- Exhaustive with no wildcard, which is half of what keeps the pin honest -- a
 -- new TriggerCondition fails to compile here. The other half, the list below, is
@@ -9179,6 +9180,13 @@ representativeEvents cond =
         -- event). Any event is therefore as representative as any other.
         TriggerCondition.StateIs _ -> one (GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice))
         TriggerCondition.SelfDealsCombatDamageToPlayer -> one combatDamage
+        -- CR 120.3's event pointed the other way, at the BEARER -- so the pair
+        -- really matches. TWO of them, combat and noncombat, because this
+        -- condition is the one damage arm that admits both: a floor claimed for
+        -- one kind and not the other would come apart here.
+        TriggerCondition.SelfIsDealtDamage ->
+          GameEvent.DamageDealt (DamageEvent.MkDamageEvent arrived (Recipient.ToCreature departed) 2 False False False 0 Nothing DamageKind.Noncombat)
+            NonEmpty.:| [GameEvent.DamageDealt (DamageEvent.MkDamageEvent arrived (Recipient.ToCreature departed) 3 False False False 0 Nothing DamageKind.Combat)]
         -- The same event read by a bystander, and the only one this condition
         -- admits.
         TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> one combatDamage
@@ -9381,6 +9389,7 @@ everyTriggerCondition =
     TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.EachTurn),
     TriggerCondition.StateIs (Condition.Type.Compares (Compares.MkCompares (Quantity.Type.Literal 0) Comparison.Exactly (Quantity.Type.Literal 0))),
     TriggerCondition.SelfDealsCombatDamageToPlayer,
+    TriggerCondition.SelfIsDealtDamage,
     TriggerCondition.PermanentDealsCombatDamageToPlayer (Filter.Type.And []),
     TriggerCondition.CreatureDealtCombatDamageToMonarch,
     TriggerCondition.OpponentLostLifeDuringYourTurn,
@@ -11457,12 +11466,187 @@ lifeGainAmountSpec s registry =
         -- than to one card's payload -- becameSlotSpec's shape. The 7 is neither
         -- life total nor any other number in reach, so an arm binding anything but
         -- the event's own amount fails here.
-        Spec.it s "CR 603.2 eventBindings binds the amount the event carries" $
+        --
+        -- BOB's gain read under the You relation, which is what pins the gainer to
+        -- the EVENT rather than to the relation: the arm binds whichever player the
+        -- event names, and an arm that reached for the ability's controller instead
+        -- would answer alice here.
+        Spec.it s "CR 603.2 eventBindings binds the amount the event carries, and the player who gained it" $
           Spec.assertEqWith
             s
-            "thatMuch is the gain"
-            (Event.eventBindings (TriggerCondition.PlayerGainsLife PlayerRelation.You) (GameEvent.LifeGained (LifeChange.MkLifeChange S.alice 7)))
-            (Map.singleton Binding.eventAmount (Binding.toAmount 7))
+            "thatMuch is the gain and thatPlayer is the gainer"
+            (Event.eventBindings (TriggerCondition.PlayerGainsLife PlayerRelation.You) (GameEvent.LifeGained (LifeChange.MkLifeChange S.bob 7)))
+            (Binding.setTriggerPlayer S.bob (Map.singleton Binding.eventAmount (Binding.toAmount 7)))
+
+-- CR 119.9's event read for its PLAYER, which neither group above can ask for:
+-- Ajani's Pridemate and Sanguine Bond both watch under CR 109.5's "you", where
+-- the gainer and the ability's controller are one seat.
+--
+-- False Cure, {B}{B} Instant, "Until end of turn, whenever a player gains life,
+-- that player loses 2 life for each 1 life they gained." Three things at once,
+-- and the board is built so that each fails on its own:
+--
+--   * CR 102.1's bare "a player" (PlayerRelation.AnyPlayer), so a gain by
+--     somebody who is not the caster fires it. bob's Radiant Fountain is that
+--     gain.
+--   * CR 603.2's gaining player, bound under Binding.triggerPlayer. THREE seats,
+--     because a two-seat board collapses "that player" onto the one opponent --
+--     carol sits there so that "an opponent" and "the player who gained" are not
+--     the same reading.
+--   * CR 603.7b's stated duration, which keeps the entry armed through firing:
+--     the second gain, alice's own, is a different seat and a different amount.
+--
+-- The doubling is Quantity.Plus of the slot with itself, Pawl.Types.Quantity
+-- having no multiply -- exact for "2 life for each 1 life", and what makes the
+-- two amounts tell a bound amount from a constant.
+falseCureSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+falseCureSpec s registry =
+  let resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      -- lifeGainAmountSpec's entry staging: the permanent is already placed, its
+      -- Moved event is recorded, and CR 603.6a's scan runs at the next settle.
+      entering oid gs =
+        let moved = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
+         in resolveAll (settle (S.withEvents [GameEvent.Moved (Moved.MkMoved moved (Projection.project oid gs))] gs))
+      -- alice casts the Cure off two Swamps on a three-seat board, and everything
+      -- else is already on the battlefield: bob's Radiant Fountain (CR 119.3, "you
+      -- gain 2 life" for BOB), alice's Soul Warden and a Goblin Piker under carol
+      -- for the Warden to see enter.
+      armed = do
+        swamp <- S.printingOf s registry "Swamp"
+        falseCure <- S.printingOf s registry "False Cure"
+        fountain <- S.printingOf s registry "Radiant Fountain"
+        soulWarden <- S.printingOf s registry "Soul Warden"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let lands = S.landsFor swamp S.alice 2 S.threePlayerGame
+            (fountainId, withFountain) = S.addCreature fountain S.bob lands
+            (_, withWarden) = S.addCreature soulWarden S.alice withFountain
+            (pikerId, withPiker) = S.addCreature piker S.carol withWarden
+            (spellId, withSpell) = S.addHandCard falseCure S.alice withPiker
+        pure (fountainId, pikerId, resolveAll (snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))))
+   in Spec.describe s "CR 603.7 False Cure" $ do
+        -- The gain that is NOT the caster's. bob gains 2 and loses 4 -- and alice's
+        -- and carol's totals are asserted untouched, which is the whole of #826: an
+        -- arm that bound CR 109.5's "you" in place of the event's player would show
+        -- alice at 16 and bob at 22 on this very board.
+        Spec.it s "CR 102.1/603.2 bob gains 2 from his own Radiant Fountain and loses 4" $ do
+          (fountainId, _, gs) <- armed
+          let after = entering fountainId gs
+          Spec.assertEqWith s "bob gained 2 and then lost 4" (S.lifeOf S.bob after) (Just 18)
+          Spec.assertEqWith s "alice, who cast the Cure, is untouched" (S.lifeOf S.alice after) (Just 20)
+          Spec.assertEqWith s "and so is carol" (S.lifeOf S.carol after) (Just 20)
+        -- The SECOND firing, on a different seat and a different amount: CR 603.7b's
+        -- stated duration keeps the entry armed, and the Soul Warden's 1 becomes 2
+        -- rather than the 4 above. A doubling that bound a constant fails here; an
+        -- entry spent by its first firing fires not at all.
+        Spec.it s "CR 603.7b the same entry fires again for alice, whose gain is 1" $ do
+          (fountainId, pikerId, gs) <- armed
+          let afterBob = entering fountainId gs
+              after = entering pikerId afterBob
+          Spec.assertEqWith s "alice gained 1 from her Soul Warden and lost 2" (S.lifeOf S.alice after) (Just 19)
+          Spec.assertEqWith s "bob is where the first firing left him" (S.lifeOf S.bob after) (Just 18)
+          Spec.assertEqWith s "carol gained nothing and lost nothing" (S.lifeOf S.carol after) (Just 20)
+        -- The control, through the narrowest path that ends the duration: CR 514.2's
+        -- cleanup, which Expiry.dropAtCleanup is. The SAME gain on the SAME board
+        -- afterwards costs bob nothing, so the two cases differ in exactly one thing.
+        Spec.it s "CR 514.2 the entry is gone after cleanup, so the same gain costs nothing" $ do
+          (fountainId, _, gs) <- armed
+          let after = entering fountainId (Expiry.dropAtCleanup gs)
+          Spec.assertEqWith s "bob gained his 2 and kept it" (S.lifeOf S.bob after) (Just 22)
+          Spec.assertEqWith s "alice is untouched either way" (S.lifeOf S.alice after) (Just 20)
+
+-- CR 120.3's event read by its RECIPIENT, which no condition could ask for
+-- before: every damage arm beside this one watches a permanent DEALING damage.
+--
+-- Ripjaw Raptor, {2}{G}{G} Creature -- Dinosaur 4/5, whose whole text is
+-- "Enrage -- Whenever this creature is dealt damage, draw a card." Enrage is an
+-- ability word (CR 207.2c) with no rules meaning, so the condition is ordinary
+-- and nothing about it reaches Pawl.Types.Keyword.
+--
+-- Three things the group has to separate, and one board each:
+--
+--   * the RECIPIENT, not the damager and not any permanent -- a Hill Giant
+--     beside the Raptor, under the same controller, takes the same damage and
+--     draws nothing.
+--   * the DAMAGE KIND, which this arm does not filter on where its neighbours all
+--     do: a noncombat event and a CR 510.2 combat event each draw one.
+--   * CR 510.2's simultaneity, which is the reading a naive once-per-batch arm
+--     gets wrong: two blockers deal two events and draw TWO cards.
+--
+-- Hand size is asserted BEFORE and AFTER every time. "alice holds one card" alone
+-- passes on a board she drew for turn on.
+enrageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+enrageSpec s registry =
+  let resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      -- A noncombat event's own path: Damage.applyDamage records the DamageDealt
+      -- entries, the settle gathers what they triggered and puts it on the stack
+      -- (CR 603.3), and the priority loop resolves it. The narrowest path that
+      -- shows the behaviour.
+      dealing events gs = resolveAll (settle (S.runPure S.identityAnswer gs (Damage.applyDamage events)))
+      -- alice's library is stocked, or CR 104.3c decks her before the assertion
+      -- runs.
+      stock printing pid n gs = List.foldl' (\g _ -> snd (S.addLibraryCard printing pid g)) gs [1 .. (n :: Int)]
+      noncombat src target amount = DamageEvent.MkDamageEvent src (Recipient.ToCreature target) amount False False False 0 Nothing DamageKind.Noncombat
+      damageOn oid gs = fmap Object.damage (Game.lookupObject oid gs)
+   in Spec.describe s "CR 120.3 enrage" $ do
+        -- The noncombat half, and the CONTROL as a pair of boards differing in
+        -- exactly one thing: which of alice's two creatures the event's recipient
+        -- names. bob's Goblin Piker is the source either way, and the Hill Giant's
+        -- toughness is 3 so that the control board's creature survives to be
+        -- asked about.
+        Spec.it s "CR 120.3 a noncombat event on the Raptor draws exactly one card, and one on another creature draws none" $ do
+          raptor <- S.printingOf s registry "Ripjaw Raptor"
+          giant <- S.printingOf s registry "Hill Giant"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (raptorId, g1) = S.addCreature raptor S.alice (Setup.emptyGame S.bothPlayers)
+              (mineId, g2) = S.addCreature giant S.alice g1
+              (theirsId, g3) = S.addCreature piker S.bob g2
+              gs = stock piker S.alice 5 g3
+              atRaptor = dealing [noncombat theirsId raptorId 1] gs
+              atGiant = dealing [noncombat theirsId mineId 1] gs
+          Spec.assertEqWith s "alice starts with an empty hand" (S.handSize S.alice gs) 0
+          Spec.assertEqWith s "the Raptor's own event drew her one" (S.handSize S.alice atRaptor) 1
+          Spec.assertEqWith s "and the damage really landed on the Raptor" (damageOn raptorId atRaptor) (Just 1)
+          Spec.assertEqWith s "the same event on her Hill Giant drew nothing" (S.handSize S.alice atGiant) 0
+          Spec.assertEqWith s "though that damage landed too" (damageOn mineId atGiant) (Just 1)
+        -- CR 510.2's combat damage, through the whole declare-block-deal sequence.
+        -- ONE blocker, so exactly one event reaches the Raptor -- which is what
+        -- proves the arm does not filter on DamageKind, the noncombat case above
+        -- being the other half of that pair.
+        Spec.it s "CR 510.2 combat damage fires it too: one blocker, one card" $ do
+          raptor <- S.printingOf s registry "Ripjaw Raptor"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (gs0, mine, _) = S.combatBoardOf [raptor] [piker]
+              gs = stock piker S.alice 5 gs0
+          case mine of
+            [] -> Spec.assertFailure s "fixture should have given alice a Ripjaw Raptor"
+            raptorId : _ -> do
+              let after = resolveAll (S.fightWith S.aggressiveAnswer gs)
+              Spec.assertEqWith s "alice started with an empty hand" (S.handSize S.alice gs) 0
+              Spec.assertEqWith s "and drew exactly one" (S.handSize S.alice after) 1
+              Spec.assertEqWith s "the one blocker's 2 is marked on the Raptor" (damageOn raptorId after) (Just 2)
+        -- TWO blockers, so CR 510.2 deals two events simultaneously and
+        -- Pawl.Engine.Damage records one DamageDealt each. Two triggers, two cards
+        -- -- which is what the Ripjaw Raptor rulings say and what an arm folding the
+        -- batch into one firing gets wrong.
+        --
+        -- The blockers are DIFFERENT printings, 2/1 and 1/1, so the 3 marked on the
+        -- Raptor is a number neither event carries alone: a single fabricated event
+        -- of the whole batch's damage would be indistinguishable otherwise.
+        Spec.it s "CR 510.2 two simultaneous events draw two cards, not one" $ do
+          raptor <- S.printingOf s registry "Ripjaw Raptor"
+          piker <- S.printingOf s registry "Goblin Piker"
+          sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+          let (gs0, mine, _) = S.combatBoardOf [raptor] [piker, sorcerer]
+              gs = stock piker S.alice 5 gs0
+          case mine of
+            [] -> Spec.assertFailure s "fixture should have given alice a Ripjaw Raptor"
+            raptorId : _ -> do
+              let after = resolveAll (S.fightWith S.aggressiveAnswer gs)
+              Spec.assertEqWith s "alice started with an empty hand" (S.handSize S.alice gs) 0
+              Spec.assertEqWith s "one card per event, so two" (S.handSize S.alice after) 2
+              Spec.assertEqWith s "and both events' damage is marked" (damageOn raptorId after) (Just 3)
 
 -- The life-GAIN group's mirror: "whenever an opponent loses life", which the
 -- rules give no CR 119.9 of its own. What counts as a loss is therefore fixed by
@@ -12587,6 +12771,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   lifeGainTriggerSpec s registry
   abilitiesWhenTriggeredSpec s registry
   lifeGainAmountSpec s registry
+  falseCureSpec s registry
+  enrageSpec s registry
   lifeLossTriggerSpec s registry
   mindcrankSpec s registry
   masterOfLaketownSpec s registry

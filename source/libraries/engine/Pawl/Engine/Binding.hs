@@ -104,9 +104,9 @@ you = SlotName.MkSlotName (Text.pack "you")
 -- name it" rule applies here too, under the same sweep. That an effect reading
 -- this slot sits under a condition that binds it is enforced by
 -- Pawl.Engine.Event.eventBindingSlots: only the combat-damage-to-a-player, the
--- CR 701.9a discard, the CR 119.3 life-loss, the CR 601.2i cast, the CR 508.3a
--- attack and the CR 725.1 crowning conditions stamp it, so reading it under any
--- other is a failing test.
+-- CR 701.9a discard, the CR 119.3 life-loss, the CR 119.9 life-GAIN, the CR
+-- 601.2i cast, the CR 508.3a attack and the CR 725.1 crowning conditions stamp
+-- it, so reading it under any other is a failing test.
 triggerPlayer :: SlotName
 triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 

@@ -3542,6 +3542,52 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTarget {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
+  -- CR 120.3: the bearer was DEALT damage -- enrage's event. The arm above with the
+  -- identity check moved from the event's SOURCE to its RECIPIENT.
+  --
+  -- Neither of that arm's other two tests, and deliberately: rule 120.3 is about
+  -- damage being dealt however it was dealt, and Ripjaw Raptor's printed phrase
+  -- qualifies it in no way, so a Prodigal Sorcerer's ping fires this exactly as
+  -- combat damage does. This is the damage arm that breaks the local pattern.
+  --
+  -- Recipient.objectOf, not a ToCreature test: CR 120.3's recipient may be any
+  -- permanent (a planeswalker, a battle), and the bearer's own id is what decides
+  -- the match either way. Nothing is dealt damage while the id is a player's, which
+  -- is what the Nothing arm falls through on.
+  TriggerCondition.SelfIsDealtDamage -> case event of
+    GameEvent.DamageDealt ev -> Recipient.objectOf (DamageEvent.target ev) == Just bearer
+    GameEvent.Moved {} -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
   -- The same event read by a BYSTANDER (CR 510.1b / 510.2): a permanent the Filter
   -- admits dealt combat damage to a player. The Filter reads the event's DAMAGER,
   -- the bearer contributing only CR 109.5's "you" and the Filter.Context's source
@@ -5903,6 +5949,7 @@ reactsToAbilityTriggering cond = case cond of
   -- game state is not an ability triggering.
   TriggerCondition.StateIs _ -> False
   TriggerCondition.SelfDealsCombatDamageToPlayer -> False
+  TriggerCondition.SelfIsDealtDamage -> False
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
   TriggerCondition.OpponentLostLifeDuringYourTurn -> False
@@ -6154,11 +6201,15 @@ eventBindings cond event = case (cond, event) of
   -- adjusts a total by the gain, so the two coincide only on a board that started
   -- at nothing, and the printed word means the gain.
   --
-  -- The gaining PLAYER is not bound alongside it, for the reason
-  -- eventBindingSlots' arm gives: under the one relation a card in the pool uses
-  -- that player is CR 109.5's "you", whom Binding.setYou already names.
-  (TriggerCondition.PlayerGainsLife _, GameEvent.LifeGained (LifeChange.MkLifeChange _ amount)) ->
-    Binding.setEventAmount amount Map.empty
+  -- The gaining PLAYER alongside it, under the reserved slot the loss arm below
+  -- and CR 701.9a's discard trigger already stamp: False Cure's "that player loses
+  -- 2 life for each 1 life they gained" reads both halves of one event, and
+  -- CR 603.2 makes both halves part of it. Bound whichever relation matched, for
+  -- the reason the loss arm spells out -- under You the slot is a second name for
+  -- CR 109.5's "you", a redundancy rather than a wrong answer, and
+  -- eventBindingSlots answers per condition with no relation in hand.
+  (TriggerCondition.PlayerGainsLife _, GameEvent.LifeGained (LifeChange.MkLifeChange pid amount)) ->
+    Binding.setTriggerPlayer pid (Binding.setEventAmount amount Map.empty)
   -- The other direction's "that much" -- Exquisite Blood's "you gain that much
   -- life". The same slot and the same reading as the gain arm above, off an
   -- event CR 603.2 makes the number part of.
@@ -6325,6 +6376,14 @@ eventBindingSlots cond = case cond of
   TriggerCondition.StateIs _ -> Set.empty
   -- CR 702.70a's "that player": the player the bearer dealt combat damage to.
   TriggerCondition.SelfDealsCombatDamageToPlayer -> Set.singleton Binding.triggerPlayer
+  -- NOTHING for enrage. CR 120.3's event names a source and an amount, and the
+  -- recipient is the bearer, whom CR 113.7a's source slot already names -- so the
+  -- two nameable halves are the damager and the number. Neither is bound and
+  -- eventBindings has no arm for this condition: Ripjaw Raptor's "draw a card"
+  -- reads no part of the event, and a slot nothing reads is a promise never kept.
+  -- Brash Taunter's "it deals that much damage" is what would want the amount
+  -- (gap #1712).
+  TriggerCondition.SelfIsDealtDamage -> Set.empty
   -- CR 510.2's damager, which the bystander's form needs and the self-scoped one
   -- above does not: there the damager IS the bearer, already bound as CR 113.7a's
   -- source. Aragorn, Hornburg Hero's "double the number of +1/+1 counters on it"
@@ -6470,12 +6529,13 @@ eventBindingSlots cond = case cond of
   -- GameEvent.LifeGained carries a Natural unconditionally, so no shape of the
   -- event withholds it. Sanguine Bond's "that much" is what reads it.
   --
-  -- The gaining PLAYER gets no slot: under the one relation a card in the pool
-  -- uses, that player is CR 109.5's "you", whom Binding.setYou already names, so a
-  -- slot would be a second name for one player. PlayerDiscards binds one because
-  -- Megrim's "that player" is somebody else's; a card watching an OPPONENT gain
-  -- life is what would want the same here (#826).
-  TriggerCondition.PlayerGainsLife _ -> Set.singleton Binding.eventAmount
+  -- And the GAINING player, for the reason the loss arm below binds the loser:
+  -- under False Cure's AnyPlayer relation that player is not the "you"
+  -- Binding.setYou names, and "that player loses 2 life for each 1 life they
+  -- gained" reads them. Guaranteed for the same reason the amount is --
+  -- GameEvent.LifeGained carries a PlayerId unconditionally, so the promise holds
+  -- under every relation.
+  TriggerCondition.PlayerGainsLife _ -> Set.fromList [Binding.eventAmount, Binding.triggerPlayer]
   -- The loss condition's amount, guaranteed for the same reason:
   -- GameEvent.LifeLost carries a Natural unconditionally. Exquisite Blood's "you
   -- gain that much life" is what reads it.
@@ -6703,6 +6763,7 @@ looksBack condition = case condition of
   TriggerCondition.StepBegins {} -> False
   TriggerCondition.StateIs _ -> False
   TriggerCondition.SelfDealsCombatDamageToPlayer -> False
+  TriggerCondition.SelfIsDealtDamage -> False
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
   TriggerCondition.OpponentLostLifeDuringYourTurn -> False
@@ -7488,6 +7549,11 @@ zonesTriggeredFrom cond = case cond of
   -- reader in any zone; stateTriggers below gathers them from the battlefield.
   TriggerCondition.StateIs _ -> battlefield
   TriggerCondition.SelfDealsCombatDamageToPlayer -> battlefield
+  -- CR 113.6's default again, and the match's own shape on top of it: this arm
+  -- compares the bearer against the event's RECIPIENT, and CR 120.3's recipient is
+  -- a player or a permanent -- so a bearer anywhere but the battlefield can never
+  -- be the one damaged.
+  TriggerCondition.SelfIsDealtDamage -> battlefield
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> battlefield
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> battlefield
   TriggerCondition.OpponentLostLifeDuringYourTurn -> battlefield
@@ -7672,6 +7738,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PermanentSacrificed -> False
   TriggerCondition.StateIs _ -> False
   TriggerCondition.SelfDealsCombatDamageToPlayer -> False
+  TriggerCondition.SelfIsDealtDamage -> False
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
   TriggerCondition.SelfCycled -> False
@@ -7824,6 +7891,7 @@ stateTriggers gs
               TriggerCondition.PermanentEnters _ -> False
               TriggerCondition.StepBegins {} -> False
               TriggerCondition.SelfDealsCombatDamageToPlayer -> False
+              TriggerCondition.SelfIsDealtDamage -> False
               TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
               TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
               TriggerCondition.OpponentLostLifeDuringYourTurn -> False
@@ -7970,26 +8038,46 @@ delayedPending events gs =
         -- EQUALITY, not a floor: CR 603.7a is a claim about ONE named turn, so the
         -- window has an upper end and not merely a lower one.
         TurnWindow.OnTurn n -> n == GameState.turnNumber gs
-      fires entry =
+      -- WHICH event fired the entry, rather than merely whether one did: the
+      -- payload reads CR 603.2's event through eventBindings below, so the match
+      -- has to hand the event forward.
+      --
+      -- The FIRST match among simultaneous ones. CR 603.7b gives an entry with no
+      -- stated duration's controller the choice of which event triggers it, and
+      -- makes an entry WITH one trigger per occurrence; neither is implemented
+      -- (#1711), and one match per group is what the store did before the event was
+      -- carried at all.
+      firedBy entry =
         let cond = TriggeredAbility.condition (DelayedTrigger.ability entry)
          in -- The entry's own bindings, which is CR 603.7c's captured environment:
             -- TriggerCondition.LoseControlOfBound asks about an object named as the
             -- arming spell resolved, and the store is the only thing that still
             -- remembers it.
-            armed entry && any (matchesTriggerGiven (DelayedTrigger.bindings entry) gs (DelayedTrigger.source entry) (DelayedTrigger.controller entry) cond) events
-      pend entry =
+            if armed entry
+              then List.find (matchesTriggerGiven (DelayedTrigger.bindings entry) gs (DelayedTrigger.source entry) (DelayedTrigger.controller entry) cond) events
+              else Nothing
+      pend entry event =
         PendingTrigger.MkPendingTrigger
           (TriggerSource.OfObject (DelayedTrigger.source entry))
           (DelayedTrigger.controller entry)
           (DelayedTrigger.ability entry)
-          (DelayedTrigger.bindings entry)
+          -- CR 603.2's event slots over CR 603.7c's captured environment, the way an
+          -- object's trigger gets them in eventTriggers -- False Cure's "that
+          -- player" is the seat that just gained, not one the arming spell named.
+          -- Map.union is left-biased, so a name the arming environment happens to
+          -- share is read as THIS firing's, which is what the printed word means.
+          (Map.union (eventBindings (TriggeredAbility.condition (DelayedTrigger.ability entry)) event) (DelayedTrigger.bindings entry))
       store = GameState.delayedTriggers gs
       -- CR 603.2 plus CR 603.4: the event matched AND the intervening "if" held,
       -- which together are what "triggered" means.
-      triggers entry = fires entry && interveningHolds gs (pend entry)
+      triggered entry = case firedBy entry of
+        Nothing -> Nothing
+        Just event ->
+          let pending = pend entry event
+           in if interveningHolds gs pending then Just pending else Nothing
       -- Triggering spends the one shot only for an entry with no stated duration.
-      spent entry = triggers entry && Maybe.isNothing (DelayedTrigger.expiry entry)
-   in (fmap pend (Foldable.toList (Seq.filter triggers store)), Seq.filter (not . spent) store)
+      spent entry = Maybe.isJust (triggered entry) && Maybe.isNothing (DelayedTrigger.expiry entry)
+   in (Maybe.mapMaybe triggered (Foldable.toList store), Seq.filter (not . spent) store)
 
 -- CR 603.7a: the printed Onset as the game first stores it. The delayed-trigger
 -- twin of Expiry.arm, deliberately blind to the board -- unlike a duration, an

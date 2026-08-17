@@ -601,6 +601,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.StepBegins {} -> []
   TriggerCondition.StateIs condition -> conditionCounts condition
   TriggerCondition.SelfDealsCombatDamageToPlayer -> []
+  TriggerCondition.SelfIsDealtDamage -> []
   -- Its watcher-scoped sibling carries a Filter, and a Filter holds no Count.
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> []
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
@@ -2407,6 +2408,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfEnters -> []
   TriggerCondition.StepBegins {} -> []
   TriggerCondition.SelfDealsCombatDamageToPlayer -> []
+  -- Enrage's condition is nullary: rule 120.3 qualifies the damage in no way, so
+  -- there is nothing for a text change to rewrite.
+  TriggerCondition.SelfIsDealtDamage -> []
   -- Its watcher-scoped sibling carries one -- Tovolar's "a Wolf or Werewolf you
   -- control", which the card lint must sweep.
   TriggerCondition.PermanentDealsCombatDamageToPlayer f -> [f]
@@ -3866,8 +3870,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- Every slot a delayed ability READS must be one the arming card DEFINES:
   -- the reserved trigger-source slot, a token bound by a Create, the
   -- incarnation a MoveToZone bound at its destination (Meandering Towershell's
-  -- exiled card), or a TARGET the arming carrier declared (armingTargetSlots, which
-  -- is CR 603.7c's captured environment -- Ray of Command's third sentence). The
+  -- exiled card), a TARGET the arming carrier declared (armingTargetSlots, which
+  -- is CR 603.7c's captured environment -- Ray of Command's third sentence), or a
+  -- CR 603.2 event slot the entry's own condition binds as it fires
+  -- (Event.eventBindingSlots -- False Cure's "that player ... they gained", which
+  -- Event.delayedPending stamps on top of the captured environment exactly as
+  -- eventTriggers does for an object's trigger). The
   -- `abilityBound` side is `cardResolutionEffects` for the
   -- reason the lint above takes it: the binding effect can live in the ability
   -- that arms, not only in a spell mode.
@@ -3882,9 +3890,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- ability declaring a slot no effect of its reads fails here too.
   Spec.it s "every slot a delayed ability reads is bound by its card" $ do
     ps <- S.allPrintings s
-    let cardOffends card =
-          let bound = Set.insert Binding.triggerSource (Set.union (armingTargetSlots card) (Resolve.definedSlots (cardResolutionEffects card)))
-           in any (modalSlotsOffend bound . TriggeredAbility.modal) (Map.elems (Face.delayedAbilities card))
+    let cardBound card = Set.insert Binding.triggerSource (Set.union (armingTargetSlots card) (Resolve.definedSlots (cardResolutionEffects card)))
+        abilityOffends card ability =
+          modalSlotsOffend
+            (Set.union (cardBound card) (Event.eventBindingSlots (TriggeredAbility.condition ability)))
+            (TriggeredAbility.modal ability)
+        cardOffends card = any (abilityOffends card) (Map.elems (Face.delayedAbilities card))
         offenders = filter (anyFace cardOffends . Printing.card) ps
     Spec.assertEqWith s "no dangling delayed-ability slot" (fmap (S.nameOf . Printing.card) offenders) []
   -- A delayed ability may not DECLARE a target slot under a name its own card

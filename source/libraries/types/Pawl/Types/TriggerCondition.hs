@@ -54,6 +54,24 @@ data TriggerCondition
   | -- | CR 603.2 / 509-510: the bearer dealt combat damage to a player, read off
     -- the DamageDealt event history.
     SelfDealsCombatDamageToPlayer
+  | -- | CR 120.3: the bearer WAS DEALT damage -- the enrage trigger's event
+    -- (Ripjaw Raptor's "whenever this creature is dealt damage"). The mirror of
+    -- SelfDealsCombatDamageToPlayer above, off the same DamageDealt history, with
+    -- the identity check moved from the event's source to its recipient.
+    --
+    -- NO DamageKind and no source Filter, unlike every neighbouring damage
+    -- condition: the printed phrase qualifies the damage in no way, so combat
+    -- damage and a Prodigal Sorcerer's ping alike fire it.
+    --
+    -- Enrage is an ability word (CR 207.2c) with no rules meaning of its own, so
+    -- nothing about it reaches Pawl.Types.Keyword; this is an ordinary triggered
+    -- ability that happens to be printed after an italic word.
+    --
+    -- ONE fire per recorded event, not one per batch: CR 510.2 deals a combat
+    -- damage step's damage simultaneously and Pawl.Engine.Damage records a
+    -- DamageDealt per surviving event, so a creature blocked by two others
+    -- triggers this twice. Pinned by Pawl.TriggerSpec.
+    SelfIsDealtDamage
   | -- | CR 603.2 / 509-510 again, read by a BYSTANDER: a permanent the Filter
     -- admits dealt combat damage to a player -- Tovolar, Dire Overlord's
     -- "whenever a Wolf or Werewolf you control deals combat damage to a player".
@@ -635,7 +653,10 @@ data TriggerCondition
     -- than 0 match, whatever its size -- but it is part of the EVENT, which is why
     -- Pawl.Engine.Event.eventBindings binds it under
     -- Pawl.Engine.Binding.eventAmount for Sanguine Bond's "that much" to read.
-    -- Ajani's Pridemate names no number and simply ignores the slot.
+    -- Ajani's Pridemate names no number and simply ignores the slot. The gaining
+    -- PLAYER rides alongside it under Pawl.Engine.Binding.triggerPlayer for the
+    -- same reason -- False Cure's "that player" is whoever the event named, which
+    -- under AnyPlayer is not CR 109.5's "you".
     --
     -- LOSING life is not the negative of this condition but a different event
     -- entirely (GameEvent.LifeLost), so a card bearing this stays silent for a
