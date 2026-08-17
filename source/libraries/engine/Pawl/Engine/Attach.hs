@@ -1,7 +1,9 @@
--- Rule 701.3's attach, in one place because two callers a library apart need the
--- same answer: Pawl.Engine.Resolve's Attach and AttachTarget opcodes, and
--- Pawl.Engine.Event's CR 303.4k arm for an Aura being turned face up. Event sits
--- BELOW Resolve, so the shared half cannot live in Resolve where it started.
+-- Rule 701.3's attach, in one place because callers a library apart need the same
+-- answer: Pawl.Engine.Resolve's Attach and AttachTarget opcodes, and two arms of
+-- Pawl.Engine.Event -- the CR 303.4k rewrite for an Aura being turned face up, and
+-- changeZoneAttaching's CR 303.4f host choice for an Aura entering the battlefield
+-- by any means other than resolving as an Aura spell. Event sits BELOW Resolve, so
+-- the shared half cannot live in Resolve where it started.
 --
 -- THE INVARIANT: nothing here asks which CARD is moving. It reads the
 -- PROJECTION's subtypes (CR 205.3) and the enchant ability rule 702.5a gives an
@@ -159,6 +161,10 @@ hostsFor controller source subject filter_ gs =
 -- CR 303.4j refuses the illegal move afterwards. Rule 303.4k leaves no such
 -- backstop open, so an offer that had to be refused would be this engine
 -- inventing one.
+--
+-- CR 303.4f -- changeZoneAttaching's Aura entry -- is that same narrowing with NO
+-- card text to intersect, since there the enchant ability IS the whole restriction.
+-- So it asks hostsFor with a bare Filter.CanHostSubject rather than through here.
 turnUpHosts :: PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Keyword -> GameState -> [ObjectId]
 turnUpHosts controller aura filter_ =
   hostsFor controller aura aura (Filter.Type.And [filter_, Filter.Type.CanHostSubject])

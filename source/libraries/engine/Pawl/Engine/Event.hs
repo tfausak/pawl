@@ -2271,9 +2271,9 @@ changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requeste
 -- would be unattached during both. No card in the pool observes the difference
 -- today; the seed buys the ordering rather than a passing test.
 --
--- Stack's Aura branch is the only caller supplying a seed, so an Aura entering by
--- any other route enters unattached and is buried on the next SBA pass by CR
--- 704.5m -- where CR 303.4g says it should instead stay in its current zone (#188).
+-- Stack's Aura branch is the only caller supplying a seed. An Aura entering by any
+-- other route is CR 303.4f's, and the body below asks its controller what it will
+-- enchant rather than letting it enter unattached -- see there.
 --
 -- `asOf` is changeZoneInBatch's batch board, Nothing otherwise. `tapped` is CR
 -- 110.5b's status, Untapped for every door but changeZoneEntering. `entering` is
@@ -2456,12 +2456,21 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
               -- designation." A Room put onto the battlefield by an effect
               -- reaches this with `shown` Nothing and enters with both doors shut.
               unlocking = dest == Zone.Battlefield && maybe False Card.hasSharedTypeLine (Game.cardOf oid gs)
-              mkObj ts =
+              -- CR 110.5's status the ARRIVING incarnation will carry. Named
+              -- because two readers want it: mkObj's `facing` field below, whose
+              -- comment has the reasoning, and the CR 303.4f gate further down,
+              -- which must not ask about an Aura card entering FACE DOWN -- CR
+              -- 708.2a leaves such a permanent with no subtypes and no enchant
+              -- ability, so it is not an Aura the rule speaks about. That read
+              -- cannot come off the projection here, which sees the object face up
+              -- in the zone it is leaving.
+              entryFacing = if dest == requestedDest then facing else Facing.FaceUp
+              mkObj entrySeed ts =
                 (Object.newIncarnation obj)
                   { Object.zone = dest,
                     Object.timestamp = ts,
                     Object.tapped = tapped,
-                    Object.attachedTo = seed,
+                    Object.attachedTo = entrySeed,
                     -- CR 109.4: only the stack and the battlefield give an object
                     -- a controller, so those are the two destinations that keep
                     -- the caller's player and every other clears it. The stack
@@ -2488,7 +2497,7 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
                     -- face-down permanent to all players as it leaves the
                     -- battlefield, so a CR 616.1 redirect that lands the object
                     -- anywhere else must leave it face up.
-                    Object.facing = if dest == requestedDest then facing else Facing.FaceUp,
+                    Object.facing = entryFacing,
                     -- CR 406.3: an exiled card is kept face up unless the effect
                     -- exiled it face down, so this is part of the move for
                     -- `facing`'s reason -- the card is never face up in exile
@@ -2619,89 +2628,160 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
                       -- chose anything for it.
                       expiry <- Maybe.maybeToList (Expiry.arm Map.empty lastController oid duration gs)
                     ]
-          State.modify' $ \g ->
-            let g1 = Game.removeFromZones pid oid g
-             in g1
-                  { GameState.objects = Map.delete oid (GameState.objects g1),
-                    -- Stored as the permanent goes, in the same write that
-                    -- removes it: nothing can observe a board where the
-                    -- permanent has left and its effect has not yet been handed
-                    -- over.
-                    GameState.continuousEffects = handover <> GameState.continuousEffects g1,
-                    -- CR 608.2h: the object ceases here, so this is the last
-                    -- moment its information is known. Filed under the id it had
-                    -- while it existed -- the id an ability on the stack still
-                    -- carries as its source (CR 113.7) -- and from the same
-                    -- `snapshot` the Moved event below records, so the two
-                    -- readings of "what was it" cannot drift apart.
-                    --
-                    -- The counters come off `obj`, the PRE-MOVE object, and not
-                    -- off the incarnation `mkObj` builds: CR 122.2 makes them
-                    -- cease to exist on the zone change, so the last moment they
-                    -- can be recorded is this one.
-                    --
-                    -- The COPIABLE snapshot is taken here for the counters'
-                    -- reason: it is layer 1 (CR 613.1a) rather than the fold
-                    -- `snapshot` is, and the copy binding and face it reads live
-                    -- on `obj`, which is about to cease. No third board walk --
-                    -- it reads that binding or the printed face and stops.
-                    GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs)) (GameState.lastKnown g1)
-                  }
-          newId <- placeObject pid mkObj dest position
-          -- CR 614.1c-d: entry replacements apply to BATTLEFIELD entries and
-          -- nowhere else. CR 616.1g's nesting of one event inside another is
-          -- expressed as call nesting rather than a field. A lone entry has no
-          -- same-batch siblings (CR 614.12a; see applyReplacementsIn
-          -- for why 614.12a and not 614.13a).
-          Monad.when (dest == Zone.Battlefield) $ do
-            -- CR 122.6a: the counters the EFFECT says the object enters with --
-            -- undying's and persist's "with a +1/+1 counter on it". Inside the
-            -- move, before the entry loop and before the Moved event below, so
-            -- nothing can see the permanent without them (the tap state's reason,
-            -- one field over). Through putCounters, CR 122.6's funnel, so CR
-            -- 614.16 applies and Doubling Season sees them, exactly as the
-            -- EntryRewrite.WithCounters arm inside the loop does.
-            --
-            -- Before the loop rather than after it, which no card observes: no
-            -- entry replacement in the pool reads a counter the entering object
-            -- already has, and the two are simultaneous in the rules anyway.
-            Monad.mapM_ (\(kind, n) -> Monad.void (putOwnCounters newId kind n)) (Map.toAscList entering)
-            runEntry Set.empty newId
-          -- CR 709.5h: an ability that triggers on a door opening fires "regardless
-          -- of whether it was given that designation while entering the
-          -- battlefield or after entering the battlefield", so the entry
-          -- designation `unlocking` wrote into mkObj above needs its event too.
-          -- Recorded rather than routed through unlockHalf, which would find the
-          -- door already open and record nothing: writing the designation inside
-          -- the move is what CR 709.5d's "as it enters" asks for, and the event is
-          -- what CR 709.5h asks for -- two rules, and the entry is the one place
-          -- they are not the same write.
+          -- CR 303.4f: an Aura entering the battlefield "by any means other than
+          -- by resolving as an Aura spell", where "the effect putting it onto the
+          -- battlefield doesn't specify the object or player the Aura will
+          -- enchant". That second clause IS `seed` being Nothing: Pawl.Engine.Stack's
+          -- Aura branch is the only door that supplies a seed, and it is the only
+          -- door a resolving Aura spell takes, so the rule's own exclusion is
+          -- carried without this funnel asking what kind of move it is.
           --
-          -- BEFORE the Moved event, so a Room's own "when you unlock this door"
-          -- and its "when this enters" are gathered in one scan with the door's
-          -- event first. The two are simultaneous and CR 603.3b lets their
-          -- controller order them on the stack, so nothing observable rides on
-          -- which is logged first.
+          -- Gated on the SETTLED destination, `unlocking`'s reading one binding up:
+          -- a CR 616.1 redirect that sends the Aura anywhere but the battlefield
+          -- (CR 614.6: the modified event is what happens) must not raise the
+          -- prompt.
           --
-          -- CR 709.5i's flag is computed here too, through the same
-          -- `fullyUnlockedAfter` unlockHalf uses, and against the designations
-          -- `mkObj` actually wrote. Reading `shown` back rather than the stored
-          -- object, so the two writers answer the question the same way from the
-          -- same input. Always False today, and that is CR 709.5d rather than a
-          -- shortcut: an entry gives at most ONE designation, so a two-door Room
-          -- can never arrive fully unlocked. CR 709.5i's second branch -- a
-          -- permanent that "has neither designation and gains both" -- is
-          -- therefore unreachable and untested (#962).
-          Monad.forM_ (if unlocking then Maybe.maybeToList shown else []) $ \half ->
-            State.modify' (recordEvent (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked newId half (fullyUnlockedAfter (foldMap Set.singleton shown) (Game.cardOf oid gs)))))
-          -- CR 603.2g: record the RESOLVED event, carrying the NEW object's id --
-          -- what an enters trigger scans -- alongside the id it had in `fromZone`,
-          -- which is the key `lastKnown` is filed under and so the only route back
-          -- once CR 400.7 has minted a new incarnation (CR 603.10a's look-back
-          -- reads it). Recorded LAST, so the entry loop's choices are locked in
-          -- before any trigger or SBA can observe the object.
-          State.modify' (recordEvent (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange oid newId fromZone dest) snapshot)))
-          pure (Just newId)
+          -- Asked of `gs`, the PRE-MOVE board, which is where the Aura still is and
+          -- where the hosts already are. Attach.hostsFor sweeps the battlefield and
+          -- Attach.attachmentFor reads Projection.subtypesOf and Game.faceOf, both
+          -- of which answer for an object in any zone.
+          --
+          -- Filter.CanHostSubject ALONE, because CR 303.4f's "a legal object or
+          -- player according to the Aura's enchant ability and any other applicable
+          -- effects" is the whole restriction -- there is no card text to intersect
+          -- it with, which is the difference from CR 303.4k's Attach.turnUpHosts.
+          --
+          -- The Aura test is the PROJECTION's subtypes (CR 205.3 -- CR 303.4 speaks
+          -- about characteristics) rather than the printed type line
+          -- Pawl.Engine.Card.isAura reads. Nothing observes the difference in this
+          -- pool: every Aura subtype in data/cards is a printed type line or a
+          -- HasSubtype filter, and no effect grants the subtype.
+          --
+          -- `entryFacing` and not the projection is what answers CR 708.2a, and the
+          -- distinction matters: the projection sees the object in the zone it is
+          -- LEAVING, where an Aura card manifested off a library (CR 701.40a) is
+          -- still face up and would trip this gate. A permanent entering face down
+          -- has no subtypes and no enchant ability, so it is not an Aura CR 303.4f
+          -- speaks about -- it enters unattached, and Sba.fallsOff, which reads the
+          -- substituted face too, leaves it alone. Pawl.AuraSpec's "a manifested
+          -- Aura card is not an Aura" is the proof: Soul Summons manifests an Unholy
+          -- Strength over two legal hosts, and dropping the conjunct raises a prompt.
+          --
+          -- Answering Nothing is CR 303.4g's "the Aura remains in its current
+          -- zone": this funnel's CR 614.6 cancel arm above, one case over, so the
+          -- object is never deleted and never re-minted (CR 400.7) and the graveyard
+          -- card is the same object it always was.
+          --
+          -- Not implemented: CR 303.4g's other branch, for an Aura whose current
+          -- zone is the stack or that is a token, and CR 303.4i's effect that names
+          -- an attachment the Aura can't legally enchant (gap #1734).
+          settledSeed <-
+            if dest == Zone.Battlefield && entryFacing == Facing.FaceUp && Maybe.isNothing seed && Set.member Subtype.Aura (Projection.subtypesOf oid gs)
+              then do
+                -- CR 303.4f's "that player" is CR 110.2a's entry controller, which
+                -- is `under` -- falling back to the owner when the effect named
+                -- nobody, per CR 110.2 and CR 108.4a, exactly as the field's own
+                -- note above says.
+                let chooser = Maybe.fromMaybe pid under
+                    hosts = Attach.hostsFor chooser oid oid Filter.Type.CanHostSubject gs
+                chosen <- Attach.chooseHost chooser oid hosts
+                -- THE TAG the Aura's own enchant slot produced, never a hand-built
+                -- ToObject: Sba.stillLegalEnchant compares the (pool, tag) pair, so
+                -- a ToObject stored where the slot offers a ToCreature falls through
+                -- and CR 704.5m buries the Aura on the next pass.
+                --
+                -- attachmentFor answering Nothing collapses into CR 303.4g's
+                -- "remains in its current zone" too, and is unreachable rather than
+                -- a second reading: hostsFor's Filter.CanHostSubject conjunct is
+                -- that same function, so every candidate it offered admits.
+                pure (fmap Just (chosen >>= \h -> Attach.attachmentFor oid (Recipient.ToObject h) gs))
+              else pure (Just seed)
+          case settledSeed of
+            Nothing -> pure Nothing
+            Just entrySeed -> do
+              State.modify' $ \g ->
+                let g1 = Game.removeFromZones pid oid g
+                 in g1
+                      { GameState.objects = Map.delete oid (GameState.objects g1),
+                        -- Stored as the permanent goes, in the same write that
+                        -- removes it: nothing can observe a board where the
+                        -- permanent has left and its effect has not yet been handed
+                        -- over.
+                        GameState.continuousEffects = handover <> GameState.continuousEffects g1,
+                        -- CR 608.2h: the object ceases here, so this is the last
+                        -- moment its information is known. Filed under the id it had
+                        -- while it existed -- the id an ability on the stack still
+                        -- carries as its source (CR 113.7) -- and from the same
+                        -- `snapshot` the Moved event below records, so the two
+                        -- readings of "what was it" cannot drift apart.
+                        --
+                        -- The counters come off `obj`, the PRE-MOVE object, and not
+                        -- off the incarnation `mkObj` builds: CR 122.2 makes them
+                        -- cease to exist on the zone change, so the last moment they
+                        -- can be recorded is this one.
+                        --
+                        -- The COPIABLE snapshot is taken here for the counters'
+                        -- reason: it is layer 1 (CR 613.1a) rather than the fold
+                        -- `snapshot` is, and the copy binding and face it reads live
+                        -- on `obj`, which is about to cease. No third board walk --
+                        -- it reads that binding or the printed face and stops.
+                        GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs)) (GameState.lastKnown g1)
+                      }
+              newId <- placeObject pid (mkObj entrySeed) dest position
+              -- CR 614.1c-d: entry replacements apply to BATTLEFIELD entries and
+              -- nowhere else. CR 616.1g's nesting of one event inside another is
+              -- expressed as call nesting rather than a field. A lone entry has no
+              -- same-batch siblings (CR 614.12a; see applyReplacementsIn
+              -- for why 614.12a and not 614.13a).
+              Monad.when (dest == Zone.Battlefield) $ do
+                -- CR 122.6a: the counters the EFFECT says the object enters with --
+                -- undying's and persist's "with a +1/+1 counter on it". Inside the
+                -- move, before the entry loop and before the Moved event below, so
+                -- nothing can see the permanent without them (the tap state's reason,
+                -- one field over). Through putCounters, CR 122.6's funnel, so CR
+                -- 614.16 applies and Doubling Season sees them, exactly as the
+                -- EntryRewrite.WithCounters arm inside the loop does.
+                --
+                -- Before the loop rather than after it, which no card observes: no
+                -- entry replacement in the pool reads a counter the entering object
+                -- already has, and the two are simultaneous in the rules anyway.
+                Monad.mapM_ (\(kind, n) -> Monad.void (putOwnCounters newId kind n)) (Map.toAscList entering)
+                runEntry Set.empty newId
+              -- CR 709.5h: an ability that triggers on a door opening fires "regardless
+              -- of whether it was given that designation while entering the
+              -- battlefield or after entering the battlefield", so the entry
+              -- designation `unlocking` wrote into mkObj above needs its event too.
+              -- Recorded rather than routed through unlockHalf, which would find the
+              -- door already open and record nothing: writing the designation inside
+              -- the move is what CR 709.5d's "as it enters" asks for, and the event is
+              -- what CR 709.5h asks for -- two rules, and the entry is the one place
+              -- they are not the same write.
+              --
+              -- BEFORE the Moved event, so a Room's own "when you unlock this door"
+              -- and its "when this enters" are gathered in one scan with the door's
+              -- event first. The two are simultaneous and CR 603.3b lets their
+              -- controller order them on the stack, so nothing observable rides on
+              -- which is logged first.
+              --
+              -- CR 709.5i's flag is computed here too, through the same
+              -- `fullyUnlockedAfter` unlockHalf uses, and against the designations
+              -- `mkObj` actually wrote. Reading `shown` back rather than the stored
+              -- object, so the two writers answer the question the same way from the
+              -- same input. Always False today, and that is CR 709.5d rather than a
+              -- shortcut: an entry gives at most ONE designation, so a two-door Room
+              -- can never arrive fully unlocked. CR 709.5i's second branch -- a
+              -- permanent that "has neither designation and gains both" -- is
+              -- therefore unreachable and untested (#962).
+              Monad.forM_ (if unlocking then Maybe.maybeToList shown else []) $ \half ->
+                State.modify' (recordEvent (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked newId half (fullyUnlockedAfter (foldMap Set.singleton shown) (Game.cardOf oid gs)))))
+              -- CR 603.2g: record the RESOLVED event, carrying the NEW object's id --
+              -- what an enters trigger scans -- alongside the id it had in `fromZone`,
+              -- which is the key `lastKnown` is filed under and so the only route back
+              -- once CR 400.7 has minted a new incarnation (CR 603.10a's look-back
+              -- reads it). Recorded LAST, so the entry loop's choices are locked in
+              -- before any trigger or SBA can observe the object.
+              State.modify' (recordEvent (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange oid newId fromZone dest) snapshot)))
+              pure (Just newId)
 
 -- The single destruction funnel (CR 701.8 / 702.12b): the Destroy opcode and the
 -- CR 704.5g/h state-based actions both flow through here.

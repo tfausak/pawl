@@ -253,7 +253,10 @@ resolveTop = resolveTopWith Resolve.noSubgame
 --
 -- The recipient is handed on UNCHANGED, tag and all, so CR 303.4c's re-check
 -- (Sba.stillLegalEnchant) can compare the stored value against the same pool's
--- candidates without re-deriving how it is referenced.
+-- candidates without re-deriving how it is referenced. Event's CR 303.4f arm gets
+-- the same tag a different way, off Attach.attachmentFor, because there is no cast
+-- target for it to hand on; routing this one through attachmentFor too would let a
+-- legally targeted Aura whose admission answer differs cancel its own resolution.
 enchantedBy :: ObjectId -> GameState.GameState -> Maybe Recipient.Recipient
 enchantedBy oid gs = case Game.lookupObject oid gs of
   Nothing -> Nothing
