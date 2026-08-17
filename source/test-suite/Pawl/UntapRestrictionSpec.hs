@@ -2,7 +2,8 @@
 
 -- Covers: CR 502.3 / CR 101.2's UNTAP PROHIBITION in both carriers --
 -- Pawl.Types.UntapRestriction, the set Pawl.Engine.UntapRestriction answers, and
--- Object.doesNotUntapNext, the one-shot Effect.DoesNotUntapNext stores -- plus
+-- Object.doesNotUntapNext, the one-shot Effect.DoesNotUntapNext and CR 508.1g's
+-- exert payment both store -- plus
 -- the one place both are subtracted (Pawl.Engine.Engine.untapAll); CR 602.1 /
 -- 605.1a read as
 -- Pawl.Types.Filter's HasNonManaActivatedAbility atom off
@@ -122,7 +123,8 @@ spec s registry = Spec.describe s "UntapRestriction" $ do
   existenceSpec s registry
 
 -- CR 502.3 / CR 611.2's ONE-SHOT prohibition: Effect.DoesNotUntapNext, the flag
--- it writes, and CR 701.43b's expiry.
+-- it writes, and CR 701.43b's expiry. CR 508.1g's exert writes the same flag
+-- without an effect; Pawl.CombatSpec's Exert group is where that path is proved.
 oneShotSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 oneShotSpec s registry = Spec.describe s "OneShot" $ do
   -- The unit's central claim. Every assertion is made on one board, so none of

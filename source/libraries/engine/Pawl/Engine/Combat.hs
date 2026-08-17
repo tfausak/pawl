@@ -1580,12 +1580,12 @@ declareAttackers pid = do
         -- about each of them, and of `attacking` rather than `chosen` so that a
         -- creature the CR 508.1d degradation dropped is never offered one.
         --
-        -- Read off the PROJECTION, not the printed face: a granted exert
-        -- (Angrath's Marauders is not that card, but Sunbird's Invocation could
-        -- grant one) counts, and CR 613 is what makes the projection the answer.
-        -- Re-read per creature from the live state because the answer to an
-        -- earlier prompt cannot change it -- a pure `Prompt r -> r` writes nothing
-        -- -- but the exert writes above it do, and none of them touches a keyword.
+        -- Read off the PROJECTION, not the printed face: CR 613 is what decides
+        -- whether a permanent has the keyword, so a granted exert would count
+        -- exactly as a printed one does. Re-read per creature from the live state
+        -- because the exert writes above it do change the board -- none of them
+        -- touches a keyword today, so the re-read is a fence rather than a
+        -- difference this pool can show.
         --
         -- CR 701.43a's keyword action is the write itself: Object.doesNotUntapNext
         -- on the exerted permanent, which Pawl.Engine.Engine.untapAll applies and
