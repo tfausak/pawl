@@ -271,6 +271,12 @@ effectSpec s registry = Spec.describe s "Effect" $ do
   -- clause: 2 instead of 4. The control is the same declaration with no Ripple
   -- cast, which is what keeps "took no damage from it" from passing because the
   -- board was never in combat at all.
+  --
+  -- The record assertion is the one that proves CR 506.4, and the life totals are
+  -- not: neutering Phasing.phaseOut's Game.removeFromCombat call leaves the record
+  -- assertion red and both life totals unchanged, Pawl.Engine.Damage having its own
+  -- liveness gate on the battlefield. So the damage here is CR 702.26b's doing and
+  -- the record is rule 506.4's.
   Spec.it s "CR 506.4 an attacking creature that phases out mid-combat deals no combat damage" $ do
     island <- S.printingOf s registry "Island"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -616,6 +622,9 @@ attachedSpec s registry = Spec.describe s "Attached" $ do
     let ((host, equip), spell, board) = equippedBoard island piker bonesplitter ripple
         gone = rippleAt equip spell board
         back = untapStep S.alice gone
+    -- Asserted before the outcome, so a version that never phased the Equipment out
+    -- fails here rather than passing the two below by never having moved anything.
+    Spec.assertEqWith s "setup: it phased out directly" (Phasing.phasedOutStatus equip gone) (Just (PhasedOut.Directly S.alice))
     -- The attachment survives the trip untouched, which is what makes rule 702.26i
     -- answerable at all: nothing clears Object.attachedTo while the permanent is away.
     Spec.assertEqWith s "it is still attached while phased out" (attachedHostOf equip gone) (Just (Recipient.ToCreature host))
