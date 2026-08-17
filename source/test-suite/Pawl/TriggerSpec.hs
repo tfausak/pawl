@@ -3138,14 +3138,14 @@ discardTriggerSpec s registry =
 foodTokenName :: CardName.CardName
 foodTokenName = CardName.MkCardName (Text.pack "Food Token")
 
--- Which of alice's two cards CR 701.9b's choice discards, PINNED -- and filtered
--- out of the set the prompt offered rather than built, so a mutation cannot be
--- repaired by an answerer that goes looking for a legal pick.
 -- CR 601.2f's discard-as-a-cost, the door every non-cycling discard in the pool
 -- goes through, asked for one card with no criterion.
 discardOne :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
 discardOne answer gs = S.runPure answer gs (Cost.payComponent S.alice S.noSource (CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.And []))))
 
+-- Which of alice's cards CR 701.9b's choice discards, PINNED -- and filtered out
+-- of the set the prompt offered rather than built, so a mutation cannot be
+-- repaired by an answerer that goes looking for a legal pick.
 discardPick :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 discardPick wanted p = case p of
   Prompt.ChooseDiscard _ _ held _ -> filter (== wanted) held
@@ -3212,8 +3212,8 @@ selfDiscardTriggerSpec s registry =
           Spec.assertEqWith s "both cards are in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 2
           Spec.assertEqWith s "and no Food was created" (S.countOnBattlefieldByName foodTokenName S.alice after) 0
         -- CR 702.29a: cycling IS discarding, so the cause the event carries is
-        -- one this condition must not read -- where TriggerCondition.SelfCycled
-        -- one arm over reads nothing else. No printing carries both this
+        -- one this condition must not read -- where its sibling
+        -- TriggerCondition.SelfCycled reads nothing else. No printing carries both this
         -- condition and cycling (a Scryfall sweep for "you discard this card"
         -- returns this card, Edgar's Awakening and Titanbones, none of them a
         -- cycler), so the two causes are driven through Event.discard, the one

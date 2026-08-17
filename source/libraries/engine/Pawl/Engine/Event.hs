@@ -8417,15 +8417,16 @@ zonesTriggeredFrom cond = case cond of
   -- battlefield at all and the hand is the one zone it can. eventTriggers'
   -- `revealedInHand` is what serves it.
   TriggerCondition.SelfRevealedForMiracle -> Set.singleton Zone.Hand
-  -- CR 113.6k's fifth reader, and the same argument SelfCycled's arm above makes:
-  -- a card cannot be discarded from the battlefield -- CR 701.9a discards from a
-  -- HAND -- so this condition can never trigger from there, and the graveyard CR
-  -- 701.9a moves the card to is the one zone the scan meets it in.
+  -- CR 113.6k's exception again, on SelfCycled's argument: CR 701.9a discards a
+  -- card from a HAND, so this condition can never trigger from the battlefield,
+  -- and the graveyard rule 701.9a moves the card to is the one zone the scan
+  -- meets it in.
   --
   -- eventTriggers' `inGraveyards` is what serves it, gated on exactly this
-  -- answer. No source of its own is owed: `cycledCard` recovers a card the
-  -- CYCLING cause named, and rule 702.29c is why that one is narrower than this
-  -- condition rather than a gap under it.
+  -- answer -- Pawl.TriggerSpec's Bartered Cow cases go red if this arm answers
+  -- the battlefield. No candidate source of its own is owed: `cycledCard`
+  -- recovers the card the CYCLING cause named, which rule 702.29c makes narrower
+  -- than this condition rather than a gap under it.
   TriggerCondition.SelfDiscarded -> Set.singleton Zone.Graveyard
   -- CR 113.6's default: the bearer watches from the battlefield, so a card in a
   -- graveyard does not see an opponent discard.
