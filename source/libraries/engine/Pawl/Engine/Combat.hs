@@ -563,7 +563,9 @@ attackCeilingGiven limit alone candidates gs =
 
 -- How many of `required` this declaration obeys (CR 508.1d): a requirement
 -- instance is obeyed exactly when the declaration attacks with its creature.
--- requirementsMet's twin, on a set of creatures rather than a map of pairs.
+-- requirementsMet's twin, on a set of creatures rather than a multiset of pairs
+-- -- the twin counts requirements and this one counts creatures, which is the
+-- divergence AttackRequirement.instances records (#1705).
 attackRequirementsMet :: Set ObjectId -> Set ObjectId -> Int
 attackRequirementsMet required declaration = Set.size (Set.intersection required declaration)
 
@@ -1029,9 +1031,14 @@ blockDeclarationAllowed limit arity pcs able declaration gs =
 -- How many of `requirements` this declaration obeys (CR 509.1c): a requirement
 -- instance is obeyed exactly when the declaration has its blocker blocking its
 -- attacker.
-requirementsMet :: Set (ObjectId, ObjectId) -> Map ObjectId (Set ObjectId) -> Int
+--
+-- Summing multiplicities rather than counting keys, because CR 509.1c counts
+-- REQUIREMENTS and BlockRequirement.instances is a multiset over pairs: two
+-- requirements naming one pair are both obeyed by the declaration that makes
+-- that block.
+requirementsMet :: Map (ObjectId, ObjectId) Natural -> Map ObjectId (Set ObjectId) -> Natural
 requirementsMet requirements declaration =
-  Set.size (Set.filter (\(blocker, attacker) -> Set.member attacker (Map.findWithDefault Set.empty blocker declaration)) requirements)
+  sum (Map.filterWithKey (\(blocker, attacker) _ -> Set.member attacker (Map.findWithDefault Set.empty blocker declaration)) requirements)
 
 -- Every declaration CR 509.1a lets the defending player write down, given the
 -- pairs CR 509.1b allows: each candidate blocker independently blocks nothing, or
@@ -1094,10 +1101,10 @@ choicesUpTo n attackers =
 -- and Projection.projectGiven). blockCeilingGiven is the half
 -- legalBlockDeclaration reaches, so that the two of them share one board rather
 -- than taking one apiece.
-blockCeiling :: PlayerId -> GameState -> (Set (ObjectId, ObjectId), Map ObjectId (Set ObjectId))
+blockCeiling :: PlayerId -> GameState -> (Map (ObjectId, ObjectId) Natural, Map ObjectId (Set ObjectId))
 blockCeiling pid gs = blockCeilingGiven (Projection.controlGrants gs) (Projection.projectAll gs) pid gs
 
-blockCeilingGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> (Set (ObjectId, ObjectId), Map ObjectId (Set ObjectId))
+blockCeilingGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> (Map (ObjectId, ObjectId) Natural, Map ObjectId (Set ObjectId))
 blockCeilingGiven grants pcs pid gs =
   let attackers = Map.keys (Combat.attackers (GameState.combat gs))
       candidates = legalBlockersGiven grants pcs pid gs
@@ -1115,7 +1122,7 @@ blockCeilingGiven grants pcs pid gs =
           else best
       legal = filter (\declaration -> blockDeclarationAllowed limit arity pcs able declaration gs) (candidateBlockDeclarations arity able candidates attackers)
    in ( requirements,
-        if Set.null requirements
+        if Map.null requirements
           then Map.empty
           else List.foldl' better Map.empty legal
       )
