@@ -1246,8 +1246,10 @@ spiderPunkSpec s registry = Spec.describe s "Spider-Punk (CR 615.12)" $ do
   -- sources deal damage to the shielded creature at the same time, and the rule
   -- gives its controller the choice of which the shield prevents -- but only
   -- when that choice can change the board. It cannot here, since an
-  -- unpreventable batch costs the shield nothing in any order, so nothing is
-  -- asked and the whole 8 lands either way.
+  -- unpreventable batch costs THIS shield nothing in any order (CR 615.12's last
+  -- sentence), so nothing is asked and the whole 8 lands either way. A CR 122.1c
+  -- shield counter is the opposite and is asked about, since the rule's middle
+  -- clause spends it either way -- shieldCounterSpec's CR 101.4c pair.
   Spec.it s "CR 615.12 / 615.7 an unpreventable batch asks the shielded creature's controller nothing"
     . withBoard
     $ \build -> do
