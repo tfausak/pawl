@@ -36,7 +36,8 @@ spec s = Spec.describe s "Pawl.Codec.Search" $ do
       )
       """ {"searcher":{"type":"Relative","value":{"type":"You"}},"owner":{"type":"InSlot","value":"player"},"quantity":{"type":"Literal","value":1},"filter":{"type":"HasCardType","value":{"type":"Land"}},"upTo":true,"destination":{"type":"BattlefieldTapped"}} """
   -- The other reading of the same count: no "upTo" key means the quantity is a
-  -- quota, which is what every search in the pool but Denying Wind's prints.
+  -- quota. Paired with the case above so the key's absence is asserted, not just
+  -- its presence -- a required key would have made every card file rewrite.
   Spec.it s "an absent upTo decodes as False and is not written back" $
     Common.assertCodec
       s

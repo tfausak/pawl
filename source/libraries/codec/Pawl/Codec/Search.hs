@@ -22,7 +22,8 @@ codec = Fields.object $ do
   quantity <- Fields.required "quantity" Quantity.codec Search.quantity
   filter_ <- Fields.required "filter" (Filter.codec Keyword.codec) Search.filter
   -- Defaulted rather than required: an absent key is a card that does not print
-  -- "up to", which is what every search in the pool but Denying Wind's is.
+  -- "up to", which is the ordinary case, and the reading every card file already
+  -- written gets.
   upTo <- Fields.defaulted "upTo" False Common.boolean Search.upTo
   destination <- Fields.required "destination" SearchDestination.codec Search.destination
   pure

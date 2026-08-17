@@ -1140,8 +1140,9 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "alice's library kept its order -- hers was never shuffled" (Game.zoneMembers Zone.Library S.alice settled) aliceLib
     Spec.assertEqWith s "nor was bob's" (Game.zoneMembers Zone.Library S.bob settled) [bobCard]
   -- Denying Wind -- "{7}{U}{U} Sorcery: Search target player's library for up to
-  -- seven cards and exile them. Then that player shuffles." Extract's card with
-  -- "up to" printed on it, which is the whole point: its filter is `And []` too,
+  -- seven cards and exile them. Then that player shuffles." Extract's sentence
+  -- with two numbers changed and "up to" added, which is the whole point of
+  -- choosing it as the producer: its filter is `And []` too,
   -- so Filter.statesAQuality answers False for both and only Search.upTo can tell
   -- them apart. Under CR 701.23d alone the search would find seven; the card's own
   -- "up to" makes the count a ceiling the searcher chooses within.
