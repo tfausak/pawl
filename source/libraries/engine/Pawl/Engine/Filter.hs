@@ -291,9 +291,10 @@ data View = MkView
     -- actually contains the atom, and the pool's one printing (Tsabo's Web) is
     -- read outside the layer fold.
     --
-    -- Unlike attachedToView, this one has NO bounded reader behind it -- the
-    -- condition is asked through a full projection, so a filter forcing this from
-    -- inside the fold would not merely recurse but fail to terminate (gap #1758).
+    -- Bounded like attachedToView, and for the same reason: the condition is
+    -- asked through the reader Pawl.Engine.Projection.viewOfCharacteristics was
+    -- handed, so a filter forcing this from inside the fold reads the board at
+    -- that caller's own layer rather than restarting the projection (CR 613.1).
     nonManaActivatedAbility :: Bool
   }
 
