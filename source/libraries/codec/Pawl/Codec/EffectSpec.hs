@@ -84,6 +84,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.PlayerScope as PlayerScope
+import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity
@@ -676,12 +677,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 4) Seq.empty))
+      (Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage Duration.UntilEndOfTurn Nothing (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 4) Seq.empty))
       """ {"type":"PreventNextDamage","value":{"duration":{"type":"UntilEndOfTurn"},"ref":{"type":"InSlot","value":"target"},"quantity":{"type":"Literal","value":4}}} """
-  -- CR 615.5's additional effect, the fourth element (Test of Faith). Elided
-  -- above, where it is empty; nested here, so the recursion into an effect
+  -- CR 615.5's additional effect (Test of Faith) and CR 510.2's kind (Decorated
+  -- Griffin's "the next 1 COMBAT damage"). Both elided above; written here, so
+  -- the defaulted keys are proven to DECODE and the recursion into an effect
   -- inside an effect is round-tripped.
-  Spec.it s "PreventNextDamage with a CR 615.5 rider" $
+  Spec.it s "PreventNextDamage with a kind and a CR 615.5 rider" $
     Common.assertJsonCodec
       s
       toJson
@@ -689,13 +691,14 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       ( Effect.PreventNextDamage
           PreventNextDamage.MkPreventNextDamage
             { PreventNextDamage.duration = Duration.UntilEndOfTurn,
+              PreventNextDamage.kind = Just DamageKind.Combat,
               PreventNextDamage.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
               PreventNextDamage.quantity = Quantity.Literal 3,
               PreventNextDamage.riders =
                 Seq.singleton (Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.InSlot (SlotName.MkSlotName (Text.pack "thatMuch"))) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
             }
       )
-      """ {"type":"PreventNextDamage","value":{"duration":{"type":"UntilEndOfTurn"},"ref":{"type":"InSlot","value":"target"},"quantity":{"type":"Literal","value":3},"riders":[{"type":"PutCounters","value":{"kind":{"type":"PlusOnePlusOne"},"quantity":{"type":"InSlot","value":"thatMuch"},"ref":{"type":"InSlot","value":"target"}}}]}} """
+      """ {"type":"PreventNextDamage","value":{"duration":{"type":"UntilEndOfTurn"},"kind":{"type":"Combat"},"ref":{"type":"InSlot","value":"target"},"quantity":{"type":"Literal","value":3},"riders":[{"type":"PutCounters","value":{"kind":{"type":"PlusOnePlusOne"},"quantity":{"type":"InSlot","value":"thatMuch"},"ref":{"type":"InSlot","value":"target"}}}]}} """
   -- CR 608.2f: Soulfire Eruption's per-object body, the other nesting of an
   -- effect inside an effect -- a DealDamage reading the mana value of the card
   -- an earlier body instruction exiled for THIS member.
@@ -719,8 +722,26 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.PreventAllDamage (DurationRef.MkDurationRef Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you")))))
+      (Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage Duration.UntilEndOfTurn Nothing (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))) Seq.empty))
       """ {"type":"PreventAllDamage","value":{"duration":{"type":"UntilEndOfTurn"},"ref":{"type":"InSlot","value":"you"}}} """
+  -- The same shield with both defaulted keys written: CR 510.2's kind
+  -- (Inkshield's "all COMBAT damage") and CR 615.5's rider (Brace for Impact's
+  -- +1/+1 counter). Elided above, so this is what proves they decode.
+  Spec.it s "PreventAllDamage with a kind and a CR 615.5 rider" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      ( Effect.PreventAllDamage
+          PreventAllDamage.MkPreventAllDamage
+            { PreventAllDamage.duration = Duration.UntilEndOfTurn,
+              PreventAllDamage.kind = Just DamageKind.Combat,
+              PreventAllDamage.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
+              PreventAllDamage.riders =
+                Seq.singleton (Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.InSlot (SlotName.MkSlotName (Text.pack "thatMuch"))) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
+            }
+      )
+      """ {"type":"PreventAllDamage","value":{"duration":{"type":"UntilEndOfTurn"},"kind":{"type":"Combat"},"ref":{"type":"InSlot","value":"target"},"riders":[{"type":"PutCounters","value":{"kind":{"type":"PlusOnePlusOne"},"quantity":{"type":"InSlot","value":"thatMuch"},"ref":{"type":"InSlot","value":"target"}}}]}} """
   -- CR 614.9: Turn the Tables, whose kind field is PRINTED ("all combat
   -- damage") and whose two refs are the source side then the destination.
   Spec.it s "RedirectDamage" $

@@ -30,6 +30,7 @@ import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
+import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity
@@ -772,28 +773,28 @@ data Effect card
     -- effects, and the analyses that walk this type descend into the rider the
     -- same way they descend into a token.
     --
-    -- PreventAllDamage below deliberately has no such field: no unbounded shield
-    -- in the pool carries a rider, and an unread one would be speculative
-    -- (#1107).
+    -- PreventAllDamage below carries the same field, for Brace for Impact.
     PreventNextDamage (PreventNextDamage.PreventNextDamage (Effect card))
   | -- | CR 615.1 / 615.3: install an UNBOUNDED prevention shield over the recipients
     -- an ObjectRef names, for a duration -- Selfless Squire's "prevent all damage
     -- that would be dealt to you this turn".
     --
-    -- PreventNextDamage above with the Quantity removed, and the missing field is
+    -- PreventNextDamage above with the Quantity removed, and that missing field is
     -- the whole difference: CR 615.7's shield is spent in damage and ends when it
     -- reaches 0, while this one has no amount to spend and ends only when its
     -- duration does (CR 615.3's other terminator). That is why it installs a
     -- DamageRewrite.PreventAll rather than a PreventNext of some large number:
     -- there is no number, and a shield that counted down would be a different
-    -- card.
+    -- card. It follows for the rider too: with no running count, CR 615.5's "the
+    -- damage prevented this way" is per APPLICATION here (Brace for Impact),
+    -- where on the countdown shield it is what that one application spent.
     --
     -- NOT a Replace carrying a DamageR, for PreventNextDamage's reason: the
     -- pattern must name the shielded permanent or player BY ID, which card data
     -- cannot write -- DamagePattern.whatRecipient describes a recipient and
     -- cannot pick out the one this resolution chose. Fog IS such a Replace
     -- precisely because it shields nobody in particular.
-    PreventAllDamage DurationRef.DurationRef
+    PreventAllDamage (PreventAllDamage.PreventAllDamage (Effect card))
   | -- | CR 614.9: install a floating REDIRECTION effect -- Turn the Tables' "all
     -- combat damage that would be dealt to you this turn is dealt to target
     -- attacking creature instead". RedirectDamage.from is the damage's original

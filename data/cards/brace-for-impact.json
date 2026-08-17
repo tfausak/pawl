@@ -1,0 +1,253 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Brace for Impact",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "PreventAllDamage",
+                    "value": {
+                      "duration": {
+                        "type": "UntilEndOfTurn"
+                      },
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "target"
+                      },
+                      "riders": [
+                        {
+                          "type": "PutCounters",
+                          "value": {
+                            "kind": {
+                              "type": "PlusOnePlusOne"
+                            },
+                            "quantity": {
+                              "type": "InSlot",
+                              "value": "thatMuch"
+                            },
+                            "ref": {
+                              "type": "InSlot",
+                              "value": "target"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ],
+            "targetSlots": {
+              "target": {
+                "filter": {
+                  "type": "Or",
+                  "value": [
+                    {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasColor",
+                          "value": {
+                            "type": "White"
+                          }
+                        },
+                        {
+                          "type": "HasColor",
+                          "value": {
+                            "type": "Blue"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasColor",
+                          "value": {
+                            "type": "White"
+                          }
+                        },
+                        {
+                          "type": "HasColor",
+                          "value": {
+                            "type": "Black"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasColor",
+                          "value": {
+                            "type": "White"
+                          }
+                        },
+                        {
+                          "type": "HasColor",
+                          "value": {
+                            "type": "Red"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasColor",
+                          "value": {
+                            "type": "White"
+                          }
+                        },
+                        {
+                          "type": "HasColor",
+                          "value": {
+                            "type": "Green"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasColor",
+                          "value": {
+                            "type": "Blue"
+                          }
+                        },
+                        {
+                          "type": "HasColor",
+                          "value": {
+                            "type": "Black"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasColor",
+                          "value": {
+                            "type": "Blue"
+                          }
+                        },
+                        {
+                          "type": "HasColor",
+                          "value": {
+                            "type": "Red"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasColor",
+                          "value": {
+                            "type": "Blue"
+                          }
+                        },
+                        {
+                          "type": "HasColor",
+                          "value": {
+                            "type": "Green"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasColor",
+                          "value": {
+                            "type": "Black"
+                          }
+                        },
+                        {
+                          "type": "HasColor",
+                          "value": {
+                            "type": "Red"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasColor",
+                          "value": {
+                            "type": "Black"
+                          }
+                        },
+                        {
+                          "type": "HasColor",
+                          "value": {
+                            "type": "Green"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasColor",
+                          "value": {
+                            "type": "Red"
+                          }
+                        },
+                        {
+                          "type": "HasColor",
+                          "value": {
+                            "type": "Green"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "pool": {
+                  "type": "Creatures"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}
