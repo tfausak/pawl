@@ -1300,6 +1300,33 @@ prevents rewrite = case rewrite of
   -- from it.
   DamageRewrite.Redirect _ -> False
 
+-- CR 615.12: applied to damage that CAN'T be prevented, does this rewrite still
+-- spend what `contestedResource` counts? The rule's middle and last sentences
+-- disagree by rewrite, which is why this is not `prevents`: CR 122.1c's counter
+-- is an ADDITIONAL effect and comes off either way ("any additional effects they
+-- have will take place"), where CR 615.7's stored amount is an "existing damage
+-- prevention shield" and is explicitly not reduced.
+--
+-- Must agree arm for arm with Pawl.Engine.Event.applyInertly, which is where the
+-- spending actually happens; True here without a corresponding action there would
+-- contest a resource nothing consumes.
+--
+-- A CLASSIFICATION of effects, in `prevents`' genre: one arm per constructor, no
+-- wildcard, so a new prevention rewrite with an additional effect breaks the
+-- build here.
+spentInertly :: DamageRewrite.DamageRewrite -> Bool
+spentInertly rewrite = case rewrite of
+  DamageRewrite.PreventRemovingShieldCounter -> True
+  DamageRewrite.PreventNext _ -> False
+  -- Fog has no resource to spend at all, so this could answer either way;
+  -- `contestedResource` gives it no supply and it never reaches `hitsOf`.
+  DamageRewrite.PreventAll -> False
+  -- CR 614.1a's replacements are not preventions, are applied in full to
+  -- unpreventable damage, and have no contested resource either.
+  DamageRewrite.SetAmount _ -> False
+  DamageRewrite.Scale _ -> False
+  DamageRewrite.Redirect _ -> False
+
 -- CR 614.9: the destination a redirection effect may still use, re-derived
 -- against the CURRENT state at redirect time. Nothing is the rule's guard --
 -- "if one of those permanents is no longer on the battlefield ... or is no
@@ -1344,9 +1371,10 @@ redirectDestination gs dest = case Recipient.objectOf dest of
 -- effects they have will take place." So `applies` is untouched by this
 -- question, the CR 616.1 loop still offers the row and still marks it applied --
 -- which is CR 615.12a's "just once", falling straight out of the applied-set the
--- loop already carries -- and what changes is only that the application does
--- nothing and the shield is not spent ("existing damage prevention shields won't
--- be reduced by damage that can't be prevented").
+-- loop already carries -- and what changes is only that the event survives
+-- undiminished and the shield is not spent ("existing damage prevention shields
+-- won't be reduced by damage that can't be prevented"). The application's
+-- ADDITIONAL effect still happens, in Pawl.Engine.Event.applyInertly.
 --
 -- Asked per EVENT, because that is what the rule's own subject is and what the
 -- printed clauses narrow: Spider-Punk's sentence admits every event, and
@@ -1374,10 +1402,16 @@ preventable gs de =
    in not (any (\(src, pat) -> matchesDamagePattern gs (context src) pat de) (PlayerEffect.unpreventable gs))
 
 -- CR 615.12: is this the pairing the rule describes -- a PREVENTION effect
--- chosen against damage that CAN'T BE PREVENTED? True means the application
--- happens and changes nothing: Pawl.Engine.Event's CR 616.1 loop hands the event
--- back untouched and marks the row applied, spending neither a use nor a point
+-- chosen against damage that CAN'T BE PREVENTED? Just means the application
+-- happens and prevents nothing: Pawl.Engine.Event's CR 616.1 loop hands the event
+-- back undiminished and marks the row applied, spending neither a use nor a point
 -- of shield.
+--
+-- The REWRITE comes back rather than a Bool, because CR 615.12's middle clause --
+-- "any additional effects they have will take place" -- makes the inert
+-- application's remaining obligation a question about which prevention this is.
+-- Pawl.Engine.Event.applyInertly is where that is answered, per constructor, so
+-- the classification stays here and the doing stays there.
 --
 -- The two halves above, asked together, and asked HERE so that the loop reads
 -- one classification rather than composing two. `prevents` is the effect half
@@ -1389,11 +1423,12 @@ preventable gs de =
 -- "this pair is not a prevention of damage" -- preventionBy's arrangement, for
 -- preventionBy's reason: the per-constructor obligation is discharged by
 -- `prevents`, which this delegates to.
-inertPrevention :: GameState -> ReplacementCandidate -> ProposedEvent -> Bool
+inertPrevention :: GameState -> ReplacementCandidate -> ProposedEvent -> Maybe DamageRewrite.DamageRewrite
 inertPrevention gs candidate event = case (ReplacementCandidate.effect candidate, event) of
-  (ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite _), ProposedEvent.WouldDealDamage de) ->
-    prevents rewrite && not (preventable gs de)
-  _ -> False
+  (ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite _), ProposedEvent.WouldDealDamage de)
+    | prevents rewrite && not (preventable gs de) ->
+        Just rewrite
+  _ -> Nothing
 
 -- CR 615.13: how much of this event the candidate just applied PREVENTED, or
 -- Nothing when it prevented nothing.
@@ -1568,19 +1603,34 @@ askOne batch (pid, positions) = do
 -- other's events -- but a superset of a question is still the player's answer,
 -- and splitting it would ask the same player twice about one batch.
 --
--- CR 615.12's damage is left out of the union, and that is an elision the rule
--- itself licenses rather than a shortcut: a shield prevents none of an
--- unpreventable event and is not reduced by it, so every order of a batch of
--- them leads to the same board and there is nothing for the shielded player to
--- decide. Filtered per EVENT rather than per batch, so a batch mixing
--- preventable and unpreventable damage still asks about the part the shield can
--- reach -- which a narrowed clause reaches: an Excruciator and an ordinary
--- creature hitting one shielded permanent at once is exactly that batch.
+-- CR 615.12's damage is left out of the union for a shield the rule's last
+-- sentence protects, and that is an elision the rule itself licenses rather than
+-- a shortcut: a CR 615.7 shield prevents none of an unpreventable event and is
+-- not reduced by it, so every order of a batch of them leads to the same board
+-- and there is nothing for the shielded player to decide. `spentInertly` is where
+-- that stops being true -- CR 122.1c's counter comes off whether or not the
+-- damage could be prevented, so an unpreventable event competes for it exactly as
+-- a preventable one does. Filtered per EVENT rather than per batch, so a batch
+-- mixing preventable and unpreventable damage still asks about the part the
+-- shield's own resource is contested over -- which a narrowed clause reaches: an
+-- Excruciator and an ordinary creature hitting one shielded permanent at once is
+-- exactly that batch.
 contested :: GameState -> [DamageEvent.DamageEvent] -> [(PlayerId, [Natural])]
 contested gs events =
   let indexed :: [(Natural, DamageEvent.DamageEvent)]
       indexed = zip [0 ..] events
-      hitsOf candidate = filter (\entry -> preventable gs (snd entry) && applies gs (ProposedEvent.WouldDealDamage (snd entry)) candidate) indexed
+      -- Reached only for a candidate `contestedResource` gave a resource for,
+      -- which is a DamageR and nothing else, so the wildcard names no rewrite.
+      spendsInertly candidate = case ReplacementCandidate.effect candidate of
+        ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite _) -> spentInertly rewrite
+        _ -> False
+      hitsOf candidate =
+        filter
+          ( \entry ->
+              (preventable gs (snd entry) || spendsInertly candidate)
+                && applies gs (ProposedEvent.WouldDealDamage (snd entry)) candidate
+          )
+          indexed
       contestedBy candidate = do
         (left, demand) <- contestedResource gs candidate
         case hitsOf candidate of

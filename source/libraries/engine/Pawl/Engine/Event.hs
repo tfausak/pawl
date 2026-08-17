@@ -679,33 +679,33 @@ loop asOf batch applied prevented event = do
         Just candidate -> do
           -- CR 615.12: the chosen effect is a prevention effect and this damage
           -- can't be prevented (Spider-Punk), so it is APPLIED and prevents none
-          -- of it. The event comes back untouched and no shield is written down
+          -- of it. The event comes back undiminished and no shield is written down
           -- -- "existing damage prevention shields won't be reduced by damage
           -- that can't be prevented" -- while the recursive call below still
           -- records it as applied, which is CR 615.12a's "just once" and the
-          -- reason this does not spin.
+          -- reason this does not spin. What the application still owes is the
+          -- rule's middle clause, "any additional effects they have will take
+          -- place", which is `applyInertly`'s whole job.
           --
           -- CR 615.3's use count is skipped too, which no card notices: every
           -- prevention row pawl installs is Uses.Unlimited (Resolve.installDamageRow
           -- says why, and Fog's authored row says Unlimited as well), so the
           -- `consume` this bypasses would have been a no-op anyway.
           --
-          -- HERE rather than inside `apply`, because CR 615.12 is a fact about
-          -- the (effect, event) PAIR and not about any one rewrite: `apply`'s
-          -- arms answer "what does this rewrite do", and the answer is unchanged
-          -- -- the rule stops the application from reaching them at all. CR
-          -- 614.1a's replacements are untouched, so a Furnace of Rath still
-          -- doubles unpreventable damage.
+          -- A SEPARATE fold rather than a flag inside `apply`, because CR 615.12 is
+          -- a fact about the (effect, event) PAIR and not about any one rewrite:
+          -- `apply`'s arms answer "what does this rewrite do", and the rule stops
+          -- the rewrite happening at all while leaving its additional effect
+          -- standing. CR 614.1a's replacements never come here, so a Furnace of
+          -- Rath still doubles unpreventable damage.
           --
-          -- Not implemented: CR 615.12's middle clause, "any additional effects
-          -- they have will take place". A row CAN carry one now (CR 615.5), but
-          -- this short-circuit runs before `apply`, so `preventionBy` below
-          -- reports nothing and the rider is never queued; nor is CR 122.1c's
-          -- shield counter removed, which the same clause requires (#1106).
-          outcome <-
-            if Replacement.inertPrevention gs candidate event
-              then pure (Just event)
-              else apply batch candidate event
+          -- Not implemented: CR 615.5's authored rider, which a row CAN carry now
+          -- but which this path still never queues -- `preventionBy` below reports
+          -- Nothing off an undiminished event, so nothing reaches the rider
+          -- (#1695).
+          outcome <- case Replacement.inertPrevention gs candidate event of
+            Just rewrite -> applyInertly candidate rewrite event
+            Nothing -> apply batch candidate event
           -- CR 615.13: read OUTSIDE `apply`, from the event before and after, so
           -- no arm of that fold has to report anything and none can forget to.
           -- What makes it exact rather than a guess is Replacement.prevents: only a
@@ -715,6 +715,50 @@ loop asOf batch applied prevented event = do
           case outcome of
             Nothing -> pure (Nothing, prevented1)
             Just rewritten -> loop asOf batch (Set.insert (ReplacementCandidate.identity candidate) applied) prevented1 rewritten
+
+-- CR 615.12: apply one chosen PREVENTION effect to damage that can't be
+-- prevented. The event comes back undiminished -- "those effects won't prevent
+-- any damage" -- and what each arm below does is only the rule's middle clause,
+-- "any additional effects they have will take place".
+--
+-- Separate from `apply` rather than a flag threaded through it, because the two
+-- answer different questions: `apply`'s arms say what a rewrite DOES, and CR
+-- 615.12 is a fact about the (effect, event) pair that stops the rewrite
+-- happening at all. Only what survives the rule is here.
+--
+-- No `consume` and no `setShield` in any arm, which is CR 615.12's last sentence:
+-- "existing damage prevention shields won't be reduced by damage that can't be
+-- prevented". CR 615.3's use count is skipped with it, which no card notices --
+-- `loop` above says why.
+--
+-- One arm per DamageRewrite constructor, `apply`'s discipline for `apply`'s
+-- reason: a new prevention rewrite carrying an additional effect must break the
+-- build here rather than silently losing it. The three that `Replacement.prevents`
+-- refuses are unreachable, since `Replacement.inertPrevention` answers Just only
+-- for a rewrite that prevents.
+applyInertly :: ReplacementCandidate -> DamageRewrite.DamageRewrite -> ProposedEvent -> Game (Maybe ProposedEvent)
+applyInertly candidate rewrite event = do
+  case rewrite of
+    -- CR 122.1c's "prevent that damage and remove a shield counter from it". The
+    -- removal is the additional effect, and it is AMOUNT-INDEPENDENT -- the rule
+    -- removes one counter per application whatever it prevented, here nothing --
+    -- so it is the half of the clause that survives unpreventable damage.
+    DamageRewrite.PreventRemovingShieldCounter -> removeCounters (ReplacementCandidate.source candidate) CounterKind.Shield 1
+    -- CR 615.7's countdown shield has no additional effect of its own; its
+    -- remaining amount is exactly the "existing damage prevention shield" the
+    -- rule's last sentence protects.
+    DamageRewrite.PreventNext _ -> pure ()
+    -- Fog's blanket prevention likewise carries nothing beyond the prevention:
+    -- CR 615.5's authored rider rides on the CANDIDATE rather than on the
+    -- rewrite, so it is `loop`'s business above and not this fold's.
+    DamageRewrite.PreventAll -> pure ()
+    -- Unreachable: `Replacement.prevents` refuses these three, so no inert
+    -- application ever reaches them. CR 614.1a's replacements are not preventions
+    -- and are applied in full to unpreventable damage.
+    DamageRewrite.SetAmount _ -> pure ()
+    DamageRewrite.Scale _ -> pure ()
+    DamageRewrite.Redirect _ -> pure ()
+  pure (Just event)
 
 -- CR 614.6: apply one chosen effect. Nothing means the event does not happen.
 --
