@@ -62,7 +62,10 @@
                           "ref": {
                             "type": "TopOfLibrary",
                             "value": {
-                              "count": 1,
+                              "count": {
+                                "type": "Literal",
+                                "value": 1
+                              },
                               "player": {
                                 "type": "Relative",
                                 "value": {

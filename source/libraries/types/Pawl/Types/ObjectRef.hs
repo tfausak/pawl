@@ -1,10 +1,10 @@
 module Pawl.Types.ObjectRef where
 
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
+import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 
@@ -82,9 +82,11 @@ data ObjectRef
     -- a hidden zone, so an arm reaching anyone else's would owe a visibility
     -- question this one never asks -- CR 109.5's "you" is the resolving
     -- controller, who may already look at their own hand. NO FILTER: a filtered
-    -- sweep of a hidden zone is the same question, since matching would reveal
-    -- which cards matched, and nothing needs to be told apart when EVERY card
-    -- goes (#1309).
+    -- SWEEP of a hidden zone is the same question, since which cards matched is
+    -- then read off what left the zone, and nothing needs to be told apart when
+    -- EVERY card goes (#1309). ChosenCardInHand below does carry a Filter, and
+    -- that is not this arm's question: one card chosen out of a hand tells nobody
+    -- which of the others matched.
     --
     -- Not a target and never one (CR 115.10a) -- a hidden zone has no target pool
     -- at all (#559) -- and swept when the effect executes (CR 608.2c), the two
@@ -187,17 +189,22 @@ data ObjectRef
     -- hidden pile (CR 400.2).
     --
     -- The PlayerRef is WHOSE library, so "the top card of target player's library"
-    -- is the same arm through its InSlot. The Natural is HOW MANY off the top of
+    -- is the same arm through its InSlot. The Quantity is HOW MANY off the top of
     -- EACH library it names, so a depth of three over "each player" is three per
     -- seat rather than three in total -- which is what "exile the top three cards
     -- of each player's library" would say. A library holding fewer cards than the
     -- depth gives up what it has (CR 609.3), and an empty one gives nothing.
     --
-    -- A Natural rather than a Pawl.Types.Quantity, the choice
-    -- Pawl.Types.DamageRewrite made for the same reason: every printed depth in
-    -- the pool is a literal number. Not implemented: a card whose depth is X
-    -- (Monastery Raid's "exile the top X cards of your library instead") has no
-    -- spelling here (#1375).
+    -- A Pawl.Types.Quantity rather than a Natural, because a printed depth need
+    -- not be a literal: Commune with Lava's "exile the top X cards of your
+    -- library" reads CR 601.2b's announced X, where Act on Impulse's three is a
+    -- Quantity.Literal. The depth is evaluated ONCE for the whole ref and clamped
+    -- to zero if it will not evaluate or evaluates negative (CR 107.1b) --
+    -- Pawl.Engine.Resolve.objectRefObjects is where both happen. A nested Quantity
+    -- is also a static-analysis surface: it may name a slot
+    -- (Pawl.Engine.Resolve.objectRefSlots) and it may read X
+    -- (Pawl.Engine.Resolve.readsX), and both reach it through
+    -- Pawl.Engine.Resolve.objectRefQuantities.
     --
     -- Not a target and never one (CR 115.10a) -- the player may be targeted, the
     -- cards are not -- so CR 608.2b has nothing to fizzle. Read when the effect
@@ -262,7 +269,7 @@ data ObjectRef
     -- sibling over the hidden zone CR 400.2 makes a hand, and the hidden half is
     -- the whole difference between them.
     --
-    -- ONE PlayerRef, where the graveyard arm needs a Pawl.Types.Chooser beside a
+    -- ONE PlayerRef beside the Filter, where the graveyard arm needs a Pawl.Types.Chooser beside a
     -- Pawl.Types.PlayerScope, because for a hand those two questions have one
     -- answer: CR 402.3 lets a player look at their own hand and at nobody else's,
     -- so the player who chooses IS the player whose hand is looked in. The ref
@@ -273,11 +280,12 @@ data ObjectRef
     -- one targeted seat; `Relative You` is the resolving controller choosing in
     -- their own hand.
     --
-    -- UNFILTERED, where the graveyard arm carries a Filter, and NOT for
-    -- EachCardInYourHand's visibility reason: a filter narrowing a hand only its
-    -- own owner is shown reveals nothing to anybody else. "A card from their
-    -- hand" simply needs no filter to say, and a narrowed hand choice waits for a
-    -- printing that asks for one. Not implemented (#1635).
+    -- FILTERED, exactly as the graveyard arm is, and the hidden zone is no bar to
+    -- it: EachCardInYourHand's visibility argument does not reach here, because a
+    -- filter narrowing a hand only its own owner is shown reveals nothing to
+    -- anybody else (CR 402.3). Elvish Piper's "a creature card from your hand" is
+    -- the printing that narrows one; Karn's "a card from their hand" states no
+    -- characteristic and writes the always-matching filter.
     --
     -- NOT A TARGET, which the zone settles here rather than CR 115.1's "target"
     -- test settling it as it does for the graveyard arm: pawl has no target pool
@@ -293,5 +301,5 @@ data ObjectRef
     -- read, so only Pawl.Engine.Resolve's MoveToZone arm can carry it out --
     -- ChosenCardInGraveyard's note above describes what a card writing it under
     -- any other opcode gets, and why that inert answer earns no lint.
-    ChosenCardInHand PlayerRef.PlayerRef
+    ChosenCardInHand ChosenCardInHand.ChosenCardInHand
   deriving (Eq, Ord, Show)

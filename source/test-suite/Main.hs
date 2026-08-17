@@ -49,6 +49,7 @@ import qualified Pawl.Codec.CharacteristicPTSpec
 import qualified Pawl.Codec.ChooseBetweenSpec
 import qualified Pawl.Codec.ChooserSpec
 import qualified Pawl.Codec.ChosenCardInGraveyardSpec
+import qualified Pawl.Codec.ChosenCardInHandSpec
 import qualified Pawl.Codec.ClauseIndexSpec
 import qualified Pawl.Codec.ClauseSpec
 import qualified Pawl.Codec.ColorSpec
@@ -444,6 +445,7 @@ spec s registry = do
   Pawl.Codec.ChooseBetweenSpec.spec s
   Pawl.Codec.ChooserSpec.spec s
   Pawl.Codec.ChosenCardInGraveyardSpec.spec s
+  Pawl.Codec.ChosenCardInHandSpec.spec s
   Pawl.Codec.ClauseIndexSpec.spec s
   Pawl.Codec.ClauseSpec.spec s
   Pawl.Codec.ColorSpec.spec s

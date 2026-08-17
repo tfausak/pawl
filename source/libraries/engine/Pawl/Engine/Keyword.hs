@@ -1730,7 +1730,7 @@ ingest =
     effect =
       Effect.MoveToZone
         ( MoveToZone.MkMoveToZone
-            (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.InSlot Binding.triggerPlayer) 1))
+            (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Literal 1)))
             Zone.Exile
             EntryRiders.MkEntryRiders
               { EntryRiders.tapped = TapState.Untapped,

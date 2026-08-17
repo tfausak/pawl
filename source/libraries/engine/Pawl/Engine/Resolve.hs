@@ -64,6 +64,7 @@ import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
+import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.Clause as Clause
 import Pawl.Types.ClauseIndex (ClauseIndex)
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
@@ -263,7 +264,8 @@ chooserSlots chooser = case chooser of
 -- object reference is a set declares no target slot and CR 608.2b has nothing to
 -- fizzle (CR 115.10a). TopOfLibrary names no object slot either -- it reads a
 -- POSITION -- but the PlayerRef saying whose library may name a player slot, and
--- that read is playerRefSlots' already.
+-- that read is playerRefSlots' already; its DEPTH is a Quantity, which may name
+-- one too (Commune with Lava's X), and that read is quantitySlots'.
 objectRefSlots :: ObjectRef -> Map.Map SlotName SlotArity
 objectRefSlots ref = case ref of
   ObjectRef.InSlot slot -> Map.singleton slot SlotArity.Many
@@ -273,7 +275,7 @@ objectRefSlots ref = case ref of
   ObjectRef.EachCardExiledWithSource {} -> Map.empty
   ObjectRef.EachSpell _ -> Map.empty
   ObjectRef.EachPlayer -> Map.empty
-  ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player _) -> playerRefSlots player
+  ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player count) -> joinTwo (playerRefSlots player) (quantitySlots count)
   -- A PlayerScope names players by their relation to the effect's controller (CR
   -- 109.5) rather than out of a slot, so whose graveyards are drawn from names
   -- none. WHO CHOOSES may: Skullwinder's chosen opponent is read out of the slot
@@ -281,8 +283,45 @@ objectRefSlots ref = case ref of
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser _ _) -> chooserSlots chooser
   -- The choosers, who are also the hands' owners (CR 402.3), so the one
   -- PlayerRef is the whole read -- Karn Liberated's "+4: TARGET player exiles a
-  -- card from their hand" names its seat with a target slot.
-  ObjectRef.ChosenCardInHand player -> playerRefSlots player
+  -- card from their hand" names its seat with a target slot. The Filter beside it
+  -- names no slot, exactly as the graveyard arms' Filters do not.
+  ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player _) -> playerRefSlots player
+
+-- The Quantities an ObjectRef carries. ONE arm does: TopOfLibrary's depth, which
+-- is Commune with Lava's X and Act on Impulse's literal three. Everything else
+-- names objects by slot, by characteristics or by a player, and holds no number.
+--
+-- Exhaustive over the constructors, no wildcard, because this is the function
+-- slotsAreExhaustive, readsX and Pawl.CardSpec's Count traversal all reach a
+-- nested Quantity THROUGH -- their own arms for the ObjectRef-taking opcodes are
+-- written `{}` and answer a constant, so a second ObjectRef arm gaining a
+-- Quantity would be invisible to all three unless it must answer here.
+--
+-- FOUR opcodes route their ref through this, not all two dozen that take one:
+-- MoveToZone, Reveal, LookAt and ForEach are the ones whose ref can name a card
+-- in a library and have the instruction mean something. Under any other opcode a
+-- TopOfLibrary names a card that opcode cannot act on -- a library card is not a
+-- permanent to tap, a spell to counter or a target to modify -- so such a card is
+-- INERT card data, the class Pawl.Types.ObjectRef's ChosenCardInGraveyard note
+-- describes and deliberately declines to lint. slotsOf needs no such split: it
+-- routes EVERY ObjectRef-taking opcode through objectRefSlots already, so a
+-- depth's target-slot read is reported wherever it is written.
+--
+-- Note this is about the DEPTH, not the ref: objectRefSlots and Pawl.CardSpec's
+-- Filter traversal both cover every opcode, and only the three constant-answering
+-- classifications above have to opt in one opcode at a time.
+objectRefQuantities :: ObjectRef -> [Quantity.Type.Quantity]
+objectRefQuantities ref = case ref of
+  ObjectRef.InSlot _ -> []
+  ObjectRef.EachMatching _ -> []
+  ObjectRef.EachCardInGraveyard {} -> []
+  ObjectRef.EachCardInYourHand -> []
+  ObjectRef.EachCardExiledWithSource {} -> []
+  ObjectRef.EachSpell _ -> []
+  ObjectRef.EachPlayer -> []
+  ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary _ count) -> [count]
+  ObjectRef.ChosenCardInGraveyard {} -> []
+  ObjectRef.ChosenCardInHand {} -> []
 
 -- The slots a MonarchTarget reads: only the targeted arm names one. Written out
 -- rather than routed through playerRefSlots because MonarchTarget is its own
@@ -585,8 +624,12 @@ conditionSlots condition = case condition of
 -- new opcode must answer HERE as well as in slotsOf. A wildcard defaulting to
 -- True would hand a future nested payload an unsound elision instead of a build
 -- failure. Fields are spelled out wherever hlint's record-pattern rule allows
--- it; the four `{}` arms below all answer a constant, so a new FIELD on one of
--- those is the one change this case will not force.
+-- it; the `{}` arms below all answer a constant, so a new FIELD on one of those
+-- is the one change this case will not force. That is exactly what a Quantity
+-- nested in an ObjectRef would have slipped past, which is why four of the
+-- ObjectRef-taking opcodes below name their ref and go through
+-- objectRefQuantities instead: a second ObjectRef arm gaining a Quantity has to
+-- answer there. Which four, and why not all of them, is on objectRefQuantities.
 slotsAreExhaustive :: Effect Card.Type.Card -> Bool
 slotsAreExhaustive effect = case effect of
   Effect.DealDamage (DealDamage.MkDealDamage _ quantity _) -> Quantity.slotsAreExhaustive quantity
@@ -612,11 +655,14 @@ slotsAreExhaustive effect = case effect of
   Effect.TurnFaceDown _ -> True
   Effect.RemoveFromCombat _ -> True
   Effect.BecomesBlocked _ -> True
-  Effect.MoveToZone {} -> True
+  -- Three of the four opcodes whose ref may nest a Quantity of its own
+  -- (ObjectRef.TopOfLibrary's depth), which objectRefQuantities is what recovers;
+  -- ForEach is the fourth, at the bottom of this case.
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> all Quantity.slotsAreExhaustive (objectRefQuantities ref)
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Mill (Mill.MkMill _ quantity _) -> Quantity.slotsAreExhaustive quantity
-  Effect.Reveal {} -> True
-  Effect.LookAt {} -> True
+  Effect.Reveal ref -> all Quantity.slotsAreExhaustive (objectRefQuantities ref)
+  Effect.LookAt (LookAt.MkLookAt ref _) -> all Quantity.slotsAreExhaustive (objectRefQuantities ref)
   Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
@@ -698,9 +744,11 @@ slotsAreExhaustive effect = case effect of
   Effect.ShuffleIntoLibrary {} -> True
   Effect.OfferCast {} -> True
   Effect.GrantPlayFromExile grant -> durationSlotsAreExhaustive (GrantPlayFromExile.duration grant)
-  -- PreventNextDamage's answer: the ref is reported by slotsOf, so only the
-  -- body can hide a read, and each of its effects answers for itself.
-  Effect.ForEach (ForEach.MkForEach _ _ body) -> all slotsAreExhaustive body
+  -- PreventNextDamage's answer for the body -- each of its effects answers for
+  -- itself -- plus the fourth ObjectRef-taking opcode's own ref: slotsOf reports
+  -- the ref's slots, but a PlayerRef nested inside the DEPTH is one it cannot
+  -- see, which is the gap objectRefQuantities closes.
+  Effect.ForEach (ForEach.MkForEach ref _ body) -> all Quantity.slotsAreExhaustive (objectRefQuantities ref) && all slotsAreExhaustive body
 
 -- CR 611.2b: only ForAsLongAs reads anything, through its Condition.
 durationSlotsAreExhaustive :: Duration.Duration -> Bool
@@ -731,7 +779,10 @@ conditionSlotsAreExhaustive condition = case condition of
 -- OPCODE the compiler does force, this case being exhaustive over constructors;
 -- widening an existing one it does not, since an arm already written `{} ->
 -- False` keeps compiling and keeps answering False about a quantity it now
--- carries.
+-- carries. The four ObjectRef-taking opcodes that route their ref go through
+-- objectRefQuantities for that reason: an ObjectRef arm gaining a Quantity
+-- answers there rather than needing four arms here changed. Which four, and why
+-- not all of them, is on objectRefQuantities.
 readsX :: [Effect Card.Type.Card] -> Bool
 readsX = any effectReadsX
   where
@@ -759,11 +810,15 @@ readsX = any effectReadsX
       Effect.TurnFaceDown _ -> False
       Effect.RemoveFromCombat _ -> False
       Effect.BecomesBlocked _ -> False
-      Effect.MoveToZone {} -> False
+      -- Commune with Lava's "exile the top X cards of your library": the X is
+      -- inside the ObjectRef rather than beside it, so these three -- and ForEach
+      -- at the bottom of this case -- go through objectRefQuantities. Without them
+      -- the CR 107.3 lint would call the card an unread announcement.
+      Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> any Quantity.readsX (objectRefQuantities ref)
       Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Mill (Mill.MkMill _ quantity _) -> Quantity.readsX quantity
-      Effect.Reveal {} -> False
-      Effect.LookAt {} -> False
+      Effect.Reveal ref -> any Quantity.readsX (objectRefQuantities ref)
+      Effect.LookAt (LookAt.MkLookAt ref _) -> any Quantity.readsX (objectRefQuantities ref)
       Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
@@ -822,8 +877,9 @@ readsX = any effectReadsX
       Effect.OfferCast {} -> False
       Effect.GrantPlayFromExile {} -> False
       -- CR 608.2f's body is an effect list like any other, so an X inside it is
-      -- an X this card reads -- PreventNextDamage's rider, one opcode over.
-      Effect.ForEach (ForEach.MkForEach _ _ body) -> readsX (Foldable.toList body)
+      -- an X this card reads -- PreventNextDamage's rider, one opcode over. The
+      -- ref it iterates is the fourth that may nest an X in a library depth.
+      Effect.ForEach (ForEach.MkForEach ref _ body) -> any Quantity.readsX (objectRefQuantities ref) || readsX (Foldable.toList body)
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -2048,8 +2104,26 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- and CR 101.4 fixes the order any per-object question is then asked in. That
   -- also drops a player CR 800.4 has taken out of the game, whose library
   -- playerRefPlayers would otherwise still be able to name.
-  ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player depth) ->
+  --
+  -- The depth is a Quantity, evaluated HERE and so when the effect executes (CR
+  -- 608.2c) -- Commune with Lava's X, read off the announcement CR 601.2b left on
+  -- the resolving object, which is why `resolving` rather than `source` is the
+  -- announcedOn id (the reason applyOneEffect's own note gives). The view and the
+  -- context are built the way every Quantity-reading arm builds them, from the
+  -- four ids this function already takes, so nothing had to be threaded in.
+  --
+  -- ONE evaluation for the whole ref rather than one per seat: the depth is a
+  -- number the card computed, not a per-recipient amount, and no printing writes a
+  -- per-library depth. A depth that will not evaluate, or evaluates negative, is
+  -- ZERO cards (CR 107.1b) -- the same nothing an empty library gives. Both of
+  -- those are REGRESSION FENCES rather than proven behaviour: every depth in the
+  -- pool evaluates, and none of them can go negative, so making the fallback 5
+  -- instead of 0 leaves the whole suite green.
+  ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player count) ->
     let named = playerRefPlayers legal controller gs player
+        viewOf = Projection.viewWithLastKnown source gs
+        context = effectContext controller source legal
+        depth = maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf context gs resolving source count)
      in concatMap
           (\pid -> List.genericTake depth (Game.zoneMembers Zone.Library pid gs))
           (filter (`elem` named) (Game.apnapOrder gs))
@@ -2135,6 +2209,24 @@ handChoosers :: Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> Pla
 handChoosers legal controller gs player =
   let named = playerRefPlayers legal controller gs player
    in filter (`elem` named) (Game.apnapOrder gs)
+
+-- The cards in ONE player's hand matching the filter: graveyardCardsOf one zone
+-- over, and Elvish Piper's "a creature card from your hand" is what needs it.
+--
+-- The filter is matched against the projection in THIS EFFECT's context, so
+-- `controller` is CR 109.5's "you" rather than whoever is choosing -- exactly the
+-- reading graveyardCardsOf takes, and for its reason. A card in a hand has no
+-- controller, so Filter.ControlledBy is vacuously False for every candidate.
+--
+-- NOT sorted, where the graveyard sibling sorts: the candidates are offered in
+-- the zone's own order, which is what the unfiltered gather already did and which
+-- no rule reads (CR 400.5). Narrowing the offer must not reorder it.
+handCardsOf :: PlayerId -> ObjectId -> GameState -> PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
+handCardsOf controller source gs pid filter_ =
+  let context = Filter.contextFor (Just controller) (Just source)
+   in filter
+        (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_)
+        (Game.zoneMembers Zone.Hand pid gs)
 
 -- CR 401.2 and CR 401.4: turn the effect's LibraryPlacement into the END each
 -- moving object arrives at, and hand back the batch in the order the moves must
@@ -3625,15 +3717,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- opponent it names does the choosing -- the controller never sees
             -- the hand, and pawl's engine never picks for them.
             --
-            -- Unfiltered, so the candidates are the whole hand: Game.zoneMembers
-            -- in the zone's own order, which is the order the EachCardInYourHand
-            -- sweep takes and which no rule reads (CR 400.5).
+            -- The candidates are the matching cards in that hand, in the zone's
+            -- own order (handCardsOf) -- Elvish Piper's "a creature card from
+            -- your hand" narrows the OFFER, and Karn's unfiltered wording writes
+            -- the always-matching filter and so keeps the whole hand. Narrowing
+            -- the candidate set is not the engine choosing: it is the card's own
+            -- words saying which cards were ever legal answers (CR 608.2d), and
+            -- the player is still asked wherever two of them match.
             --
             -- Elided at one card and skipped at none, ChooseCardInGraveyard's
-            -- rule (CR 101.3, CR 609.3): a one-card hand leaves nothing to decide
-            -- and an empty one nothing to do. Neither elision leaks anything --
-            -- the card was going to a public zone either way.
-            ObjectRef.ChosenCardInHand player -> do
+            -- rule (CR 101.3, CR 609.3): a hand with one matching card leaves
+            -- nothing to decide and one with none nothing to do. Neither elision
+            -- leaks anything -- the card was going to a public zone either way.
+            ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player filter_) -> do
               gs <- State.get
               let ask asked candidates = case candidates of
                     [] -> pure []
@@ -3642,7 +3738,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       let offered = first NonEmpty.:| (second : more)
                       answer <- Game.choose (Prompt.ChooseCardInHand (Decide.deciderFor asked gs) asked source offered)
                       pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
-              fmap concat . Monad.mapM (\pid -> ask pid (Game.zoneMembers Zone.Hand pid gs)) $
+              fmap concat . Monad.mapM (\pid -> ask pid (handCardsOf controller source gs pid filter_)) $
                 handChoosers legal controller gs player
           arrived <- Monad.mapM moveOne =<< settleArrivals zone placement targets
           Monad.mapM_ (\slot -> bindArrivals slot (Maybe.catMaybes arrived)) mSlot

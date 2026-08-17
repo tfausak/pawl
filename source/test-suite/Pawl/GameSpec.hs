@@ -696,11 +696,16 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
   -- one carol chose out of her own hidden hand (CR 400.2, CR 402.3).
   --
   -- carol and bob hold two cards each, and the pair differs in exactly one
-  -- thing -- whose hand it is. The answer NAMES carol's Wolves outright rather
+  -- thing -- whose hand it is. The answer NAMES carol's Piker outright rather
   -- than searching the offer, so an engine that asked the controller instead
   -- would be offered a set the pinned card is not in, fall back to bob's first
   -- card, and fail every assertion below. Two cards each is also what keeps the
   -- prompt real: a one-card hand is elided.
+  --
+  -- Carol's two cards are a CREATURE and an INSTANT, which is what makes Karn's
+  -- unfiltered wording observable: the ref's Filter is And [] because Karn states
+  -- no characteristic, and a narrowing one would leave the Piker as the only
+  -- candidate, elide the prompt, and make the control leg exile it too.
   --
   -- The second leg is the "the engine does not pick" control: the same board and
   -- the same activation, answered by the default, exiles carol's OTHER card.
@@ -710,14 +715,14 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
   Spec.it s "CR 608.2d gameplay: Karn's +4 exiles the card its target chose out of their own hand" $ do
     karn <- S.printingOf s registry "Karn Liberated"
     piker <- S.printingOf s registry "Goblin Piker"
-    wolves <- S.printingOf s registry "Russet Wolves"
+    growth <- S.printingOf s registry "Giant Growth"
     pacifism <- S.printingOf s registry "Pacifism"
     mountain <- S.printingOf s registry "Mountain"
     let g0 = Setup.emptyGame S.threePlayers
         (karnId, g1a) = S.addCreature karn S.bob g0
         g1 = S.addCounter CounterKind.Loyalty 6 karnId g1a
         (carolPiker, g2) = S.addHandCard piker S.carol g1
-        (_, g3) = S.addHandCard wolves S.carol g2
+        (_, g3) = S.addHandCard growth S.carol g2
         (_, g4) = S.addHandCard pacifism S.bob g3
         (_, g5) = S.addHandCard mountain S.bob g4
         gStart = g5 {GameState.activePlayer = S.bob, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.bob}
@@ -740,12 +745,14 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
         let after = S.runPure atCarol gStart (do Activate.activateAbility S.bob karnId plusFour; Stack.resolveTop)
             control = S.runPure defaulting gStart (do Activate.activateAbility S.bob karnId plusFour; Stack.resolveTop)
         Spec.assertEqWith s "CR 608.2d: the card carol named is the card that left" (named Zone.Exile S.carol after) [card "Goblin Piker"]
-        Spec.assertEqWith s "the card she did not name is still in her hand" (named Zone.Hand S.carol after) [card "Russet Wolves"]
+        Spec.assertEqWith s "the card she did not name is still in her hand" (named Zone.Hand S.carol after) [card "Giant Growth"]
         Spec.assertEqWith s "CR 402.3: the controller's own hand is not touched" (named Zone.Hand S.bob after) (List.sort [card "Mountain", card "Pacifism"])
         Spec.assertEqWith s "the third seat is not touched either" (S.handSize S.alice after) 0
         Spec.assertEqWith s "CR 606.4: the +4 was paid, so Karn is on 10" (S.counterOf CounterKind.Loyalty karnId after) 10
-        -- The pair: only the answer differs, and the other card goes.
-        Spec.assertEqWith s "the engine does not pick: the default answer exiles her OTHER card instead" (named Zone.Exile S.carol control) [card "Russet Wolves"]
+        -- The pair: only the answer differs, and the other card goes. This is
+        -- also what proves Karn's own Filter is the always-matching one -- a
+        -- narrowing filter would offer only the Piker and exile it here too.
+        Spec.assertEqWith s "the engine does not pick: the default answer exiles her OTHER card instead" (named Zone.Exile S.carol control) [card "Giant Growth"]
         Spec.assertEqWith s "and leaves the one the pinned answer took" (named Zone.Hand S.carol control) [card "Goblin Piker"]
         Spec.assertEqWith s "bob's hand is untouched on the control leg too" (named Zone.Hand S.bob control) (List.sort [card "Mountain", card "Pacifism"])
       _ -> Spec.assertFailure s "Karn does not have exactly one ability adding four loyalty"
