@@ -555,8 +555,10 @@ data Prompt r where
   -- The Natural is how many cards this search may find -- Explosive Vegetation's
   -- "up to two". Answering with fewer is legal for a search stating a quality (CR
   -- 701.23b's "some or all"), and the empty answer is that search's "fail to
-  -- find"; a search for a bare quantity is under CR 701.23d instead, and
-  -- Pawl.Engine.Resolve completes a short answer there rather than honouring it.
+  -- find"; so is it for a search whose card prints "up to" (Search.upTo, Denying
+  -- Wind). A search for a bare quantity with neither is under CR 701.23d instead,
+  -- and Pawl.Engine.Resolve completes a short answer there rather than honouring
+  -- it.
   -- A LIST rather than a Maybe and a repeated prompt: CR 701.23a's find is one
   -- look at the whole zone, so the searcher names the whole set at once.
   SearchLibrary :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt [ObjectId.ObjectId]
