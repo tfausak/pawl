@@ -466,8 +466,13 @@ candidateAttackDeclarations candidates =
 -- answer the same question; the closed form is a shortcut that only some boards
 -- admit.
 --
--- The CLOSED FORM is the instance set, minus whichever instances CR 508.1d's cost
--- clause excuses. It is exact when no set-shaped restriction reaches a candidate,
+-- The CLOSED FORM is the required creatures, minus whichever ones CR 508.1d's
+-- cost clause excuses. Multiplicity leaves that DECLARATION alone: it is still
+-- every required creature that attacks freely, and it still maximizes -- no
+-- declaration over those creatures contains more of them, and a multiplicity is
+-- never negative, so none can sum higher. What multiplicity changes is only how
+-- the sum is read off it, which is attackRequirementsMet's business.
+-- It is exact when no set-shaped restriction reaches a candidate,
 -- because then every restriction pawl models is per creature (CR 508.1a's own
 -- clauses, CR 702.3b's defender, CR 508.1c's printed
 -- CombatRestriction.CantAttack), and canAttack has already applied all of them to
@@ -480,7 +485,8 @@ candidateAttackDeclarations candidates =
 -- declaration illegal for what it CONTAINS (a lone Bonded Construct) or for how
 -- BIG it is (three creatures under a Silent Arbiter), so "all of the required
 -- creatures at once" can be a declaration no player may make, and the maximum
--- stops being the instance set. The ENUMERATION is then blockCeiling's search,
+-- stops being the whole instance multiset. The ENUMERATION is then
+-- blockCeiling's search,
 -- at blockCeiling's exponential cost -- #342's shape on the attacking side,
 -- where nothing is capped and nothing is sampled for #342's reason (#714).
 --
@@ -490,7 +496,7 @@ candidateAttackDeclarations candidates =
 -- contains, and the closed form's own answer being WITHIN the bound means none
 -- is disallowed for its size either -- so the winning declaration would be the
 -- set of required creatures that attack freely, element for element what
--- Set.filter builds. Testing the answer rather than testing `limit` for
+-- Map.filterWithKey builds. Testing the answer rather than testing `limit` for
 -- emptiness is what keeps a Silent Arbiter beside a single Curse of the Nightly
 -- Hunt off the exponential path: one required creature is within a bound of one,
 -- and the two disagree only once the required creatures outnumber the bound. It
@@ -503,7 +509,7 @@ candidateAttackDeclarations candidates =
 -- is not required to pay a cost to attack, so a declaration that costs something
 -- cannot be the bar another declaration is judged against. Excluding those
 -- creatures from the search is the same act the closed form performs with
--- Set.filter.
+-- Map.filterWithKey.
 --
 -- CR 508.1d's COST CLAUSE is a modifier on the maximization rather than a check
 -- of its own: a player is never required to pay a cost to attack, even where
@@ -527,14 +533,14 @@ candidateAttackDeclarations candidates =
 -- every declaration obeys zero -- and that case takes the closed form whatever
 -- `alone` and `limit` say, so a board carrying a set-shaped restriction and no
 -- requirement enumerates nothing and no cost walk is taken.
-attackCeiling :: [ObjectId] -> GameState -> (Set ObjectId, Set ObjectId)
+attackCeiling :: [ObjectId] -> GameState -> (Map ObjectId Natural, Set ObjectId)
 attackCeiling candidates gs =
   attackCeilingGiven (CombatRestriction.attackLimit gs) (CombatRestriction.cantAttackAlone candidates gs) candidates gs
 
 -- attackCeiling against the restrictions the caller already gathered, which is
 -- what both callers below want: each has to ask attackDeclarationAllowed of the
 -- player's own declaration as well, and the two must be judging the same board.
-attackCeilingGiven :: Maybe Natural -> Set ObjectId -> [ObjectId] -> GameState -> (Set ObjectId, Set ObjectId)
+attackCeilingGiven :: Maybe Natural -> Set ObjectId -> [ObjectId] -> GameState -> (Map ObjectId Natural, Set ObjectId)
 attackCeilingGiven limit alone candidates gs =
   let required = AttackRequirement.instances candidates gs
       targets = case Combat.defender (GameState.combat gs) of
@@ -554,27 +560,39 @@ attackCeilingGiven limit alone candidates gs =
           better
           Set.empty
           (filter (attackDeclarationAllowed limit alone) (candidateAttackDeclarations (filter freely candidates)))
-      closed = Set.filter freely required
+      -- CR 508.1d's cost clause is a filter on the CREATURE, never on its
+      -- requirements: a creature is excused wholly or not at all, so the test
+      -- reads the key and ignores the multiplicity.
+      closed = Map.filterWithKey (\oid _ -> freely oid) required
    in ( required,
-        if (Set.null alone && withinLimit limit (Set.size closed)) || Set.null required
-          then closed
+        -- Map.size and not the multiplicity total, because what `limit` bounds
+        -- is a declaration's SIZE (CR 508.1c counts creatures) and never a
+        -- requirement tally. No board tells the two apart: summing can only make
+        -- the guard stricter, and the enumeration it then falls through to
+        -- computes the same maximum wherever the guard would have held -- so this
+        -- spelling is argued from the rule rather than fenced by a test.
+        if (Set.null alone && withinLimit limit (Map.size closed)) || Map.null required
+          then Map.keysSet closed
           else enumerated
       )
 
 -- How many of `required` this declaration obeys (CR 508.1d): a requirement
 -- instance is obeyed exactly when the declaration attacks with its creature.
--- requirementsMet's twin, on a set of creatures rather than a multiset of pairs
--- -- the twin counts requirements and this one counts creatures, which is the
--- divergence AttackRequirement.instances records (#1705).
-attackRequirementsMet :: Set ObjectId -> Set ObjectId -> Int
-attackRequirementsMet required declaration = Set.size (Set.intersection required declaration)
+-- requirementsMet's twin, on a multiset of creatures rather than one of pairs.
+--
+-- Summing multiplicities rather than counting keys, because CR 508.1d counts
+-- REQUIREMENTS: two requirements naming one creature are both obeyed by the
+-- declaration that attacks with it.
+attackRequirementsMet :: Map ObjectId Natural -> Set ObjectId -> Natural
+attackRequirementsMet required declaration =
+  sum (Map.filterWithKey (\oid _ -> Set.member oid declaration) required)
 
 -- CR 508.1d asked of a declaration that has already passed CR 508.1a and CR
 -- 508.1c: does it obey at least as many requirements as the maximum? Split out of
 -- legalAttackDeclaration so that declareAttackers can ask it against a ceiling it
 -- computed once, rather than paying for a second one -- and so that the two of
 -- them cannot drift, since the caller's check is built from this same expression.
-obeysAttackRequirements :: (Set ObjectId, Set ObjectId) -> [ObjectId] -> Bool
+obeysAttackRequirements :: (Map ObjectId Natural, Set ObjectId) -> [ObjectId] -> Bool
 obeysAttackRequirements (required, best) chosen =
   attackRequirementsMet required (Set.fromList chosen) >= attackRequirementsMet required best
 
@@ -620,7 +638,7 @@ legalAttackDeclarationGiven candidates chosen gs =
 --
 -- Taken as a filter over `candidates` rather than as Set.toList, so the forced
 -- declaration comes back in the order the player was offered its creatures.
-forcedAttackDeclaration :: (Set ObjectId, Set ObjectId) -> [ObjectId] -> [ObjectId]
+forcedAttackDeclaration :: (Map ObjectId Natural, Set ObjectId) -> [ObjectId] -> [ObjectId]
 forcedAttackDeclaration (_, best) = filter (\oid -> Set.member oid best)
 
 -- CR 509.1a: a blocking creature must be untapped and controlled by the
