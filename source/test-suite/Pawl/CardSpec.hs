@@ -902,10 +902,132 @@ perAttackerCounts perAttacker = case perAttacker of
   PerAttacker.Fixed _ -> []
   PerAttacker.Counted quantity -> quantityCounts quantity
 
--- Hand-maintained, with cardCounts' caveat: a NEW Face field holding effects
--- must be added here too.
+-- Every effect a card AUTHORS: the ones its carriers hold, plus everything
+-- nested inside one of those effects' own payloads, transitively. The nested
+-- half is what makes this a CLOSURE rather than the flat concatenation the
+-- carriers give -- CR 615.5's rider on a spell's prevention (Inkshield's Create)
+-- is an effect the card wrote, and every lint downstream asks whether the CARD
+-- authored an effect of some shape rather than which field it sat in.
+--
+-- Not the effects a token or emblem this card MINTS prints: those belong to
+-- another object, and the sweeps that want them take `card : mintedFaces card`
+-- and ask this question of each face separately.
 cardResolutionEffects :: Face.Face Card.Type.Card -> [Effect.Effect Card.Type.Card]
-cardResolutionEffects card =
+cardResolutionEffects = concatMap effectWithNested . cardCarrierEffects
+
+-- One effect and everything nested inside it, transitively. Terminates on card
+-- data of any shape: Pawl.Types.Effect nests structurally and a JSON document is
+-- finite, so the depth is whatever the card printed.
+effectWithNested :: Effect.Effect Card.Type.Card -> [Effect.Effect Card.Type.Card]
+effectWithNested effect = effect : concatMap effectWithNested (effectNestedEffects effect)
+
+-- The effects one effect carries in its own payload -- exactly the four arms
+-- Pawl.Types.Effect declares parametrically in `Effect card`, since an arm with
+-- no effect-typed field can hold none.
+--
+-- A Create's token and a CreateEmblem's emblem are NOT nested effects, though
+-- each embeds a whole Card: those effects are the MINTED object's, not this
+-- card's, and folding them in would attribute a token's slot binding to the card
+-- that created it. mintedFaces is the traversal for that axis.
+--
+-- Exhaustive and hand-maintained, with effectReplacements' caveat: a NEW effect
+-- carrying effects of its own must be added here too, and the build breaks until
+-- it is.
+effectNestedEffects :: Effect.Effect Card.Type.Card -> [Effect.Effect Card.Type.Card]
+effectNestedEffects effect = case effect of
+  -- CR 615.5's rider and CR 614.1c's as-enters instruction, on the replacement a
+  -- resolution INSTALLS; the PRINTED twin arrives through cardCarrierEffects'
+  -- last limb instead.
+  Effect.Replace (Replace.MkReplace _ _ _ _ replacement) -> replacementPrintedEffects replacement
+  -- CR 615.5's rider on the two prevention opcodes a SPELL authors: Test of
+  -- Faith's counters, Inkshield's Inklings.
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ riders) -> Foldable.toList riders
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ riders) -> Foldable.toList riders
+  -- CR 608.2f's body, run once per member of the fold.
+  Effect.ForEach (ForEach.MkForEach _ _ body) -> Foldable.toList body
+  Effect.Create {} -> []
+  Effect.CreateCopy {} -> []
+  Effect.BecomeCopy {} -> []
+  Effect.CreateEmblem {} -> []
+  Effect.BecomeMonarch {} -> []
+  Effect.Designate {} -> []
+  Effect.DealDamage {} -> []
+  Effect.ModifyTarget {} -> []
+  Effect.AddMana {} -> []
+  Effect.Search {} -> []
+  Effect.ExileAllGraveyards -> []
+  Effect.Proliferate -> []
+  Effect.Bolster {} -> []
+  Effect.Amass {} -> []
+  Effect.Blight {} -> []
+  Effect.TemptWithTheRing -> []
+  Effect.Venture -> []
+  Effect.ExileHandThenDraw -> []
+  Effect.PlayerSacrifices {} -> []
+  Effect.RestartGame {} -> []
+  Effect.ControlPlayerNextTurn {} -> []
+  Effect.Destroy {} -> []
+  Effect.Sacrifice {} -> []
+  Effect.MoveToZone {} -> []
+  Effect.Draw {} -> []
+  Effect.Mill {} -> []
+  Effect.Reveal {} -> []
+  Effect.LookAt {} -> []
+  Effect.Scry {} -> []
+  Effect.Surveil {} -> []
+  Effect.Fateseal {} -> []
+  Effect.Explore {} -> []
+  Effect.Discard {} -> []
+  Effect.LoseLife {} -> []
+  Effect.GainLife {} -> []
+  Effect.ExchangeLifeTotals {} -> []
+  Effect.SetLifeTotal {} -> []
+  Effect.RedistributeLifeTotals -> []
+  Effect.IncreaseSpeed {} -> []
+  Effect.DecreaseSpeed {} -> []
+  Effect.SkipNextPhase {} -> []
+  Effect.RedirectDamage {} -> []
+  Effect.TurnFaceDown {} -> []
+  Effect.RemoveFromCombat {} -> []
+  Effect.BecomesBlocked {} -> []
+  Effect.Counter {} -> []
+  Effect.PutCounters {} -> []
+  Effect.RemoveCounters {} -> []
+  Effect.GainPlayerCounters {} -> []
+  Effect.RemovePlayerCounters {} -> []
+  Effect.Tap {} -> []
+  Effect.Untap {} -> []
+  Effect.Detain {} -> []
+  Effect.DoesNotUntapNext {} -> []
+  Effect.Transform {} -> []
+  Effect.PhaseOut {} -> []
+  Effect.AddPhases {} -> []
+  Effect.GainControl {} -> []
+  Effect.Unsuspect {} -> []
+  Effect.Evolve {} -> []
+  Effect.Mentor {} -> []
+  Effect.Train {} -> []
+  Effect.ItBecomes {} -> []
+  Effect.ExileUntilMonarch {} -> []
+  Effect.ExileHaunting {} -> []
+  Effect.Attach {} -> []
+  Effect.AttachTarget {} -> []
+  Effect.PlaySubgame {} -> []
+  Effect.ChooseOpponent {} -> []
+  Effect.ArmDelayedTrigger {} -> []
+  Effect.AffectPlayers {} -> []
+  Effect.RequireBlock {} -> []
+  Effect.TakeExtraTurn {} -> []
+  Effect.ShuffleIntoLibrary {} -> []
+  Effect.OfferCast {} -> []
+  Effect.GrantPlayFromExile {} -> []
+  Effect.ChangeText {} -> []
+
+-- The carriers themselves, before the nesting closure above: one limb per field
+-- of a Face that holds effects. Hand-maintained, with cardCounts' caveat: a NEW
+-- Face field holding effects must be added here too.
+cardCarrierEffects :: Face.Face Card.Type.Card -> [Effect.Effect Card.Type.Card]
+cardCarrierEffects card =
   Card.allEffects card
     <> concatMap (Modal.allEffects . ActivatedAbility.modal) (Face.activatedAbilities card)
     <> concatMap (Modal.allEffects . TriggeredAbility.modal) (Face.triggeredAbilities card)
@@ -930,10 +1052,10 @@ cardResolutionEffects card =
 -- on its own (Pawl.Engine.Mulligan.handWindow performs one and asks again), so a
 -- slot one action defines is not there for another to read.
 --
--- Deliberately NOT folded into cardResolutionEffects: that view answers what the
--- card RESOLVES, a dozen lints read it, and widening it would change all of them
--- at once for the sake of two fields only the sweep below and ownBoundSlots
--- read.
+-- Deliberately NOT a limb of cardCarrierEffects: these run from a HAND, before
+-- the game begins, and each runs on its own -- so folding them into one flat
+-- list would hand a dozen lints a slot-sharing claim that is false of them. The
+-- sweep below and ownBoundSlots are the two readers, and both want the split.
 handActions :: Face.Face Card.Type.Card -> [[Effect.Effect Card.Type.Card]]
 handActions card = Face.mulliganActions card <> Face.openingHandActions card
 
@@ -1118,12 +1240,10 @@ replacementEntryEffects replacement = case replacement of
 -- nothing else, since no other arm has a field to carry one. The card-authored
 -- twin of the two prevention opcodes' `riders`.
 --
--- Only THIS half reaches cardResolutionEffects. A rider a SPELL authors on
--- Effect.PreventAllDamage or Effect.PreventNextDamage is invisible to every lint
--- downstream of that function, because Card.allEffects and Modal.allEffects are
--- flat over Clause.effects -- so Inkshield's nested token face is unswept by the
--- CR 111.4 naming case below, and only Pawl.ReplacementSpec's inkshieldSpec
--- catches a misnaming there (gap #1746).
+-- Both halves reach cardResolutionEffects: this one as a carrier of its own, and
+-- the rider a SPELL authors on Effect.PreventAllDamage or
+-- Effect.PreventNextDamage through effectNestedEffects, which is what lets the CR
+-- 111.4 naming case below see Inkshield's nested token face.
 replacementEffectRiders :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> [Effect.Effect Card.Type.Card]
 replacementEffectRiders replacement = case replacement of
   ReplacementEffect.DamageR (DamageR.MkDamageR _ _ riders) -> Foldable.toList riders
@@ -1698,9 +1818,10 @@ powerToughnessSlots card =
 -- emblem's abilities function in the command zone, so an ability arriving as an
 -- effect's payload is as real as a printed one.
 --
--- Deliberately NOT folded into cardResolutionEffects, which several other lints
--- read: those ask what THIS card executes, and widening that view would change
--- all of them at once.
+-- A separate axis from cardResolutionEffects' nesting closure, and deliberately
+-- so: a minted face's effects belong to ANOTHER object, so the sweeps that want
+-- them ask their question of each face in turn rather than reading one list that
+-- pretends a token's text is the creating card's.
 --
 -- Not applied to the ability dataflow lints built on modalSlotsOffend, which
 -- still stop at the printed face (#1010).
@@ -1893,9 +2014,9 @@ reservedDeclarations :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
 reservedDeclarations = Set.intersection reservedSlots . declaredTargetSlots
 
 -- Every slot ONE FACE binds: the names its own effects author for a later effect
--- to read back -- Resolve.definedSlots over every carrier that face can execute
--- an effect from (cardResolutionEffects), which is the spell modes plus the
--- activated, triggered and delayed abilities.
+-- to read back -- Resolve.definedSlots over every effect that face authors
+-- (cardResolutionEffects), which is every carrier cardCarrierEffects lists and
+-- everything nested inside one of their effects.
 --
 -- ownDeclaredTargetSlots' sibling and the other half of the same question.
 -- Declaring a target slot is not the only way a card names a slot: MoveToZone and Create
@@ -3627,6 +3748,43 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- the suffix dropped.
         Spec.assertBool s (tokenNameOffends token {Face.name = CardName.MkCardName $ Text.pack "Spirit"}) "misnamed token detected"
       other -> Spec.assertFailure s ("expected exactly one Create, got " <> show (length other))
+  -- The same self-test one level down, and the proof that cardResolutionEffects
+  -- is a CLOSURE rather than the carriers' flat concatenation: Inkshield's Create
+  -- sits inside CR 615.5's rider on a spell's prevention, which no carrier limb
+  -- reaches. Without effectNestedEffects the corpus sweep above saw no token here
+  -- at all, so renaming this one to the bare "Inkling" CR 111.4 forbids left it
+  -- green and only a gameplay assertion in Pawl.ReplacementSpec objected.
+  Spec.it s "CR 111.4 the sweep reaches a token nested in a prevention rider" $ do
+    inkshield <- S.printingOf s registry "Inkshield"
+    case concatMap (NonEmpty.toList . Card.Type.faces) [token | Effect.Create (Create.MkCreate _ token _ _) <- cardResolutionEffects (S.combinedFace inkshield)] of
+      [token] -> do
+        Spec.assertBool s (not (tokenNameOffends token)) "the real token passes"
+        Spec.assertBool s (tokenNameOffends token {Face.name = CardName.MkCardName $ Text.pack "Inkling"}) "misnamed token detected"
+      other -> Spec.assertFailure s ("expected exactly one Create, got " <> show (length other))
+  -- The countdown shield's rider, the same limb one opcode over: Test of Faith
+  -- hangs CR 615.5's counters off a PreventNextDamage where Inkshield hangs its
+  -- tokens off a PreventAllDamage. No lint fires on a PutCounters, so this is
+  -- what observes that arm at all.
+  Spec.it s "CR 615.5 the sweep reaches a rider on the countdown shield" $ do
+    testOfFaith <- S.printingOf s registry "Test of Faith"
+    Spec.assertEqWith
+      s
+      "the shield's rider is swept"
+      (length [() | Effect.PutCounters {} <- cardResolutionEffects (S.combinedFace testOfFaith)])
+      1
+  -- The closure's OTHER limb with a producer in the pool: CR 608.2f's body.
+  -- Soulfire Eruption's exile is nested in a ForEach, so the four MoveToZone
+  -- sweeps below (CR 406.3's face-down exile, CR 708.3's face-down entry, CR
+  -- 401.2's owner-chosen end, and the plural binding) saw nothing of it before
+  -- this closure, and no corpus card offends any of them from a nested position
+  -- to say so.
+  Spec.it s "CR 608.2f the sweep reaches an effect nested in a ForEach body" $ do
+    soulfireEruption <- S.printingOf s registry "Soulfire Eruption"
+    Spec.assertEqWith
+      s
+      "the body's move is swept"
+      [zone | Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone _ _ _ _) <- cardResolutionEffects (S.combinedFace soulfireEruption)]
+      [Zone.Exile]
   -- ONE sweep over the whole reserved set, replacing the five per-name
   -- cases this grew out of. Those five each filtered on
   -- Card.allTargetSlots, so they saw a card's spell modes and enchant slot
@@ -3917,9 +4075,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- TEST, never a trigger that silently never fires. Equality, not subset: a
   -- declared ability nothing arms is dead card text.
   --
-  -- SCOPE: `cardResolutionEffects`, every carrier a card can execute an effect
-  -- from -- its spell modes AND its activated, triggered and delayed abilities'
-  -- -- and not `Card.allEffects`, which is the spell modes alone. Meandering
+  -- SCOPE: `cardResolutionEffects`, every effect the card authors -- its
+  -- abilities' as well as its spell modes' -- and not `Card.allEffects`, which is
+  -- the spell modes alone. Meandering
   -- Towershell is what makes the difference load-bearing: it arms from a
   -- TRIGGERED ability, so the narrower view saw a declared entry that nothing
   -- appeared to arm and failed the equality outright.
