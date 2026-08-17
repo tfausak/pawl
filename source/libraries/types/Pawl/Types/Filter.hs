@@ -467,9 +467,10 @@ data Filter keyword
     -- The nest reads the host and the OUTER context: CR 109.5's "you" is the
     -- ability's controller wherever it appears, so `AttachedTo (ControlledBy
     -- You)` is "attached to something you control" and never "attached to
-    -- something its own controller controls". A consequence rather than a
-    -- defect: `AttachedTo IsSource` is then a synonym for IsAttachedToSource
-    -- below.
+    -- something its own controller controls". A consequence worth stating:
+    -- `AttachedTo IsSource` then asks nearly what IsAttachedToSource below asks,
+    -- and differs on exactly one board -- a source that has left the battlefield,
+    -- which this atom's own narrowing excludes and that one's does not.
     --
     -- False for a candidate attached to a PLAYER (CR 303.4's other destination)
     -- and for one whose host has left the battlefield (CR 110.1) -- the host
