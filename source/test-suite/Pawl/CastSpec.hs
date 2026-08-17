@@ -2188,6 +2188,98 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
     Spec.assertEqWith s "alice's attacker was tapped to attack" (S.tappedCount S.alice attacked) 1
     Spec.assertEqWith s "and Rally did not untap it" (S.tappedCount S.alice resolved) 1
 
+  necrologiaSpec s registry
+
+-- Necrologia {3}{B}{B} Instant: "Cast this spell only during your end step. As
+-- an additional cost to cast this spell, pay X life. Draw X cards."
+--
+-- The card for the TURN axis of CastingRestriction.DuringPhase (CR 109.5's
+-- "your"), where Rally the Troops above is the card for a window every player
+-- shares.
+--
+-- alice holds Necrologia and a Lightning Bolt, with five Swamps and a Mountain
+-- untapped and three cards in her library. The Bolt is the CONTROL on every
+-- board below: an unrestricted instant in the same hand at the same moment, so a
+-- board that refuses Necrologia for want of priority or mana refuses the Bolt
+-- too, and the negative cases would not pass for that reason unnoticed.
+necrologiaBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Phase.Phase -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+necrologiaBoard swamp mountain necrologia bolt ph =
+  let (base, necrologiaId) = S.boltInHand swamp necrologia 5 ph
+      (boltId, withBolt) = S.addHandCard bolt S.alice (snd (S.addCreature mountain S.alice base))
+      stocked = List.foldl' (\gs _ -> snd (S.addLibraryCard swamp S.alice gs)) withBolt [1 :: Int, 2, 3]
+   in (necrologiaId, boltId, stocked)
+
+-- Announces this X for Necrologia; every other prompt takes the identity
+-- fallback. CostSpec's answerHatredXOf, for the other card whose only X is a
+-- CostComponent.PayLifeX.
+answerNecrologiaXOf :: Natural -> Prompt.Prompt r -> r
+answerNecrologiaXOf n p = case p of
+  Prompt.ChooseX {} -> n
+  _ -> S.identityAnswer p
+
+necrologiaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+necrologiaSpec s registry = Spec.describe s "Necrologia" $ do
+  -- CR 512.1 / CR 513.1: the end step is a step of the ending phase, and alice
+  -- is the active player, so both conjuncts hold.
+  Spec.it s "CR 601.3 castable in its controller's own end step" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    mountain <- S.printingOf s registry "Mountain"
+    necrologia <- S.printingOf s registry "Necrologia"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (oid, boltId, board) = necrologiaBoard swamp mountain necrologia bolt (Phase.Ending EndingStep.EndStep)
+    Spec.assertBool s (S.castable S.alice oid board) "castable"
+    Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.alice board)) "and offered as a legal action"
+    Spec.assertBool s (S.castable S.alice boltId board) "the control instant is castable too"
+  -- CR 109.5: the TURN half, isolated. The same board with ONE field changed --
+  -- bob is the active player. alice still holds priority, still has the same
+  -- five Swamps, and the game is still in an end step.
+  Spec.it s "CR 109.5 the same card is NOT castable in an opponent's end step" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    mountain <- S.printingOf s registry "Mountain"
+    necrologia <- S.printingOf s registry "Necrologia"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (oid, boltId, board) = necrologiaBoard swamp mountain necrologia bolt (Phase.Ending EndingStep.EndStep)
+        bobsTurn = board {GameState.activePlayer = S.bob}
+    Spec.assertBool s (not (S.castable S.alice oid bobsTurn)) "TurnScope.ControllersTurn refuses it"
+    Spec.assertBool s (not (any (S.isCastOf oid) (Action.legalActions S.alice bobsTurn))) "and it is not offered"
+    Spec.assertBool s (S.castable S.alice boltId bobsTurn) "though the control instant still is"
+  -- CR 500.1: the WINDOW half, isolated. alice's own turn, wrong phase.
+  Spec.it s "CR 601.3 not castable in its controller's precombat main phase" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    mountain <- S.printingOf s registry "Mountain"
+    necrologia <- S.printingOf s registry "Necrologia"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (oid, boltId, board) = necrologiaBoard swamp mountain necrologia bolt Phase.PrecombatMain
+    Spec.assertBool s (not (S.castable S.alice oid board)) "the end-step window is closed"
+    Spec.assertBool s (S.castable S.alice boltId board) "though the control instant is castable"
+  -- CR 512.1: the cleanup step is the OTHER step of the same phase, so a reader
+  -- comparing PhaseSelector.EndingPhase rather than the step would admit it.
+  -- This is the case that keeps Turn.inWindow's containment honest for a Step.
+  Spec.it s "CR 512.1 not castable in the cleanup step of the same phase" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    mountain <- S.printingOf s registry "Mountain"
+    necrologia <- S.printingOf s registry "Necrologia"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (oid, boltId, board) = necrologiaBoard swamp mountain necrologia bolt (Phase.Ending EndingStep.Cleanup)
+    Spec.assertBool s (not (S.castable S.alice oid board)) "a Step window names one step"
+    Spec.assertBool s (S.castable S.alice boltId board) "though the control instant is castable"
+  -- Gameplay level, through the stack: the permitted cast resolves, CR 119.4
+  -- takes the announced life and CR 121.3 draws that many, so the gate admits a
+  -- card that then plays. Falsifiers: an X read as 0 leaves 20 life and one card
+  -- drawn short of nothing; an X paid but not read back leaves 18 life and no
+  -- draw.
+  Spec.it s "CR 601.2b/107.3a the permitted cast pays 2 life and draws 2" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    mountain <- S.printingOf s registry "Mountain"
+    necrologia <- S.printingOf s registry "Necrologia"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (oid, _, board) = necrologiaBoard swamp mountain necrologia bolt (Phase.Ending EndingStep.EndStep)
+        after = S.runPure (answerNecrologiaXOf 2) board (do S.cast S.alice oid; Stack.resolveTop)
+    Spec.assertEqWith s "CR 119.4 subtracted the announced 2" (S.lifeOf S.alice after) (Just 18)
+    -- One Bolt left in hand plus the two drawn; Necrologia itself has left it.
+    Spec.assertEqWith s "two cards drawn" (S.handSize S.alice after) 3
+    Spec.assertEqWith s "and the library is two shorter" (length (Game.zoneMembers Zone.Library S.alice after)) 1
+
 tapStateOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
 tapStateOf oid gs = fmap Object.tapped (Game.lookupObject oid gs)
 
