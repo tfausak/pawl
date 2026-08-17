@@ -50,6 +50,7 @@ import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
+import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
@@ -59,7 +60,11 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.Layer as Layer
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.Modification as Modification
@@ -2863,6 +2868,22 @@ levelerSpec s registry = Spec.describe s "Leveler" $ do
     Spec.assertEqWith s "not on bob's turn" (levelUpsOf oid gs {GameState.activePlayer = S.bob}) []
     Spec.assertBool s (elem spellId (GameState.stack withSpell)) "the stack really is occupied"
     Spec.assertEqWith s "not with a spell on the stack" (levelUpsOf oid withSpell) []
+
+  -- CR 702.87a's payload makes level up a family-bearing keyword, and
+  -- Pawl.Engine.Keyword.familyOf answering Nothing for it would compile. The
+  -- observer is Filter.HasKeywordFamily, which reads familyOf: "a creature with
+  -- level up" must find the Student whatever its cost is written as, while the
+  -- exact-instance atom beside it must not find a cost the card does not print.
+  Spec.it s "CR 702.87a the Student answers to the level up FAMILY, not only to level up {W}" $ do
+    (oid, gs) <- studentBoard s registry 0
+    let view = Projection.viewOfObject oid gs
+        context = Filter.contextFor (Just S.alice) (Just oid)
+        white = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.White)])) []
+        blue = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Blue)])) []
+    Spec.assertBool s (Filter.matches context view (Filter.Type.HasKeywordFamily KeywordFamily.LevelUp)) "the family reaches it"
+    Spec.assertBool s (Filter.matches context view (Filter.Type.HasKeyword (Keyword.LevelUp white))) "so does the written {W} instance"
+    Spec.assertBool s (not (Filter.matches context view (Filter.Type.HasKeyword (Keyword.LevelUp blue)))) "but level up {U} is a different instance"
+    Spec.assertBool s (not (Filter.matches context view (Filter.Type.HasKeywordFamily KeywordFamily.Outlast))) "and it is not outlast"
 
 -- alice controls a Student of Warfare and `plains` untapped Plains, in her
 -- precombat main phase with priority.
