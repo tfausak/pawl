@@ -92,9 +92,9 @@ morphCostOf oid gs = do
 -- permanent itself with no card type and no mana cost at all -- so a projected
 -- read would refuse every manifested permanent ever put onto the battlefield.
 --
--- The card's own printed types, not its projected ones, for the same reason. CR
--- 701.40b asks what the card IS, which is CR 108.2's question about a card
--- outside the game state rather than CR 613's about a permanent in it.
+-- The card's own printed types, not its projected ones, for the same reason and
+-- morphCostOf's: the rule's subject is the card, so a CR 613 read of the
+-- permanent answers a different question.
 manifestCostOf :: ObjectId -> GameState -> Maybe (Cost Keyword)
 manifestCostOf oid gs = do
   face <- Game.faceUpFaceOf oid gs
