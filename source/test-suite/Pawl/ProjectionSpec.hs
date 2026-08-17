@@ -2789,6 +2789,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     -- report both colours here and pass every other case in this task.
     Spec.assertEqWith s "both colours with no face shown" (Projection.colorsOf oid gs0) (Set.fromList [Color.Green, Color.White])
 
+  attachedHostSpec s registry
   keywordCounterSpec s registry
   levelerSpec s registry
   supertypeSpec s registry
@@ -3041,3 +3042,79 @@ keywordCounterSpec s registry = Spec.describe s "KeywordCounter" $ do
         hasted = S.addCounter (CounterKind.Keyword Keyword.Haste) 1 pikerId board
     Spec.assertBool s (Projection.hasKeyword Keyword.Haste pikerId hasted) "haste granted"
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying pikerId hasted)) "flying is not"
+
+-- CR 701.3a / 613.1: Filter.AttachedTo reached from INSIDE the layer fold, which
+-- is where the pool's two mutually-referring Equipment put it.
+--
+-- Bride's Gown ({1}{W} Artifact -- Equipment, "Equipped creature gets +2/+0. It
+-- gets an additional +0/+2 and has first strike as long as an Equipment named
+-- Groom's Finery is attached to a creature you control." / "Equip {2}") and
+-- Groom's Finery ({1}{B}, the same sentence with deathtouch and the two names
+-- swapped), both checked against Scryfall 2026-08-17. Each card's CR 604.2 "as
+-- long as" clause counts the OTHER one and asks about its HOST, so answering
+-- either means projecting an object the fold is not projecting.
+--
+-- That is the pair of questions this group separates: does the clause read the
+-- host at all (the boards below, which differ by one attachment), and does it
+-- read it at the right DEPTH (the Kormus Bell case, the only board in the pool
+-- where a bounded host view and a full one disagree).
+attachedHostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+attachedHostSpec s registry = Spec.describe s "AttachedTo" $ do
+  -- Three boards ONE attachment apart, so nothing but the Finery's host moves:
+  -- on a creature its own controller controls, on nobody, and on a creature the
+  -- opponent controls. CR 109.5 makes the clause's "you" the Equipment printing
+  -- it -- Bride's Gown's controller -- which is what the third board reads and
+  -- the printed ruling states outright.
+  --
+  -- The numbers keep the two halves of the sentence apart: a Goblin Piker is
+  -- 2/1, the unconditional half makes it 4/1, and only the conditional half can
+  -- make it 4/3. First strike is the same assertion on the other axis, since a
+  -- keyword grant and a P/T modification are two layers.
+  Spec.it s "CR 604.2 Bride's Gown's clause reads the OTHER Equipment's host" $ do
+    gown <- S.printingOf s registry "Bride's Gown"
+    finery <- S.printingOf s registry "Groom's Finery"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (bride, g1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+        (groom, g2) = S.addCreature piker S.alice g1
+        (theirs, g3) = S.addCreature piker S.bob g2
+        (gownId, g4) = S.addCreature gown S.alice g3
+        (fineryId, g5) = S.addCreature finery S.alice g4
+        loose = S.attach gownId bride g5
+        held = S.attach fineryId groom loose
+        elsewhere = S.attach fineryId theirs loose
+        reading gs = (Projection.powerOf bride gs, Projection.toughnessOf bride gs, Projection.hasKeyword Keyword.FirstStrike bride gs)
+    Spec.assertEqWith
+      s
+      "the clause holds only while the Finery is on a creature its own controller controls"
+      (reading held, reading loose, reading elsewhere)
+      ((Just 4, Just 3, True), (Just 4, Just 1, False), (Just 4, Just 1, False))
+
+  -- CR 613.1: the host is read through the layers BELOW the clause's own, the way
+  -- a nested Count already is. Kormus Bell ("All Swamps are 1/1 black creatures
+  -- that are still lands", checked against Scryfall 2026-08-17) is what makes the
+  -- two readings differ: its AddCardType is layer 4, so a Swamp host answers
+  -- "creature" above that bound and not below it, where a host read through the
+  -- FULL projection would answer "creature" at every bound.
+  --
+  -- Asked of Projection.viewUpTo directly rather than through a card, because no
+  -- clause in the pool sits low enough to tell the two apart: Bride's Gown's own
+  -- lowest layer is 6, by which point layer 4 has settled either way.
+  Spec.it s "CR 613.1 the nest reads its host at the layer bound it was asked at" $ do
+    bell <- S.printingOf s registry "Kormus Bell"
+    gown <- S.printingOf s registry "Bride's Gown"
+    swamp <- S.printingOf s registry "Swamp"
+    let (swampId, g1) = S.addCreature swamp S.alice (Setup.emptyGame S.bothPlayers)
+        (_, g2) = S.addCreature bell S.alice g1
+        (gownId, g3) = S.addCreature gown S.alice g2
+        gs = S.attach gownId swampId g3
+        cands = Projection.gather gs
+        context = Filter.contextFor (Just S.alice) (Just gownId)
+        onto bound =
+          fmap
+            (\view -> Filter.matches context view (Filter.Type.AttachedTo (Filter.Type.HasCardType CardType.Creature)))
+            (Projection.viewUpTo bound cands gs gownId)
+    Spec.assertEqWith
+      s
+      "not a creature below layer 4, a creature above it"
+      (onto Layer.Type, onto Layer.ModifyPT)
+      (Just False, Just True)

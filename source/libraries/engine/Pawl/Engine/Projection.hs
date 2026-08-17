@@ -503,8 +503,22 @@ data Gathered = MkGathered
 -- characteristics, so a layer-4 type change is visible to a later layer. CR
 -- 109.5: an affected-set filter's "you" is the SOURCE's controller, which
 -- ControlledBy compares against the affected object's own controller.
+--
+-- This one is for callers OUTSIDE the layer fold -- CR 613.11's combat modules
+-- and the CR 305.7 gate that reads a finished projection -- which is what makes
+-- fullView the right reader for an attached candidate's host. A caller inside
+-- the fold wants affectsGiven with its own layer's bound; see there.
 affects :: ObjectId -> ObjectId -> Affected.Affected -> ProjectedCharacteristics -> GameState -> Bool
-affects source oid a partial gs = case a of
+affects source oid a partial gs = affectsGiven (fullView gs) source oid a partial gs
+
+-- affects with the reader for an ATTACHED candidate's HOST supplied (CR 701.3a),
+-- which every caller has to pick at the same depth as `partial`: a caller folding
+-- at layer L passes viewUpTo L, a caller reading base characteristics passes
+-- baseView, and a caller outside the fold takes `affects` above. See
+-- viewOfCharacteristics for why the depths must agree, and why a caller inside
+-- the fold reaching for fullView would not terminate; see #1729.
+affectsGiven :: Count.ViewOf -> ObjectId -> ObjectId -> Affected.Affected -> ProjectedCharacteristics -> GameState -> Bool
+affectsGiven hosts source oid a partial gs = case a of
   Affected.TheseObjects s -> Set.member oid s
   -- CR 303.4m: read the SOURCE's attachment, not the candidate's. An unattached
   -- source names nothing, so the set is empty and the effect applies to no one.
@@ -521,11 +535,11 @@ affects source oid a partial gs = case a of
         -- controller controls".
         perspective = controllerOf source gs
      in Set.member oid (GameState.battlefield gs)
-          && Filter.matches (Filter.contextFor perspective (Just source)) (viewOfCharacteristics oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
+          && Filter.matches (Filter.contextFor perspective (Just source)) (viewOfCharacteristics hosts oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
   -- Matching's body without the battlefield conjunct.
   Affected.MatchingAnywhere f ->
     let perspective = controllerOf source gs
-     in Filter.matches (Filter.contextFor perspective (Just source)) (viewOfCharacteristics oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
+     in Filter.matches (Filter.contextFor perspective (Just source)) (viewOfCharacteristics hosts oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
   -- CR 303.4b / 303.4m: the source's attachment again, read for the PLAYER it
   -- names. A source that is unattached, or attached to an object, names no player
   -- and affects nobody. The controller comparison is CR 613.1b's layer 2, already
@@ -544,7 +558,7 @@ affects source oid a partial gs = case a of
       let controller = controllerOf oid gs
        in Set.member oid (GameState.battlefield gs)
             && controller == Just pid
-            && Filter.matches (Filter.contextFor (controllerOf source gs) (Just source)) (viewOfCharacteristics oid partial controller (countersOf oid gs) gs) f
+            && Filter.matches (Filter.contextFor (controllerOf source gs) (Just source)) (viewOfCharacteristics hosts oid partial controller (countersOf oid gs) gs) f
     _ -> False
 
 -- The characteristics view of an object: its CR 613 projection and its projected
@@ -560,7 +574,11 @@ viewOfObject oid gs = viewOfObjectGiven Map.empty (controlGrants gs) oid gs
 -- projectGiven for what the board is and when it is valid.
 viewOfObjectGiven :: Map ObjectId ProjectedCharacteristics -> [ControlGrant] -> ObjectId -> GameState -> Filter.View
 viewOfObjectGiven pcs grants oid gs =
-  viewOfCharacteristics oid (projectGiven pcs oid gs) (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs
+  -- A host is read the same way this object is -- the whole projection, off the
+  -- same board and the same grants. Recursive, and safe for the reason
+  -- viewOfCharacteristics gives: the host view is lazy, so the recursion is
+  -- driven by a filter's own AttachedTo nesting, which is finite.
+  viewOfCharacteristics (\host -> Just (viewOfObjectGiven pcs grants host gs)) oid (projectGiven pcs oid gs) (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs
 
 -- CR 112.2 / 601.2a: the view of a SPELL on the stack, whose controller is "by
 -- default, the player who put it on the stack" -- the player casting it, which
@@ -574,12 +592,14 @@ viewOfObjectGiven pcs grants oid gs =
 -- effects that modify the spell as it is cast are applied BEFORE it becomes cast,
 -- so by the time a trigger reads this they are already on the stack object.
 viewOfSpell :: PlayerId.PlayerId -> ObjectId -> GameState -> Filter.View
-viewOfSpell caster oid gs = viewOfCharacteristics oid (project oid gs) (Just caster) (countersOf oid gs) gs
+viewOfSpell caster oid gs = viewOfCharacteristics (fullView gs) oid (project oid gs) (Just caster) (countersOf oid gs) gs
 
 -- The ViewOf for callers OUTSIDE the CR 613 layer fold: every object projected
 -- with all layers applied. `viewUpTo` below is the bounded counterpart for
 -- callers INSIDE the fold. Picking the wrong one is not a type error -- both are
--- Count.ViewOf -- so it is a silent wrong answer in either direction.
+-- Count.ViewOf -- so it is a silent wrong answer in either direction, and for a
+-- caller inside the fold that reaches for this one as its `hosts` it is a
+-- non-terminating one (see viewOfCharacteristics).
 fullView :: GameState -> Count.ViewOf
 fullView gs oid = Just (viewOfObject oid gs)
 
@@ -638,7 +658,7 @@ viewWithLastKnownAnywhere gs oid =
     then fullView gs oid
     else
       fmap
-        (\lk -> viewOfCharacteristics oid (LastKnown.characteristics lk) (Just (LastKnown.controller lk)) (LastKnown.counters lk) gs)
+        (\lk -> viewOfCharacteristics (fullView gs) oid (LastKnown.characteristics lk) (Just (LastKnown.controller lk)) (LastKnown.counters lk) gs)
         (Map.lookup oid (GameState.lastKnown gs))
 
 -- CR 608.2h: this object's last known information, and only when the id names
@@ -713,10 +733,14 @@ powerWithLastKnownGiven pcs oid gs = case lastKnownOf oid gs of
 -- off-battlefield candidate the way viewOfCardIn did. That is CR 613.1's own
 -- order rather than a loss: the same count over a battlefield candidate has
 -- never seen it either.
+--
+-- CR 701.3a: an attached candidate's HOST is read at this same bound, which is
+-- what keeps a Filter.AttachedTo reached from inside the fold out of a loop --
+-- see viewOfCharacteristics for the argument.
 viewUpTo :: Layer -> [Gathered] -> GameState -> Count.ViewOf
 viewUpTo bound cands gs oid =
   if Map.member oid (GameState.objects gs)
-    then Just (viewOfCharacteristics oid (projectUpTo bound cands oid gs) (controllerOf oid gs) (countersOf oid gs) gs)
+    then Just (viewOfCharacteristics (viewUpTo bound cands gs) oid (projectUpTo bound cands oid gs) (controllerOf oid gs) (countersOf oid gs) gs)
     else Nothing
 
 -- The characteristics view of a printed card, from the FACE alone. Every axis is
@@ -989,8 +1013,25 @@ milledIt oid event = case event of
 -- counters themselves are gone from that record. The caller has to say what was
 -- on the object, and only the caller knows whether it is reading a live one or CR
 -- 608.2h's record of one that is not.
-viewOfCharacteristics :: ObjectId -> ProjectedCharacteristics -> Maybe PlayerId.PlayerId -> Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> GameState -> Filter.View
-viewOfCharacteristics oid pc controller counters gs =
+--
+-- `hosts` comes in for the same reason and is the same choice one level out: an
+-- attached object's HOST is another object with a projection of its own (CR
+-- 701.3a), and only the caller knows how deep the fold it is standing in has
+-- got. Every caller passes the reader that matches its own `pc` -- viewUpTo at
+-- the same layer bound from inside the fold, baseView from a base-characteristics
+-- reader, fullView from outside the fold -- so the host is read exactly as the
+-- object itself is, which is CR 613.1's own order applied to both.
+--
+-- Why it is a parameter rather than a projection taken here: a full projection
+-- taken from inside the fold re-enters `gather`, and gather's CR 604.2 gate is
+-- object-independent, so it asks the same condition again and again on the same
+-- state with no memo and no descending bound -- an unbounded loop rather than a
+-- wrong answer; see #1729. Each caller's reader is bounded: viewUpTo's stays at the
+-- caller's layer, and the fold below it drops to a strictly lower one, so the
+-- only recursion left is a Filter nesting AttachedTo inside AttachedTo, which a
+-- finite non-recursive filter term bounds.
+viewOfCharacteristics :: Count.ViewOf -> ObjectId -> ProjectedCharacteristics -> Maybe PlayerId.PlayerId -> Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> GameState -> Filter.View
+viewOfCharacteristics hosts oid pc controller counters gs =
   Filter.MkView
     { -- CR 201.1 / 709.4a off the PROJECTION, beside cardTypes: names are copiable
       -- (CR 707.2), so a Clone answers to what it copied and a face-down object
@@ -1053,7 +1094,8 @@ viewOfCharacteristics oid pc controller counters gs =
       -- CR 701.3a: also not a characteristic, so the attachment comes off
       -- Object.attachedTo -- but AttachedTo's nest asks about the HOST, whose
       -- characteristics are projected (layer 4 can make a land a creature), so
-      -- the host arrives as a whole view of its own.
+      -- the host arrives as a whole view of its own, read through `hosts` at the
+      -- caller's own depth (CR 613.1).
       --
       -- CR 303.4 / 110.1: narrowed to a host that is an object ON THE
       -- BATTLEFIELD. A player host answers Nothing, which is
@@ -1063,17 +1105,16 @@ viewOfCharacteristics oid pc controller counters gs =
       -- permanent" and not "attached to anything".
       --
       -- The view under the Just must stay lazy -- `affects` calls this function
-      -- from inside a projection, and forcing a second one would recurse -- and
-      -- deciding Just from Nothing forces no projection at all, so a nest that
-      -- names no characteristic costs none.
+      -- from inside a projection, and `hosts` is a reader that will project again
+      -- -- and deciding Just from Nothing forces no projection at all, so a nest
+      -- that names no characteristic costs none. Laziness is what keeps the cost
+      -- off the ordinary path; it is `hosts` being BOUNDED, not laziness, that
+      -- keeps a forced nest terminating.
       Filter.attachedToView =
-        fmap
-          (\host -> viewOfObject host gs)
-          ( Game.lookupObject oid gs
-              >>= Object.attachedTo
-              >>= Recipient.objectOf
-              >>= \host -> if Set.member host (GameState.battlefield gs) then Just host else Nothing
-          ),
+        Game.lookupObject oid gs
+          >>= Object.attachedTo
+          >>= Recipient.objectOf
+          >>= \host -> if Set.member host (GameState.battlefield gs) then hosts host else Nothing,
       -- CR 701.3a / 301.5a: the same attachment again, kept as the HOST'S ID rather
       -- than as a view -- IsAttachedToSource compares it against the match's
       -- source, which this builder does not know. Deliberately NOT narrowed to a
@@ -1370,7 +1411,27 @@ colorOfManaType manaType = case manaType of
 -- affects evaluated against an object's BASE characteristics (used by
 -- source-liveness, which must not recurse into the projection it feeds).
 affectsBase :: ObjectId -> ObjectId -> Affected.Affected -> GameState -> Bool
-affectsBase source oid a gs = affects source oid a (baseCharacteristics oid gs) gs
+affectsBase source oid a gs = affectsGiven (baseView gs) source oid a (baseCharacteristics oid gs) gs
+
+-- The ViewOf that reads every object at its BASE characteristics: what a caller
+-- feeding the projection rather than reading it wants for an attached
+-- candidate's host, since anything folded would recurse into the projection
+-- affectsBase exists to stay out of. fullView and viewUpTo are the two
+-- counterparts; picking between the three is viewOfCharacteristics' `hosts`
+-- choice, and none of them is a type error at the others' call sites.
+--
+-- Nothing for an id naming no object, like viewUpTo -- and like it, terminating
+-- because nothing under here folds: baseCharacteristics reads the printed face.
+--
+-- A regression fence rather than proven behaviour: swapping this for fullView
+-- leaves the whole suite green, since reaching it needs a card that sets a
+-- subtype on a filtered set of ATTACHED permanents and no printing does
+-- (gap #1757).
+baseView :: GameState -> Count.ViewOf
+baseView gs oid =
+  if Map.member oid (GameState.objects gs)
+    then Just (viewOfCharacteristics (baseView gs) oid (baseCharacteristics oid gs) (controllerOf oid gs) (countersOf oid gs) gs)
+    else Nothing
 
 -- CR 608.2h / 611.2d: evaluate a modification's quantities once and rewrite them
 -- to literals. Called by Resolve when a spell's or an ability's resolution stores
@@ -1693,7 +1754,7 @@ textChangesAffecting :: ObjectId -> GameState -> [(Subtype.Type.Subtype, Subtype
 textChangesAffecting oid gs =
   let pairOf eff = case ContinuousEffect.modification eff of
         Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord from to) ->
-          if affects (ContinuousEffect.source eff) oid (ContinuousEffect.affected eff) (baseCharacteristics oid gs) gs
+          if affectsGiven (baseView gs) (ContinuousEffect.source eff) oid (ContinuousEffect.affected eff) (baseCharacteristics oid gs) gs
             then Just (from, to)
             else Nothing
         _ -> Nothing
@@ -2721,7 +2782,7 @@ frozenStaticParts src gs =
             decided = decisionsUpTo lyr cands oid gs
          in case gEffect c >>= (`Map.lookup` decided) of
               Just answer -> answer
-              Nothing -> affects (gSource c) oid (gAffected c) partial gs
+              Nothing -> affectsGiven (viewUpTo lyr cands gs) (gSource c) oid (gAffected c) partial gs
       -- One entry per ability rather than per part, so the set is computed once
       -- and shared -- the parts of an ability agree on both inputs, gAffected
       -- and gLowest, so whichever part Map.fromList keeps asks the same
@@ -2926,7 +2987,7 @@ abilitiesRemovedBy keep cands gs oid =
             decided = decisionsUpTo lyr cands oid gs
             removes c = case gEffect c >>= (`Map.lookup` decided) of
               Just answer -> answer
-              Nothing -> affects (gSource c) oid (gAffected c) partial gs
+              Nothing -> affectsGiven (viewUpTo lyr cands gs) (gSource c) oid (gAffected c) partial gs
          in any removes cs
    in any removesAt (Map.toList byLowest)
 
@@ -3317,7 +3378,9 @@ filterReads f = case f of
   -- they are the HOST's: Aspect names an aspect of ONE object's projection, so
   -- there is no way to say "another object's card types", and over-declaring is
   -- the conservative direction. Nothing in the pool puts this atom in an affected
-  -- set (#357).
+  -- set (#357) -- Bride's Gown puts it in a CR 604.2 condition, and this
+  -- classification does not range over one: an affected set and a modification's
+  -- own quantities are the only things asked.
   --
   -- The attachment itself reads nothing -- it stops at Object.attachedTo (CR
   -- 303.4) plus battlefield membership (CR 110.1), and no Modification writes
@@ -3729,7 +3792,7 @@ projectDeciding admits cands = forObject
                 -- not only the one being projected.
                 appliesTo o ds pc c = case gEffect c of
                   Just k | Just answer <- Map.lookup k ds -> answer
-                  _ -> affects (gSource c) o (gAffected c) pc gs
+                  _ -> affectsGiven bounded (gSource c) o (gAffected c) pc gs
                 -- Fold every part of ONE effect landing in this layer, in the order
                 -- the card lists them (CR 613.6). The parts share a source and an
                 -- affected set, so the caller asks applicability once.
@@ -3831,8 +3894,17 @@ projectDeciding admits cands = forObject
                         -- it reads are settled at layer 4, and the bounded view this
                         -- stands in for applies it too, so the two agree wherever
                         -- there is nothing at this layer to see.
+                        --
+                        -- A HOST is read off the running board too, so an
+                        -- AttachedTo nest sees the same partials the rest of this
+                        -- view does (CR 701.3a). Recursive and terminating: the
+                        -- partials are already built, and the fallback is
+                        -- `bounded`, whose own hosts stay at this layer's bound.
+                        -- A fence like baseView's: only a CR 613.8-movable layer
+                        -- reaches this reader, and no card puts an AttachedTo
+                        -- filter in one (gap #1757).
                         viewOfBoard board o = case Map.lookup o board of
-                          Just (p, _) -> Just (viewOfCharacteristics o (noncreaturePT o gs p) (controllerOf o gs) (countersOf o gs) gs)
+                          Just (p, _) -> Just (viewOfCharacteristics (viewOfBoard board) o (noncreaturePT o gs p) (controllerOf o gs) (countersOf o gs) gs)
                           Nothing -> bounded o
                         view = viewOfBoard running
                         -- Every object CR 613.8a's question ranges over, the
@@ -3947,7 +4019,7 @@ projectDeciding admits cands = forObject
                   Nothing -> ds
                   Just k
                     | gLayer c /= lyr || Map.member k ds -> ds
-                    | otherwise -> Map.insert k (affects (gSource c) oid (gAffected c) seeded gs) ds
+                    | otherwise -> Map.insert k (affectsGiven bounded (gSource c) oid (gAffected c) seeded gs) ds
              in if movableHere
                   then resolve (seeded, decided) otherBoards (zip [0 :: Int ..] (effectUnits (filter (\c -> gLayer c == lyr) cands)))
                   else
@@ -3963,7 +4035,7 @@ projectDeciding admits cands = forObject
                     -- `resolve`'s.
                     let decided' = List.foldl' remember decided cands
                         applies c = case gEffect c of
-                          Nothing -> affects (gSource c) oid (gAffected c) seeded gs
+                          Nothing -> affectsGiven bounded (gSource c) oid (gAffected c) seeded gs
                           Just k -> Map.findWithDefault False k decided'
                         ordered = List.sortOn gTimestamp (filter (\c -> gLayer c == lyr && applies c) cands)
                         step pc c = applyModification bounded (gSource c) gs oid (gModification c) pc
