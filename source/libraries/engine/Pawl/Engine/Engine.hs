@@ -1580,9 +1580,10 @@ priorityLoop = do
 -- passes and at every extra turn popped, including the ones whose turn never
 -- begins. For the seat that does begin a turn, the same call is CR 611.2a.
 --
--- CR 702.26n hangs off the same moment for a phased-out permanent that will
--- otherwise never come back, and so takes the same two branches:
--- Phasing.orphanSchedule, and only where the turn does not begin.
+-- CR 702.26n hangs off that same moment for a phased-out permanent that would
+-- otherwise never come back, so Phasing.orphanSchedule fires at both of the
+-- places dropAtTurnOf does -- but only where the turn does not begin, a seat
+-- that begins one being nobody's orphan.
 handoffTurn :: Game ()
 handoffTurn = State.modify' takeNextTurn
 
