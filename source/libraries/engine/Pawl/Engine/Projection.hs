@@ -110,6 +110,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireBlock as RequireBlock
+import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
@@ -1970,7 +1971,9 @@ rewriteEffect pairs effect = case effect of
   -- swap reaches it; the slot it binds to is a name no card prints.
   Effect.Mill (Mill.MkMill ref quantity mTally) ->
     Effect.Mill (Mill.MkMill ref quantity (fmap (\t -> t {MillTally.filter = Filter.rewrite pairs (MillTally.filter t)}) mTally))
-  Effect.Reveal ref -> Effect.Reveal (rewriteObjectRef pairs ref)
+  -- The ObjectRef alone, as LookAt below: the slot name is not a word a CR 612.1
+  -- swap reaches.
+  Effect.Reveal (Reveal.MkReveal ref slot) -> Effect.Reveal (Reveal.MkReveal (rewriteObjectRef pairs ref) slot)
   -- The ObjectRef alone, as Explore below: the slot name is not a word a CR
   -- 612.1 swap reaches.
   Effect.LookAt (LookAt.MkLookAt ref slot) -> Effect.LookAt (LookAt.MkLookAt (rewriteObjectRef pairs ref) slot)

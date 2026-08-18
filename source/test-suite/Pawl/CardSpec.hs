@@ -188,6 +188,7 @@ import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireBlock as RequireBlock
+import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
@@ -727,7 +728,7 @@ effectCounts effect = case effect of
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> refCounts ref
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.Mill (Mill.MkMill _ quantity _) -> quantityCounts quantity
-  Effect.Reveal ref -> refCounts ref
+  Effect.Reveal (Reveal.MkReveal ref _) -> refCounts ref
   Effect.LookAt (LookAt.MkLookAt ref _) -> refCounts ref
   Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
@@ -3130,7 +3131,7 @@ effectFilters effect = case effect of
   Effect.Mill (Mill.MkMill _ quantity mTally) -> unframed (quantityFilters quantity <> fmap MillTally.filter (Maybe.maybeToList mTally))
   -- The ObjectRef's Filter is a position a card author writes, so the lint
   -- reaches it, as Explore's does. Both halves of CR 701.20 answer alike.
-  Effect.Reveal ref -> sourceHosted (objectRefFilters ref)
+  Effect.Reveal (Reveal.MkReveal ref _) -> sourceHosted (objectRefFilters ref)
   Effect.LookAt (LookAt.MkLookAt ref _) -> sourceHosted (objectRefFilters ref)
   Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
@@ -4767,11 +4768,17 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           PlayerRef.Candidate -> True
           -- One seat -- InSlot's answer, one indirection out.
           PlayerRef.ControllerOfBound _ -> True
+        -- Every opcode that binds an ObjectRef's result under a name of the
+        -- card's own: a move, CR 701.20e's look and CR 701.20a's reveal. All
+        -- three dispatch on how many objects arrived, so all three can leave the
+        -- group binding a singular reader cannot see.
         boundPlurally effect = case effect of
           Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ mSlot _ _) | not (movesAtMostOne ref) -> Maybe.maybeToList mSlot
+          Effect.LookAt (LookAt.MkLookAt ref slot) | not (movesAtMostOne ref) -> [slot]
+          Effect.Reveal (Reveal.MkReveal ref mSlot) | not (movesAtMostOne ref) -> Maybe.maybeToList mSlot
           _ -> []
         readSingly effect = case effect of
-          Effect.OfferCast (OfferCast.MkOfferCast slot _) -> [slot]
+          Effect.OfferCast (OfferCast.MkOfferCast slot _ _ _) -> [slot]
           _ -> []
         clashes effects =
           not
@@ -4785,18 +4792,18 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           _ -> False
         exiledSlot = SlotName.MkSlotName (Text.pack "exiled")
     -- Half the rejected shape is in the pool: Act on Impulse binds a group. The
-    -- OTHER half is not, and cannot be -- no card prints an OfferCast at all,
-    -- since the only writer of that opcode is Pawl.Engine.Battle's CR 310.12b
-    -- offer, which the engine bakes. So the REJECTING direction is proven here
-    -- against a hand-built pair rather than by a corpus sweep, the posture the
-    -- phase-skip lint below takes against Eon Hub, and the sweep is a fence
-    -- against a future card authoring the shape.
+    -- OTHER half is Wild Evocation, whose OfferCast reads a slot a RANDOM reveal
+    -- of one card bound -- singular either way, so the two never meet. The
+    -- REJECTING direction is therefore proven against a hand-built pair rather
+    -- than by a corpus sweep, the posture the phase-skip lint below takes
+    -- against Eon Hub, and the sweep is a fence against a future card authoring
+    -- the shape.
     Spec.assertBool s (any (anyFace (any binds . cardResolutionEffects) . Printing.card) ps) "the pool has a card binding what a plural move minted"
     Spec.assertBool
       s
       ( clashes
           [ Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Zone.Exile EntryRiders.defaultValue (Just exiledSlot) Nothing LibraryPlacement.defaultValue),
-            Effect.OfferCast (OfferCast.MkOfferCast exiledSlot CastOffer.defaultValue)
+            Effect.OfferCast (OfferCast.MkOfferCast exiledSlot (PlayerRef.Relative PlayerRelation.You) Optionality.Optional CastOffer.defaultValue)
           ]
       )
       "a singular read of a plurally bound slot is caught"

@@ -125,6 +125,7 @@ import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Result as Result
+import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Search as Search
@@ -9062,21 +9063,24 @@ communeWithLavaSpec s registry =
         -- ObjectRef-taking opcodes to plant it under.
         Spec.it s "CR 603.3b a depth nested in an ObjectRef is a slot read and an X read" $ do
           let slot = SlotName.MkSlotName (Text.pack "victim")
-              depthOf q = ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) q)
+              -- A slotless reveal: the planted Quantity is in the ref's depth,
+              -- and the bind slot is a separate position this case says nothing
+              -- about.
+              depthOf q = Effect.Reveal (Reveal.MkReveal (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) q)) Nothing)
           Spec.assertEqWith
             s
             "a depth naming a slot is reported, so the CR 603.3b dataflow lint sees it"
-            (Resolve.slotsOf (Effect.Reveal (depthOf (Quantity.InSlot slot))))
+            (Resolve.slotsOf (depthOf (Quantity.InSlot slot)))
             (Map.singleton slot SlotArity.One)
           Spec.assertEqWith
             s
             "and a literal depth names none, so the report is the depth's and not the arm's"
-            (Resolve.slotsOf (Effect.Reveal (depthOf (Quantity.Literal 3))))
+            (Resolve.slotsOf (depthOf (Quantity.Literal 3)))
             Map.empty
           Spec.assertEqWith
             s
             "CR 107.3: a depth reading X makes the effect an X reader"
-            (Resolve.readsX [Effect.Reveal (depthOf (Quantity.InSlot Binding.variableX))], Resolve.readsX [Effect.Reveal (depthOf (Quantity.Literal 3))])
+            (Resolve.readsX [depthOf (Quantity.InSlot Binding.variableX)], Resolve.readsX [depthOf (Quantity.Literal 3)])
             (True, False)
           -- The third reader of the same seam, and the one CR 603.3b's elision
           -- rests on: a PlayerRef nested in the depth is a TARGET slot that
@@ -9086,8 +9090,8 @@ communeWithLavaSpec s registry =
           Spec.assertEqWith
             s
             "CR 603.3b: a depth hiding a target slot is not exhaustively reported"
-            ( Resolve.slotsAreExhaustive (Effect.Reveal (depthOf (Quantity.LifeTotal (PlayerRef.InSlot slot)))),
-              Resolve.slotsAreExhaustive (Effect.Reveal (depthOf (Quantity.Literal 3)))
+            ( Resolve.slotsAreExhaustive (depthOf (Quantity.LifeTotal (PlayerRef.InSlot slot))),
+              Resolve.slotsAreExhaustive (depthOf (Quantity.Literal 3))
             )
             (False, True)
 
@@ -10361,10 +10365,161 @@ randomRevealSpec s registry =
           maiden <- S.printingOf s registry "Bird Maiden"
           let base = List.foldl' (\g p -> snd (S.addHandCard p S.bob g)) (Setup.emptyGame S.bothPlayers) [piker, wraith, maiden]
               gs = base {GameState.lastChoice = Timestamp.MkTimestamp 0}
-              effect = Effect.Reveal (ObjectRef.RandomCardInHand (PlayerRef.Relative PlayerRelation.Opponent))
+              effect = Effect.Reveal (Reveal.MkReveal (ObjectRef.RandomCardInHand (PlayerRef.Relative PlayerRelation.Opponent)) Nothing)
               after = S.runPure (rolling 1) gs (Resolve.applyEffect S.noSource S.noSource S.alice Map.empty Map.empty effect)
           Spec.assertEqWith s "the roll was honoured here too" (revealed after) [(S.bob, ["Bog Wraith"])]
           Spec.assertEqWith s "and nobody was recorded as having been offered a choice" (GameState.lastChoice after) (Timestamp.MkTimestamp 0)
+
+-- Wild Evocation is the card: {5}{R} Enchantment, "At the beginning of each
+-- player's upkeep, that player reveals a card at random from their hand. If it's
+-- a land card, the player puts it onto the battlefield. Otherwise, the player
+-- casts it without paying its mana cost if able."
+--
+-- The pool's only producer of CR 608.2g's "INSTRUCTS" half, and its only
+-- OfferCast whose caster is somebody other than the resolving controller. Both
+-- readings need two seats to separate, so ALICE controls the enchantment and BOB
+-- takes the upkeep: a one-seat board would make "that player casts it" and "the
+-- resolving controller casts it" agree, and would make "each player's upkeep"
+-- indistinguishable from "your upkeep".
+--
+-- The revealed card is bound and read back twice -- once by Filter.IsBound in
+-- each branch's condition, once by ObjectRef.InSlot / OfferCast's slot -- which
+-- is what makes Effect.Reveal's slot load-bearing rather than decoration.
+--
+-- "If it's a land card" is counted over EVERY player's hand rather than over the
+-- upkeep player's, and the two are the same question: the Filter.IsBound
+-- conjunct already names exactly one card, so the scope only has to reach it. A
+-- Count over a slot-named player's zone is unanswerable from a trigger today
+-- (gap #1783), which is why it is not spelled the other way.
+wildEvocationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+wildEvocationSpec s registry =
+  let -- alice controls the enchantment; bob holds `cards` in the order given, so
+      -- index 0 is the first (CR 400.5, through Game.zoneMembers). S.addHandCard
+      -- puts its card at the FRONT of the hand, so the last named is stocked
+      -- first.
+      board evocation cards =
+        let (_, withEvocation) = S.addCreature evocation S.alice (Setup.emptyGame S.bothPlayers)
+         in List.foldl' (\g p -> snd (S.addHandCard p S.bob g)) withEvocation (reverse cards)
+      -- BOB's upkeep, which is the half TurnScope.EachTurn buys: under
+      -- ControllersTurn the trigger would not fire here at all.
+      runBobsUpkeep :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      runBobsUpkeep answer gs =
+        let upkeep = Phase.Beginning BeginningStep.Upkeep
+            began =
+              Event.recordEvent
+                (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.bob))
+                (gs {GameState.phase = upkeep, GameState.activePlayer = S.bob})
+            settled = S.runPure answer began Engine.settleForPriority
+         in S.runPure answer settled Engine.priorityLoop
+      -- randomRevealSpec's answerer, pinned by INDEX for its reason: one that
+      -- hunted the offer for a castable card would go on answering legally after
+      -- a mutation broke which card the engine honours.
+      rolling :: Int -> Prompt.Prompt r -> r
+      rolling i p = case p of
+        Prompt.RandomObject offered -> case List.drop (min i (length (NonEmpty.toList offered) - 1)) (NonEmpty.toList offered) of
+          h : _ -> h
+          [] -> NonEmpty.head offered
+        _ -> S.identityAnswer p
+      -- The same, counting the cast offers CR 608.2g's "allows" half would raise.
+      -- Threaded through State rather than pinned, since two OfferedCast prompts
+      -- over one board are structurally identical and a pure answerer could not
+      -- tell them apart.
+      offersUnder :: Int -> GameState.GameState -> Int
+      offersUnder i gs =
+        let counting :: Prompt.Prompt r -> State.State Int r
+            counting p = case p of
+              Prompt.OfferedCast {} -> do
+                State.modify (+ 1)
+                pure (S.identityAnswer p)
+              _ -> pure (rolling i p)
+            upkeep = Phase.Beginning BeginningStep.Upkeep
+            began =
+              Event.recordEvent
+                (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.bob))
+                (gs {GameState.phase = upkeep, GameState.activePlayer = S.bob})
+         in State.execState
+              (Engine.runGame counting began (Engine.settleForPriority >> Engine.priorityLoop))
+              0
+      named n = CardName.MkCardName (Text.pack n)
+      bobsHand gs = fmap (\oid -> maybe "?" (Text.unpack . CardName.unwrap . Face.name) (Game.faceOf oid gs)) (Game.zoneMembers Zone.Hand S.bob gs)
+      revealed gs = fmap (fmap (List.sort . fmap (Text.unpack . CardName.unwrap) . Set.toList)) (S.revealsOf gs)
+      -- Three distinct printings, none of them a land, so every index is a
+      -- different card and the "otherwise" branch is the one taken.
+      spells = ["Goblin Piker", "Bog Wraith", "Bird Maiden"]
+   in Spec.describe s "WildEvocation" $ do
+        -- The unit's whole point. Rule 608.2g's "instructs" is not a decision, so
+        -- the cast happens with no Prompt.OfferedCast raised at all -- and it is
+        -- BOB's cast, which the seat the permanent lands under is what says.
+        Spec.it s "CR 608.2g a mandatory offer casts without asking, and the caster is the named player" $ do
+          evocation <- S.printingOf s registry "Wild Evocation"
+          ps <- traverse (S.printingOf s registry) spells
+          let gs = board evocation ps
+              after = runBobsUpkeep (rolling 0) gs
+          Spec.assertEqWith s "the Piker resolved onto BOB's battlefield" (S.countOnBattlefieldByName (named "Goblin Piker") S.bob after) 1
+          Spec.assertEqWith s "and not alice's, who controls the enchantment" (S.countOnBattlefieldByName (named "Goblin Piker") S.alice after) 0
+          Spec.assertEqWith s "the other two are still in hand" (bobsHand after) ["Bog Wraith", "Bird Maiden"]
+          Spec.assertEqWith s "bob showed the card he cast" (revealed after) [(S.bob, ["Goblin Piker"])]
+          Spec.assertEqWith s "stack empty: the trigger and the spell both resolved" (length (GameState.stack after)) 0
+          Spec.assertEqWith s "and nobody was asked whether to cast" (offersUnder 0 gs) 0
+        -- The same board, one different roll: the cast is of the card the reveal
+        -- NAMED rather than of whatever the hand happens to hold. Without this
+        -- leg an implementation casting the head of the hand passes the case
+        -- above.
+        Spec.it s "CR 608.2g the card cast is the one the reveal bound" $ do
+          evocation <- S.printingOf s registry "Wild Evocation"
+          ps <- traverse (S.printingOf s registry) spells
+          let after = runBobsUpkeep (rolling 2) (board evocation ps)
+          Spec.assertEqWith s "the Maiden resolved onto bob's battlefield" (S.countOnBattlefieldByName (named "Bird Maiden") S.bob after) 1
+          Spec.assertEqWith s "and the Piker never left bob's hand" (bobsHand after) ["Goblin Piker", "Bog Wraith"]
+        -- The land branch, and the pair that proves it reads the BOUND card
+        -- rather than the zone. A land sits in the hand in both legs, so an
+        -- implementation counting lands in the hand passes the first and fails
+        -- the second.
+        Spec.it s "CR 701.20a a revealed land is put onto the battlefield instead of cast" $ do
+          evocation <- S.printingOf s registry "Wild Evocation"
+          forest <- S.printingOf s registry "Forest"
+          piker <- S.printingOf s registry "Goblin Piker"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          let gs = board evocation [forest, piker, maiden]
+              after = runBobsUpkeep (rolling 0) gs
+          Spec.assertEqWith s "the Forest is on bob's battlefield" (S.countOnBattlefieldByName (named "Forest") S.bob after) 1
+          Spec.assertEqWith s "nothing was cast: the two spells are still in hand" (bobsHand after) ["Goblin Piker", "Bird Maiden"]
+          Spec.assertEqWith s "and no cast was offered either" (offersUnder 0 gs) 0
+        Spec.it s "CR 608.2g the same hand with a nonland revealed casts it and leaves the land alone" $ do
+          evocation <- S.printingOf s registry "Wild Evocation"
+          forest <- S.printingOf s registry "Forest"
+          piker <- S.printingOf s registry "Goblin Piker"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          let after = runBobsUpkeep (rolling 1) (board evocation [forest, piker, maiden])
+          Spec.assertEqWith s "the Piker was cast" (S.countOnBattlefieldByName (named "Goblin Piker") S.bob after) 1
+          Spec.assertEqWith s "and the Forest is still in hand, unplayed" (bobsHand after) ["Forest", "Bird Maiden"]
+          Spec.assertEqWith s "so nothing entered the battlefield as a land" (S.countOnBattlefieldByName (named "Forest") S.bob after) 0
+        -- CR 118.8's "if able", read through Cast.castableWhenOffered: a Plummet
+        -- with no flier anywhere to target cannot be cast, so a MANDATORY offer
+        -- is simply not made. Bob's hand is otherwise identical to the first
+        -- case's, and the board carries no creature with flying.
+        Spec.it s "CR 601.3 an uncastable card is not cast and raises no prompt" $ do
+          evocation <- S.printingOf s registry "Wild Evocation"
+          plummet <- S.printingOf s registry "Plummet"
+          piker <- S.printingOf s registry "Goblin Piker"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          let gs = board evocation [plummet, piker, maiden]
+              after = runBobsUpkeep (rolling 0) gs
+          Spec.assertEqWith s "the Plummet is still in bob's hand" (bobsHand after) ["Plummet", "Goblin Piker", "Bird Maiden"]
+          Spec.assertEqWith s "bob still showed it, though (CR 701.20a)" (revealed after) [(S.bob, ["Plummet"])]
+          Spec.assertEqWith s "stack empty: the trigger resolved and did nothing" (length (GameState.stack after)) 0
+          Spec.assertEqWith s "and no question was put on the wire" (offersUnder 0 gs) 0
+        -- CR 609.3 at the empty end: the reveal names nothing, so the slot goes
+        -- unbound, Resolve.slotOne answers Nothing and the "otherwise" clause --
+        -- whose AtMost 0 count DOES hold over an empty hand -- offers nothing.
+        -- A regression fence rather than a proof: no mutation of this change
+        -- makes it fail on its own.
+        Spec.it s "CR 609.3 an empty hand reveals nothing and casts nothing" $ do
+          evocation <- S.printingOf s registry "Wild Evocation"
+          let after = runBobsUpkeep (rolling 0) (board evocation [])
+          Spec.assertEqWith s "nothing was revealed" (revealed after) []
+          Spec.assertEqWith s "bob's hand is still empty" (bobsHand after) []
+          Spec.assertEqWith s "stack empty: the trigger resolved" (length (GameState.stack after)) 0
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
@@ -10452,6 +10607,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   communeWithLavaSpec s registry
   soulfireEruptionSpec s registry
   randomRevealSpec s registry
+  wildEvocationSpec s registry
 
 -- CR 601.2c's announcement, answered with a stated number for every variable
 -- slot -- where S.identityAnswer announces as many as the board allows.

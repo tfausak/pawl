@@ -178,6 +178,7 @@ import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Result as Result
+import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
@@ -407,7 +408,8 @@ slotsOf effect = case effect of
   -- it belongs to boundSlots below -- Destroy's third field takes the same
   -- posture, for the same reason.
   Effect.Mill (Mill.MkMill ref quantity _) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
-  Effect.Reveal ref -> objectRefSlots ref
+  -- The bound slot is a DEFINITION and not a read, LookAt's posture below.
+  Effect.Reveal (Reveal.MkReveal ref _) -> objectRefSlots ref
   -- The bound slot is a DEFINITION and not a read, the posture Mill's tally
   -- above takes; boundSlots below is where it is reported.
   Effect.LookAt (LookAt.MkLookAt ref _) -> objectRefSlots ref
@@ -523,9 +525,10 @@ slotsOf effect = case effect of
   -- Both halves may name a slot: the ObjectRef names what is shuffled, and the
   -- PlayerRef whose library (Dwell on the Past's "target player").
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named ref) -> joinTwo (maybe Map.empty playerRefSlots named) (objectRefSlots ref)
-  -- OfferCast's slot is a READ: it names the object being offered, bound by an
-  -- earlier effect of the same list (CR 400.7).
-  Effect.OfferCast (OfferCast.MkOfferCast slot _) -> oneSlot slot
+  -- BOTH are reads: the slot names the object being offered, bound by an earlier
+  -- effect of the same list (CR 400.7), and the PlayerRef may name the caster's
+  -- (Wild Evocation's "that player").
+  Effect.OfferCast (OfferCast.MkOfferCast slot caster _ _) -> joinTwo (oneSlot slot) (playerRefSlots caster)
   -- Both a READ: the ObjectRef names the object being permitted, normally bound
   -- by a MoveToZone earlier in the same list (CR 400.7) exactly as OfferCast's
   -- slot is, and the Duration's Condition may read a slot as a Quantity.
@@ -676,7 +679,7 @@ slotsAreExhaustive effect = case effect of
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> all Quantity.slotsAreExhaustive (objectRefQuantities ref)
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Mill (Mill.MkMill _ quantity _) -> Quantity.slotsAreExhaustive quantity
-  Effect.Reveal ref -> all Quantity.slotsAreExhaustive (objectRefQuantities ref)
+  Effect.Reveal (Reveal.MkReveal ref _) -> all Quantity.slotsAreExhaustive (objectRefQuantities ref)
   Effect.LookAt (LookAt.MkLookAt ref _) -> all Quantity.slotsAreExhaustive (objectRefQuantities ref)
   Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
@@ -835,7 +838,7 @@ readsX = any effectReadsX
       Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> any Quantity.readsX (objectRefQuantities ref)
       Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Mill (Mill.MkMill _ quantity _) -> Quantity.readsX quantity
-      Effect.Reveal ref -> any Quantity.readsX (objectRefQuantities ref)
+      Effect.Reveal (Reveal.MkReveal ref _) -> any Quantity.readsX (objectRefQuantities ref)
       Effect.LookAt (LookAt.MkLookAt ref _) -> any Quantity.readsX (objectRefQuantities ref)
       Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
@@ -1079,9 +1082,11 @@ boundSlots effect = case effect of
   -- How many of the cards this mill put in the graveyard matched the tally's
   -- filter, for CR 728.1's "for each nonland card milled this way" to read.
   Effect.Mill (Mill.MkMill _ _ mTally) -> foldMap (Set.singleton . MillTally.slot) mTally
-  -- CR 701.20a's reveal binds nothing: it is public, so what it leaves behind
-  -- is the GameEvent.Revealed in the log rather than a name for a later clause.
-  Effect.Reveal {} -> Set.empty
+  -- The cards CR 701.20a's reveal showed, where the card named a slot: Wild
+  -- Evocation's "that player reveals a card at random from their hand ... the
+  -- player casts IT". Optional, where LookAt's is not, because a reveal is
+  -- public and the GameEvent.Revealed in the log is a record on its own.
+  Effect.Reveal (Reveal.MkReveal _ mSlot) -> foldMap Set.singleton mSlot
   -- The cards CR 701.20e's look showed, for a later clause of the same
   -- resolution to name -- Into the Wilds' "if it's a land card ... put it onto
   -- the battlefield", which reads the slot twice over (Filter.IsBound, then
@@ -2525,15 +2530,25 @@ slotOne slot resolving gs = do
 --      BEFORE the prompt, so the player is never offered a cast the announcement
 --      would only reverse.
 --
--- Then, and only then, the "may" (CR 601.2b's decisions are the player's, and so
--- is this one). Declining leaves the card exactly where the earlier effect put
--- it, which for CR 310.12b is exile.
+-- Then, and only then, the "may" -- and only where the opcode says CR 608.2g
+-- "allows" rather than "instructs". At Optionality.Mandatory the cast is not a
+-- decision, so there is nothing to ask and Prompt.OfferedCast is elided, which
+-- is the posture Game.choose's haddock expects of every prompt site: ask only
+-- the branch that genuinely has two answers. Question 4 above is what "if able"
+-- means (CR 118.8's family), and it is asked either way -- a mandatory offer the
+-- caster cannot take is simply not made. Declining an OPTIONAL one leaves the
+-- card exactly where the earlier effect put it, which for CR 310.12b is exile.
+--
+-- The caster is a parameter and not the resolving controller: rule 608.2g says
+-- "a player", and CR 601.2's announcements belong to that player. The opcode's
+-- PlayerRef is resolved by the caller.
 --
 -- THE INVARIANT: everything above is a CLASSIFICATION carried by the opcode's
--- CastOffer -- which face, which cost -- and nothing here asks which effect is
--- offering or which card is being offered.
-offerCast :: ObjectId -> PlayerId -> SlotName -> CastOffer.CastOffer -> Game ()
-offerCast resolving controller slot offer = do
+-- CastOffer and its Optionality -- which face, which cost, whether it is a may
+-- -- and nothing here asks which effect is offering or which card is being
+-- offered.
+offerCast :: ObjectId -> PlayerId -> SlotName -> Optionality.Optionality -> CastOffer.CastOffer -> Game ()
+offerCast resolving caster slot optionality offer = do
   gs <- State.get
   let offered = do
         oid <- slotOne slot resolving gs
@@ -2570,16 +2585,20 @@ offerCast resolving controller slot offer = do
             -- nothing about turning the card over.
             proposed = Cast.asProposed oid name Facing.FaceUp gs
             candidates = maybe (Cost.costsFor name oid proposed) pure applied
-        Monad.guard (Cast.castableWhenOffered controller oid name candidates proposed)
+        Monad.guard (Cast.castableWhenOffered caster oid name candidates proposed)
         pure (oid, name, applied)
   case offered of
     Nothing -> pure ()
     Just (oid, name, applied) -> do
-      let decider = Decide.deciderFor controller gs
-      decision <- Game.choose (Prompt.OfferedCast decider controller oid name)
-      case decision of
-        OptionalDecision.Declines -> pure ()
-        OptionalDecision.Exercises -> Cast.castSpellWith applied controller oid name Facing.FaceUp
+      let cast = Cast.castSpellWith applied caster oid name Facing.FaceUp
+      case optionality of
+        Optionality.Mandatory -> cast
+        Optionality.Optional -> do
+          let decider = Decide.deciderFor caster gs
+          decision <- Game.choose (Prompt.OfferedCast decider caster oid name)
+          case decision of
+            OptionalDecision.Declines -> pure ()
+            OptionalDecision.Exercises -> cast
 
 -- CR 615.3: install one floating damage row over `recipient`, for a duration.
 -- The shared body of Effect.PreventNextDamage's, Effect.PreventAllDamage's and
@@ -3891,7 +3910,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- calls a transcript can replay a fact about the rules rather than about
     -- PlayerId's Ord.
     Monad.forM_ (filter (`Set.member` owners) (Game.apnapOrder gs)) Mulligan.shuffleLibrary
-  Effect.OfferCast (OfferCast.MkOfferCast slot offer) -> offerCast resolving controller slot offer
+  Effect.OfferCast (OfferCast.MkOfferCast slot caster optionality offer) -> do
+    gs <- State.get
+    -- CR 608.2g names "a player", and a reference resolving to nobody offers the
+    -- cast to nobody -- every PlayerRef arm's posture. Several would be several
+    -- offers, which no producer writes.
+    Monad.forM_ (playerRefPlayers legal controller gs caster) $ \pid ->
+      offerCast resolving pid slot optionality offer
   -- CR 601.3: write the standing permission onto every object the ObjectRef
   -- names, as CR 109.5's "you" and the stated duration.
   --
@@ -4095,8 +4120,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- GameEvent.Revealed's shape allows -- it carries a single ObjectId. Nothing
   -- in rule 701.20a makes a simultaneous reveal differ from a sequence of them,
   -- since nothing moves and nothing is decided in between.
-  Effect.Reveal ref -> do
+  Effect.Reveal (Reveal.MkReveal ref mSlot) -> do
     gs <- State.get
+    -- The slot, when the card named one. bindSlot and NOT bindObjectsSlot: only
+    -- the SINGLE binding is visible to Filter.IsBound and to slotOne (#1532),
+    -- which are the two readers Wild Evocation's later clauses use. LookAt's arm
+    -- below makes the same call the same way, dispatching on how many arrived.
+    let showOne pid oid = do
+          Event.reveal RevealCause.Ordinary pid oid
+          Monad.forM_ mSlot $ \slot -> State.modify' (bindSlot resolving slot oid)
     case ref of
       -- Merfolk Spy's "that player reveals a card at random from their hand".
       -- The one ref whose objects are a QUESTION rather than a read, so it is
@@ -4116,20 +4148,32 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- candidates are the hand as CR 608.2c reaches it, in the zone's own order
       -- (CR 400.5), and the seats come from handChoosers so the per-seat asks
       -- run in CR 608.2e's APNAP order.
+      --
+      -- ONE card per SEAT, so a ref naming several seats writes the slot once
+      -- each and the last write stands. Every producer names one seat -- Merfolk
+      -- Spy binds nothing at all and Wild Evocation's PlayerRef is an InSlot --
+      -- so no board can tell that from any other reading of the rule.
       ObjectRef.RandomCardInHand player ->
         Monad.forM_ (handChoosers legal controller gs player) $ \pid ->
           case Game.zoneMembers Zone.Hand pid gs of
             [] -> pure ()
-            [only] -> Event.reveal RevealCause.Ordinary pid only
+            [only] -> showOne pid only
             first : second : more -> do
               let offered = first NonEmpty.:| (second : more)
               answer <- Game.ask (Prompt.RandomObject offered)
-              Event.reveal RevealCause.Ordinary pid $
+              showOne pid $
                 if List.elem answer (NonEmpty.toList offered) then answer else first
-      _ ->
-        Monad.mapM_
-          (Event.reveal RevealCause.Ordinary controller)
-          (objectRefObjects legal resolving controller source gs ref)
+      _ -> do
+        let named = objectRefObjects legal resolving controller source gs ref
+        Monad.mapM_ (Event.reveal RevealCause.Ordinary controller) named
+        -- LookAt's one-versus-many line, and for its reason: a lone card takes
+        -- the SINGLE binding, which is the only shape Filter.IsBound and
+        -- slotOne can see, and several take the group binding (#1532). No
+        -- printing in the pool reaches this branch with a slot.
+        Monad.forM_ mSlot $ \slot -> case named of
+          [] -> pure ()
+          [only] -> State.modify' (bindSlot resolving slot only)
+          several -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList several))
   Effect.LookAt (LookAt.MkLookAt ref slot) -> do
     gs <- State.get
     -- CR 608.2c: the cards are named as this instruction is reached, and CR

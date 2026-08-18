@@ -205,6 +205,7 @@ import qualified Pawl.Codec.ReplacementEffectSpec
 import qualified Pawl.Codec.ReplacementOriginSpec
 import qualified Pawl.Codec.RequireBlockSpec
 import qualified Pawl.Codec.RevealCauseSpec
+import qualified Pawl.Codec.RevealSpec
 import qualified Pawl.Codec.RevealedSpec
 import qualified Pawl.Codec.RoomIndexSpec
 import qualified Pawl.Codec.RoundingSpec
@@ -602,6 +603,7 @@ spec s registry = do
   Pawl.Codec.ReplacementOriginSpec.spec s
   Pawl.Codec.RequireBlockSpec.spec s
   Pawl.Codec.RevealCauseSpec.spec s
+  Pawl.Codec.RevealSpec.spec s
   Pawl.Codec.RevealedSpec.spec s
   Pawl.Codec.RoomIndexSpec.spec s
   Pawl.Codec.RoundingSpec.spec s
