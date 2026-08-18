@@ -10,7 +10,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ControlChanged" $ do
   -- CR 613.1b. BEFORE and AFTER are both a PlayerId and deliberately differ --
-  -- Pawl.Engine.Event.sampleControl only mints the event when they do, and a
+  -- Pawl.Engine.Engine.sampleControl only mints the event when they do, and a
   -- symmetric fixture would round-trip a codec that reported the change
   -- backwards.
   Spec.it s "MkControlChanged, every key" $

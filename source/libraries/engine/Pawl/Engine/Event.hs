@@ -3177,8 +3177,9 @@ attach subject destination = do
 -- The typed question, so this module never sees a PlayerEffect constructor;
 -- Pawl.Engine.PlayerEffect.cantBeCountered is where the casing lives.
 --
--- Projection.controllerOf, which is what every other reader of a stack object's
--- controller already asks (Replacement.decider, PlayerEffect.matchesSpell). For a
+-- Projection.controllerOf, which is what every other reader of an affected
+-- object's controller already asks (PlayerEffect.matchesObject, and
+-- Replacement.chooserOf for CR 616.1's chooser). For a
 -- SPELL that is a re-derivation rather than the stored fact CR 405.4 describes,
 -- and it falls back to the owner (#83); a spell cast from a zone its owner does
 -- not hold would therefore be read against the wrong player here.

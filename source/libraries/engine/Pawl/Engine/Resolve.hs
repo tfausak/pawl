@@ -1605,7 +1605,7 @@ resolveModes stackId srcId modes = do
                       -- CR 701.46a: the printed "if" first, for the spell path's
                       -- reason. Read against `srcId`, the source permanent, not the
                       -- ability object -- CR 701.46a says "this permanent", which is
-                      -- also why `paid` is given `srcId`.
+                      -- also why `payGatePaid` is given `srcId`.
                       -- The LIVE bindings off the STACK object, the spell path's own
                       -- re-read and for its reason (CR 608.2c) -- and off that object
                       -- rather than off `srcId`, because that is where this
@@ -1645,7 +1645,7 @@ resolveModes stackId srcId modes = do
 -- `controller` is CR 109.5's "you". `source` is the object both Quantities read,
 -- and it is the source PERMANENT rather than the ability on the stack -- CR
 -- 701.46a says "this permanent", and CR 113.7a's separation of the two is why
--- `paid` takes `source` apart from `resolving` for its own reason. The two are
+-- `payGatePaid` takes `source` apart from `resolving` for its own reason. The two are
 -- the same object for a spell.
 --
 -- CR 608.2h's view, not the live one, and the rule states the case outright:

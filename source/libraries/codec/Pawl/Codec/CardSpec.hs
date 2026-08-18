@@ -122,7 +122,7 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
       " {\"faces\":[{\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]}}],\"layout\":{\"type\":\"Normal\"}} "
       mountainCard
   -- Where the at-least-one-face invariant is enforced: Card.faces is a NonEmpty
-  -- so that Pawl.Engine.Card.combined can be total, and Common.decodeNonEmpty is
+  -- so that Pawl.Engine.Card.combined can be total, and Common.nonEmpty is
   -- the only gate a file passes through to get there.
   Spec.it s "a card with no faces is rejected rather than decoded" $
     Spec.assertBool

@@ -642,8 +642,9 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.sickness = Sickness.Settled S.alice,
               -- CR 700.2: Boil has one mode, and a directly-built stack object
               -- (bypassing Cast.castSpell) must stamp it chosen (mode 0), or
-              -- Resolve.effectsOf/resolveSpell -- scoped to CHOSEN modes --
-              -- would see no effects and no target slots at all.
+              -- Resolve.modesOf and Resolve.targetSlotsOf -- both scoped to the
+              -- CHOSEN modes through Binding.modesOf -- would see no effects and
+              -- no target slots at all.
               Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,

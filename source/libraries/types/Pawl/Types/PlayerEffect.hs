@@ -331,7 +331,7 @@ data PlayerEffect
     --
     -- WHICH spells is the Filter, the same shape IncreaseSpellCost and
     -- CastAsThoughItHadFlash carry and read through the same
-    -- Pawl.Engine.PlayerEffect.matchesSpell. Spider-Punk narrows by nothing and
+    -- Pawl.Engine.PlayerEffect.matchesObject. Spider-Punk narrows by nothing and
     -- so writes `And []`; Prowling Serpopard's "creature spells" writes
     -- HasCardType Creature.
     --

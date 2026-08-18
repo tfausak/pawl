@@ -245,7 +245,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
         "false"
 
     Spec.it s "when the THRESHOLD side cannot be evaluated" $ do
-      -- Quantity.X with no binding on the object: same collapse.
+      -- Quantity.Type.InSlot Binding.variableX with no binding on the object:
+      -- same collapse.
       swamp <- S.printingOf s registry "Swamp"
       let (viewOf, gs) = boardOf swamp 0
       Spec.assertBool

@@ -1626,11 +1626,11 @@ triggeredAbilityOffends ability =
 --   * Binding.variableX, and ONLY when the ability's own cost prints an {X}:
 --     CR 601.2b's "the player announces the value of that variable", measured
 --     against what CR 602.2b calls "an activated ability's analog to a spell's
---     mana cost ... its activation cost" (Cinder Elemental). Nothing reads it as
---     a slot today -- a printed X is Quantity.X, whose own half of the contract
---     is the CR 602.2b sweep below -- but the activation really does bind it, so
---     leaving it out would reject a read that works (#14 is what would make one
---     sayable).
+--     mana cost ... its activation cost" (Cinder Elemental). A printed X is an
+--     ordinary slot read since #14 retired Quantity.X, so it arrives here like
+--     any other, and the activation really does bind it -- leaving it out would
+--     reject a read that works. The cast side's bullet in cardOffends below
+--     states the same thing about a spell's cost.
 --   * Resolve.definedSlots, the slot an effect of this ability MINTS rather than
 --     reads. The same exemption every sibling carrier takes.
 --
