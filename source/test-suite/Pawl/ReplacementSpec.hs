@@ -1937,6 +1937,13 @@ luminesceSpec s registry = Spec.describe s "Luminesce (CR 615.1, CR 609.7b)" $ d
 --
 -- The DAMAGE BATCH is hand-built and the SPELL is not, for mendingHandsSpec's
 -- reason.
+--
+-- The card's `HasCardType Creature` conjunct ("by CREATURES other than ...") is a
+-- REGRESSION FENCE here rather than a proved behaviour: deleting it leaves the
+-- whole suite green, because CR 510.1a makes attacking and blocking creatures the
+-- only assigners of combat damage, so no rules-legal board separates the two
+-- readings. It is written because a hand-built batch like this one can name a
+-- Forest as a Combat source, and the card file should say what the card says.
 moonmistSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 moonmistSpec s registry = Spec.describe s "Moonmist (CR 615.1, CR 609.7b)" $ do
   let hit kind src n = DamageEvent.MkDamageEvent src (Recipient.ToPlayer S.alice) n False False False 0 Nothing kind
