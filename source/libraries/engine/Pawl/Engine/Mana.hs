@@ -735,7 +735,7 @@ paysStep clauses step unit = case step of
 -- assignments. Equal units collapse, and so do two orders of the same spend.
 --
 -- Set-at-a-time rather than a search per assignment, so the work is bounded by
--- the number of distinct sub-pools rather than by the permutations (#595).
+-- the distinct sub-pools rather than by the permutations of them; see #595.
 leftovers :: [SpendManaAsThough.SpendManaAsThough] -> [Maybe Demand] -> [ManaUnit] -> Set.Set [ManaUnit]
 leftovers clauses steps units = List.foldl' advance (Set.singleton (List.sort units)) steps
   where

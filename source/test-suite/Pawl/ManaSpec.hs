@@ -4083,8 +4083,8 @@ activateAndResolve answer gs oid ability =
 --
 -- Two units a rule can tell apart are what makes the choice observable at all.
 -- The board has both axes: a Snow-Covered Mountain and a Mountain each add one
--- red mana and CR 107.4h reads the difference, while Shizuko, Caller of Autumn's
--- CR 514.2 retention separates two green.
+-- red mana and CR 107.4h reads the difference, while CR 106.4's retention --
+-- Shizuko, Caller of Autumn's -- separates two green.
 spendChoiceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spendChoiceSpec s registry = Spec.describe s "Choosing which mana to spend" $ do
   -- Gameplay level, and the assertion that can DIFFER is the second payment:
@@ -4109,8 +4109,8 @@ spendChoiceSpec s registry = Spec.describe s "Choosing which mana to spend" $ do
     Spec.assertBool s (sparedPaid && spentPaid) "both boards paid the {R}"
     Spec.assertEqWith s "and the pools say which unit went" (poolOf S.alice spared, poolOf S.alice spent) ([snowRed], [plainRed])
 
-  -- The other axis, and the same shape: CR 514.2's retention rides one unit, so
-  -- the mana the payer spares is the mana the step's end does or does not take.
+  -- The other axis, same shape: CR 106.4's retention rides one unit, so the
+  -- mana the payer spares is the mana CR 500.5's sweep does or does not take.
   Spec.it s "CR 601.2h paying {G} out of a retained and an ordinary green spends the one the payer names" $ do
     let floated = seededPool [retainedGreen, plainGreen]
         spends :: ManaUnit.ManaUnit -> (forall r. Prompt.Prompt r -> r)
