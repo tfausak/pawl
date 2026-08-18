@@ -1207,7 +1207,9 @@ data TriggerCondition
     -- stolen crown is a crowning, and fires the same trigger" is the test that
     -- proves the last of those, which is the route with no card in it at all.
     --
-    -- CR 725.4's departure reassignment does not reach this yet (#1052).
+    -- CR 725.4's departure reassignment records that same event, so a crown that
+    -- moves because the monarch left fires this alike -- TriggerSpec's "CR 725.4
+    -- a departure crowns alice, and that crowning fires her edict".
     PlayerBecomesMonarch PlayerRelation.PlayerRelation
   | -- | CR 603.7: "when you lose control of the creature" -- Ray of Command's third
     -- sentence. Fires when the permanent BOUND IN THE NAMED SLOT stops being
