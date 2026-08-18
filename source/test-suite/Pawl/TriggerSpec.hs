@@ -353,6 +353,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
+import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
@@ -9748,7 +9749,12 @@ representativeEvents cond =
         -- the targeting object's controller -- an event BOTH relations admit,
         -- since matchesTrigger reads `you` from the bearer's side and this list
         -- pins the binding rather than the match.
-        TriggerCondition.SelfBecomesTargeted _ -> one (GameEvent.BecameTarget (BecameTarget.MkBecameTarget departed arrived S.alice))
+        TriggerCondition.SelfBecomesTargeted _ -> one (GameEvent.BecameTarget (BecameTarget.MkBecameTarget (Recipient.ToObject departed) arrived StackObjectKind.Ability S.alice))
+        -- The same event one recipient over, and the kind this condition asks
+        -- for: a targeted PLAYER, by a SPELL. Both fields differ from the arm
+        -- above, which is what keeps the eventBindings/eventBindingSlots pin
+        -- honest across the two new axes.
+        TriggerCondition.ControllerBecomesTargetOfSpell -> one (GameEvent.BecameTarget (BecameTarget.MkBecameTarget (Recipient.ToPlayer S.alice) arrived StackObjectKind.Spell S.alice))
         -- CR 709.5h's own event, on the BEARER and naming the same door the
         -- condition does, so the pair really matches -- the door below is the one
         -- everyTriggerCondition names.
@@ -9909,6 +9915,7 @@ everyTriggerCondition =
     -- unseen if only rule 702.21a's own Opponent were listed.
     TriggerCondition.SelfBecomesTargeted PlayerRelation.Opponent,
     TriggerCondition.SelfBecomesTargeted PlayerRelation.You,
+    TriggerCondition.ControllerBecomesTargetOfSpell,
     TriggerCondition.SelfHalfUnlocked (CardName.MkCardName (Text.pack "Steaming Sauna")),
     TriggerCondition.RoomFullyUnlocked PlayerRelation.You,
     -- Balemurk Leech's own pair, and not an arbitrary one: PermanentEnters binds
@@ -10872,6 +10879,155 @@ wardSpec s registry =
           let cost n = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []
           Spec.assertEqWith s "ward {2} held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Ward (cost 2)) 2)) [Keyword.ward (cost 2), Keyword.ward (cost 2)]
           Spec.assertBool s (Keyword.ward (cost 2) /= Keyword.ward (cost 3)) "and the cost reaches the minted ability"
+
+-- CR 601.2c read from the TARGETED PLAYER's side: "the chosen objects and/or
+-- players each become a target of that spell". Dormant Gomazoa, {1}{U}{U}
+-- Creature -- Jellyfish 5/5: "Flying / This creature enters tapped. / This
+-- creature doesn't untap during your untap step. / Whenever you become the
+-- target of a spell, you may untap this creature."
+--
+-- The first card in the pool that watches a PLAYER become a target, and the
+-- reason GameEvent.BecameTarget carries a Recipient rather than an ObjectId.
+--
+-- "A SPELL", not "a spell or ability" -- which is why BecameTarget also carries
+-- a StackObjectKind, and why the Ravenous Rats leg is here: CR 602.2b and CR
+-- 603.3d route an ability through the same rule 601.2c, and the matcher is pure
+-- with no GameState to look that stack object up in.
+--
+-- TAPPEDNESS IS THE SIGNAL, never power or toughness: CR 502.3 keeps this
+-- creature from untapping in its own untap step while CR 701.26b's Untap action
+-- is what the trigger performs, so the two answers "the trigger fired" and "it
+-- did not" are exactly untapped and tapped.
+--
+-- Every leg runs under `taking`, an ACCEPTING answerer. S.identityAnswer
+-- declines a CR 603.5 "may" (Replay.defaultAnswer), which would leave the
+-- Gomazoa tapped in every leg and make the three absences below prove nothing.
+gomazoaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+gomazoaSpec s registry =
+  let -- Accepts CR 603.5's "may" and pins every target slot at one recipient.
+      -- The offered set is FILTERED rather than replaced, so a leg that names a
+      -- recipient the engine never offered chooses nothing instead of quietly
+      -- passing a target the CR 608.2b re-read would drop.
+      taking :: Recipient.Recipient -> Prompt.Prompt r -> r
+      taking r p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter (== r) candidates) sets
+        _ -> S.identityAnswer p
+      tapStateOf oid gs = fmap Object.tapped (Game.lookupObject oid gs)
+      -- THREE SEATS: alice controls the Gomazoa, bob casts everything, and carol
+      -- is a target that is neither. Two seats would collapse "a player who is
+      -- not you" onto the caster.
+      board = do
+        island <- S.printingOf s registry "Island"
+        swamp <- S.printingOf s registry "Swamp"
+        forest <- S.printingOf s registry "Forest"
+        piker <- S.printingOf s registry "Goblin Piker"
+        gomazoa <- S.printingOf s registry "Dormant Gomazoa"
+        fatigue <- S.printingOf s registry "Fatigue"
+        rats <- S.printingOf s registry "Ravenous Rats"
+        growth <- S.printingOf s registry "Giant Growth"
+        -- Three colors because the three producers are {1}{U}, {1}{B} and {G};
+        -- one leg casts one spell, so the lands never compete.
+        let g0 = S.landsFor forest S.bob 1 (S.landsFor swamp S.bob 2 (S.landsFor island S.bob 2 S.threePlayerGame))
+            (gomazoaId, g1) = S.addCreature gomazoa S.alice g0
+            -- alice's control for the untap-step leg: an ordinary creature under
+            -- the same player, tapped the same way, differing only in the
+            -- restriction.
+            (pikerId, g2) = S.addCreature piker S.alice g1
+            (fatigueId, g3) = S.addHandCard fatigue S.bob g2
+            (ratsId, g4) = S.addHandCard rats S.bob g3
+            (growthId, g5) = S.addHandCard growth S.bob g4
+            -- One card in alice's hand, which is the Ravenous Rats leg's control:
+            -- the ability really did name her.
+            (_, g6) = S.addHandCard island S.alice g5
+            -- CR 104.3c: nothing here draws, but an empty library is a loss
+            -- waiting for any leg that advances.
+            stocked = List.foldl' (\g pid -> snd (S.addLibraryCard island pid g)) g6 [S.alice, S.bob, S.carol, S.alice, S.bob, S.carol]
+            tapped = S.tapObject pikerId (S.tapObject gomazoaId stocked)
+        pure
+          ( gomazoaId,
+            pikerId,
+            fatigueId,
+            ratsId,
+            growthId,
+            tapped
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.bob,
+                GameState.priority = Just S.bob
+              }
+          )
+      -- Cast one spell at `r`, settle so any trigger reaches the stack, then
+      -- resolve the top under the same accepting answerer. `taking r` is written
+      -- out at each use rather than bound once: it is polymorphic in the prompt's
+      -- answer type, and a let-bound copy would be pinned to one.
+      castThenResolve r caster oid gs =
+        let onStack = S.runPure (taking r) (S.runPure (taking r) gs (S.cast caster oid)) Engine.settleForPriority
+            ((_, after), transcript) = Replay.record (taking r) onStack Stack.resolveTop
+         in (onStack, after, transcript)
+   in Spec.describe s "CR 601.2c a player becoming the target of a spell" $ do
+        -- The positive the three absences below rest on. Fatigue rather than
+        -- Ancestral Recall on purpose: it draws nothing, so CR 704.5b cannot end
+        -- the game mid-leg and no life total moves.
+        Spec.it s "CR 601.2c whole card: a spell targeting the Gomazoa's controller untaps it" $ do
+          (gomazoaId, _, fatigueId, _, _, gs) <- board
+          let (onStack, after, transcript) = castThenResolve (Recipient.ToPlayer S.alice) S.bob fatigueId gs
+          Spec.assertEqWith s "the Gomazoa starts tapped" (tapStateOf gomazoaId gs) (Just TapState.Tapped)
+          Spec.assertEqWith s "CR 701.26b the trigger untapped it" (tapStateOf gomazoaId after) (Just TapState.Untapped)
+          Spec.assertEqWith s "CR 603.5 its controller was asked the may exactly once" (optionalResponses transcript) [Response.ChoseOptional OptionalDecision.Exercises]
+          Spec.assertEqWith s "the Fatigue and the trigger were both on the stack" (length (GameState.stack onStack)) 2
+        -- CR 109.5: the same board and the same spell, differing in NOTHING but
+        -- which player it names. carol is neither the Gomazoa's controller nor
+        -- the caster.
+        Spec.it s "CR 109.5 a spell targeting another player leaves it tapped" $ do
+          (gomazoaId, _, fatigueId, _, _, gs) <- board
+          let (onStack, after, transcript) = castThenResolve (Recipient.ToPlayer S.carol) S.bob fatigueId gs
+          Spec.assertEqWith s "the Gomazoa is still tapped" (tapStateOf gomazoaId after) (Just TapState.Tapped)
+          Spec.assertEqWith s "and nobody was offered the may" (optionalResponses transcript) []
+          Spec.assertEqWith s "only the Fatigue was on the stack" (length (GameState.stack onStack)) 1
+        -- CR 112.1 against CR 113.3, which is the whole of BecameTarget.kind:
+        -- Ravenous Rats' SPELL targets nothing and its enters-trigger targets an
+        -- opponent, so the only BecameTarget on this board is an ability's.
+        Spec.it s "CR 112.1 an ABILITY targeting the Gomazoa's controller leaves it tapped" $ do
+          (gomazoaId, _, _, ratsId, _, gs) <- board
+          let atAlice = Recipient.ToPlayer S.alice
+              entered = S.runPure (taking atAlice) (S.runPure (taking atAlice) gs (S.cast S.bob ratsId)) Stack.resolveTop
+              triggerOnStack = S.runPure (taking atAlice) entered Engine.settleForPriority
+              ((_, after), transcript) = Replay.record (taking atAlice) triggerOnStack Stack.resolveTop
+          Spec.assertEqWith s "the Gomazoa is still tapped" (tapStateOf gomazoaId after) (Just TapState.Tapped)
+          Spec.assertEqWith s "and nobody was offered the may" (optionalResponses transcript) []
+          -- The controls, which are what stop this leg passing because nothing
+          -- happened at all: the ability reached the stack and really named her.
+          Spec.assertEqWith s "CR 603.3d the Rats' enters trigger reached the stack" (length (GameState.stack triggerOnStack)) 1
+          Spec.assertEqWith s "and alice discarded the card it targeted her for" (S.handSize S.alice after) 0
+        -- CR 115.1's other kind of target on the same event: the Gomazoa itself
+        -- becomes one, which is SelfBecomesTargeted's condition and not this one.
+        Spec.it s "CR 115.1 the Gomazoa becoming a target itself is not its controller becoming one" $ do
+          (gomazoaId, _, _, _, growthId, gs) <- board
+          let (onStack, after, transcript) = castThenResolve (Recipient.ToCreature gomazoaId) S.bob growthId gs
+          Spec.assertEqWith s "the Gomazoa is still tapped" (tapStateOf gomazoaId after) (Just TapState.Tapped)
+          Spec.assertEqWith s "and nobody was offered the may" (optionalResponses transcript) []
+          Spec.assertEqWith s "only the Growth was on the stack" (length (GameState.stack onStack)) 1
+          Spec.assertEqWith s "and it resolved onto the Gomazoa" (S.powerToughnessOf gomazoaId after) (Just (8, 8))
+        -- The card's third line, which is what makes the trigger worth printing:
+        -- CR 502.3's turn-based untap passes the Gomazoa over while CR 701.26b's
+        -- Untap action above does not. The Piker is the pair's other half.
+        Spec.it s "CR 502.3 the Gomazoa does not untap in its controller's untap step, and an ordinary creature does" $ do
+          (gomazoaId, pikerId, _, _, _, gs) <- board
+          let untapped = S.runPure S.identityAnswer (gs {GameState.activePlayer = S.alice}) (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
+          Spec.assertEqWith s "the Gomazoa is still tapped" (tapStateOf gomazoaId untapped) (Just TapState.Tapped)
+          Spec.assertEqWith s "and the Piker untapped" (tapStateOf pikerId untapped) (Just TapState.Untapped)
+
+-- The CR 603.5 "may" answers in a transcript, in order -- paysFor's
+-- payResponses one Response constructor over. A transcript with no
+-- ChooseOptional in it says the prompt was never raised, which is what makes an
+-- absence leg above assert more than a tap state.
+optionalResponses :: [Response.Response] -> [Response.Response]
+optionalResponses = filter isOptionalResponse
+
+isOptionalResponse :: Response.Response -> Bool
+isOptionalResponse response = case response of
+  Response.ChoseOptional _ -> True
+  _ -> False
 
 -- Blind Hunter, a Creature -- Bat: "Flying / Haunt (When this creature dies,
 -- exile it haunting target creature.) / When this creature enters or the
@@ -13741,6 +13897,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   afterlifeSpec s registry
   fabricateSpec s registry
   wardSpec s registry
+  gomazoaSpec s registry
   soulshiftSpec s registry
   hauntSpec s registry
   strippedTriggerSpec s registry

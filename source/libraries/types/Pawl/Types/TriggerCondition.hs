@@ -922,6 +922,23 @@ data TriggerCondition
     -- effect that changes a target makes the new object become a target too. No
     -- such effect is in the pool (#1525).
     SelfBecomesTargeted PlayerRelation.PlayerRelation
+  | -- | CR 601.2c read from the PLAYER's side: "whenever you become the target of
+    -- A SPELL" -- Dormant Gomazoa's. Matched against GameEvent.BecameTarget whose
+    -- `targeted` is a Recipient.ToPlayer equal to CR 109.5's "you" (CR 603.3a's
+    -- controller of the object when the ability triggered), and whose `kind` is
+    -- StackObjectKind.Spell (CR 112.1).
+    --
+    -- The KIND is read off the event rather than off the board because the
+    -- matcher has no GameState: CR 602.2b and CR 603.3d route an ability through
+    -- the same rule 601.2c, so a condition that did not ask would fire on
+    -- Ravenous Rats' targeted discard as well.
+    --
+    -- PAYLOAD-FREE, SelfCast's posture rather than SelfBecomesTargeted's above:
+    -- the sibling carries a PlayerRelation over the TARGETING object's controller
+    -- because rule 702.21a asks for one, and Gomazoa does not narrow that way.
+    -- Not implemented: Amulet of Safekeeping's "a spell or ability an opponent
+    -- controls" needs both the relation and the Ability half of the kind (#1798).
+    ControllerBecomesTargetOfSpell
   | -- | CR 709.5h: "when you unlock this door" -- fires when the permanent bearing
     -- the ability is given the unlocked designation for the NAMED half. "Some
     -- abilities trigger when a player unlocks a particular half of a permanent.

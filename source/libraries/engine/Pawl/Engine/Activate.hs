@@ -47,6 +47,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
@@ -694,5 +695,5 @@ activateAbility pid srcId ability = do
                   --
                   -- After the payment for Cast.castSpell's reason: everything
                   -- above can still restore `before` and unwind the activation.
-                  Event.becameTarget abilId pid chosen
+                  Event.becameTarget abilId StackObjectKind.Ability pid chosen
                 Payment.Unpaid -> State.put before

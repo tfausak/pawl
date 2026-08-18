@@ -58,6 +58,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
+import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Uses as Uses
@@ -1418,7 +1419,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                           -- still reject the cast and rewind, and rule 601.2c
                           -- holds the trigger off the stack "until the spell has
                           -- finished being cast" anyway.
-                          Event.becameTarget sid pid chosen
+                          Event.becameTarget sid StackObjectKind.Spell pid chosen
                           -- Stamped on `sid` itself, the incarnation CR 601.2a
                           -- put on the stack, rather than on whatever is on top
                           -- of it now.
