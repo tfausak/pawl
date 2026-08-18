@@ -10441,7 +10441,21 @@ wildEvocationSpec s registry =
               (Engine.runGame counting began (Engine.settleForPriority >> Engine.priorityLoop))
               0
       named n = CardName.MkCardName (Text.pack n)
-      bobsHand gs = fmap (\oid -> maybe "?" (Text.unpack . CardName.unwrap . Face.name) (Game.faceOf oid gs)) (Game.zoneMembers Zone.Hand S.bob gs)
+      -- WHO controls the permanent bob's card became, which is the one reading
+      -- that separates "that player casts it" from "the resolving controller
+      -- casts it". NOT the owner: S.countOnBattlefieldByName indexes the
+      -- battlefield by owner (CR 108.1), and the card is bob's whoever cast it,
+      -- so a count alone is green under either reading.
+      controllerOfNamed n gs =
+        Maybe.listToMaybe
+          [ ctrl
+          | oid <- Game.zoneMembers Zone.Battlefield S.bob gs,
+            fmap Face.name (Game.faceOf oid gs) == Just (named n),
+            ctrl <- Maybe.maybeToList (Projection.controllerOf oid gs)
+          ]
+      zoneOf zone gs = fmap (\oid -> maybe "?" (Text.unpack . CardName.unwrap . Face.name) (Game.faceOf oid gs)) (Game.zoneMembers zone S.bob gs)
+      bobsHand = zoneOf Zone.Hand
+      bobsGraveyard = zoneOf Zone.Graveyard
       revealed gs = fmap (fmap (List.sort . fmap (Text.unpack . CardName.unwrap) . Set.toList)) (S.revealsOf gs)
       -- Three distinct printings, none of them a land, so every index is a
       -- different card and the "otherwise" branch is the one taken.
@@ -10455,8 +10469,8 @@ wildEvocationSpec s registry =
           ps <- traverse (S.printingOf s registry) spells
           let gs = board evocation ps
               after = runBobsUpkeep (rolling 0) gs
-          Spec.assertEqWith s "the Piker resolved onto BOB's battlefield" (S.countOnBattlefieldByName (named "Goblin Piker") S.bob after) 1
-          Spec.assertEqWith s "and not alice's, who controls the enchantment" (S.countOnBattlefieldByName (named "Goblin Piker") S.alice after) 0
+          Spec.assertEqWith s "CR 608.2g: BOB controls the resulting permanent, not alice who controls the enchantment" (controllerOfNamed "Goblin Piker" after) (Just S.bob)
+          Spec.assertEqWith s "and it really did resolve" (S.countOnBattlefieldByName (named "Goblin Piker") S.bob after) 1
           Spec.assertEqWith s "the other two are still in hand" (bobsHand after) ["Bog Wraith", "Bird Maiden"]
           Spec.assertEqWith s "bob showed the card he cast" (revealed after) [(S.bob, ["Goblin Piker"])]
           Spec.assertEqWith s "stack empty: the trigger and the spell both resolved" (length (GameState.stack after)) 0
@@ -10471,27 +10485,34 @@ wildEvocationSpec s registry =
           let after = runBobsUpkeep (rolling 2) (board evocation ps)
           Spec.assertEqWith s "the Maiden resolved onto bob's battlefield" (S.countOnBattlefieldByName (named "Bird Maiden") S.bob after) 1
           Spec.assertEqWith s "and the Piker never left bob's hand" (bobsHand after) ["Goblin Piker", "Bog Wraith"]
-        -- The land branch, and the pair that proves it reads the BOUND card
-        -- rather than the zone. A land sits in the hand in both legs, so an
-        -- implementation counting lands in the hand passes the first and fails
-        -- the second.
+        -- The land branch, and the pair that proves the branch reads the BOUND
+        -- card rather than the zone. One Forest sits in the hand in both legs,
+        -- so an implementation counting lands in the hand passes the first and
+        -- fails the second.
+        --
+        -- The nonland is a Lightning Bolt rather than a creature deliberately:
+        -- a creature is on the battlefield either way, so it cannot tell a CAST
+        -- from the land branch's MoveToZone. The Bolt separates them -- cast, it
+        -- resolves, deals its damage and reaches a graveyard (CR 608.2n); moved,
+        -- it would sit on the battlefield with alice's life untouched.
         Spec.it s "CR 701.20a a revealed land is put onto the battlefield instead of cast" $ do
           evocation <- S.printingOf s registry "Wild Evocation"
           forest <- S.printingOf s registry "Forest"
-          piker <- S.printingOf s registry "Goblin Piker"
+          bolt <- S.printingOf s registry "Lightning Bolt"
           maiden <- S.printingOf s registry "Bird Maiden"
-          let gs = board evocation [forest, piker, maiden]
+          let gs = board evocation [forest, bolt, maiden]
               after = runBobsUpkeep (rolling 0) gs
           Spec.assertEqWith s "the Forest is on bob's battlefield" (S.countOnBattlefieldByName (named "Forest") S.bob after) 1
-          Spec.assertEqWith s "nothing was cast: the two spells are still in hand" (bobsHand after) ["Goblin Piker", "Bird Maiden"]
+          Spec.assertEqWith s "nothing was cast: the Bolt is still in hand and nobody was burned" (bobsHand after, S.lifeOf S.alice after) (["Lightning Bolt", "Bird Maiden"], Just 20)
           Spec.assertEqWith s "and no cast was offered either" (offersUnder 0 gs) 0
         Spec.it s "CR 608.2g the same hand with a nonland revealed casts it and leaves the land alone" $ do
           evocation <- S.printingOf s registry "Wild Evocation"
           forest <- S.printingOf s registry "Forest"
-          piker <- S.printingOf s registry "Goblin Piker"
+          bolt <- S.printingOf s registry "Lightning Bolt"
           maiden <- S.printingOf s registry "Bird Maiden"
-          let after = runBobsUpkeep (rolling 1) (board evocation [forest, piker, maiden])
-          Spec.assertEqWith s "the Piker was cast" (S.countOnBattlefieldByName (named "Goblin Piker") S.bob after) 1
+          let after = runBobsUpkeep (rolling 1) (board evocation [forest, bolt, maiden])
+          Spec.assertEqWith s "the Bolt was CAST: it resolved and dealt its damage" (S.lifeOf S.alice after) (Just 17)
+          Spec.assertEqWith s "so it reached a graveyard rather than the battlefield (CR 608.2n)" (bobsGraveyard after, S.countOnBattlefieldByName (named "Lightning Bolt") S.bob after) (["Lightning Bolt"], 0)
           Spec.assertEqWith s "and the Forest is still in hand, unplayed" (bobsHand after) ["Forest", "Bird Maiden"]
           Spec.assertEqWith s "so nothing entered the battlefield as a land" (S.countOnBattlefieldByName (named "Forest") S.bob after) 0
         -- CR 118.8's "if able", read through Cast.castableWhenOffered: a Plummet

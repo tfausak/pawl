@@ -94,6 +94,11 @@ has bitten.
   must go red for the *intended* reason, in the intended place. A mutation that
   fails a dozen unrelated cases, or the target case with a different message
   than the behaviour predicts, has proved something else.
+- **Order the assertions so the mutation reaches the real one.** A cheap proxy
+  --- a prompt count, a zone size, a list length --- placed before the
+  gameplay-level assertion absorbs the mutation and goes red first, and the
+  failure you read is about the proxy. The behaviour under test asserts first;
+  the proxy is a supporting check after it.
 - **Never `git checkout <file>` to revert a mutation** --- real edits have been
   lost that way. Copy the file to a backup first and move it back.
 - **Build a negative as a pair of boards differing in exactly one thing.** A
@@ -151,6 +156,26 @@ Each of these has shipped a green-but-meaningless test in this repository:
   a hand-built `Recipient.ToObject` of the same permanent is a different
   recipient, and CR 608.2b's re-read at resolution drops it with no error.
   FILTER the offered set instead.
+- **A pure `Prompt r -> r` answerer cannot tell two structurally identical
+  prompts apart.** Same constructor, same decider, same controller, same
+  candidate set means the second call is indistinguishable from the first, so an
+  answerer that pins one answer answers both the same way and the test is green
+  whatever the engine did. Thread state instead --- an answerer in `State.State`
+  counting or indexing its calls, as `Pawl.CopySpec` and `Pawl.ManaSpec` do with
+  `countingAnswer` --- and assert on the sequence.
+- **A fixture supplies preconditions your assertion silently rests on.** The
+  `Pawl.Support` builders settle what they place (`S.addCreature` writes
+  `Sickness.Settled`), stock what they draw from, and leave what they place
+  untapped; a permanent that pays `{T}` in your test may be paying only because
+  of that. Name the precondition the behaviour needs and assert it on the board,
+  or the test proves the fixture rather than the change --- and a hand-built
+  negative that lacks it differs from the positive in two things, not one.
+- **A `Pawl.Support` counter may index by a different question than your
+  assertion's wording.** `S.countOnBattlefieldByName` takes a `PlayerId`, but
+  `Game.zoneMembers` indexes the battlefield by OWNER (CR 108.1), so it cannot
+  see who CONTROLS anything --- an assertion about a controller written through
+  it is green under both readings. Read the helper before trusting its
+  parameter's name; `Projection.controllerOf` is the control question.
 - **Two conditions a board cannot tell apart.** Name the other reading of the
   rule and check the board distinguishes them --- same zone for two
   destinations, same timestamp for two layers, one player holding two roles.

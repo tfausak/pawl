@@ -1363,6 +1363,10 @@ data Prompt r where
   -- No facing here, because an OfferCast opcode offers no face-down cast (see
   -- Pawl.Engine.Resolve.offerCast).
   --
+  -- Raised only for CR 608.2g's "allows". An opcode carrying that rule's
+  -- "instructs" instead -- Wild Evocation's "casts it ... if able" -- is not a
+  -- decision, so it casts without reaching this prompt at all.
+  --
   -- Distinct from CastWhileSearching, which is the same rule's other producer.
   -- That one offers a LIST and loops, because CR 601.3's Panglacial permission
   -- ranges over a whole library and several cards may hold it; this one offers
