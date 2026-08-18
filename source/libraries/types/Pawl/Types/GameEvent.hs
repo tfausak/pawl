@@ -703,9 +703,10 @@ data GameEvent
     -- alone names nothing: two players may be in room 1 of two different dungeons,
     -- and CR 309.4c makes each room ability the dungeon card's own.
     VentureMarkerEntered VentureMarkerEntered.VentureMarkerEntered
-  | -- | CR 601.2c: an object BECAME A TARGET of a spell or ability. Emitted by
-    -- Pawl.Engine.Event.becameTarget, once per targeted object, as the targets
-    -- are announced -- which is the moment that rule names, and the reason
+  | -- | CR 601.2c: an object or player BECAME A TARGET of a spell or ability --
+    -- CR 115.1 makes a player a target in its own right, so the payload's
+    -- `targeted` is a Recipient. Emitted by Pawl.Engine.Event.becameTarget, once
+    -- per targeted recipient, as the targets are announced -- which is the moment that rule names, and the reason
     -- nothing here fires for an object merely CHOSEN at resolution (CR 115.10a
     -- makes such a choice no target at all).
     --

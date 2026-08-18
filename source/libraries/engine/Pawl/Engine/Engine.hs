@@ -93,6 +93,7 @@ import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
@@ -1082,7 +1083,7 @@ placeBorne srcId pending = do
       -- Nothing here can reject the placement afterwards -- CR 603.3d's own
       -- removal is the `selectionPossible` branch above -- so this is the last
       -- line rather than a payment's successor as in Cast and Activate.
-      Event.becameTarget abilId controller chosen
+      Event.becameTarget abilId StackObjectKind.Ability controller chosen
 
 -- CR 101.4 / 603.3b: the players who control a pending trigger, active player
 -- first and then the rest in turn order. Grouped by controller because the

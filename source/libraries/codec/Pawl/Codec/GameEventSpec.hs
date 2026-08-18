@@ -43,6 +43,7 @@ import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
+import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
@@ -306,16 +307,25 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered (PlayerId.MkPlayerId 1) (ObjectId.MkObjectId 4) (RoomIndex.MkRoomIndex 2)))
       " {\"type\":\"VentureMarkerEntered\",\"value\":{\"player\":1,\"dungeon\":4,\"room\":2}} "
-  -- The targeted object, then the spell or ability that named it, then that
-  -- object's controller. Distinct ids prove the order: CR 702.21a counters the
-  -- SECOND field and offers the cost to the third, and a swap would counter the
-  -- warded permanent.
+  -- The targeted recipient, then the spell or ability that named it, then which
+  -- kind of stack object that was, then its controller. Distinct ids prove the
+  -- order: CR 702.21a counters the SECOND field and offers the cost to the
+  -- fourth, and a swap would counter the warded permanent.
   Spec.it s "BecameTarget" $
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.BecameTarget (BecameTarget.MkBecameTarget (ObjectId.MkObjectId 9) (ObjectId.MkObjectId 10) (PlayerId.MkPlayerId 2)))
-      " {\"type\":\"BecameTarget\",\"value\":{\"targeted\":9,\"source\":10,\"controller\":2}} "
+      (GameEvent.BecameTarget (BecameTarget.MkBecameTarget (Recipient.ToObject (ObjectId.MkObjectId 9)) (ObjectId.MkObjectId 10) StackObjectKind.Ability (PlayerId.MkPlayerId 2)))
+      " {\"type\":\"BecameTarget\",\"value\":{\"targeted\":{\"type\":\"ToObject\",\"value\":9},\"source\":10,\"kind\":{\"type\":\"Ability\"},\"controller\":2}} "
+  -- CR 115.1's other kind of target, and CR 112.1's other kind of stack object:
+  -- Dormant Gomazoa's event, which the object case above cannot stand in for
+  -- since both fields differ.
+  Spec.it s "BecameTarget of a player, by a spell" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.BecameTarget (BecameTarget.MkBecameTarget (Recipient.ToPlayer (PlayerId.MkPlayerId 3)) (ObjectId.MkObjectId 11) StackObjectKind.Spell (PlayerId.MkPlayerId 2)))
+      " {\"type\":\"BecameTarget\",\"value\":{\"targeted\":{\"type\":\"ToPlayer\",\"value\":3},\"source\":11,\"kind\":{\"type\":\"Spell\"},\"controller\":2}} "
   -- CR 800.4a. One id, TurnedFaceUp's payload again: the object left the game, so
   -- there is no destination zone to carry and no new incarnation to name.
   Spec.it s "LeftTheGame" $
