@@ -1098,6 +1098,7 @@ library types
     Pawl.Types.PlayerSacrifices
     Pawl.Types.PlayerScope
     Pawl.Types.PlayerStaticAbility
+    Pawl.Types.PlayPermissionOrigin
     Pawl.Types.Plus
     Pawl.Types.Pool
     Pawl.Types.Power
