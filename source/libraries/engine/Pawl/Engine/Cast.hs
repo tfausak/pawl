@@ -239,9 +239,17 @@ payableCost = payableCostAt 0
 -- gate asks whether some resolution pays: the choice is the payer's, made at CR
 -- 601.2f, and a gate that priced the symbol at nothing refused casts the payer
 -- was entitled to.
+--
+-- BOTH halves of CR 601.2f's totalling, exactly as Activate.payableCostAt asks
+-- them: the mana arithmetic rides in as a function, and the additional non-mana
+-- components an effect applies to this spell (CR 118.8) are appended to the cost
+-- before it is measured (Cost.plusComponents). Drought's "Sacrifice a Swamp" is
+-- therefore a reason this gate can answer False, and the cost it measures is the
+-- cost castSpell will pay.
 payableCostAt :: Natural -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAt x spending pid oid gs cost =
-  Cost.canPaySomeCompletion spending pid oid (Cost.totalManas (Cost.spellAdjustments pid oid gs)) (Cost.substituteX x cost) gs
+  let adjustments = Cost.spellAdjustments pid oid gs
+   in Cost.canPaySomeCompletion spending pid oid (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs
 
 -- CR 601.2b: the greatest value of X this player could actually pay for, which is
 -- what Prompt.ChooseX carries -- measured on the cost the cast is measuring, with
@@ -261,11 +269,13 @@ payableCostAt x spending pid oid gs cost =
 -- inspection of the pool. X reaches a cost two ways, and each is monotone on its
 -- own:
 --
---   * as GENERIC MANA (Mana.substituteX). CR 601.2f's adjustments never read the
---     cost so they add and forgive the same amounts at every X, and only
---     Mana.canPay's leftover comparison reads the generic count -- on the
---     demanding side of a >= whose supply side X cannot move, and which the finite
---     supplies must eventually fail.
+--   * as GENERIC MANA (Mana.substituteX). CR 601.2f's adjustments forgive and
+--     demand the same amounts at every X, and only Mana.canPay's leftover
+--     comparison reads the generic count -- on the demanding side of a >= whose
+--     supply side X cannot move, and which the finite supplies must eventually
+--     fail. The one adjustment that DOES read the cost is a CostScale, and it
+--     reads only CR 202.2b's coloured symbols: substituting X writes generic
+--     mana, which carries no colour, so the count is the same at every X too.
 --
 --   * as LIFE (Cost.substituteXInComponent, a CostComponent.PayLifeX becoming a
 --     PayLife). CR 119.4's floor is Event.canPayLife's >= against a life total X
@@ -1334,7 +1344,16 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                   -- ones CR 601.2f's total can pay -- the same adjusted cost
                   -- payableCost gated this cast on, read from the same `gs` the
                   -- total below is.
-                  announcedCost <- Cost.announce spending pid sid (Cost.totalManas (Cost.spellAdjustments pid sid gs)) announcedAtX
+                  --
+                  -- CR 601.2f's additional components are on the cost by this
+                  -- point (Cost.plusComponents), which is what payableCost
+                  -- measured and what Cost.pay will charge -- Activate's own
+                  -- announcement says why it matters to the announcement itself:
+                  -- a Phyrexian symbol offered without the added "Sacrifice a
+                  -- Swamp" in view would be offered against a board that has one
+                  -- Swamp too many.
+                  let gathered = Cost.spellAdjustments pid sid gs
+                  announcedCost <- Cost.announce spending pid sid (Cost.totalManas gathered) (Cost.plusComponents gathered announcedAtX)
                   -- CR 601.2c, and the spell is on the stack for it: `sets` above
                   -- was computed from the same post-move `gs`, so a "target spell"
                   -- slot draws from the pool CR 601.2a built -- with this spell in

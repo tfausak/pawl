@@ -58,6 +58,7 @@ import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostAdjustments as CostAdjustments
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostReduction as CostReduction
+import qualified Pawl.Types.CostScale as CostScale
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DiscardCards as DiscardCards
@@ -577,8 +578,23 @@ totalWith adjustments cost = cost {Cost.mana = fmap (applyAdjustments adjustment
 -- below: CR 606.5 makes them one cost, so there is no order between them for CR
 -- 601.2h to offer.
 --
--- A no-op for every SPELL cost, whose adjustments carry no components at all
--- (Pawl.Engine.PlayerEffect.spellCostAdjustments).
+-- The SCALE is cashed here and nowhere else, because this is the only place CR
+-- 601.2f's addition meets the cost it is being added to: the gatherers
+-- (Pawl.Engine.PlayerEffect.spellCostAdjustments, activationCostAdjustments) are
+-- handed an OBJECT, and the activation half never sees an activation cost at
+-- all. Drought's "for each black mana symbol in their mana costs" is the
+-- sentence, and CR 202.2b's classification of a symbol as coloured is the count
+-- -- Pawl.Engine.Projection.symbolColors, the same classifier CR 202.2's colour
+-- of an object is read through, so CR 107.4e's hybrid and CR 107.4f's Phyrexian
+-- symbols count exactly as Drought's 2008-08-01 ruling says they do. Zero
+-- matching symbols adds NOTHING rather than a component of count zero.
+--
+-- Counted on THIS cost -- CR 601.2b's announced cost, before `totalWith` applies
+-- any reduction -- which is the ordering CR 601.2f states: the total is 601.2b's
+-- cost "plus all additional costs and cost increases, and minus all cost
+-- reductions", so a cost reducer on the same board cannot change how many Swamps
+-- Drought demands. Nothing in the suite pairs Drought with a reducer that
+-- removes a coloured symbol, so that ordering is argued rather than tested.
 --
 -- Applied AFTER `substituteX`, which is why an ADDED component may not carry CR
 -- 601.2b's X: a CostComponent.PayLifeX arriving this way would never be
@@ -594,7 +610,14 @@ totalWith adjustments cost = cost {Cost.mana = fmap (applyAdjustments adjustment
 -- paid. `combineLoyalty` is the identity on every cost carrying at most one
 -- loyalty component, which is every printed one.
 plusComponents :: CostAdjustments.CostAdjustments -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
-plusComponents adjustments cost = cost {Cost.components = combineLoyalty (Cost.components cost <> CostAdjustments.components adjustments)}
+plusComponents adjustments cost =
+  let symbols = foldMap ManaCost.unwrap (Cost.mana cost)
+      repeats scale = case scale of
+        CostScale.Once -> 1
+        CostScale.PerColoredSymbol color -> length (filter (elem color . Projection.symbolColors) symbols)
+      expand (scale, component) = replicate (repeats scale) component
+      added = concatMap expand (CostAdjustments.components adjustments)
+   in cost {Cost.components = combineLoyalty (Cost.components cost <> added)}
 
 -- CR 601.2f's totalling of the MANA part alone, curried so that it is a function
 -- of one mana cost. `total` above is this fmapped over a whole Cost's mana part;

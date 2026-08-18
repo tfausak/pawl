@@ -60,6 +60,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
+import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
@@ -2710,7 +2711,10 @@ playerEffectFilters playerEffect = case playerEffect of
   -- land"). Both are authored by the card, so both are linted, and the inner
   -- ones go through costComponentFilters so an added component and a printed
   -- one are held to one standard.
-  PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost f components) -> f : concatMap costComponentFilters components
+  PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost f components _) -> f : concatMap costComponentFilters components
+  -- The spell-side twin, whose Filter names the SPELL (Drought's is universal)
+  -- and whose components carry one of their own ("sacrifice a SWAMP").
+  PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost f components _) -> f : concatMap costComponentFilters components
   PlayerEffect.CantCastSpells -> []
   PlayerEffect.CantCastMoreThan _ -> []
   -- CR 601.3 / 305.1: the quality both prohibitions name is a CardName chosen as
@@ -2801,6 +2805,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.ReduceSpellCost {} -> False
   PlayerEffect.ReduceActivationCost {} -> False
   PlayerEffect.AddActivationCost {} -> False
+  PlayerEffect.AddSpellCost {} -> False
   PlayerEffect.CantCastSpells -> False
   PlayerEffect.CantCastMoreThan _ -> False
   PlayerEffect.CantCastChosenName -> False
@@ -2845,6 +2850,7 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.ReduceSpellCost {} -> False
   PlayerEffect.ReduceActivationCost {} -> False
   PlayerEffect.AddActivationCost {} -> False
+  PlayerEffect.AddSpellCost {} -> False
   PlayerEffect.CantCastSpells -> False
   PlayerEffect.CantCastMoreThan _ -> False
   PlayerEffect.CantCastChosenName -> False

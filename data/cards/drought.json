@@ -1,0 +1,170 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Drought",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "AddSpellCost",
+            "value": {
+              "components": [
+                {
+                  "type": "Sacrifice",
+                  "value": {
+                    "count": 1,
+                    "whichPermanents": {
+                      "type": "HasSubtype",
+                      "value": {
+                        "type": "Swamp"
+                      }
+                    }
+                  }
+                }
+              ],
+              "scale": {
+                "type": "PerColoredSymbol",
+                "value": {
+                  "type": "Black"
+                }
+              },
+              "whichSpells": {
+                "type": "And",
+                "value": []
+              }
+            }
+          },
+          "scope": {
+            "type": "EachPlayer"
+          }
+        },
+        {
+          "effect": {
+            "type": "AddActivationCost",
+            "value": {
+              "components": [
+                {
+                  "type": "Sacrifice",
+                  "value": {
+                    "count": 1,
+                    "whichPermanents": {
+                      "type": "HasSubtype",
+                      "value": {
+                        "type": "Swamp"
+                      }
+                    }
+                  }
+                }
+              ],
+              "scale": {
+                "type": "PerColoredSymbol",
+                "value": {
+                  "type": "Black"
+                }
+              },
+              "whichAbilities": {
+                "type": "And",
+                "value": []
+              }
+            }
+          },
+          "scope": {
+            "type": "EachPlayer"
+          }
+        }
+      ],
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "StepBegins",
+            "value": {
+              "phase": {
+                "type": "Beginning",
+                "value": {
+                  "type": "Upkeep"
+                }
+              },
+              "scope": {
+                "type": "ControllersTurn"
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Sacrifice",
+                        "value": "self"
+                      }
+                    ],
+                    "payGate": {
+                      "branch": {
+                        "type": "IfNotPaid"
+                      },
+                      "cost": {
+                        "mana": [
+                          {
+                            "type": "OfType",
+                            "value": {
+                              "type": "Colored",
+                              "value": {
+                                "type": "White"
+                              }
+                            }
+                          },
+                          {
+                            "type": "OfType",
+                            "value": {
+                              "type": "Colored",
+                              "value": {
+                                "type": "White"
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "payer": "you"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}
