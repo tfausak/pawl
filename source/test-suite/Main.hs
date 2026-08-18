@@ -270,6 +270,7 @@ import qualified Pawl.Codec.ZoneChangeSpec
 import qualified Pawl.Codec.ZoneSpec
 import qualified Pawl.CodecIntegrationSpec
 import qualified Pawl.ColorSpec
+import qualified Pawl.CombatEffectSpec
 import qualified Pawl.CombatSpec
 import qualified Pawl.CommanderSpec
 import qualified Pawl.ConditionSpec
@@ -684,6 +685,7 @@ spec s registry = do
   Pawl.Codec.ZoneSpec.spec s
   Pawl.CodecIntegrationSpec.spec s registry
   Pawl.ColorSpec.spec s registry
+  Pawl.CombatEffectSpec.spec s registry
   Pawl.CombatSpec.spec s registry
   Pawl.CommanderSpec.spec s registry
   Pawl.ConditionSpec.spec s registry
