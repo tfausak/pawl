@@ -1165,6 +1165,66 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         settled = snd (Engine.runGamePure aliceFindingNothing cast Engine.priorityLoop)
     Spec.assertEqWith s "nothing was exiled" (Game.zoneMembers Zone.Exile S.carol settled) []
     Spec.assertEqWith s "carol keeps every card, shuffled" (Set.fromList (Game.zoneMembers Zone.Library S.carol settled)) (Set.fromList carolLib)
+  -- Jungle Wayfinder -- "{2}{G} Creature -- Elf Warrior 3/3. When this creature
+  -- enters, each player may search their library for a basic land card, reveal
+  -- it, put it into their hand, then shuffle." Oracle text verified against
+  -- api.scryfall.com. The whole-card proof of CR 701.23a's COUPLING: "each
+  -- player searches THEIR library" is one instruction applied per player, so the
+  -- searcher and the library's owner are the same seat on every pass. Extract,
+  -- five cases above, is the card that separates the two readings from the other
+  -- side -- there the searcher and the owner are deliberately different players.
+  --
+  -- Three seats, so a cross-product engine is off by a factor of three rather
+  -- than of two, and each library holds a DIFFERENT basic (alice Islands, bob
+  -- Mountains, carol Plains) so "how many did she find" and "whose library did
+  -- it come from" are separable assertions. None of the three is the Forest the
+  -- {2}{G} is paid with, so a fetched card cannot be confused with one already
+  -- in play. Each library also holds a Goblin Piker for the filter to reject.
+  --
+  -- THREE basics per library, not one, and that is what makes the case
+  -- non-vacuous. A found card goes to its OWNER's hand (CR 400.3, through
+  -- Event.changeZone), so on a one-basic board the cross product is invisible:
+  -- alice's Island reaches alice's hand whether she found it or bob did, and the
+  -- later passes over her library find nothing left to take. With three, the
+  -- cross product empties each library into its owner's hand -- three cards per
+  -- seat -- where the coupled reading takes exactly one.
+  --
+  -- The printed "may" is not transcribed, and pawl's copy is no weaker for it:
+  -- CR 701.23b already lets a search STATING A QUALITY -- "a basic land card" --
+  -- find nothing, which is the whole of the permission as far as the find goes.
+  -- What is left over is the shuffle a player who declined outright would not
+  -- make; pawl's copy shuffles every library, which is stricter than printed.
+  -- Not implemented: a per-player "may", each player the clause reaches deciding
+  -- for themselves (#1862).
+  Spec.it s "CR 701.23a whole card: Jungle Wayfinder has each player search THEIR OWN library" $ do
+    forest <- S.printingOf s registry "Forest"
+    wayfinder <- S.printingOf s registry "Jungle Wayfinder"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let stock printing pid g = List.foldl' (\h _ -> snd (S.addLibraryCard printing pid h)) g [1 :: Int .. 3]
+        g0 = S.landsFor forest S.alice 3 S.threePlayerGame
+        (_, g1) = S.addLibraryCard piker S.alice g0
+        g2 = stock island S.alice g1
+        (_, g3) = S.addLibraryCard piker S.bob g2
+        g4 = stock mountain S.bob g3
+        (_, g5) = S.addLibraryCard piker S.carol g4
+        g6 = stock plains S.carol g5
+        (gs, spellId) = S.handOne wayfinder g6
+        cast = snd (Engine.runGamePure findFirst gs (S.cast S.alice spellId))
+        settled = snd (Engine.runGamePure findFirst cast Engine.priorityLoop)
+        nameOf = Just . CardName.MkCardName . Text.pack
+    Spec.assertEqWith s "alice found ONE of her three Islands -- her library was searched once, by her" (namesIn Zone.Hand S.alice settled) [nameOf "Island"]
+    Spec.assertEqWith s "bob one of his three Mountains" (namesIn Zone.Hand S.bob settled) [nameOf "Mountain"]
+    Spec.assertEqWith s "carol one of her three Plains" (namesIn Zone.Hand S.carol settled) [nameOf "Plains"]
+    -- What each library kept: the two basics nobody took and the Piker the
+    -- filter rejected. A search that read a library it had no business in shows
+    -- up here as a shortfall.
+    Spec.assertEqWith s "alice's library kept the other two Islands and the Piker" (List.sort (namesIn Zone.Library S.alice settled)) (List.sort [nameOf "Island", nameOf "Island", nameOf "Goblin Piker"])
+    Spec.assertEqWith s "bob's the other two Mountains" (List.sort (namesIn Zone.Library S.bob settled)) (List.sort [nameOf "Mountain", nameOf "Mountain", nameOf "Goblin Piker"])
+    Spec.assertEqWith s "and carol's the other two Plains" (List.sort (namesIn Zone.Library S.carol settled)) (List.sort [nameOf "Plains", nameOf "Plains", nameOf "Goblin Piker"])
+    Spec.assertEqWith s "the Wayfinder itself resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Jungle Wayfinder")) S.alice settled) 1
   Spec.it s "CR 603/608.2n Rest in Peace's ETB exiles graveyards and ceases" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     piker <- S.printingOf s registry "Goblin Piker"

@@ -1469,8 +1469,12 @@ playerRefPlayers legal controller gs ref = case ref of
   -- The baked seat, unreachable from card data. Not filtered against the roster:
   -- it names one specific player who arrived from elsewhere.
   PlayerRef.Specific pid -> [pid]
-  -- NOBODY, and not a hole: the reference is only answerable inside a Count
-  -- (Pawl.Engine.Quantity's playersOf), so here the opcode is a no-op.
+  -- NOBODY, and not a hole: the reference names whichever player a fold has
+  -- reached, and this function holds no fold. Its two answerable positions
+  -- substitute it before they ever call here -- Pawl.Engine.Quantity's playersOf
+  -- inside a Count, and the Effect.Search arm's ownersFor for a search whose
+  -- owner is its searcher -- so what reaches this arm is a reference in a
+  -- position with no candidate at all, and the opcode is a no-op.
   PlayerRef.Candidate -> []
   -- CR 608.2h: the controller of the object the slot names, through last known
   -- information -- the clause naming the player generally MOVED it first, and CR
@@ -2217,14 +2221,24 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 let named = playerRefPlayers legal controller gs0 r
                  in filter (\pid -> List.elem pid named) (Game.apnapOrder gs0)
               searchers = inApnapOrder searcherRef
-              owners = inApnapOrder ownerRef
+              -- "Each player searches THEIR library" (Jungle Wayfinder) is ONE
+              -- instruction applied per player, not the cross product of two
+              -- folds: the library read is whichever searcher this pass has
+              -- reached. That is Pawl.Types.PlayerRef.Candidate's reading, and
+              -- the substitution is the same move Pawl.Engine.Quantity
+              -- .forCandidate makes for a per-player amount. Every other ref
+              -- names a set of its own, so Extract's You/InSlot pair still
+              -- crosses -- one searcher over one owner.
+              ownersFor searcher = case ownerRef of
+                PlayerRef.Candidate -> [searcher]
+                _ -> inApnapOrder ownerRef
               -- How many cards this search may find (CR 701.23a), evaluated ONCE
               -- before the loop: one instruction names one count. An unevaluable
               -- or non-positive quantity comes out as 0.
               cap = case Quantity.evaluateFor (Projection.viewWithLastKnown source gs0) (effectContext controller source legal) gs0 resolving source quantity of
                 Just n | n > 0 -> Integer.toNaturalSaturating n
                 _ -> 0
-          Monad.forM_ searchers $ \searcher -> Monad.forM_ owners $ \owner -> do
+          Monad.forM_ searchers $ \searcher -> Monad.forM_ (ownersFor searcher) $ \owner -> do
             -- CR 101.2: a player who can't search libraries does not, and finds
             -- nothing. Asked BEFORE CR 601.3's offer below, which is made WHILE
             -- SEARCHING. The rest of the instruction still happens -- CR 701.23

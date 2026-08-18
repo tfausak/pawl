@@ -1416,7 +1416,10 @@ wolfOn forest hillGiant aspect n =
 -- Two capabilities in one CDA (CR 604.3, layer 7a): CR 107.1a's rounding, and an
 -- Aggregation.Greatest folding a per-PLAYER quantity over Scope.OverPlayers --
 -- the maximum reads each candidate's own life through
--- Pawl.Types.PlayerRef.Candidate, which no other card in the pool writes.
+-- Pawl.Types.PlayerRef.Candidate. That reference is written by several cards in
+-- data/cards/ -- Arbiter of Knollridge folds the same Greatest over the whole
+-- table, and Jungle Wayfinder writes it in a search's owner -- but no other one
+-- puts it under a CDA.
 --
 -- Three seats with DISTINCT life totals, alice's highest of all: 39 for alice,
 -- 13 for bob and 21 for carol. Every wrong reading lands on a different number
