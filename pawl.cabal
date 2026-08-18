@@ -108,6 +108,7 @@ library codec
     Pawl.Codec.AttackerDeclaredSpec
     Pawl.Codec.AttackRequirement
     Pawl.Codec.AttackRequirementSpec
+    Pawl.Codec.BecameAttached
     Pawl.Codec.BecameDesignated
     Pawl.Codec.BecameDesignatedSpec
     Pawl.Codec.BecameTarget
@@ -910,6 +911,7 @@ library types
     Pawl.Types.AttackerDeclared
     Pawl.Types.AttackRequirement
     Pawl.Types.AttackTarget
+    Pawl.Types.BecameAttached
     Pawl.Types.BecameDesignated
     Pawl.Types.BecameTarget
     Pawl.Types.BecomeCopy

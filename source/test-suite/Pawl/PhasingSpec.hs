@@ -70,6 +70,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
@@ -125,6 +126,16 @@ enchantedCrocodile crocodile pacifism owner enchanter gs =
 
 attachedHostOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Recipient.Recipient
 attachedHostOf oid gs = Game.lookupObject oid gs >>= Object.attachedTo
+
+-- The Saproling tokens `pid` controls. TOKENS and by SUBTYPE, so a fixture that
+-- grew another creature could not drift the count.
+saprolingsOf :: PlayerId.PlayerId -> GameState.GameState -> Int
+saprolingsOf pid gs =
+  length
+    ( filter
+        (\oid -> Set.member Subtype.Saproling (Projection.subtypesOf oid gs) && Projection.controllerOf oid gs == Just pid)
+        (S.tokensOf gs)
+    )
 
 -- Aim every target slot at `oid`, and otherwise answer as S.aggressiveAnswer does
 -- -- so one answerer serves both the quiet boards and the combat ones.
@@ -472,10 +483,10 @@ indirectSpec s registry = Spec.describe s "Indirect" $ do
   -- NOTHING to CR 608.2i's log across either transition -- which also restates CR
   -- 702.26d's "zone-change triggers don't trigger".
   --
-  -- NOT a proof of a rule 702.26j guard, because there is none to guard: pawl has
-  -- no attach or unattach event and no trigger condition keyed to one (#1033), so
-  -- this assertion would pass against an engine that had never heard of the rule.
-  -- It is a regression fence for the day one exists.
+  -- A REGRESSION FENCE rather than a proof, and it stays one: this board attaches
+  -- through Pawl.Support.attach, which writes Object.attachedTo directly, so no
+  -- GameEvent.BecameAttached was ever recorded here to begin with. The case below
+  -- is the one that reaches the rule with a real event behind it.
   Spec.it s "CR 702.26j/702.26d neither transition emits an event" $ do
     crocodile <- S.printingOf s registry "Sandbar Crocodile"
     pacifism <- S.printingOf s registry "Pacifism"
@@ -485,6 +496,54 @@ indirectSpec s registry = Spec.describe s "Indirect" $ do
         events = length . GameState.events
     Spec.assertEqWith s "phasing out logged nothing" (events gone) (events board)
     Spec.assertEqWith s "and phasing in logged nothing" (events back) (events gone)
+  -- CR 702.26j with a real attachment event behind it: "abilities that trigger
+  -- when a permanent becomes attached or unattached from an object or player
+  -- don't trigger when that permanent phases in or out."
+  --
+  -- Bramble Elemental watches for it ("whenever an Aura becomes attached to this
+  -- creature, create two 1\/1 green Saproling creature tokens"), and the board is
+  -- built by CASTING Pacifism at it -- so the baseline of two is a real count that
+  -- a real emit produced, which is the whole difference between this case and the
+  -- one above. Reality Ripple then phases the enchanted Elemental out, the Aura
+  -- goes with it (CR 702.26g), and alice's untap step brings both back attached.
+  --
+  -- A FENCE STILL, though a discriminating one: CR 702.26j is satisfied
+  -- structurally rather than by a guard, since Pawl.Engine.Phasing never clears
+  -- Object.attachedTo (the case above asserts the Aura is still attached after a
+  -- full cycle), so on the way back in there is no attachment for a plausible
+  -- implementation to record. What it holds is that the phasing path stays quiet.
+  Spec.it s "CR 702.26j phasing an enchanted permanent out and back in does not re-trigger" $ do
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    bramble <- S.printingOf s registry "Bramble Elemental"
+    pacifism <- S.printingOf s registry "Pacifism"
+    ripple <- S.printingOf s registry "Reality Ripple"
+    let base = S.landsFor plains S.alice 3 (S.landsFor island S.alice 2 (Setup.emptyGame S.bothPlayers))
+        (brambleId, withBramble) = S.addCreature bramble S.alice base
+        (armed, auraSpell) = S.handOne pacifism withBramble
+        cast = S.runPure (aimedAt brambleId) armed (S.cast S.alice auraSpell)
+        entered = S.runPure (aimedAt brambleId) cast (Monad.void Stack.resolveTop)
+        placed = S.runPure (aimedAt brambleId) entered Engine.settleForPriority
+        enchanted = S.runPure (aimedAt brambleId) placed Stack.resolveTop
+        (withRipple, rippleSpell) = S.handOne ripple enchanted
+        phasedOut = rippleAt brambleId rippleSpell withRipple
+        returned = untapStep S.alice phasedOut
+        -- The CR 117.5 boundary AFTER the untap step, and then the stack: a
+        -- trigger the phase-in had recorded would be placed here and resolve
+        -- here. Without it the count below could not tell an engine that emitted
+        -- nothing from one that emitted and was never scanned.
+        placedAfter = S.runPure (aimedAt brambleId) returned Engine.settleForPriority
+        phasedIn = S.runPure (aimedAt brambleId) placedAfter Stack.resolveTop
+    Spec.assertEqWith s "the cast Aura made two Saprolings" (saprolingsOf S.alice enchanted) 2
+    -- THE DISCRIMINATOR. Four would mean the phase-in recorded an attachment.
+    Spec.assertEqWith s "CR 702.26j still exactly two after a phase cycle" (saprolingsOf S.alice phasedIn) 2
+    -- Without these the count above is vacuous: a permanent that never phased
+    -- reads two either way.
+    Spec.assertEqWith s "CR 702.26b the Elemental phased out" (onBattlefield brambleId phasedOut) False
+    Spec.assertEqWith s "CR 702.26a and phased back in at alice's untap step" (onBattlefield brambleId phasedIn) True
+    case filter (\oid -> (Game.lookupObject oid phasedIn >>= Object.attachedTo >>= Recipient.objectOf) == Just brambleId) (Set.toList (GameState.battlefield phasedIn)) of
+      [auraId] -> Spec.assertEqWith s "CR 702.26g with the Aura back on it" (attachedHostOf auraId phasedIn) (Just (Recipient.ToCreature brambleId))
+      other -> Spec.assertFailure s ("expected exactly one Aura back on the Elemental, got " <> show (length other))
 
 phaseOutSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 phaseOutSpec s registry = Spec.describe s "PhaseOut" $ do

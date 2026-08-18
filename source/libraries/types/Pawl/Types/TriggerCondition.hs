@@ -1306,4 +1306,26 @@ data TriggerCondition
     -- whose two triggers would each see both exerts -- CR 701.43d makes that a
     -- second static ability, and nothing in print has one.
     SelfExerted
+  | -- | CR 701.3a read by the HOST: "whenever an Aura becomes attached to this
+    -- creature" -- Bramble Elemental's. Matched against
+    -- GameEvent.BecameAttached, whose `host` is compared with the bearer, while
+    -- the Filter reads the ATTACHMENT, which is what "an Aura" narrows.
+    --
+    -- A self-scoped bearer PLUS a Filter, and not PermanentTurnedFaceUp's single
+    -- Filter: the two objects play different parts here. The bearer's identity is
+    -- a bare comparison with nothing about its characteristics read (SelfEnters'
+    -- shape), and the only thing narrowed is what became attached. Enormous
+    -- Energy Blade's "whenever this Equipment becomes attached to a creature" is
+    -- the OTHER scope -- bearer as the attachment -- and earns its own
+    -- constructor plus a binding for "that creature" (gap #1837).
+    --
+    -- A LIVE read of the attachment, PermanentTurnedFaceUp's posture: attaching
+    -- is no zone change, and the one route that is -- an Aura arriving already
+    -- attached -- leaves the permanent on the battlefield for the Filter to see.
+    --
+    -- CR 702.26j is satisfied by WHERE the event is emitted rather than by a
+    -- guard here: Pawl.Engine.Phasing writes Object.attachedTo without going
+    -- through the funnel, so a permanent phasing in or out records nothing for
+    -- this to match.
+    SelfBecomesAttachedBy (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)

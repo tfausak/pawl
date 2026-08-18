@@ -27,6 +27,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.StepBegins as StepBegins
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Types.TurnScope as TurnScope
@@ -645,4 +646,13 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.SelfExerted
       " {\"type\":\"SelfExerted\"} "
+  -- CR 701.3a read from the host. The Filter is over the ATTACHMENT, and Bramble
+  -- Elemental's narrows to Auras, so the payload is a real HasSubtype rather than
+  -- the trivial `And []`.
+  Spec.it s "SelfBecomesAttachedBy round-trips" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.SelfBecomesAttachedBy (Filter.HasSubtype Subtype.Aura))
+      " {\"type\":\"SelfBecomesAttachedBy\",\"value\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Aura\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s TriggerCondition.codec

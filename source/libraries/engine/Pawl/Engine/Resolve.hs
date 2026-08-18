@@ -5392,33 +5392,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- it onto that object" -- so this relocates a source that is already attached
   -- elsewhere. The SOURCE moves here; AttachTarget below is the sibling that
   -- moves the slot's TARGET instead.
-  Effect.Attach slot ->
-    case legalOne slot legal of
-      Just recipient -> do
-        gs <- State.get
-        -- The slot's recipient is a PROPOSED destination; what gets stored is the
-        -- recipient the moving permanent's own rules name it by (attachmentFor),
-        -- and Nothing there is CR 701.3b's illegal attach.
-        case Attach.attachmentFor source recipient gs of
-          Nothing -> pure ()
-          Just attachment -> do
-            let alreadyThere = case Game.lookupObject source gs of
-                  Nothing -> False
-                  Just obj -> Object.attachedTo obj == Just attachment
-            -- CR 701.3b, both sentences: an attach that cannot legally be
-            -- performed does not move the permanent at all (it stays where it was
-            -- rather than becoming unattached), and attaching it to what it is
-            -- ALREADY attached to "does nothing" -- which matters because of the
-            -- restamp below.
-            Monad.unless alreadyThere $ do
-              gs1 <- State.get
-              -- CR 701.3c: attaching to a DIFFERENT object or player gives it a
-              -- new timestamp. Not cosmetic -- CR 613.7 orders layer effects by
-              -- it, so two things modifying one creature apply in attach order.
-              let (ts, gs2) = Game.freshTimestamp gs1
-                  move o = o {Object.attachedTo = Just attachment, Object.timestamp = ts}
-              State.put gs2 {GameState.objects = Map.adjust move source (GameState.objects gs2)}
-      _ -> pure ()
+  --
+  -- Through Event.attach, the one funnel CR 701.3's move goes through: the slot's
+  -- recipient is a PROPOSED destination, and what gets stored is the recipient the
+  -- moving permanent's own rules name it by. Both of rule 701.3b's sentences and
+  -- CR 701.3c's restamp live there, as does the GameEvent.BecameAttached this
+  -- records -- which is why this arm no longer writes Object.attachedTo itself.
+  Effect.Attach slot -> Foldable.for_ (legalOne slot legal) (Event.attach source)
   -- CR 701.3a, in the other direction from Attach above: the SLOT's target is what
   -- moves, and the destination is chosen now rather than targeted.
   Effect.AttachTarget (AttachTarget.MkAttachTarget slot filter_) ->
@@ -5445,12 +5425,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- re-derived for an optional attach (#359).
           destination <- Attach.chooseHost controller subject (Attach.hostsFor controller source subject filter_ gs)
           -- The destination was chosen as an object off the battlefield, so it is
-          -- proposed as a bare ToObject and Attach.attach re-tags it the way the
+          -- proposed as a bare ToObject and Event.attach re-tags it the way the
           -- subject's own enchant slot references it. Always a DIFFERENT object
           -- than the current host, which hostsFor never offers, so CR 701.3c's
           -- restamp is always earned -- and CR 303.4j's refusal, for a
-          -- destination the subject may not go to, happens inside Attach.attach.
-          Monad.mapM_ (Attach.attach subject . Recipient.ToObject) destination
+          -- destination the subject may not go to, happens inside Event.attach.
+          Monad.mapM_ (Event.attach subject . Recipient.ToObject) destination
       _ -> pure ()
   Effect.ExileUntilMonarch slot ->
     case legalOne slot legal of

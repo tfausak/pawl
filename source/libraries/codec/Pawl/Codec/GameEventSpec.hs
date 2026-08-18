@@ -10,6 +10,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
+import qualified Pawl.Types.BecameAttached as BecameAttached
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BlockerDeclared as BlockerDeclared
@@ -385,3 +386,21 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       s
       (Codec.encode GameEvent.codec (GameEvent.Exerted (ObjectId.MkObjectId 7)) /= Codec.encode GameEvent.codec (GameEvent.Explored (ObjectId.MkObjectId 7)))
       "an exert and an explore of the same object encode differently"
+  -- CR 701.3a's two ends, and the ORDER is what the distinct ids prove: the
+  -- attachment first, then what it went onto. A swap would credit the host with
+  -- becoming attached to the Aura.
+  Spec.it s "BecameAttached" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.BecameAttached (BecameAttached.MkBecameAttached (ObjectId.MkObjectId 12) (Recipient.ToCreature (ObjectId.MkObjectId 13))))
+      " {\"type\":\"BecameAttached\",\"value\":{\"attachment\":12,\"host\":{\"type\":\"ToCreature\",\"value\":13}}} "
+  -- CR 702.5a's other destination: an enchant ability may name a player, which is
+  -- why `host` is a Recipient at all. The object case above cannot stand in for
+  -- it, the tag being the whole difference.
+  Spec.it s "BecameAttached to a player" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.BecameAttached (BecameAttached.MkBecameAttached (ObjectId.MkObjectId 14) (Recipient.ToPlayer (PlayerId.MkPlayerId 3))))
+      " {\"type\":\"BecameAttached\",\"value\":{\"attachment\":14,\"host\":{\"type\":\"ToPlayer\",\"value\":3}}} "
