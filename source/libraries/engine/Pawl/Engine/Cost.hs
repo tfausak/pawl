@@ -22,6 +22,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Ord as Ord
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Blight as Blight
 import qualified Pawl.Engine.Claim as Claim
 import qualified Pawl.Engine.Commander as Commander
@@ -82,7 +83,9 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Sacrifice as Sacrifice
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapPermanents as TapPermanents
@@ -1291,7 +1294,10 @@ pay spending pid oid cost = do
         else do
           outcome <- payComponents pid oid (Cost.components cost)
           case outcome of
-            Payment.Paid -> pure Payment.Paid
+            -- The components' bound slots ride out unchanged: the mana window
+            -- above binds none, and a caller that has a binding environment to
+            -- write them into is the only thing between here and CR 608.2h.
+            Payment.Paid _ -> pure outcome
             Payment.Unpaid -> do
               State.put before
               pure Payment.Unpaid
@@ -1319,12 +1325,27 @@ payComponents pid oid components =
 
 payInOrder :: PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
 payInOrder pid oid components = case components of
-  [] -> pure Payment.Paid
+  [] -> pure bindsNothing
   component : rest -> do
     outcome <- payComponent pid oid component
     case outcome of
       Payment.Unpaid -> pure Payment.Unpaid
-      Payment.Paid -> payInOrder pid oid rest
+      Payment.Paid bound -> fmap (mergeBound bound) (payInOrder pid oid rest)
+
+-- The slots two components of one cost bound, in one map. Set-UNIONED per slot
+-- rather than left-biased: Jarad, Golgari Lich Lord's "Sacrifice a Swamp and a
+-- Forest" is two Sacrifice components writing one reserved name, and what that
+-- names is the pair -- which Pawl.Engine.Binding.onlyOne then declines to read as
+-- a single object (#1532), rather than silently answering with whichever
+-- component was paid first.
+mergeBound :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> Payment.Payment -> Payment.Payment
+mergeBound bound outcome = case outcome of
+  Payment.Unpaid -> Payment.Unpaid
+  Payment.Paid rest -> Payment.Paid (Map.unionWith Set.union bound rest)
+
+-- A component that bound no slot, which is every component but Sacrifice.
+bindsNothing :: Payment.Payment
+bindsNothing = Payment.Paid Map.empty
 
 -- CR 601.2h: can this cost's payer tell one order from another? Two conditions,
 -- and the prompt above is asked only when both hold.
@@ -1506,7 +1527,10 @@ tapForMana oid = do
           outcome <- payActivation controller oid (ManaOption.cost chosen)
           case outcome of
             Payment.Unpaid -> pure False
-            Payment.Paid -> do
+            -- CR 605.3b: a mana ability's cost binds nothing this path could
+            -- read. It lifts the AddMana yield out rather than resolving the
+            -- ability, so there is no ability object to write a slot onto (#1118).
+            Payment.Paid _ -> do
               State.modify' (Mana.addMana controller (Mana.unitsOf (ManaOption.yield chosen)))
               pure True
 
@@ -1529,14 +1553,16 @@ payActivation pid oid cost = do
   before <- State.get
   outcome <- payComponents pid oid (Cost.components cost)
   paid <- case (outcome, Cost.mana cost) of
-    (Payment.Paid, Just (ManaCost.MkManaCost [])) -> pure True
+    (Payment.Paid _, Just (ManaCost.MkManaCost [])) -> pure True
     -- CR 118.14's permission is granted to CAST a spell and never to activate an
     -- ability, so an activation cost is paid with the mana it is.
-    (Payment.Paid, Just manaCost) -> payMana ManaSpending.AsProduced pid manaCost
+    (Payment.Paid _, Just manaCost) -> payMana ManaSpending.AsProduced pid manaCost
     -- CR 118.6: attempting to pay an unpayable cost is an illegal action.
     _ -> pure False
   Monad.unless paid (State.put before)
-  pure (if paid then Payment.Paid else Payment.Unpaid)
+  -- `outcome` and not a fresh Paid: the components' bound slots survive the mana
+  -- half, which binds none of its own.
+  pure (if paid then outcome else Payment.Unpaid)
 
 -- Which way this source is tapped -- which mana ability, in which mode, and
 -- which colour each of that mode's AddMana effects makes -- asked as ONE
@@ -1566,14 +1592,14 @@ payComponent :: PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type
 payComponent pid oid component = case component of
   CostComponent.TapThis -> do
     tapObject oid
-    pure Payment.Paid
+    pure bindsNothing
   -- CR 107.6: a direct edit like TapThis above, not a distinction CR 701.26b
   -- draws. Nothing in `data/cards/` watches for an untap, so the two routes are
   -- observationally identical; the first card that triggers on untapping would
   -- force this through the funnel.
   CostComponent.UntapThis -> do
     State.modify' (\gs -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Untapped}) oid (GameState.objects gs)})
-    pure Payment.Paid
+    pure bindsNothing
   -- Through Event.sacrifice, the CR 701.21 funnel, and never a direct zone poke:
   -- a cost payment is a game event, so dies-triggers, replacement effects and the
   -- turn history all see it.
@@ -1581,12 +1607,12 @@ payComponent pid oid component = case component of
     -- CR 701.21a's "a permanent they don't control" guard lives in the funnel;
     -- `pid` is the player paying, who for "sacrifice this" is its controller.
     Event.sacrifice pid oid
-    pure Payment.Paid
+    pure bindsNothing
   -- CR 119.4: the payment is subtracted from the life total, shared with CR
   -- 107.4f's Phyrexian symbol as the payability check above is.
   CostComponent.PayLife n -> do
     State.modify' (Event.payLife pid n)
-    pure Payment.Paid
+    pure bindsNothing
   -- Unpayable, `canPayComponent`'s answer and for its reason. Unpaid rather than
   -- a guessed 0, which CR 601.2h turns into the reversal of the whole casting.
   CostComponent.PayLifeX -> pure Payment.Unpaid
@@ -1609,7 +1635,15 @@ payComponent pid oid component = case component of
     if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
       then do
         Monad.mapM_ (Event.sacrifice pid) (Set.toAscList chosen)
-        pure Payment.Paid
+        -- CR 608.2h: the permanents are gone by the time anything this cost paid
+        -- for resolves, so an effect that reads one ("the sacrificed creature's
+        -- power") needs a name for it. The ONE component that binds a slot; every
+        -- other returns bindsNothing.
+        --
+        -- Bound under the id it had on the battlefield, which is the id
+        -- Event.changeZone files its last known information under -- the graveyard
+        -- incarnation is a different object (CR 400.7) and carries none of it.
+        pure (Payment.Paid (Map.singleton Binding.sacrificedPermanent (Set.map Recipient.ToObject chosen)))
       else pure Payment.Unpaid
   -- CR 702.122a: the payer chooses WHICH permanents to tap and HOW MANY, so this
   -- is a prompt, and unlike Sacrifice above it is NEVER elided -- whether the
@@ -1632,7 +1666,7 @@ payComponent pid oid component = case component of
     if Set.isSubsetOf chosen (Set.fromList candidates) && totalPower >= toInteger n
       then do
         Monad.mapM_ tapObject (Set.toAscList chosen)
-        pure Payment.Paid
+        pure bindsNothing
       else pure Payment.Unpaid
   -- The payer chooses WHICH permanents to tap, so this is a prompt. Sacrifice's
   -- posture rather than TapForTotalPower's: the count is exact, so as many
@@ -1652,7 +1686,7 @@ payComponent pid oid component = case component of
     if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
       then do
         Monad.mapM_ tapObject (Set.toAscList chosen)
-        pure Payment.Paid
+        pure bindsNothing
       else pure Payment.Unpaid
   -- CR 701.9b: the discarding player chooses which cards, so this is a prompt.
   -- Elided only when forced -- as many MATCHING cards in hand as the count, which
@@ -1681,7 +1715,7 @@ payComponent pid oid component = case component of
     if all (\c -> List.elem c held) distinct && Natural.length distinct == n
       then do
         Monad.mapM_ (Event.discard DiscardCause.Ordinary pid) distinct
-        pure Payment.Paid
+        pure bindsNothing
       else pure Payment.Unpaid
   -- CR 701.9a's move, through the funnel DiscardCards uses above. No prompt: the
   -- cost names this card.
@@ -1697,7 +1731,7 @@ payComponent pid oid component = case component of
   -- Pawl.ActivateSpec's "CR 702.77a a reinforce discard is not a cycle" proves it.
   CostComponent.DiscardThis cause -> do
     Event.discard cause pid oid
-    pure Payment.Paid
+    pure bindsNothing
   -- CR 107.14: paying energy removes that many energy counters from the player.
   -- Natural subtraction is PARTIAL, so `left` is guarded; canPayComponent
   -- guarantees `have >= n` at pay time, and the guard keeps this total anyway.
@@ -1707,7 +1741,7 @@ payComponent pid oid component = case component of
               left = if have >= n then have - n else 0
            in player {Player.counters = Map.insert PlayerCounterKind.Energy left (Player.counters player)}
     State.modify' (\gs -> gs {GameState.players = Map.adjust spend pid (GameState.players gs)})
-    pure Payment.Paid
+    pure bindsNothing
   -- CR 606.4: put the loyalty counters on. A DIRECT edit and deliberately NOT
   -- through Event.putCounters, the CR 614 funnel: CR 614.16 admits a
   -- counter-scaling replacement only where a resolving spell or ability's EFFECT
@@ -1717,11 +1751,11 @@ payComponent pid oid component = case component of
   -- (CR 306.5b, through the funnel) and leave its +1 alone.
   CostComponent.AddLoyaltyToThis n -> do
     State.modify' (\gs -> gs {GameState.objects = Map.adjust (addLoyalty n) oid (GameState.objects gs)})
-    pure Payment.Paid
+    pure bindsNothing
   -- CR 606.4's other half, guarded as PayEnergy's is above.
   CostComponent.RemoveLoyaltyFromThis n -> do
     State.modify' (\gs -> gs {GameState.objects = Map.adjust (removeLoyalty n) oid (GameState.objects gs)})
-    pure Payment.Paid
+    pure bindsNothing
   -- CR 122.6's placement, through the Event.putCounters funnel as
   -- CounterCause.ByEffect -- the opposite call from AddLoyaltyToThis above, and
   -- the difference is WHEN the cost is paid. CR 118.12 pays this one as the spell
@@ -1732,7 +1766,7 @@ payComponent pid oid component = case component of
     -- CR 609.1: the player putting them is the one whose resolution this is,
     -- which for a cost paid during a resolution is the player paying it.
     Monad.void (Event.putCounters (CounterCause.ByEffect pid) oid CounterKind.PlusOnePlusOne n)
-    pure Payment.Paid
+    pure bindsNothing
   -- CR 701.68a's whole procedure, which Pawl.Engine.Blight owns. Unpaid on rule
   -- 701.68b's board, which canPayComponent has already refused, so reaching it
   -- means the creature left between the check and the payment.
@@ -1743,7 +1777,7 @@ payComponent pid oid component = case component of
   -- all naming +1/+1 counters (gap #1647).
   CostComponent.Blight n -> do
     blighted <- Blight.blight pid oid n
-    pure (if blighted then Payment.Paid else Payment.Unpaid)
+    pure (if blighted then bindsNothing else Payment.Unpaid)
   -- CR 406.2's move, through the Event.changeZone funnel, so the card gets a CR
   -- 400.7 incarnation and anything watching a graveyard-to-exile move sees it.
   -- No prompt: the cost names this card.
@@ -1753,7 +1787,7 @@ payComponent pid oid component = case component of
   -- that has already left the graveyard the cost read.
   CostComponent.ExileThisFromGraveyard -> do
     Event.changeZone oid Zone.Exile
-    pure Payment.Paid
+    pure bindsNothing
   -- CR 406.2's move again, for CHOSEN cards: the payer picks which, so this is a
   -- prompt. Elided only when forced, Sacrifice's elision.
   --
@@ -1771,7 +1805,7 @@ payComponent pid oid component = case component of
     if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
       then do
         Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) (Set.toAscList chosen)
-        pure Payment.Paid
+        pure bindsNothing
       else pure Payment.Unpaid
   -- CR 406.2 with no prompt: CR 404.2's order determines the card. Unpaid where
   -- the graveyard holds no matching card, agreeing with canPayComponent above.
@@ -1781,7 +1815,7 @@ payComponent pid oid component = case component of
       Nothing -> pure Payment.Unpaid
       Just candidate -> do
         Event.changeZone candidate Zone.Exile
-        pure Payment.Paid
+        pure bindsNothing
 
 -- The arithmetic half, pure and board-free.
 --

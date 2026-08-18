@@ -150,7 +150,9 @@ foretell pid oid = do
       payment <- Cost.pay ManaSpending.AsProduced pid oid actionCost
       case payment of
         Payment.Unpaid -> State.put before
-        Payment.Paid -> do
+        -- Dropped, Pawl.Engine.Ignore's reason: this action exiles a card and
+        -- resolves nothing, and the later cast pays its own cost.
+        Payment.Paid _ -> do
           exiled <- Event.changeZoneEntering oid Zone.Exile LibraryPosition.defaultValue riders Nothing
           case exiled of
             Nothing -> pure ()
