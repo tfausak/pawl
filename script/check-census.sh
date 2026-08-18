@@ -20,6 +20,7 @@
 # Usage: `check-census.sh`, from the repository root. Reports each stale row as
 # `#ISSUE: RULE NAME -- Type.Constructor exists` and each coverage defect as
 # `#ISSUE: CR RULE has no row` or `#ISSUE: row RULE is no rule`, and exits 1.
+# The censuses are read once per assertion, so a run makes four `gh` calls.
 #
 # NEEDS THE NETWORK, which is why it is not a `.hooky.kdl` hook: the censuses
 # live in GitHub issue bodies rather than in the tree, and `hooky fix` is offline
@@ -45,9 +46,9 @@
 # keyword ability, and both bodies say in as many words that they are excluded.
 # They separate mechanically rather than by a hardcoded pair: their heading text
 # after the number is a sentence and so contains a period, where every keyword
-# heading is a bare title -- `702.163. For Mirrodin!`, `702.186. Infinity`,
-# `702.145. Daybound and Nightbound`. Of the 265 CR 701 and CR 702 headings in
-# `docs/rules.txt`, exactly those two carry a period in the title.
+# heading is a bare title -- `702.163. For Mirrodin!`, `702.186. ∞ (Infinity)`,
+# `702.145. Daybound and Nightbound`. Measured over every CR 701 and CR 702
+# heading in `docs/rules.txt`, exactly those two carry a period in the title.
 #
 # Only the two blocks count as row locations. #876's "The rows that are a
 # subsystem, not an opcode" and #877's "The rows that are not one-line
@@ -169,7 +170,7 @@ check_rules() {
         bad = 1
       }
       if (!rows) {
-        printf "#%s: no rows under an \"Implemented\" heading\n", issue
+        printf "#%s: no rows under either block heading\n", issue
         bad = 1
       }
       exit bad
