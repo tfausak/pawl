@@ -304,6 +304,8 @@ startGameFromCards perform exemptions = do
       -- CR 727.5a -- an exempted commander does not begin the new game in the
       -- command zone -- is satisfied by the ordering rather than by a second test:
       -- `rebuilt` already drops `exempt`, so an exempted commander stays in exile.
+      -- Pawl.CommanderSpec's Restart group is what proves that, against a control
+      -- leg whose only difference is an empty exempt set.
       --
       -- One object per player, by Commander.isCommander's CR 903.5 argument: the
       -- designation is a printing and a legal deck holds one copy of it, so at
