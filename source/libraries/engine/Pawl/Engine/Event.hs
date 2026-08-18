@@ -2386,8 +2386,8 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
           -- the same way for CR 800.4a's first clause.
           --
           -- Live for an id the batch board does not hold: destroyIn follows the
-          -- object a CR 701.19a rewrite SETTLED on, which may be an incarnation
-          -- minted after that board was taken.
+          -- object its replacement loop settled on, which CR 614.6 lets a
+          -- rewrite redirect to one that board never held.
           lki = case asOf of
             Just before | Maybe.isJust (Game.lookupObject oid before) -> before
             _ -> gs
