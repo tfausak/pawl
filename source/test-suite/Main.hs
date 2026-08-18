@@ -108,6 +108,7 @@ import qualified Pawl.Codec.EntryRSpec
 import qualified Pawl.Codec.EntryRewriteSpec
 import qualified Pawl.Codec.EntryRidersSpec
 import qualified Pawl.Codec.EventShapeSpec
+import qualified Pawl.Codec.ExcessDestinationSpec
 import qualified Pawl.Codec.ExchangeSidesSpec
 import qualified Pawl.Codec.ExileCardsFromGraveyardSpec
 import qualified Pawl.Codec.ExileHauntingSpec
@@ -511,6 +512,7 @@ spec s registry = do
   Pawl.Codec.EntryRidersSpec.spec s
   Pawl.Codec.EventShapeSpec.spec s
   Pawl.Codec.ExchangeSidesSpec.spec s
+  Pawl.Codec.ExcessDestinationSpec.spec s
   Pawl.Codec.ExileCardsFromGraveyardSpec.spec s
   Pawl.Codec.ExileHauntingSpec.spec s
   Pawl.Codec.ExpirySpec.spec s
