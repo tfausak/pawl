@@ -2614,6 +2614,13 @@ victorName = CardName.MkCardName (Text.pack "Victor Mancha, Runaway")
 benalishHeroName = CardName.MkCardName (Text.pack "Benalish Hero")
 swampName = CardName.MkCardName (Text.pack "Swamp")
 
+-- The adventurer card the last case below permits out of exile. Named here
+-- rather than imported from Pawl.AdventureSpec, which is the module's own
+-- convention for every other card name in this file.
+shieldbreakerName, battleDisplayName :: CardName.CardName
+shieldbreakerName = CardName.MkCardName (Text.pack "Embereth Shieldbreaker")
+battleDisplayName = CardName.MkCardName (Text.pack "Battle Display")
+
 -- The battlefield objects answering to a name -- how a test reaches the
 -- permanent a cast produced, whose id is neither the card's in hand nor the
 -- spell's on the stack (CR 400.7).
@@ -2797,6 +2804,39 @@ victorManchaSpec s registry = Spec.describe s "VictorMancha" $ do
         -- CR 109.5 again: exile is a SHARED zone, so bob can reach the object --
         -- what stops him is that the permission names alice.
         Spec.assertEqWith s "bob is offered his own hand and nothing else" (offeredPlays S.bob bobsTurn) [A.Play hisMountain Nothing]
+      other -> Spec.assertFailure s ("expected exactly one exiled card, got " <> show (length other))
+  -- CR 715.3d's closing clause: "it can't be cast as an Adventure THIS WAY,
+  -- although other effects that allow a player to cast it may allow a player to
+  -- cast it as an Adventure". Victor is one of those other effects, so the
+  -- adventurer card he exiles offers BOTH halves -- CR 715.3 having the player
+  -- choose between them wherever the card is playable.
+  --
+  -- The paired negative is Pawl.AdventureSpec's "CR 715.3d from exile the
+  -- creature is castable and the Adventure is not": the SAME card, in exile, in
+  -- a sorcery window, asked of by the same player -- differing only in which
+  -- rule wrote the permission. Neither board alone tells "the origin is read"
+  -- from "the exclusion was dropped".
+  Spec.it s "CR 715.3d another effect's permission allows the Adventure half" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    victor <- S.printingOf s registry "Victor Mancha, Runaway"
+    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
+    let (_, victors, placed) = victorTriggered mountain victor shieldbreaker
+        resolved = S.runPure S.identityAnswer placed Stack.resolveTop
+        -- Mountains rather than the fixture's Plains, and a SEVENTH added: five
+        -- paid Victor's {5}, Battle Display's {R} comes off the sixth, and the
+        -- creature half's {1}{R} needs the seventh. Both halves are therefore
+        -- affordable, so a missing offer of either is about the permission --
+        -- Cast.castable gates on payability, which is the trap this dodges.
+        after = S.landsFor mountain S.alice 1 resolved
+    -- Battle Display targets an artifact, and Victor is a Legendary ARTIFACT
+    -- Creature standing on this board -- so CR 601.2c is satisfied and cannot be
+    -- the reason for an absent offer either.
+    Spec.assertEqWith s "Victor is on the battlefield, and is the artifact Battle Display can target" (length victors) 1
+    case Game.zoneMembers Zone.Exile S.alice after of
+      [exiledId] -> do
+        Spec.assertEqWith s "two Mountains untapped, so neither half is priced out" (S.tappedCount S.alice after) 5
+        Spec.assertBool s (offeredCast exiledId shieldbreakerName after) "the creature half is offered, as it would be under CR 715.3d's own permission too"
+        Spec.assertBool s (offeredCast exiledId battleDisplayName after) "and so is the Adventure half, which CR 715.3d's own permission would refuse"
       other -> Spec.assertFailure s ("expected exactly one exiled card, got " <> show (length other))
   -- The negative of the pair, and the same one the cast side takes above: Victor
   -- leaves, CR 611.2b's duration ends, and the same board with the same Swamp in

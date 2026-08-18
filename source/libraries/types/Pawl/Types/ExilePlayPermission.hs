@@ -3,6 +3,7 @@ module Pawl.Types.ExilePlayPermission where
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import qualified Pawl.Types.PlayerId as PlayerId
 
 -- | CR 601.3: "a player can begin to cast a spell only if a rule or effect
@@ -14,8 +15,9 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- CARD remains exiled, THAT PLAYER may play it" -- one card, one player -- and
 -- CR 400.7 then ends it for free, since the incarnation that carries it stops
 -- existing the moment the card leaves exile. Object's own haddock argues the
--- rest of that case; this type is what the field holds now that an Effect can
--- write one too.
+-- rest of that case; this type is what the field holds, whether rule 715.3d
+-- wrote it or an Effect did -- and `origin` below is which, because one clause
+-- of the rules turns on the difference.
 --
 -- `player` is CR 109.5's "you": the controller of the spell or ability whose
 -- resolution granted the permission, baked in at that moment. Victor Mancha,
@@ -47,6 +49,16 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- cost nor what mana was actually spent -- and Pawl.Engine.Mana.relax is the one
 -- place that reads it.
 --
+-- `origin` is which rule granted this permission, and CR 715.3d's closing clause
+-- is the one place it is read: "it can't be cast as an Adventure this way,
+-- ALTHOUGH OTHER EFFECTS that allow a player to cast it may allow a player to
+-- cast it as an Adventure". Without it the Adventure exclusion narrows every
+-- permission this field can hold, where the rule scopes it to 715.3d's own --
+-- Pawl.Engine.Cast.permitsCastFromExile is the only reader, and Pawl.CastSpec's
+-- "CR 715.3d another effect's permission allows the Adventure half" against
+-- Pawl.AdventureSpec's "CR 715.3d from exile the creature is castable and the
+-- Adventure is not" is the pair that proves it.
+--
 -- Runtime-only: no codec. A permission is written by a resolution and never
 -- printed on a card, and Object -- the only thing that holds one -- has no codec
 -- either.
@@ -54,6 +66,7 @@ data ExilePlayPermission = MkExilePlayPermission
   { player :: PlayerId.PlayerId,
     source :: ObjectId.ObjectId,
     expiry :: Expiry.Expiry,
-    spending :: ManaSpending.ManaSpending
+    spending :: ManaSpending.ManaSpending,
+    origin :: PlayPermissionOrigin.PlayPermissionOrigin
   }
   deriving (Eq, Ord, Show)

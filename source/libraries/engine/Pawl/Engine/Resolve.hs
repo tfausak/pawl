@@ -149,6 +149,7 @@ import qualified Pawl.Types.Payment as Payment
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PendingEntryEffect as PendingEntryEffect
 import qualified Pawl.Types.PhasePattern as PhasePattern
+import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import Pawl.Types.PlayerId (PlayerId)
@@ -1500,7 +1501,12 @@ finishSpell oid face controller =
           ExilePlayPermission.expiry = Expiry.Type.Never,
           -- CR 715.3d grants permission and says nothing about mana, so the
           -- Adventure is paid for in the colours it prints.
-          ExilePlayPermission.spending = ManaSpending.AsProduced
+          ExilePlayPermission.spending = ManaSpending.AsProduced,
+          -- This IS rule 715.3d's own permission, and so the one its next
+          -- sentence excludes the Adventure half from -- "it can't be cast as
+          -- an Adventure this way". Pawl.Engine.Cast.permitsCastFromExile reads
+          -- it; nothing else does.
+          ExilePlayPermission.origin = PlayPermissionOrigin.Adventure
         }
 
 -- The no-subgame spell resolver (Stack's default path and every direct caller).
@@ -3953,7 +3959,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       -- CR 118.14, carried from the opcode unread: this module
                       -- stores what the card said and Pawl.Engine.Mana is the
                       -- only thing that acts on it.
-                      ExilePlayPermission.spending = spending
+                      ExilePlayPermission.spending = spending,
+                      -- CR 715.3d's "other effects that allow a player to cast
+                      -- it": a card said this, not rule 715.3d, so the Adventure
+                      -- exclusion does not reach it. WHICH effect said it stays
+                      -- unrecorded -- the classification is "a card's", and that
+                      -- is all Pawl.Engine.Cast may ask.
+                      ExilePlayPermission.origin = PlayPermissionOrigin.Granted
                     }
                 grant o = o {Object.playableFromExile = Just permission}
              in gs {GameState.objects = foldr (Map.adjust grant) (GameState.objects gs) targets}

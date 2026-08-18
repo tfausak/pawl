@@ -31,6 +31,7 @@ import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerId (PlayerId)
@@ -259,7 +260,9 @@ dirtied pid object =
       Object.face = Just (CardName.MkCardName (Text.pack "Mountain")),
       Object.turnedOverAt = Just (Timestamp.MkTimestamp 1),
       Object.worldSince = Just (Timestamp.MkTimestamp 2),
-      Object.playableFromExile = Just (ExilePlayPermission.MkExilePlayPermission pid S.noSource Expiry.Never ManaSpending.AnyType),
+      -- The origin is inert here: newIncarnation clears playableFromExile
+      -- outright, so no value of it makes this fixture more or less honest.
+      Object.playableFromExile = Just (ExilePlayPermission.MkExilePlayPermission pid S.noSource Expiry.Never ManaSpending.AnyType PlayPermissionOrigin.Granted),
       Object.ringBearerFor = Just pid,
       Object.protector = Just pid,
       Object.unlockedHalves = Set.singleton (CardName.MkCardName (Text.pack "Steaming Sauna")),

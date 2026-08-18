@@ -53,6 +53,7 @@ import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
+import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
@@ -407,8 +408,9 @@ castableZones pid oid face gs =
 -- CR 601.3: may this player cast this half of this exiled card? THREE
 -- INDEPENDENT PERMISSIONS, any of which suffices, because the rules state three.
 -- The first is Object.playableFromExile's, whose two conjuncts are below and
--- whose second is why the Adventure half of an exiled adventurer card is not
--- offered while the same card in a hand offers both; the second is CR 702.170d's
+-- whose second is why a card its own Adventure exiled offers only the creature
+-- half, while the same card in a hand -- or exiled by some other effect --
+-- offers both; the second is CR 702.170d's
 -- plotted card, which permitsCastPlotted answers; the third is CR 702.143a's
 -- foretold card, which permitsCastForetold answers.
 --
@@ -416,25 +418,36 @@ castableZones pid oid face gs =
 --     permission from being an offer to the table. Written either by CR 715.3d's
 --     own "for as long as that card remains exiled, that player may play it" or
 --     by an Effect.GrantPlayFromExile a card states.
---   * CR 715.3d's "it can't be cast as an Adventure this way" -- so the proposed
---     face must not be the Adventure one.
---
--- Not implemented: the rule's own last clause, "although other effects that
--- allow a player to cast it may allow a player to cast it as an Adventure".
--- The Adventure exclusion is applied to every permission this field can hold,
--- where CR 715.3d scopes it to the one CR 715.3d itself grants -- so a card
--- permitted to be played by some other effect is refused its Adventure half
--- (#669). STRICTER than printed, which is the admissible direction: the engine
--- offers fewer casts than the rules allow, never more.
+--   * CR 715.3d's "it can't be cast as an Adventure THIS WAY" -- so the proposed
+--     face must not be the Adventure one, and only under rule 715.3d's own
+--     permission. "This way" is what scopes it, and the rule spells the scope
+--     out: "although other effects that allow a player to cast it may allow a
+--     player to cast it as an Adventure". Pawl.CastSpec's "CR 715.3d another
+--     effect's permission allows the Adventure half" and Pawl.AdventureSpec's
+--     "CR 715.3d from exile the creature is castable and the Adventure is not"
+--     are the pair that proves both directions.
 permitsCastFromExile :: PlayerId -> ObjectId -> Face.Face Card.Type.Card -> GameState -> Bool
 permitsCastFromExile pid oid face gs =
-  (permitsPlayFromExile pid oid gs && not (Card.isAdventure face))
+  (permitsPlayFromExile pid oid gs && not (Card.isAdventure face && grantedByAdventureRule oid gs))
     || permitsCastPlotted pid oid gs
     || permitsCastForetold pid oid gs
 
--- CR 715.3d's permission on its own, with neither of permitsCastFromExile's
--- other two disjuncts and without its Adventure conjunct: does the exiled
--- object's stored permission name THIS player?
+-- CR 715.3d's "this way": was this exiled object's stored permission written by
+-- rule 715.3d itself, rather than by an Effect.GrantPlayFromExile a card states?
+--
+-- A classification of the PERMISSION, never of the effect that wrote one --
+-- ExilePlayPermission.origin has two arms and neither names a card. An object
+-- with no permission at all answers False, which costs nothing: the caller has
+-- already had to pass permitsPlayFromExile.
+grantedByAdventureRule :: ObjectId -> GameState -> Bool
+grantedByAdventureRule oid gs =
+  fmap ExilePlayPermission.origin (Game.lookupObject oid gs >>= Object.playableFromExile)
+    == Just PlayPermissionOrigin.Adventure
+
+-- Object.playableFromExile's permission on its own -- whichever rule wrote it,
+-- with neither of permitsCastFromExile's other two disjuncts and without its
+-- Adventure conjunct: does the exiled object's stored permission name THIS
+-- player?
 --
 -- The rule says PLAY, so this is the conjunct the land side shares --
 -- Pawl.Engine.Action.playableLands asks it of an exiled land, where playing is

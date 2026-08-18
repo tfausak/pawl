@@ -160,7 +160,11 @@ spec s registry = Spec.describe s "Adventure" $ do
   -- play it. It can't be cast as an Adventure this way."
   --
   -- The contrast with the hand case above is the whole point: the same card
-  -- offers TWO halves from a hand and exactly ONE from exile.
+  -- offers TWO halves from a hand and exactly ONE from THIS exile. "This way"
+  -- scopes the exclusion to the permission rule 715.3d itself grants, so an
+  -- adventurer card exiled under some other effect's permission offers both --
+  -- Pawl.CastSpec's "CR 715.3d another effect's permission allows the Adventure
+  -- half" is that board, and the two are read together or not at all.
   Spec.it s "CR 715.3d from exile the creature is castable and the Adventure is not" $ do
     shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
     mountain <- S.printingOf s registry "Mountain"
