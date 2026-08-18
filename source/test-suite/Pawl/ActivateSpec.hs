@@ -977,7 +977,7 @@ reinforceSpec s registry = Spec.describe s "Reinforce" $ do
 -- aims at. THREE candidates for a two-target announcement, so the choice is a
 -- real one, and the Forest is what tells "exiled the targets" from "swept the
 -- graveyards". No land is needed: the whole activation cost is the discard.
-macabreBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+macabreBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 macabreBoard s registry = do
   macabre <- S.printingOf s registry "Faerie Macabre"
   piker <- S.printingOf s registry "Goblin Piker"
@@ -985,9 +985,9 @@ macabreBoard s registry = do
   forest <- S.printingOf s registry "Forest"
   let (pikerId, g0) = S.addGraveyardCard piker S.bob (Setup.emptyGame S.bothPlayers)
       (maulerId, g1) = S.addGraveyardCard mauler S.bob g0
-      (forestId, g2) = S.addGraveyardCard forest S.alice g1
+      (_, g2) = S.addGraveyardCard forest S.alice g1
       (g3, macabreId) = S.handOne macabre g2
-  pure (macabreId, pikerId, maulerId, forestId, g3 {GameState.priority = Just S.alice})
+  pure (macabreId, pikerId, maulerId, g3 {GameState.priority = Just S.alice})
 
 -- Aims at exactly these cards by FILTERING the offered recipients rather than
 -- building one: a hand-built Recipient of another tag is a different recipient,
@@ -1023,7 +1023,7 @@ authoredHandAbilitySpec s registry = Spec.describe s "Authored hand ability" $ d
   -- that never offers the ability activates nothing, so the exile below is what
   -- goes red rather than a count ahead of it.
   Spec.it s "CR 113.6j an authored discard-this ability functions from the hand" $ do
-    (macabreId, pikerId, maulerId, _, gs) <- macabreBoard s registry
+    (macabreId, pikerId, maulerId, gs) <- macabreBoard s registry
     let abilities = Activate.abilitiesFor macabreId gs
         activated = S.runPure (aimAtCards [pikerId, maulerId]) gs (mapM_ (Activate.activateAbility S.alice macabreId) abilities)
         after = S.runPure (aimAtCards [pikerId, maulerId]) activated Stack.resolveTop
@@ -1051,7 +1051,7 @@ authoredHandAbilitySpec s registry = Spec.describe s "Authored hand ability" $ d
   -- Distinct numbers: the Marmoset is a 2/3 and a 4/3 pumped.
   Spec.it s "CR 702.29c an authored discard-this cost is not a cycle" $ do
     marmoset <- S.printingOf s registry "Prickly Marmoset"
-    (macabreId, pikerId, maulerId, _, board) <- macabreBoard s registry
+    (macabreId, pikerId, maulerId, board) <- macabreBoard s registry
     let (marmosetId, gs) = S.addCreature marmoset S.alice board
         abilities = Activate.abilitiesFor macabreId gs
         activated = S.runPure (aimAtCards [pikerId, maulerId]) gs (mapM_ (Activate.activateAbility S.alice macabreId) abilities)

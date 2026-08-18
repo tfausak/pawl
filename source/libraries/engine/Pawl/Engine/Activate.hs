@@ -78,8 +78,11 @@ sicknessOkGiven pcs pid srcId ability =
 -- zone abilities are CASTING permissions (CR 702.34a), so they reach
 -- Pawl.Engine.Cast instead. The first ability ACTIVATED from a fourth zone adds
 -- an arm here: CR 113.6j reaches "any zone in which its cost can be paid", and
--- Cost.zoneOfComponent names only the hand and the graveyard, so a library or an
--- exile zone has no cost component that could be paid from it.
+-- Cost.zoneOfComponent names only the hand and the graveyard, so no cost in the
+-- vocabulary is payable from a library or from exile. CR 113.6m's EFFECT half
+-- could name another zone through a MoveToZone's `origin`, and every such
+-- `origin` in `data/cards/` states the graveyard -- Jarad, Golgari Lich Lord,
+-- Reassembling Skeleton and Squee, Goblin Nabob, swept 2026-08-18.
 --
 -- CR 702.29b and CR 702.77b are why this gates ACTIVATION and not existence: a
 -- cycling or reinforce ability keeps existing in every zone, so an effect
