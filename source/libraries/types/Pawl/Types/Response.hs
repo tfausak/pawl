@@ -296,6 +296,15 @@ data Response
     -- mode, and from CastWhileSearched, which records the same rule's
     -- library-search producer and names which card was cast.
     ChoseOfferedCast OptionalDecision.OptionalDecision
+  | -- | CR 709.3 / 712.11b / 715.3: which half of a multi-faced object a player
+    -- chose to cast when a resolving effect offered it. Distinct from
+    -- ChoseOfferedCast, which records whether that cast was taken at all: the two
+    -- are asked one after the other about the same object, so both in one replay
+    -- are not a duplicate. Distinct from CastWhileSearched, which names an object
+    -- as well because CR 601.3's offer ranges over a whole library, and from
+    -- ChoseCardName, which is a name named out of the whole card pool rather than
+    -- one picked from the halves of an object already on offer.
+    ChoseOfferedCastFace CardName.CardName
   | -- | CR 702.94a / CR 121.9: whether a player revealed the card they were
     -- drawing as they drew it. Distinct from ChoseOfferedCast, which records the
     -- LINKED ability's later "may": one reveal can be followed by a declined
