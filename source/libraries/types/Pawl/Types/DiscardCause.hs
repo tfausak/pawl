@@ -15,7 +15,8 @@ data DiscardCause
     -- component naming cards, or CR 514.1's cleanup step.
     Ordinary
   | -- | CR 702.29c: discarding this card to pay a cycling ability's activation
-    -- cost. Recorded by Pawl.Engine.Cost's DiscardThis component -- see that arm
-    -- for what it cannot see.
+    -- cost. Carried by Pawl.Types.CostComponent's DiscardThis, since the rule
+    -- that mints that component is the one that knows whether the ability is a
+    -- cycling ability -- rule 702.29a's is, rule 702.77a's reinforce is not.
     ToPayCyclingCost
   deriving (Bounded, Enum, Eq, Ord, Show)

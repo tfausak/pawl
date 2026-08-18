@@ -8,6 +8,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.DiscardCards as DiscardCards
+import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
@@ -88,7 +89,7 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
     Common.assertCodec
       s
       codec
-      CostComponent.DiscardThis
+      (CostComponent.DiscardThis DiscardCause.Ordinary)
       " {\"type\":\"DiscardThis\"} "
   Spec.it s "PayEnergy" $
     Common.assertCodec

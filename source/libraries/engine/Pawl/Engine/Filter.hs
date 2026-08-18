@@ -1099,7 +1099,7 @@ rewriteComponent pairs component = case component of
   CostComponent.SacrificeThis -> component
   CostComponent.PayLife _ -> component
   CostComponent.PayLifeX -> component
-  CostComponent.DiscardThis -> component
+  CostComponent.DiscardThis _ -> component
   CostComponent.PayEnergy _ -> component
   CostComponent.AddLoyaltyToThis _ -> component
   CostComponent.RemoveLoyaltyFromThis _ -> component

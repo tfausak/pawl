@@ -46,6 +46,7 @@ import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryR as EntryR
@@ -426,10 +427,14 @@ handAbilitiesFor keyword = case keyword of
 -- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability
 -- is activated. No restriction clause, because rule 702.29a states no timing
 -- restriction, which leaves CR 117.1b's default.
+--
+-- ToPayCyclingCost, which is what CR 702.29c means by "an activation cost of a
+-- cycling ability" -- and it covers rule 702.29e's typecycling too, because rule
+-- 702.29f makes those cycling abilities and this one function mints both.
 cycling :: Cost Keyword -> Maybe (Filter Keyword) -> ActivatedAbility Card
 cycling cost searchFor =
   ActivatedAbility.MkActivatedAbility
-    { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis]},
+    { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis DiscardCause.ToPayCyclingCost]},
       ActivatedAbility.modal =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
@@ -478,7 +483,10 @@ cycling cost searchFor =
 -- the discard, and the ability outlives the card it discards (CR 113.7a).
 --
 -- The discard is a COMPONENT of the activation cost for cycling's reasons, rule
--- 702.77a putting it before the colon just as rule 702.29a does.
+-- 702.77a putting it before the colon just as rule 702.29a does. Its cause is
+-- Ordinary and not ToPayCyclingCost: rule 702.77 never says reinforce is a
+-- cycling ability, where CR 702.29f says exactly that of typecycling, so CR
+-- 702.29c's "when you cycle this card" must not see this discard.
 --
 -- The target is Pool.Creatures unqualified: rule 702.77a prints "target
 -- creature" and no more, so the bearer's controller is no more required than the
@@ -489,7 +497,7 @@ cycling cost searchFor =
 reinforce :: Natural -> Cost Keyword -> ActivatedAbility Card
 reinforce n cost =
   ActivatedAbility.MkActivatedAbility
-    { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis]},
+    { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis DiscardCause.Ordinary]},
       ActivatedAbility.modal =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton reinforceTarget slot)))
