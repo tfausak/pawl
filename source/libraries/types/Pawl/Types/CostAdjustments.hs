@@ -2,6 +2,7 @@ module Pawl.Types.CostAdjustments where
 
 import Numeric.Natural (Natural)
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CostScale as CostScale
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 
@@ -54,17 +55,23 @@ data CostAdjustments = MkCostAdjustments
     -- several effects can add to one cost at once, so even a vocabulary where
     -- each effect adds a single component has to accumulate here.
     --
+    -- Each component PAIRED WITH ITS OWN SCALE, the way the reductions above are
+    -- paired with their own floors and for the same reason: "for each black mana
+    -- symbol in their mana costs" is one effect's sentence, so a scaled addition
+    -- beside an unscaled one must expand by its own count. The scale is not
+    -- resolved here because a gatherer is handed an OBJECT and never a cost;
+    -- Pawl.Engine.Cost.plusComponents holds the cost and cashes it there.
+    --
     -- SEPARATE from `increases` above rather than folded into it, for the reason
     -- that field is separate from `reductions`: the two do not have the same
     -- shape, and CR 601.2f orders the mana arithmetic (increases, then
     -- reductions, then the floor) in a way that a non-mana component takes no
     -- part in -- nothing reduces a "sacrifice a land" away.
     --
-    -- Empty for a SPELL's cost. CR 601.2f's additional costs for a spell arrive
-    -- through Pawl.Engine.Cost.plus instead, off the spell's own card text (CR
-    -- 601.2b's alternative and additional costs). No gathered player effect adds
-    -- one because Pawl.Types.PlayerEffect has no arm that could -- Drought is
-    -- the printing (gap #1679).
-    components :: [CostComponent.CostComponent Keyword.Keyword]
+    -- Written on BOTH sides of CR 601.2f: an activation cost's additions (Brutal
+    -- Suppression, by CR 602.2b) and a spell's (Drought). A spell's own PRINTED
+    -- additional costs are not among them -- those are card text and arrive
+    -- through Pawl.Engine.Cost.plus at CR 601.2b instead.
+    components :: [(CostScale.CostScale, CostComponent.CostComponent Keyword.Keyword)]
   }
   deriving (Eq, Ord, Show)

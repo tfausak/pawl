@@ -14,6 +14,7 @@ import qualified Pawl.Codec.AbilityTriggeredSpec
 import qualified Pawl.Codec.ActivatedAbilitySpec
 import qualified Pawl.Codec.ActivationRestrictionSpec
 import qualified Pawl.Codec.AddActivationCostSpec
+import qualified Pawl.Codec.AddSpellCostSpec
 import qualified Pawl.Codec.AffectPlayersSpec
 import qualified Pawl.Codec.AffectedPlayersSpec
 import qualified Pawl.Codec.AffectedSpec
@@ -65,6 +66,7 @@ import qualified Pawl.Codec.ControllerRelationSpec
 import qualified Pawl.Codec.CopyExceptionSpec
 import qualified Pawl.Codec.CostComponentSpec
 import qualified Pawl.Codec.CostReductionSpec
+import qualified Pawl.Codec.CostScaleSpec
 import qualified Pawl.Codec.CostSpec
 import qualified Pawl.Codec.CountSpec
 import qualified Pawl.Codec.CounterChangeSpec
@@ -417,6 +419,7 @@ spec s registry = do
   Pawl.Codec.ActivatedAbilitySpec.spec s
   Pawl.Codec.ActivationRestrictionSpec.spec s
   Pawl.Codec.AddActivationCostSpec.spec s
+  Pawl.Codec.AddSpellCostSpec.spec s
   Pawl.Codec.AffectPlayersSpec.spec s
   Pawl.Codec.AffectedPlayersSpec.spec s
   Pawl.Codec.AffectedSpec.spec s
@@ -468,6 +471,7 @@ spec s registry = do
   Pawl.Codec.CopyExceptionSpec.spec s
   Pawl.Codec.CostComponentSpec.spec s
   Pawl.Codec.CostReductionSpec.spec s
+  Pawl.Codec.CostScaleSpec.spec s
   Pawl.Codec.CostSpec.spec s
   Pawl.Codec.CountSpec.spec s
   Pawl.Codec.CounterSpec.spec s

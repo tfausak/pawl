@@ -2626,11 +2626,13 @@ offerCast resolving caster slot optionality offer = do
                 -- 118.9d keeps the face's additional costs on an alternative cost,
                 -- so every candidate already carries them, and this is the more
                 -- faithful spelling of "that spell has a mandatory additional
-                -- cost". The rule's other half -- a cost APPLIED from another
-                -- effect (CR 118.8) -- arrives as CostAdjustments.components, which
-                -- spellAdjustments hard-sets empty and only
-                -- PlayerEffect.AddActivationCost ever writes, so it cannot reach a
-                -- spell at all and reading the candidates is exhaustive.
+                -- cost".
+                --
+                -- Not implemented: the rule's other half -- a cost APPLIED from
+                -- another effect (CR 118.8) -- arrives as
+                -- CostAdjustments.components and is not read here, so a stated
+                -- quality in a hidden zone reaching a spell that way would be
+                -- missed (#1834).
                 --
                 -- Attached to Optionality.Mandatory, whose antecedent is the
                 -- printed phrase "if able": every printing instructing a cast

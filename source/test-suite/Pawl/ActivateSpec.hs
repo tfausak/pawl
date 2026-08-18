@@ -127,6 +127,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   activationCostReductionSpec s registry
   unflooredActivationCostReductionSpec s registry
   activationCostAdditionSpec s registry
+  droughtActivationSpec s registry
   goldenEggSpec s registry
   presenceOfGondSpec s registry
 
@@ -2748,6 +2749,111 @@ activationCostAdditionSpec s registry = Spec.describe s "ActivationCostAddition"
     Spec.assertEqWith s "the nontoken Rebel is taxed and cannot pay" (activationsOf reclusId actions) []
     Spec.assertBool s (not (null (activationsOf sorcererId actions))) "the nonRebel is untaxed"
     Spec.assertBool s (not (null (activationsOf tokenId actions))) "and so is the token Rebel"
+
+-- alice's board: Drudge Skeletons, Saltfield Recluse, `swamps` Swamps, and a
+-- Goblin Piker under bob for the Recluse's ability to aim at -- plus Drought
+-- under BOB when one is passed. The positive and the negative differ in that
+-- Maybe and in nothing else.
+--
+-- Drought sits with bob for suppressionBoard's reason: its sentence is symmetric
+-- (PlayerScope.EachPlayer, no possessive), and the board that proves that is the
+-- one where the activating player does not control it.
+droughtActivationBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Int ->
+  Maybe Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+droughtActivationBoard skeletons recluse swamp piker swamps mDrought =
+  let base = List.foldl' (\g _ -> snd (S.addCreature swamp S.alice g)) (Setup.emptyGame S.bothPlayers) [1 .. swamps]
+      (skeletonId, g1) = S.addCreature skeletons S.alice base
+      (recluseId, g2) = S.addCreature recluse S.alice g1
+      g3 = snd (S.addCreature piker S.bob g2)
+      g4 = maybe g3 (\drought -> snd (S.addCreature drought S.bob g3)) mDrought
+   in (skeletonId, recluseId, g4 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice})
+
+-- CR 601.2f's "plus all additional costs" reaching an ACTIVATION cost by CR
+-- 602.2b, now SCALED by the cost it is adjusting (#1417) -- which nothing could
+-- do before: AddActivationCost carried a fixed list, so the added cost could not
+-- be a function of the cost.
+--
+-- Drought {2}{W}{W} Enchantment -- "Activated abilities cost an additional
+-- \"Sacrifice a Swamp\" to activate for each black mana symbol in their
+-- activation costs" (Oracle text checked against Scryfall) -- is the printing.
+-- Drudge Skeletons ({B}: Regenerate this creature) is the ability it taxes and
+-- Saltfield Recluse ({T}: Target creature gets -2/-0, no mana at all) is the one
+-- it does not, on the SAME board.
+--
+-- ZERO, ONE and TWO, so the multiplier is proven on this side and not only on
+-- Pawl.CastSpec's spell side: the two is Port of Karfell's second ability,
+-- {3}{U}{B}{B}, {T}, Sacrifice this land (Oracle text checked against Scryfall).
+-- A sweep of every `faces[].activatedAbilities[].cost.mana` in `data/cards/`
+-- (2026-08-18) is what found it -- it is the only activation cost in the corpus
+-- printing more than one black mana symbol, so a later card demoting it should
+-- leave this case where it is.
+droughtActivationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+droughtActivationSpec s registry = Spec.describe s "DroughtActivation" $ do
+  Spec.it s "CR 602.2b an activation cost with one black symbol costs a Swamp" $ do
+    skeletons <- S.printingOf s registry "Drudge Skeletons"
+    recluse <- S.printingOf s registry "Saltfield Recluse"
+    drought <- S.printingOf s registry "Drought"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let name = S.nameOf (Printing.card swamp)
+        ability = theAbility skeletons
+        (taxedId, _, taxed) = droughtActivationBoard skeletons recluse swamp piker 3 (Just drought)
+        (freeId, _, free) = droughtActivationBoard skeletons recluse swamp piker 3 Nothing
+        after = S.runPure S.identityAnswer taxed (Activate.activateAbility S.alice taxedId ability)
+        control = S.runPure S.identityAnswer free (Activate.activateAbility S.alice freeId ability)
+    Spec.assertEqWith s "one of the three Swamps was sacrificed" (S.countOnBattlefieldByName name S.alice after) 2
+    Spec.assertEqWith s "where the same activation without Drought keeps all three" (S.countOnBattlefieldByName name S.alice control) 3
+    Spec.assertEqWith s "and the regenerate is on the stack, not refused" (length (GameState.stack after)) 1
+  -- The falsifier, on the SAME board as the positive: the Recluse's activation
+  -- cost is {T} and nothing else, so it holds no black mana symbol and Drought
+  -- adds nothing at all -- not a Sacrifice of count zero.
+  Spec.it s "CR 602.2b an activation cost with no black symbol sacrifices nothing" $ do
+    skeletons <- S.printingOf s registry "Drudge Skeletons"
+    recluse <- S.printingOf s registry "Saltfield Recluse"
+    drought <- S.printingOf s registry "Drought"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let name = S.nameOf (Printing.card swamp)
+        ability = theAbility recluse
+        (_, recluseId, taxed) = droughtActivationBoard skeletons recluse swamp piker 3 (Just drought)
+        after = S.runPure S.identityAnswer taxed (Activate.activateAbility S.alice recluseId ability)
+    Spec.assertEqWith s "all three Swamps survive" (S.countOnBattlefieldByName name S.alice after) 3
+    Spec.assertEqWith s "and the Recluse's ability is on the stack" (length (GameState.stack after)) 1
+    Spec.assertEqWith s "having tapped the Recluse, so the cost really was paid" (fmap Object.tapped (Game.lookupObject recluseId after)) (Just TapState.Tapped)
+  -- THE MULTIPLIER on this side: Port of Karfell's second ability is
+  -- {3}{U}{B}{B}, {T}, Sacrifice this land, so CR 602.2b's activation cost holds
+  -- TWO black mana symbols and Drought demands two Swamps where Drudge Skeletons'
+  -- one demanded one. Seven Swamps and two Islands is strictly more mana than the
+  -- six the cost asks for, so no reading of this board is "she could not afford
+  -- it", and the assertion is the survivor count.
+  Spec.it s "CR 602.2b two black symbols in an activation cost cost two Swamps" $ do
+    port <- S.printingOf s registry "Port of Karfell"
+    drought <- S.printingOf s registry "Drought"
+    swamp <- S.printingOf s registry "Swamp"
+    island <- S.printingOf s registry "Island"
+    let name = S.nameOf (Printing.card swamp)
+        ability = case Face.activatedAbilities (S.combinedFace port) of
+          _ : second : _ -> second
+          _ -> theAbility port
+        board mDrought =
+          let swamps = List.foldl' (\g _ -> snd (S.addCreature swamp S.alice g)) (Setup.emptyGame S.bothPlayers) [1 .. 7 :: Int]
+              islands = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) swamps [1 .. 2 :: Int]
+              (portId, g1) = S.addCreature port S.alice islands
+              g2 = maybe g1 (\d -> snd (S.addCreature d S.bob g1)) mDrought
+           in (portId, g2 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice})
+        (taxedId, taxed) = board (Just drought)
+        (freeId, free) = board Nothing
+        after = S.runPure S.identityAnswer taxed (Activate.activateAbility S.alice taxedId ability)
+        control = S.runPure S.identityAnswer free (Activate.activateAbility S.alice freeId ability)
+    Spec.assertEqWith s "two of the seven Swamps were sacrificed" (S.countOnBattlefieldByName name S.alice after) 5
+    Spec.assertEqWith s "where the same activation without Drought keeps all seven" (S.countOnBattlefieldByName name S.alice control) 7
+    Spec.assertEqWith s "and the ability is on the stack, not refused" (length (GameState.stack after)) 1
 
 -- Golden Egg ({2} Artifact -- Food): "When this artifact enters, draw a card. /
 -- {1}, {T}, Sacrifice this artifact: Add one mana of any color. / {2}, {T},

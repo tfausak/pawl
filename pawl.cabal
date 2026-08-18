@@ -74,6 +74,8 @@ library codec
     Pawl.Codec.ActivationRestrictionSpec
     Pawl.Codec.AddActivationCost
     Pawl.Codec.AddActivationCostSpec
+    Pawl.Codec.AddSpellCost
+    Pawl.Codec.AddSpellCostSpec
     Pawl.Codec.Affected
     Pawl.Codec.AffectedPlayers
     Pawl.Codec.AffectedPlayersSpec
@@ -181,6 +183,8 @@ library codec
     Pawl.Codec.CostComponentSpec
     Pawl.Codec.CostReduction
     Pawl.Codec.CostReductionSpec
+    Pawl.Codec.CostScale
+    Pawl.Codec.CostScaleSpec
     Pawl.Codec.CostSpec
     Pawl.Codec.Count
     Pawl.Codec.Counter
@@ -887,6 +891,7 @@ library types
     Pawl.Types.ActivePlayerEffect
     Pawl.Types.ActiveReplacement
     Pawl.Types.AddActivationCost
+    Pawl.Types.AddSpellCost
     Pawl.Types.Affected
     Pawl.Types.AffectedPlayers
     Pawl.Types.AffectedUnless
@@ -954,6 +959,7 @@ library types
     Pawl.Types.CostAdjustments
     Pawl.Types.CostComponent
     Pawl.Types.CostReduction
+    Pawl.Types.CostScale
     Pawl.Types.Count
     Pawl.Types.Counter
     Pawl.Types.Counterability
