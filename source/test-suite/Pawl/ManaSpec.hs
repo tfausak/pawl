@@ -52,6 +52,7 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -64,6 +65,7 @@ import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.ManaProduction as ManaProduction
+import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -166,7 +168,7 @@ waxingMoonBoard waxingMoon reliquaryTower forest hasForest =
 -- One mana unit of `mt`, untagged -- what tapping a land for its one mana ability
 -- floats.
 oneUnit :: ManaType.ManaType -> Mana.Type.Mana
-oneUnit mt = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = mt, ManaUnit.tags = Set.empty}]
+oneUnit mt = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = mt, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}]
 
 pikerCost :: ManaCost.ManaCost
 pikerCost = ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Red)]
@@ -237,7 +239,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
           s
           "pool"
           (Game.poolOf S.alice after)
-          (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty}])
+          (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}])
 
   Spec.it s "two Mountains can pay {1}{R}" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -252,8 +254,9 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice pikerCost (S.landsInPlay mountain 0))) "unaffordable"
 
   -- Three identical Mountains: every candidate is a copy of the same card, so
-  -- the choice is genuinely indistinguishable and payCost must NOT ask (#12).
-  -- S.identityAnswer would answer anyway; what this pins is the tap count.
+  -- the choice is genuinely indistinguishable and Cost.payMana must NOT ask
+  -- (#12). S.identityAnswer would answer anyway; what this pins is the tap
+  -- count.
   Spec.it s "paying {1}{R} taps exactly two of three Mountains and leaves no float" $ do
     mountain <- S.printingOf s registry "Mountain"
     let (paid, after) = S.runPureWith S.identityAnswer (S.landsInPlay mountain 3) (Cost.payMana ManaSpending.AsProduced S.alice pikerCost)
@@ -410,7 +413,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     let ab =
           ActivatedAbility.MkActivatedAbility
             { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
-              ActivatedAbility.modal = singleModeAbility [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)))] Map.empty,
+              ActivatedAbility.modal = singleModeAbility [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary)] Map.empty,
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing
             }
@@ -422,7 +425,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
             { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
               ActivatedAbility.modal =
                 singleModeAbility
-                  [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)))]
+                  [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary)]
                   (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSlot.required Pool.AnyTarget Nothing)),
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing
@@ -623,7 +626,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
 prefersColor :: Color.Color -> Prompt.Prompt r -> r
 prefersColor wanted p = case p of
   Prompt.ChooseManaYield _ _ _ candidates ->
-    S.optionYielding (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored wanted, ManaUnit.tags = Set.empty}]) candidates
+    S.optionYielding (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored wanted, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}]) candidates
   _ -> S.identityAnswer p
 
 -- Alice controls `permanents` and holds `spell`; she casts it and resolves it,
@@ -1210,8 +1213,8 @@ palladiumMyrSpec s registry = Spec.describe s "Palladium Myr" $ do
     palladiumMyr <- S.printingOf s registry "Palladium Myr"
     let (_, g1) = S.addCreature ashaya S.alice (Setup.emptyGame S.bothPlayers)
         (myrId, gs) = S.addCreature palladiumMyr S.alice g1
-        green = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty}
-        colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty}
+        green = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}
+        colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}
     Spec.assertEqWith
       s
       "the Forest's {G} and the artifact's {C}{C}"
@@ -1531,7 +1534,7 @@ manaConfluenceSpec s registry = Spec.describe s "Mana Confluence" $ do
     urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
     let (confluenceId, g1) = S.addCreature manaConfluence S.alice (Setup.emptyGame S.bothPlayers)
         (_, gs) = S.addCreature urborg S.alice g1
-        black = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Black, ManaUnit.tags = Set.empty}]
+        black = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Black, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}]
         -- The offered black option that is CR 305.6's free one, or the printed
         -- one that charges the life -- `printed` picks which.
         buysBlack :: Bool -> Prompt.Prompt r -> r
@@ -1557,7 +1560,7 @@ manaConfluenceSpec s registry = Spec.describe s "Mana Confluence" $ do
 prefersDoubleBlack :: Prompt.Prompt r -> r
 prefersDoubleBlack p = case p of
   Prompt.ChooseManaYield _ _ _ candidates ->
-    let unit = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Black, ManaUnit.tags = Set.empty}
+    let unit = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Black, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}
      in S.optionYielding (Mana.Type.MkMana [unit, unit]) candidates
   _ -> S.identityAnswer p
 
@@ -1855,7 +1858,7 @@ nextColor p = case p of
       Nothing -> S.identityAnswer p
       Just color ->
         S.optionYielding
-          (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty}])
+          (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}])
           candidates
   _ -> pure (S.identityAnswer p)
 
@@ -2278,19 +2281,29 @@ burningTreeArranged bte pid =
 -- One green mana with no production tags, plainRed's twin: what the Emissary's
 -- trigger adds alongside it.
 plainGreen :: ManaUnit.ManaUnit
-plainGreen = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty}
+plainGreen = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}
+
+-- plainGreen's twin, differing in EXACTLY one field: what Shizuko, Caller of
+-- Autumn's trigger adds. The pair is what makes the group below discriminating
+-- -- ManaUnit derives Eq, so an assertion naming both by name says which units
+-- survived a sweep and not merely how many.
+retainedGreen :: ManaUnit.ManaUnit
+retainedGreen = plainGreen {ManaUnit.retention = ManaRetention.UntilEndOfTurn}
 
 -- CR 106.4's other half, the one CR 109.5 does NOT answer: an effect may name the
 -- player whose pool the mana lands in. Shizuko, Caller of Autumn ({1}{G}{G} 2/3
 -- Legendary Creature -- Snake Shaman, "At the beginning of each player's upkeep,
--- that player adds {G}{G}{G}") is the printing, and the two halves it needs are
--- CR 603.2b's step event binding the active player (Event.eventBindings) and the
--- AddMana payload's PlayerRef reading that slot (Resolve's arm).
+-- that player adds {G}{G}{G}. Until end of turn, they don't lose this mana as
+-- steps and phases end") is the printing, and the three halves it needs are CR
+-- 603.2b's step event binding the active player (Event.eventBindings), the
+-- AddMana payload's PlayerRef reading that slot (Resolve's arm), and its
+-- ManaRetention riding onto each unit added (Pawl.Types.ManaRetention).
 --
--- Not implemented: the card's third clause, "Until end of turn, they don't lose
--- this mana as steps and phases end". Retention in pawl is a player-axis property
--- of a mana TYPE, and "this mana" is a set of units, so pawl's Shizuko is
--- STRICTER than printed -- the three green empty at the end of the step (#352).
+-- The third sentence is what puts the retention on the UNIT rather than on the
+-- CR 613.11 player axis: "this mana" is the three units this ability added, and
+-- carol's fourth green in the same pool is lost at the same moment. The
+-- "an ordinary green in the same pool" case is what proves it -- no player-axis
+-- implementation can keep three of four identical-but-for-retention units.
 --
 -- THREE SEATS, because two collapse the reading under test: with alice and bob
 -- alone, "that player" and "an opponent of the controller" name the same seat.
@@ -2301,7 +2314,7 @@ shizukoSpec s registry = Spec.describe s "Shizuko, Caller of Autumn" $ do
   Spec.it s "CR 106.4 the three green land in the UPKEEP player's pool, not the controller's" $ do
     shizuko <- S.printingOf s registry "Shizuko, Caller of Autumn"
     let after = shizukoUpkeep shizuko S.carol
-    Spec.assertEqWith s "carol got {G}{G}{G}" (poolOf S.carol after) [plainGreen, plainGreen, plainGreen]
+    Spec.assertEqWith s "carol got {G}{G}{G}" (poolOf S.carol after) [retainedGreen, retainedGreen, retainedGreen]
     Spec.assertEqWith s "alice, who controls Shizuko, got nothing" (poolOf S.alice after) []
     Spec.assertEqWith s "and neither did bob" (poolOf S.bob after) []
     Spec.assertEqWith s "the stack is empty again" (length (GameState.stack after)) 0
@@ -2314,7 +2327,7 @@ shizukoSpec s registry = Spec.describe s "Shizuko, Caller of Autumn" $ do
   Spec.it s "CR 603.2b on the controller's own upkeep the same trigger pays the controller" $ do
     shizuko <- S.printingOf s registry "Shizuko, Caller of Autumn"
     let after = shizukoUpkeep shizuko S.alice
-    Spec.assertEqWith s "alice got {G}{G}{G}" (poolOf S.alice after) [plainGreen, plainGreen, plainGreen]
+    Spec.assertEqWith s "alice got {G}{G}{G}" (poolOf S.alice after) [retainedGreen, retainedGreen, retainedGreen]
     Spec.assertEqWith s "carol got nothing" (poolOf S.carol after) []
 
   -- Gameplay level: the floated mana is ordinary mana, so carol can spend it. The
@@ -2326,9 +2339,51 @@ shizukoSpec s registry = Spec.describe s "Shizuko, Caller of Autumn" $ do
     shizuko <- S.printingOf s registry "Shizuko, Caller of Autumn"
     let (oid, hers) = S.addHandCard shizuko S.carol (carolMain (shizukoUpkeep shizuko S.carol))
         (otherOid, his) = S.addHandCard shizuko S.carol (carolMain (shizukoUpkeep shizuko S.alice))
-    Spec.assertEqWith s "the two boards differ only in whose pool holds the mana" (poolOf S.carol hers, poolOf S.carol his) ([plainGreen, plainGreen, plainGreen], [])
+    Spec.assertEqWith s "the two boards differ only in whose pool holds the mana" (poolOf S.carol hers, poolOf S.carol his) ([retainedGreen, retainedGreen, retainedGreen], [])
     Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.carol hers)) "carol casts a second Shizuko off her own upkeep's mana"
     Spec.assertBool s (not (any (S.isCastOf otherOid) (Action.legalActions S.carol his))) "and cannot when the mana went to alice"
+
+  -- CR 500.5 / 106.4, driven through Engine.runStep so the WHOLE upkeep step runs
+  -- -- CR 603.2b's event, the trigger, the priority round and the step's own
+  -- end-of-step mana emptying -- rather than by calling Mana.emptyManaPools.
+  --
+  -- carol's pool is seeded with one ORDINARY green before the step, so the pool
+  -- the sweep sees holds four units identical but for their retention. The two
+  -- casts read that difference at gameplay level on one board: Shizuko is
+  -- {1}{G}{G} and Giant Spider is {3}{G}, so three green pays the first and not
+  -- the second. Keeping nothing fails the first assertion; keeping all four --
+  -- which is what a player-axis retention would do -- fails the second.
+  Spec.it s "CR 500.5 the three retained green survive the upkeep step's end and the ordinary fourth does not" $ do
+    shizuko <- S.printingOf s registry "Shizuko, Caller of Autumn"
+    giantSpider <- S.printingOf s registry "Giant Spider"
+    let seeded = Mana.addMana S.carol [plainGreen] (shizukoStep shizuko S.carol (Phase.Beginning BeginningStep.Upkeep))
+        after = carolMain (S.runPure S.identityAnswer seeded Engine.runStep)
+        (shizukoId, withShizuko) = S.addHandCard shizuko S.carol after
+        (spiderId, withSpider) = S.addHandCard giantSpider S.carol after
+    Spec.assertBool s (any (S.isCastOf shizukoId) (Action.legalActions S.carol withShizuko)) "carol casts a {1}{G}{G} spell in a later phase, off mana the step's end did not take"
+    Spec.assertBool s (not (any (S.isCastOf spiderId) (Action.legalActions S.carol withSpider))) "but not a {3}{G} one, because the ordinary fourth green WAS taken"
+    Spec.assertEqWith s "exactly the three the trigger added" (poolOf S.carol after) [retainedGreen, retainedGreen, retainedGreen]
+
+  -- CR 514.2 ends the retention, and CR 500.5 then takes the mana. A pair of
+  -- boards differing in EXACTLY one thing -- which step Engine.runStep runs --
+  -- both starting from the same resolved upkeep trigger.
+  --
+  -- The end step is the last one the retention outlives: its end runs CR 500.5's
+  -- sweep with the retention still standing. The cleanup step's turn-based
+  -- actions run CR 514.2 at that step's START (Mana.endManaRetention), so the
+  -- same sweep at that step's END finds ordinary mana and takes it. Swapping the
+  -- two moments in Engine.hs is what this pair refuses.
+  Spec.it s "CR 514.2 the retention outlives the end step and not the cleanup step" $ do
+    shizuko <- S.printingOf s registry "Shizuko, Caller of Autumn"
+    let floated = shizukoUpkeep shizuko S.carol
+        ran phase = carolMain (S.runPure S.identityAnswer (atStep phase floated) Engine.runStep)
+        afterEnd = ran (Phase.Ending EndingStep.EndStep)
+        afterCleanup = ran (Phase.Ending EndingStep.Cleanup)
+        (endId, castableAfterEnd) = S.addHandCard shizuko S.carol afterEnd
+        (cleanupId, castableAfterCleanup) = S.addHandCard shizuko S.carol afterCleanup
+    Spec.assertBool s (any (S.isCastOf endId) (Action.legalActions S.carol castableAfterEnd)) "carol still has the mana once the end step has ended"
+    Spec.assertBool s (not (any (S.isCastOf cleanupId) (Action.legalActions S.carol castableAfterCleanup))) "and no longer does once the cleanup step has ended"
+    Spec.assertEqWith s "the pools say the same thing" (poolOf S.carol afterEnd, poolOf S.carol afterCleanup) ([retainedGreen, retainedGreen, retainedGreen], [])
 
 -- One Shizuko on the battlefield under ALICE's control, with @upkeep@'s upkeep
 -- beginning (CR 500.1: a step belongs to exactly one turn, so the event names one
@@ -2344,6 +2399,28 @@ shizukoUpkeep shizuko upkeep =
           board {GameState.activePlayer = upkeep, GameState.phase = Phase.Beginning BeginningStep.Upkeep}
       placed = snd (Engine.runGamePure S.identityAnswer began Engine.placePendingTriggers)
    in snd (Engine.runGamePure S.identityAnswer placed Stack.resolveTop)
+
+-- @shizukoUpkeep@'s twin for a runStep-driven case: the same board with NOTHING
+-- yet done to it, since Engine.runStep records CR 603.2b's event, places the
+-- trigger and runs the priority round that resolves it. The schedule loses its
+-- head for Pawl.ActivateSpec's augurUpkeep reason -- Setup.emptyGame's
+-- `remaining` still begins with the upkeep step, so a runStep-driven board would
+-- otherwise advance back into the step it just ran.
+shizukoStep :: Printing.Printing -> PlayerId.PlayerId -> Phase.Phase -> GameState.GameState
+shizukoStep shizuko active phase =
+  let (_, board) = S.addCreature shizuko S.alice S.threePlayerGame
+   in board
+        { GameState.activePlayer = active,
+          GameState.phase = phase,
+          GameState.priority = Just active,
+          GameState.remaining = Seq.drop 1 (GameState.remaining board)
+        }
+
+-- An already-floated board moved to another step of the SAME turn, so the pair
+-- above differs in one field and nothing else. The active player keeps priority,
+-- which is what makes Engine.runStep grant a priority round rather than settle.
+atStep :: Phase.Phase -> GameState.GameState -> GameState.GameState
+atStep phase gs = gs {GameState.phase = phase, GameState.priority = Just (GameState.activePlayer gs)}
 
 -- CR 307.1 / 117.1a: carol active with priority in her own precombat main phase,
 -- which is what a sorcery-speed cast of hers needs. Applied to BOTH boards of the
@@ -2449,7 +2526,7 @@ recordingManaTypes manaType p = case p of
 -- One mana of `color` carrying no production tag, plainRed's and plainGreen's
 -- generalisation: CR 107.4h reads the SOURCE, and Quirion Sentinel is not snow.
 plainColor :: Color.Color -> ManaUnit.ManaUnit
-plainColor color = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty}
+plainColor color = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}
 
 -- These printings on the battlefield under alice's control, untapped and settled.
 alicePermanents :: [Printing.Printing] -> GameState.GameState
@@ -2512,7 +2589,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
 -- One mana of one type carrying no production tag: what a basic land really puts
 -- in a pool, and the unit the Celestial Dawn cases below seat directly.
 plainOf :: ManaType.ManaType -> ManaUnit.ManaUnit
-plainOf manaType = ManaUnit.MkManaUnit {ManaUnit.manaType = manaType, ManaUnit.tags = Set.empty}
+plainOf manaType = ManaUnit.MkManaUnit {ManaUnit.manaType = manaType, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}
 
 -- A cost of exactly one symbol, so a payability answer is about that symbol and
 -- nothing else.
@@ -2601,7 +2678,7 @@ celestialDawnSpec s registry = Spec.describe s "Celestial Dawn" $ do
   -- spent AS without making a nonsnow mana snow.
   Spec.it s "CR 107.4h the clause does not make a nonsnow white mana pay {S}" $ do
     dawn <- S.printingOf s registry "Celestial Dawn"
-    let snowWhite = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.White, ManaUnit.tags = Set.singleton ProductionTag.Snow}
+    let snowWhite = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.White, ManaUnit.tags = Set.singleton ProductionTag.Snow, ManaUnit.retention = ManaRetention.Ordinary}
         (plainBoard, _) = dawnBoards dawn [plainOf (ManaType.Colored Color.White)]
         (snowBoard, _) = dawnBoards dawn [snowWhite]
     Spec.assertBool s (not (payable S.alice snowCost plainBoard)) "the nonsnow white mana does not pay {S}"
@@ -2677,11 +2754,12 @@ snowRed :: ManaUnit.ManaUnit
 snowRed =
   ManaUnit.MkManaUnit
     { ManaUnit.manaType = ManaType.Colored Color.Red,
-      ManaUnit.tags = Set.singleton ProductionTag.Snow
+      ManaUnit.tags = Set.singleton ProductionTag.Snow,
+      ManaUnit.retention = ManaRetention.Ordinary
     }
 
 plainRed :: ManaUnit.ManaUnit
-plainRed = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty}
+plainRed = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}
 
 -- CR 107.4h: "When used in a cost, the snow mana symbol {S} represents a cost
 -- that can be paid with one mana of any type produced by a snow source (see rule
@@ -2780,7 +2858,7 @@ snowSpec s registry = Spec.describe s "Snow" $ do
 -- {S}" into when the source is not snow, and the unit every assertion below
 -- compares against.
 plainColorless :: ManaUnit.ManaUnit
-plainColorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty}
+plainColorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}
 
 -- CR 106.11: "If an effect would add mana represented by one or more snow mana
 -- symbols to a player's mana pool, that much colorless mana is added to that
@@ -3030,8 +3108,8 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
   -- reading a payment path that charged every symbol one mana would also
   -- get right, so this is the control the cases below discriminate
   -- against -- and the tap count is what says the route was really taken:
-  -- six Mountains would still be three taps, because payCost stops as
-  -- soon as the cost is payable.
+  -- six Mountains would still be three taps, because Cost.payMana stops
+  -- as soon as the cost is payable.
   Spec.it s "CR 107.4e whole card: Flame Javelin casts off three Mountains, {R} per symbol" $ do
     mountain <- S.printingOf s registry "Mountain"
     flameJavelin <- S.printingOf s registry "Flame Javelin"
@@ -3102,8 +3180,8 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
   -- paid during a resolution or for a special action (#373), which is why
   -- this calls `spend` directly.
   Spec.it s "CR 118.13b with nothing announced, spend takes a {2/R}'s one-mana half (#373)" $
-    let red = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty}
-        colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty}
+    let red = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}
+        colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}
      in Spec.assertEqWith
           s
           "the {R} is spent and both {C} remain -- the other half would spend both {C} and leave the {R}"
@@ -3339,7 +3417,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- INSTEAD of it, would each read as "paid" without it.
   --
   -- It also pins what Cost.payMana does with an UNANNOUNCED cost, which is
-  -- what this and the four cases after it exercise: they call payCost
+  -- what this and the four cases after it exercise: they call Cost.payMana
   -- directly, so no CR 118.13a announcement has happened and the least-life
   -- rule still decides, which here means none (#373). A cast goes through
   -- Cast.castSpell instead and asks -- see the CR 118.13a cases at the end of
@@ -3504,7 +3582,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- is gone and CR 107.4f's 2 life is all that is left. pawl pays it rather
   -- than failing the payment, which is the same MORE PERMISSIVE posture
   -- Cost.payMana's haddock takes towards a mis-tapped colour. Reached only
-  -- because this calls payCost directly, with nothing announced (#373).
+  -- because this calls Cost.payMana directly, with nothing announced (#373).
   Spec.it s "CR 107.4f a Birds tapped for blue still pays a {G/P}, out of life" $ do
     birds <- S.printingOf s registry "Birds of Paradise"
     let (_, gs) = S.addCreature birds S.alice (Setup.emptyGame S.bothPlayers)

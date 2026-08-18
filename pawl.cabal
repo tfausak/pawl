@@ -325,6 +325,8 @@ library codec
     Pawl.Codec.ManaFilterSpec
     Pawl.Codec.ManaProduction
     Pawl.Codec.ManaProductionSpec
+    Pawl.Codec.ManaRetention
+    Pawl.Codec.ManaRetentionSpec
     Pawl.Codec.ManaSpending
     Pawl.Codec.ManaSpendingSpec
     Pawl.Codec.ManaSymbol
@@ -1042,6 +1044,7 @@ library types
     Pawl.Types.ManaFilter
     Pawl.Types.ManaOption
     Pawl.Types.ManaProduction
+    Pawl.Types.ManaRetention
     Pawl.Types.ManaSpending
     Pawl.Types.ManaSymbol
     Pawl.Types.ManaType

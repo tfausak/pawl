@@ -40,6 +40,7 @@ import Pawl.Types.ManaOption (ManaOption)
 import qualified Pawl.Types.ManaOption as ManaOption
 import Pawl.Types.ManaProduction (ManaProduction)
 import qualified Pawl.Types.ManaProduction as ManaProduction
+import qualified Pawl.Types.ManaRetention as ManaRetention
 import Pawl.Types.ManaSpending (ManaSpending)
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import Pawl.Types.ManaSymbol (ManaSymbol)
@@ -262,7 +263,13 @@ manaOptionsOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -
 manaOptionsOfGiven pcs oid gs =
   let tags = productionTagsGiven pcs oid gs
       asMana manaTypes =
-        Mana.MkMana (fmap (\manaType -> ManaUnit.MkManaUnit {ManaUnit.manaType = manaType, ManaUnit.tags = tags}) manaTypes)
+        -- Not implemented: the retention an AddMana instruction may carry
+        -- (Pawl.Types.ManaRetention). This is CR 605.3b's inline payment, and
+        -- ManaAbility.manaProduced answers a ManaProduction alone, so a mana
+        -- ability that said its mana is kept would be paid Ordinary here while
+        -- the same clause on a stack-using ability works (#1808). Exact for
+        -- data/cards/, where every retaining printing is a static or a trigger.
+        Mana.MkMana (fmap (\manaType -> ManaUnit.MkManaUnit {ManaUnit.manaType = manaType, ManaUnit.tags = tags, ManaUnit.retention = ManaRetention.Ordinary}) manaTypes)
       expand (cost, productions) =
         fmap
           (\manaTypes -> ManaOption.MkManaOption {ManaOption.cost = cost, ManaOption.yield = asMana manaTypes})
@@ -331,13 +338,23 @@ addMana pid units gs =
 --
 -- The RETENTION check lives here rather than at that call site, because it is
 -- part of the turn-based action and not part of the moment: CR 500.5 names one
--- action, and which mana it takes belongs to the action. Asked PER PLAYER and
--- then PER UNIT, off the CR 613.11 player-axis carrier, through a typed question
--- (PlayerEffect.keepsUnspentMana) that never reveals which effect answered it.
--- Per unit because a card may name only some of the mana: Upwelling keeps every
+-- action, and which mana it takes belongs to the action.
+--
+-- TWO CARRIERS, and a unit either keeps it is kept. The CR 613.11 player-axis
+-- one is asked per player and then per unit, through a typed question
+-- (PlayerEffect.keepsUnspentMana) that never reveals which effect answered it --
+-- per unit because a card may name only some of the mana: Upwelling keeps every
 -- type, Omnath, Locus of Mana only green. The per-player question is asked ONCE
--- and its predicate applied to that player's units -- the shape
--- keepsUnspentMana's argument order is built for.
+-- and its predicate applied to that player's units, which is the shape
+-- keepsUnspentMana's argument order is built for. The other carrier is the UNIT
+-- itself (Pawl.Types.ManaRetention), which is where a clause naming the mana one
+-- ability just added has to live -- Shizuko, Caller of Autumn's "they don't lose
+-- THIS mana" says different things about two manas of one pool, so no widening
+-- of the player-axis filter can express it.
+--
+-- A DISJUNCTION over the two, for keepsUnspentMana's own reason: two retention
+-- effects that name different mana are not in conflict, and CR 613.11's
+-- timestamp order has nothing to order here.
 --
 -- A player left with nothing is DROPPED from the map rather than left holding an
 -- empty pool: absent already means an empty pool (Game.poolOf), so keeping the
@@ -347,10 +364,32 @@ addMana pid units gs =
 -- Upwelling that left the battlefield during the step is simply not there.
 emptyManaPools :: GameState -> GameState
 emptyManaPools gs =
-  let retain pid pool = case filter (PlayerEffect.keepsUnspentMana pid gs) (Mana.unwrap pool) of
+  let keptByUnit unit = ManaUnit.retention unit /= ManaRetention.Ordinary
+      keeps pid unit = PlayerEffect.keepsUnspentMana pid gs unit || keptByUnit unit
+      retain pid pool = case filter (keeps pid) (Mana.unwrap pool) of
         [] -> Nothing
         kept -> Just (Mana.MkMana kept)
    in gs {GameState.manaPool = Map.mapMaybeWithKey retain (GameState.manaPool gs)}
+
+-- CR 514.2: "all 'until end of turn' and 'this turn' effects end", during the
+-- cleanup step. A unit's retention is such an effect, so it ends here -- and the
+-- mana itself does NOT: this only clears the duration, and the cleanup step's
+-- own CR 500.5 sweep at the step's END is what then takes the mana. Engine.hs
+-- calls this beside Damage.removeAllDamage, which is CR 514.2's other half.
+--
+-- Here rather than in Pawl.Engine.Expiry, which sweeps the carriers keyed by a
+-- Pawl.Types.Expiry: a mana unit carries none, and the pool is this module's.
+-- The two are one simultaneous turn-based action either way, and nothing runs
+-- between them.
+--
+-- Rewrites every unit rather than filtering: CR 514.2 ends the retention, it
+-- does not remove the mana, so a retained unit becomes an ordinary one and stays
+-- in the pool for the rest of the step.
+endManaRetention :: GameState -> GameState
+endManaRetention gs =
+  let ordinary unit = unit {ManaUnit.retention = ManaRetention.Ordinary}
+      ended pool = Mana.MkMana (fmap ordinary (Mana.unwrap pool))
+   in gs {GameState.manaPool = fmap ended (GameState.manaPool gs)}
 
 -- Permanents this player controls with a mana ability they could activate right
 -- now (CR 109.4a: a mana ability's controller is determined as though it were on
@@ -367,8 +406,9 @@ emptyManaPools gs =
 --
 -- Projection.projectGiven carries the snapshot argument. It holds here because
 -- this is a pure function of one GameState: nothing can move between the
--- projection and its uses, and payCost's loop -- the one caller that DOES change
--- the state, by tapping -- takes a fresh State.get on every pass.
+-- projection and its uses, and Pawl.Engine.Cost.payMana's loop -- the one
+-- caller that DOES change the state, by tapping -- takes a fresh State.get on
+-- every pass.
 manaSources :: Capacity -> PlayerId -> GameState -> [ObjectId]
 manaSources capacity pid gs = manaSourcesGiven capacity (Projection.controlGrants gs) (Projection.projectAll gs) pid gs
 
@@ -694,12 +734,12 @@ takeAny units _ = case units of
 -- permission (Pawl.Engine.Cast.castSpellWith captures it before the move).
 --
 -- The BUDGET is a cap and not a target, and it is what keeps that ordering
--- meaningful during payCost's loop. Left uncapped, a {G/P} would take the 2-life
--- resolution on the first pass -- the pool is empty before any source is tapped,
--- so the mana resolution cannot fit yet -- and the Forest would never be tapped
--- at all. payCost passes `lifeNeeded`, the least life any PAYABLE resolution
--- costs, so a cost the board can pay with mana is capped at zero life and the
--- loop is forced to tap for it.
+-- meaningful during Pawl.Engine.Cost.payMana's loop. Left uncapped, a {G/P}
+-- would take the 2-life resolution on the first pass -- the pool is empty
+-- before any source is tapped, so the mana resolution cannot fit yet -- and the
+-- Forest would never be tapped at all. payMana passes `lifeNeeded`, the least
+-- life any PAYABLE resolution costs, so a cost the board can pay with mana is
+-- capped at zero life and the loop is forced to tap for it.
 spend :: [SpendManaAsThough.SpendManaAsThough] -> ManaSpending -> Natural -> ManaCost -> Mana -> Maybe (Mana, Natural)
 spend clauses spending budget cost (Mana.MkMana units) =
   let attempt (demands, generic, life) = do
@@ -1212,9 +1252,10 @@ payableResolutionsGiven capacity spending sources pcs pid committed claimed cost
 -- is payable. `resolutions` is sorted by life ascending and payableResolutions
 -- keeps that order, so the head is the minimum.
 --
--- This is the budget payCost pays under. A cast or an activation has already
--- announced its Phyrexian symbols away (`announce`, CR 118.13a), so this answers
--- 0 for them; it decides anything only where nothing announced (#373).
+-- This is the budget Pawl.Engine.Cost.payMana pays under. A cast or an
+-- activation has already announced its Phyrexian symbols away (`announce`,
+-- CR 118.13a), so this answers 0 for them; it decides anything only where
+-- nothing announced (#373).
 --
 -- Nothing committed and nothing claimed, unlike the gates: this runs DURING the
 -- payment, where the cost's components may already have been paid, so the whole

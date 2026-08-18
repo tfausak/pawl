@@ -1428,9 +1428,11 @@ maximumHandSize pid gs =
 -- destroyed earlier in the step is simply not found and the pools empty with
 -- nothing to unwind (CR 604.2).
 --
--- Not the finest granularity the pool asks for. A card that keeps only the mana
--- it just added (Shizuko, Karn) needs the retention to leave this player-axis
--- carrier altogether (#352).
+-- NOT the whole of what the pool keeps, and deliberately not. A card that keeps
+-- only the mana it just added (Shizuko, Caller of Autumn) says different things
+-- about two manas of one pool, which no player-axis filter can express, so its
+-- retention rides the UNIT instead (Pawl.Types.ManaRetention).
+-- Pawl.Engine.Mana.emptyManaPools takes the disjunction of the two carriers.
 keepsUnspentMana :: PlayerId -> GameState -> ManaUnit -> Bool
 keepsUnspentMana pid gs =
   let keeps effect = case effect of

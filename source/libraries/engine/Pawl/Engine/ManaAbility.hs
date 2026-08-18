@@ -96,6 +96,12 @@ isManaAbility ab =
 -- adds an activation's whole yield to the activator, so a mana ability naming
 -- another player would pay the wrong pool. Spectral Searchlight and Valleymaker
 -- are the printings; neither is in `data/cards/` (#1673).
+--
+-- The payload's RETENTION (Pawl.Types.ManaRetention) is dropped for the same
+-- reason and just as rightly: CR 605.1a's four criteria say nothing about how
+-- long the mana lasts, so a retained AddMana is a mana ability like any other.
+-- Not implemented: the payment path acting on it -- Mana.manaOptionsOfGiven
+-- stamps Ordinary, so a mana ability that retained its mana would not (#1808).
 manaProduced :: Effect Card.Type.Card -> Maybe ManaProduction
 manaProduced effect = case effect of
   Effect.AddMana addition -> Just (ManaAddition.production addition)
