@@ -8104,6 +8104,52 @@ gaeasBlessingSpec s registry =
 --     simply offered every graveyard card's every ability would pass.
 --   * Squee ON the battlefield at the same upkeep fires nothing, which is the
 --     "functions ONLY in that zone" half.
+-- Drought's FIRST sentence, "At the beginning of your upkeep, sacrifice this
+-- enchantment unless you pay {W}{W}" (Oracle text checked against Scryfall) --
+-- CR 118.12a's gate over a MANA cost, where Circling Vultures' is over a
+-- component. The other two sentences are Pawl.CastSpec's droughtSpec and
+-- Pawl.ActivateSpec's droughtActivationSpec.
+--
+-- THREE boards, and the third is what makes the gate a real choice: an
+-- implementation that sacrificed unconditionally passes the first, one that
+-- never sacrificed passes the second, and only declining a payment alice could
+-- have made tells "she was asked" from "she was charged".
+droughtUpkeepSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+droughtUpkeepSpec s registry =
+  let upkeep = Phase.Beginning BeginningStep.Upkeep
+      beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice)) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+      -- Drought under alice with `plains` Plains beside it, her upkeep begun and
+      -- the trigger settled onto the stack.
+      board plains n = do
+        drought <- S.printingOf s registry "Drought"
+        let (droughtId, g1) = S.addCreature drought S.alice (S.landsFor plains S.alice n (Setup.emptyGame S.bothPlayers))
+        pure (droughtId, S.runPure S.identityAnswer (beginUpkeep g1) Engine.settleForPriority)
+   in Spec.describe s "DroughtUpkeep" $ do
+        -- CR 118.3: no white mana, so the payment is not on offer at all and the
+        -- "unless" branch runs.
+        Spec.it s "CR 118.12a with no white mana Drought sacrifices itself" $ do
+          plains <- S.printingOf s registry "Plains"
+          (droughtId, onStack) <- board plains 0
+          let after = S.runPure (paysFor S.alice) onStack Stack.resolveTop
+          Spec.assertBool s (not (S.onBattlefield droughtId after)) "Drought was sacrificed"
+          Spec.assertEqWith s "CR 701.21a into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+          Spec.assertBool s (not (null (GameState.stack onStack))) "and the upkeep trigger really reached the stack"
+        Spec.it s "CR 118.12a paying {W}{W} keeps it on the battlefield" $ do
+          plains <- S.printingOf s registry "Plains"
+          (droughtId, onStack) <- board plains 2
+          let after = S.runPure (paysFor S.alice) onStack Stack.resolveTop
+          Spec.assertBool s (S.onBattlefield droughtId after) "Drought survived"
+          Spec.assertEqWith s "both Plains paid for it" (S.tappedCount S.alice after) 2
+          Spec.assertEqWith s "and nothing reached her graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+        -- The same board, the other answer: the payment is a "may", so declining
+        -- one alice could have made is what runs the branch.
+        Spec.it s "CR 118.12a declining the payment sacrifices it even off two Plains" $ do
+          plains <- S.printingOf s registry "Plains"
+          (droughtId, onStack) <- board plains 2
+          let after = S.runPure S.identityAnswer onStack Stack.resolveTop
+          Spec.assertBool s (not (S.onBattlefield droughtId after)) "Drought was sacrificed"
+          Spec.assertEqWith s "with both Plains still untapped" (S.tappedCount S.alice after) 0
+
 graveyardEffectZoneTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 graveyardEffectZoneTriggerSpec s registry =
   let squeeName = CardName.MkCardName (Text.pack "Squee, Goblin Nabob")
@@ -14270,6 +14316,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   graveyardTriggerSpec s registry
   gaeasBlessingSpec s registry
   graveyardEffectZoneTriggerSpec s registry
+  droughtUpkeepSpec s registry
   commandZoneTriggerSpec s registry
   serraAvatarSpec s registry
   diesTriggerSpec s registry

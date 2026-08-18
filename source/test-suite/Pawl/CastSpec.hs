@@ -3041,10 +3041,113 @@ direFleetDaredevilSpec s registry = Spec.describe s "DireFleetDaredevil" $ do
         Spec.assertEqWith s "all five Mountains are tapped" (S.tappedCount S.alice after) 5
         Spec.assertEqWith s "and nothing is left floating" (Game.poolOf S.alice after) (Mana.Type.MkMana [])
 
+-- alice with `n` untapped Swamps and one spell in hand, a Goblin Piker under BOB
+-- for the spells that target a creature, and Drought under bob when one is
+-- passed. The positive and the negative differ in that Maybe and in nothing
+-- else: same seats, same permanents, same Swamps.
+--
+-- Drought sits with BOB however the cast goes, because its sentence is symmetric
+-- ("Spells cost an additional ...", no possessive, PlayerScope.EachPlayer) --
+-- the board that proves that is the one where the caster does not control it.
+droughtBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Maybe Printing.Printing ->
+  Int ->
+  (GameState.GameState, ObjectId.ObjectId)
+droughtBoard swamp piker spell mDrought n =
+  let withPiker = snd (S.addCreature piker S.bob (S.landsInPlay swamp n))
+      board = maybe withPiker (\drought -> snd (S.addCreature drought S.bob withPiker)) mDrought
+   in S.handOne spell board
+
+-- Drought {2}{W}{W} Enchantment (ICE), Oracle text checked against Scryfall:
+-- "At the beginning of your upkeep, sacrifice this enchantment unless you pay
+-- {W}{W}. / Spells cost an additional \"Sacrifice a Swamp\" to cast for each
+-- black mana symbol in their mana costs. / Activated abilities cost an
+-- additional \"Sacrifice a Swamp\" to activate for each black mana symbol in
+-- their activation costs."
+--
+-- The SPELL sentence, which is CR 118.8's "or applied to a spell or ability from
+-- another effect" -- the half a spell's own card text cannot state -- reaching CR
+-- 601.2f's total. The activation sentence is Pawl.ActivateSpec's droughtSpec;
+-- line one is droughtUpkeepSpec below.
+--
+-- FIVE Swamps on every board, more than any case consumes, so a cast that
+-- succeeded for lack of anything to sacrifice cannot pass: the assertion is the
+-- SURVIVOR count and never zero.
+--
+-- NEITHER the one-symbol case nor the zero-symbol case discriminates alone. An
+-- implementation that adds the component unconditionally passes the first and
+-- fails the second; one that adds it exactly once for a black spell passes both
+-- and fails the two-symbol case. All three are the proof.
+droughtSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+droughtSpec s registry = Spec.describe s "Drought" $ do
+  -- ONE black mana symbol, so one Swamp. Doom Blade is {1}{B}, and the generic
+  -- half is what shows the count is over SYMBOLS OF A COLOUR and not over the
+  -- cost's size.
+  Spec.it s "CR 601.2f a spell with one black symbol costs a Swamp to cast" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    drought <- S.printingOf s registry "Drought"
+    blade <- S.printingOf s registry "Doom Blade"
+    let (taxed, taxedId) = droughtBoard swamp piker blade (Just drought) 5
+        (free, freeId) = droughtBoard swamp piker blade Nothing 5
+        after = S.runPure S.identityAnswer taxed (S.cast S.alice taxedId)
+        control = S.runPure S.identityAnswer free (S.cast S.alice freeId)
+    Spec.assertEqWith s "one of the five Swamps was sacrificed" (S.countOnBattlefieldByName swampName S.alice after) 4
+    Spec.assertEqWith s "where the same cast without Drought keeps all five" (S.countOnBattlefieldByName swampName S.alice control) 5
+    Spec.assertEqWith s "and the Blade is on the stack, not refused" (length (GameState.stack after)) 1
+  -- ZERO black mana symbols, so nothing at all -- not a Sacrifice component of
+  -- count zero. Bonesplitter is {1}, and the board is carried far enough that a
+  -- component added regardless of the count would have taken a Swamp.
+  Spec.it s "CR 601.2f a spell with no black symbol sacrifices nothing" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    drought <- S.printingOf s registry "Drought"
+    splitter <- S.printingOf s registry "Bonesplitter"
+    let (taxed, taxedId) = droughtBoard swamp piker splitter (Just drought) 5
+        after = S.runPure S.identityAnswer taxed (S.cast S.alice taxedId)
+    Spec.assertEqWith s "all five Swamps survive" (S.countOnBattlefieldByName swampName S.alice after) 5
+    Spec.assertEqWith s "and the Bonesplitter is on the stack" (length (GameState.stack after)) 1
+  -- TWO black mana symbols, so two Swamps: the multiplier, which the one-symbol
+  -- case above cannot tell from "add it once". Sign in Blood is {B}{B}.
+  Spec.it s "CR 601.2f two black symbols cost two Swamps" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    drought <- S.printingOf s registry "Drought"
+    sign <- S.printingOf s registry "Sign in Blood"
+    let (taxed, taxedId) = droughtBoard swamp piker sign (Just drought) 5
+        (free, freeId) = droughtBoard swamp piker sign Nothing 5
+        after = S.runPure S.identityAnswer taxed (S.cast S.alice taxedId)
+        control = S.runPure S.identityAnswer free (S.cast S.alice freeId)
+    Spec.assertEqWith s "two of the five Swamps were sacrificed" (S.countOnBattlefieldByName swampName S.alice after) 3
+    Spec.assertEqWith s "where the same cast without Drought keeps all five" (S.countOnBattlefieldByName swampName S.alice control) 5
+    Spec.assertEqWith s "and Sign in Blood is on the stack" (length (GameState.stack after)) 1
+  -- Drought's 2008-08-01 ruling, tested rather than argued: "A hybrid symbol
+  -- that is both black and another type is a black mana symbol, regardless of
+  -- what cost is paid for it." Dismember is {1}{B/P}{B/P}, so CR 107.4f's
+  -- Phyrexian symbols are two black mana symbols and demand two Swamps -- which
+  -- an implementation counting only CR 107.4a's plain coloured symbols reads as
+  -- zero.
+  Spec.it s "CR 107.4f two Phyrexian black symbols cost two Swamps too" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    drought <- S.printingOf s registry "Drought"
+    dismember <- S.printingOf s registry "Dismember"
+    let (taxed, taxedId) = droughtBoard swamp piker dismember (Just drought) 5
+        (free, freeId) = droughtBoard swamp piker dismember Nothing 5
+        after = S.runPure S.identityAnswer taxed (S.cast S.alice taxedId)
+        control = S.runPure S.identityAnswer free (S.cast S.alice freeId)
+    Spec.assertEqWith s "two of the five Swamps were sacrificed" (S.countOnBattlefieldByName swampName S.alice after) 3
+    Spec.assertEqWith s "where the same cast without Drought keeps all five" (S.countOnBattlefieldByName swampName S.alice control) 5
+    Spec.assertEqWith s "and Dismember is on the stack" (length (GameState.stack after)) 1
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   castSpec s registry
   castEngineSpec s registry
+  droughtSpec s registry
   stackSpec s registry
   discardSpec s registry
   sicknessSpec s registry
