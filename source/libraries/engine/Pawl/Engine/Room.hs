@@ -153,4 +153,6 @@ unlock pid oid half = do
         payment <- Cost.pay ManaSpending.AsProduced pid oid (unlockCostOf face)
         case payment of
           Payment.Unpaid -> State.put before
-          Payment.Paid -> Event.unlockHalf oid half
+          -- Dropped, Pawl.Engine.Ignore's reason: unlocking resolves nothing
+          -- whose effects could read a slot.
+          Payment.Paid _ -> Event.unlockHalf oid half

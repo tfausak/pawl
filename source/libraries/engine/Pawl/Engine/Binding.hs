@@ -243,6 +243,26 @@ eventAmount = SlotName.MkSlotName (Text.pack "thatMuch")
 sacrificedCount :: SlotName
 sacrificedCount = SlotName.MkSlotName (Text.pack "thatMany")
 
+-- CR 701.21a: the reserved slot under which the permanent a COST payment
+-- sacrificed is bound -- "the sacrificed creature" in Jarad, Golgari Lich Lord's
+-- "each opponent loses life equal to the sacrificed creature's power". Stamped
+-- by Pawl.Engine.Activate as the activation's payment returns (CR 601.2h at the
+-- position CR 602.2b gives it), which is why the ability object holds it and its
+-- source permanent does not.
+--
+-- The permanent is in a graveyard by the time the ability resolves, so every
+-- read of it is CR 608.2h's last known information; Pawl.Engine.Resolve.effectViewOf
+-- is what licenses that for this slot.
+--
+-- Not needed for "sacrifice this": CR 113.7's `triggerSource` already names that
+-- permanent, and Projection.viewWithLastKnown answers a gone SOURCE by rule
+-- 608.2h without any of this.
+--
+-- Not a target, so the same CR 608.2b posture and the same "no card's
+-- targetSlots may name it" sweep as sacrificedCount above.
+sacrificedPermanent :: SlotName
+sacrificedPermanent = SlotName.MkSlotName (Text.pack "thatSacrificedPermanent")
+
 -- CR 601.2i: the reserved slot under which a cast trigger's WATCHED SPELL is
 -- bound -- the printed "it" in Presence of the Master's "whenever a player casts
 -- an enchantment spell, counter it", and "that spell" wherever a card spells the
@@ -515,6 +535,16 @@ setCombatDamager oid = Map.insert combatDamager (toObject oid)
 -- Bind an object under the reserved mentoredCreature slot (CR 702.134c).
 setMentoredCreature :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setMentoredCreature oid = Map.insert mentoredCreature (toObject oid)
+
+-- Fold the slots a COST PAYMENT bound (Pawl.Types.Payment.Paid) into a binding
+-- environment. Left-biased, and harmlessly so: every key here is a reserved
+-- name, which Pawl.CardSpec's sweep keeps a card from declaring or binding, so
+-- there is nothing of the card's to clobber.
+--
+-- Set-valued like a target slot, so a payment that sacrificed SEVERAL permanents
+-- lands on `onlyOne`'s Nothing rather than on one of them (#1532).
+setPaid :: Map SlotName (Set Recipient) -> Map SlotName Binding -> Map SlotName Binding
+setPaid paid = Map.union (fmap toRecipients paid)
 
 -- Bind a number under the reserved eventAmount slot (CR 603.2).
 setEventAmount :: Natural -> Map SlotName Binding -> Map SlotName Binding

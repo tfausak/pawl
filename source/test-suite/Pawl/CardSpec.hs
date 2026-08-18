@@ -1659,7 +1659,26 @@ activatedAbilityOffends ability =
         if declaresVariable (ActivatedAbility.cost ability)
           then Set.singleton Binding.variableX
           else Set.empty
-   in modalSlotsOffend (Set.union (Set.fromList [Binding.triggerSource, Binding.you]) announcedX) (ActivatedAbility.modal ability)
+      sacrificed =
+        if sacrificesAsCost (ActivatedAbility.cost ability)
+          then Set.singleton Binding.sacrificedPermanent
+          else Set.empty
+   in modalSlotsOffend (Set.unions [Set.fromList [Binding.triggerSource, Binding.you], announcedX, sacrificed]) (ActivatedAbility.modal ability)
+
+-- Does this cost sacrifice a permanent the payer CHOOSES? Binding.variableX's
+-- shape exactly: CR 601.2h's payment binds the slot (Cost.payComponent's
+-- Sacrifice arm, folded on by Activate), so an ability whose cost has such a
+-- component may read it and one whose cost has not may not.
+--
+-- CostComponent.SacrificeThis is deliberately not counted: it sacrifices the
+-- source, which CR 113.7's `triggerSource` already names and
+-- Projection.viewWithLastKnown already answers off its last known information.
+sacrificesAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
+sacrificesAsCost = any isSacrifice . Cost.Type.components
+  where
+    isSacrifice component = case component of
+      CostComponent.Sacrifice {} -> True
+      _ -> False
 
 -- CR 603.7 / 109.5: does this card arm a delayed ability "on your next turn"
 -- whose condition is not scoped to its controller's turn?
@@ -1802,6 +1821,7 @@ reservedSlots =
       Binding.became,
       Binding.eventAmount,
       Binding.sacrificedCount,
+      Binding.sacrificedPermanent,
       Binding.castSpell,
       Binding.targetingObject,
       Binding.blockingCreature,

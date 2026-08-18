@@ -220,7 +220,9 @@ turnFaceUp pid procedure oid = do
           -- CR 708.8: the copiable values revert, which for pawl is the status
           -- flipping -- Game.faceOf reads it, so the substitution simply stops
           -- applying and the card's own face answers again.
-          Payment.Paid -> do
+          -- The payment's bound slots are dropped, Pawl.Engine.Ignore's reason:
+          -- turning a permanent face up resolves nothing.
+          Payment.Paid _ -> do
             State.modify'
               ( \gs ->
                   gs
