@@ -1,9 +1,10 @@
 -- Rule 701.3's LEGALITY READING, in one place because callers a library apart need
--- the same answer: Pawl.Engine.Resolve's Attach and AttachTarget opcodes, and two
--- arms of Pawl.Engine.Event -- the CR 303.4k rewrite for an Aura being turned face
--- up, and changeZoneAttaching's CR 303.4f host choice for an Aura entering the
--- battlefield by any means other than resolving as an Aura spell. Event sits BELOW
--- Resolve, so the shared half cannot live in Resolve where it started.
+-- the same answer: Pawl.Engine.Event.attach, which every CR 701.3 move goes
+-- through, Pawl.Engine.Resolve's AttachTarget opcode, and two arms of
+-- Pawl.Engine.Event -- the CR 303.4k rewrite for an Aura being turned face up, and
+-- changeZoneAttaching's CR 303.4f host choice for an Aura entering the battlefield
+-- by any means other than resolving as an Aura spell. Event sits BELOW Resolve, so
+-- the shared half cannot live in Resolve where it started.
 --
 -- WHAT MAY BE ATTACHED WHERE, and never the move itself: rule 701.3b's write is
 -- Pawl.Engine.Event.attach, beside the other funnels that record an event, since

@@ -2328,8 +2328,13 @@ changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requeste
 -- changeZoneReturning with an attachment seed. Per CR 303.4 attachment is a
 -- property of entering, not a step after it: the CR 614.1c entry replacement loop
 -- and the Moved event both run before this returns, so an Aura attached afterward
--- would be unattached during both. No card in the pool observes the difference
--- today; the seed buys the ordering rather than a passing test.
+-- would be unattached during both.
+--
+-- The seed is also what the CR 701.3a attachment event further down is read off,
+-- so Bramble Elemental's "whenever an Aura becomes attached to this creature"
+-- turns on it -- Pawl.TriggerSpec's "CR 608.3c whole card" case is the proof.
+-- The ORDERING against the entry loop and the Moved event is the rule's rather
+-- than anything a card in data/cards reads.
 --
 -- Stack's Aura branch is the only caller supplying a seed. An Aura entering by any
 -- other route is CR 303.4f's, and the body below asks its controller what it will
@@ -3138,9 +3143,9 @@ becameTarget source kind controller chosen =
 --
 -- LIVES HERE rather than in Pawl.Engine.Attach, which is where the legality
 -- reading it asks (Attach.attachmentFor) still lives: Event imports Attach, so a
--- recordEvent call from there would invert the edge. Both call sites -- this
--- module's CR 303.4k rewrite and Pawl.Engine.Resolve's Attach opcode -- already
--- see this module.
+-- recordEvent call from there would invert the edge. All three call sites -- this
+-- module's CR 303.4k rewrite and Pawl.Engine.Resolve's Attach and AttachTarget
+-- opcodes -- already see this module.
 --
 -- The event carries the tag attachmentFor produced rather than the caller's
 -- `destination`, so a reader sees the same Recipient Object.attachedTo holds.

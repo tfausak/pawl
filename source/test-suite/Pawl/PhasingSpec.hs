@@ -505,7 +505,7 @@ indirectSpec s registry = Spec.describe s "Indirect" $ do
   -- built by CASTING Pacifism at it -- so the baseline of two is a real count that
   -- a real emit produced, which is the whole difference between this case and the
   -- one above. Reality Ripple then phases the enchanted Elemental out, the Aura
-  -- goes with it (CR 702.26e), and alice's untap step brings both back attached.
+  -- goes with it (CR 702.26g), and alice's untap step brings both back attached.
   --
   -- A FENCE STILL, though a discriminating one: CR 702.26j is satisfied
   -- structurally rather than by a guard, since Pawl.Engine.Phasing never clears
@@ -542,7 +542,7 @@ indirectSpec s registry = Spec.describe s "Indirect" $ do
     Spec.assertEqWith s "CR 702.26b the Elemental phased out" (onBattlefield brambleId phasedOut) False
     Spec.assertEqWith s "CR 702.26a and phased back in at alice's untap step" (onBattlefield brambleId phasedIn) True
     case filter (\oid -> (Game.lookupObject oid phasedIn >>= Object.attachedTo >>= Recipient.objectOf) == Just brambleId) (Set.toList (GameState.battlefield phasedIn)) of
-      [auraId] -> Spec.assertEqWith s "CR 702.26e with the Aura back on it" (attachedHostOf auraId phasedIn) (Just (Recipient.ToCreature brambleId))
+      [auraId] -> Spec.assertEqWith s "CR 702.26g with the Aura back on it" (attachedHostOf auraId phasedIn) (Just (Recipient.ToCreature brambleId))
       other -> Spec.assertFailure s ("expected exactly one Aura back on the Elemental, got " <> show (length other))
 
 phaseOutSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
