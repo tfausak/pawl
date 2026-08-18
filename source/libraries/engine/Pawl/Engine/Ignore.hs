@@ -103,7 +103,7 @@ ignore pid oid = do
       payment <- Cost.pay ManaSpending.AsProduced pid oid cost
       case payment of
         Payment.Unpaid -> State.put before
-        -- The payment's bound slots are dropped: CR 116.2's special action puts
+        -- The payment's bound slots are dropped: CR 116.2d's special action puts
         -- nothing on the stack, so there is no resolving object whose effects
         -- could read one.
         Payment.Paid _ ->
