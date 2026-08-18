@@ -28,6 +28,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -36,22 +37,36 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layout as Layout
+import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
+import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggerLimit as TriggerLimit
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Zone as Zone
 
@@ -81,12 +96,20 @@ theRingName = CardName.MkCardName (Text.pack "The Ring")
 -- Pawl.Engine.CombatRestriction.inForce and Pawl.Engine.Event.eventTriggers each
 -- walk the command zone for exactly that.
 --
--- Not implemented: the two-, three- and four-temptation abilities, which the
--- emblem gains as the temptations accumulate (#706). The scan that would gather
--- them once they exist is in place -- they are triggered abilities, and
--- eventTriggers offers an emblem's.
-theRingEmblem :: Card.Card
-theRingEmblem =
+-- CR 701.54c's three remaining sentences each begin "as long as the Ring has
+-- tempted that player N or more times, it HAS", so the emblem's ability set is a
+-- function of the count and this takes it as an argument. `tempt` re-mints the
+-- emblem's card at every temptation, which is why the count needs to reach no
+-- reader but this one.
+--
+-- Not implemented: the two- and three-temptation abilities (#706). Both need a
+-- TriggerCondition arm that does not exist -- a bystander "a permanent the Filter
+-- admits attacks" and a bystander "becomes blocked by a creature"; every attack
+-- and block arm the type has today is self-scoped. The scan that gathers the
+-- four-temptation one gathers those too once they exist: Event.eventTriggers'
+-- `inCommand` source offers every triggered ability of an emblem, unfiltered.
+theRingEmblem :: Natural.Natural -> Card.Card
+theRingEmblem temptations =
   Card.MkCard
     { Card.layout = Layout.Normal,
       Card.faces =
@@ -106,7 +129,12 @@ theRingEmblem =
               Face.spell = Face.defaultSpell,
               Face.activatedAbilities = [],
               Face.replacementEffects = [],
-              Face.triggeredAbilities = [],
+              -- CR 701.54c's fourth sentence, and only once its threshold is
+              -- met: "as long as the Ring has tempted that player four or more
+              -- times, it has ...". Written as the rule's own inequality rather
+              -- than an equality, so a fifth temptation does not take the ability
+              -- away again.
+              Face.triggeredAbilities = [theRingDrainsOnCombatDamage | temptations >= 4],
               Face.delayedAbilities = Map.empty,
               Face.rooms = Seq.empty,
               Face.castingPermissions = [],
@@ -130,22 +158,80 @@ theRingEmblem =
             }
     }
 
+-- | CR 701.54e's "is your Ring-bearer", as a Filter: the two conjuncts a Filter
+-- can carry, beside the battlefield one Affected.Matching and
+-- TriggerCondition.PermanentDealsCombatDamageToPlayer each supply themselves.
+-- ControlledBy You is "under your control", whose "you" is CR 109.5's -- the
+-- emblem's controller, which CR 114.2 makes the player it was minted for; and
+-- IsRingBearer is "has the Ring-bearer designation", asked of that same
+-- perspective. The control conjunct is the RULE and not belt-and-braces: CR
+-- 701.54e states it in as many words.
+--
+-- ONE binding for all three of the emblem's abilities, because every one of them
+-- says "your Ring-bearer" and they must not drift apart: a clause reaching a
+-- creature another does not would be a Ring-bearer that is legendary but
+-- blockable, or that connects but drains nobody.
+--
+-- No creature-ness conjunct, for the reason isRingBearerOf below gives at length:
+-- CR 701.54e's "a creature" is the antecedent of the phrase, not a fourth
+-- condition, and none of rule 701.54c's own sentences adds one either. A
+-- Ring-bearer turned into a land by Song of the Dryads is a legendary land.
+yourRingBearer :: Filter.Filter Keyword.Keyword
+yourRingBearer =
+  Filter.And
+    [ Filter.IsRingBearer,
+      Filter.ControlledBy PlayerRelation.You
+    ]
+
+-- | CR 701.54c's four-temptation sentence: "Whenever your Ring-bearer deals combat
+-- damage to a player, each opponent loses 3 life." Minted here rather than carried
+-- in card data for theRingIsLegendary's reason.
+--
+-- TriggerCondition.PermanentDealsCombatDamageToPlayer is a BYSTANDER condition --
+-- the emblem is not the damager, and CR 114.3 leaves it no power to deal damage
+-- with -- so the Filter is what "your Ring-bearer" comes to, and it is the shared
+-- `yourRingBearer` above. That condition's Filter is read against the DAMAGER
+-- with the trigger's controller as CR 109.5's perspective, which for an emblem is
+-- its owner (CR 114.2), so "your" lands on the tempted player.
+--
+-- Effect.LoseLife and not damage: rule 701.54c says "loses 3 life", so this is CR
+-- 119.3's life loss and none of CR 120's damage machinery sees it. PlayerRef's
+-- Relative Opponent is "each opponent" -- CR 102.2's other player, and CR 102.3's
+-- every player not on your team -- read against that same controller, and NOT
+-- against the player who was dealt the damage: the rule drains the whole table
+-- and only coincides with the damaged seat in a two-player game.
+--
+-- Not proved in a two-player suite, which is the only one Pawl.RingSpec builds
+-- here: "each opponent" and "the defending player" are one seat there, so the
+-- clause is a regression fence rather than a proved behaviour.
+theRingDrainsOnCombatDamage :: TriggeredAbility.TriggeredAbility Card.Card
+theRingDrainsOnCombatDamage =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.PermanentDealsCombatDamageToPlayer yourRingBearer,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      -- No intervening "if" (CR 603.4): rule 701.54c gives the emblem the ability
+      -- or does not, and an ability that exists and declines to trigger is a
+      -- different thing.
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
+    }
+  where
+    effect =
+      Effect.LoseLife
+        ( PlayerQuantity.MkPlayerQuantity
+            (PlayerRef.Relative PlayerRelation.Opponent)
+            (Quantity.Literal 3)
+        )
+
 -- | CR 701.54c's first clause, "Your Ring-bearer is legendary", as the emblem's one
 -- static ability. Rulebook text minted here rather than card data, on this module's
 -- own terms: rule 701.54c prints The Ring's text, and Birthday Escape does not.
 --
--- The affected set is CR 701.54e's definition of "is your Ring-bearer", spelled
--- across the three places that hold its three conjuncts. Affected.Matching carries
--- the "on the battlefield" one itself; ControlledBy You is "under your control",
--- whose "you" is CR 109.5's -- the emblem's controller, which CR 114.2 makes the
--- player it was minted for; and IsRingBearer is "has the Ring-bearer designation",
--- asked of that same perspective. The control conjunct is the RULE and not
--- belt-and-braces: CR 701.54e states it in as many words.
---
--- No creature-ness conjunct, for the reason isRingBearerOf below gives at length:
--- CR 701.54e's "a creature" is the antecedent of the phrase, not a fourth
--- condition, and rule 701.54c's own sentence adds none either. A Ring-bearer turned
--- into a land by Song of the Dryads is a legendary land.
+-- The affected set is `yourRingBearer` above, beside the battlefield conjunct
+-- Affected.Matching carries itself -- CR 701.54e's three, and no more.
 --
 -- One AddSupertype and no more, per CR 205.4b: a supertype is gained and never set,
 -- so the Ring-bearer keeps whatever supertypes it already had. Unconditional, since
@@ -154,13 +240,7 @@ theRingEmblem =
 theRingIsLegendary :: StaticAbility.StaticAbility Card.Card
 theRingIsLegendary =
   StaticAbility.MkStaticAbility
-    { StaticAbility.affected =
-        Affected.Matching
-          ( Filter.And
-              [ Filter.IsRingBearer,
-                Filter.ControlledBy PlayerRelation.You
-              ]
-          ),
+    { StaticAbility.affected = Affected.Matching yourRingBearer,
       StaticAbility.condition = Nothing,
       -- CR 604.2 as written: the emblem's ability is not a card's text saying
       -- its effect outlives the emblem, and CR 114.4 keeps the emblem in the
@@ -174,10 +254,8 @@ theRingIsLegendary =
 -- theRingIsLegendary's reason.
 --
 -- The SAME affected set as theRingIsLegendary, because it is the same sentence's
--- subject -- CR 701.54e's "is your Ring-bearer", spelled as its two conjuncts
--- beside Affected.Matching's own battlefield one. The two must not drift apart:
--- one clause reaching a creature the other does not would be a Ring-bearer that
--- is legendary but blockable, or blockable but not legendary.
+-- subject: `yourRingBearer` above, which is why that binding exists rather than
+-- the filter being written out twice.
 --
 -- Filter.PowerGreaterThanSource is "with greater power" exactly, and strictly:
 -- CR 701.54c says greater, so a blocker of EQUAL power blocks legally. The source
@@ -191,31 +269,58 @@ theRingCantBeBlockedByGreaterPower :: CombatRestriction.CombatRestriction
 theRingCantBeBlockedByGreaterPower =
   CombatRestriction.CantBeBlockedBy
     CantBeBlockedBy.MkCantBeBlockedBy
-      { CantBeBlockedBy.affected =
-          Affected.Matching
-            ( Filter.And
-                [ Filter.IsRingBearer,
-                  Filter.ControlledBy PlayerRelation.You
-                ]
-            ),
+      { CantBeBlockedBy.affected = Affected.Matching yourRingBearer,
         CantBeBlockedBy.blockers = Filter.PowerGreaterThanSource,
         CantBeBlockedBy.unless = Nothing
       }
 
--- CR 701.54c: does this player already have an emblem named The Ring?
+-- CR 701.54c: this player's emblems named The Ring.
 --
 -- By NAME, which is the rule's own test, rather than by comparing the whole card
--- against theRingEmblem above. Comparing cards would answer alike today and stop
--- the moment the emblem's abilities change under it -- a card is only equal to
--- itself, while the rule asks about the name however the emblem's text grows.
+-- against theRingEmblem above. Comparing cards would answer alike for a fixed
+-- emblem and stop the moment its abilities change under it -- a card is only
+-- equal to itself, while the rule asks about the name however the emblem's text
+-- grows. The text now DOES grow, `theRingEmblem` being a function of the count,
+-- so this is load-bearing rather than anticipatory.
 --
 -- zoneMembers slices the command zone by OWNER, which is the right cut: CR 114.2
 -- makes an emblem owned and controlled by the player who got it, and nothing
 -- moves an emblem afterwards.
-hasTheRing :: PlayerId -> GameState.GameState -> Bool
-hasTheRing pid gs =
+theRings :: PlayerId -> GameState.GameState -> [ObjectId]
+theRings pid gs =
   let named oid = fmap Face.name (Game.faceOf oid gs) == Just theRingName
-   in any named (Game.zoneMembers Zone.Command pid gs)
+   in filter named (Game.zoneMembers Zone.Command pid gs)
+
+-- CR 701.54c: does this player already have an emblem named The Ring?
+hasTheRing :: PlayerId -> GameState.GameState -> Bool
+hasTheRing pid gs = not (null (theRings pid gs))
+
+-- CR 701.54c: how many times the Ring has tempted this player. Zero for a player
+-- not in the game, which no caller here reaches.
+temptationsOf :: PlayerId -> GameState.GameState -> Natural.Natural
+temptationsOf pid gs = maybe 0 Player.ringTemptations (Map.lookup pid (GameState.players gs))
+
+-- CR 701.54c's three "as long as" sentences, applied: rewrite this player's
+-- emblem to the card their CURRENT temptation count entitles them to.
+--
+-- A rewrite of the existing object's Source.OfEmblem card rather than a fresh
+-- emblem, so CR 613.7a's entry timestamp and the object's identity both survive
+-- -- "it HAS" says the emblem gains an ability, not that it is replaced. Nothing
+-- else about the object changes, an emblem carrying no per-incarnation state
+-- worth preserving beyond that.
+--
+-- The alternative rejected here: mint all four abilities up front and gate the
+-- three tiers with an intervening "if" (CR 603.4). The two are observationally
+-- equivalent only because ringTemptations never decreases -- an ability the
+-- emblem does not have and one that exists and declines to trigger differ the
+-- moment a count can fall -- and CR 701.54c says the emblem does not have it.
+refreshTheRing :: PlayerId -> Game ()
+refreshTheRing pid =
+  State.modify' $ \gs ->
+    let card = theRingEmblem (temptationsOf pid gs)
+        rewrite :: ObjectId -> Map.Map ObjectId Object.Object -> Map.Map ObjectId Object.Object
+        rewrite = Map.adjust (\o -> o {Object.source = Source.OfEmblem card})
+     in gs {GameState.objects = foldr rewrite (GameState.objects gs) (theRings pid gs)}
 
 -- CR 701.54a: this creature becomes that player's Ring-bearer.
 --
@@ -259,8 +364,11 @@ designate pid oid =
 tempt :: PlayerId -> Game ()
 tempt pid = do
   gs0 <- State.get
-  -- CR 701.54c, first: the emblem, and only if they have none.
-  Monad.unless (hasTheRing pid gs0) (Monad.void (Event.createEmblem pid theRingEmblem))
+  -- CR 701.54c, first: the emblem, and only if they have none. Minted at the
+  -- count they have BEFORE this temptation, which refreshTheRing below then
+  -- raises -- the emblem arrives before the choice, and this temptation has not
+  -- been completed (CR 701.54d) until the choice is made.
+  Monad.unless (hasTheRing pid gs0) (Monad.void (Event.createEmblem pid (theRingEmblem (temptationsOf pid gs0))))
   gs1 <- State.get
   let candidates = List.sort (filter (\oid -> Projection.isCreatureOf oid gs1) (Projection.controls pid gs1))
   case candidates of
@@ -288,6 +396,9 @@ tempt pid = do
               Map.adjust (\p -> p {Player.ringTemptations = Player.ringTemptations p + 1}) pid (GameState.players g)
           }
     )
+  -- CR 701.54c's "as long as", re-read against the count this temptation just
+  -- raised: the emblem gains a tier the moment its threshold is crossed.
+  refreshTheRing pid
 
 -- | CR 701.54a's SECOND ending: "until ... another player gains control of it".
 -- Lift the designation from every permanent whose controller is no longer the
@@ -355,18 +466,15 @@ endOnControlChange = do
 -- into a land by Song of the Dryads is still designated. The caller supplies the
 -- creature restriction its own printed sentence carries.
 --
--- The IMPERATIVE spelling of the same three conjuncts theRingIsLegendary above
+-- The IMPERATIVE spelling of the same three conjuncts `yourRingBearer` above
 -- spells as a Filter, for a caller with no Filter and no projection fold in hand.
 -- The two must not drift: this one reads Projection.controllerOf where the Filter's
 -- ControlledBy reads the partial projection's controller, which is CR 613.1b's
 -- layer 2 either way.
 --
 -- Still read by no RULE -- what reads CR 701.54e in anger is the emblem's own
--- text, and both of the base ability's clauses spell those conjuncts as a Filter
--- instead (theRingIsLegendary, theRingCantBeBlockedByGreaterPower); the emblem's
--- remaining abilities are triggered and nothing mints them yet (#706).
--- Pawl.RingSpec
--- proves the designation through it.
+-- text, and every ability of it that pawl mints reaches the designation through
+-- `yourRingBearer` instead. Pawl.RingSpec proves the designation through it.
 isRingBearerOf :: PlayerId -> ObjectId -> GameState.GameState -> Bool
 isRingBearerOf pid oid gs =
   Set.member oid (GameState.battlefield gs)
