@@ -2343,7 +2343,8 @@ shizukoSpec s registry = Spec.describe s "Shizuko, Caller of Autumn" $ do
     Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.carol hers)) "carol casts a second Shizuko off her own upkeep's mana"
     Spec.assertBool s (not (any (S.isCastOf otherOid) (Action.legalActions S.carol his))) "and cannot when the mana went to alice"
 
-  -- CR 500.5 / 106.4, driven through Engine.runStep so the WHOLE upkeep step runs
+  -- CR 500.5 / 106.4, driven through Engine.runStep so the WHOLE upkeep step
+  -- runs
   -- -- CR 603.2b's event, the trigger, the priority round and the step's own
   -- end-of-step mana emptying -- rather than by calling Mana.emptyManaPools.
   --

@@ -340,17 +340,17 @@ addMana pid units gs =
 -- part of the turn-based action and not part of the moment: CR 500.5 names one
 -- action, and which mana it takes belongs to the action.
 --
--- TWO CARRIERS, and a unit either keeps it is kept. The CR 613.11 player-axis
--- one is asked per player and then per unit, through a typed question
--- (PlayerEffect.keepsUnspentMana) that never reveals which effect answered it --
--- per unit because a card may name only some of the mana: Upwelling keeps every
--- type, Omnath, Locus of Mana only green. The per-player question is asked ONCE
--- and its predicate applied to that player's units, which is the shape
--- keepsUnspentMana's argument order is built for. The other carrier is the UNIT
--- itself (Pawl.Types.ManaRetention), which is where a clause naming the mana one
--- ability just added has to live -- Shizuko, Caller of Autumn's "they don't lose
--- THIS mana" says different things about two manas of one pool, so no widening
--- of the player-axis filter can express it.
+-- TWO CARRIERS, and a unit either of them keeps is kept. The CR 613.11
+-- player-axis one is asked per player and then per unit, through a typed
+-- question (PlayerEffect.keepsUnspentMana) that never reveals which effect
+-- answered it -- per unit because a card may name only some of the mana:
+-- Upwelling keeps every type, Omnath, Locus of Mana only green. The per-player
+-- question is asked ONCE and its predicate applied to that player's units,
+-- which is the shape keepsUnspentMana's argument order is built for. The other
+-- carrier is the UNIT itself (Pawl.Types.ManaRetention), which is where a
+-- clause naming the mana one ability just added has to live -- Shizuko, Caller
+-- of Autumn's "they don't lose THIS mana" says different things about two manas
+-- of one pool, so no widening of the player-axis filter can express it.
 --
 -- A DISJUNCTION over the two, for keepsUnspentMana's own reason: two retention
 -- effects that name different mana are not in conflict, and CR 613.11's
