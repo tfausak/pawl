@@ -534,9 +534,9 @@ restartSpec s registry = Spec.describe s "Restart" $ do
   -- procedure that restarts the game won't begin the new game in the command
   -- zone. However, it remains that deck's commander for the new game."
   --
-  -- Two assertions, one per sentence, on one pair of boards that differ in the
-  -- exempt set and in nothing else. Both halves live in Pawl.Engine.Setup and
-  -- this is what proves them: the first in startGameFromCards, which drops the
+  -- One sentence each, on a pair of restarts that differ in the exempt set and
+  -- in nothing else. Both halves live in Pawl.Engine.Setup and this is what
+  -- proves them: the first in startGameFromCards, which drops the
   -- exempt objects before it picks each owner's commander out of the rebuilt
   -- pool; the second in resetPlayers, which deliberately leaves Player.commander
   -- alone.
@@ -560,7 +560,7 @@ restartSpec s registry = Spec.describe s "Restart" $ do
             kept = S.runPure S.identityAnswer exiled (Setup.restartGame S.performer Set.empty S.alice)
         -- Pins the fixture: without these every assertion below could hold
         -- because there was no commander in exile to exempt.
-        Spec.assertEqWith s "the commander really reached exile, as one object" (length (Set.toAscList (GameState.exile exiled))) 1
+        Spec.assertEqWith s "the commander really reached exile, as one object" (Set.size (GameState.exile exiled)) 1
         Spec.assertEqWith s "and is still alice's commander there" (Commander.isCommander oid exiled) True
         -- CR 727.5a's first sentence: the discriminating assertion.
         Spec.assertEqWith s "the exempted commander is not in the new game's command zone" (inCommandZone after) []
