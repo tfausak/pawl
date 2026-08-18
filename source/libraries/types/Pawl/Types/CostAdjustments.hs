@@ -62,8 +62,9 @@ data CostAdjustments = MkCostAdjustments
     --
     -- Empty for a SPELL's cost. CR 601.2f's additional costs for a spell arrive
     -- through Pawl.Engine.Cost.plus instead, off the spell's own card text (CR
-    -- 601.2b's alternative and additional costs), and no gathered player effect
-    -- adds one.
+    -- 601.2b's alternative and additional costs). No gathered player effect adds
+    -- one because Pawl.Types.PlayerEffect has no arm that could -- Drought is
+    -- the printing (gap #1679).
     components :: [CostComponent.CostComponent Keyword.Keyword]
   }
   deriving (Eq, Ord, Show)
