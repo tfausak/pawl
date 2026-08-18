@@ -259,3 +259,37 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
         s
         (Define.run (Codec.schema (Common.textMap id id Common.integer)))
         (Define.run (fmap Schema.mapOf (Codec.schema Common.integer)))
+
+  Spec.describe s "assertMatchesSchema" $ do
+    -- A capturing spec, so that a FAILING assertion is a value rather than the
+    -- end of the run. Pawl.Spec's assertFailure is polymorphic in its result,
+    -- which makes Either's Left a lawful implementation of it.
+    let capture =
+          Spec.MkSpec
+            { Spec.assertFailure = Left,
+              Spec.describe = \_ x -> x,
+              Spec.it = \_ x -> x
+            }
+        -- Deliberately self-contradictory: the encoder writes a number where
+        -- the schema says string. No codec built from the combinators above can
+        -- be, which is why this one is assembled by hand.
+        inconsistent =
+          Codec.MkCodec
+            { Codec.encode = \() -> Value.integer 1,
+              Codec.decode = \_ -> Right (),
+              Codec.schema = pure Schema.string
+            }
+    Spec.it s "passes a codec that agrees with its schema" $
+      Spec.assertEq s (Common.assertMatchesSchema capture Common.integer 1) (Right ())
+    Spec.it s "fails a codec whose encoder contradicts its schema" $
+      Spec.assertBool
+        s
+        (Either.isLeft (Common.assertMatchesSchema capture inconsistent ()))
+        "expected the assertion to fail"
+    -- The wiring rather than the helper: assertCodec is what every per-type
+    -- spec calls, so dropping its schema step would leave this green.
+    Spec.it s "assertCodec checks the schema" $
+      Spec.assertBool
+        s
+        (Either.isLeft (Common.assertCodec capture inconsistent () "1"))
+        "expected the assertion to fail"

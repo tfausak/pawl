@@ -6,9 +6,13 @@ module Pawl.CardsSpec where
 import qualified Data.ByteString as ByteString
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
+import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Printing as Printing
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
+import qualified Pawl.JsonSchema.Define as Define
+import qualified Pawl.JsonSchema.Validate as Validate
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -19,10 +23,14 @@ spec s = Spec.describe s "Pawl.Cards" $ do
   Spec.it s "each committed file re-parses to its compiled card (P3)" $ do
     root <- Registry.defaultRoot
     ps <- S.allPrintings s
-    mapM_ (checkFile s root) ps
+    -- Rendered once for the whole corpus rather than per file: it is one value,
+    -- and building it a thousand times is the one place this case could get
+    -- slow.
+    let schema = Define.run (Codec.schema Card.codec)
+    mapM_ (checkFile s root schema) ps
 
-checkFile :: Spec.Spec IO n -> FilePath -> Printing.Printing -> IO ()
-checkFile s root p = do
+checkFile :: Spec.Spec IO n -> FilePath -> Value.Value -> Printing.Printing -> IO ()
+checkFile s root schema p = do
   let slug = Registry.filedAs (Printing.card p)
   let path = Registry.cardPath root slug
   -- Read as bytes and decoded as UTF-8 explicitly, for the reason
@@ -37,7 +45,13 @@ checkFile s root p = do
       case Common.parse contents of
         -- Unreachable: S.allPrintings would have failed in IO first.
         Left err -> Spec.assertFailure s (path <> ": " <> Text.unpack err)
-        Right value ->
+        Right value -> do
+          -- Every committed file matches the schema the card codec publishes.
+          -- Asserted BEFORE the re-encoding below, which would otherwise absorb
+          -- a schema defect and report itself instead. Card.codec rather than
+          -- Printing.codec because Registry.parseCard is what reads these files
+          -- and it decodes a Card; the two write the same wire.
+          Spec.assertEqWith s (path <> ": schema") (Validate.validate schema value) []
           -- The loader reads everything the file says and invents nothing:
           -- re-encoding the loaded printing reproduces the file's meaning. Compared
           -- up to key order and whitespace, because JSON objects are unordered and
