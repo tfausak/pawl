@@ -263,10 +263,12 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.Action as A
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
+import qualified Pawl.Types.BecameAttached as BecameAttached
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
@@ -9985,6 +9987,12 @@ representativeEvents cond =
         -- the floor for a matching pair too, this condition binding nothing
         -- either way.
         TriggerCondition.SelfExerted -> one (GameEvent.Exerted departed)
+        -- CR 701.3a's own event, and the only one this condition admits. The HOST
+        -- is `departed`, the bearer position, so the pair really matches; the
+        -- attachment is `arrived`, and the Filter this condition is instantiated
+        -- with below is the trivial one, which admits whatever that id resolves
+        -- to.
+        TriggerCondition.SelfBecomesAttachedBy _ -> one (GameEvent.BecameAttached (BecameAttached.MkBecameAttached arrived (Recipient.ToCreature departed)))
 
 -- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
 -- eventBindings and eventBindingSlots both ignore them, which is itself part of
@@ -10093,7 +10101,8 @@ everyTriggerCondition =
     TriggerCondition.PlayerSurveils PlayerRelation.Opponent,
     TriggerCondition.SelfBecomesPlotted,
     TriggerCondition.PermanentExplores (Filter.Type.And []),
-    TriggerCondition.SelfExerted
+    TriggerCondition.SelfExerted,
+    TriggerCondition.SelfBecomesAttachedBy (Filter.Type.And [])
   ]
 
 -- CR 603.6c's penultimate sentence -- "An ability that attempts to do something
@@ -14203,6 +14212,158 @@ wildgrowthWalkerSpec s registry =
           Spec.assertEqWith s "alice gained 3" (S.lifeOf S.alice after) (Just 23)
           Spec.assertEqWith s "and nothing was binned" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
 
+-- CR 701.3a's attachment event, read from the HOST's side by
+-- TriggerCondition.SelfBecomesAttachedBy.
+--
+-- Bramble Elemental, {3}{G}{G} Creature -- Elemental 4/4, "Whenever an Aura
+-- becomes attached to this creature, create two 1/1 green Saproling creature
+-- tokens."
+--
+-- TWO emit sites, and a leg apiece, because the rules reach the same trigger by
+-- two roads: CR 608.3c puts a resolving Aura spell onto the battlefield already
+-- attached (Pawl.Engine.Event's zone-change funnel writes the seed), and CR
+-- 701.3a moves a permanent that is already there (Event.attach). Deleting either
+-- emit leaves the other leg green, which is why neither stands alone.
+--
+-- NOTHING here goes through Pawl.Support.attach, which writes Object.attachedTo
+-- directly and records no event: a leg built on it would read zero before and
+-- zero after and could not tell this engine from one that had never heard of the
+-- rule.
+-- Tokens only, and by SUBTYPE: the Elemental's own board is full of creatures,
+-- and counting them would drift the moment a fixture changed.
+saprolingsOf :: PlayerId.PlayerId -> GameState.GameState -> Int
+saprolingsOf pid gs =
+  length
+    ( filter
+        (\oid -> Set.member Subtype.Saproling (Projection.subtypesOf oid gs) && Projection.controllerOf oid gs == Just pid)
+        (S.tokensOf gs)
+    )
+
+-- Answers every target slot with the offered recipients that name one object.
+--
+-- FILTERS the offered set rather than building a Recipient, AuraSpec's
+-- aimAtOffered posture: Pacifism's enchant slot pools creatures, and a
+-- hand-built recipient of another shape is dropped by CR 608.2b's re-read at
+-- resolution with no error to see.
+aimAtOffered :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtOffered oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just oid) . Recipient.objectOf) . snd) sets
+  _ -> S.identityAnswer p
+
+-- Both of an attach-moving ability's prompts: its target slot, and CR 701.3a's
+-- destination choice.
+moveOnto :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+moveOnto subject dest p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just subject) . Recipient.objectOf) . snd) sets
+  Prompt.ChooseAttachment {} -> dest
+  _ -> S.identityAnswer p
+
+-- The CR 117.5 boundary scans for triggers, then the one it placed resolves.
+-- Narrower than the priority loop, which would sweep the rest of the board too.
+fireTriggers :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+fireTriggers answer gs =
+  let placed = S.runPure answer gs Engine.settleForPriority
+   in S.runPure answer placed Stack.resolveTop
+
+-- What is attached to `host`, by whichever tag the attaching permanent's own
+-- rules text names it -- Pawl.AuraSpec's attachedTo.
+attachmentsOn :: ObjectId.ObjectId -> GameState.GameState -> [ObjectId.ObjectId]
+attachmentsOn host gs =
+  filter
+    (\oid -> (Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf) == Just host)
+    (Set.toList (GameState.battlefield gs))
+
+firstActivatedOf :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+firstActivatedOf printing = case Face.activatedAbilities (S.combinedFace printing) of
+  ability : _ -> Just ability
+  [] -> Nothing
+
+brambleElementalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+brambleElementalSpec s registry =
+  Spec.describe s "CR 701.3a a trigger on becoming attached" $ do
+    -- CR 608.3c: the Aura spell resolves and is put onto the battlefield
+    -- attached to what it targeted. The attachment is written inside the zone
+    -- change, on the CR 400.7 incarnation, so this leg is the entry emit and
+    -- reaches Event.attach not at all.
+    Spec.it s "CR 608.3c whole card: casting Pacifism on the Elemental creates two Saprolings" $ do
+      plains <- S.printingOf s registry "Plains"
+      bramble <- S.printingOf s registry "Bramble Elemental"
+      pacifism <- S.printingOf s registry "Pacifism"
+      let (brambleId, board) = S.addCreature bramble S.alice (S.landsInPlay plains 3)
+          (armed, auraSpell) = S.handOne pacifism board
+          cast = S.runPure (aimAtOffered brambleId) armed (S.cast S.alice auraSpell)
+          entered = S.runPure (aimAtOffered brambleId) cast Stack.resolveTop
+          after = fireTriggers (aimAtOffered brambleId) entered
+      Spec.assertEqWith s "CR 603.2 two Saprolings once the trigger resolves" (saprolingsOf S.alice after) 2
+      Spec.assertEqWith s "and none on the board the Aura was cast from" (saprolingsOf S.alice armed) 0
+      -- The precondition the count rests on: an Aura that never landed would
+      -- make zero the right answer for the wrong reason.
+      Spec.assertEqWith s "the Aura is attached to the Elemental" (length (attachmentsOn brambleId entered)) 1
+    -- CR 701.3a's other road: an Aura already on the battlefield MOVES.
+    -- Crown of the Ages, "{4}, {T}: Attach target Aura attached to a creature
+    -- to another creature" -- Unholy Strength enters on a Piker, where
+    -- nothing triggers, and is then moved onto the Elemental.
+    --
+    -- The Piker half is the pair's other board, one object different: same
+    -- Aura, same cast, same resolution, a host that is not the watcher.
+    Spec.it s "CR 701.3a whole card: Crown of the Ages moving an Aura onto the Elemental creates two Saprolings" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      piker <- S.printingOf s registry "Goblin Piker"
+      bramble <- S.printingOf s registry "Bramble Elemental"
+      unholyStrength <- S.printingOf s registry "Unholy Strength"
+      crown <- S.printingOf s registry "Crown of the Ages"
+      let (pikerId, base1) = S.addCreature piker S.alice (S.landsInPlay swamp 7)
+          -- A DECOY creature, so Crown's "another creature" offers two
+          -- destinations and Attach.chooseHost really asks rather than
+          -- eliding at a single candidate.
+          (_, base2) = S.addCreature piker S.alice base1
+          (brambleId, base3) = S.addCreature bramble S.alice base2
+          (armed, auraSpell) = S.handOne unholyStrength base3
+          onPiker = S.runPure (aimAtOffered pikerId) armed (S.cast S.alice auraSpell >> Stack.resolveTop)
+          settledOnPiker = fireTriggers (aimAtOffered pikerId) onPiker
+      case attachmentsOn pikerId settledOnPiker of
+        [] -> Spec.assertFailure s "Unholy Strength should have entered attached to the Piker"
+        auraId : _ -> do
+          let (withCrown, crownSpell) = S.handOne crown settledOnPiker
+              resolved = S.runPure S.identityAnswer withCrown (S.cast S.alice crownSpell >> Stack.resolveTop)
+              crownIds = filter (\oid -> Game.cardOf oid resolved == Just (Printing.card crown)) (Set.toList (GameState.battlefield resolved))
+          case (crownIds, firstActivatedOf crown) of
+            (crownId : _, Just move) -> do
+              let ready = resolved {GameState.priority = Just S.alice}
+                  activated = S.runPure (moveOnto auraId brambleId) ready (Activate.activateAbility S.alice crownId move)
+                  moved = S.runPure (moveOnto auraId brambleId) activated Stack.resolveTop
+                  after = fireTriggers (moveOnto auraId brambleId) moved
+              Spec.assertEqWith s "CR 603.2 two Saprolings once the move's trigger resolves" (saprolingsOf S.alice after) 2
+              -- The other board, one object different: the same Aura entering
+              -- on a creature that is not the watcher fires nothing.
+              Spec.assertEqWith s "and none while the Aura sat on the Piker" (saprolingsOf S.alice settledOnPiker) 0
+              Spec.assertEqWith s "the Aura really moved onto the Elemental" (attachmentsOn brambleId moved) [auraId]
+            _ -> Spec.assertFailure s "Crown of the Ages should have resolved onto the battlefield with one activated ability"
+    -- "An AURA", the word the Filter carries, on the SAME emit site as the
+    -- leg above: Bonesplitter's equip attaches an Equipment to the Elemental
+    -- through Event.attach, and nothing happens.
+    --
+    -- Discriminating only because that leg is the positive on this path --
+    -- alone it would pass against an engine with no event at all.
+    Spec.it s "CR 702.6a equipping the Elemental with Bonesplitter creates nothing" $ do
+      plains <- S.printingOf s registry "Plains"
+      bramble <- S.printingOf s registry "Bramble Elemental"
+      bonesplitter <- S.printingOf s registry "Bonesplitter"
+      let (brambleId, base1) = S.addCreature bramble S.alice (S.landsInPlay plains 3)
+          (bladeId, base2) = S.addCreature bonesplitter S.alice base1
+          ready = base2 {GameState.priority = Just S.alice}
+      case firstActivatedOf bonesplitter of
+        Nothing -> Spec.assertFailure s "Bonesplitter should print one activated ability"
+        Just equip -> do
+          let activated = S.runPure (aimAtOffered brambleId) ready (Activate.activateAbility S.alice bladeId equip)
+              equipped = S.runPure (aimAtOffered brambleId) activated Stack.resolveTop
+              after = fireTriggers (aimAtOffered brambleId) equipped
+          Spec.assertEqWith s "no Saproling: an Equipment is not an Aura" (saprolingsOf S.alice after) 0
+          -- Without this the zero says nothing: an equip that never happened
+          -- would read the same.
+          Spec.assertEqWith s "though the Equipment really did become attached" (attachmentsOn brambleId equipped) [bladeId]
+          Spec.assertEqWith s "which CR 301.5f's +2/+0 confirms" (S.powerToughnessOf brambleId equipped) (Just (6, 4))
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   logSpec s registry
@@ -14326,3 +14487,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   aloeAlchemistSpec s registry
   wildgrowthWalkerSpec s registry
   rayOfCommandSpec s registry
+  brambleElementalSpec s registry

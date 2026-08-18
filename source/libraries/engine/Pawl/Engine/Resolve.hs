@@ -5443,12 +5443,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- re-derived for an optional attach (#359).
           destination <- Attach.chooseHost controller subject (Attach.hostsFor controller source subject filter_ gs)
           -- The destination was chosen as an object off the battlefield, so it is
-          -- proposed as a bare ToObject and Attach.attach re-tags it the way the
+          -- proposed as a bare ToObject and Event.attach re-tags it the way the
           -- subject's own enchant slot references it. Always a DIFFERENT object
           -- than the current host, which hostsFor never offers, so CR 701.3c's
           -- restamp is always earned -- and CR 303.4j's refusal, for a
-          -- destination the subject may not go to, happens inside Attach.attach.
-          Monad.mapM_ (Attach.attach subject . Recipient.ToObject) destination
+          -- destination the subject may not go to, happens inside Event.attach.
+          Monad.mapM_ (Event.attach subject . Recipient.ToObject) destination
       _ -> pure ()
   Effect.ExileUntilMonarch slot ->
     case legalOne slot legal of

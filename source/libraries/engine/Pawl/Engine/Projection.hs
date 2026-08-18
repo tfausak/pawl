@@ -2422,6 +2422,10 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PermanentExplores f -> TriggerCondition.PermanentExplores (Filter.rewrite pairs f)
   -- Nullary, so there is nothing for CR 612.1 to reach.
   TriggerCondition.SelfExerted -> condition
+  -- Its Filter is a predicate over the ATTACHMENT, so a subtype rewrite reaches
+  -- it for PermanentExplores' reason: Bramble Elemental's names Aura, which CR
+  -- 205.3g makes a subtype word an effect could in principle swap.
+  TriggerCondition.SelfBecomesAttachedBy f -> TriggerCondition.SelfBecomesAttachedBy (Filter.rewrite pairs f)
 
 -- CR 612.1 through Condition's predicate vocabulary, at the four clauses a
 -- PRINTED ability carries one in: a triggered ability's CR 603.8 state trigger

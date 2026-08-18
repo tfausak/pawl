@@ -1,9 +1,14 @@
--- Rule 701.3's attach, in one place because callers a library apart need the same
--- answer: Pawl.Engine.Resolve's Attach and AttachTarget opcodes, and two arms of
--- Pawl.Engine.Event -- the CR 303.4k rewrite for an Aura being turned face up, and
--- changeZoneAttaching's CR 303.4f host choice for an Aura entering the battlefield
--- by any means other than resolving as an Aura spell. Event sits BELOW Resolve, so
--- the shared half cannot live in Resolve where it started.
+-- Rule 701.3's LEGALITY READING, in one place because callers a library apart need
+-- the same answer: Pawl.Engine.Resolve's Attach and AttachTarget opcodes, and two
+-- arms of Pawl.Engine.Event -- the CR 303.4k rewrite for an Aura being turned face
+-- up, and changeZoneAttaching's CR 303.4f host choice for an Aura entering the
+-- battlefield by any means other than resolving as an Aura spell. Event sits BELOW
+-- Resolve, so the shared half cannot live in Resolve where it started.
+--
+-- WHAT MAY BE ATTACHED WHERE, and never the move itself: rule 701.3b's write is
+-- Pawl.Engine.Event.attach, beside the other funnels that record an event, since
+-- Event imports this module and the edge cannot run both ways. Everything here is
+-- a question with no answer written back to the board.
 --
 -- THE INVARIANT: nothing here asks which CARD is moving. It reads the
 -- PROJECTION's subtypes (CR 205.3) and the enchant ability rule 702.5a gives an
@@ -14,7 +19,6 @@ module Pawl.Engine.Attach where
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
-import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Card as Card
@@ -189,24 +193,3 @@ chooseHost controller subject candidates = case candidates of
       let offered = first NonEmpty.:| (second : more)
       answer <- Game.choose (Prompt.ChooseAttachment (Decide.deciderFor controller gs) controller subject offered)
       pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
-
--- CR 701.3b and CR 701.3c: store the attachment and restamp.
---
--- CR 303.4j for an Aura -- "the Aura doesn't move" -- and CR 701.3b's first
--- sentence for the rest. A FAILURE MODE, not a fizzle: the only thing that does
--- not happen is the move, and in particular the subject stays attached to its old
--- host rather than becoming unattached, so CR 704.5m has nothing to bury.
---
--- CR 701.3c: attaching to a DIFFERENT object gives it a new timestamp, which CR
--- 613.7 orders layer effects by. The caller is responsible for not calling this
--- with the host the subject already has -- CR 701.3b's "does nothing" would
--- otherwise become a restamp.
-attach :: ObjectId -> Recipient -> Game ()
-attach subject destination = do
-  gs <- State.get
-  case attachmentFor subject destination gs of
-    Nothing -> pure ()
-    Just attachment -> do
-      let (ts, gs1) = Game.freshTimestamp gs
-          move o = o {Object.attachedTo = Just attachment, Object.timestamp = ts}
-      State.put gs1 {GameState.objects = Map.adjust move subject (GameState.objects gs1)}
