@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 
-# A census issue tracks a run of CR rules, and this checks two things about it.
+# A census issue tracks a run of CR rules, and this checks it by the evidence
+# rules below.
 #
 # EPONYMY, in `check`: a census's "Not implemented" block must not name a
 # capability the tree already carries. Every census-tracked unit is supposed to
@@ -17,10 +18,21 @@
 # sat under "Not implemented" after PR #1708 landed it as `Designation.Solved`,
 # eponymous with no `Keyword` constructor at all. Coverage sees both.
 #
+# WRITTEN NAMES, in `check_names`: the `Type.Constructor` tokens a census writes
+# in backticks are exactly the constructors of the type it tracks, minus a
+# documented exempt list. This is what serves #875 (CR 116), whose prose names
+# ("Play a land", "Roll the planar die") will never be eponymous with a
+# constructor -- but whose implemented rows write the constructor out instead.
+# Set equality has no blind spot in either direction, and the reverse direction
+# is what earns it: a PR that adds an `Action` arm and leaves #875 alone goes
+# red, which is the #1485/#1527 shape prose twice failed to prevent.
+#
 # Usage: `check-census.sh`, from the repository root. Reports each stale row as
-# `#ISSUE: RULE NAME -- Type.Constructor exists` and each coverage defect as
-# `#ISSUE: CR RULE has no row` or `#ISSUE: row RULE is no rule`, and exits 1.
-# The censuses are read once per assertion, so a run makes four `gh` calls.
+# `#ISSUE: RULE NAME -- Type.Constructor exists`, each coverage defect as
+# `#ISSUE: CR RULE has no row` or `#ISSUE: row RULE is no rule`, and each name
+# mismatch as `#ISSUE: Type.Constructor has no row` or `#ISSUE: row names
+# Type.Constructor, which is no constructor`, and exits 1. The censuses are read
+# once per assertion, so a run makes one `gh` call per assertion.
 #
 # NEEDS THE NETWORK, which is why it is not a `.hooky.kdl` hook: the censuses
 # live in GitHub issue bodies rather than in the tree, and `hooky fix` is offline
@@ -57,9 +69,23 @@
 # harmless as long as the rules it names are real: #876's "CR 701.10 double and
 # CR 701.12 exchange are not in this list" passes for that reason.
 #
-# CR 116's census (#875) is not checked. Its rows are keyed to the subsystem
-# each is gated on rather than to a constructor name ("Turn a face-down creature
-# face up" is `Action.TurnFaceUp`), so there is nothing mechanical to compare.
+# Written names must be BACKTICK-ANCHORED. #875's own status paragraph reads
+# "`Pawl.Types.Action.Action` carries an arm per implemented row", and an
+# unanchored `Action\.[A-Z]...` pattern reads `Action.Action` out of it -- a name
+# no constructor has, so the check would be red on arrival. Requiring a backtick
+# immediately before the type name drops the qualified form while still admitting
+# a future `Pawl.Engine.Action.Foo` written in backticks, which a "reject when
+# preceded by a period" rule would not.
+#
+# The `Action` arms `Pass`, `Cast`, `Activate` and `ActivateManaAbility` are
+# exempt, and #875's body already names all four in prose. CR 116.1 defines a
+# special action as one a player takes with priority that does not use the stack,
+# and CR 116.2 enumerates the twelve; passing, casting and activating are not
+# among them (CR 117.1a is the cast permission, CR 601 and CR 602 the
+# procedures). They are the priority actions AROUND the special ones, so #875
+# carries no row for them. `Concede` is absent for a different reason -- CR
+# 104.3a puts it outside the priority enumeration and it is no `Action`
+# constructor at all, so set equality never sees it.
 
 set -o errexit
 set -o nounset
@@ -178,10 +204,78 @@ check_rules() {
   ' docs/rules.txt "$body" || status=1
 }
 
+# issue, module, type, exempt constructors separated by spaces
+check_names() {
+  gh issue view "$1" --json body --jq .body >"$body"
+  awk -v issue="$1" -v module="$2" -v type="$3" -v exempt="$4" '
+    BEGIN {
+      n = split(exempt, e, / /)
+      for (i = 1; i <= n; i++) skip[e[i]] = 1
+    }
+    # The tracked type first, by the constructor pattern check() already uses.
+    FNR == NR {
+      if ($0 ~ "^data " type "( |$)") { inside = 1; next }
+      if (inside && $0 ~ /^  deriving/) { inside = 0 }
+      if (inside && match($0, /^(  [=|] |    )[A-Z][A-Za-z0-9_]*/)) {
+        name = $0
+        sub(/^(  [=|] |    )/, "", name)
+        sub(/[^A-Za-z0-9_].*$/, "", name)
+        ctors = ctors + 1
+        if (!(name in skip)) ctor[name] = 1
+      }
+      next
+    }
+    # Then the census body: every `Type.Constructor` written in backticks.
+    {
+      rest = $0
+      while (match(rest, "`" type "\\.[A-Z][A-Za-z0-9_]*")) {
+        name = substr(rest, RSTART + length(type) + 2, RLENGTH - length(type) - 2)
+        rest = substr(rest, RSTART + RLENGTH)
+        if (name in skip) continue
+        rows = rows + 1
+        row[name] = 1
+      }
+    }
+    # Exempt names are dropped from BOTH sides, so a row that did name an exempt
+    # constructor is ignored rather than falsely reported.
+    END {
+      for (name in ctor) {
+        if (!(name in row)) {
+          printf "#%s: %s.%s has no row\n", issue, type, name
+          bad = 1
+        }
+      }
+      for (name in row) {
+        if (!(name in ctor)) {
+          printf "#%s: row names %s.%s, which is no constructor\n", issue, type, name
+          bad = 1
+        }
+      }
+      # As in check(), a body or a module that parses to nothing would pass
+      # vacuously. The row guard counts non-exempt tokens only, so a body edited
+      # down to nothing but exempt names is red; the constructor guard counts
+      # every arm, so it fires on a renamed type rather than on a wide exempt
+      # list.
+      if (!rows) {
+        printf "#%s: no `%s.` rows\n", issue, type
+        bad = 1
+      }
+      if (!ctors) {
+        printf "%s: no constructors of %s\n", module, type
+        bad = 1
+      }
+      exit bad
+    }
+  ' "$2" "$body" || status=1
+}
+
 check 876 source/libraries/types/Pawl/Types/Effect.hs Effect
 check 877 source/libraries/types/Pawl/Types/Keyword.hs Keyword
 
 check_rules 876 701
 check_rules 877 702
+
+check_names 875 source/libraries/types/Pawl/Types/Action.hs Action \
+  'Pass Cast Activate ActivateManaAbility'
 
 exit "$status"
