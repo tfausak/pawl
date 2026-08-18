@@ -135,9 +135,11 @@ data CombatRestriction
     -- ATTACKER or as the arm below.
     CantBlock AffectedUnless.AffectedUnless
   | -- | CR 509.1b's second paragraph: these ATTACKING creatures can't be blocked
-    -- by creatures matching the Filter, unless the gate holds. CR 701.54c's "your
-    -- Ring-bearer ... can't be blocked by creatures with greater power" is the
-    -- pool's one statement of it (Pawl.Engine.Ring.theRingCantBeBlockedByGreaterPower).
+    -- by creatures matching the Filter, unless the gate holds. Questing Beast's
+    -- "can't be blocked by creatures with power 2 or less" is the pool's printed
+    -- statement of it, and CR 701.54c's "your Ring-bearer ... can't be blocked by
+    -- creatures with greater power" the rulebook's
+    -- (Pawl.Engine.Ring.theRingCantBeBlockedByGreaterPower).
     --
     -- The one arm carrying an OBJECT as well as a subject, because a pair is the
     -- smallest thing the sentence is about: the Filter describes a blocker
