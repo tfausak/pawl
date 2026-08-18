@@ -4549,8 +4549,19 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- creature the creature with the ability blocks" -- and the difference from
   -- SelfBlocks above, together with the attacker eventBindings stamps under
   -- Binding.blockedCreature.
-  TriggerCondition.SelfBlocksCreature -> case event of
-    GameEvent.BlockerDeclared (BlockerDeclared.MkBlockerDeclared blocker _) -> blocker == bearer
+  --
+  -- The Filter is a predicate over that ATTACKER, read from the game as it
+  -- stands, which is rule 509.3f's "at the point blockers are declared" for
+  -- SelfBecomesBlockedBy's reason below. viewWithLastKnown for that arm's reason
+  -- too -- an attacker already gone (CR 608.2h) is still read as it was on the
+  -- battlefield.
+  TriggerCondition.SelfBlocksCreature f -> case event of
+    GameEvent.BlockerDeclared (BlockerDeclared.MkBlockerDeclared blocker attacker)
+      | blocker == bearer ->
+          case Projection.viewWithLastKnown attacker gs attacker of
+            Nothing -> False
+            Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
+    GameEvent.BlockerDeclared {} -> False
     -- CR 509.3a's grouped event is the once-per-combat one, and matching it here
     -- would lose a blocker's second attacker.
     GameEvent.BlocksDeclared {} -> False
@@ -6718,7 +6729,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.CreatureAttacksYou -> False
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
-  TriggerCondition.SelfBlocksCreature -> False
+  TriggerCondition.SelfBlocksCreature _ -> False
   TriggerCondition.SelfBlocksAtLeast _ -> False
   TriggerCondition.SelfBlocksOneOrMore _ -> False
   TriggerCondition.SelfBecomesBlocked -> False
@@ -7037,7 +7048,7 @@ eventBindings cond event = case (cond, event) of
   -- Loyal Sentry's payload destroys. The mirror of the arm above, and
   -- unconditional for the same reason; here it is the BLOCKER that is the bearer
   -- and so gets no second name.
-  (TriggerCondition.SelfBlocksCreature, GameEvent.BlockerDeclared (BlockerDeclared.MkBlockerDeclared _ attacker)) ->
+  (TriggerCondition.SelfBlocksCreature _, GameEvent.BlockerDeclared (BlockerDeclared.MkBlockerDeclared _ attacker)) ->
     Binding.setBlockedCreature attacker Map.empty
   -- CR 702.134c's "that creature": the creature that was mentored, the event's
   -- second id -- Aegis of the Legion's shield counter goes on it. The MENTOR gets no
@@ -7277,7 +7288,7 @@ eventBindingSlots cond = case cond of
   -- Guaranteed rather than conditional, as SelfBecomesBlockedBy's is: every
   -- declaration carries both ids, and matchesTrigger has already pinned the
   -- blocker to the bearer.
-  TriggerCondition.SelfBlocksCreature -> Set.singleton Binding.blockedCreature
+  TriggerCondition.SelfBlocksCreature _ -> Set.singleton Binding.blockedCreature
   -- CR 508.5's defending player, which the becomes-blocked event carries for
   -- SelfAttacks' reason -- rule 702.130a's afflict is the reader. No BLOCKER: CR
   -- 509.3c names none, so GameEvent.AttackerBlocked carries none, and CR 509.3d's
@@ -7603,7 +7614,7 @@ looksBack condition = case condition of
   TriggerCondition.CreatureAttacksYou -> False
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
-  TriggerCondition.SelfBlocksCreature -> False
+  TriggerCondition.SelfBlocksCreature _ -> False
   TriggerCondition.SelfBlocksAtLeast _ -> False
   TriggerCondition.SelfBlocksOneOrMore _ -> False
   TriggerCondition.SelfBecomesBlocked -> False
@@ -8516,7 +8527,7 @@ zonesTriggeredFrom cond = case cond of
   TriggerCondition.CreatureAttacksYou -> battlefield
   TriggerCondition.SelfAttacksPlayerWithMostLife -> battlefield
   TriggerCondition.SelfBlocks -> battlefield
-  TriggerCondition.SelfBlocksCreature -> battlefield
+  TriggerCondition.SelfBlocksCreature _ -> battlefield
   TriggerCondition.SelfBlocksAtLeast _ -> battlefield
   TriggerCondition.SelfBlocksOneOrMore _ -> battlefield
   TriggerCondition.SelfBecomesBlocked -> battlefield
@@ -8739,7 +8750,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.CreatureAttacksYou -> False
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
-  TriggerCondition.SelfBlocksCreature -> False
+  TriggerCondition.SelfBlocksCreature _ -> False
   TriggerCondition.SelfBlocksAtLeast _ -> False
   TriggerCondition.SelfBlocksOneOrMore _ -> False
   TriggerCondition.SelfBecomesBlocked -> False
@@ -8895,7 +8906,7 @@ stateTriggers gs
               TriggerCondition.CreatureAttacksYou -> False
               TriggerCondition.SelfAttacksPlayerWithMostLife -> False
               TriggerCondition.SelfBlocks -> False
-              TriggerCondition.SelfBlocksCreature -> False
+              TriggerCondition.SelfBlocksCreature _ -> False
               TriggerCondition.SelfBlocksAtLeast _ -> False
               TriggerCondition.SelfBlocksOneOrMore _ -> False
               TriggerCondition.SelfBecomesBlocked -> False

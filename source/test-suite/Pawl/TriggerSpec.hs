@@ -4221,11 +4221,14 @@ selfBlocksSpec s registry =
           Spec.assertEqWith s "the same card attacking makes two" (length (S.tokensOf (S.runCombat S.aggressiveAnswer attacking))) 2
 
 -- CR 509.3b: "Whenever [a creature] blocks a creature, . . ." -- selfBlocksSpec's
--- condition with the attacker NAMED, bound under Binding.blockedCreature.
+-- condition with the attacker NAMED, bound under Binding.blockedCreature and
+-- compared against the condition's own Filter.
 --
 -- Loyal Sentry {W} Creature -- Human Soldier 1/1, "When this creature blocks a
--- creature, destroy that creature and this creature", is the card: the trigger is
--- its whole text, and "that creature" is the binding under test. Every reading is
+-- creature, destroy that creature and this creature", is the unnarrowed card: the
+-- trigger is its whole text, and "that creature" is the binding under test.
+-- Netcaster Spider and Crimson Roc are the narrowed pair, in the last case below.
+-- Every reading is
 -- taken at the COMBAT DAMAGE step, before damage is dealt, so a death there is
 -- the trigger's (CR 509.2a) and never combat's.
 selfBlocksCreatureSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -4314,6 +4317,55 @@ selfBlocksCreatureSpec s registry =
                 (fmap (`S.onBattlefield` controlStruck) (otherPikers <> otherSentries))
                 [False, False]
             _ -> Spec.assertFailure s "fixture should give each seat one creature"
+        -- CR 509.3b's FILTER, which narrows the printed "a creature" to Netcaster
+        -- Spider's "a creature with flying" and Crimson Roc's "without flying".
+        --
+        -- Netcaster Spider {2}{G} Creature -- Spider 2/3, "Reach / Whenever this
+        -- creature blocks a creature with flying, this creature gets +2/+0 until
+        -- end of turn". Crimson Roc {4}{R} Creature -- Bird 2/2, "Flying /
+        -- Whenever this creature blocks a creature without flying, this creature
+        -- gets +1/+0 and gains first strike until end of turn". CR 702.9b is what
+        -- lets both of them block the flier, and lets the Roc block the ground
+        -- creature.
+        --
+        -- BOTH stand on bob's side of BOTH boards, so the two boards differ in
+        -- exactly one thing: whether alice's lone attacker has flying. No-Regrets
+        -- Egret 2/2 flying and Icehide Golem 2/2 are the attackers -- same stats
+        -- and same seat.
+        --
+        -- Two cards whose Filters are each other's negation is what tells "the
+        -- Filter is read" from "the field is there and ignored": a hardcoded
+        -- HasKeyword Flying agrees with the Spider on both boards and gets the Roc
+        -- backwards on both, and an always-true Filter gets one leg of each card
+        -- wrong. Each board carries a leg that FIRES beside the leg that does not,
+        -- so neither absence can pass on a board where no block happened.
+        Spec.it s "CR 509.3b the Filter narrows which attacker fires it" $ do
+          (flier, _, blockingFlier) <- board ["No-Regrets Egret"] ["Netcaster Spider", "Crimson Roc"]
+          (ground, _, blockingGround) <- board ["Icehide Golem"] ["Netcaster Spider", "Crimson Roc"]
+          case (blockingFlier, blockingGround) of
+            ([spiderF, rocF], [spiderG, rocG]) -> do
+              let struckFlier = atDamage flier
+                  struckGround = atDamage ground
+              Spec.assertEqWith
+                s
+                "the Spider fires on the flier and not on the ground creature, and the Roc the other way round"
+                ( S.powerToughnessOf spiderF struckFlier,
+                  S.powerToughnessOf spiderG struckGround,
+                  S.powerToughnessOf rocG struckGround,
+                  S.powerToughnessOf rocF struckFlier
+                )
+                (Just (4, 3), Just (2, 3), Just (3, 2), Just (2, 2))
+              -- The Roc's second clause, on the leg that fired and the leg that
+              -- did not: rule 702.7a's first strike is the half a power reading
+              -- cannot see.
+              Spec.assertEqWith
+                s
+                "and the granted first strike came with the pump, on that leg alone"
+                ( Map.member Keyword.Type.FirstStrike (Projection.keywordsOf rocG struckGround),
+                  Map.member Keyword.Type.FirstStrike (Projection.keywordsOf rocF struckFlier)
+                )
+                (True, False)
+            _ -> Spec.assertFailure s "fixture should give bob a Spider and a Roc on each board"
 
 -- CR 509.3e's FILTERED forms, both halves of one printed sentence: "whenever
 -- [a creature] blocks or becomes blocked by one or more [black] creatures". The
@@ -9628,7 +9680,7 @@ representativeEvents cond =
         TriggerCondition.SelfBlocksOneOrMore _ -> one (GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared departed 1))
         -- The PAIRWISE event instead: CR 509.3b's bearer is the BLOCKER too, and
         -- the attacker beside it is what this one binds.
-        TriggerCondition.SelfBlocksCreature -> one (GameEvent.BlockerDeclared (BlockerDeclared.MkBlockerDeclared departed (ObjectId.MkObjectId 41)))
+        TriggerCondition.SelfBlocksCreature _ -> one (GameEvent.BlockerDeclared (BlockerDeclared.MkBlockerDeclared departed (ObjectId.MkObjectId 41)))
         -- CR 508.5's defending player again, and carol for SelfAttacks' reason
         -- above: eventBindings binds this field under `thatPlayer`.
         TriggerCondition.SelfBecomesBlocked -> one (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked departed S.carol))
@@ -9819,7 +9871,7 @@ everyTriggerCondition =
     TriggerCondition.SelfAttacksPlayerWithMostLife,
     TriggerCondition.SelfBlocks,
     TriggerCondition.SelfBlocksAtLeast 2,
-    TriggerCondition.SelfBlocksCreature,
+    TriggerCondition.SelfBlocksCreature (Filter.Type.And []),
     TriggerCondition.SelfBecomesBlocked,
     TriggerCondition.SelfBlocksOneOrMore (Filter.Type.And []),
     TriggerCondition.SelfBecomesBlockedBy (Filter.Type.And []),

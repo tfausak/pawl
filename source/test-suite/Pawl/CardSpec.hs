@@ -627,8 +627,9 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 702.105a compares life totals rather than counting objects, so no Count.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> []
   TriggerCondition.SelfBlocks -> []
-  -- CR 509.3b names the attacker without counting anything, so no Count either.
-  TriggerCondition.SelfBlocksCreature -> []
+  -- CR 509.3b names the attacker without counting anything, and its Filter holds
+  -- no Count for PermanentEnters' reason.
+  TriggerCondition.SelfBlocksCreature _ -> []
   TriggerCondition.SelfBlocksAtLeast _ -> []
   -- CR 509.3e's filtered form spends the number on a quality instead, so its
   -- Filter holds no Count either.
@@ -2627,9 +2628,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- attacked, so no Filter.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> []
   TriggerCondition.SelfBlocks -> []
-  -- CR 509.3b's condition carries no Filter, so there is none to traverse. The
-  -- printings that narrow the attacker are not served yet (#1253).
-  TriggerCondition.SelfBlocksCreature -> []
+  -- CR 509.3b names a quality the attacker blocked must have, so this one DOES
+  -- carry a Filter -- Netcaster Spider's "with flying".
+  TriggerCondition.SelfBlocksCreature f -> [f]
   TriggerCondition.SelfBlocksAtLeast _ -> []
   -- CR 509.3e's filtered form names a quality the attackers blocked must have,
   -- so this one DOES carry a Filter.
