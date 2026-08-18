@@ -34,6 +34,64 @@
                         }
                       }
                     }
+                  },
+                  {
+                    "type": "Replace",
+                    "value": {
+                      "duration": {
+                        "type": "UntilEndOfTurn"
+                      },
+                      "effect": {
+                        "type": "DamageR",
+                        "value": {
+                          "matching": {
+                            "whatSource": {
+                              "type": "And",
+                              "value": [
+                                {
+                                  "type": "HasCardType",
+                                  "value": {
+                                    "type": "Creature"
+                                  }
+                                },
+                                {
+                                  "type": "Not",
+                                  "value": {
+                                    "type": "Or",
+                                    "value": [
+                                      {
+                                        "type": "HasSubtype",
+                                        "value": {
+                                          "type": "Werewolf"
+                                        }
+                                      },
+                                      {
+                                        "type": "HasSubtype",
+                                        "value": {
+                                          "type": "Wolf"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              ]
+                            },
+                            "whichKind": {
+                              "type": "Combat"
+                            }
+                          },
+                          "rewrite": {
+                            "type": "PreventAll"
+                          }
+                        }
+                      },
+                      "origin": {
+                        "type": "Other"
+                      },
+                      "uses": {
+                        "type": "Unlimited"
+                      }
+                    }
                   }
                 ]
               }

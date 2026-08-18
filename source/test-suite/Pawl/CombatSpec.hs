@@ -4631,9 +4631,11 @@ isWaneCast a = case a of
 -- into a leaves-the-battlefield test. Llanowar Elves' mana ability is never
 -- activated -- both answerers pass, and an attacking Elf is tapped anyway.
 --
--- FIVE loyalty counters, where jaceBoard places three: the two legs then read 4
--- and 3, each distinct from the other and from the starting 5, and neither
--- reaches CR 704.5i's zero.
+-- FIVE loyalty counters, where jaceBoard places three: the three legs then read 4,
+-- 3 and 5, each distinct from the others, and none reaches CR 704.5i's zero. The
+-- both-at-once leg's reading is the starting value itself, since nothing is ever
+-- assigned to him there -- which is what the untouched 5 has to be distinguishable
+-- from, and it is: 4 and 3 are the only other readings the fixture admits.
 creaturePlaneswalkerBoard ::
   Printing.Printing ->
   Printing.Printing ->
@@ -4698,6 +4700,33 @@ blockAndWane jaceId atBob marchId p = case p of
     [] -> A.Pass
   _ -> blockWithJace jaceId atBob p
 
+-- The other half of the pair blockAndWane makes: the cast that strips BOTH card
+-- types at once rather than one of them.
+songName :: CardName.CardName
+songName = CardName.MkCardName (Text.pack "Song of the Dryads")
+
+isSongCast :: A.Action -> Bool
+isSongCast a = case a of
+  A.Cast _ name _ -> name == songName
+  _ -> False
+
+-- blockWithJace, plus: whoever is offered the cast takes Song of the Dryads and
+-- enchants Jace with it. The recipient is FILTERED out of what the prompt offers
+-- rather than built: "enchant permanent" is a Pool.Permanents slot, so a
+-- hand-built Recipient.ToCreature of the same object would be a different
+-- recipient and CR 608.2b's re-read at resolution would drop it with no error --
+-- where a filter that matches nothing leaves the slot empty and reddens loudly.
+--
+-- Wax // Wane is in the same hand and both its halves are affordable once the
+-- Forests are seated, so unlike blockAndWane the name filter is load-bearing here.
+blockAndSong :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+blockAndSong jaceId atBob p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (Recipient.ToObject jaceId ==) . snd) sets
+  Prompt.ChooseAction _ _ actions -> case filter isSongCast actions of
+    a : _ -> a
+    [] -> A.Pass
+  _ -> blockWithJace jaceId atBob p
+
 -- CR 506.4d: "A permanent that's both a blocking creature and a planeswalker
 -- that's being attacked is removed from combat if it stops being both a creature
 -- and a planeswalker. If it stops being one of those card types but continues to
@@ -4711,8 +4740,9 @@ blockAndWane jaceId atBob marchId p = case p of
 -- membership, tap state, creature-ness and CR 509.1b's restrictions, none of which
 -- excludes a permanent that is itself being attacked.
 --
--- Four pool cards carry the rule, every oracle text checked against Scryfall (two
--- Llanowar Elves and a Plains are scaffolding -- see creaturePlaneswalkerBoard):
+-- Six pool cards carry the rule, every oracle text checked against Scryfall (two
+-- Llanowar Elves, a Plains and three Forests are scaffolding -- see
+-- creaturePlaneswalkerBoard):
 --
 --   * Jace Beleren ({1}{U}{U} Legendary Planeswalker -- Jace) is bob's, and the
 --     permanent that holds both roles.
@@ -4733,14 +4763,29 @@ blockAndWane jaceId atBob marchId p = case p of
 --     staying an artifact PLANESWALKER (CR 611.3b for the animation ending, CR
 --     613.1d for card types being a layer-4 read) -- exactly CR 506.4d's "stops
 --     being one of those card types but continues to be the other".
+--   * Song of the Dryads ({2}{G} Enchantment -- Aura, "Enchant permanent /
+--     Enchanted permanent is a colorless Forest land") is the first sentence's
+--     card: CR 205.1a makes the set REPLACE the existing card types, so the
+--     animated Jace stops being a creature and a planeswalker in one resolution.
+--     It is the only card in data/cards/ carrying SetCardType (grep the
+--     constructor name), and it sets Land, which is why the mirror leg below is
+--     still waiting on card data.
+--   * Vedalken Orrery ({4} Artifact, "You may cast spells as though they had
+--     flash") is alice's, and is what makes that cast reachable: CR 303.1 admits
+--     an enchantment only in a main phase, and the block has to be declared first
+--     (CR 601.3b for the permission, CR 702.8a for the window it carries).
+--     March animates it too, exactly as it animates the Coating, which changes
+--     nothing here: attackJaceAndBob declares only the two Elves as attackers.
 --
--- No board in the pool can build the mirror case, where the permanent stops being
--- a PLANESWALKER and stays a creature: nothing removes the planeswalker card type.
--- That leg and the both-at-once leg are unproven here rather than asserted.
+-- The mirror case, where the permanent stops being a PLANESWALKER and stays a
+-- creature, is unproven here rather than asserted (gap #1846): it needs an effect
+-- that sets the card type to Creature, and the Song -- data/cards/'s lone
+-- SetCardType -- sets Land. Kenrith's Transformation prints one and is not in the
+-- pool yet.
 --
--- Both legs hand over at the declare blockers step, typeChangeRemovalSpec's
--- pattern, so the block is declared before the kill lands, and stop at the end of
--- combat step where CR 511.3 leaves the record live.
+-- Every leg hands over at the declare blockers step, typeChangeRemovalSpec's
+-- pattern, so the block is declared before the type change lands, and stops at the
+-- end of combat step where CR 511.3 leaves the record live.
 creaturePlaneswalkerCombatSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 creaturePlaneswalkerCombatSpec s registry = Spec.describe s "CreaturePlaneswalkerInCombat" $ do
   Spec.it s "CR 506.4d whole cards: a blocking Jace that stops being a creature is still a planeswalker that's being attacked" $ do
@@ -4813,6 +4858,67 @@ creaturePlaneswalkerCombatSpec s registry = Spec.describe s "CreaturePlaneswalke
         Spec.assertEqWith s "and both attackers' 1 came off his loyalty" (S.counterOf CounterKind.Loyalty jaceId atEnd) 3
         Spec.assertBool s (S.onBattlefield jaceId atEnd) "CR 704.5g and CR 704.5i: 2 marked on a 3-toughness creature and 3 loyalty left, so neither is lethal"
         Spec.assertEqWith s "and he is being attacked all along (CR 508.1b)" (Map.lookup atJace (Combat.Type.attackers (GameState.combat atEnd))) (Just (AttackTarget.OfPlaneswalker jaceId))
+  Spec.it s "CR 506.4d whole cards: a blocking Jace that stops being BOTH card types is removed from combat" $ do
+    jace <- S.printingOf s registry "Jace Beleren"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    coating <- S.printingOf s registry "Liquimetal Coating"
+    march <- S.printingOf s registry "March of the Machines"
+    plains <- S.printingOf s registry "Plains"
+    waxWane <- S.printingOf s registry "Wane"
+    forest <- S.printingOf s registry "Forest"
+    song <- S.printingOf s registry "Song of the Dryads"
+    orrery <- S.printingOf s registry "Vedalken Orrery"
+    case creaturePlaneswalkerBoard jace elves coating march plains waxWane of
+      Nothing -> Spec.assertFailure s "fixture should give alice two Llanowar Elves and a Coating with one activated ability, and bob a Jace"
+      Just (gs0, atJace, atBob, jaceId, marchId) -> do
+        -- Both additions go on AFTER the fixture returns rather than into it. The
+        -- Song costs {2}{G} and both Elves are attacking and tapped, but widening
+        -- the shared board with green would make Wax castable in the leg above and
+        -- falsify blockAndWane's "a lone Plains cannot pay its {G}". The Orrery is
+        -- what makes the cast reachable at all: the Song is an enchantment, so CR
+        -- 303.1 would leave it in hand for the whole combat phase, and the Orrery's
+        -- CR 601.3b permission carries CR 702.8a's window -- any time you could
+        -- cast an instant -- so it is castable once the block has been declared.
+        let (_, gs1) = S.addCreature forest S.alice gs0
+            (_, gs2) = S.addCreature forest S.alice gs1
+            (_, gs3) = S.addCreature forest S.alice gs2
+            (_, gs4) = S.addCreature orrery S.alice gs3
+            (_, gs) = S.addHandCard song S.alice gs4
+        -- The same fixture pins the leg above takes, for the same reason.
+        Spec.assertBool s (Set.member CardType.Artifact (Projection.cardTypesOf jaceId gs)) "CR 205.1b: the Coating made Jace an artifact"
+        Spec.assertBool s (Projection.isCreatureOf jaceId gs) "CR 613.8: so March animates him"
+        Spec.assertEqWith s "a 3/3, his mana value" (S.powerToughnessOf jaceId gs) (Just (3, 3))
+        let atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (attackJaceAndBob atJace atBob) gs
+            atEnd = runToEndOfCombat (blockAndSong jaceId atBob) atBlockers
+            attackers = Combat.Type.attackers (GameState.combat atEnd)
+        Spec.assertEqWith s "one attacker really was announced at the planeswalker (CR 508.1b)" (Map.lookup atJace (Combat.Type.attackers (GameState.combat atBlockers))) (Just (AttackTarget.OfPlaneswalker jaceId))
+        Spec.assertEqWith s "and the other at bob" (Map.lookup atBob (Combat.Type.attackers (GameState.combat atBlockers))) (Just (AttackTarget.OfPlayer S.bob))
+        Spec.assertEqWith s "the leg reached the end of combat step, where the record still reads live (CR 511.3)" (GameState.phase atEnd) (Phase.Combat CombatStep.EndOfCombat)
+        Spec.assertBool s (S.onBattlefield marchId atEnd) "March of the Machines survives -- this leg destroys nothing"
+        -- CR 205.1a: the Song's set REPLACES the card types rather than adding to
+        -- them, so both of CR 506.4d's roles end at one resolution.
+        Spec.assertBool s (not (Projection.isCreatureOf jaceId atEnd)) "CR 205.1a: Jace stopped being a creature"
+        Spec.assertBool s (not (Projection.isPlaneswalkerOf jaceId atEnd)) "and stopped being a planeswalker too"
+        Spec.assertBool s (S.onBattlefield jaceId atEnd) "and is still on the battlefield, so this is the card-types clause and not the leaves-the-battlefield one"
+        -- The gameplay readings first, because they are what the rule is about and
+        -- what the two engine-level readings below are only evidence for. Damage is
+        -- the one that separates the two halves' failures: the attacker Jace
+        -- blocked would mark him (CR 510.1c) if the block survived, and the
+        -- attacker aimed at him would take loyalty (CR 306.8 / 120.3c) if he were
+        -- still attacked, so 0 and 5 fail independently.
+        Spec.assertEqWith s "CR 510.1c: the attacker Jace blocked assigns nothing, so nothing is marked on him" (S.damageOf jaceId atEnd) (Just 0)
+        Spec.assertEqWith s "CR 510.1b: and the attacker aimed at him assigns nothing either, so loyalty is untouched at 5" (S.counterOf CounterKind.Loyalty jaceId atEnd) 5
+        Spec.assertEqWith s "and bob takes nothing: the attacker he would have taken damage from is still blocked" (S.lifeOf S.bob atEnd) (Just 20)
+        -- Half one, which the leg above also reaches: the block goes.
+        Spec.assertEqWith s "CR 506.4: Jace is blocking nothing" (Combat.blockersOf atBob atEnd) Set.empty
+        Spec.assertBool s (Combat.isBlocked atBob atEnd) "CR 509.1h: but that attacker remains blocked"
+        -- Half two, which no other leg can assert: he stops being attacked as well.
+        -- pawl derives attacked-ness at Combat.stillAttacked rather than storing
+        -- it, and CR 506.4c keeps the ATTACKER in combat, so its Combat.attackers
+        -- entry still names the planeswalker -- asserting that entry is gone would
+        -- fail a correct engine.
+        Spec.assertBool s (not (Combat.stillAttacked jaceId atEnd)) "CR 506.4: and he stops being attacked"
+        Spec.assertEqWith s "CR 506.4c: while the attacker aimed at him stays in combat, record entry and all" (Map.lookup atJace attackers) (Just (AttackTarget.OfPlaneswalker jaceId))
 
 -- CR 508.4: "If a creature is put onto the battlefield attacking, its controller
 -- chooses which defending player ... it's attacking ... Such creatures are
