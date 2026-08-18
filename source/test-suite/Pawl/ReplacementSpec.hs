@@ -1767,6 +1767,97 @@ excruciatorSpec s registry = Spec.describe s "Excruciator (CR 615.12)" $ do
       Spec.assertEqWith s "so only its 3 is marked" (S.damageOf victim after) (Just 3)
       Spec.assertEqWith s "and only the Piker's 2 came off the shield" (shieldsLeft after) [2]
 
+-- CR 615.12 narrowed on TWO axes at once, whose producer is Questing Beast
+-- ({2}{G}{G} Legendary Creature -- Beast 4/4, Throne of Eldraine 171, "Combat
+-- damage that would be dealt by creatures you control can't be prevented").
+-- Excruciator's clause above names ONE object (Filter.IsSource) and says nothing
+-- about the kind; this one names a SET by characteristic and pins CR 120.1's
+-- source to CR 510.2's combat damage, so it is the pool's first pattern where
+-- both `whichKind` and a characteristic `whatSource` have to be read.
+--
+-- CR 109.5: the "you" inside whatSource is the ABILITY'S SOURCE's controller,
+-- which is the Maybe ObjectId Pawl.Engine.PlayerEffect.unpreventable threads out
+-- beside each pattern -- bob's, and not the shielded creature's controller.
+--
+-- ONE board carries all four cases, excruciatorSpec's design and for its reason:
+-- alice's Goblin Piker is shielded by a Mending Hands she really casts on it,
+-- alice controls a SECOND Piker, and bob controls a Piker and the Beast. Nothing
+-- but the axis under test differs between the cases -- the source's controller
+-- in the first two, the damage's KIND in the third -- so neither control can
+-- pass because the damage would have got through anyway.
+--
+-- The DAMAGE BATCHES are hand-built and the SPELL is not, for spiderPunkSpec's
+-- reason: that is what lets a case name DamageKind.Combat without driving a
+-- whole combat phase to produce a fixture these assertions read straight off.
+questingBeastSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+questingBeastSpec s registry = Spec.describe s "Questing Beast (CR 615.12)" $ do
+  let hit kind src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing kind
+      amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
+      withBoard act = do
+        plains <- S.printingOf s registry "Plains"
+        pikerPrinting <- S.printingOf s registry "Goblin Piker"
+        mendingHands <- S.printingOf s registry "Mending Hands"
+        questingBeast <- S.printingOf s registry "Questing Beast"
+        let base = S.landsInPlay plains 1
+            (victim, g1) = S.addCreature pikerPrinting S.alice base
+            (hers, g2) = S.addCreature pikerPrinting S.alice g1
+            (his, g3) = S.addCreature pikerPrinting S.bob g2
+            (_, g4) = S.addCreature questingBeast S.bob g3
+            (g5, spellId) = S.handOne mendingHands g4
+        act victim hers his (castAndResolve (aimCreature victim) g5 spellId)
+  -- THE whatSource CONTROL: the same shield, on the same board, with the Beast on
+  -- the battlefield the whole time, prevents the combat damage of a creature
+  -- ALICE controls whole. "Creatures you control" is bob's set, so a pattern that
+  -- dropped the ControlledBy atom would fail here.
+  Spec.it s "CR 615.7 combat damage from a creature the Beast's controller does NOT control is prevented"
+    . withBoard
+    $ \victim hers _ shielded -> do
+      let after = settleDamage S.identityAnswer shielded [hit DamageKind.Combat hers (Recipient.ToCreature victim) 3]
+      Spec.assertEqWith s "setup: the shield is a floating replacement" (shieldsLeft shielded) [4]
+      Spec.assertEqWith s "nothing is marked on the shielded creature" (S.damageOf victim after) (Just 0)
+      Spec.assertEqWith s "and no damage event happened at all" (amounts after) []
+      Spec.assertEqWith s "3 of the shield's 4 were spent, so 1 remains" (shieldsLeft after) [1]
+  -- THE CARD: the same shield, the same creature, the same 3, and the source is
+  -- now a creature BOB controls. It lands whole and the shield is not reduced
+  -- (CR 615.12's last sentence).
+  --
+  -- Bob's GOBLIN PIKER and not the Beast itself, which is what separates this
+  -- clause from Excruciator's: an engine reading whatSource as Filter.IsSource
+  -- would prevent this damage.
+  Spec.it s "CR 615.12 combat damage from a creature the Beast's controller DOES control lands in full"
+    . withBoard
+    $ \victim _ his shielded -> do
+      let after = settleDamage S.identityAnswer shielded [hit DamageKind.Combat his (Recipient.ToCreature victim) 3]
+      Spec.assertEqWith s "setup: the same shield is on the same creature" (shieldsLeft shielded) [4]
+      Spec.assertEqWith s "the whole 3 is marked on the shielded creature" (S.damageOf victim after) (Just 3)
+      Spec.assertEqWith s "and the event happened, at its full amount" (amounts after) [3]
+      Spec.assertEqWith s "the shield still holds all 4" (shieldsLeft after) [4]
+  -- THE whichKind CONTROL: the SAME source, the SAME shield, the same 3 -- only
+  -- CR 510.2's kind differs, and the damage is prevented. This is the assertion
+  -- that keeps whichKind from being decoration.
+  Spec.it s "CR 615.7 NONcombat damage from that same creature is prevented"
+    . withBoard
+    $ \victim _ his shielded -> do
+      let after = settleDamage S.identityAnswer shielded [hit DamageKind.Noncombat his (Recipient.ToCreature victim) 3]
+      Spec.assertEqWith s "setup: the same shield is on the same creature" (shieldsLeft shielded) [4]
+      Spec.assertEqWith s "nothing is marked on the shielded creature" (S.damageOf victim after) (Just 0)
+      Spec.assertEqWith s "and no damage event happened at all" (amounts after) []
+      Spec.assertEqWith s "3 of the shield's 4 came off it" (shieldsLeft after) [1]
+  -- Both directions in ONE batch, which is what makes the narrowing a per-EVENT
+  -- fact rather than a per-board one, exactly as excruciatorSpec's third case is.
+  --
+  -- The two amounts DIFFER, and that is what makes the case discriminate: with 3
+  -- and 3 an engine that had the two events exactly backwards would leave the
+  -- same board and every assertion here would pass on it.
+  Spec.it s "CR 615.12 one batch: bob's Piker's combat 3 lands and alice's Piker's combat 2 is prevented"
+    . withBoard
+    $ \victim hers his shielded -> do
+      let after = settleDamage S.identityAnswer shielded [hit DamageKind.Combat his (Recipient.ToCreature victim) 3, hit DamageKind.Combat hers (Recipient.ToCreature victim) 2]
+      Spec.assertEqWith s "only bob's Piker's event happened" (amounts after) [3]
+      Spec.assertEqWith s "so only its 3 is marked" (S.damageOf victim after) (Just 3)
+      Spec.assertEqWith s "and only alice's Piker's 2 came off the shield" (shieldsLeft after) [2]
+
 -- CR 615.1 / 609.7b: a shield that names its source by CHARACTERISTIC rather than
 -- by identity, whose producer is Luminesce ({W} Instant, Tenth Edition 28,
 -- "Prevent all damage that black sources and red sources would deal this turn").
@@ -3053,6 +3144,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   spiderPunkSpec s registry
   apnapSpec s registry
   excruciatorSpec s registry
+  questingBeastSpec s registry
   luminesceSpec s registry
   selflessSquireSpec s registry
   turnTheTablesSpec s registry

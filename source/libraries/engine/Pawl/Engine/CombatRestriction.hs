@@ -438,7 +438,9 @@ restricted select candidates gs =
 
 -- CR 509.1b's PAIRWISE restrictions: which (blocker, attacker) pairs an effect in
 -- force right now forbids. CR 701.54c's "can't be blocked by creatures with
--- greater power" is the pool's one producer.
+-- greater power" and Questing Beast's "can't be blocked by creatures with power
+-- 2 or less" are the pool's two producers -- one minted by the rulebook, one
+-- printed on a card.
 --
 -- A set of PAIRS, where the three questions above answer with a set of creatures,
 -- and the shape is forced by the rule rather than chosen: the restriction is
@@ -459,8 +461,9 @@ restricted select candidates gs =
 -- Pawl.Engine.Combat.landwalkAllowsGiven gives a keyword-borne Filter. CR 109.5's
 -- "you" would instead be the SOURCE's controller, as it is for the gate in
 -- `inForce` and the affected set in `restricted`, and the two readings are
--- indistinguishable on the pool's one producer: CR 701.54c's affected set carries
--- ControlledBy You, so the Ring-bearer's controller IS the emblem's. What is not
+-- indistinguishable on both of the pool's producers: CR 701.54c's affected set
+-- carries ControlledBy You, so the Ring-bearer's controller IS the emblem's, and
+-- Questing Beast's carries IsSource, so the attacker IS the source. What is not
 -- a choice is the source POWER, which CR 701.54c compares the blocker against:
 -- the emblem has no power at all (CR 114.3), so only the attacker's makes the
 -- comparison mean anything.
