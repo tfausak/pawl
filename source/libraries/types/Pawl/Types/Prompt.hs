@@ -221,8 +221,9 @@ data Prompt r where
   --   * one AddMana effect offering a choice, whose options are CR 105.4's colours;
   --   * a permanent with several single-type mana abilities, an Urborg'd Mountain
   --     being both a Mountain and a Swamp (CR 305.6/305.7);
-  --   * a mana ability with several MODES (CR 700.2), which no card in the pool
-  --     has; and
+  --   * a mana ability with several MODES (CR 700.2), which Synthetic Prismatic
+  --     Wellspring reaches -- Pawl.ManaSpec's wellspringSpec drives it and
+  --     records the Scryfall sweep behind its being synthetic; and
   --   * two abilities adding the same mana for DIFFERENT costs, an Urborg'd Mana
   --     Confluence's free {B} beside the {B} it charges 1 life for (#1117).
   --

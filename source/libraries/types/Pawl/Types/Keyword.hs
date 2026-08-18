@@ -567,9 +567,13 @@ data Keyword
     -- prints two, so its reader takes MEMBERSHIP, which is the Set
     -- Pawl.Engine.Keyword.handAbilitiesOf already takes.
     --
-    -- Rule 702.77b's other half -- the ability keeps existing in every other
-    -- zone, so an object with reinforce counts as having an activated ability --
-    -- is not modelled (#1207).
+    -- The hand-only half is NOT a field here, exactly as Cycling's is not: rule
+    -- 702.77b keeps the ability in existence in every other zone, so the zone is
+    -- a question the READER asks -- Pawl.Engine.Activate.abilitiesFor gates
+    -- ACTIVATION, while Pawl.Engine.Projection keeps handAbilitiesOf in the
+    -- ability list an effect counting activated abilities reads.
+    -- Pawl.UntapRestrictionSpec's "CR 502.3/702.77b whole cards: under Tsabo's
+    -- Web the Rustic Clachan does not untap" is what proves that half.
     Reinforce (Reinforce.Reinforce Keyword)
   | -- | 702.79a: persist. "When this permanent is put into a graveyard from the
     -- battlefield, if it had no -1/-1 counters on it, return it to the

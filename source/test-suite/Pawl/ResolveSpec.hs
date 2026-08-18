@@ -450,11 +450,12 @@ targetSpec s registry = Spec.describe s "Target" $ do
       "source is its own legal target"
       (Target.legalSets Nothing Map.empty srcId slots gs)
       (Map.singleton slot (Set.singleton (Recipient.ToCreature srcId)))
-  -- Gate cards for P9 Task 5: Terror and Reprisal. Both cards' printed text
-  -- ends "It can't be regenerated."; regeneration is not modelled (no
-  -- regeneration shield to suppress), so that clause is a no-op and is
-  -- omitted from data/cards/{terror,reprisal}.json -- regeneration clause
-  -- omitted; not modelled (#113).
+  -- Gate cards for P9 Task 5: Terror and Reprisal. Both cards' printed text ends
+  -- "It can't be regenerated.", which both card files carry as
+  -- CantBeRegenerated; CR 701.19c's half is proved by Pawl.ReplacementSpec's
+  -- "CR 701.19c a shield does not save a creature from a destruction that
+  -- forbids regeneration", not here. The cases below are about the TARGET
+  -- filters only.
   Spec.it s "Terror: And of Not(HasColor Black) and Not(HasCardType Artifact) excludes black and artifact creatures" $ do
     terror <- S.printingOf s registry "Terror"
     typhoidRats <- S.printingOf s registry "Typhoid Rats"
@@ -7205,11 +7206,15 @@ targetedMonarchSpec s registry = Spec.describe s "TargetedMonarch" $ do
   --
   -- The InSlot line is now ALSO covered by CardSpec's dataflow lint, which since
   -- #1043 states its equality over an activated ability's modes too -- reverting
-  -- this arm to Set.empty fails Denethor there as well as here. Kept rather than
-  -- deleted for the two lines the lint cannot reach: no card in the pool uses
-  -- TheController or ControllerOfSource, so an arm wrongly REPORTING a slot for
-  -- either would be swept by nothing. Those are the arm-level pin; the first line
-  -- is a locality convenience, keeping all three answers in one place.
+  -- this arm to Set.empty fails Denethor there as well as here, and the
+  -- TheController line is swept the same way, six cards writing that arm (Palace
+  -- Jailer, Queen Marchesa, Custodi Lich, Dawnglade Regent, Entourage of Trest,
+  -- Marchesa's Decree). Kept rather than deleted for the one line the lint cannot
+  -- reach: CR 725.2's crown steal is a rules-minted ability, so
+  -- ControllerOfSource comes from Pawl.Engine.Monarch.crownSteal rather than from
+  -- any card file, and an arm wrongly REPORTING a slot for it would be swept by
+  -- nothing. That is the arm-level pin; the first two lines are a locality
+  -- convenience, keeping all three answers in one place.
   Spec.it s "CR 725.1 slotsOf reads the targeted monarch's slot, and only that arm's" $ do
     let slot = SlotName.MkSlotName (Text.pack "player")
     Spec.assertEqWith s "the targeted arm names its slot" (Resolve.slotsOf (Effect.BecomeMonarch (MonarchTarget.InSlot slot))) (Map.singleton slot SlotArity.One)
@@ -7449,8 +7454,11 @@ optionalEffectSpec s registry =
         -- CR 608.2d over CR 608.2e's unit: a "may" covers the CLAUSE it is
         -- printed on, not the whole mode. Two clauses in one mode -- a mandatory
         -- Draw and an optional Draw -- and declining the second must still leave
-        -- the first having happened. Driven through resolveModes directly,
-        -- because no card in the pool has two clauses yet (#335).
+        -- the first having happened. The mandatory-then-optional pair itself is
+        -- printed -- Corpse Churn, Into the Wilds, Nissa, Steward of Elements
+        -- and Shed Weakness all write it -- and resolveModes is driven directly
+        -- here only for the two-DRAW shape, where the library count alone
+        -- separates "declined" from "drew".
         Spec.it s "CR 608.2d a declined clause skips only its own effects" $ do
           forest <- S.printingOf s registry "Forest"
           piker <- S.printingOf s registry "Goblin Piker"
