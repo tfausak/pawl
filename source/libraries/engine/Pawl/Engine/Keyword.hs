@@ -128,11 +128,10 @@ import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 -- here and handed to the ordinary CR 603 and CR 602 machinery instead.
 --
 -- Casing on Keyword here is legitimate for the reason Pawl.Types.Keyword's own
--- comment gives: a keyword is a numbered rule, not an effect's identity. What
--- this module must never do is grow an arm for a CARD.
---
--- Rule 702 has no state-triggered (CR 603.8) or delayed (CR 603.7) keyword
--- ability, so the first keyword that needs one must widen Event's two scans.
+-- comment gives: a keyword is a numbered rule, not an effect's identity. What this
+-- module must never do is grow an arm for a CARD. Rule 702 has no state-triggered
+-- (CR 603.8) keyword ability, so the first keyword that needs one must widen
+-- Event's two scans.
 --
 -- Rule 702.34a's flashback shows how wide this voice is: ONE keyword becomes a
 -- cost, a casting permission and a replacement effect, none of whose readers learn
@@ -354,24 +353,20 @@ handAbilitiesFor keyword = case keyword of
   -- minted by `abilitiesFor` above and reached from a hand by CR 113.6k.
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
-  -- CR 701.43d's ability is static and functions on the battlefield, so it mints
-  -- nothing activatable from a hand.
   Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
 
--- CR 702.29a: cycling means paying its cost and discarding the card to draw a
--- card. The whole ability, minted from the one cost the keyword carries.
+-- CR 702.29a's whole ability, minted from the one cost the keyword carries.
 --
 -- The discard is a COMPONENT of the activation cost and not an effect, rule
 -- 702.29a putting it before the colon. Three things follow: an activation the
 -- player backs out of discards nothing, the card is already in the graveyard while
 -- the draw is still on the stack, and CR 702.29c's "when you cycle this card" has
--- a cost payment to trigger off rather than a resolution.
---
--- ToPayCyclingCost, which is what CR 702.29c means by "an activation cost of a
--- cycling ability" -- and it covers rule 702.29e's typecycling too, rule 702.29f
--- making those cycling abilities and this one function minting both.
+-- a cost payment to trigger off rather than a resolution. ToPayCyclingCost is what
+-- that rule means by "an activation cost of a cycling ability", and it covers rule
+-- 702.29e's typecycling too, rule 702.29f making those cycling abilities and this
+-- one function minting both.
 cycling :: Cost Keyword -> Maybe (Filter Keyword) -> ActivatedAbility Card
 cycling cost searchFor =
   ActivatedAbility.MkActivatedAbility
@@ -443,8 +438,7 @@ reinforce n cost =
             (ObjectRef.InSlot reinforceTarget)
         )
 
--- The slot rule 702.77a's one target is chosen into, modularTarget's position and
--- for its reason.
+-- The slot rule 702.77a's one target is chosen into, mentorTarget's position.
 reinforceTarget :: SlotName.SlotName
 reinforceTarget = SlotName.MkSlotName (Text.pack "reinforced")
 
@@ -545,8 +539,8 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Foretell _ -> []
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
-  -- CR 701.43d states no activated ability: exerting is a cost paid at CR 508.1g,
-  -- which Pawl.Engine.Combat.declareAttackers offers rather than the stack.
+  -- Exerting is a cost paid at CR 508.1g, which Combat.declareAttackers offers
+  -- rather than the stack.
   Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -556,25 +550,23 @@ battlefieldAbilitiesFor keyword count = case keyword of
 -- THE COST. Only the AGGREGATE is the component's own, total power being a
 -- property of the chosen set rather than of any candidate. `Not IsSource` is
 -- load-bearing: a Vehicle that has already become a creature could otherwise crew
--- itself.
+-- itself. CR 302.6 does NOT reach this cost, in either direction.
 --
--- CR 302.6 does NOT reach this cost, in either direction. The Vehicle needs no
--- haste, the tap symbol not being in the cost; and a creature that arrived this
--- turn may still be tapped to crew, rule 302.6 gating only a creature's OWN
--- activated ability with the tap symbol in it.
+-- The Vehicle needs no haste, the tap symbol not being in the cost; and a creature
+-- that arrived this turn may still be tapped to crew, rule 302.6 gating only a
+-- creature's OWN activated ability with the tap symbol in it.
 --
 -- THE EFFECT. "Becomes an artifact creature" ADDS two card types and sets nothing,
 -- which is CR 205.1b naming this exact phrase -- so the Vehicle stays a Vehicle,
 -- and AddCardType is right where SetCardType's CR 205.1a replacement would take
 -- the artifact type and the Vehicle subtype away. TWO of them (CR 300.1) in one
--- mode, since CR 613.7b stamps both at once. Layer 4 either way (CR 613.1d).
+-- mode, since CR 613.7b stamps both at once. Layer 4 either way (CR 613.1d), and
+-- CR 208.3 needs no clause: the Vehicle's printed power and toughness are already
+-- gated on its being a creature at Projection's read points.
 --
 -- Binding.triggerSource, so the Vehicle is named and never TARGETED (CR 115.10a):
 -- a targeted crew would fizzle to shroud and fire "becomes the target" triggers
 -- the printed ability does not.
---
--- CR 208.3 needs no clause here: the Vehicle's printed power and toughness are
--- gated on its being a creature at Projection's read points.
 crew :: Natural -> ActivatedAbility Card
 crew n =
   ActivatedAbility.MkActivatedAbility
@@ -688,11 +680,9 @@ permissionsFor cardTypes keyword = case keyword of
     | Set.member CardType.Instant cardTypes || Set.member CardType.Sorcery cardTypes ->
         [CastingPermission.CastFromGraveyard]
     | otherwise -> []
-  -- CR 702.29a is an ACTIVATED ability, not a casting permission: cycling
-  -- discards the card, it never casts it. See handAbilitiesOf above.
+  -- CR 702.29a is an ACTIVATED ability, not a casting permission: cycling discards
+  -- the card, it never casts it. Rule 702.122a is one too, one zone over.
   Keyword.Cycling {} -> []
-  -- CR 702.122a is an activated ability too, and one that functions on the
-  -- battlefield -- see battlefieldAbilitiesOf above.
   Keyword.Crew _ -> []
   Keyword.Fabricate _ -> []
   Keyword.Deathtouch -> []
@@ -739,13 +729,10 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Morph {} -> []
   Keyword.Menace -> []
   Keyword.Renown _ -> []
-  -- CR 702.33a grants no permission either, for entwine's reason below: kicker
-  -- adds a cost to a cast some other rule already allowed. CR 702.33a's "as you
-  -- cast this spell" is not a zone or a timing permission -- it is when the
-  -- additional cost is announced (CR 601.2b).
+  -- CR 702.33a's "as you cast this spell" is not a zone or a timing permission --
+  -- it is when the additional cost is announced (CR 601.2b). CR 702.42a's entwine
+  -- is the same shape one clause over.
   Keyword.Kicker _ -> []
-  -- CR 702.42a grants no permission: entwine widens a MODE choice and adds a
-  -- cost to a cast that some other rule already allowed; it never allows one.
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
@@ -799,7 +786,6 @@ permissionsFor cardTypes keyword = case keyword of
   -- own timing.
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
-  -- CR 701.43d names no zone a card may be cast from.
   Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -853,16 +839,13 @@ flashbackCost keywords =
         _ -> Nothing
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
--- CR 702.37a / 702.37e: the MORPH cost -- what a face-down permanent's
--- controller pays to turn it face up as CR 116.2b's special action -- or Nothing
--- when the card has no morph ability. Read by Pawl.Engine.FaceDown.
+-- CR 702.37a / 702.37e: the MORPH cost -- what a face-down permanent's controller
+-- pays to turn it face up as CR 116.2b's special action -- or Nothing when the
+-- card has no morph ability. NOT the cost of the morph CAST, which rule 702.37a
+-- writes into the rule itself, so that one comes from Cost.faceDownCost.
 --
--- NOT the cost of the morph CAST: rule 702.37a writes that one into the rule
--- itself ("by paying {3}"), so it comes from Cost.faceDownCost.
---
--- Asked of the card's PRINTED keywords, which for morph is the rule's own scope:
--- a face-down permanent projects no keywords at all (CR 708.2a), so a projected
--- read would find nothing to pay.
+-- Asked of the card's PRINTED keywords: a face-down permanent projects no keywords
+-- at all (CR 708.2a), so a projected read would find nothing to pay.
 --
 -- CR 702.37b: MEGAMORPH REACHES HERE TOO, which is why Pawl.Types.Keyword's Morph
 -- carries a variant rather than having a sibling constructor -- the case below is
@@ -921,11 +904,9 @@ plotCost keywords =
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
 -- CR 702.143a: what a foretold card is CAST for, or Nothing when the card has no
--- foretell.
---
--- The cost of the CAST and never of the special action, plotCost's mirror: CR
--- 116.2h fixes the action's cost at {2} for every printing, so Pawl.Engine.Foretell
--- mints that itself.
+-- foretell. The cost of the CAST and never of the special action, plotCost's
+-- mirror: CR 116.2h fixes the action's cost at {2} for every printing, so
+-- Pawl.Engine.Foretell mints that itself.
 --
 -- A wildcard, and ONE cost per card (the ascending-least), morphCost's shape.
 foretellCost :: Set Keyword -> Maybe (Cost Keyword)
@@ -936,12 +917,10 @@ foretellCost keywords =
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
 -- The one exile CR 702.34a, CR 702.127a and CR 702.133a all print, in the same
--- words: the ability functioning while the card is on the stack, exiling it
--- instead of putting it anywhere else as it leaves.
---
--- Filter.IsSource, because the rule says "this card". The destination is Graveyard
--- rather than "anywhere else": a ZoneChangePattern names ONE destination, and the
--- graveyard is the only place a spell leaves the stack for in this pool (#293).
+-- words. Filter.IsSource, because the rule says "this card". The destination is
+-- Graveyard rather than "anywhere else": a ZoneChangePattern names ONE
+-- destination, and the graveyard is the only place a spell leaves the stack for in
+-- this pool (#293).
 --
 -- GATED on the clause each of the three rules puts in front of it, and the three
 -- clauses are not the same question. `castFor` is the keyword whose candidate cost
@@ -984,13 +963,10 @@ castFromGraveyardExile =
     )
 
 -- CR 702.136a: the AS-ENTERS REPLACEMENT rule 702 gives a permanent for holding
--- riot -- "You may have this permanent enter with an additional +1/+1 counter on
--- it. If you don't, it gains haste."
---
--- Gathered by the PROJECTION off POST-LAYER keyword COUNTS, since rule 702.136a
--- functions on the battlefield -- so Humility takes it away and a static ability
--- granting riot adds it, both for free. The pattern is Filter.IsSource: CR 614.1c's
--- ability is the entering object's own.
+-- riot. Gathered by the PROJECTION off POST-LAYER keyword COUNTS, since rule
+-- 702.136a functions on the battlefield -- so Humility takes it away and a static
+-- ability granting riot adds it, both for free. The pattern is Filter.IsSource: CR
+-- 614.1c's ability is the entering object's own.
 --
 -- ONE ROW PER INSTANCE, because CR 702.136b says each instance works separately.
 -- The two rows are EQUAL VALUES, so what gives the second its own CR 614.5
@@ -1125,8 +1101,8 @@ mintedReplacementsFor keyword count = case keyword of
   -- rewrite. Pawl.Engine.Event's draw funnel asks miracleCost directly.
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
-  -- CR 701.43d replaces no event: CR 508.1g's choice is a step of a turn-based
-  -- action, and the exert itself writes Object.exertedBy directly.
+  -- CR 508.1g's choice is a step of a turn-based action, and the exert itself
+  -- writes Object.exertedBy directly.
   Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -1248,12 +1224,10 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Toxic _ -> []
   Keyword.Plot _ -> []
   Keyword.Foretell _ -> []
-  -- CR 702.94a states no combat restriction.
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
-  -- CR 701.43d states no combat restriction. It states an optional COST to
-  -- attack, which never makes an attack illegal -- the active player may always
-  -- decline it (CR 508.1g).
+  -- CR 701.43d's optional COST to attack never makes an attack illegal: the active
+  -- player may always decline it (CR 508.1g).
   Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -1492,22 +1466,16 @@ battleCry =
             )
         )
 
--- CR 702.100a: whenever a creature you control enters, if that creature's power
--- and/or toughness is greater than this creature's, put a +1/+1 counter on this
--- creature.
---
--- The bearer is NOT excluded from the condition's Filter, which is the rule rather
+-- CR 702.100a. The bearer is NOT excluded from the condition's Filter, which is
+-- the rule rather
 -- than an omission: a creature entering compares itself against itself, which no
 -- comparison below can answer true.
---
 -- The comparison rides the intervening "if" (CR 603.4) and not the Filter, where
 -- training's lives, because rule 702.100a prints "if": CR 608.2a re-checks it as
 -- the ability resolves, so pumping the bearer in response takes the counter away.
---
--- "THAT CREATURE" is the entrant, neither the bearer nor a target, so the
--- condition reaches it through Quantity.AgainstSlot at Binding.became. Read
--- through CR 608.2h, so an entrant killed while the trigger waits is compared at
--- the power and toughness it last had on the battlefield.
+-- It reaches the entrant -- neither the bearer nor a target -- through
+-- Quantity.AgainstSlot at Binding.became, and through CR 608.2h, so one killed
+-- while the trigger waits is compared at its last known power and toughness.
 --
 -- Condition.Any because rule 702.100a's "and/or" compares two DIFFERENT
 -- characteristics. STRICTLY greater, spelled as "at least one more" since CR
@@ -1646,12 +1614,10 @@ rampage n =
             (ObjectRef.EachMatching Filter.IsSource)
         )
 
--- CR 702.25a.
---
--- CR 509.3d is the event -- "becomes blocked by a creature", once for each
--- creature that blocks -- and NOT CR 509.3c's "becomes blocked", which fires once
--- however many blockers there are. Two blockers on one flanker is two triggers and
--- two -1/-1s. Bushido below reads that other, grouped event.
+-- CR 702.25a. CR 509.3d is the event -- "becomes blocked by a creature", once for
+-- each creature that blocks -- and NOT CR 509.3c's "becomes blocked", which fires
+-- once however many blockers there are. Two blockers on one flanker is two
+-- triggers and two -1/-1s; bushido below reads that other, grouped event.
 --
 -- "WITHOUT FLANKING" rides the condition rather than the payload, which is rule
 -- 509.3f: a blocker's characteristics are checked as it becomes a blocking
@@ -1953,7 +1919,6 @@ decayed =
 --
 -- Read by NAME and never off the board, which is what CR 603.7 asks for: a source
 -- that has since lost the keyword -- or left the battlefield -- still sacrifices.
---
 -- NOT a nested ability inside the opcode: Pawl.Types.Effect is first-order and
 -- non-recursive on purpose.
 --
@@ -2029,8 +1994,7 @@ provoke =
         )
     untap = Effect.Untap (ObjectRef.InSlot provokeTarget)
 
--- The slot rule 702.39a's one target is chosen into, declared by the ability that
--- reads it for mentorTarget's reason.
+-- The slot rule 702.39a's one target is chosen into, mentorTarget's position.
 provokeTarget :: SlotName.SlotName
 provokeTarget = SlotName.MkSlotName (Text.pack "provoked")
 
@@ -2064,9 +2028,8 @@ renown n =
 
 -- CR 702.105a. The whole of the keyword is in the CONDITION,
 -- TriggerCondition.SelfAttacksPlayerWithMostLife, which is why the payload is
--- renown's first effect with no second.
---
--- NOT an intervening "if" (CR 603.4), which is where renown puts its comparison:
+-- renown's first effect with no second. NOT an intervening "if" (CR 603.4), which
+-- is where renown puts its comparison:
 -- rule 702.105a prints no "if", and CR 608.2a would re-check one on resolution --
 -- so an opponent gaining life in response would wrongly remove the ability from
 -- the stack.
@@ -2089,14 +2052,12 @@ dethrone =
 persist :: TriggeredAbility Card
 persist = returns CounterKind.MinusOneMinusOne
 
--- CR 702.93a: undying, persist's mirror -- rule 702.79a's sentence in +1/+1
--- counters.
+-- CR 702.93a: undying, persist's mirror in +1/+1 counters.
 undying :: TriggeredAbility Card
 undying = returns CounterKind.PlusOnePlusOne
 
--- The sentence both keywords state, in the counter kind that tells them apart. ONE
--- body rather than two, rules 702.79a and 702.93a differing in nothing else: the
--- kind decides which counter the permanent comes back with AND which one the "if"
+-- The sentence both keywords state, in the counter kind that tells them apart: it
+-- decides which counter the permanent comes back with AND which one the "if"
 -- clause looks for.
 --
 -- TWO INCARNATIONS, and the split is why this works: CR 400.7 mints a fresh object
@@ -2146,10 +2107,7 @@ returns kind =
             LibraryPlacement.defaultValue
         )
 
--- CR 702.135a: afterlife N. "When this permanent is put into a graveyard from
--- the battlefield, create N 1/1 white and black Spirit creature tokens with
--- flying." The same CR 700.4 dies event `returns` above watches, so the
--- condition is TriggerCondition.SelfDies.
+-- CR 702.135a: afterlife N, on the same CR 700.4 dies event `returns` watches.
 --
 -- Nothing is bound: unlike undying and persist this never touches the permanent
 -- that died, so the ability is indifferent to the CR 400.7 incarnation split. CR
@@ -2283,11 +2241,9 @@ fabricate n =
                 Cost.mana = Just (ManaCost.MkManaCost []),
                 Cost.components = [CostComponent.PutPlusOneCountersOnThis n]
               },
-          -- Rule 702.123a prints CR 118.12a's rewriting already done, so the
-          -- Servos are the "if you don't" branch.
           PayGate.branch = PayBranch.IfNotPaid,
-          -- PayObligation.Optional: rule 702.123a prints the "may" itself. No
-          -- offeredAt, one clause making its own offer.
+          -- Optional because rule 702.123a prints the "may" itself; no offeredAt,
+          -- one clause making its own offer.
           PayGate.obligation = PayObligation.Optional,
           PayGate.offeredAt = Nothing
         }
@@ -2410,15 +2366,12 @@ soulshift n =
             LibraryPlacement.defaultValue
         )
 
--- The slot rule 702.46a's one target is chosen into, declared by the ability that
--- reads it for mentorTarget's reason.
+-- The slot rule 702.46a's one target is chosen into, mentorTarget's position.
 soulshiftTarget :: SlotName.SlotName
 soulshiftTarget = SlotName.MkSlotName (Text.pack "soulshifted")
 
--- CR 702.55a: haunt. "When this permanent is put into a graveyard from the
--- battlefield, exile it haunting target creature." Soulshift's shape -- the CR
--- 700.4 dies event and one target slot -- with the clause mandatory, since rule
--- 702.55a states no "may".
+-- CR 702.55a: haunt. Soulshift's shape -- the CR 700.4 dies event and one target
+-- slot -- with the clause mandatory, rule 702.55a stating no "may".
 --
 -- ONLY the permanent sentence. Rule 702.55a's other one, haunt on an instant or
 -- sorcery, is not minted (#1404).
@@ -2568,10 +2521,7 @@ vanishingLastCounter =
   where
     effect = Effect.Sacrifice Binding.triggerSource
 
--- CR 702.32a's SECOND ability: "at the beginning of your upkeep, remove a fade
--- counter from this permanent. If you can't, sacrifice the permanent."
---
--- vanishingUpkeep's trigger condition exactly, and everything after it differs.
+-- CR 702.32a's SECOND ability, on vanishingUpkeep's trigger condition exactly.
 -- Rule 702.32a states NO intervening "if", so this fires on every one of its
 -- controller's upkeeps including the one where the pile is already empty; that
 -- firing is the whole of the rule's sacrifice.
@@ -2646,7 +2596,6 @@ modular =
             (ObjectRef.InSlot modularTarget)
         )
 
--- The slot rule 702.43a's one target is chosen into, mentorTarget's position and
--- for its reason.
+-- The slot rule 702.43a's one target is chosen into, mentorTarget's position.
 modularTarget :: SlotName.SlotName
 modularTarget = SlotName.MkSlotName (Text.pack "modularRecipient")

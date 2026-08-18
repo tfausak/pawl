@@ -127,7 +127,7 @@ attackablePlaneswalkers defender gs =
 -- why this walks the whole battlefield. CR 310.9b's first sentence needs no check:
 -- the argument is the DEFENDING player. PROJECTED card types (CR 613.1d), the
 -- protector surviving a permanent ceasing to be a battle (CR 310.9g), with the
--- designation asked FIRST so a board with no battle projects nothing (#200).
+-- designation asked FIRST so a board with no battle projects nothing.
 attackableBattles :: PlayerId -> GameState -> [ObjectId]
 attackableBattles defender gs =
   let protects oid = Battle.protectorOf oid gs == Just defender
@@ -216,7 +216,7 @@ isCreatureObjectGiven = Projection.isCreatureGiven
 -- can't also be battles", which the creature test below already covers (#898).
 --
 -- canAttackGiven is the half a LOOP wants: `grants`, `pcs` and `restricted` are
--- each one battlefield-wide walk, taken once per declaration pass (#200). An
+-- each one battlefield-wide walk, taken once per declaration pass. An
 -- absent projection is a cache miss the projection recovers from, while an absent
 -- restriction set is a wrong answer -- which is why canAttack computes one.
 canAttack :: PlayerId -> ObjectId -> GameState -> Bool
@@ -578,7 +578,7 @@ landwalkAllowsGiven grants pcs attacker gs =
       defendingPlayer = Defender.playerOfAttacker attacker gs
       -- CR 702.14c's lands of the defending player. Lazy, and load-bearing: this
       -- walks the whole battlefield, and `any` below never forces it for an
-      -- attacker without landwalk (#200).
+      -- attacker without landwalk.
       defendersLands = foldMap (\pid -> Projection.controlsGiven grants pid gs) defendingPlayer
       -- CR 109.5's "you" for the criterion is the ATTACKER's controller and the
       -- source is the attacker, the pairing every keyword-borne Filter takes.
@@ -588,7 +588,7 @@ landwalkAllowsGiven grants pcs attacker gs =
       -- 702.14c reads "at least one LAND". Still asked even where the criterion
       -- names a land type, since nothing in the projection enforces CR 205.3d.
       -- ONE projection per candidate: Filter.cardTypes is the very set
-      -- Projection.cardTypesGiven would rebuild (#200).
+      -- Projection.cardTypesGiven would rebuild.
       matchesCriterion criterion oid =
         let view = Projection.viewOfObjectGiven pcs grants oid gs
          in Set.member CardType.Land (Filter.cardTypes view) && Filter.matches context view criterion
@@ -617,7 +617,7 @@ menaceAllowsGiven pcs declaration gs =
       -- never twice: CR 702.111b counts CREATURES blocking, not blocks.
       blockerCounts = Map.fromListWith (+) (fmap (\attacker -> (attacker, 1 :: Int)) (concatMap Set.toList (Map.elems declaration)))
       -- The count first, so a comfortably blocked attacker never pays for a
-      -- keyword read inside candidateBlockDeclarations' exponential filter (#200).
+      -- keyword read inside candidateBlockDeclarations' exponential filter.
       allowed (attacker, count) = count >= 2 || not (Projection.hasKeywordGiven pcs Keyword.Menace attacker gs)
    in all allowed (Map.toList blockerCounts)
 
@@ -636,7 +636,7 @@ pairAllowed candidates attackers blocker attacker gs =
 
 -- pairAllowed against a pre-projected board: this is asked once per (blocker,
 -- attacker) PAIR, so each evasion read would otherwise be a fresh gather in a
--- doubly nested loop (#200). An EMPTY pcs is a cache miss the projection recovers
+-- doubly nested loop. An EMPTY pcs is a cache miss the projection recovers
 -- from, but an empty grant list is a wrong answer.
 --
 -- `barred` is CR 509.1b's PAIRWISE restrictions stated on the attacker (CR
@@ -885,7 +885,7 @@ removeChanged gs =
 -- is why this is a plain Game () and not an ability. It runs before any trigger by
 -- construction: Engine.runStep calls runTurnBasedActions before priorityLoop.
 --
--- Not prompted with one candidate (#169): CR 507.1's condition is a multiplayer
+-- Not prompted with one candidate: CR 507.1's condition is a multiplayer
 -- game, and a two-player game's defending player is CR 506.2's nonactive player.
 -- No candidates leaves Combat.defender Nothing, which declareAttackers reads as no
 -- attack being possible; unreachable in a running game (CR 104.2a).
