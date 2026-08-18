@@ -1109,6 +1109,77 @@ magicalHackTimingSpec s registry = Spec.describe s "MagicalHackTiming" $ do
     Spec.assertEqWith s "the resolution replays deterministically" replayed resolved
     Spec.assertEqWith s "and the transcript answered every prompt" desync Nothing
 
+-- Aims every target slot at `oid`, whichever recipient shape the offered set
+-- holds, and answers a basic-land-type changer with `from -> to`. The offered
+-- set is FILTERED rather than rebuilt, so CR 608.2b's re-read at resolution sees
+-- the recipient the engine itself offered.
+hackAt :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
+hackAt oid from to p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter (\r -> r == Recipient.ToObject oid || r == Recipient.ToCreature oid) candidates) sets
+  Prompt.ChooseLandTypeSwap {} -> (from, to)
+  _ -> S.identityAnswer p
+
+-- CR 611.2b's duration read through CR 612.1. alice casts Synthetic Conditional
+-- Theft -- "Gain control of target creature for as long as you control a Swamp",
+-- data/cards/synthetic-conditional-theft.json -- at bob's Goblin Piker, over
+-- `islands` Islands and `swamps` Swamps; when `hack`, she also resolves a
+-- Magical Hack at the Theft SPELL first, swapping Swamp -> Island. Returns the
+-- Piker's id and the final state.
+--
+-- alice's own Blade Instructor is there so the Theft's target is a real choice
+-- rather than the pool's only member; being hers, it also cannot be confused
+-- with the Piker by a controller assertion.
+--
+-- The Theft is cast BEFORE the Hack, so the Hack resolves first and the Theft
+-- resolves already rewritten -- pietyCharmChain's ordering.
+theftChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> Int -> Bool -> m (ObjectId.ObjectId, GameState.GameState)
+theftChain s registry islands swamps hack = do
+  island <- S.printingOf s registry "Island"
+  swamp <- S.printingOf s registry "Swamp"
+  piker <- S.printingOf s registry "Goblin Piker"
+  bladeInstructor <- S.printingOf s registry "Blade Instructor"
+  theft <- S.printingOf s registry "Synthetic Conditional Theft"
+  magicalHack <- S.printingOf s registry "Magical Hack"
+  let lands = S.landsFor swamp S.alice swamps (S.landsFor island S.alice islands (Setup.emptyGame S.bothPlayers))
+      (pikerId, g1) = S.addCreature piker S.bob lands
+      (_instructorId, g2) = S.addCreature bladeInstructor S.alice g1
+      (theftId, g3) = S.addHandCard theft S.alice g2
+      (hackId, g4) = S.addHandCard magicalHack S.alice g3
+      onStack = S.runPure (hackAt pikerId Subtype.Swamp Subtype.Island) g4 (S.cast S.alice theftId)
+      spellId = case GameState.stack onStack of
+        top : _ -> top
+        [] -> ObjectId.MkObjectId 999
+      hacked =
+        if hack
+          then S.runPure (hackAt spellId Subtype.Swamp Subtype.Island) onStack $ do
+            S.cast S.alice hackId
+            Stack.resolveTop
+          else onStack
+      after = S.runPure S.identityAnswer hacked Stack.resolveTop
+  pure (pikerId, after)
+
+-- CR 612.1 reaching a stored effect's DURATION, which is printed text like any
+-- other. The first two cases are what makes the third discriminating: they pin
+-- that the Theft works at all, and that its "for as long as" duration genuinely
+-- gates on the printed word (CR 611.2b: "if the 'for as long as' duration never
+-- starts, the effect does nothing").
+magicalHackDurationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+magicalHackDurationSpec s registry = Spec.describe s "MagicalHackDuration" $ do
+  Spec.it s "CR 611.2b a satisfied duration starts, and the theft takes hold" $ do
+    (pikerId, after) <- theftChain s registry 1 1 False
+    Spec.assertEqWith s "alice controls the Piker" (Projection.controllerOf pikerId after) (Just S.alice)
+    Spec.assertEqWith s "the stack emptied" (length (GameState.stack after)) 0
+  Spec.it s "CR 611.2b a duration that never starts does nothing" $ do
+    (pikerId, after) <- theftChain s registry 2 0 False
+    Spec.assertEqWith s "bob keeps the Piker" (Projection.controllerOf pikerId after) (Just S.bob)
+    Spec.assertEqWith s "the stack emptied" (length (GameState.stack after)) 0
+  -- And the point: the same Swamp-less board, with the word the duration names
+  -- swapped for one alice does control.
+  Spec.it s "CR 612.1 a Magical Hack on the theft rewrites the duration's own word" $ do
+    (pikerId, after) <- theftChain s registry 3 0 True
+    Spec.assertEqWith s "alice controls the Piker" (Projection.controllerOf pikerId after) (Just S.alice)
+    Spec.assertEqWith s "the stack emptied" (length (GameState.stack after)) 0
+
 -- Aims every target slot at `oid` as an object (the SpellsAndPermanents pool's
 -- recipient shape), and swaps `from` for `to` when the text-changer asks. Every
 -- other prompt takes the identity fallback.
@@ -1337,6 +1408,44 @@ ministrantChain s registry swap = do
       settled = S.runPure S.identityAnswer killed Engine.settleForPriority
       after = S.runPure S.identityAnswer settled Stack.resolveTop
   pure (ministrantId, evolved, S.tokensOf after, after)
+
+-- CR 612.2 reaching the ObjectRef INSIDE an effect: alice controls Agent Phil
+-- Coulson ({1}{W} Legendary Creature -- Human Spy Hero 2/2, "Vigilance / {T}:
+-- Put a +1/+1 counter on each other Hero you control", checked against
+-- Scryfall), a Spider-Punk (Legendary Creature -- Spider Human Hero) and a
+-- Goblin Piker (Creature -- Goblin Warrior); optionally an Artificial Evolution
+-- is resolved at the Coulson, and then she activates his ability. Returns the
+-- Spider-Punk, the Piker and the final state.
+--
+-- The two other creatures are the referents of the printed word and of the new
+-- one, so the two readings of the rule disagree in opposite directions on the
+-- same board. Spider-Punk's riot never fires: S.addCreature writes the object
+-- straight onto the battlefield with no counters and no entry, so both its
+-- +1/+1 counts start at zero.
+--
+-- The ability is taken from Projection.abilitiesOf and NOT from the printed
+-- face, which is the mechanism under test -- ajaniEmblemChain's route.
+coulsonChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe (Subtype.Subtype, Subtype.Subtype) -> m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+coulsonChain s registry swap = do
+  island <- S.printingOf s registry "Island"
+  coulson <- S.printingOf s registry "Agent Phil Coulson"
+  spiderPunk <- S.printingOf s registry "Spider-Punk"
+  goblinPiker <- S.printingOf s registry "Goblin Piker"
+  artificialEvolution <- S.printingOf s registry "Artificial Evolution"
+  let (coulsonId, g1) = S.addCreature coulson S.alice (S.landsInPlay island 1)
+      (punkId, g2) = S.addCreature spiderPunk S.alice g1
+      (pikerId, g3) = S.addCreature goblinPiker S.alice g2
+      (evolutionId, g4) = S.addHandCard artificialEvolution S.alice g3
+      evolved = case swap of
+        Nothing -> g4
+        Just (from, to) ->
+          S.runPure (evolveAt coulsonId from to) g4 $ do
+            S.cast S.alice evolutionId
+            Stack.resolveTop
+      used = case Projection.abilitiesOf coulsonId evolved of
+        ability : _ -> S.runPure S.identityAnswer evolved (do Activate.activateAbility S.alice coulsonId ability; Stack.resolveTop)
+        [] -> evolved
+  pure (punkId, pikerId, used)
 
 -- Aims every target slot at `oid` as a creature (Turn to Frog's Pool.Creatures
 -- recipient shape); the board holds more than one creature, so the choice has to
@@ -1604,6 +1713,24 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
           Stack.resolveTop
     Spec.assertEqWith s "Creature -- Elf Warrior" (Projection.subtypesOf pikerId after) (Set.fromList [Subtype.Elf, Subtype.Warrior])
     Spec.assertEqWith s "and the name is untouched" (Projection.namesOf pikerId after) (Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker")))
+
+  -- The control for the pair below, and what rules out "the ability never
+  -- resolved": with no Evolution the printed word stands, so the Spider-Punk --
+  -- and only it -- takes the counter.
+  Spec.it s "CR 612 an unevolved Coulson counters the Hero and not the Goblin" $ do
+    (punkId, pikerId, after) <- coulsonChain s registry Nothing
+    Spec.assertEqWith s "the Spider-Punk got the counter" (S.counterOf CounterKind.PlusOnePlusOne punkId after) 1
+    Spec.assertEqWith s "the Goblin Piker got none" (S.counterOf CounterKind.PlusOnePlusOne pikerId after) 0
+
+  -- And the point: CR 612.2's creature-type swap reaches the ObjectRef inside
+  -- PutCounters, so "each other Hero you control" becomes "each other Goblin you
+  -- control" and the two counts trade places. The Coulson itself is a Goblin by
+  -- then and still takes nothing, because "other" is a Not IsSource the swap
+  -- does not touch.
+  Spec.it s "CR 612.2 an evolved Coulson counters the Goblin and not the Hero" $ do
+    (punkId, pikerId, after) <- coulsonChain s registry (Just (Subtype.Hero, Subtype.Goblin))
+    Spec.assertEqWith s "the Goblin Piker got the counter" (S.counterOf CounterKind.PlusOnePlusOne pikerId after) 1
+    Spec.assertEqWith s "the Spider-Punk got none" (S.counterOf CounterKind.PlusOnePlusOne punkId after) 0
 
 -- The one activated ability of a printing that declares exactly one -- Prodigal
 -- Sorcerer's {T}, which is all these fixtures reach for. Nothing for any other
@@ -1878,5 +2005,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   merfolkSeerSpec s registry
   fortressKinGuardSpec s registry
   magicalHackTimingSpec s registry
+  magicalHackDurationSpec s registry
   artificialEvolutionSpec s registry
   stifleSpec s registry
