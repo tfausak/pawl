@@ -2483,6 +2483,81 @@ damageSourceSpec s registry = Spec.describe s "DamageSource" $ do
     Spec.assertEqWith s "no deathtouch rider" (fmap DamageEvent.dealtByDeathtouch (S.damageEventsOf after)) [False]
     Spec.assertBool s (S.onBattlefield wall (S.settleSba after)) "the Wall survives"
 
+-- Three Mountains and Flame Spill in alice's hand, one creature for bob, and the
+-- instant cast at it -- the only creature on the board, so the target is forced
+-- whatever `aimedAt` prefers. `prepare` is the one thing the three cases below
+-- differ in, so each pair of boards differs in exactly one thing.
+--
+-- Returns the victim, the board BEFORE the cast (bob's life is read off it, so
+-- the assertions say "three less than it was" rather than a number that also
+-- depends on the starting total) and the board after resolution, with
+-- state-based actions NOT settled: S.damageOf reads nothing off a creature the
+-- CR 704.5g sweep has already destroyed.
+spillBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId -> GameState.GameState -> GameState.GameState) ->
+  (ObjectId.ObjectId, GameState.GameState, GameState.GameState)
+spillBoard mountain flameSpill victimPrinting prepare =
+  let (victimId, withVictim) = S.addCreature victimPrinting S.bob (S.landsInPlay mountain 3)
+      (gs, spellId) = S.handOne flameSpill (prepare victimId withVictim)
+      after = S.runPure (aimedAt victimId) gs (S.cast S.alice spellId Monad.>> Stack.resolveTop)
+   in (victimId, gs, after)
+
+-- CR 120.4a: "if an effect that's causing damage to be dealt states that excess
+-- damage that would be dealt to a permanent is dealt to another permanent or
+-- player instead, the damage event is modified accordingly."
+--
+-- Flame Spill {2}{R} Instant (data/cards/flame-spill.json): "Flame Spill deals 4
+-- damage to target creature. Excess damage is dealt to that creature's
+-- controller instead." The pool's producer for the rule, and the whole reason
+-- DealDamage carries an excess destination.
+--
+-- The LIFE TOTAL is the assertion each case leads with. Marked damage alone
+-- cannot tell the rewrite from its absence on the first board -- a 2/1 is
+-- destroyed by 1 and by 4 alike -- so an assertion that the Piker died, or even
+-- that some damage was marked, passes with CR 120.4a unimplemented.
+--
+-- Three boards, differing in one thing each:
+--
+--   * a Goblin Piker (2/1): 1 is lethal, so 1 is marked and 3 goes to bob.
+--   * a Wall of Stone (0/8): nothing is excess, so all 4 stay on the Wall and
+--     bob loses nothing. The negative, on the same board as the third case.
+--   * that same Wall with 5 damage already marked: CR 120.6's bar is 3 rather
+--     than 8, so 3 are marked and 1 goes to bob. This is the case that reads the
+--     lethal-damage definition rather than the toughness -- on an undamaged
+--     creature the two agree, and only "damage already marked on the creature"
+--     separates them.
+excessDamageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+excessDamageSpec s registry = Spec.describe s "ExcessDamage" $ do
+  Spec.it s "CR 120.4a Flame Spill's excess goes to the creature's controller" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    flameSpill <- S.printingOf s registry "Flame Spill"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (pikerId, before, after) = spillBoard mountain flameSpill piker (\_ gs -> gs)
+    Spec.assertEqWith s "CR 120.4a: 3 of the 4 went to the Piker's controller" (S.lifeOf S.bob after) (fmap (subtract 3) (S.lifeOf S.bob before))
+    Spec.assertEqWith s "CR 120.6: 1 was lethal, so 1 is what is marked" (S.damageOf pikerId after) (Just 1)
+    Spec.assertEqWith s "and the spell's controller took none of it" (S.lifeOf S.alice after) (S.lifeOf S.alice before)
+    Spec.assertBool s (not (S.onBattlefield pikerId (S.settleSba after))) "CR 704.5g: 1 is still lethal to a 2/1"
+  Spec.it s "CR 120.4a nothing is excess on an undamaged Wall of Stone, so nothing is redirected" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    flameSpill <- S.printingOf s registry "Flame Spill"
+    wall <- S.printingOf s registry "Wall of Stone"
+    let (wallId, before, after) = spillBoard mountain flameSpill wall (\_ gs -> gs)
+    Spec.assertEqWith s "CR 120.4a: 4 is under the 0/8's bar, so bob loses nothing" (S.lifeOf S.bob after) (S.lifeOf S.bob before)
+    Spec.assertEqWith s "and all 4 are marked on the Wall" (S.damageOf wallId after) (Just 4)
+    Spec.assertBool s (S.onBattlefield wallId (S.settleSba after)) "CR 704.5g: 4 is not lethal to a 0/8"
+  Spec.it s "CR 120.4a/120.6 the bar is lethal damage, not toughness" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    flameSpill <- S.printingOf s registry "Flame Spill"
+    wall <- S.printingOf s registry "Wall of Stone"
+    -- The same 0/8, with 5 marked: the ONE difference from the case above.
+    let (wallId, before, after) = spillBoard mountain flameSpill wall (\oid gs -> S.markDamage oid 5 gs)
+    Spec.assertEqWith s "CR 120.4a/120.6: 3 more is lethal, so 1 goes to bob" (S.lifeOf S.bob after) (fmap (subtract 1) (S.lifeOf S.bob before))
+    Spec.assertEqWith s "and the Wall is marked to exactly its toughness" (S.damageOf wallId after) (Just 8)
+    Spec.assertBool s (not (S.onBattlefield wallId (S.settleSba after))) "CR 704.5g: 8 marked on a 0/8 is lethal"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Damage" $ do
   damageSpec s registry
@@ -2507,4 +2582,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Damage" $ do
   lifelinkSpec s registry
   lastKnownRiderSpec s registry
   creaturePlaneswalkerSpec s registry
+  excessDamageSpec s registry
   m2cPropertySpec s registry

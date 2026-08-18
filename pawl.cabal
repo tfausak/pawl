@@ -265,6 +265,8 @@ library codec
     Pawl.Codec.EntryRSpec
     Pawl.Codec.EventShape
     Pawl.Codec.EventShapeSpec
+    Pawl.Codec.ExcessDestination
+    Pawl.Codec.ExcessDestinationSpec
     Pawl.Codec.ExchangeSides
     Pawl.Codec.ExchangeSidesSpec
     Pawl.Codec.ExileCardsFromGraveyard
@@ -1001,6 +1003,7 @@ library types
     Pawl.Types.EntwineDecision
     Pawl.Types.EventGroup
     Pawl.Types.EventShape
+    Pawl.Types.ExcessDestination
     Pawl.Types.ExchangeSides
     Pawl.Types.ExileCardsFromGraveyard
     Pawl.Types.ExileHaunting
