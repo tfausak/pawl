@@ -60,6 +60,7 @@ import qualified Pawl.Codec.ComparesSpec
 import qualified Pawl.Codec.ComparisonSpec
 import qualified Pawl.Codec.ConditionSpec
 import qualified Pawl.Codec.ControlChangedSpec
+import qualified Pawl.Codec.ControllerBecomesTargetSpec
 import qualified Pawl.Codec.ControllerRelationSpec
 import qualified Pawl.Codec.CopyExceptionSpec
 import qualified Pawl.Codec.CostComponentSpec
@@ -460,6 +461,7 @@ spec s registry = do
   Pawl.Codec.ComparisonSpec.spec s
   Pawl.Codec.ConditionSpec.spec s
   Pawl.Codec.ControlChangedSpec.spec s
+  Pawl.Codec.ControllerBecomesTargetSpec.spec s
   Pawl.Codec.ControllerRelationSpec.spec s
   Pawl.Codec.CopyExceptionSpec.spec s
   Pawl.Codec.CostComponentSpec.spec s

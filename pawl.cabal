@@ -169,6 +169,8 @@ library codec
     Pawl.Codec.ConditionSpec
     Pawl.Codec.ControlChanged
     Pawl.Codec.ControlChangedSpec
+    Pawl.Codec.ControllerBecomesTarget
+    Pawl.Codec.ControllerBecomesTargetSpec
     Pawl.Codec.ControllerRelation
     Pawl.Codec.ControllerRelationSpec
     Pawl.Codec.CopyException
@@ -939,6 +941,7 @@ library types
     Pawl.Types.Condition
     Pawl.Types.ContinuousEffect
     Pawl.Types.ControlChanged
+    Pawl.Types.ControllerBecomesTarget
     Pawl.Types.ControllerRelation
     Pawl.Types.CopyException
     Pawl.Types.Cost

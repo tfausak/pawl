@@ -2321,7 +2321,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfDiscarded -> condition
   TriggerCondition.SelfCast -> condition
   TriggerCondition.SelfBecomesTargeted _ -> condition
-  TriggerCondition.ControllerBecomesTargetOfSpell -> condition
+  TriggerCondition.ControllerBecomesTarget {} -> condition
   TriggerCondition.PlayerDiscards _ -> condition
   TriggerCondition.PlayerCycles _ -> condition
   TriggerCondition.PlayerDrawsNthCard {} -> condition

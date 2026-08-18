@@ -10,6 +10,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.ControllerBecomesTarget as ControllerBecomesTarget
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.EndingStep as EndingStep
@@ -24,6 +25,7 @@ import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SelfCountersReached as SelfCountersReached
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellCast as SpellCast
+import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
@@ -413,15 +415,22 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.SelfBecomesTargeted PlayerRelation.Opponent)
       " {\"type\":\"SelfBecomesTargeted\",\"value\":{\"type\":\"Opponent\"}} "
-  -- The same rule from the PLAYER's side, Dormant Gomazoa's: nullary, because
-  -- "you" is CR 109.5's and the "a spell" half rides on the event's kind rather
-  -- than on a payload here.
-  Spec.it s "ControllerBecomesTargetOfSpell" $
+  -- The same rule from the PLAYER's side. Two cases, because the payload's kind
+  -- is elided when absent: Amulet of Safekeeping's "a spell or ability an
+  -- opponent controls" writes no kind, and Dormant Gomazoa's "a spell" writes
+  -- one.
+  Spec.it s "ControllerBecomesTarget, a spell or ability alike" $
     Common.assertCodec
       s
       TriggerCondition.codec
-      TriggerCondition.ControllerBecomesTargetOfSpell
-      " {\"type\":\"ControllerBecomesTargetOfSpell\"} "
+      (TriggerCondition.ControllerBecomesTarget (ControllerBecomesTarget.MkControllerBecomesTarget {ControllerBecomesTarget.relation = PlayerRelation.Opponent, ControllerBecomesTarget.kind = Nothing}))
+      " {\"type\":\"ControllerBecomesTarget\",\"value\":{\"relation\":{\"type\":\"Opponent\"}}} "
+  Spec.it s "ControllerBecomesTarget, a spell only" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.ControllerBecomesTarget (ControllerBecomesTarget.MkControllerBecomesTarget {ControllerBecomesTarget.relation = PlayerRelation.AnyPlayer, ControllerBecomesTarget.kind = Just StackObjectKind.Spell}))
+      " {\"type\":\"ControllerBecomesTarget\",\"value\":{\"relation\":{\"type\":\"AnyPlayer\"},\"kind\":{\"type\":\"Spell\"}}} "
   Spec.it s "SelfCast" $
     Common.assertCodec
       s
