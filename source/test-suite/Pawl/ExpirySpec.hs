@@ -460,6 +460,9 @@ masterThiefThreeWay darksteelMyr masterThief =
 -- enters, gain control of target artifact for as long as you control this
 -- creature." CR 611.2b's own printed example; the three assertions below in
 -- tests 2-4 are its three Gatherer rulings, verbatim.
+--
+-- The fourth way this duration ends is not a ruling but CR 702.26f, and lives in
+-- Pawl.PhasingSpec: the Thief phases out, so the count can no longer see it.
 masterThiefSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 masterThiefSpec s registry = Spec.describe s "MasterThief" $ do
   Spec.it s "CR 611.2b it works: the ETB resolves and control of the artifact changes" $ do
