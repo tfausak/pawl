@@ -122,104 +122,70 @@ import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 
--- Rule 702 in its OTHER voice. Most keywords this pool has are read where they
--- matter -- Projection.hasKeyword for an evasion or combat bit,
--- Pawl.Engine.Damage for infect's and toxic's damage riders -- because the rule
--- states them as static abilities some rules-core reader already asks about.
--- Rules 702.23, 702.25, 702.45, 702.63, 702.70, 702.83, 702.86, 702.91, 702.108,
--- 702.121, 702.130 and 702.134 do not: they spell rampage, flanking, bushido,
--- vanishing, poisonous, exalted, annihilator, battle cry, prowess, melee, afflict
--- and mentor out as TRIGGERED abilities, so those have to be MINTED and handed to
--- the ordinary CR 603 machinery rather than merely consulted.
+-- Rule 702 in its OTHER voice. Most keywords are read where they matter --
+-- Projection.hasKeyword for an evasion bit, Pawl.Engine.Damage for infect's and
+-- toxic's riders -- because the rule states them as static abilities some
+-- rules-core reader already asks about. The ones rule 702 spells out as TRIGGERED
+-- or ACTIVATED abilities have to be MINTED here and handed to the ordinary CR 603
+-- and CR 602 machinery instead.
 --
 -- Casing on Keyword here is legitimate for the reason Pawl.Types.Keyword's own
 -- comment gives: a keyword is a numbered rule, not an effect's identity. What
 -- this module must never do is grow an arm for a CARD.
 --
--- triggeredAbilitiesOf derives its abilities from a projection's POST-LAYER
--- keyword counts, so Humility takes all of those abilities away for free
--- and an Aura's layer-6 grant adds them. Its one caller outside this module is
--- Pawl.Engine.Projection.mintedTriggeredAbilitiesOf, which wraps what this
--- returns in the object's CR 612 text changes and is what Pawl.Engine.Event's
--- EVENT scan reads; printedTriggeredAbilitiesOf below is the in-module one.
--- Rule 702 has no
--- state-triggered (CR 603.8) or delayed (CR 603.7) keyword ability, so the first
--- keyword that needs one must widen Event's two scans -- and would reach them
--- through that same wrapper.
+-- Rule 702 has no state-triggered (CR 603.8) or delayed (CR 603.7) keyword
+-- ability, so the first keyword that needs one must widen Event's two scans.
 --
 -- Rule 702.34a's flashback shows how wide this voice is: ONE keyword becomes a
 -- cost (flashbackCost), a casting permission (castingPermissionsOf) and a
--- replacement effect (castFromGraveyardExile). Those three readers get ordinary
--- rules objects and never learn that flashback produced them. All three are
--- derived
--- from a card's PRINTED keywords rather than a projection's post-layer ones,
--- because all three function in the graveyard or on the stack (CR 113.6),
--- neither of which pawl's projection reaches (#160). entwineCost is read the
--- same way and for the same reason (CR 702.42a).
+-- replacement effect (castFromGraveyardExile), none of whose readers learn that
+-- flashback produced them. All three are derived from a card's PRINTED keywords
+-- rather than a projection's post-layer ones, because all three function in the
+-- graveyard or on the stack (CR 113.6), neither of which pawl's projection
+-- reaches (#160). entwineCost is read the same way (CR 702.42a).
 
 -- CR 702.70b: multiple instances of poisonous each trigger separately, so this
--- returns one ability PER INSTANCE -- `Poisonous 1` twice is two abilities and
--- two poison counters, not one ability for 2. (Contrast CR 702.164b, where
--- toxic's N values are SUMMED into a single rider -- Projection.totalToxic.) CR
--- 702.23c says the same of rampage, CR 702.25b of flanking, CR 702.45b of
--- bushido, CR 702.86b of annihilator, CR 702.91b of battle cry, CR 702.108b of
--- prowess, CR 702.121b of melee, CR 702.130b of afflict, CR 702.134b of mentor
--- and CR 702.63c of vanishing, so the minting arms below are the same shape --
--- bushido's and vanishing's `concat` aside, since each of those instances is two
--- abilities.
+-- returns one ability PER INSTANCE -- `Poisonous 1` twice is two abilities and two
+-- poison counters, not one ability for 2. (Contrast CR 702.164b, where toxic's N
+-- values are SUMMED -- Projection.totalToxic.) Most of the arms below say the same
+-- under their own rule; a keyword whose rule states no such clause gets it from CR
+-- 603.2's general reason instead.
 --
--- Exalted is the one with no such clause of its own: rule 702.83 states only
--- that exalted IS a triggered ability, and the "multiple instances are
--- redundant" sentence that would collapse it (CR 702.28c's, for shadow) is
--- absent -- so two instances are two abilities here for the general reason CR
--- 603.2 gives, rather than because the keyword's own rule says so.
---
--- Order is the Map's, which is Keyword's Ord -- rule-number order, and stable.
--- The CR 603.3b ordering prompt indexes into the scan's canonical order, so this
--- being deterministic is what keeps that prompt reproducible.
+-- Order is the Map's, which is Keyword's Ord -- rule-number order, and stable. The
+-- CR 603.3b ordering prompt indexes into the scan's canonical order, so this being
+-- deterministic is what keeps that prompt reproducible.
 triggeredAbilitiesOf :: Map Keyword Natural -> [TriggeredAbility Card]
 triggeredAbilitiesOf counts = concatMap (uncurry abilitiesFor) (Map.toAscList counts)
 
--- The abilities one keyword, held `count` times, contributes.
---
--- This case is the ROSTER of the keywords rule 702 states as triggered
--- abilities: it is exhaustive under -Werror, so it cannot fall behind rule 702
--- the way a count in prose can. Comments elsewhere say "rule 702 states it as a
--- triggered ability" and point here rather than numbering the pool; the running
--- ordinals that used to do that job disagreed with each other across modules.
+-- The abilities one keyword, held `count` times, contributes. The ROSTER of the
+-- keywords rule 702 states as triggered abilities, exhaustive under -Werror so it
+-- cannot fall behind rule 702 the way a count in prose can.
 abilitiesFor :: Keyword -> Natural -> [TriggeredAbility Card]
 abilitiesFor keyword count = case keyword of
   Keyword.Poisonous n -> List.genericReplicate count (poisonous n)
-  -- An arm that yields TWO abilities per instance -- hence the `concat`: rule
-  -- 702.45a's ability watches two events, and a TriggeredAbility carries one
-  -- condition.
+  -- TWO abilities per instance -- hence the `concat`: rule 702.45a's ability
+  -- watches two events, and a TriggeredAbility carries one condition.
   Keyword.Bushido n -> concat (List.genericReplicate count (bushido n))
-  -- CR 702.46b says each instance triggers separately, so a permanent with
-  -- soulshift twice dies with two abilities and each chooses its own target.
+  -- CR 702.46b: each instance triggers separately.
   Keyword.Soulshift n -> List.genericReplicate count (soulshift n)
   Keyword.Bloodthirst _ -> []
   Keyword.Haunt -> List.genericReplicate count haunt
   Keyword.SplitSecond -> []
-  -- Another: rule 702.63a states three abilities, and the first of
-  -- them is a replacement effect rather than a trigger, so two land here.
+  -- Rule 702.63a states three abilities, the first of them a replacement effect
+  -- rather than a trigger, so two land here.
   Keyword.Vanishing _ -> concat (List.genericReplicate count vanishing)
-  -- CR 702.32a's SECOND ability, one per instance: rule 702.32a states two and the
-  -- first of them is a replacement effect, so unlike vanishing's arm above only
-  -- one trigger lands here.
+  -- CR 702.32a's SECOND ability: the rule states two, the first a replacement
+  -- effect, so unlike vanishing only one trigger lands here.
   Keyword.Fading _ -> List.genericReplicate count fading
-  -- CR 702.68b says each instance triggers separately, so a creature with
-  -- frenzy twice gets both bonuses -- poisonous' multiplicity.
+  -- CR 702.68b: each instance triggers separately.
   Keyword.Frenzy n -> List.genericReplicate count (frenzy n)
-  -- CR 702.43a's SECOND ability, one per instance -- CR 702.43b says each works
-  -- separately, so a permanent with modular twice dies with two triggers and
-  -- each moves the whole pile.
+  -- CR 702.43a's SECOND ability, one per instance (CR 702.43b).
   Keyword.Modular _ -> List.genericReplicate count modular
   Keyword.Annihilator n -> List.genericReplicate count (annihilator n)
   Keyword.Afflict n -> List.genericReplicate count (afflict n)
   Keyword.BattleCry -> List.genericReplicate count battleCry
   Keyword.Evolve -> List.genericReplicate count evolve
-  -- CR 702.105b says each instance triggers separately, so two instances put two
-  -- counters on -- prowess' multiplicity rather than shadow's redundancy.
+  -- CR 702.105b: each instance triggers separately.
   Keyword.Dethrone -> List.genericReplicate count dethrone
   Keyword.LevelUp _ -> []
   Keyword.Outlast _ -> []
@@ -229,8 +195,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Melee -> List.genericReplicate count melee
   Keyword.Mentor -> List.genericReplicate count mentor
   Keyword.Afterlife n -> List.genericReplicate count (afterlife n)
-  -- CR 702.123b says each instance triggers separately, so a permanent with
-  -- fabricate twice enters with two abilities and each is answered on its own.
+  -- CR 702.123b: each instance triggers separately.
   Keyword.Fabricate n -> List.genericReplicate count (fabricate n)
   Keyword.Provoke -> List.genericReplicate count provoke
   Keyword.Rampage n -> List.genericReplicate count (rampage n)
@@ -238,8 +203,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Renown n -> List.genericReplicate count (renown n)
   Keyword.Persist -> List.genericReplicate count persist
   Keyword.Undying -> List.genericReplicate count undying
-  -- CR 702.115b says each instance triggers separately, so two instances exile
-  -- two cards -- poisonous' multiplicity.
+  -- CR 702.115b: each instance triggers separately.
   Keyword.Ingest -> List.genericReplicate count ingest
   Keyword.Crew _ -> []
   Keyword.Deathtouch -> []
@@ -258,10 +222,8 @@ abilitiesFor keyword count = case keyword of
   Keyword.Trample -> []
   Keyword.TrampleOverPlaneswalkers -> []
   Keyword.Vigilance -> []
-  -- CR 702.21a's ability, one per instance: rule 702.21 states no "each instance"
-  -- sentence, so two of them are two abilities for CR 603.2's general reason --
-  -- exalted's case rather than shadow's redundancy -- and a spell targeting a
-  -- doubly warded permanent is offered both costs.
+  -- CR 702.21a's ability, one per instance for CR 603.2's general reason, so a
+  -- spell targeting a doubly warded permanent is offered both costs.
   Keyword.Ward cost -> List.genericReplicate count (ward cost)
   Keyword.Banding -> []
   Keyword.Phasing -> []
@@ -292,40 +254,29 @@ abilitiesFor keyword count = case keyword of
   Keyword.Plot _ -> []
   Keyword.Foretell _ -> []
   -- CR 702.94a's linked triggered half, one per instance for CR 603.2's general
-  -- reason -- rule 702.94 states no "each instance" sentence, and no printing
-  -- carries miracle twice. Minted HERE rather than in a hand-only roster because
-  -- WHERE it functions is CR 113.6k's question, answered once in
-  -- Pawl.Engine.Event.zonesTriggeredFrom: the battlefield scan filters it out and
-  -- the hand source picks it up, neither of them learning it is miracle.
+  -- reason. Minted HERE rather than in a hand-only roster because WHERE it
+  -- functions is CR 113.6k's question, answered in Event.zonesTriggeredFrom.
   Keyword.Miracle cost -> List.genericReplicate count (miracle cost)
   Keyword.StartYourEngines -> []
-  -- CR 701.43d's static ability mints NO triggered ability. Rule 701.43d says a
-  -- card may print a linked "when you do" beside it without saying what that
-  -- ability does, unlike rule 702.94a's miracle above -- so each printing
-  -- authors its own on TriggerCondition.SelfExerted, and Glory-Bound Initiate
-  -- is the pool's.
+  -- CR 701.43d's static ability mints NO triggered ability: the rule lets a card
+  -- print a linked "when you do" beside it without saying what that ability does,
+  -- so each printing authors its own on TriggerCondition.SelfExerted.
   Keyword.Exert -> []
 
 -- CR 602.1: the ACTIVATED abilities rule 702 gives a card while it sits in its
--- owner's hand, and the first sibling here that mints something a player takes
--- an action with.
+-- owner's hand. Named for the ZONE rather than for cycling, because that is the
+-- classification its reader wants: Activate.abilitiesFor asks "what can be
+-- activated from here" and never learns which rule produced any of them.
 --
--- Named for the ZONE rather than for cycling, because that is the classification
--- its one reader wants: Pawl.Engine.Activate.abilitiesFor asks "what can be
--- activated from here" and never learns that rule 702.29 or rule 702.77 produced
--- any of them. Rule 702 has more hand abilities to come (forecast, CR 702.57),
--- and each joins this list without its reader changing.
---
--- Printed keywords rather than a projection's post-layer ones, the same rules
--- fact castingPermissionsOf records: CR 113.6b confines an ability to the zones
--- it states, and rules 702.29a and 702.77a state the hand -- where no pool
--- effect changes a card's abilities (#160).
+-- Printed keywords rather than a projection's post-layer ones, the same rules fact
+-- castingPermissionsOf records: CR 113.6b confines an ability to the zones it
+-- states, and rules 702.29a and 702.77a state the hand -- where no pool effect
+-- changes a card's abilities (#160).
 handAbilitiesOf :: Set Keyword -> [ActivatedAbility Card]
 handAbilitiesOf = concatMap handAbilitiesFor . Set.toAscList
 
--- Exhaustive for the reason permissionsFor is: rule 702 keeps adding abilities
--- that function from a hand, so the next one must break this build rather than
--- silently produce nothing.
+-- Exhaustive for the reason permissionsFor is: the next keyword that functions
+-- from a hand must break this build rather than silently produce nothing.
 handAbilitiesFor :: Keyword -> [ActivatedAbility Card]
 handAbilitiesFor keyword = case keyword of
   Keyword.Cycling (Cycling.MkCycling cost searchFor) -> [cycling cost searchFor]
@@ -416,25 +367,18 @@ handAbilitiesFor keyword = case keyword of
 -- CR 702.29a: cycling means paying its cost and discarding the card to draw a
 -- card. The whole ability, minted from the one cost the keyword carries.
 --
--- The discard is a COMPONENT of the activation cost and not an effect, because
--- rule 702.29a puts it before the colon. Three things follow that would all be
--- wrong the other way round: an activation the player backs out of discards
--- nothing (Pawl.Engine.Cost.pay restores the entry state), the card is already
--- in the graveyard while the draw is still on the stack, and CR 702.29c's "when
--- you cycle this card" has a cost payment to trigger off rather than a
--- resolution.
---
--- The card's own data carries only what is PRINTED on it, and rule 702.29a's
--- discard is added here. That is the split the whole module exists for: the card
--- says which keyword, the rule says what it means.
---
--- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability
--- is activated. No restriction clause, because rule 702.29a states no timing
--- restriction, which leaves CR 117.1b's default.
+-- The discard is a COMPONENT of the activation cost and not an effect, rule
+-- 702.29a putting it before the colon. Three things follow: an activation the
+-- player backs out of discards nothing, the card is already in the graveyard while
+-- the draw is still on the stack, and CR 702.29c's "when you cycle this card" has
+-- a cost payment to trigger off rather than a resolution.
 --
 -- ToPayCyclingCost, which is what CR 702.29c means by "an activation cost of a
 -- cycling ability" -- and it covers rule 702.29e's typecycling too, because rule
 -- 702.29f makes those cycling abilities and this one function mints both.
+--
+-- No restriction clause, rule 702.29a stating no timing restriction, which leaves
+-- CR 117.1b's default.
 cycling :: Cost Keyword -> Maybe (Filter Keyword) -> ActivatedAbility Card
 cycling cost searchFor =
   ActivatedAbility.MkActivatedAbility
@@ -448,19 +392,13 @@ cycling cost searchFor =
       ActivatedAbility.condition = Nothing
     }
   where
-    -- The only difference between rule 702.29a and rule 702.29e: what the
-    -- ability does once its cost is paid. Everything above is shared, which is CR
-    -- 702.29f holding by construction.
+    -- The only difference between rule 702.29a and rule 702.29e: what the ability
+    -- does once its cost is paid. Everything above is shared, which is CR 702.29f
+    -- holding by construction.
     --
-    -- CR 702.29a draws for the ability's controller, which CR 113.8 makes the
-    -- player who activated it -- so You, the perspective Pawl.Engine.Resolve
-    -- evaluates a PlayerRef against.
-    --
-    -- CR 702.29e searches instead, and rule 702.29e prints "your library", so it
-    -- is the same You -- twice over, since the player looking is the player whose
-    -- library it is. The reveal is part of the destination because it is part of
-    -- that same sentence -- see Pawl.Types.SearchDestination, and CR 701.23e for
-    -- why a search does not reveal on its own.
+    -- You either way: CR 113.8 makes the ability's controller the player who
+    -- activated it, and rule 702.29e prints "your library". The reveal is part of
+    -- the destination because it is part of that same sentence (CR 701.23e).
     effect = case searchFor of
       Nothing -> Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1))
       -- CR 702.29e's "search your library for a [quality] card", so one card is
@@ -473,28 +411,23 @@ cycling cost searchFor =
               Search.quantity = Quantity.Literal 1,
               Search.filter = filter_,
               -- CR 702.29e prints no "up to", and its quality-stating filter puts
-              -- the search under CR 701.23b anyway, so the shortfall is already
-              -- legal here and this value is unobservable.
+              -- the search under CR 701.23b anyway, so this value is unobservable.
               Search.upTo = False,
               Search.destination = SearchDestination.RevealThenHand
             }
 
 -- CR 702.77a: "reinforce N-[cost]" means "[cost], Discard this card: Put N +1/+1
 -- counters on target creature." Cycling's ability one clause over, and the first
--- hand ability with a TARGET -- which costs nothing extra, because
--- Pawl.Engine.Activate.activateAbility walks CR 601.2b-i for any ability from any
--- zone: the target is chosen at CR 601.2c, before CR 601.2h pays and so before
--- the discard, and the ability outlives the card it discards (CR 113.7a).
+-- hand ability with a TARGET: the target is chosen at CR 601.2c, before CR 601.2h
+-- pays and so before the discard, and the ability outlives the card it discards
+-- (CR 113.7a).
 --
--- The discard is a COMPONENT of the activation cost for cycling's reasons, rule
--- 702.77a putting it before the colon just as rule 702.29a does. Its cause is
--- Ordinary and not ToPayCyclingCost: rule 702.77 never says reinforce is a
--- cycling ability, where CR 702.29f says exactly that of typecycling, so CR
--- 702.29c's "when you cycle this card" must not see this discard.
+-- The discard is a COMPONENT of the activation cost for cycling's reasons. Its
+-- cause is Ordinary and not ToPayCyclingCost: rule 702.77 never says reinforce is
+-- a cycling ability, so CR 702.29c's "when you cycle this card" must not see it.
 --
--- The target is Pool.Creatures unqualified: rule 702.77a prints "target
--- creature" and no more, so the bearer's controller is no more required than the
--- opponent is forbidden. Mandatory, because the rule states no "may".
+-- The target is Pool.Creatures unqualified, rule 702.77a printing "target
+-- creature" and no more, and Mandatory, the rule stating no "may".
 --
 -- Quantity.Literal and not a counter reading: N is written on the card, where
 -- modular's count is measured off the dying permanent.
@@ -527,20 +460,15 @@ reinforceTarget :: SlotName.SlotName
 reinforceTarget = SlotName.MkSlotName (Text.pack "reinforced")
 
 -- CR 602.1: the ACTIVATED abilities rule 702 gives a PERMANENT, handAbilitiesOf's
--- sibling one zone over. Named for the zone for that function's reason, and read
--- by Pawl.Engine.Projection.abilitiesGiven, which appends them to the projection's
--- own list and never learns that rule 702 produced any of them.
+-- sibling one zone over.
 --
 -- POST-LAYER keywords, unlike handAbilitiesOf's printed ones, and the contrast is
 -- CR 113.6 again: this ability functions on the battlefield, which the projection
--- does reach. So Humility takes crew away at CR 613.1f layer 6 for free, and an
--- effect that grants crew adds it.
+-- does reach. So Humility takes crew away at CR 613.1f layer 6 for free.
 --
--- One ability PER INSTANCE, rule 702.70b's reading rather than rule 702.164b's:
--- CR 702.122a states a whole self-contained ability, so a permanent with crew
--- twice has two of them to activate and two thresholds, and nothing is summed.
---
--- Order is the Map's, which is Keyword's Ord -- rule-number order, and stable, for
+-- One ability PER INSTANCE, rule 702.70b's reading rather than rule 702.164b's: CR
+-- 702.122a states a whole self-contained ability, so a permanent with crew twice
+-- has two of them to activate and two thresholds. Order is the Map's, for
 -- triggeredAbilitiesOf's reason.
 battlefieldAbilitiesOf :: Map Keyword Natural -> [ActivatedAbility Card]
 battlefieldAbilitiesOf counts = concatMap (uncurry battlefieldAbilitiesFor) (Map.toAscList counts)
@@ -579,8 +507,8 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Fear -> []
   Keyword.Intimidate -> []
   -- CR 702.37e: turning a face-down permanent face up is a SPECIAL ACTION and
-  -- doesn't use the stack (CR 116), so morph gives a permanent no activated
-  -- ability. Pawl.Engine.Keyword.morphCost serves that action instead.
+  -- doesn't use the stack (CR 116), so morph gives no activated ability;
+  -- morphCost below serves that action instead.
   Keyword.Morph {} -> []
   Keyword.Menace -> []
   Keyword.Renown _ -> []
@@ -637,57 +565,36 @@ battlefieldAbilitiesFor keyword count = case keyword of
 -- CR 702.122a: "Crew N" means "Tap any number of other untapped creatures you
 -- control with total power N or greater: This permanent becomes an artifact
 -- creature until end of turn." The whole ability, minted from the one number the
--- keyword carries -- the card says which keyword, the rule says what it means.
+-- keyword carries.
 --
 -- THE COST. Every word of rule 702.122a's criterion is written in the existing
--- Filter vocabulary rather than baked into the component: "other" is
--- `Not IsSource` (#163's one-relation-one-spelling), "untapped" is
--- `Not IsTapped`, "creatures" is `HasCardType Creature` and "you control" is
--- `ControlledBy You`. Only the AGGREGATE is the component's own, total power
--- being a property of the chosen set rather than of any candidate -- see
--- Pawl.Types.CostComponent.TapForTotalPower.
---
--- `Not IsSource` is load-bearing and not decoration: a Vehicle that has already
--- become a creature -- by an earlier crew, or by Opalescence -- would otherwise
--- be an untapped creature its controller controls, and could crew itself.
+-- Filter vocabulary rather than baked into the component; only the AGGREGATE is
+-- the component's own, total power being a property of the chosen set rather than
+-- of any candidate. `Not IsSource` is load-bearing: a Vehicle that has already
+-- become a creature could otherwise crew itself.
 --
 -- CR 302.6 does NOT reach this cost, in either direction. The Vehicle needs no
--- haste, because the tap symbol is not in the cost (Cost.requiresSicknessCheck
--- tests for CostComponent.TapThis and this is not one); and a creature that
--- arrived this turn may still be tapped to crew, because rule 302.6 gates only a
--- creature's OWN activated ability with the tap symbol in it. The Vehicle it
--- crews is still subject to rule 302.6's second sentence when it attacks.
+-- haste, the tap symbol not being in the cost; and a creature that arrived this
+-- turn may still be tapped to crew, rule 302.6 gating only a creature's OWN
+-- activated ability with the tap symbol in it.
 --
--- THE EFFECT. "Becomes an artifact creature" ADDS two card types and sets
--- nothing, which is CR 205.1b naming this exact phrase: "some effects state that
--- an object becomes an 'artifact creature'; these effects also allow the object
--- to retain all of its prior card types and subtypes". So the Vehicle stays a
--- Vehicle, and Modification.AddCardType is the right opcode rather than a near
--- miss -- deliberately not its sibling SetCardType, whose CR 205.1a replacement
--- would take the artifact type and the Vehicle subtype away. TWO of them, artifact and
--- creature being separate card types (CR 300.1), in one mode rather than one
--- opcode over a set: AddCardType carries a single type by design, and CR 613.7b
--- stamps both at the moment this one resolution creates them, so nothing in CR
--- 613.7's ordering can come between them.
+-- THE EFFECT. "Becomes an artifact creature" ADDS two card types and sets nothing,
+-- which is CR 205.1b naming this exact phrase -- so the Vehicle stays a Vehicle,
+-- and AddCardType is right where its sibling SetCardType's CR 205.1a replacement
+-- would take the artifact type and the Vehicle subtype away. TWO of them (CR
+-- 300.1) in one mode, since CR 613.7b stamps both at the moment this one
+-- resolution creates them. Layer 4 either way (CR 613.1d).
 --
--- Layer 4 either way (CR 613.1d).
+-- Binding.triggerSource, so the Vehicle is named and never TARGETED (CR 115.10a):
+-- a targeted crew would fizzle to shroud and fire "becomes the target" triggers
+-- that the printed ability does not.
 --
--- ObjectRef.InSlot Binding.triggerSource -- the engine-reserved "self" slot -- so
--- the Vehicle is named and never TARGETED (CR 115.10a): rule 702.122a says "this
--- permanent", and a targeted crew would fizzle to shroud and fire "becomes the
--- target" triggers that the printed ability does not.
+-- CR 208.3 needs no clause here: the Vehicle's printed power and toughness are
+-- gated on its being a creature at Projection's read points, so adding the type is
+-- the whole of CR 301.7b.
 --
--- CR 208.3 is what makes this observable at all, and it needs no clause here: the
--- Vehicle's printed power and toughness are gated on its being a creature at
--- Pawl.Engine.Projection's read points, so adding the type is the whole of CR
--- 301.7b's "it immediately has its printed power and toughness".
---
--- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability is
--- activated, cycling's posture. No restriction clause, because rule 702.122a
--- states no timing restriction, which leaves CR 117.1b's default -- and CR
--- 702.122a's "any number
--- of times" needs no expression, an activated ability having no once-per-turn
--- limit unless one is printed.
+-- No restriction clause, rule 702.122a stating no timing restriction, and its "any
+-- number of times" needs no expression.
 crew :: Natural -> ActivatedAbility Card
 crew n =
   ActivatedAbility.MkActivatedAbility
