@@ -136,10 +136,11 @@ import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 -- Rule 702.34a's flashback shows how wide this voice is: ONE keyword becomes a
 -- cost, a casting permission and a replacement effect, none of whose readers learn
 -- that flashback produced them. All three function in the graveyard or on the
--- stack (CR 113.6), and the graveyard read goes through the projection
--- (Cost.costsFor).
+-- stack (CR 113.6), and the graveyard reads go through the projection
+-- (Cost.costsFor, Cast.graveyardKeywords).
 --
--- Not implemented: the STACK read stays printed (#1859).
+-- Not implemented: what is read while the object is on the STACK stays printed
+-- (#1859).
 
 -- CR 702.70b: multiple instances of poisonous each trigger separately, so this
 -- returns one ability PER INSTANCE -- `Poisonous 1` twice is two abilities and two

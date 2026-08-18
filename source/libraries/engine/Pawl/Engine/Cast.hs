@@ -144,20 +144,19 @@ proposedFace oid name gs = case fmap Object.facing (Game.lookupObject oid gs) of
 -- CR 702.8a's keyword arrives two ways, so the keyword half is itself a
 -- disjunction. One limb is the PROPOSED HALF's printed keywords (CR 709.3a: only
 -- the chosen half is evaluated); the other is the OBJECT's post-layer keywords,
--- which is where
--- an effect granting flash to a card off the battlefield lands (CR 613.1f) --
--- Teferi, Mage of Zhalfir's "creature cards you own that aren't on the
+-- where an effect granting flash to a card off the battlefield lands (CR 613.1f)
+-- -- Teferi, Mage of Zhalfir's "creature cards you own that aren't on the
 -- battlefield have flash". Read wherever the cast is being proposed from, which
 -- is CR 702.8a's "functions in any zone from which you could play the card it's
 -- on".
 --
--- The two keyword reads are disjoined rather than merged because they answer
--- about different things: a split card off the stack shows both halves' printed
--- keywords at once (CR 709.4a), so the projection cannot say WHICH half a
--- printed flash sits on. Nothing separates the two readings today -- an
--- api.scryfall.com search for is:split o:flash, 2026-08-18, returns no card
--- printing flash on one half of a split card, and Wax // Wane is the pool's
--- split card either reading would have to disagree about.
+-- The two limbs are disjoined rather than merged because they answer about
+-- different things: a split card off the stack shows both halves' printed
+-- keywords at once (CR 709.4a), so the projection cannot say WHICH half a printed
+-- flash sits on, and this reads it as flash on either. What would refute that is
+-- a split card printing flash on one half only; an api.scryfall.com search for
+-- is:split o:flash on 2026-08-18 returned none, so nothing separates the two
+-- readings today.
 --
 -- The PLAYER-scoped sibling is NOT this and is deliberately not folded in: an
 -- effect that lets a player cast OTHER spells as though they had flash (CR

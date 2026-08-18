@@ -2431,8 +2431,8 @@ flashSpec s registry = Spec.describe s "Flash" $ do
     forest <- S.printingOf s registry "Forest"
     warMammoth <- S.printingOf s registry "War Mammoth"
     teferi <- S.printingOf s registry "Teferi, Mage of Zhalfir"
-    let (bare, mammothId) = teferiBoard forest warMammoth Nothing
-        withTeferi = fst (teferiBoard forest warMammoth (Just teferi))
+    let (mammothId, bare) = teferiBoard forest warMammoth Nothing
+        withTeferi = snd (teferiBoard forest warMammoth (Just teferi))
         play gs = S.runPure S.castAnswer gs Engine.priorityLoop
         after = play withTeferi
     Spec.assertEqWith s "the Mammoth is on the battlefield" (S.countOnBattlefieldByName (S.printingName warMammoth) S.alice after) 1
@@ -2441,18 +2441,23 @@ flashSpec s registry = Spec.describe s "Flash" $ do
     Spec.assertBool s (Projection.hasKeyword Keyword.Flash mammothId withTeferi) "the card in hand projects flash"
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Flash mammothId bare)) "and does not without Teferi"
 
-  -- CR 400.1 the arm's own gate, read from the other side: Teferi's set is
-  -- Affected.MatchingOffBattlefield, so his OWN creatures on the battlefield are
-  -- outside it. Nothing in the rules turns on a permanent's flash, so this is the
-  -- one place the difference between that arm and MatchingAnywhere shows.
-  Spec.it s "CR 613.1f Teferi's off-battlefield set skips a creature on the battlefield" $ do
+  -- The arm's own gate, read from the other side. Teferi's set is
+  -- Affected.MatchingOffBattlefield, so a creature ON the battlefield is outside
+  -- it -- which is the whole difference between that arm and MatchingAnywhere,
+  -- and CR 702.8a is a permission to PLAY a card, so nothing else on the board
+  -- would show it.
+  --
+  -- TWO War Mammoths on ONE board differing in exactly one thing: which zone each
+  -- is in. Same printing, same owner, same Teferi, so a set that ignored the zone
+  -- would answer alike for both.
+  Spec.it s "CR 613.1f Teferi's off-battlefield set reaches the Mammoth in hand and not the one in play" $ do
     forest <- S.printingOf s registry "Forest"
     warMammoth <- S.printingOf s registry "War Mammoth"
     teferi <- S.printingOf s registry "Teferi, Mage of Zhalfir"
-    let gs0 = S.landsInPlay forest 4
-        (mammothId, gs1) = S.addCreature warMammoth S.alice gs0
-        gs = snd (S.addCreature teferi S.alice gs1)
-    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flash mammothId gs)) "the Mammoth on the battlefield has no flash"
+    let (inHand, gs0) = teferiBoard forest warMammoth (Just teferi)
+        (inPlay, gs) = S.addCreature warMammoth S.alice gs0
+    Spec.assertBool s (Projection.hasKeyword Keyword.Flash inHand gs) "the one in hand has flash"
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flash inPlay gs)) "the one on the battlefield does not"
 
 -- Four Forests and a War Mammoth in alice's hand, on BOB's turn with alice
 -- holding priority, and Teferi on the battlefield or not. The Mammoth is {3}{G},
@@ -2462,15 +2467,15 @@ teferiBoard ::
   Printing.Printing ->
   Printing.Printing ->
   Maybe Printing.Printing ->
-  (GameState.GameState, ObjectId.ObjectId)
+  (ObjectId.ObjectId, GameState.GameState)
 teferiBoard forest warMammoth mTeferi =
   let (gs0, mammothId) = S.handOne warMammoth (S.landsInPlay forest 4)
       gs1 = maybe gs0 (\teferi -> snd (S.addCreature teferi S.alice gs0)) mTeferi
-   in ( gs1
+   in ( mammothId,
+        gs1
           { GameState.activePlayer = S.bob,
             GameState.priority = Just S.alice
-          },
-        mammothId
+          }
       )
 
 -- The two names Wax // Wane prints (CR 709.4a). Neither of them is "Wax//Wane",
