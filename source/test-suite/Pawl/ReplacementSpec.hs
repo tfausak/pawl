@@ -1772,8 +1772,10 @@ excruciatorSpec s registry = Spec.describe s "Excruciator (CR 615.12)" $ do
 -- damage that would be dealt by creatures you control can't be prevented").
 -- Excruciator's clause above names ONE object (Filter.IsSource) and says nothing
 -- about the kind; this one names a SET by characteristic and pins CR 120.1's
--- source to CR 510.2's combat damage, so it is the pool's first pattern where
--- both `whichKind` and a characteristic `whatSource` have to be read.
+-- source to CR 510.2's combat damage, so it is the pool's one statement of CR
+-- 615.12 where both `whichKind` and a characteristic `whatSource` have to be
+-- read -- Excruciator's and Malignus' write IsSource and Spider-Punk's writes
+-- neither field.
 --
 -- CR 109.5: the "you" inside whatSource is the ABILITY'S SOURCE's controller,
 -- which is the Maybe ObjectId Pawl.Engine.PlayerEffect.unpreventable threads out
