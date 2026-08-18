@@ -532,6 +532,7 @@ activateAbility pid srcId ability = do
             Object.sickness = Sickness.Settled pid,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.counterTimestamps = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,

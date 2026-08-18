@@ -715,6 +715,7 @@ placeBorne srcId pending = do
             Object.sickness = Sickness.Settled controller,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.counterTimestamps = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
@@ -907,9 +908,9 @@ performSettle = do
 -- the halting problem, so the question this answers is "has this gone on longer
 -- than any real game would?". The MARGIN is what makes it safe.
 -- GameState.nextTimestamp advances on the events CR 104.4b names (CR 613.7a,
--- 613.7d), and the slowest real ending -- decking out from a 60-card library --
--- spends on the order of fifty of them, twenty times under the limit, where a
--- two-card recursion loop arrives in a few hundred.
+-- 613.7c, 613.7d), and the slowest real ending -- decking out from a 60-card
+-- library -- spends on the order of fifty of them, twenty times under the limit,
+-- where a two-card recursion loop arrives in a few hundred.
 mandatoryLoopLimit :: Natural
 mandatoryLoopLimit = 1000
 

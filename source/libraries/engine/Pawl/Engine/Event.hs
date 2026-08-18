@@ -557,6 +557,7 @@ createEmblem pid card =
             Object.sickness = Sickness.Settled pid,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.counterTimestamps = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
@@ -1978,8 +1979,15 @@ putCounters cause oid kind n = do
           case Game.lookupObject target gs of
             Nothing -> pure 0
             Just obj -> do
+              -- CR 613.7c: the counters arriving get a timestamp, and the ones of
+              -- that kind already there get the same one.
+              ts <- State.state Game.freshTimestamp
               let before = Map.findWithDefault 0 settledKind (Object.counters obj)
-                  bump o = o {Object.counters = Map.insertWith (+) settledKind settledCount (Object.counters o)}
+                  bump o =
+                    o
+                      { Object.counters = Map.insertWith (+) settledKind settledCount (Object.counters o),
+                        Object.counterTimestamps = Map.insert settledKind ts (Object.counterTimestamps o)
+                      }
                   bumped g = g {GameState.objects = Map.adjust bump target (GameState.objects g)}
               -- CR 122.6's placement, recorded AFTER the write and from the SETTLED
               -- count, so a Doubling Season that turned one counter into two records
@@ -3347,6 +3355,7 @@ createTokens controller card copy n tapped entering = do
                     -- copy's from the instant it exists.
                     Object.bindings = maybe Map.empty (\pc -> Binding.setCopy pc Map.empty) copy,
                     Object.counters = Map.empty,
+                    Object.counterTimestamps = Map.empty,
                     Object.attachedTo = Nothing,
                     Object.chosenColor = Nothing,
                     Object.chosenSubtype = Nothing,

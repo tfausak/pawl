@@ -3063,6 +3063,42 @@ keywordCounterSpec s registry = Spec.describe s "KeywordCounter" $ do
     Spec.assertBool s (Projection.hasKeyword Keyword.Haste pikerId hasted) "haste granted"
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying pikerId hasted)) "flying is not"
 
+  -- CR 613.7c against CR 613.7d: the grant carries the moment the COUNTER was put
+  -- on, not the moment the creature entered. Humility's CR 613.1f removal is in
+  -- the same layer, so the two orders below disagree -- and the Piker enters
+  -- before Humility on both boards, which is what makes the counter's own stamp
+  -- the only thing that can decide it.
+  Spec.it s "CR 613.7c a counter put on AFTER Humility grants flying through it" $ do
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    humility <- S.printingOf s registry "Humility"
+    spontaneousFlight <- S.printingOf s registry "Spontaneous Flight"
+    let (target, humbled) = countered piker humility plains spontaneousFlight True
+    Spec.assertBool s (Projection.hasKeyword Keyword.Flying target humbled) "the counter is younger than Humility, so it flies"
+    Spec.assertEqWith s "Humility is applying: base 1/1 plus the spell's +2/+2" (Projection.powerOf target humbled) (Just 3)
+
+  Spec.it s "CR 613.7c a counter put on BEFORE Humility loses flying to it" $ do
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    humility <- S.printingOf s registry "Humility"
+    spontaneousFlight <- S.printingOf s registry "Spontaneous Flight"
+    let (target, humbled) = countered piker humility plains spontaneousFlight False
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying target humbled)) "the counter is older than Humility, so it does not"
+    Spec.assertEqWith s "Humility is applying: base 1/1 plus the spell's +2/+2" (Projection.powerOf target humbled) (Just 3)
+
+-- The pair of boards the CR 613.7c cases above read: a Piker, a resolved
+-- Spontaneous Flight and a Humility, differing in nothing but whether Humility
+-- arrives before the flying counter or after it. The Piker always enters first,
+-- so the entry timestamp CR 613.7d gives it is older than Humility either way.
+countered :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, GameState.GameState)
+countered piker humility plains spontaneousFlight humilityFirst =
+  let (target, withCreature) = S.addCreature piker S.alice (S.landsInPlay plains 3)
+      before = if humilityFirst then S.withHumility humility withCreature else withCreature
+      (gs, spellId) = S.handOne spontaneousFlight before
+      cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
+      resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+   in (target, if humilityFirst then resolved else S.withHumility humility resolved)
+
 -- CR 701.3a / 613.1: Filter.AttachedTo reached from INSIDE the layer fold, which
 -- is where the pool's two mutually-referring Equipment put it.
 --
