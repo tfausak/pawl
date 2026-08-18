@@ -69,6 +69,10 @@ castAndResolve answer pid spellId gs =
   let cast = S.runPure answer gs (S.cast pid spellId)
    in S.runPure answer cast (Stack.resolveTop >> Engine.settleForPriority)
 
+-- Cast and resolve the first `n` of these Birthday Escapes, in order.
+castEscapes :: (forall r. Prompt.Prompt r -> r) -> Int -> [ObjectId] -> GameState.GameState -> GameState.GameState
+castEscapes answer n spells gs = List.foldl' (flip (castAndResolve answer S.alice)) gs (take n spells)
+
 -- Answers Prompt.ChooseRingBearer with the LAST candidate offered, delegating
 -- everything else to S.identityAnswer (which answers it with the FIRST).
 --
@@ -107,22 +111,27 @@ twoCreatureBoard island piker escape lands =
       (lower, higher) = if a < b then (a, b) else (b, a)
    in (lower, higher, spellId, gs)
 
--- alice holds one Birthday Escape, has one untapped Island and one card left to
--- draw, and controls one creature per printing in `mine`; bob controls one per
--- printing in `theirs`. Still in alice's precombat main phase, so the spell can
--- actually be cast -- a sorcery cannot be cast in combat, which is why CR 701.54c's
--- blocking clause needs a board built in two moves rather than S.combatBoardOf.
+-- alice holds `copies` Birthday Escapes, has that many untapped Islands and that
+-- many cards left to draw, and controls one creature per printing in `mine`; bob
+-- controls one per printing in `theirs`. Still in alice's precombat main phase, so
+-- the spells can actually be cast -- a sorcery cannot be cast in combat, which is
+-- why CR 701.54c's blocking clause needs a board built in two moves rather than
+-- S.combatBoardOf.
 --
--- Returns the spell, alice's creatures and bob's, in the order their printings were
--- given.
-ringCombatBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> [Printing.Printing] -> [Printing.Printing] -> (ObjectId, [ObjectId], [ObjectId], GameState.GameState)
-ringCombatBoard island escape filler mine theirs =
+-- One Island and one library card PER Birthday Escape: {U} apiece, and CR 104.3c
+-- takes a player who draws from an empty library out of the game before anything
+-- can be asserted.
+--
+-- Returns the spells, alice's creatures and bob's, in the order their printings
+-- were given.
+ringCombatBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> [Printing.Printing] -> [Printing.Printing] -> ([ObjectId], [ObjectId], [ObjectId], GameState.GameState)
+ringCombatBoard island escape filler copies mine theirs =
   let addAll pid ps g = List.foldl' (\(ids, acc) p -> let (oid, acc1) = S.addCreature p pid acc in (ids <> [oid], acc1)) ([], g) ps
-      (_, g0) = S.addLibraryCard filler S.alice (S.landsInPlay island 1)
+      g0 = List.foldl' (\g _ -> snd (S.addLibraryCard filler S.alice g)) (S.landsInPlay island copies) [1 .. copies]
       (ours, g1) = addAll S.alice mine g0
       (yours, g2) = addAll S.bob theirs g1
-      (gs, spellId) = S.handOne escape g2
-   in (spellId, ours, yours, gs)
+      (spellIds, gs) = List.foldl' (\(ids, acc) _ -> let (oid, acc1) = S.addHandCard escape S.alice acc in (ids <> [oid], acc1)) ([], g2) [1 .. copies]
+   in (spellIds, ours, yours, gs)
 
 -- Move a main-phase board into the declare attackers step and attack with
 -- everything, which is what puts alice's Ring-bearer where CR 509.1b can be asked
@@ -154,6 +163,20 @@ blocks blocker attacker = Combat.legalBlockDeclaration S.bob (Map.singleton bloc
 -- which for the two cases below says nothing about it either way.
 isLegendary :: ObjectId -> GameState.GameState -> Bool
 isLegendary oid gs = Set.member Supertype.Legendary (Projection.supertypesOf oid gs)
+
+-- Drive a main-phase board through combat to actual damage, then let CR 117.5 put
+-- what triggered on the stack and resolve it.
+--
+-- Stack.resolveTop is a no-op on an empty stack, so the three-temptation board --
+-- where nothing may trigger at all -- runs the IDENTICAL sequence to the
+-- four-temptation one. The second settle is what performs CR 119.3's life loss's
+-- consequences.
+drainThrough :: GameState.GameState -> GameState.GameState
+drainThrough gs =
+  S.runPure
+    S.aggressiveAnswer
+    (intoCombat gs)
+    (Combat.declareBlockers >> Damage.dealCombatDamage >> Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
@@ -417,8 +440,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     hillGiant <- S.printingOf s registry "Hill Giant"
     elves <- S.printingOf s registry "Llanowar Elves"
-    let (spellId, mine, theirs, board) = ringCombatBoard island escape piker [piker] [hillGiant, piker, elves]
-        gs = intoCombat (castAndResolve S.identityAnswer S.alice spellId board)
+    let (spells, mine, theirs, board) = ringCombatBoard island escape piker 1 [piker] [hillGiant, piker, elves]
+        gs = intoCombat (castEscapes S.identityAnswer 1 spells board)
     case (mine, theirs) of
       ([bearer], [bigger, equal, smaller]) -> do
         Spec.assertEqWith s "the attacker is alice's Ring-bearer" (markedFor S.alice gs) [bearer]
@@ -436,7 +459,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
     escape <- S.printingOf s registry "Birthday Escape"
     piker <- S.printingOf s registry "Goblin Piker"
     hillGiant <- S.printingOf s registry "Hill Giant"
-    let (_, mine, theirs, board) = ringCombatBoard island escape piker [piker] [hillGiant]
+    let (_, mine, theirs, board) = ringCombatBoard island escape piker 1 [piker] [hillGiant]
         gs = intoCombat board
     case (mine, theirs) of
       ([attacker], [bigger]) -> do
@@ -454,10 +477,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     hillGiant <- S.printingOf s registry "Hill Giant"
     elves <- S.printingOf s registry "Llanowar Elves"
-    let (spellId, mine, theirs, board) = ringCombatBoard island escape piker [elves, piker] [hillGiant]
+    let (spells, mine, theirs, board) = ringCombatBoard island escape piker 1 [elves, piker] [hillGiant]
         -- The LAST candidate, so the designation lands on the Piker rather than on
         -- the first creature a never-prompting implementation would take.
-        gs = intoCombat (castAndResolve lastCandidate S.alice spellId board)
+        gs = intoCombat (castEscapes lastCandidate 1 spells board)
     case (mine, theirs) of
       ([other, bearer], [bigger]) -> do
         Spec.assertEqWith s "the Piker is the Ring-bearer" (markedFor S.alice gs) [bearer]
@@ -471,8 +494,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
     island <- S.printingOf s registry "Island"
     escape <- S.printingOf s registry "Birthday Escape"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (spellId, mine, theirs, board) = ringCombatBoard island escape piker [piker] [piker]
-        gs = intoCombat (castAndResolve S.identityAnswer S.alice spellId board)
+    let (spells, mine, theirs, board) = ringCombatBoard island escape piker 1 [piker] [piker]
+        gs = intoCombat (castEscapes S.identityAnswer 1 spells board)
     case (mine, theirs) of
       ([bearer], [blocker]) ->
         Spec.assertEqWith
@@ -489,10 +512,66 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
     escape <- S.printingOf s registry "Birthday Escape"
     piker <- S.printingOf s registry "Goblin Piker"
     hillGiant <- S.printingOf s registry "Hill Giant"
-    let (spellId, _, _, board) = ringCombatBoard island escape piker [piker] [hillGiant]
+    let (spells, _, _, board) = ringCombatBoard island escape piker 1 [piker] [hillGiant]
         play gs = let after = S.settleSba (S.runPure S.aggressiveAnswer (intoCombat gs) (Combat.declareBlockers >> Damage.dealCombatDamage)) in (S.lifeOf S.bob after, S.creaturesInPlay S.alice after, S.creaturesInPlay S.bob after)
     Spec.assertEqWith
       s
       "unblockable with the Ring; blocked and dead without it"
-      (play (castAndResolve S.identityAnswer S.alice spellId board), play board)
+      (play (castEscapes S.identityAnswer 1 spells board), play board)
       ((Just 18, 1, 1), (Just 20, 0, 1))
+
+  -- CR 701.54c's FOURTH sentence: "as long as the Ring has tempted that player four
+  -- or more times, it has 'Whenever your Ring-bearer deals combat damage to a
+  -- player, each opponent loses 3 life.'"
+  --
+  -- Both cases below run the SAME board to actual combat damage and differ in one
+  -- thing -- three castings of Birthday Escape against four -- so what separates
+  -- them is the threshold and nothing else. bob's board is empty, so the 2/1
+  -- Ring-bearer connects for 2 either way and the only other movement in his life
+  -- total is CR 701.54c's.
+  Spec.it s "CR 701.54c four temptations drain each opponent when the Ring-bearer connects" $ do
+    island <- S.printingOf s registry "Island"
+    escape <- S.printingOf s registry "Birthday Escape"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (spells, _, _, board) = ringCombatBoard island escape piker 4 [piker] []
+        -- S.identityAnswer, alice controlling one creature: CR 701.54a leaves
+        -- nothing to ask, and the designation is pinned by the count of
+        -- attackers rather than by the answer.
+        after = drainThrough (castEscapes S.identityAnswer 4 spells board)
+    -- 20 - 2 combat damage - 3 life. The GAMEPLAY assertion, and first: the two
+    -- readings of the rule differ here and nowhere earlier.
+    Spec.assertEqWith s "bob took 2 in combat and lost 3 more" (S.lifeOf S.bob after) (Just 15)
+    -- Anti-vacuity, AFTER the claim so it cannot absorb a mutation of it: four
+    -- castings really happened, and the damage really was dealt.
+    Spec.assertEqWith s "alice was tempted four times" (temptationsOf S.alice after) (Just 4)
+    Spec.assertEqWith s "alice lost nothing" (S.lifeOf S.alice after) (Just 20)
+  Spec.it s "CR 701.54c three temptations do not" $ do
+    -- THE DISCRIMINATOR. Without it the case above passes for an emblem carrying
+    -- the ability at every count, which is the whole of what the gate prevents.
+    island <- S.printingOf s registry "Island"
+    escape <- S.printingOf s registry "Birthday Escape"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (spells, _, _, board) = ringCombatBoard island escape piker 3 [piker] []
+        after = drainThrough (castEscapes S.identityAnswer 3 spells board)
+    Spec.assertEqWith s "bob took the combat damage and nothing else" (S.lifeOf S.bob after) (Just 18)
+    Spec.assertEqWith s "alice was tempted three times" (temptationsOf S.alice after) (Just 3)
+  Spec.it s "CR 701.54c the drain reaches the Ring-bearer alone" $ do
+    -- CR 701.54c says "YOUR RING-BEARER", not "a creature you control": alice
+    -- attacks with a 1/1 Llanowar Elves beside the 2/1 Ring-bearer and both
+    -- connect. An ability whose Filter dropped the IsRingBearer conjunct would
+    -- trigger twice and take 6, so the two readings differ by 3 on one board.
+    --
+    -- lastCandidate for every casting, so the designation lands on the Piker rather
+    -- than on the first creature a never-prompting implementation would take.
+    island <- S.printingOf s registry "Island"
+    escape <- S.printingOf s registry "Birthday Escape"
+    piker <- S.printingOf s registry "Goblin Piker"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    let (spells, mine, _, board) = ringCombatBoard island escape piker 4 [elves, piker] []
+        after = drainThrough (castEscapes lastCandidate 4 spells board)
+    -- 20 - 1 - 2 combat damage - 3 life, drained once and not twice.
+    Spec.assertEqWith s "bob took 3 in combat and lost 3 once" (S.lifeOf S.bob after) (Just 14)
+    case mine of
+      [_, bearer] -> Spec.assertEqWith s "the Piker is the Ring-bearer" (markedFor S.alice after) [bearer]
+      _ -> Spec.assertFailure s "fixture should have two attackers"
+    Spec.assertEqWith s "alice was tempted four times" (temptationsOf S.alice after) (Just 4)
