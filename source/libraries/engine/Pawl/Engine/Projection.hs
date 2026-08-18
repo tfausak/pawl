@@ -59,6 +59,7 @@ import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.Effect as Effect
@@ -105,6 +106,7 @@ import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
@@ -1270,7 +1272,7 @@ rewriteAffected pairs a = case a of
 rewriteEffect :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Effect.Effect Card.Type.Card -> Effect.Effect Card.Type.Card
 rewriteEffect pairs effect = case effect of
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
-    Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration (rewriteModificationWith (const Void.absurd) pairs modification) (rewriteObjectRef pairs ref))
+    Effect.ModifyTarget (ModifyTarget.MkModifyTarget (rewriteDuration pairs duration) (rewriteModificationWith (const Void.absurd) pairs modification) (rewriteObjectRef pairs ref))
   Effect.DealDamage (DealDamage.MkDealDamage ref quantity dealer excess) -> Effect.DealDamage (DealDamage.MkDealDamage (rewriteObjectRef pairs ref) quantity dealer excess)
   -- CR 612.1: a text-changer's own restriction clause is text like any other.
   Effect.ChangeText (ChangeText.MkChangeText family forbidden slot) ->
@@ -1331,12 +1333,16 @@ rewriteEffect pairs effect = case effect of
   Effect.SkipNextPhase {} -> effect
   -- CR 612.1: a rider's text is as changeable as any other.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration kind ref quantity rider) ->
-    Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration kind ref quantity (fmap (rewriteEffect pairs) rider))
+    Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage (rewriteDuration pairs duration) kind ref quantity (fmap (rewriteEffect pairs) rider))
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration kind ref rider) ->
-    Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration kind ref (fmap (rewriteEffect pairs) rider))
+    Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage (rewriteDuration pairs duration) kind ref (fmap (rewriteEffect pairs) rider))
   Effect.RedirectDamage {} -> effect
   Effect.Counter (Counter.MkCounter ref mSlot) -> Effect.Counter (Counter.MkCounter (rewriteObjectRef pairs ref) mSlot)
-  Effect.PutCounters {} -> effect
+  -- Not implemented: a CR 122.1b keyword counter named in the kind keeps its
+  -- printed keyword through the swap, where Filter's HasCounters arm rewrites
+  -- the same kind (#1840).
+  Effect.PutCounters (PutCounters.MkPutCounters kind quantity ref) ->
+    Effect.PutCounters (PutCounters.MkPutCounters kind (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref))
   Effect.RemoveCounters {} -> effect
   Effect.GainPlayerCounters {} -> effect
   Effect.RemovePlayerCounters {} -> effect
@@ -1347,13 +1353,13 @@ rewriteEffect pairs effect = case effect of
   Effect.Transform ref -> Effect.Transform (rewriteObjectRef pairs ref)
   Effect.PhaseOut ref -> Effect.PhaseOut (rewriteObjectRef pairs ref)
   Effect.AddPhases _ -> effect
-  Effect.GainControl (DurationRef.MkDurationRef duration ref) -> Effect.GainControl (DurationRef.MkDurationRef duration (rewriteObjectRef pairs ref))
+  Effect.GainControl (DurationRef.MkDurationRef duration ref) -> Effect.GainControl (DurationRef.MkDurationRef (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
   Effect.ArmDelayedTrigger {} -> effect
   -- Not implemented: the Filter inside the PlayerEffect keeps its printed word
   -- while the spell is on the stack (#1370).
   Effect.AffectPlayers {} -> effect
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration blocker attacker) ->
-    Effect.RequireBlock (RequireBlock.MkRequireBlock duration (rewriteObjectRef pairs blocker) (rewriteObjectRef pairs attacker))
+    Effect.RequireBlock (RequireBlock.MkRequireBlock (rewriteDuration pairs duration) (rewriteObjectRef pairs blocker) (rewriteObjectRef pairs attacker))
   -- CR 114.3 leaves an emblem no type line and no name, so its ABILITIES are the
   -- whole of what CR 612.1 can reach.
   Effect.CreateEmblem card -> Effect.CreateEmblem (rewriteCard pairs card)
@@ -1373,9 +1379,12 @@ rewriteEffect pairs effect = case effect of
   Effect.TakeExtraTurn {} -> effect
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named ref) -> Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named (rewriteObjectRef pairs ref))
   Effect.OfferCast {} -> effect
-  -- The Duration is left untouched, so a ForAsLongAs Condition's Filters are not
-  -- rewritten -- GainControl's asymmetry, matched here.
-  Effect.GrantPlayFromExile grant -> Effect.GrantPlayFromExile grant {GrantPlayFromExile.ref = rewriteObjectRef pairs (GrantPlayFromExile.ref grant)}
+  Effect.GrantPlayFromExile grant ->
+    Effect.GrantPlayFromExile
+      grant
+        { GrantPlayFromExile.duration = rewriteDuration pairs (GrantPlayFromExile.duration grant),
+          GrantPlayFromExile.ref = rewriteObjectRef pairs (GrantPlayFromExile.ref grant)
+        }
   Effect.ForEach (ForEach.MkForEach ref slot body) ->
     Effect.ForEach (ForEach.MkForEach (rewriteObjectRef pairs ref) slot (fmap (rewriteEffect pairs) body))
 
@@ -1587,8 +1596,8 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfExerted -> condition
   TriggerCondition.SelfBecomesAttachedBy f -> TriggerCondition.SelfBecomesAttachedBy (Filter.rewrite pairs f)
 
--- CR 612.1 through Condition's predicate vocabulary. A CR 611.2b duration is
--- stored rather than printed, so no text change reaches it here.
+-- CR 612.1 through Condition's predicate vocabulary. A Condition reached through
+-- a CR 611.2b duration comes here by way of rewriteDuration below.
 rewriteCondition :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Condition.Type.Condition -> Condition.Type.Condition
 rewriteCondition pairs condition = case condition of
   Condition.Type.Compares c ->
@@ -1599,6 +1608,22 @@ rewriteCondition pairs condition = case condition of
         }
   Condition.Type.Any conditions -> Condition.Type.Any (fmap (rewriteCondition pairs) conditions)
   Condition.Type.All conditions -> Condition.Type.All (fmap (rewriteCondition pairs) conditions)
+
+-- CR 612.1 through a Duration, which Pawl.Types.Duration holds as the card
+-- prints it: a CR 611.2b "for as long as ..." clause is rules text like any
+-- other, so the words inside its Condition are reachable. Every other arm is a
+-- turn-structure window and names none.
+--
+-- Exhaustive rather than a wildcard, for rewriteTriggerCondition's reason: a new
+-- arm carrying a Condition or a Filter must break this build.
+rewriteDuration :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Duration.Duration -> Duration.Duration
+rewriteDuration pairs duration = case duration of
+  Duration.ForAsLongAs condition -> Duration.ForAsLongAs (rewriteCondition pairs condition)
+  Duration.UntilEndOfTurn -> duration
+  Duration.Indefinite -> duration
+  Duration.UntilYourNextTurn -> duration
+  Duration.UntilEndOfYourNextTurn -> duration
+  Duration.UntilEndOfCombat -> duration
 
 -- CR 612.1 through a Quantity: a Count's Filter is where the subtype word hides,
 -- and its Aggregation may name a further Quantity. Every remaining arm is a leaf.

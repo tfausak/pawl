@@ -48,7 +48,7 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- Runtime-only, like ActiveReplacement: no codec, which keeps a stored value out
 -- of a card file and a printed value out of the store. NOT like Expiry, which
 -- does have one (Pawl.Codec.Expiry) because a Duration's condition serialises
--- through it -- the claim this comment used to make (#1059).
+-- through it -- the claim this comment used to make; see #1059.
 data ActivePlayerEffect = MkActivePlayerEffect
   { source :: ObjectId.ObjectId,
     controller :: PlayerId.PlayerId,
