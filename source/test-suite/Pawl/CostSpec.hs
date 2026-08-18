@@ -1304,10 +1304,10 @@ longtuskCubSpec s registry =
 -- graveyard, one untapped Bayou, and whatever `extras` adds beside it, with
 -- priority in her own precombat main phase.
 --
--- Not implemented: Jarad's other activated ability, "{1}{B}{G}, Sacrifice
--- another creature: Each opponent loses life equal to the sacrificed creature's
--- power" -- no quantity can read the power of a permanent sacrificed to pay a
--- COST, so the card file omits the ability (#1061).
+-- Jarad's OTHER activated ability, "{1}{B}{G}, Sacrifice another creature: Each
+-- opponent loses life equal to the sacrificed creature's power", is the card's
+-- first and is proved by jaradDrainSpec below; this group's helper reaches the
+-- second through `swampAndForest`.
 --
 -- THE card for CR 118.3 across two components, and a Bayou is why: `Land --
 -- Forest Swamp` is one permanent that answers BOTH halves of the cost, so a gate

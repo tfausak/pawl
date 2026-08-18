@@ -2293,10 +2293,9 @@ namedJarad gs oid = case Game.faceOf oid gs of
 -- Cost.canPay; this is the same rule at gameplay level, through
 -- Action.legalActions.
 --
--- Not implemented: Jarad's other activated ability, "{1}{B}{G}, Sacrifice
--- another creature: Each opponent loses life equal to the sacrificed creature's
--- power" -- no quantity can read the power of a permanent sacrificed to pay a
--- COST, so the card file omits the ability (#1061).
+-- Jarad's OTHER activated ability, "{1}{B}{G}, Sacrifice another creature: Each
+-- opponent loses life equal to the sacrificed creature's power", is the card's
+-- first and is proved by Pawl.CostSpec's jaradDrainSpec.
 twoSacrificeComponentSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 twoSacrificeComponentSpec s registry = Spec.describe s "TwoSacrificeComponents" $ do
   Spec.it s "CR 118.3 with one Bayou the activation is not offered, and a Forest offers it" $ do
