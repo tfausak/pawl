@@ -573,8 +573,9 @@ landwalkAllowsGiven grants pcs attacker gs =
       -- CR 508.5, in Pawl.Engine.Defender: landwalk is an ability of an attacking
       -- creature referring to a defending player, so the player is read off the
       -- ATTACK and not off the blocker's controller -- CR 310.9d breaks the two
-      -- apart once a battle is attacked. Nothing means the object is not attacking,
-      -- or that its attacked BATTLE has left the battlefield (#1248).
+      -- apart once a battle is attacked. Nothing means the object is not attacking
+      -- at all; an attacker whose battle has left still reads CR 506.2's defending
+      -- player, which Pawl.BattleSpec's departed-Siege trio proves.
       defendingPlayer = Defender.playerOfAttacker attacker gs
       -- CR 702.14c's lands of the defending player. Lazy, and load-bearing: this
       -- walks the whole battlefield, and `any` below never forces it for an
@@ -1110,8 +1111,9 @@ declareAttackers pid = do
               -- The event also carries CR 506.5's count of this declaration, the
               -- same on every event of the batch, and CR 508.5's defending player,
               -- computed per creature because CR 508.5a resolves the phrase through
-              -- what each creature is attacking. Only a departed BATTLE reaches the
-              -- `defender` fallback.
+              -- what each creature is attacking. Nothing reaches the `defender`
+              -- fallback: every target here came from attackTargets, and each of
+              -- the three arms answers a player for one of those.
               --
               -- Not implemented: CR 508.3a's attacks-a-permanent form, CR 508.3b
               -- and CR 508.3e, the event naming no target (#538).
