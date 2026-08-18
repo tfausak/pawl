@@ -527,7 +527,13 @@ indirectSpec s registry = Spec.describe s "Indirect" $ do
         enchanted = S.runPure (aimedAt brambleId) placed Stack.resolveTop
         (withRipple, rippleSpell) = S.handOne ripple enchanted
         phasedOut = rippleAt brambleId rippleSpell withRipple
-        phasedIn = untapStep S.alice phasedOut
+        returned = untapStep S.alice phasedOut
+        -- The CR 117.5 boundary AFTER the untap step, and then the stack: a
+        -- trigger the phase-in had recorded would be placed here and resolve
+        -- here. Without it the count below could not tell an engine that emitted
+        -- nothing from one that emitted and was never scanned.
+        placedAfter = S.runPure (aimedAt brambleId) returned Engine.settleForPriority
+        phasedIn = S.runPure (aimedAt brambleId) placedAfter Stack.resolveTop
     Spec.assertEqWith s "the cast Aura made two Saprolings" (saprolingsOf S.alice enchanted) 2
     -- THE DISCRIMINATOR. Four would mean the phase-in recorded an attachment.
     Spec.assertEqWith s "CR 702.26j still exactly two after a phase cycle" (saprolingsOf S.alice phasedIn) 2

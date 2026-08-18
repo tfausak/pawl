@@ -3127,10 +3127,14 @@ becameTarget source kind controller chosen =
 -- is recorded on that branch either, which is CR 701.3b in as many words -- the
 -- permanent did not become attached.
 --
+-- CR 701.3b's SECOND sentence is checked here rather than left to the caller:
+-- attaching a permanent to the object or player it is already attached to "does
+-- nothing", so there is no restamp and no event. Two of the three callers cannot
+-- reach it -- Attach.hostsFor never offers the current host -- and CR 702.6a's
+-- equip, whose target is any creature its controller owns, can.
+--
 -- CR 701.3c: attaching to a DIFFERENT object gives it a new timestamp, which CR
--- 613.7 orders layer effects by. The caller is responsible for not calling this
--- with the host the subject already has -- CR 701.3b's "does nothing" would
--- otherwise become a restamp, and would record an attachment that did not happen.
+-- 613.7 orders layer effects by.
 --
 -- LIVES HERE rather than in Pawl.Engine.Attach, which is where the legality
 -- reading it asks (Attach.attachmentFor) still lives: Event imports Attach, so a
@@ -3145,7 +3149,7 @@ attach subject destination = do
   gs <- State.get
   case Attach.attachmentFor subject destination gs of
     Nothing -> pure ()
-    Just attachment -> do
+    Just attachment -> Monad.unless (fmap Object.attachedTo (Game.lookupObject subject gs) == Just (Just attachment)) $ do
       let (ts, gs1) = Game.freshTimestamp gs
           move o = o {Object.attachedTo = Just attachment, Object.timestamp = ts}
       State.put gs1 {GameState.objects = Map.adjust move subject (GameState.objects gs1)}
