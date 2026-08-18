@@ -204,9 +204,12 @@ data PlayerEffect
     -- and is the carrier's, not this constructor's -- Upwelling is
     -- PlayerScope.EachPlayer and Omnath is PlayerScope.You.
     --
-    -- Shizuko and Karn, Legacy Reforged keep only the mana they just added, which
-    -- is not a player-axis property at all and so is not reachable by widening
-    -- this filter (#352).
+    -- Shizuko, Caller of Autumn and Karn, Legacy Reforged keep only the mana
+    -- they just added, which is not a player-axis property at all and so is not
+    -- reachable by widening this filter. That retention rides the mana unit
+    -- instead (Pawl.Types.ManaRetention), and the two carriers coexist: this one
+    -- answers a clause about a player's whole pool, that one a clause about the
+    -- mana one instruction added.
     DontLoseUnspentMana ManaFilter.ManaFilter
   | -- | CR 609.4b / 613.11 / Celestial Dawn: this player may spend the mana the
     -- payload's filter names as though it were mana of the types the payload

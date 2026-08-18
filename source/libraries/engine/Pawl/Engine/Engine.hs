@@ -589,8 +589,17 @@ runTurnBasedActions phase = do
     Phase.Ending EndingStep.Cleanup -> do
       Monad.when hasActive (discardToHandSize active)
       -- CR 514.2: damage wears off AND until-end-of-turn effects end,
-      -- simultaneously. One sweep over both carriers (Pawl.Engine.Expiry). NOT
-      -- guarded: CR 703.4p is the game's action, not the active player's.
+      -- simultaneously. One sweep over the stored-effect carriers
+      -- (Pawl.Engine.Expiry), one over marked damage, and one over the mana
+      -- pools, whose units carry an until-end-of-turn retention of their own
+      -- (Pawl.Types.ManaRetention). NOT guarded: CR 703.4p is the game's action,
+      -- not the active player's.
+      --
+      -- The three are simultaneous and their order here is not observable:
+      -- nothing between them reads a mana pool, marked damage or a stored
+      -- effect. Mana.endManaRetention only ENDS the retention -- the mana itself
+      -- is taken by this same step's CR 500.5 sweep at its end, which is what
+      -- makes retained mana outlive every earlier step and not this one.
       --
       -- This is the pool's one reachable CR 603.3a window, one of the three
       -- GameState.battlefieldWhenTriggered closes: the discard above has already
@@ -600,6 +609,7 @@ runTurnBasedActions phase = do
       -- BACK.
       State.modify' Damage.removeAllDamage
       State.modify' Expiry.dropAtCleanup
+      State.modify' Mana.endManaRetention
     _ -> pure ()
 
 -- CR 505.4 / 703.4f / 714.3c's ACTION half: one lore counter onto each Saga this
@@ -1932,14 +1942,19 @@ runStepThatBegan phase = do
         -- CR 703.4q: emptying the pool is a turn-based action that does not use
         -- the stack, and CR 500.5's "Then" puts it AFTER the expiries above. This
         -- line says only WHEN; WHICH mana empties is the action itself, and
-        -- Mana.emptyManaPools decides it per player and per unit (Upwelling's
-        -- whole pool, Omnath Locus of Mana's green).
+        -- Mana.emptyManaPools decides it off both retention carriers -- per
+        -- player (Upwelling's whole pool, Omnath Locus of Mana's green) and per
+        -- unit (Shizuko, Caller of Autumn's three green).
         --
-        -- The ordering is observable: PlayerEffect.DontLoseUnspentMana is read
-        -- live by Mana.emptyManaPools, so a retention effect that expires here
-        -- keeps nothing, while one swept afterwards would keep the pool across a
-        -- boundary it no longer covers. No CARD in the pool prints that
-        -- combination (CR 702.189a firebending is the shape that would).
+        -- The ordering against a retention that ENDS at this same boundary is
+        -- observable, and both carriers are read live: an effect that expires
+        -- here keeps nothing, while one swept afterwards would keep the pool
+        -- across a boundary it no longer covers. Shizuko is the case in the
+        -- pool, one step-grain coarser -- its retention ends among the cleanup
+        -- step's turn-based actions (CR 514.2, Mana.endManaRetention) and this
+        -- line takes the mana as that same step ends. A retention ending at a
+        -- STEP boundary, which is what these two expiry sweeps could do, still
+        -- has no printing (CR 702.189a firebending is the shape that would).
         State.modify' Mana.emptyManaPools
         -- CR 511.3: as soon as the end of combat step ends, creatures, battles
         -- and planeswalkers are removed from combat -- so it belongs here, at the

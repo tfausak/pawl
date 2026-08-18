@@ -1,10 +1,17 @@
 module Pawl.Types.ManaUnit where
 
 import qualified Data.Set as Set
+import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ProductionTag as ProductionTag
 
 -- | One unit of mana in a pool.
+--
+-- THREE axes, and the third is not one of the two collections below.
+-- Pawl.Types.ManaRetention is a DURATION something must end (CR 514.2), not a
+-- fact about how the mana was made, and it comes from the wording of the effect
+-- that added the mana rather than from any property of its source -- which is
+-- why it is a field of its own and not a production tag.
 --
 -- Grows TWO separate collections, and conflating them would be a mistake.
 -- Production-time tags are the CLOSED half -- snow-ness, "this activation caused
@@ -25,6 +32,11 @@ import qualified Pawl.Types.ProductionTag as ProductionTag
 -- Pawl.Engine.Mana.productionTagsGiven.
 data ManaUnit = MkManaUnit
   { manaType :: ManaType.ManaType,
-    tags :: Set.Set ProductionTag.ProductionTag
+    tags :: Set.Set ProductionTag.ProductionTag,
+    -- | CR 106.4: whether the player loses this mana as a step or phase ends.
+    -- Stamped by the same two producers as `tags`, but read off the ADDITION
+    -- (Pawl.Types.ManaAddition) rather than off the source: a mana ability paid
+    -- inline states no retention, so that path always adds Ordinary.
+    retention :: ManaRetention.ManaRetention
   }
   deriving (Eq, Ord, Show)
