@@ -1453,7 +1453,8 @@ aimedAtRecipient recipient p = case p of
 -- board.
 --
 -- bob's War Mammoth earns its place twice: it is the SECOND candidate the CR
--- 601.2c choice picks between, so the prompt is a real choice rather than one
+-- 601.2c choice picks between (CR 602.2b routes an ability's targets through
+-- that rule), so the prompt is a real choice rather than one
 -- elided for having exactly as many candidates as it needs, and it is the
 -- unshielded recipient every batch below hits alongside the shielded one -- the
 -- control leg, on the same board, differing from it in nothing but the shield.
@@ -1563,9 +1564,9 @@ dovinSpec s registry = Spec.describe s "DovinHandOfControl" $ do
   -- "target permanent an OPPONENT controls", which nothing above reads: every
   -- case there aims at bob's Piker, and a slot with no filter at all would offer
   -- it just the same. Aiming at alice's own creature is what tells the two
-  -- apart -- the filter leaves the offered set with nothing naming it, so CR
-  -- 608.2b's ability has no legal target and installs no shield.
-  Spec.it s "CR 601.2c the slot offers no permanent alice controls" $ do
+  -- apart -- the filter leaves the offered set with nothing naming it, so the
+  -- ability is activated with no permanent to shield and installs no row.
+  Spec.it s "CR 601.2c / 602.2b the slot offers no permanent alice controls" $ do
     plains <- S.printingOf s registry "Plains"
     piker <- S.printingOf s registry "Goblin Piker"
     warMammoth <- S.printingOf s registry "War Mammoth"
