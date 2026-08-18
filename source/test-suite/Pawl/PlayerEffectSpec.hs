@@ -3475,7 +3475,7 @@ vedalkenOrrerySpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       orrery <- S.printingOf s registry "Vedalken Orrery"
       let (oid, _, board) = orreryBoard mountain piker [orrery]
-      Spec.assertBool s (not (Cast.instantSpeed (S.combinedFace piker))) "no flash on the card"
+      Spec.assertBool s (not (Cast.instantSpeed oid (S.combinedFace piker) board)) "no flash on the card"
       Spec.assertBool s (PlayerEffect.mayCastAsThoughItHadFlash S.alice oid board) "the permission is the player's"
 
     -- CR 604.2: the permission is gathered live off the battlefield, so removing

@@ -47,6 +47,17 @@ data Affected
     -- reaches an ability on the stack (CR 113.1c) and an emblem in the command
     -- zone (CR 114.5). Neither is observable today (#1551).
     MatchingAnywhere (Filter.Filter Keyword.Keyword)
+  | -- | Matching with the battlefield gate INVERTED: any object matching the
+    -- Filter that is not on the battlefield. Teferi, Mage of Zhalfir's "creature
+    -- cards you own that aren't on the battlefield" is the pool's first such
+    -- clause standing alone, which is why it is an arm of its own: Maskwood
+    -- Nexus and Arcane Adaptation print the same words BESIDE a battlefield
+    -- clause, so their two sentences together are exactly MatchingAnywhere.
+    --
+    -- Reaches every zone but the battlefield -- a hand, a library, a graveyard,
+    -- exile, the command zone and the stack -- which is what the printed phrase
+    -- says. CR 400.1 lists the zones; nothing narrows the phrase further.
+    MatchingOffBattlefield (Filter.Filter Keyword.Keyword)
   | -- | CR 303.4m: the object this ability's SOURCE is attached to -- "enchanted
     -- creature". Neither a fixed id set nor a predicate over candidates:
     -- TheseObjects is fixed at resolution (CR 611.2c) and Matching /

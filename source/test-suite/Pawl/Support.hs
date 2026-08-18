@@ -459,6 +459,7 @@ continuousEffectAffects target eff = case ContinuousEffect.affected eff of
   Affected.TheseObjects ids -> Set.member target ids
   Affected.Matching _ -> False
   Affected.MatchingAnywhere _ -> False
+  Affected.MatchingOffBattlefield _ -> False
   Affected.Attached -> False
   Affected.AttachedPlayerControls _ -> False
 

@@ -99,7 +99,7 @@ timingOk :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
 timingOk pid oid name gs = case proposedFace oid name gs of
   Nothing -> False
   Just face ->
-    instantSpeed face
+    instantSpeed oid face gs
       || PlayerEffect.mayCastAsThoughItHadFlash pid oid gs
       || sorcerySpeed pid gs
 
@@ -141,10 +141,23 @@ proposedFace oid name gs = case fmap Object.facing (Game.lookupObject oid gs) of
 -- ITSELF, so widening the shared window would make an equip ability on the same
 -- board instant-speed, which no rule says.
 --
--- Read off the PRINTED keywords rather than through the CR 613 projection (CR
--- 113.6e for the zones, #160 for why printed and projected agree in them), and
--- wherever the cast is being proposed from -- CR 702.8a's "functions in any zone
--- from which you could play the card it's on".
+-- CR 702.8a's keyword arrives two ways, so the keyword half is itself a
+-- disjunction. One limb is the PROPOSED HALF's printed keywords (CR 709.3a: only
+-- the chosen half is evaluated); the other is the OBJECT's post-layer keywords,
+-- which is where
+-- an effect granting flash to a card off the battlefield lands (CR 613.1f) --
+-- Teferi, Mage of Zhalfir's "creature cards you own that aren't on the
+-- battlefield have flash". Read wherever the cast is being proposed from, which
+-- is CR 702.8a's "functions in any zone from which you could play the card it's
+-- on".
+--
+-- The two keyword reads are disjoined rather than merged because they answer
+-- about different things: a split card off the stack shows both halves' printed
+-- keywords at once (CR 709.4a), so the projection cannot say WHICH half a
+-- printed flash sits on. Nothing separates the two readings today -- an
+-- api.scryfall.com search for is:split o:flash, 2026-08-18, returns no card
+-- printing flash on one half of a split card, and Wax // Wane is the pool's
+-- split card either reading would have to disagree about.
 --
 -- The PLAYER-scoped sibling is NOT this and is deliberately not folded in: an
 -- effect that lets a player cast OTHER spells as though they had flash (CR
@@ -152,8 +165,11 @@ proposedFace oid name gs = case fmap Object.facing (Game.lookupObject oid gs) of
 -- through PlayerEffect.mayCastAsThoughItHadFlash. Widening this one instead would
 -- say the Orrery gave every card in every zone the flash keyword, which is not
 -- what CR 702.8a's "the card it's on" means.
-instantSpeed :: Face.Face Card.Type.Card -> Bool
-instantSpeed face = Card.isInstant face || Keyword.hasFlash (Face.keywords face)
+instantSpeed :: ObjectId -> Face.Face Card.Type.Card -> GameState -> Bool
+instantSpeed oid face gs =
+  Card.isInstant face
+    || Keyword.hasFlash (Face.keywords face)
+    || Keyword.hasFlash (Map.keysSet (Projection.keywordsOf oid gs))
 
 -- CR 601.2c / 700.2a: castable when the fillable modes admit some selection at
 -- all (Modal.selectionPossible) -- ordinarily at least as many fillable modes as
