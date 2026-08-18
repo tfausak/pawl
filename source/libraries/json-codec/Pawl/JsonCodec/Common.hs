@@ -51,6 +51,7 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonSchema.Define as Define
 import qualified Pawl.JsonSchema.Name as Name
 import qualified Pawl.JsonSchema.Schema as Schema
+import qualified Pawl.JsonSchema.Validate as Validate
 import qualified Pawl.Spec as Spec
 import qualified Text.Parsec as Parsec
 
@@ -409,7 +410,10 @@ textMap unwrapKey wrapKey c =
       Codec.schema = Schema.mapOf <$> Codec.schema c
     }
 
--- | 'assertJsonCodec' against a bundle rather than a loose pair.
+-- | 'assertJsonCodec' against a bundle rather than a loose pair, plus the
+-- assertion only a bundle can make: that the encoder writes what the schema
+-- claims. The schema assertion runs FIRST so that nothing ahead of it can
+-- absorb a schema defect and report itself instead.
 assertCodec ::
   (Stack.HasCallStack, Monad m, Eq a, Show a) =>
   Spec.Spec m n ->
@@ -417,7 +421,25 @@ assertCodec ::
   a ->
   String ->
   m ()
-assertCodec s c = assertJsonCodec s (Codec.encode c) (Codec.decode c)
+assertCodec s c x j = do
+  assertMatchesSchema s c x
+  assertJsonCodec s (Codec.encode c) (Codec.decode c) x j
+
+-- | Validates a codec's own encoding of a value against its own schema. This is
+-- the pairing 'assertHasSchema' cannot make: a schema that renders is not a
+-- schema that describes what the encoder writes.
+assertMatchesSchema ::
+  (Stack.HasCallStack, Applicative m) =>
+  Spec.Spec m n ->
+  Codec.Codec a ->
+  a ->
+  m ()
+assertMatchesSchema s c x =
+  Spec.assertEqWith
+    s
+    "schema"
+    (Validate.validate (Define.run (Codec.schema c)) (Codec.encode c x))
+    []
 
 -- | Round-trips EVERY constructor of an all-nullary type through its codec, and
 -- asserts that no two of them encode alike.
@@ -447,7 +469,8 @@ assertEnumCodec s c = do
 -- is demanded, so pattern-matching the value (as 'asObject' alone does) forces
 -- only the outer tag, not the @$defs@ bodies inside it; rendering to text and
 -- parsing it back walks the whole tree, which is what actually forces those.
--- Not validated against the schema itself (#1264).
+-- What the schema SAYS is checked by 'assertMatchesSchema', against a value the
+-- codec encoded.
 assertHasSchema :: (Stack.HasCallStack, Applicative m) => Spec.Spec m n -> Codec.Codec a -> m ()
 assertHasSchema s c =
   Spec.assertBool
