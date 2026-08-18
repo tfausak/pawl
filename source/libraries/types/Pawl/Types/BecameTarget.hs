@@ -29,13 +29,15 @@ data BecameTarget = MkBecameTarget
     -- that is what a ward trigger counters.
     source :: ObjectId.ObjectId,
     -- | Which of CR 601.2c's two roads `source` came by. Dormant Gomazoa reads
-    -- "the target of A SPELL" (CR 112.1) where ward reads "a spell or ability",
+    -- "the target of A SPELL" (CR 112.1) where ward and Amulet of Safekeeping read
+    -- "a spell or ability",
     -- and the matcher that answers both is pure with no GameState, so the
     -- classification has to ride on the event rather than be looked up from it.
     kind :: StackObjectKind.StackObjectKind,
     -- | CR 405.4: who controlled `source` as it was put onto the stack. The player
-    -- rule 702.21a's "an opponent controls" compares against CR 109.5's "you", and
-    -- the one rule 702.21a offers the ward cost to.
+    -- an "an opponent controls" clause compares against CR 109.5's "you" -- rule
+    -- 702.21a's ward and Amulet of Safekeeping's alike -- and the one each of them
+    -- offers its cost to.
     --
     -- Captured here rather than re-derived at match time, for
     -- Countering.controller's reason: the targeting object can leave the stack

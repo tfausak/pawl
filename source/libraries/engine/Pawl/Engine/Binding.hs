@@ -278,11 +278,18 @@ sacrificedCount = SlotName.MkSlotName (Text.pack "thatMany")
 castSpell :: SlotName
 castSpell = SlotName.MkSlotName (Text.pack "thatSpell")
 
--- CR 601.2c: the reserved slot under which the SPELL OR ABILITY THAT TARGETED the
--- bearer is bound -- rule 702.21a's "that spell or ability", which ward counters
--- and whose controller ward offers the cost to. Stamped by
+-- CR 601.2c: the reserved slot under which the SPELL OR ABILITY THAT DID THE
+-- TARGETING is bound -- rule 702.21a's "that spell or ability", which ward
+-- counters and whose controller ward offers the cost to. Stamped by
 -- Pawl.Engine.Event.eventBindings as the trigger is gathered, alongside
 -- `castSpell` and the rest.
+--
+-- For BOTH sides of rule 601.2c's announcement, which is why it is worded over
+-- the targeting object rather than over what was targeted: the bearer becoming a
+-- target (TriggerCondition.SelfBecomesTargeted, ward's) and the bearer's
+-- CONTROLLER becoming one (TriggerCondition.ControllerBecomesTarget, Amulet of
+-- Safekeeping's "counter that spell or ability"). The object bound is the same
+-- field of the same event either way.
 --
 -- Distinct from `castSpell` even though both name a stack object: that one is the
 -- spell a CAST event named, and an activated ability targeting a warded permanent
@@ -290,8 +297,9 @@ castSpell = SlotName.MkSlotName (Text.pack "thatSpell")
 -- typecheck, so two slots make the mismatch a dead name instead.
 --
 -- Distinct from `triggerSource` (CR 113.7a) for `castSpell`'s reason: the bearer
--- is a permanent watching the stack, and the targeting object belongs to an
--- opponent by the time rule 702.21a cares.
+-- is a permanent watching the stack, and the targeting object is another object
+-- entirely -- one an opponent controls under the relation both readers' printings
+-- narrow to.
 --
 -- ONE object, never a group: rule 601.2c makes each chosen target its own
 -- becoming, so a spell naming the bearer twice is two events and two abilities,
@@ -301,7 +309,7 @@ castSpell = SlotName.MkSlotName (Text.pack "thatSpell")
 -- Not a target (nothing was chosen), so the same CR 608.2b posture and the same
 -- "no card's targetSlots may name it" sweep as `castSpell`. A dead id is possible
 -- and is the payload's problem: the targeting spell can be countered by something
--- else before the ward trigger resolves.
+-- else before the trigger reading this slot resolves.
 targetingObject :: SlotName
 targetingObject = SlotName.MkSlotName (Text.pack "thatTargetingObject")
 

@@ -3,6 +3,7 @@ module Pawl.Types.TriggerCondition where
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.ControllerBecomesTarget as ControllerBecomesTarget
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
@@ -923,22 +924,21 @@ data TriggerCondition
     -- such effect is in the pool (#1525).
     SelfBecomesTargeted PlayerRelation.PlayerRelation
   | -- | CR 601.2c read from the PLAYER's side: "whenever you become the target of
-    -- A SPELL" -- Dormant Gomazoa's. Matched against GameEvent.BecameTarget whose
-    -- `targeted` is a Recipient.ToPlayer equal to CR 109.5's "you" (CR 603.3a's
-    -- controller of the object when the ability triggered), and whose `kind` is
-    -- StackObjectKind.Spell (CR 112.1).
+    -- a spell or ability" -- Dormant Gomazoa's and Amulet of Safekeeping's.
+    -- Matched against GameEvent.BecameTarget whose `targeted` is a
+    -- Recipient.ToPlayer equal to CR 109.5's "you" (CR 603.3a's controller of the
+    -- object when the ability triggered).
     --
-    -- The KIND is read off the event rather than off the board because the
-    -- matcher has no GameState: CR 602.2b and CR 603.3d route an ability through
-    -- the same rule 601.2c, so a condition that did not ask would fire on
-    -- Ravenous Rats' targeted discard as well.
+    -- The payload carries the two narrowings the printings differ in, and the
+    -- payload's own haddock says why each is read off the EVENT rather than off
+    -- the board: the matcher has no GameState, and the targeting object can leave
+    -- the stack before anything reads the event.
     --
-    -- PAYLOAD-FREE, SelfCast's posture rather than SelfBecomesTargeted's above:
-    -- the sibling carries a PlayerRelation over the TARGETING object's controller
-    -- because rule 702.21a asks for one, and Gomazoa does not narrow that way.
-    -- Not implemented: Amulet of Safekeeping's "a spell or ability an opponent
-    -- controls" needs both the relation and the Ability half of the kind (#1798).
-    ControllerBecomesTargetOfSpell
+    -- The sibling SelfBecomesTargeted above is the same rule 601.2c announcement
+    -- one recipient over -- the BEARER becoming a target rather than its
+    -- controller -- and carries the relation half of this payload for rule
+    -- 702.21a's sake.
+    ControllerBecomesTarget ControllerBecomesTarget.ControllerBecomesTarget
   | -- | CR 709.5h: "when you unlock this door" -- fires when the permanent bearing
     -- the ability is given the unlocked designation for the NAMED half. "Some
     -- abilities trigger when a player unlocks a particular half of a permanent.

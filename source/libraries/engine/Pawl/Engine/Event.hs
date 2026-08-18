@@ -67,6 +67,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ControlChanged as ControlChanged
+import qualified Pawl.Types.ControllerBecomesTarget as ControllerBecomesTarget
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -5779,22 +5780,27 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
   -- CR 601.2c from the PLAYER's side, the sibling above one recipient over:
-  -- Dormant Gomazoa's "whenever you become the target of a spell". The recipient
-  -- is compared with CR 109.5's "you" -- CR 603.3a's controller of the bearer as
-  -- the ability triggered -- rather than with the bearer, which is the whole of
-  -- what separates this from ward.
+  -- Dormant Gomazoa's "whenever you become the target of a spell" and Amulet of
+  -- Safekeeping's "whenever you become the target of a spell or ability an
+  -- opponent controls". The recipient is compared with CR 109.5's "you" -- CR
+  -- 603.3a's controller of the bearer as the ability triggered -- rather than
+  -- with the bearer, which is the whole of what separates this from ward.
   --
-  -- The KIND is read too, and that conjunct is the arm's rules content: CR 112.1
+  -- The KIND conjunct is the arm's rules content, and it is a Maybe: CR 112.1
   -- makes a spell a card on the stack, while CR 602.2b and CR 603.3d route an
-  -- activated and a triggered ability through the same rule 601.2c. Without it
-  -- Ravenous Rats' targeted discard would untap the Gomazoa.
+  -- activated and a triggered ability through the same rule 601.2c. Gomazoa names
+  -- Spell and Ravenous Rats' targeted discard must not untap it; Amulet names
+  -- neither limb and takes both.
   --
-  -- No PlayerRelation read at all, unlike ward: Gomazoa fires on its own spells
-  -- as readily as on an opponent's.
-  TriggerCondition.ControllerBecomesTargetOfSpell -> case event of
+  -- The RELATION is ward's, read off the same BecameTarget.controller field --
+  -- CR 405.4's controller of the targeting object, which is who Amulet offers the
+  -- {1} to. Gomazoa's AnyPlayer fires on its own spells as readily as on an
+  -- opponent's.
+  TriggerCondition.ControllerBecomesTarget c -> case event of
     GameEvent.BecameTarget t ->
       Recipient.playerOf (BecameTarget.targeted t) == Just you
-        && BecameTarget.kind t == StackObjectKind.Spell
+        && maybe True (== BecameTarget.kind t) (ControllerBecomesTarget.kind c)
+        && PlayerRelation.holds (ControllerBecomesTarget.relation c) you (BecameTarget.controller t)
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -6820,7 +6826,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.SpellCast {} -> False
   TriggerCondition.SelfCast -> False
   TriggerCondition.SelfBecomesTargeted _ -> False
-  TriggerCondition.ControllerBecomesTargetOfSpell -> False
+  TriggerCondition.ControllerBecomesTarget {} -> False
   TriggerCondition.SelfHalfUnlocked _ -> False
   TriggerCondition.RoomFullyUnlocked _ -> False
   TriggerCondition.SelfTurnedFaceUp -> False
@@ -7125,6 +7131,16 @@ eventBindings cond event = case (cond, event) of
   -- slot as "whoever controls that object", which is the whole of rule 702.21a's
   -- "unless that player pays".
   (TriggerCondition.SelfBecomesTargeted _, GameEvent.BecameTarget t) ->
+    Binding.setTargetingObject (BecameTarget.source t) Map.empty
+  -- The same slot off the same field, one recipient over: Amulet of Safekeeping's
+  -- "counter THAT SPELL OR ABILITY unless its controller pays {1}" names the
+  -- object that did the targeting, and here the targeted party is a player rather
+  -- than the bearer, so nothing else on the ability reaches it.
+  --
+  -- Unconditional in the same sense as the arm above, and its controller likewise
+  -- takes no slot of its own: Resolve.payerOf reads this slot as "whoever
+  -- controls that object", which is CR 405.4's answer to "its controller".
+  (TriggerCondition.ControllerBecomesTarget {}, GameEvent.BecameTarget t) ->
     Binding.setTargetingObject (BecameTarget.source t) Map.empty
   -- CR 509.3d's "that creature": the blocker whose declaration fired this, which
   -- rule 702.25a's payload gives -1/-1. Unconditional in the same sense as the
@@ -7566,13 +7582,17 @@ eventBindingSlots cond = case cond of
   -- reads a slot bound to an object as that object's controller, which is what
   -- "unless that player pays" asks for.
   TriggerCondition.SelfBecomesTargeted _ -> Set.singleton Binding.targetingObject
-  -- Empty by decision, beside the non-empty sibling directly above: Dormant
-  -- Gomazoa's "you may untap this creature" names the BEARER and nothing else,
-  -- and CR 109.5's "you" is already reachable without a slot. A card printing
-  -- "that spell" from the targeted player's side is what would earn the same
-  -- targetingObject slot; nothing prints one. eventBindings has no arm for this
-  -- condition and its fallthrough answers the same.
-  TriggerCondition.ControllerBecomesTargetOfSpell -> Set.empty
+  -- CR 601.2c's targeting object again, the sibling directly above one recipient
+  -- over: Amulet of Safekeeping's "counter that spell or ability" reads it, and
+  -- with a PLAYER targeted there is no bearer-shaped slot that would already
+  -- name it. Guaranteed for the sibling's reason -- every GameEvent.BecameTarget
+  -- carries a source.
+  --
+  -- Claimed for the condition rather than for the printing, which is what a
+  -- per-CONDITION set means: Dormant Gomazoa's "you may untap this creature"
+  -- reads the bearer and never this slot, and a slot promised but unread is
+  -- harmless where the reverse is the failure this lint exists to catch.
+  TriggerCondition.ControllerBecomesTarget {} -> Set.singleton Binding.targetingObject
   -- CR 603.3b's second class binds NOTHING, a deliberate empty rather than a
   -- default: GameEvent.AbilityTriggered names the Saga and the player who
   -- controls the chapter ability, and Historian's Boon's "create a 4/4 white
@@ -7727,7 +7747,7 @@ looksBack condition = case condition of
   TriggerCondition.SpellCast {} -> False
   TriggerCondition.SelfCast -> False
   TriggerCondition.SelfBecomesTargeted _ -> False
-  TriggerCondition.ControllerBecomesTargetOfSpell -> False
+  TriggerCondition.ControllerBecomesTarget {} -> False
   TriggerCondition.SelfHalfUnlocked _ -> False
   TriggerCondition.RoomFullyUnlocked _ -> False
   -- CR 603.3b's second class names no zone change at all -- its event is another
@@ -8725,10 +8745,10 @@ zonesTriggeredFrom cond = case cond of
   -- permanent, so the bearer watches the announcement from the battlefield. A
   -- spell on the stack can become a target too, and no card in the pool is one.
   TriggerCondition.SelfBecomesTargeted _ -> battlefield
-  -- CR 113.6's default again: Dormant Gomazoa is a creature and watches its
-  -- controller from the battlefield. Nothing on the stack reads its controller
-  -- becoming a target.
-  TriggerCondition.ControllerBecomesTargetOfSpell -> battlefield
+  -- CR 113.6's default again: Dormant Gomazoa is a creature and Amulet of
+  -- Safekeeping an artifact, both watching their controller from the
+  -- battlefield. Nothing on the stack reads its controller becoming a target.
+  TriggerCondition.ControllerBecomesTarget {} -> battlefield
   -- CR 113.6's default a last time: Historian's Boon is an enchantment watching
   -- the battlefield's Sagas, and a card in a graveyard sees no chapter fire.
   TriggerCondition.SagaFinalChapterTriggers _ -> battlefield
@@ -8902,7 +8922,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfBecomesTargeted _ -> False
   -- Its player-side sibling likewise: a spell can name its controller on anybody's
   -- turn.
-  TriggerCondition.ControllerBecomesTargetOfSpell -> False
+  TriggerCondition.ControllerBecomesTarget {} -> False
   -- CR 714.3c's turn-based action falls on the Saga controller's own turn, but
   -- nothing restricts this CONDITION to it: CR 714.3a's entry replacement can put
   -- a Saga's last lore counter on during anybody's turn, and the watcher is not
@@ -9089,7 +9109,7 @@ stateTriggers gs
               TriggerCondition.SpellCast {} -> False
               TriggerCondition.SelfCast -> False
               TriggerCondition.SelfBecomesTargeted _ -> False
-              TriggerCondition.ControllerBecomesTargetOfSpell -> False
+              TriggerCondition.ControllerBecomesTarget {} -> False
               -- CR 709.5i is an EVENT trigger, for CR 709.5h's reason one arm up:
               -- it fires on the LAST designation arriving, and CR 709.5c leaves
               -- the permanent holding both thereafter, so a state read would fire
