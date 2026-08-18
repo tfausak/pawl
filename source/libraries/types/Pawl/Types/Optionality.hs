@@ -14,10 +14,17 @@ module Pawl.Types.Optionality where
 -- Not a Bool, for the reason Regenerability and TapState are not: `Optional` says
 -- which rule is in play where `True` would say nothing.
 --
--- Scoped to a CLAUSE (CR 608.2e), which is the span one printed "may" governs.
--- A "may" over two instructions is one clause and so one question, as the
--- printed English says; two adjacent printed "may"s are two clauses and two
--- questions. Shed Weakness is the card that separates the two readings.
+-- Scoped to a CLAUSE (CR 608.2e) where Pawl.Types.Clause carries it, which is
+-- the span one printed "may" governs. A "may" over two instructions is one
+-- clause and so one question, as the printed English says; two adjacent printed
+-- "may"s are two clauses and two questions. Shed Weakness is the card that
+-- separates the two readings.
+--
+-- Pawl.Types.OfferCast carries it too, and there the span is that ONE cast: CR
+-- 608.2g's sentence has its own may/must axis ("instructs or allows"), asked
+-- after the clause's. Wild Evocation's mandatory cast sits in a clause whose own
+-- instructions are mandatory, so the two are independent rather than nested
+-- readings of one printed word.
 data Optionality
   = Mandatory
   | Optional

@@ -39,6 +39,7 @@ import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.RequireBlock as RequireBlock
+import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
@@ -353,12 +354,13 @@ data Effect card
     -- the card is shown to one player. Nothing moves either way (CR 701.20b),
     -- so both arms are pure information.
     --
-    -- NO SLOT, where LookAt binds one. Rule 701.20a shows the cards to
-    -- everybody, so this rides Event.reveal and the public GameEvent.Revealed
-    -- it appends is the whole record; LookAt has nothing public to record --
-    -- see #1412 -- and its binding is all it leaves. No printing in the pool
-    -- reveals a card and then asks a question about that same card, so a
-    -- binding here would be data nothing reads.
+    -- AN OPTIONAL SLOT, where LookAt's is required. Rule 701.20a shows the
+    -- cards to everybody, so this rides Event.reveal and the public
+    -- GameEvent.Revealed it appends is already the whole record; LookAt has
+    -- nothing public to record -- see #1412 -- and its binding is all it leaves.
+    -- So a reveal that names no slot is still the whole instruction, which is
+    -- every printing in the pool but Wild Evocation's "that player reveals a
+    -- card at random from their hand ... the player casts IT".
     --
     -- Not implemented: rule 701.20a keeps a revealed card revealed "for as long
     -- as necessary", which pawl has nowhere to store -- the event is a moment,
@@ -369,7 +371,7 @@ data Effect card
     -- reveal-and-branch and reads the revealed card's type inside the opcode
     -- because rule 701.44 is part of the rulebook. This arm is the bare reveal
     -- a card's own sentence asks for.
-    Reveal ObjectRef.ObjectRef
+    Reveal Reveal.Reveal
   | -- | CR 701.20e: the cards the ObjectRef names are LOOKED AT -- shown to one
     -- player rather than to all of them -- and bound into the slot, so a later
     -- clause of the same resolution can act on what was seen. Into the Wilds'
@@ -1554,12 +1556,17 @@ data Effect card
     -- if there are no objects in that set") through EachCardInGraveyard, which
     -- is Gaea's Blessing's "shuffle your graveyard into your library".
     ShuffleIntoLibrary ShuffleIntoLibrary.ShuffleIntoLibrary
-  | -- | CR 608.2g: offer this effect's controller the cast of the object the slot
-    -- names -- "if an effect specifically instructs or allows a player to cast a
-    -- spell during resolution, they do so by following the steps in rules
-    -- 601.2a-i, except no player receives priority after it's cast". CR 310.12b's
-    -- "then you may cast it transformed without paying its mana cost" is the
-    -- producer, and the CastOffer is that sentence's two riders.
+  | -- | CR 608.2g: offer a player the cast of the object the slot names -- "if an
+    -- effect specifically instructs or allows a player to cast a spell during
+    -- resolution, they do so by following the steps in rules 601.2a-i, except no
+    -- player receives priority after it's cast". CR 310.12b's "then you may cast
+    -- it transformed without paying its mana cost" is the producer, and the
+    -- CastOffer is that sentence's two riders.
+    --
+    -- "INSTRUCTS OR ALLOWS" is the payload's Optionality, and WHICH player is its
+    -- PlayerRef; both default to CR 310.12b's reading (the resolving controller,
+    -- who may decline). Wild Evocation's "that player casts it ... if able" is
+    -- the other end of both.
     --
     -- The slot is a READ, not a definition, and it may be filled either way.
     -- CR 310.12b's "exile it, THEN you may cast it" binds it with a MoveToZone
@@ -1574,10 +1581,11 @@ data Effect card
     -- Cast.castableWhenOffered asks the prohibitions and the cost and never asks
     -- the zone.
     --
-    -- An OFFER and not a cast: CR 601.2b's own announcements still belong to the
-    -- player, and the "may" ahead of them is asked first (Prompt.OfferedCast).
-    -- Nothing here says the cast succeeds -- an announcement the player cannot
-    -- complete is reversed by CR 601.2, which puts the card back where it was.
+    -- An OFFER and not a cast, even at Mandatory: CR 601.2b's own announcements
+    -- still belong to the caster, and the "may" ahead of them is asked first
+    -- (Prompt.OfferedCast) unless the payload took it away. Nothing here says
+    -- the cast succeeds -- an announcement the player cannot complete is
+    -- reversed by CR 601.2, which puts the card back where it was.
     --
     -- NOT a permission written onto the card. CR 715.3d's exile permission lasts
     -- "for as long as that card remains exiled" and is Object.playableFromExile;

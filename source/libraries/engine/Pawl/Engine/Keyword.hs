@@ -3176,6 +3176,10 @@ miracle cost =
       Effect.OfferCast
         OfferCast.MkOfferCast
           { OfferCast.slot = Binding.triggerSource,
+            -- Rule 702.94a's "YOU may cast it": the revealer, who is the
+            -- trigger's controller, and a "may".
+            OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
+            OfferCast.optionality = Optionality.Optional,
             OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Just cost}
           }
 

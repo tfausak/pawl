@@ -46,10 +46,12 @@
                       {
                         "type": "Reveal",
                         "value": {
-                          "type": "RandomCardInHand",
-                          "value": {
-                            "type": "InSlot",
-                            "value": "thatPlayer"
+                          "ref": {
+                            "type": "RandomCardInHand",
+                            "value": {
+                              "type": "InSlot",
+                              "value": "thatPlayer"
+                            }
                           }
                         }
                       }
