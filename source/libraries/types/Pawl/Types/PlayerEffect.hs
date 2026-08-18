@@ -2,6 +2,7 @@ module Pawl.Types.PlayerEffect where
 
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
+import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
@@ -143,11 +144,23 @@ data PlayerEffect
     -- can name several actions ("sacrifice a land and discard a card"), and a
     -- list needs no sibling constructor when one does.
     --
-    -- Not implemented: an added component whose count scales with the cost being
-    -- adjusted -- Drought's "for each black mana symbol in their activation
-    -- costs" -- which needs the components to be a function of the cost rather
-    -- than a fixed list (#1417).
+    -- How many times that list joins the cost is the payload's CostScale, which
+    -- is what Drought's "for each black mana symbol in their activation costs"
+    -- writes; Pawl.Engine.Cost.plusComponents resolves it, since only that
+    -- function holds the cost being adjusted.
     AddActivationCost AddActivationCost.AddActivationCost
+  | -- | CR 613.11 / 601.2f / Drought: matching SPELLS cost these additional
+    -- NON-MANA components to cast ("Spells cost an additional \"Sacrifice a
+    -- Swamp\" to cast for each black mana symbol in their mana costs"). CR
+    -- 118.8's "or applied to a spell or ability from another effect", which is
+    -- the half a spell's own card text (Pawl.Types.Face.additionalCosts) cannot
+    -- state.
+    --
+    -- The SPELL-side twin of AddActivationCost above, and a separate constructor
+    -- for that arm's stated reason: the Filter classifies an OBJECT, so nothing
+    -- in it can say "and it is a spell", and which moment an arm is asked at is
+    -- therefore the constructor's to say.
+    AddSpellCost AddSpellCost.AddSpellCost
   | -- | CR 305.2 / Exploration, Azusa Lost but Seeking: this player may play this
     -- many lands each turn OVER the one CR 305.2 normally allows.
     --

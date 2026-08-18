@@ -1,6 +1,7 @@
 module Pawl.Codec.PlayerEffect where
 
 import qualified Pawl.Codec.AddActivationCost as AddActivationCost
+import qualified Pawl.Codec.AddSpellCost as AddSpellCost
 import qualified Pawl.Codec.DamagePattern as DamagePattern
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.IncreaseSpellCost as IncreaseSpellCost
@@ -28,6 +29,7 @@ codec =
       Arm.payload "ReduceSpellCost" ReduceSpellCost.codec PlayerEffect.ReduceSpellCost (\x -> case x of PlayerEffect.ReduceSpellCost y -> Just y; _ -> Nothing),
       Arm.payload "ReduceActivationCost" ReduceActivationCost.codec PlayerEffect.ReduceActivationCost (\x -> case x of PlayerEffect.ReduceActivationCost y -> Just y; _ -> Nothing),
       Arm.payload "AddActivationCost" AddActivationCost.codec PlayerEffect.AddActivationCost (\x -> case x of PlayerEffect.AddActivationCost y -> Just y; _ -> Nothing),
+      Arm.payload "AddSpellCost" AddSpellCost.codec PlayerEffect.AddSpellCost (\x -> case x of PlayerEffect.AddSpellCost y -> Just y; _ -> Nothing),
       Arm.payload "PlayAdditionalLands" Common.natural PlayerEffect.PlayAdditionalLands (\x -> case x of PlayerEffect.PlayAdditionalLands y -> Just y; _ -> Nothing),
       Arm.nullary "NoMaximumHandSize" PlayerEffect.NoMaximumHandSize,
       Arm.payload "SetMaximumHandSize" Common.natural PlayerEffect.SetMaximumHandSize (\x -> case x of PlayerEffect.SetMaximumHandSize y -> Just y; _ -> Nothing),
