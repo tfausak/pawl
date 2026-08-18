@@ -4774,12 +4774,15 @@ creaturePlaneswalkerCombatSpec s registry = Spec.describe s "CreaturePlaneswalke
         -- TARGET, never an attacker -- so this is the entry an engine that treated
         -- removal from combat as removing attacked-ness too would have deleted.
         Spec.assertEqWith s "CR 506.4d: he continues to be a planeswalker that's being attacked" (Map.lookup atJace attackers) (Just (AttackTarget.OfPlaneswalker jaceId))
-        Spec.assertEqWith s "CR 306.8 / 120.3c: so the attacker's 1 came off his loyalty" (S.counterOf CounterKind.Loyalty jaceId atEnd) 4
         -- CR 506.4d's second half: he stopped being a creature, so he stops being
-        -- a blocking one.
+        -- a blocking one. Asserted BEFORE the loyalty reading below, which is the
+        -- shared gameplay consequence both halves land in: a sampler that never
+        -- swept him out of the blocker set would show up there too, and the
+        -- failure a reader wants to see first is the one about blocking.
         Spec.assertEqWith s "CR 506.4: Jace is blocking nothing" (Combat.blockersOf atBob atEnd) Set.empty
         Spec.assertBool s (Combat.isBlocked atBob atEnd) "CR 509.1h: but that attacker remains blocked"
         Spec.assertEqWith s "CR 510.1c: so it assigns no combat damage, and nothing was marked on Jace" (S.damageOf jaceId atEnd) (Just 0)
+        Spec.assertEqWith s "CR 306.8 / 120.3c: only the attacker aimed at him took loyalty, 5 - 1" (S.counterOf CounterKind.Loyalty jaceId atEnd) 4
         Spec.assertEqWith s "and bob takes nothing from it" (S.lifeOf S.bob atEnd) (Just 20)
   Spec.it s "CR 506.4d the control leg: with March left alone Jace blocks, survives, and is attacked too" $ do
     -- The same board, the same block, differing in exactly one thing: alice never
