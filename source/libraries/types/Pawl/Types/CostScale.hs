@@ -19,11 +19,13 @@ data CostScale
     -- additional \"Sacrifice a land\" to activate", with no "for each".
     Once
   | -- | Once per mana symbol of this colour in the cost being adjusted:
-    -- Drought's "for each black mana symbol in their mana costs". CR 202.2b's
-    -- classification of a symbol as coloured is the count, so a hybrid or
-    -- Phyrexian symbol carrying the colour counts too (CR 107.4e / 107.4f) --
-    -- Drought's 2008-08-01 ruling says so in as many words, and
+    -- Drought's "for each black mana symbol in their mana costs". What counts is
+    -- CR 107.4a's coloured mana symbol, which CR 107.4e's hybrid and CR 107.4f's
+    -- Phyrexian symbols also are -- Drought's 2008-08-01 ruling states the
+    -- hybrid half ("A hybrid symbol that is both black and another type is a
+    -- black mana symbol, regardless of what cost is paid for it") and rule
+    -- 107.4f is the Phyrexian half, which postdates it.
     -- Pawl.Engine.Projection.symbolColors is the shared classifier that makes
-    -- it fall out.
+    -- all three fall out.
     PerColoredSymbol Color.Color
   deriving (Eq, Ord, Show)

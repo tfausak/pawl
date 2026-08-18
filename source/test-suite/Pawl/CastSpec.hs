@@ -3073,14 +3073,16 @@ droughtBoard swamp piker spell mDrought n =
 -- 601.2f's total. The activation sentence is Pawl.ActivateSpec's droughtSpec;
 -- line one is droughtUpkeepSpec below.
 --
--- FIVE Swamps on every board, more than any case consumes, so a cast that
+-- STRICTLY MORE Swamps than any case consumes on every board, so a cast that
 -- succeeded for lack of anything to sacrifice cannot pass: the assertion is the
 -- SURVIVOR count and never zero.
 --
--- NEITHER the one-symbol case nor the zero-symbol case discriminates alone. An
--- implementation that adds the component unconditionally passes the first and
--- fails the second; one that adds it exactly once for a black spell passes both
--- and fails the two-symbol case. All three are the proof.
+-- NO SINGLE CASE HERE DISCRIMINATES. An implementation that adds the component
+-- unconditionally passes the one-symbol case and fails the zero-symbol one; one
+-- that adds it exactly once for a black spell passes both and fails the
+-- two-symbol case; one that saturates at two fails only Stalker Hag's three. The
+-- ladder 0, 1, 2, 3 is the proof, and the counting RULE is what Dismember and
+-- the Hag add on top of it.
 droughtSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 droughtSpec s registry = Spec.describe s "Drought" $ do
   -- ONE black mana symbol, so one Swamp. Doom Blade is {1}{B}, and the generic
@@ -3124,12 +3126,10 @@ droughtSpec s registry = Spec.describe s "Drought" $ do
     Spec.assertEqWith s "two of the five Swamps were sacrificed" (S.countOnBattlefieldByName swampName S.alice after) 3
     Spec.assertEqWith s "where the same cast without Drought keeps all five" (S.countOnBattlefieldByName swampName S.alice control) 5
     Spec.assertEqWith s "and Sign in Blood is on the stack" (length (GameState.stack after)) 1
-  -- Drought's 2008-08-01 ruling, tested rather than argued: "A hybrid symbol
-  -- that is both black and another type is a black mana symbol, regardless of
-  -- what cost is paid for it." Dismember is {1}{B/P}{B/P}, so CR 107.4f's
-  -- Phyrexian symbols are two black mana symbols and demand two Swamps -- which
-  -- an implementation counting only CR 107.4a's plain coloured symbols reads as
-  -- zero.
+  -- CR 107.4f: "Phyrexian mana symbols are colored mana symbols ... {B/P} is
+  -- black", so Dismember's {1}{B/P}{B/P} holds two BLACK mana symbols and
+  -- demands two Swamps -- where an implementation counting only CR 107.4a's
+  -- five primary symbols reads it as zero.
   Spec.it s "CR 107.4f two Phyrexian black symbols cost two Swamps too" $ do
     swamp <- S.printingOf s registry "Swamp"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -3142,6 +3142,28 @@ droughtSpec s registry = Spec.describe s "Drought" $ do
     Spec.assertEqWith s "two of the five Swamps were sacrificed" (S.countOnBattlefieldByName swampName S.alice after) 3
     Spec.assertEqWith s "where the same cast without Drought keeps all five" (S.countOnBattlefieldByName swampName S.alice control) 5
     Spec.assertEqWith s "and Dismember is on the stack" (length (GameState.stack after)) 1
+  -- Drought's own 2008-08-01 ruling, on the symbols it was written about: "A
+  -- hybrid symbol that is both black and another type is a black mana symbol,
+  -- regardless of what cost is paid for it." Stalker Hag is {B/G}{B/G}{B/G}, so
+  -- it is THREE black mana symbols -- and the ruling's last clause is what the
+  -- board pins: every one of them is paid with black mana here (alice has only
+  -- Swamps), and the count would be the same off Forests, because CR 107.4e
+  -- makes a hybrid symbol all of its component colours whatever pays it.
+  --
+  -- THREE, so this is also the multiplier past two: a scale that saturated at
+  -- one or two would leave a Swamp standing.
+  Spec.it s "CR 107.4e three black hybrid symbols cost three Swamps" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    drought <- S.printingOf s registry "Drought"
+    hag <- S.printingOf s registry "Stalker Hag"
+    let (taxed, taxedId) = droughtBoard swamp piker hag (Just drought) 6
+        (free, freeId) = droughtBoard swamp piker hag Nothing 6
+        after = S.runPure S.identityAnswer taxed (S.cast S.alice taxedId)
+        control = S.runPure S.identityAnswer free (S.cast S.alice freeId)
+    Spec.assertEqWith s "three of the six Swamps were sacrificed" (S.countOnBattlefieldByName swampName S.alice after) 3
+    Spec.assertEqWith s "where the same cast without Drought keeps all six" (S.countOnBattlefieldByName swampName S.alice control) 6
+    Spec.assertEqWith s "and the Hag is on the stack" (length (GameState.stack after)) 1
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do

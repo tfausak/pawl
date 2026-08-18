@@ -583,11 +583,11 @@ totalWith adjustments cost = cost {Cost.mana = fmap (applyAdjustments adjustment
 -- (Pawl.Engine.PlayerEffect.spellCostAdjustments, activationCostAdjustments) are
 -- handed an OBJECT, and the activation half never sees an activation cost at
 -- all. Drought's "for each black mana symbol in their mana costs" is the
--- sentence, and CR 202.2b's classification of a symbol as coloured is the count
--- -- Pawl.Engine.Projection.symbolColors, the same classifier CR 202.2's colour
--- of an object is read through, so CR 107.4e's hybrid and CR 107.4f's Phyrexian
--- symbols count exactly as Drought's 2008-08-01 ruling says they do. Zero
--- matching symbols adds NOTHING rather than a component of count zero.
+-- sentence, and what it counts is CR 107.4a's coloured mana symbol -- read
+-- through Pawl.Engine.Projection.symbolColors, the same classifier CR 202.2's
+-- colour of an object is read through, so CR 107.4e's hybrid and CR 107.4f's
+-- Phyrexian symbols count too. Zero matching symbols adds NOTHING rather than a
+-- component of count zero.
 --
 -- Counted on THIS cost -- CR 601.2b's announced cost, before `totalWith` applies
 -- any reduction -- which is the ordering CR 601.2f states: the total is 601.2b's

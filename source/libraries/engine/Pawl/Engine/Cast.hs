@@ -274,8 +274,9 @@ payableCostAt x spending pid oid gs cost =
 --     comparison reads the generic count -- on the demanding side of a >= whose
 --     supply side X cannot move, and which the finite supplies must eventually
 --     fail. The one adjustment that DOES read the cost is a CostScale, and it
---     reads only CR 202.2b's coloured symbols: substituting X writes generic
---     mana, which carries no colour, so the count is the same at every X too.
+--     reads only CR 107.4a's coloured mana symbols: substituting X writes
+--     generic mana, which carries no colour, so the count is the same at every
+--     X too.
 --
 --   * as LIFE (Cost.substituteXInComponent, a CostComponent.PayLifeX becoming a
 --     PayLife). CR 119.4's floor is Event.canPayLife's >= against a life total X
