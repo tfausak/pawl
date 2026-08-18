@@ -29,8 +29,8 @@
 -- opponent controls and gain control of it until end of turn" is the pool's way
 -- to phase out a creature under a player who does not own it.
 --
--- Clever Concealment is the fourth, and the only printing here whose target slot
--- takes CR 601.2c's variable number: "any number of target nonland permanents you
+-- Clever Concealment joins them as the only printing here whose target slot takes
+-- CR 601.2c's variable number: "any number of target nonland permanents you
 -- control phase out" is what names a permanent and its own Equipment in one
 -- announcement, which is CR 702.26h's tie-break. Its convoke is not implemented
 -- (#877), so pawl's copy pays {2}{W}{W} in full -- stricter than printed.
@@ -177,15 +177,15 @@ equippedBoard island piker bonesplitter ripple =
      in ((host, equip), S.attach equip host withEquip)
 
 -- CR 601.2c's whole announcement for Clever Concealment: as many targets as
--- `oids` names, and those objects preferred out of the offered set.
+-- `oids` names, and exactly those objects taken out of the offered set.
 --
 -- FILTERS the offered set, which is aimedAt's posture above and for its reason.
 -- Not S.preferring, though: that takes the slot's ANNOUNCED number, so an
 -- announcement that had degraded to one would silently hand back one recipient
 -- and the case below would pass without ever naming both permanents. Filtering
 -- makes a degraded announcement a count mismatch the engine reacts to.
-aimedAtBoth :: Set.Set ObjectId.ObjectId -> Prompt.Prompt r -> r
-aimedAtBoth oids p = case p of
+aimedAtAll :: Set.Set ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimedAtAll oids p = case p of
   Prompt.AnnounceTargets _ _ _ offers -> fmap (const (Natural.length oids)) offers
   Prompt.ChooseTargets _ _ _ sets ->
     fmap (\(_, legal) -> Set.filter (maybe False (`Set.member` oids) . Recipient.objectOf) legal) sets
@@ -194,7 +194,7 @@ aimedAtBoth oids p = case p of
 -- alice casts `spell` naming every one of `oids` and resolves it.
 concealAll :: Set.Set ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 concealAll oids spell gs =
-  S.runPure (aimedAtBoth oids) gs $ do
+  S.runPure (aimedAtAll oids) gs $ do
     S.cast S.alice spell
     Monad.void Stack.resolveTop
 
