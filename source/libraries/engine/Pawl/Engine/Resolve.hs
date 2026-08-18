@@ -2641,16 +2641,17 @@ offerCast resolving caster slot optionality offer = do
         oid <- slotOne slot resolving gs
         card <- Game.cardOf oid gs
         fmap (Maybe.mapMaybe (proposal oid)) (faces card)
+  -- No survivor is no offer; ONE survivor is one outcome, so CR 709.3's choice
+  -- is elided there rather than asked -- Prompt.ChoosePlayer's and
+  -- Prompt.ChooseProtector's posture. Two or more is the caster's decision.
   chosen <- case offers of
     [] -> pure Nothing
-    [only] -> pure (Just only)
+    [sole] -> pure (Just sole)
     first : rest -> do
-      -- CR 709.3's choice, asked of the caster. Only where two halves survived:
-      -- one is one outcome, which is the elision every "choose" prompt takes.
       let decider = Decide.deciderFor caster gs
           nameOf (_, name, _, _) = name
-          oid = (\(o, _, _, _) -> o) first
-      picked <- Game.choose (Prompt.ChooseOfferedCastFace decider caster oid (fmap nameOf (first NonEmpty.:| rest)))
+          oidOf (oid, _, _, _) = oid
+      picked <- Game.choose (Prompt.ChooseOfferedCastFace decider caster (oidOf first) (fmap nameOf (first NonEmpty.:| rest)))
       -- Reject-not-repair, castWhileSearching's posture: a name the offer did not
       -- include is no cast at all, never a half the engine picked instead.
       pure (List.find ((== picked) . nameOf) offers)
