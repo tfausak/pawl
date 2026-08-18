@@ -11,6 +11,7 @@ import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.DiscardCause as DiscardCause
 
 -- | Tagged rather than bare-nullary from the start: this family grows
 -- payload-carrying constructors (PayLife, Sacrifice), so it is built from
@@ -33,7 +34,13 @@ codec keywordCodec =
       Arm.payload "TapForTotalPower" (TapForTotalPower.codec keywordCodec) CostComponent.TapForTotalPower (\x -> case x of CostComponent.TapForTotalPower y -> Just y; _ -> Nothing),
       Arm.payload "TapPermanents" (TapPermanents.codec keywordCodec) CostComponent.TapPermanents (\x -> case x of CostComponent.TapPermanents y -> Just y; _ -> Nothing),
       Arm.payload "DiscardCards" (DiscardCards.codec keywordCodec) CostComponent.DiscardCards (\x -> case x of CostComponent.DiscardCards y -> Just y; _ -> Nothing),
-      Arm.nullary "DiscardThis" CostComponent.DiscardThis,
+      -- The component carries a DiscardCause, but the WIRE does not: a card
+      -- prints "Discard this card" and never says the discard is a cycle, which
+      -- CR 702.29c makes true only of a cycling ability's cost -- and a cycling
+      -- ability is minted from the keyword by Pawl.Engine.Keyword rather than
+      -- authored. So this stays nullary over the Ordinary cause, which leaves
+      -- ToPayCyclingCost unspellable by card data.
+      Arm.nullary "DiscardThis" (CostComponent.DiscardThis DiscardCause.Ordinary),
       Arm.payload "PayEnergy" Common.natural CostComponent.PayEnergy (\x -> case x of CostComponent.PayEnergy y -> Just y; _ -> Nothing),
       Arm.payload "AddLoyaltyToThis" Common.natural CostComponent.AddLoyaltyToThis (\x -> case x of CostComponent.AddLoyaltyToThis y -> Just y; _ -> Nothing),
       Arm.payload "RemoveLoyaltyFromThis" Common.natural CostComponent.RemoveLoyaltyFromThis (\x -> case x of CostComponent.RemoveLoyaltyFromThis y -> Just y; _ -> Nothing),

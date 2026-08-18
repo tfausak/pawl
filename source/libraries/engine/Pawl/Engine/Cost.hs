@@ -669,7 +669,7 @@ substituteXInComponent x component = case component of
   CostComponent.TapForTotalPower {} -> component
   CostComponent.TapPermanents {} -> component
   CostComponent.DiscardCards {} -> component
-  CostComponent.DiscardThis -> component
+  CostComponent.DiscardThis _ -> component
   CostComponent.PayEnergy _ -> component
   CostComponent.AddLoyaltyToThis _ -> component
   CostComponent.RemoveLoyaltyFromThis _ -> component
@@ -711,7 +711,7 @@ componentHasVariable component = case component of
   CostComponent.TapForTotalPower {} -> False
   CostComponent.TapPermanents {} -> False
   CostComponent.DiscardCards {} -> False
-  CostComponent.DiscardThis -> False
+  CostComponent.DiscardThis _ -> False
   CostComponent.PayEnergy _ -> False
   CostComponent.AddLoyaltyToThis _ -> False
   CostComponent.RemoveLoyaltyFromThis _ -> False
@@ -987,7 +987,7 @@ loyaltyAmountOf component = case component of
   CostComponent.TapForTotalPower {} -> Nothing
   CostComponent.TapPermanents {} -> Nothing
   CostComponent.DiscardCards {} -> Nothing
-  CostComponent.DiscardThis -> Nothing
+  CostComponent.DiscardThis _ -> Nothing
   CostComponent.PayEnergy _ -> Nothing
   CostComponent.PutPlusOneCountersOnThis _ -> Nothing
   CostComponent.Blight _ -> Nothing
@@ -1054,7 +1054,7 @@ zoneOfComponent component = case component of
   -- reinforce abilities into the projection for every zone: this is the answer
   -- Activate.functionsIn reads to keep a Rustic Clachan on the battlefield from
   -- offering its reinforce ability.
-  CostComponent.DiscardThis -> Just Zone.Hand
+  CostComponent.DiscardThis _ -> Just Zone.Hand
   CostComponent.ExileThisFromGraveyard -> Just Zone.Graveyard
   CostComponent.TapThis -> Nothing
   CostComponent.UntapThis -> Nothing
@@ -1124,7 +1124,7 @@ componentStatesHiddenQuality component = case component of
   -- The hidden zone WITHOUT a quality: CR 702.29a's "discard this card" names
   -- the object the cost is on, so no card is described at all and the player has
   -- no card to fail to find. False, and argued rather than lumped in below.
-  CostComponent.DiscardThis -> False
+  CostComponent.DiscardThis _ -> False
   -- Cards, but in a PUBLIC zone (CR 400.2), so the first conjunct fails however
   -- specific the filter is: these three read the battlefield.
   CostComponent.Sacrifice {} -> False
@@ -1338,7 +1338,7 @@ claimOf pid oid component gs = case component of
       1
   CostComponent.DiscardCards (DiscardCards.MkDiscardCards n criterion) ->
     claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (discardCandidates pid oid criterion gs)) n
-  CostComponent.DiscardThis -> claim (ClaimAxis.Removal Zone.Hand) (itself (isOwnedIn Zone.Hand)) 1
+  CostComponent.DiscardThis _ -> claim (ClaimAxis.Removal Zone.Hand) (itself (isOwnedIn Zone.Hand)) 1
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) ->
     claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (exileCandidates pid criterion gs)) n
   -- A pool of at most ONE, and the claim is on that one card rather than on a
@@ -1616,7 +1616,7 @@ uncountedCeiling component = case component of
   CostComponent.Sacrifice {} -> Nothing
   CostComponent.SacrificeThis -> Nothing
   CostComponent.DiscardCards {} -> Nothing
-  CostComponent.DiscardThis -> Nothing
+  CostComponent.DiscardThis _ -> Nothing
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
   CostComponent.ExileTopFromGraveyard _ -> Nothing
   CostComponent.ExileThisFromGraveyard -> Nothing
@@ -1761,7 +1761,7 @@ lifeOwedByComponent component = case component of
   CostComponent.TapForTotalPower {} -> 0
   CostComponent.TapPermanents {} -> 0
   CostComponent.DiscardCards {} -> 0
-  CostComponent.DiscardThis -> 0
+  CostComponent.DiscardThis _ -> 0
   CostComponent.PayEnergy _ -> 0
   CostComponent.AddLoyaltyToThis _ -> 0
   CostComponent.RemoveLoyaltyFromThis _ -> 0
@@ -1873,7 +1873,7 @@ canPayComponent pid oid component gs = case component of
   -- the zone and the owner rather than of control, because CR 108.4 gives a card
   -- in a hand no controller to ask about -- and the owner is the right player,
   -- since CR 400.3 sends every card that would go to a hand to its OWNER's.
-  CostComponent.DiscardThis -> case Game.lookupObject oid gs of
+  CostComponent.DiscardThis _ -> case Game.lookupObject oid gs of
     Nothing -> False
     Just obj -> Object.zone obj == Zone.Hand && Object.owner obj == pid
   -- CR 406.2: payable only while the card is in the paying player's graveyard.
@@ -2076,7 +2076,7 @@ orderSensitive component = case component of
   CostComponent.Sacrifice {} -> True
   CostComponent.SacrificeThis -> True
   CostComponent.DiscardCards {} -> True
-  CostComponent.DiscardThis -> True
+  CostComponent.DiscardThis _ -> True
   CostComponent.ExileCardsFromGraveyard {} -> True
   CostComponent.ExileTopFromGraveyard _ -> True
   CostComponent.ExileThisFromGraveyard -> True
@@ -2498,14 +2498,15 @@ payComponent pid oid component = case component of
   -- cause travels with the discard recorded off the COST rather than off the
   -- ability resolving.
   --
-  -- The one thing this site cannot see is CR 702.29c's "of a CYCLING ability": a
-  -- cost component knows it was paid, not which ability it belonged to.
-  -- Keyword.cycling is the only producer of DiscardThis, so the two name the same
-  -- event today. Faerie Macabre prints "Discard this card:" as an ability of its
-  -- own and would break that, firing every cycling trigger on the board; the
-  -- event has to carry which ability paid it before that card can exist (#319).
-  CostComponent.DiscardThis -> do
-    Event.discard DiscardCause.ToPayCyclingCost pid oid
+  -- CR 702.29c's "of a CYCLING ability" is the one thing this site cannot see for
+  -- itself: a cost component knows it was paid, not which ability it belonged to.
+  -- So the cause rides on the component and this arm only carries it through --
+  -- Keyword.cycling mints rule 702.29a's discard as ToPayCyclingCost and
+  -- Keyword.reinforce mints rule 702.77a's as Ordinary, since rule 702.77 never
+  -- makes reinforce a cycling ability the way rule 702.29f makes typecycling one.
+  -- Pawl.ActivateSpec's "CR 702.77a a reinforce discard is not a cycle" proves it.
+  CostComponent.DiscardThis cause -> do
+    Event.discard cause pid oid
     pure Payment.Paid
   -- CR 107.14: paying energy removes that many energy counters from the player.
   -- Natural subtraction is PARTIAL (it throws on underflow), so `left` is guarded

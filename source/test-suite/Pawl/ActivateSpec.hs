@@ -46,6 +46,7 @@ import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
@@ -549,9 +550,9 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
       [ability] -> do
         Spec.assertEqWith
           s
-          "the printed {2} plus rule 702.29a's discard"
+          "the printed {2} plus rule 702.29a's discard, recorded as CR 702.29c's cycle"
           (ActivatedAbility.cost ability)
-          (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [CostComponent.DiscardThis])
+          (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [CostComponent.DiscardThis DiscardCause.ToPayCyclingCost])
         Spec.assertEqWith s "instant speed" (ActivatedAbility.restrictions ability) []
       abilities -> Spec.assertFailure s ("expected exactly one ability, got " <> show (length abilities))
 
@@ -712,7 +713,7 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
           s
           "both costs end in rule 702.29a's discard"
           (Maybe.listToMaybe (reverse (Cost.Type.components (ActivatedAbility.cost typecycler))), Maybe.listToMaybe (reverse (Cost.Type.components (ActivatedAbility.cost plain))))
-          (Just CostComponent.DiscardThis, Just CostComponent.DiscardThis)
+          (Just (CostComponent.DiscardThis DiscardCause.ToPayCyclingCost), Just (CostComponent.DiscardThis DiscardCause.ToPayCyclingCost))
         Spec.assertEqWith s "and both are instant speed" (ActivatedAbility.restrictions typecycler, ActivatedAbility.restrictions plain) ([], [])
       _ -> Spec.assertFailure s "expected one cycling ability on each"
 
@@ -863,9 +864,9 @@ reinforceSpec s registry = Spec.describe s "Reinforce" $ do
       [ability] -> do
         Spec.assertEqWith
           s
-          "the printed {1}{W} plus rule 702.77a's discard"
+          "the printed {1}{W} plus rule 702.77a's discard, whose cause is NOT rule 702.29c's cycle"
           (ActivatedAbility.cost ability)
-          (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.White)])) [CostComponent.DiscardThis])
+          (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.White)])) [CostComponent.DiscardThis DiscardCause.Ordinary])
         Spec.assertEqWith s "instant speed" (ActivatedAbility.restrictions ability) []
         Spec.assertEqWith
           s
@@ -896,6 +897,40 @@ reinforceSpec s registry = Spec.describe s "Reinforce" $ do
         Spec.assertEqWith s "Alice's own Piker was not the target and is untouched" (countersOn pikerId resolved) (Just Nothing)
         Spec.assertEqWith s "still a 2/1" (S.powerToughnessOf pikerId resolved) (Just (2, 1))
         Spec.assertEqWith s "the stack is empty" (GameState.stack resolved) []
+      abilities -> Spec.assertFailure s ("expected one reinforce ability, got " <> show (length abilities))
+
+  -- CR 702.77a's discard against CR 702.29c's: reinforce's cost ends in the same
+  -- "Discard this card" rule 702.29a's does, and it is NOT cycling -- rule 702.77
+  -- never says so, where CR 702.29f says exactly that of typecycling. Prickly
+  -- Marmoset ("whenever you cycle a card, this creature gets +2/+0 until end of
+  -- turn") is the observer, under the same seat that pays the reinforce cost, so
+  -- CR 603.3a's "you" is alice either way and only the CAUSE can tell the two
+  -- discards apart.
+  --
+  -- Distinct numbers throughout: the Marmoset is a 2/3 and a 4/3 pumped, the
+  -- Piker a 2/1 and a 3/2 reinforced, so no reading of the rule lands on another's
+  -- pair.
+  Spec.it s "CR 702.77a a reinforce discard is not a cycle" $ do
+    guard <- S.printingOf s registry "Mosquito Guard"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    marmoset <- S.printingOf s registry "Prickly Marmoset"
+    let (pikerId, g0) = S.addCreature piker S.alice (S.landsInPlay plains 2)
+        (marmosetId, g1) = S.addCreature marmoset S.alice g0
+        (g2, guardId) = S.handOne guard g1
+        gs = g2 {GameState.priority = Just S.alice}
+    Spec.assertEqWith s "the Marmoset starts a 2/3" (S.powerToughnessOf marmosetId gs) (Just (2, 3))
+    case Activate.abilitiesFor guardId gs of
+      [ability] -> do
+        let activated = S.runPure (aimAtCreature pikerId) gs (Activate.activateAbility S.alice guardId ability)
+            placed = S.runPure (aimAtCreature pikerId) activated Engine.settleForPriority
+            after = S.runPure (aimAtCreature pikerId) placed Stack.resolveTop
+        Spec.assertEqWith s "the Marmoset is untouched by a discard that is not a cycle" (S.powerToughnessOf marmosetId after) (Just (2, 3))
+        -- Also the proof that the activation really happened: a 2/1 reads 3/2
+        -- only once rule 702.77a's counter has landed.
+        Spec.assertEqWith s "and reinforce still put its counter on the Piker" (S.powerToughnessOf pikerId after) (Just (3, 2))
+        Spec.assertEqWith s "only the reinforce ability was on the stack -- no cycling trigger joined it" (length (GameState.stack placed)) 1
+        Spec.assertEqWith s "the Guard was discarded to pay the cost" (length (Game.zoneMembers Zone.Graveyard S.alice activated)) 1
       abilities -> Spec.assertFailure s ("expected one reinforce ability, got " <> show (length abilities))
 
   -- CR 601.2c through CR 602.2b: an ability with a target it cannot legally

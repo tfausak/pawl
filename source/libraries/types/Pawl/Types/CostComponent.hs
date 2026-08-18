@@ -2,6 +2,7 @@ module Pawl.Types.CostComponent where
 
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.DiscardCards as DiscardCards
+import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Sacrifice as Sacrifice
@@ -140,8 +141,15 @@ data CostComponent keyword
     -- DiscardThis below states the rest of what reading a hand costs, for both
     -- of the components that do.
     DiscardCards (DiscardCards.DiscardCards keyword)
-  | -- | CR 702.29a's "Discard this card": discard the card the cost is on, from
-    -- the hand it is in.
+  | -- | CR 702.29a's and CR 702.77a's "Discard this card": discard the card the
+    -- cost is on, from the hand it is in. Two rules print the same clause, so
+    -- the component carries the Pawl.Types.DiscardCause the payment logs -- CR
+    -- 702.29c's "when you cycle this card" means "when you discard this card to
+    -- pay an activation cost OF A CYCLING ABILITY", and rule 702.77 never says
+    -- reinforce is one, where rule 702.29f says exactly that of typecycling.
+    -- Whoever mints the component knows which rule it is spelling; the payment
+    -- does not, so the cause travels with the component rather than being
+    -- guessed at the pay site.
     --
     -- Deliberately NOT a one-card DiscardCards above, and the distinction is the
     -- one SacrificeThis draws against Sacrifice: CR 701.9b gives the discarding
@@ -162,7 +170,7 @@ data CostComponent keyword
     -- Pawl.Engine.Cost.discardCandidates. That does not arise here: this names
     -- the object the cost is on, and a cost on an object that is no longer in a
     -- hand is simply unpayable.
-    DiscardThis
+    DiscardThis DiscardCause.DiscardCause
   | -- | CR 107.14 / 118: pay N energy counters. Energy-specific, not a general
     -- PayPlayerCounters -- energy is the only player counter ever spent as a
     -- cost. A Natural, not a Quantity, for PayLife's reason; a variable-amount
