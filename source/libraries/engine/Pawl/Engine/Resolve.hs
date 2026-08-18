@@ -2592,7 +2592,7 @@ offerCast resolving caster slot optionality offer = do
       --
       -- The excuse being the half's is the one part of that no test observes: no
       -- printing pairs a multi-half layout with a hidden-zone additional cost, so
-      -- hoisting it out of this function leaves the suite green (see #1814).
+      -- hoisting it out of this function leaves the suite green (gap #1814).
       proposal oid face =
         let name = Face.name face
             -- CR 118.9a: at most ONE alternative cost, so the applied one
@@ -2686,7 +2686,8 @@ offerCast resolving caster slot optionality offer = do
 -- ObjectRef names rather than installing a single row: CR 615.11 says an effect
 -- covering several recipients "creates a prevention shield for each applicable
 -- creature when the spell or ability that generates that effect resolves". Every
--- producer in the pool names exactly one, so the fold is over a singleton today.
+-- producer in the pool names exactly one, so the fold is over a singleton today
+-- (gap #1108).
 --
 -- The `rider` is CR 615.5's additional effect, Nothing for a row that has none.
 -- Both prevention arms pass one when their card printed the clause -- Test of
