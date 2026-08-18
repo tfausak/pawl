@@ -1,0 +1,71 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Prey Upon",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "Fight",
+                    "value": {
+                      "first": "mine",
+                      "second": "theirs"
+                    }
+                  }
+                ]
+              }
+            ],
+            "targetSlots": {
+              "mine": {
+                "filter": {
+                  "type": "ControlledBy",
+                  "value": {
+                    "type": "You"
+                  }
+                },
+                "pool": {
+                  "type": "Creatures"
+                }
+              },
+              "theirs": {
+                "filter": {
+                  "type": "Not",
+                  "value": {
+                    "type": "ControlledBy",
+                    "value": {
+                      "type": "You"
+                    }
+                  }
+                },
+                "pool": {
+                  "type": "Creatures"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

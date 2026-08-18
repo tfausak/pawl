@@ -25,6 +25,11 @@
 -- cost, and CR 701.40b's, at the card's mana cost. CR 701.40c is the case where
 -- both are open at once, and the engine offers both rather than picking.
 --
+-- A THIRD ROAD UP that is not a procedure at all: an Effect.TurnFaceUp
+-- (Showstopping Surprise), which pays nothing and shows nothing. It shares
+-- performTurnFaceUp with the two procedures because CR 701.40g replaces the
+-- TURNING OVER and does not care what proposed it.
+--
 -- THE INVARIANT: rules 701.40 and 702.37 are part of the rulebook, so reading
 -- Keyword.Morph's cost or a FaceDownReason here is the same closed-half act as
 -- reading a Phase. This module never asks which CARD is underneath.
@@ -192,6 +197,59 @@ turnableFaceUp pid gs =
 -- that correct rather than merely tidy -- the cost is paid BEFORE the permanent
 -- turns over, so a failed payment has turned nothing over to undo.
 --
+-- Everything from the status write on is performTurnFaceUp below, which the
+-- effect road shares.
+turnFaceUp :: PlayerId -> TurnUpProcedure -> ObjectId -> Game ()
+turnFaceUp pid procedure oid = do
+  before <- State.get
+  if not (canTurnFaceUp pid procedure oid before)
+    then pure ()
+    else case costOf procedure oid before of
+      Nothing -> pure ()
+      Just cost -> do
+        payment <- Cost.pay ManaSpending.AsProduced pid oid cost
+        case payment of
+          Payment.Unpaid -> State.put before
+          Payment.Paid -> performTurnFaceUp (Just procedure) oid
+
+-- CR 701.40g: "if a manifested permanent that's represented by an instant or
+-- sorcery card would turn face up, its controller reveals it and leaves it face
+-- down".
+--
+-- TWO conjuncts and both are the rule's own words. MANIFESTED, so the reason on
+-- the status is asked (CR 708.6) and a morph-cast permanent is not covered; and
+-- the CARD it is REPRESENTED BY is an instant or a sorcery, so the read goes
+-- through Game.faceUpFaceOf for manifestCostOf's reason -- CR 708.2a has left the
+-- permanent itself with no card type at all, so a projected read would answer
+-- about the 2/2 rather than about the card.
+--
+-- The REVEAL is not modelled, for the reason the two procedures' showing is not:
+-- nothing in pawl hides a face-down permanent's card from a reader, so there is
+-- no concealment for it to lift (#682). What is left of the rule is the second
+-- half of its first sentence, and its second sentence.
+revealsInsteadOfTurningUp :: ObjectId -> GameState -> Bool
+revealsInsteadOfTurningUp oid gs =
+  fmap (Facing.reasonOf . Object.facing) (Game.lookupObject oid gs) == Just (Just FaceDownReason.Manifested)
+    && maybe
+      False
+      (not . Set.null . Set.intersection instantOrSorcery . TypeLine.types . Face.typeLine)
+      (Game.faceUpFaceOf oid gs)
+  where
+    instantOrSorcery = Set.fromList [CardType.Instant, CardType.Sorcery]
+
+-- The turning-over itself, once whatever allowed it has allowed it: the status
+-- write, CR 708.11's replacement loop, and CR 708.7's event, in that order and
+-- for the reasons the notes below give.
+--
+-- ONE funnel for both roads up. The special action above reaches it after CR
+-- 116.2b's payment; an Effect.TurnFaceUp reaches it through turnFaceUpByEffect,
+-- having paid nothing. CR 701.40g is the whole reason the two share a body
+-- rather than each writing the status: the rule replaces the TURNING OVER and
+-- says nothing about what proposed it, so a guard on one road would leave the
+-- other one wrong.
+--
+-- The procedure is Maybe for that same asymmetry -- see Pawl.Types.ProposedEvent.
+--
 -- CR 708.8 falls out of the shape and is not implemented anywhere: "any effects
 -- that have been applied to the face-down permanent still apply to the face-up
 -- permanent", and this writes one status field on one object -- no CR 400.7
@@ -204,75 +262,100 @@ turnableFaceUp pid gs =
 -- permanent would have an 'As [this permanent] is turned face up . . .' ability
 -- after it's turned face up, that ability is applied WHILE that permanent is
 -- being turned face up, NOT AFTERWARD". That is why the CR 616.1 loop runs
--- between the two lines below rather than after both -- see the note at the
+-- between the two writes below rather than after both -- see the note at the
 -- call.
-turnFaceUp :: PlayerId -> TurnUpProcedure -> ObjectId -> Game ()
-turnFaceUp pid procedure oid = do
-  before <- State.get
-  if not (canTurnFaceUp pid procedure oid before)
-    then pure ()
-    else case costOf procedure oid before of
-      Nothing -> pure ()
-      Just cost -> do
-        payment <- Cost.pay ManaSpending.AsProduced pid oid cost
-        case payment of
-          Payment.Unpaid -> State.put before
-          -- CR 708.8: the copiable values revert, which for pawl is the status
-          -- flipping -- Game.faceOf reads it, so the substitution simply stops
-          -- applying and the card's own face answers again.
-          Payment.Paid -> do
-            State.modify'
-              ( \gs ->
-                  gs
-                    { GameState.objects =
-                        Map.adjust (\o -> o {Object.facing = Facing.FaceUp}) oid (GameState.objects gs)
-                    }
-              )
-            -- CR 708.11 / 614.1e: the "as this permanent is turned face up"
-            -- abilities, applied HERE -- after the status write and before the
-            -- event record -- which is the rule's "while that permanent is being
-            -- turned face up, not afterward" written as a position in this
-            -- function.
-            --
-            -- AFTER the status write, and that placement is what makes the rule's
-            -- "would have ... AFTER it's turned face up" answerable without a
-            -- counterfactual: the permanent has its abilities back by now (CR
-            -- 708.2a took them away only while it was face down), so
-            -- Projection.replacementsAffecting simply sees the row. Running the
-            -- loop first would collect from a permanent with no abilities at all
-            -- and apply nothing.
-            --
-            -- BEFORE the event record, and that half is observable: a CR 614.1e
-            -- ability and a CR 708.7 trigger on one card would otherwise be
-            -- ordered the wrong way round, and CR 708.11's "not afterward" is
-            -- exactly the sentence that decides it. Pawl.FaceDownSpec's second
-            -- turnFaceUp call is what proves the loop is inside the PAID branch
-            -- rather than run on every ask: a permanent that is already face up
-            -- has its megamorph row too, so a loop outside this branch would put
-            -- a second counter on.
-            --
-            -- Monad.void discards the Nothing that would mean the turning does
-            -- not happen. No arm reachable from this event returns one -- CR
-            -- 614.1e's abilities add to the turning over rather than replacing it
-            -- -- and there is nothing left to cancel by this point anyway: the
-            -- status is already written.
-            Monad.void (Event.applyReplacements (ProposedEvent.WouldTurnFaceUp oid procedure))
-            -- CR 708.7 through CR 603.2: Skirk Marauder's "when this creature is
-            -- turned face up" watches for this, and this is the only place in the
-            -- engine that writes it.
-            --
-            -- AFTER the status write, matching CR 702.37e's own order. Not
-            -- observable either way: CR 117.5's scan runs at
-            -- Engine.settleForPriority and reads the log later, never between
-            -- these two lines, so no reader can see the permanent mid-turnover.
-            --
-            -- Inside the PAID branch, which IS observable: turnFaceUp is a
-            -- no-op for a permanent that is already face up (canTurnFaceUp's
-            -- first conjunct), and such a permanent has its text back -- so an
-            -- event recorded unconditionally would fire the ability again on a
-            -- second, refused call. Pawl.FaceDownSpec asks twice to prove it.
-            -- The unpaid branch is quiet for a different reason: CR 702.37e's
-            -- reject-not-repair restores the state the attempt began with, log
-            -- and all, and CR 708.2a leaves the still-face-down permanent with
-            -- no ability that could have seen the event anyway.
-            State.modify' (Event.recordEvent (GameEvent.TurnedFaceUp oid))
+performTurnFaceUp :: Maybe TurnUpProcedure -> ObjectId -> Game ()
+performTurnFaceUp procedure oid = do
+  gs <- State.get
+  if revealsInsteadOfTurningUp oid gs
+    then
+      -- CR 701.40g: it stays face down, and NOTHING below runs. The rule's second
+      -- sentence -- "abilities that trigger whenever a permanent is turned face
+      -- up won't trigger" -- is exactly the GameEvent.TurnedFaceUp that is never
+      -- recorded, and CR 614.1e's loop is skipped with it, since a permanent that
+      -- did not turn over was never being turned over.
+      pure ()
+    else do
+      -- CR 708.8: the copiable values revert, which for pawl is the status
+      -- flipping -- Game.faceOf reads it, so the substitution simply stops
+      -- applying and the card's own face answers again.
+      State.modify'
+        ( \g ->
+            g
+              { GameState.objects =
+                  Map.adjust (\o -> o {Object.facing = Facing.FaceUp}) oid (GameState.objects g)
+              }
+        )
+      -- CR 708.11 / 614.1e: the "as this permanent is turned face up"
+      -- abilities, applied HERE -- after the status write and before the
+      -- event record -- which is the rule's "while that permanent is being
+      -- turned face up, not afterward" written as a position in this
+      -- function.
+      --
+      -- AFTER the status write, and that placement is what makes the rule's
+      -- "would have ... AFTER it's turned face up" answerable without a
+      -- counterfactual: the permanent has its abilities back by now (CR
+      -- 708.2a took them away only while it was face down), so
+      -- Projection.replacementsAffecting simply sees the row. Running the
+      -- loop first would collect from a permanent with no abilities at all
+      -- and apply nothing.
+      --
+      -- BEFORE the event record, and that half is observable: a CR 614.1e
+      -- ability and a CR 708.7 trigger on one card would otherwise be
+      -- ordered the wrong way round, and CR 708.11's "not afterward" is
+      -- exactly the sentence that decides it. Pawl.FaceDownSpec's second
+      -- turnFaceUp call is what proves the loop is inside the PAID branch
+      -- rather than run on every ask: a permanent that is already face up
+      -- has its megamorph row too, so a loop outside this branch would put
+      -- a second counter on.
+      --
+      -- Monad.void discards the Nothing that would mean the turning does
+      -- not happen. No arm reachable from this event returns one -- CR
+      -- 614.1e's abilities add to the turning over rather than replacing it
+      -- -- and there is nothing left to cancel by this point anyway: the
+      -- status is already written.
+      Monad.void (Event.applyReplacements (ProposedEvent.WouldTurnFaceUp oid procedure))
+      -- CR 708.7 through CR 603.2: Skirk Marauder's "when this creature is
+      -- turned face up" watches for this, and this is the only place in the
+      -- engine that writes it.
+      --
+      -- AFTER the status write, matching CR 702.37e's own order. Not
+      -- observable either way: CR 117.5's scan runs at
+      -- Engine.settleForPriority and reads the log later, never between
+      -- these two lines, so no reader can see the permanent mid-turnover.
+      --
+      -- Inside the PAID branch, which IS observable: turnFaceUp is a
+      -- no-op for a permanent that is already face up (canTurnFaceUp's
+      -- first conjunct), and such a permanent has its text back -- so an
+      -- event recorded unconditionally would fire the ability again on a
+      -- second, refused call. Pawl.FaceDownSpec asks twice to prove it.
+      -- The unpaid branch is quiet for a different reason: CR 702.37e's
+      -- reject-not-repair restores the state the attempt began with, log
+      -- and all, and CR 708.2a leaves the still-face-down permanent with
+      -- no ability that could have seen the event anyway.
+      State.modify' (Event.recordEvent (GameEvent.TurnedFaceUp oid))
+
+-- CR 708 by way of an Effect.TurnFaceUp: Showstopping Surprise's "turn it face
+-- up if it's face down", with no cost, no procedure and no CR 116.2b special
+-- action anywhere in it.
+--
+-- TWO guards and no more. It is a permanent, so a card the effect reached in
+-- some other zone has no face to turn (CR 110.1); and it is FACE DOWN, which is
+-- the card's own "if it's face down" -- CR 708.2b's mirror, and the same
+-- conjunct canTurnFaceUp opens with. Nothing about a card type, a mana cost or a
+-- morph ability: those are CR 701.40b's and CR 702.37e's price lists and belong
+-- to the procedures, not to the turning-over. CR 701.40g is the one restriction
+-- that survives, and it lives in performTurnFaceUp because it is about the
+-- turning-over rather than about the road.
+--
+-- No controller argument: the effect's controller is who resolved it, and
+-- nothing left here reads a player -- CR 701.40g's reveal is the permanent's own
+-- controller's and is not modelled (#682).
+turnFaceUpByEffect :: ObjectId -> Game ()
+turnFaceUpByEffect oid = do
+  gs <- State.get
+  Monad.when
+    ( Set.member oid (GameState.battlefield gs)
+        && maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject oid gs)
+    )
+    (performTurnFaceUp Nothing oid)

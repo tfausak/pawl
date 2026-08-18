@@ -2672,4 +2672,113 @@ spec s registry = Spec.describe s "Pawl.Engine.Damage" $ do
   lastKnownRiderSpec s registry
   creaturePlaneswalkerSpec s registry
   excessDamageSpec s registry
+  fightSpec s registry
   m2cPropertySpec s registry
+
+-- Fill every target slot with whichever of the two named permanents that slot's
+-- own filter admits. Prey Upon's slots are disjointly filtered by controller, so
+-- one predicate over both ids aims each slot at exactly one candidate.
+aimedAtEither :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimedAtEither a b p = case p of
+  Prompt.ChooseTargets _ _ _ sets ->
+    S.preferring (\r -> Recipient.objectOf r == Just a || Recipient.objectOf r == Just b) sets
+  _ -> S.identityAnswer p
+
+-- alice holds Prey Upon over one Forest, controls a Goblin Piker and faces bob's
+-- Hill Giant, returned as (the board, the spell in hand, alice's fighter, bob's).
+--
+-- The two bodies are chosen so every reading of CR 701.14a produces a different
+-- board. The powers differ (2 against 3) so a fight that ran one blow twice, or
+-- swapped the dealers, reads wrong; the toughnesses differ (1 against 3) so
+-- exactly one creature dies, and WHICH one is the rule's answer rather than a
+-- coincidence. Two 2/2s could not tell any of that apart.
+preyBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+preyBoard s registry = do
+  prey <- S.printingOf s registry "Prey Upon"
+  forest <- S.printingOf s registry "Forest"
+  piker <- S.printingOf s registry "Goblin Piker"
+  giant <- S.printingOf s registry "Hill Giant"
+  let (g0, spell) = S.handOne prey (S.landsInPlay forest 1)
+      (mine, g1) = S.addCreature piker S.alice g0
+      (theirs, g2) = S.addCreature giant S.bob g1
+  pure (g2, spell, mine, theirs)
+
+-- CR 701.14, through Prey Upon: "target creature you control fights target
+-- creature you don't control". The whole card is the keyword action, which is
+-- why it is the producer -- Wolverine, Fierce Fighter drags CR 701.69's heal in
+-- beside it.
+--
+-- Here rather than in Pawl.CombatSpec because CR 701.14d says the damage is not
+-- combat damage, and this module owns the damage funnel.
+fightSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+fightSpec s registry = Spec.describe s "Fight (CR 701.14)" $ do
+  Spec.it s "CR 701.14a each fighter deals damage equal to its power to the other" $ do
+    (before, spell, mine, theirs) <- preyBoard s registry
+    let after = S.settleSba (S.runPure (aimedAtEither mine theirs) before (S.cast S.alice spell >> Stack.resolveTop))
+    -- The fixture's own numbers first, so neither assertion below can pass on a
+    -- board whose bodies were not what this case claims.
+    Spec.assertEqWith s "alice's 2/1 and bob's 3/3" (S.powerToughnessOf mine before, S.powerToughnessOf theirs before) (Just (2, 1), Just (3, 3))
+    -- CR 701.14a's first blow. 2 and not 3: the Piker deals ITS power, not the
+    -- Giant's.
+    Spec.assertEqWith s "CR 701.14a the Piker dealt 2 to the Giant" (S.damageOf theirs after) (Just 2)
+    -- CR 701.14a's second blow, and the assertion that only it can redden: the
+    -- Giant's 3 is lethal to a 2/1 (CR 704.5g).
+    Spec.assertBool s (not (S.onBattlefield mine after)) "CR 701.14a/704.5g the Giant's 3 back killed the Piker"
+    -- The control: 2 is not lethal to a 3/3, so the Giant is still there and the
+    -- death above is the rule's arithmetic rather than a board-wide wipe.
+    Spec.assertBool s (S.onBattlefield theirs after) "CR 704.5g and 2 is not lethal to the Giant"
+
+  -- CR 701.14b: "if one or both creatures instructed to fight are no longer on
+  -- the battlefield or are no longer creatures, NEITHER of them fights or deals
+  -- damage. If one or both creatures are illegal targets ... neither of them
+  -- fights or deals damage."
+  --
+  -- THE PAIR with the case above, differing in one thing: bob takes control of
+  -- the Piker (CR 108.4) after Prey Upon is on the stack. That makes the "mine"
+  -- slot's target illegal -- it is no longer a creature alice controls -- while
+  -- leaving the Piker on the battlefield, still a creature, still a legal
+  -- RECIPIENT. So the board can tell "neither fights" from "the survivor swings
+  -- alone", which a Piker that had simply been destroyed could not: a destroyed
+  -- Piker is no recipient either way and both readings deal nothing.
+  --
+  -- Prey Upon still has its other target, so CR 608.2b lets it resolve rather
+  -- than countering it -- the graveyard assertion is what pins that, and without
+  -- it this case would pass for a spell that never resolved at all.
+  Spec.it s "CR 701.14b one illegal target and NEITHER creature deals damage" $ do
+    (before, spell, mine, theirs) <- preyBoard s registry
+    let cast = S.runPure (aimedAtEither mine theirs) before (S.cast S.alice spell)
+        stolen = S.giveControl mine S.bob cast
+        after = S.settleSba (S.runPure S.identityAnswer stolen Stack.resolveTop)
+    -- The discriminator: under a per-fighter reading the Giant is still a legal
+    -- target and would deal its 3 to the Piker, killing it.
+    Spec.assertEqWith s "CR 701.14b the Giant dealt nothing to the Piker" (S.damageOf mine after) (Just 0)
+    Spec.assertBool s (S.onBattlefield mine after) "CR 701.14b so the Piker lived"
+    Spec.assertEqWith s "CR 701.14b and the Piker dealt nothing to the Giant" (S.damageOf theirs after) (Just 0)
+    -- CR 608.2b: it RESOLVED, and was not countered for want of targets.
+    Spec.assertEqWith s "the spell resolved into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertEqWith s "and left the stack" (length (GameState.stack after)) 0
+
+  -- CR 701.14d: "the damage dealt when a creature fights ISN'T COMBAT DAMAGE."
+  --
+  -- Read through a Fog-shaped shield -- CR 615.1's prevention, scoped to
+  -- DamageKind.Combat and to no recipient in particular -- so the rule is a
+  -- board on which combat damage cannot land and the fight's damage does anyway.
+  -- THE PAIR with the first case, differing only in that shield: every number
+  -- below is the same one that case asserts.
+  Spec.it s "CR 701.14d fight damage is not combat damage, so a combat-only prevention misses it" $ do
+    (base, spell, mine, theirs) <- preyBoard s registry
+    let shield =
+          ActiveReplacement.MkActiveReplacement
+            { ActiveReplacement.effect = ReplacementEffect.DamageR (DamageR.MkDamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) (Filter.Type.And []) Nothing Nothing) DamageRewrite.PreventAll Seq.empty),
+              ActiveReplacement.source = theirs,
+              ActiveReplacement.controller = S.alice,
+              ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
+              ActiveReplacement.expiry = Expiry.Type.AtCleanup,
+              ActiveReplacement.uses = Uses.Unlimited,
+              ActiveReplacement.origin = ReplacementOrigin.Other,
+              ActiveReplacement.rider = Nothing
+            }
+        before = S.addReplacement shield base
+        after = S.settleSba (S.runPure (aimedAtEither mine theirs) before (S.cast S.alice spell >> Stack.resolveTop))
+    Spec.assertEqWith s "CR 701.14d the Piker's 2 still landed on the Giant" (S.damageOf theirs after) (Just 2)
+    Spec.assertBool s (not (S.onBattlefield mine after)) "CR 701.14d and the Giant's 3 still killed the Piker"

@@ -51,6 +51,11 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- cost at all. Nothing on the object records which road it came by, so the event
 -- has to.
 --
+-- MAYBE the procedure, because CR 708.7's two procedures are CR 116.2b special
+-- actions and an Effect.TurnFaceUp is neither: it takes no procedure, shows
+-- nothing and pays nothing. Nothing is what a reader gating on a paid cost -- CR
+-- 702.37b's megamorph counter, the only such reader -- correctly declines.
+--
 -- Nine arms, not every replaceable event class the rules define: each of the
 -- rest is one more arm plus the funnel that raises it.
 data ProposedEvent
@@ -99,5 +104,5 @@ data ProposedEvent
     -- Raised by Pawl.Engine.FaceDown.turnFaceUp, the only place in the engine
     -- that turns anything face up, and the one funnel CR 116.2b's special action
     -- goes through.
-    WouldTurnFaceUp ObjectId.ObjectId TurnUpProcedure.TurnUpProcedure
+    WouldTurnFaceUp ObjectId.ObjectId (Maybe TurnUpProcedure.TurnUpProcedure)
   deriving (Eq, Ord, Show)

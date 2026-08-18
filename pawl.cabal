@@ -286,6 +286,8 @@ library codec
     Pawl.Codec.FaceDownCharacteristics
     Pawl.Codec.FaceDownCharacteristicsSpec
     Pawl.Codec.FaceSpec
+    Pawl.Codec.Fight
+    Pawl.Codec.FightSpec
     Pawl.Codec.Filter
     Pawl.Codec.FilterSpec
     Pawl.Codec.ForEach
@@ -1026,6 +1028,7 @@ library types
     Pawl.Types.FaceDownCharacteristics
     Pawl.Types.FaceDownReason
     Pawl.Types.Facing
+    Pawl.Types.Fight
     Pawl.Types.Filter
     Pawl.Types.ForEach
     Pawl.Types.Game

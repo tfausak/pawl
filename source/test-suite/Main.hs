@@ -118,6 +118,7 @@ import qualified Pawl.Codec.ExpirySpec
 import qualified Pawl.Codec.ExtraPhaseSpec
 import qualified Pawl.Codec.FaceDownCharacteristicsSpec
 import qualified Pawl.Codec.FaceSpec
+import qualified Pawl.Codec.FightSpec
 import qualified Pawl.Codec.FilterSpec
 import qualified Pawl.Codec.ForEachSpec
 import qualified Pawl.Codec.GameEventSpec
@@ -534,6 +535,7 @@ spec s registry = do
   Pawl.Codec.ExtraPhaseSpec.spec s
   Pawl.Codec.FaceDownCharacteristicsSpec.spec s
   Pawl.Codec.FaceSpec.spec s
+  Pawl.Codec.FightSpec.spec s
   Pawl.Codec.FilterSpec.spec s
   Pawl.Codec.ForEachSpec.spec s
   Pawl.Codec.GameEventSpec.spec s
