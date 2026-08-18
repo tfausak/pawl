@@ -450,8 +450,8 @@ youControlNoSwamps =
 -- in play (S.giveControl's own AtCleanup SetController on the object whose
 -- control moved, which is not what CR 611.2b's "never starts" is about).
 -- Matches every Affected constructor explicitly (no wildcard): a GainControl
--- effect only ever stores TheseObjects, so a dynamic Matching (or
--- MatchingAnywhere) set is correctly False here, but an exhaustive case means a
+-- effect only ever stores TheseObjects, so a dynamic set is correctly False
+-- here, but an exhaustive case means a
 -- future Affected constructor forces a decision at this site instead of
 -- silently reading as "nothing stored".
 continuousEffectAffects :: ObjectId.ObjectId -> ContinuousEffect.ContinuousEffect Card.Type.Card -> Bool
@@ -459,6 +459,7 @@ continuousEffectAffects target eff = case ContinuousEffect.affected eff of
   Affected.TheseObjects ids -> Set.member target ids
   Affected.Matching _ -> False
   Affected.MatchingAnywhere _ -> False
+  Affected.MatchingOffBattlefield _ -> False
   Affected.Attached -> False
   Affected.AttachedPlayerControls _ -> False
 

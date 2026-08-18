@@ -69,7 +69,7 @@ sicknessOkGiven pcs pid srcId ability =
 -- On the battlefield: the PROJECTION's, so Humility (layer 6) strips them. In a
 -- hand: the ones rule 702 mints for the card's printed keywords, which is
 -- cycling (CR 702.29a) and reinforce (CR 702.77a) today, read off the PRINTED
--- card because no pool effect changes a card's abilities in a hand (#160); CR 113.6b is the rule
+-- card, which misses an effect that granted one there (#1859); CR 113.6b is the rule
 -- that lets an ability name its own zone -- PLUS the card's own printed
 -- abilities that name the hand, per CR 113.6j and CR 113.6m (Faerie Macabre's
 -- "Discard this card: ..."). In a graveyard: the PRINTED abilities
@@ -102,7 +102,7 @@ abilitiesFor = abilitiesForGiven Map.empty
 -- The ...Given half of the pair, and the one the enumeration calls:
 -- Action.legalActions hands it the board it projected once, so nothing here
 -- re-derives a projection per object. Only the battlefield arm reads that board
--- at all -- a hand or graveyard object's absence from it is not a miss (#160; see
+-- at all -- a hand or graveyard object's absence from it is not a miss (#1859; see
 -- Projection.projectGiven).
 abilitiesForGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card]
 abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) of
@@ -152,10 +152,9 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
 -- so the GRANT functions in the graveyard too -- which is exactly this gate being
 -- asked of a card that is not on the battlefield.
 --
--- The PRINTED abilities, not the projection's: no pool effect changes the
--- abilities of a card off the battlefield (#160), the Face.castingPermissions
--- precedent, which Keyword.hasFlash spells out for the hand in particular. Not a claim
--- about the rules -- CR 613.1f does reach a card outside the battlefield -- and
+-- The PRINTED abilities, not the projection's (#1859), the Face.castingPermissions
+-- precedent. Not a claim about the rules -- CR 613.1f does reach a card outside
+-- the battlefield, and Cast.instantSpeed reads rule 702.8a's keyword there -- and
 -- observationally identical while nothing can rewrite a graveyard card's text.
 --
 -- The condition's perspective is the OWNER. CR 109.5's "your" is the ability's

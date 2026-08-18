@@ -74,7 +74,7 @@ openingHands perform owners = do
 --
 -- Read straight off the face (Game.faceOf) and never through the projection --
 -- the Face.castingPermissions precedent: these abilities function in the HAND
--- (CR 113.6), where no pool effect changes a card's abilities (#160).
+-- (CR 113.6), where this reader takes the printed card (#1859).
 actionsFor :: (Face.Face Card.Card -> [[Effect Card.Card]]) -> PlayerId -> GameState.GameState -> [((ObjectId, HandActionIndex.HandActionIndex), [Effect Card.Card])]
 actionsFor field pid gs =
   let withActions oid = case Game.faceOf oid gs of

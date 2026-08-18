@@ -491,7 +491,7 @@ data PlayerEffect
     -- CantCastMatching makes of a card in a hand. What a NARROWING filter sees
     -- of a card in a graveyard is unobserved, since the one producer writes the
     -- predicate that is true of everything, and this reader takes the printed
-    -- card there (#160).
+    -- card there (#1859).
     --
     -- A PERMISSION, folded as a disjunction for CastAsThoughItHadFlash's reason:
     -- there is nothing for a second permission to outvote.
@@ -562,7 +562,7 @@ data PlayerEffect
     -- The Filter is the axis that separates the producers, as it is for
     -- CastFromGraveyard: Omniscience says "spells" and so matches everything
     -- (`And []`), while a narrowing printing would name the quality here. What a
-    -- narrowing filter would see of a card in a hand is unobserved (#160, the
+    -- narrowing filter would see of a card in a hand is unobserved (#1859, the
     -- same gap the graveyard arm records).
     CastFromHandWithoutPayingManaCost (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)

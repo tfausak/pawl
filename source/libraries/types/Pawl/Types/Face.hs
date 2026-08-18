@@ -89,10 +89,13 @@ data Face card = MkFace
     -- The closed half must read this through Pawl.Engine.Projection.keywordsOf, never
     -- directly, since layer 6 grants and removes abilities. The exception is a
     -- keyword whose ability functions in a zone where no pool effect changes a
-    -- card's keywords (#160) -- a HAND, where flash is read here -- the same carve-out
-    -- castingPermissions and additionalCosts take. A GRAVEYARD is no longer one
-    -- of those zones: rule 702.34a's flashback is read there through the
-    -- projection, so a granted one reaches the cost (Pawl.Engine.Cost.costsFor).
+    -- card's keywords (#1859) -- the carve-out castingPermissions and
+    -- additionalCosts take. A GRAVEYARD is no longer one of those zones: rule
+    -- 702.34a's flashback is read there through the projection, so a granted one
+    -- reaches the cost (Pawl.Engine.Cost.costsFor). Nor is a HAND for FLASH:
+    -- Pawl.Engine.Cast.instantSpeed reads rule 702.8a's keyword through the
+    -- projection, which is what lets Teferi, Mage of Zhalfir grant it to a card
+    -- in a hand.
     keywords :: Set.Set Keyword.Keyword,
     -- | CR 204.1/204.2: the colour indicator printed left of the type line. An
     -- object is each colour it denotes, IN ADDITION to the colours of its mana
@@ -153,8 +156,7 @@ data Face card = MkFace
     -- | CR 601.3: this face's PRINTED casting permissions -- zone or condition
     -- exceptions to normal timing (Panglacial Wurm). Read directly from the card
     -- and NOT the projection: the permission functions in the library (CR 113.6),
-    -- which Projection.gather does not reach -- it walks the battlefield, the
-    -- command zone, the stack and the graveyard, and no other zone (#160).
+    -- where this reader takes the printed card (#1859).
     -- Not a claim about the rules: CR 613.1 names no zone, and CR 122.1b / 613.1f
     -- reach a card outside the battlefield.
     --
@@ -176,8 +178,8 @@ data Face card = MkFace
     -- must hold for a cast to be legal, where one permission suffices.
     --
     -- Read directly from the card, the castingPermissions precedent; CR 113.6e is
-    -- the rule that puts such an ability in the hand, which pawl's projection does
-    -- not reach (#160).
+    -- the rule that puts such an ability in the hand, where this reader takes the
+    -- printed card (#1859).
     --
     -- SELF-scoped and printed-only, which is the whole difference between this and
     -- the other producer CR 601.3's "rule or effect" names. A prohibition aimed at
@@ -198,11 +200,10 @@ data Face card = MkFace
     enchant :: [TargetSlot.TargetSlot],
     -- | CR 113.6g: a can't-be-countered ability functions on the stack (Rending
     -- Volley). Read straight off the card by Event.counter rather than through the
-    -- projection -- the castingPermissions precedent: a spell on the stack gets no
-    -- projection in pawl either, since gather's static-ability sources are
-    -- battlefield permanents and every dynamic affected set is battlefield-gated
-    -- (#160). CR 613 itself does reach the stack; this is a fact about the engine,
-    -- not about the rules.
+    -- projection -- the castingPermissions precedent: this reader takes the
+    -- printed card while the object is on the stack (#1859). CR 613 itself does
+    -- reach the stack, and so does pawl's projection; this is a fact about ONE
+    -- reader, not about the rules and not about the fold.
     --
     -- CR 113.6g's SELF-referential clause only. A permanent's static ability
     -- about OTHER objects being uncounterable (Spider-Punk) rides
@@ -212,7 +213,7 @@ data Face card = MkFace
     -- | CR 118.8: this face's printed additional costs, paid at the same time as
     -- the spell's mana cost (Village Rites). Read directly from the card, the
     -- castingPermissions precedent: a cost is consulted while the object is in
-    -- hand, where no pool effect changes a card's costs (#160). CR 118.8d: this does not
+    -- hand, where this reader takes the printed card (#1859). CR 118.8d: this does not
     -- change the card's mana cost, so 'manaCost' above and every reader of mana
     -- value is unaffected.
     --
@@ -252,7 +253,7 @@ data Face card = MkFace
     --
     -- The third member of the additionalCosts/alternativeCosts family above, and
     -- read the way they are: straight off the card, never through the projection
-    -- (#160). Pawl.Engine.Cost.selfReductions is the one reader, and it folds these in
+    -- (#1859). Pawl.Engine.Cost.selfReductions is the one reader, and it folds these in
     -- alongside the CR 613.11 reductions other permanents generate, so CR
     -- 601.2f's "minus all cost reductions" is applied once over both.
     --
@@ -332,8 +333,8 @@ data Face card = MkFace
     -- | CR 103.5b: this face's "any time you could mulligan" actions, in printed
     -- order, each one its own list of effects in written order (Serum Powder).
     -- Read directly from the card, the castingPermissions precedent: the ability
-    -- functions in the HAND (CR 113.6), where no pool effect changes a card's
-    -- abilities (#160).
+    -- functions in the HAND (CR 113.6), where this reader takes the printed card
+    -- (#1859).
     --
     -- A LIST OF ACTIONS and not one action's effects: nothing in CR 103 caps how
     -- many such actions a face may grant, and two are two separate offers a
@@ -342,7 +343,7 @@ data Face card = MkFace
     -- how a card that says nothing about this window is never offered one.
     mulliganActions :: [[Effect.Effect card]],
     -- | CR 103.6 / 103.6a: this face's opening-hand actions, shaped exactly like
-    -- mulliganActions above and read the same way (CR 113.6, #160).
+    -- mulliganActions above and read the same way (CR 113.6, #1859).
     --
     -- The SIBLING of mulliganActions, not a reuse: the two windows are at different
     -- times (CR 103.5b sits AT a declaration, CR 103.6 opens once the whole
@@ -355,8 +356,8 @@ data Face card = MkFace
     -- | CR 116.2: the special actions this face's printed text grants -- CR
     -- 116.2e's "you may discard this card any time you could cast an instant"
     -- (Circling Vultures). Read directly from the card, the castingPermissions
-    -- precedent: the ability functions in the HAND (CR 113.6), where no pool
-    -- effect changes a card's abilities (#160).
+    -- precedent: the ability functions in the HAND (CR 113.6), where this reader
+    -- takes the printed card (#1859).
     --
     -- A LIST rather than a flag, matching every neighbouring permission field:
     -- nothing in CR 116.2 caps how many such lines a face may print, and

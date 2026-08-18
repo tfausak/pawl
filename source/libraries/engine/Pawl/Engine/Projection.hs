@@ -404,6 +404,11 @@ affectsGiven peers source oid a partial gs = case a of
   Affected.MatchingAnywhere f ->
     let perspective = controllerOf source gs
      in Filter.matches (Filter.contextFor perspective (Just source)) (viewOfCharacteristics peers oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
+  -- Matching's body with that conjunct NEGATED rather than dropped.
+  Affected.MatchingOffBattlefield f ->
+    let perspective = controllerOf source gs
+     in not (Set.member oid (GameState.battlefield gs))
+          && Filter.matches (Filter.contextFor perspective (Just source)) (viewOfCharacteristics peers oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
   -- CR 303.4b / 303.4m: the source's attachment again, read for the PLAYER it
   -- names. The Filter's perspective stays the source's controller (CR 109.5), not
   -- the enchanted player's. The candidate's controller is bound once and used
@@ -1253,6 +1258,7 @@ rewriteAffected :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Affected.Af
 rewriteAffected pairs a = case a of
   Affected.Matching f -> Affected.Matching (Filter.rewrite pairs f)
   Affected.MatchingAnywhere f -> Affected.MatchingAnywhere (Filter.rewrite pairs f)
+  Affected.MatchingOffBattlefield f -> Affected.MatchingOffBattlefield (Filter.rewrite pairs f)
   Affected.AttachedPlayerControls f -> Affected.AttachedPlayerControls (Filter.rewrite pairs f)
   -- A frozen id set names no word (CR 611.2c), and an attachment names none.
   Affected.TheseObjects _ -> a
@@ -1878,6 +1884,8 @@ candidatesFor a gs = case a of
   Affected.Attached -> GameState.battlefield gs
   Affected.AttachedPlayerControls _ -> GameState.battlefield gs
   Affected.MatchingAnywhere _ -> Map.keysSet (GameState.objects gs)
+  -- Every object the battlefield does NOT hold, which is the arm's own gate.
+  Affected.MatchingOffBattlefield _ -> Set.difference (Map.keysSet (GameState.objects gs)) (GameState.battlefield gs)
   -- Already fixed (CR 611.2c), so freezing it is the identity. Returned rather
   -- than special-cased away, so the caller has one shape to filter.
   Affected.TheseObjects s -> s
@@ -2408,6 +2416,7 @@ movableAspects c =
         Affected.Attached -> Nothing
         Affected.Matching f -> readsOf f
         Affected.MatchingAnywhere f -> readsOf f
+        Affected.MatchingOffBattlefield f -> readsOf f
         -- Always movable, whatever the filter reads: the set is narrowed by WHO
         -- CONTROLS each candidate, and layer 2 writes Controller (CR 613.1b).
         Affected.AttachedPlayerControls f -> Just (Set.insert Controller (filterReads f))
@@ -2418,6 +2427,7 @@ staticallyMovable :: Gathered -> Bool
 staticallyMovable c = case gAffected c of
   Affected.Matching _ -> True
   Affected.MatchingAnywhere _ -> True
+  Affected.MatchingOffBattlefield _ -> True
   Affected.TheseObjects _ -> False
   Affected.Attached -> False
   -- Movable, unlike Attached: WHO CONTROLS a candidate is a layer-2 effect's
@@ -3235,6 +3245,7 @@ controlNames gs source a = case a of
   Affected.Attached -> maybe Set.empty Set.singleton (hostOf source gs)
   Affected.Matching _ -> Set.empty
   Affected.MatchingAnywhere _ -> Set.empty
+  Affected.MatchingOffBattlefield _ -> Set.empty
   Affected.AttachedPlayerControls _ -> Set.empty
 
 -- CR 110.2 / 108.4a: the controller a CR 613.1b layer-2 effect OVERRIDES. A

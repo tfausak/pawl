@@ -2450,13 +2450,14 @@ targetSlotFilters = Maybe.maybeToList . TargetSlot.filter
 
 -- A continuous effect's affected set (Pawl.Types.Affected), wherever one is
 -- written -- a static ability, a combat restriction, an attack or block
--- requirement. Only the three predicate arms carry a Filter; the fixed id set
+-- requirement. Only the predicate arms carry a Filter; the fixed id set
 -- (CR 611.2c) and CR 303.4m's "enchanted permanent" carry none.
 affectedFilters :: Affected.Affected -> [Filter.Type.Filter Keyword.Keyword]
 affectedFilters affected = case affected of
   Affected.TheseObjects _ -> []
   Affected.Matching f -> [f]
   Affected.MatchingAnywhere f -> [f]
+  Affected.MatchingOffBattlefield f -> [f]
   Affected.Attached -> []
   Affected.AttachedPlayerControls f -> [f]
 

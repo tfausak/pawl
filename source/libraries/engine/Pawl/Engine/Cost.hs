@@ -287,7 +287,7 @@ spellAdjustments pid oid gs =
 -- the direction that leaves the spell dearer.
 --
 -- The face comes straight off the object rather than through a projection, for
--- Pawl.Types.CostReduction's reason (#160): it is the half Cast.asProposed
+-- Pawl.Types.CostReduction's reason (#1859): it is the half Cast.asProposed
 -- already stamped (CR 709.3b).
 selfReductions :: PlayerId -> ObjectId -> GameState -> [ManaCost.ManaCost]
 selfReductions pid oid gs =

@@ -99,7 +99,7 @@ timingOk :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
 timingOk pid oid name gs = case proposedFace oid name gs of
   Nothing -> False
   Just face ->
-    instantSpeed face
+    instantSpeed oid face gs
       || PlayerEffect.mayCastAsThoughItHadFlash pid oid gs
       || sorcerySpeed pid gs
 
@@ -141,10 +141,22 @@ proposedFace oid name gs = case fmap Object.facing (Game.lookupObject oid gs) of
 -- ITSELF, so widening the shared window would make an equip ability on the same
 -- board instant-speed, which no rule says.
 --
--- Read off the PRINTED keywords rather than through the CR 613 projection (CR
--- 113.6e for the zones, #160 for why printed and projected agree in them), and
--- wherever the cast is being proposed from -- CR 702.8a's "functions in any zone
--- from which you could play the card it's on".
+-- CR 702.8a's keyword arrives two ways, so the keyword half is itself a
+-- disjunction. One limb is the PROPOSED HALF's printed keywords (CR 709.3a: only
+-- the chosen half is evaluated); the other is the OBJECT's post-layer keywords,
+-- where an effect granting flash to a card off the battlefield lands (CR 613.1f)
+-- -- Teferi, Mage of Zhalfir's "creature cards you own that aren't on the
+-- battlefield have flash". Read wherever the cast is being proposed from, which
+-- is CR 702.8a's "functions in any zone from which you could play the card it's
+-- on".
+--
+-- The two limbs are disjoined rather than merged because they answer about
+-- different things: a split card off the stack shows both halves' printed
+-- keywords at once (CR 709.4a), so the projection cannot say WHICH half a printed
+-- flash sits on, and this reads it as flash on either. What would refute that is
+-- a split card printing flash on one half only; an api.scryfall.com search for
+-- is:split o:flash on 2026-08-18 returned none, so nothing separates the two
+-- readings today.
 --
 -- The PLAYER-scoped sibling is NOT this and is deliberately not folded in: an
 -- effect that lets a player cast OTHER spells as though they had flash (CR
@@ -152,8 +164,11 @@ proposedFace oid name gs = case fmap Object.facing (Game.lookupObject oid gs) of
 -- through PlayerEffect.mayCastAsThoughItHadFlash. Widening this one instead would
 -- say the Orrery gave every card in every zone the flash keyword, which is not
 -- what CR 702.8a's "the card it's on" means.
-instantSpeed :: Face.Face Card.Type.Card -> Bool
-instantSpeed face = Card.isInstant face || Keyword.hasFlash (Face.keywords face)
+instantSpeed :: ObjectId -> Face.Face Card.Type.Card -> GameState -> Bool
+instantSpeed oid face gs =
+  Card.isInstant face
+    || Keyword.hasFlash (Face.keywords face)
+    || Keyword.hasFlash (Map.keysSet (Projection.keywordsOf oid gs))
 
 -- CR 601.2c / 700.2a: castable when the fillable modes admit some selection at
 -- all (Modal.selectionPossible) -- ordinarily at least as many fillable modes as
@@ -635,9 +650,9 @@ controlsLegendaryCreatureOrPlaneswalker pid gs =
 -- attacked this step".
 --
 -- The exact counterweight to permissionsWith below, and read the way its LIBRARY
--- caller reads keywords: off the card, never through the projection (CR 113.6e,
--- which for this pool means a hand, where no pool effect changes a card's
--- keywords -- #160). ALL of them must hold, which is what CR 601.3's "no ... prohibits"
+-- caller reads keywords: off the card, never through the projection (CR 113.6e;
+-- an effect granting or removing a printed restriction there is missed, #1859).
+-- ALL of them must hold, which is what CR 601.3's "no ... prohibits"
 -- means; one permission, by contrast, suffices.
 --
 -- Casing on the arms is a classification, not an effect's identity:
@@ -865,9 +880,7 @@ graveyardKeywords oid gs = Map.keysSet (Projection.keywordsOf oid gs)
 -- the two callers read them from different places, and each is right for its
 -- zone: a card in a GRAVEYARD is read through the projection, since an ability
 -- granted to it there grants rule 702.34a's permission as much as a printed
--- keyword does; a card in a LIBRARY is read as printed, since nothing in the
--- pool changes such a card and the projection's own gather reaches neither it
--- nor a hand (#160).
+-- keyword does; a card in a LIBRARY is read as printed instead (#1859).
 --
 -- The face's own type line is what answers rule 702.34a's "if the resulting
 -- spell is an instant or sorcery spell", and it is the PROPOSED face's because
