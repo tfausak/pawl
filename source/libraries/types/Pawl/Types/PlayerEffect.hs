@@ -326,7 +326,9 @@ data PlayerEffect
     --
     -- Questing Beast's "combat damage that would be dealt by CREATURES YOU
     -- CONTROL" narrows the source by a characteristic rather than by identity,
-    -- which the pattern's Filter says and no card in the pool writes (#1544).
+    -- and its KIND alongside it, so it is the pool's card that makes both halves
+    -- of the pattern observable at once -- Pawl.ReplacementSpec's
+    -- questingBeastSpec proves each of the two against the other's control.
     --
     -- Not implemented: Whippoorwill's recipient limb has no site to bake a
     -- recipient into this pattern (#845). Banefire's "the damage can't be

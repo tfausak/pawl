@@ -731,6 +731,30 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
       (a : _, b : _) ->
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+  -- CR 509.1b's second paragraph on a CARD rather than on the rulebook: Questing
+  -- Beast's "can't be blocked by creatures with power 2 or less" is the pool's
+  -- first card-authored CombatRestriction.CantBeBlockedBy, where CR 701.54c's
+  -- Ring-bearer clause (Pawl.Engine.Ring) is minted by the rules.
+  --
+  -- A PAIR on the same attacker, differing only in the blocker's power, so
+  -- neither case can pass because the declaration was illegal for some other
+  -- reason: the 2/1 Goblin Piker is barred and the 3/3 War Mammoth is not.
+  Spec.it s "CR 509.1b Questing Beast can't be blocked by a creature with power 2 or less" $ do
+    questingBeast <- S.printingOf s registry "Questing Beast"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [questingBeast] [piker]
+    case (mine, theirs) of
+      (a : _, b : _) ->
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs)) "illegal"
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+  Spec.it s "CR 509.1b a creature with power 3 may block Questing Beast" $ do
+    questingBeast <- S.printingOf s registry "Questing Beast"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    let (gs, mine, theirs) = attacking [questingBeast] [mammoth]
+    case (mine, theirs) of
+      (a : _, b : _) ->
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 509.1a a ground creature is still a legal blocker while a flier attacks" $ do
     -- 509.1a is about the blocker ALONE: it can block SOMETHING. This test
     -- fails if evasion is wrongly implemented as a filter on the candidates.
