@@ -101,8 +101,8 @@ to agents as written. What it doesn't say:
 - STAGE, then `hooky fix`. It acts on staged files only --- an unstaged file is
   skipped, which is where "hooky fix wasn't enough" comes from --- and runs
   every check `.hooky.kdl` wires up: CI's ormolu, hlint, cabal-gild, `cabal
-  check` and nixfmt, plus the JSON formatter, the citation check and the
-  builtin lint rules. It rewrites in place, so `git add` again afterwards.
+  check` and nixfmt, plus the JSON formatter and the builtin lint rules. It
+  rewrites in place, so `git add` again afterwards.
   `--all` sweeps the tree in two minutes instead of one second; use it only
   when you suspect something landed unstaged.
 
@@ -165,11 +165,14 @@ to agents as written. What it doesn't say:
   the issue; a comment citing the test that *proves* a behavior is a different
   genre and outlives it.
 
-  `script/check-gaps.sh` reads the WORDING: a comment paragraph saying "not
-  implemented" is an elision paragraph, and every `(#N)` in it must be open.
-  An elision phrased otherwise marks its citation `(gap #N)`; a historical
-  reference sharing a paragraph with an elision drops the parentheses (`see
-  #1116`).
+  Nothing checks any of this. The scripts that did --- elisions, censuses, CR
+  citations --- were removed as overfitted to a tree that changes daily; don't
+  propose replacements. The WORDING is still the convention, because a `grep` is
+  what finds these now: a comment paragraph saying "not implemented" is an
+  elision paragraph, an elision phrased otherwise marks its citation `(gap #N)`,
+  and a historical reference sharing a paragraph with an elision drops the
+  parentheses (`see #1116`). Closing an issue means grepping its bare number and
+  rewriting every elision that cited it, in the same PR.
 
   A BLOCKED issue records its blocker as a GitHub dependency, not as prose:
 
@@ -221,10 +224,9 @@ to agents as written. What it doesn't say:
 
 5.  Closing #N means moving every census row that cites it. #875, #876 and #877
     annotate implemented rows with the issue numbers of what those rows still
-    don't do, and `script/check-census.sh` checks rule numbers and written
-    constructor names but never issue numbers --- so a closed number inside a
-    row is invisible to it. `grep` the issue number in the three bodies before
-    opening the PR, and edit the row in the same PR.
+    don't do, and nothing checks the three bodies against anything. Read them
+    for the issue number before opening the PR, and edit the row in the same
+    PR; landing a capability a census tracks means that same edit.
 
 ## Code conventions
 
