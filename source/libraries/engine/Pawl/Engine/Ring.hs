@@ -462,18 +462,15 @@ endOnControlChange = do
 -- into a land by Song of the Dryads is still designated. The caller supplies the
 -- creature restriction its own printed sentence carries.
 --
--- The IMPERATIVE spelling of the same three conjuncts theRingIsLegendary above
+-- The IMPERATIVE spelling of the same three conjuncts `yourRingBearer` above
 -- spells as a Filter, for a caller with no Filter and no projection fold in hand.
 -- The two must not drift: this one reads Projection.controllerOf where the Filter's
 -- ControlledBy reads the partial projection's controller, which is CR 613.1b's
 -- layer 2 either way.
 --
 -- Still read by no RULE -- what reads CR 701.54e in anger is the emblem's own
--- text, and both of the base ability's clauses spell those conjuncts as a Filter
--- instead (theRingIsLegendary, theRingCantBeBlockedByGreaterPower); the emblem's
--- remaining abilities are triggered and nothing mints them yet (#706).
--- Pawl.RingSpec
--- proves the designation through it.
+-- text, and every ability of it that pawl mints reaches the designation through
+-- `yourRingBearer` instead. Pawl.RingSpec proves the designation through it.
 isRingBearerOf :: PlayerId -> ObjectId -> GameState.GameState -> Bool
 isRingBearerOf pid oid gs =
   Set.member oid (GameState.battlefield gs)
