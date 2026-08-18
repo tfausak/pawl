@@ -76,6 +76,16 @@ the libraries, and the files you edited along with the ones you did not; both
 are where survivors turn up. Re-derive every hit and rewrite it to say what it
 actually rests on, worded so a later grep finds it.
 
+Adding a card does the same thing from the other direction. A comment that
+counts producers --- "the pool's one statement of it", "no card in the pool
+writes this", "the rulebook's only" --- is falsified by the card that becomes
+the second one, and the card's own PR is the only place that is visible. So
+when the card you are adding is the first printed producer of a construct, or
+the first to write two halves of a pattern at once, grep the construct's type
+and constructor names for the counting absolutes (`one`, `only`, `no card`,
+`the pool's`) before you push, and rewrite each hit to say what the pool now
+holds. PR #1788 made three such comments false, and only that sweep found them.
+
 ## Stale reads
 
 pawl's recurring defect shape is a consumer reading a snapshot where the rule
@@ -258,14 +268,22 @@ takes ten minutes now and forty as its own dispatch is folded in.
   name, or under no constructor of the tracked type at all, is yours alone.
 - **Landing a capability means reading what it unblocked**; `CLAUDE.md` has
   the query. Say in the PR which dependents are now workable.
-- **Closing #N means re-deriving every inline `(#N)` in the tree**, not just
-  the site you fixed; other sites cite the same issue for their own reasons.
+- **Closing #N means re-deriving every inline `(#N)` in the tree**, not just the
+  site you fixed; other sites cite the same issue for their own reasons. Find
+  them by grepping the BARE number over the whole tree, not by trusting the file
+  set a brief or an issue body names --- that set has been incomplete three
+  times in one session, and each miss was a live elision citing an issue the PR
+  closed, which is CI's Tracker job red on merge. A citation can also arrive
+  after the brief was written, from a PR that landed while you worked, so grep
+  again after the last merge from `origin/main`.
 
 Before pushing: stage, `hooky fix` (`CLAUDE.md`), stage again. Two hooks bite
 differently by hand: `script/format-json.sh` takes `MODE FILE...` and passes
 vacuously when run bare, and `script/check-citations.sh` defaults to the whole
 tree --- run it bare after taking a CR update, since a renumbering breaks
-citations in files you never touched. Two checks are NOT hooks because they
+citations in files you never touched. The same renumbering breaks them in issue
+bodies, where nothing checks anything: after taking a CR update, grep the open
+tracker for the renumbered rules and correct the bodies in a comment. Two checks are NOT hooks because they
 read GitHub: `script/check-census.sh` and `script/check-gaps.sh`. Both take a
 second and run in CI's Tracker job, which you will not be waiting for, so run
 them yourself.
