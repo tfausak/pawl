@@ -71,6 +71,9 @@
                                 "type": "Green"
                               }
                             }
+                          },
+                          "retention": {
+                            "type": "UntilEndOfTurn"
                           }
                         }
                       },
@@ -89,6 +92,9 @@
                                 "type": "Green"
                               }
                             }
+                          },
+                          "retention": {
+                            "type": "UntilEndOfTurn"
                           }
                         }
                       },
@@ -107,6 +113,9 @@
                                 "type": "Green"
                               }
                             }
+                          },
+                          "retention": {
+                            "type": "UntilEndOfTurn"
                           }
                         }
                       }

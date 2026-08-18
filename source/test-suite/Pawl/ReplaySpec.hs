@@ -45,6 +45,7 @@ import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaOption as ManaOption
+import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
@@ -76,7 +77,7 @@ oneMana :: Color.Color -> ManaOption.ManaOption
 oneMana color =
   ManaOption.MkManaOption
     { ManaOption.cost = Mana.intrinsicManaCost,
-      ManaOption.yield = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty}]
+      ManaOption.yield = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}]
     }
 
 combatReplaySpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()

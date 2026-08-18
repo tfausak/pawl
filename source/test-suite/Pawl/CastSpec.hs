@@ -61,6 +61,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -438,7 +439,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
         picksGreen :: Prompt.Prompt r -> r
         picksGreen p = case p of
           Prompt.ChooseManaYield _ _ _ candidates ->
-            S.optionYielding (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty}]) candidates
+            S.optionYielding (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}]) candidates
           _ -> S.identityAnswer p
         after = snd (Engine.runGamePure picksGreen gs (S.cast S.alice oid))
     Spec.assertEqWith s "nothing on the stack" (length (GameState.stack after)) 0
@@ -458,7 +459,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
         picksRed :: Prompt.Prompt r -> r
         picksRed p = case p of
           Prompt.ChooseManaYield _ _ _ candidates ->
-            S.optionYielding (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty}]) candidates
+            S.optionYielding (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}]) candidates
           _ -> S.identityAnswer p
         after = snd (Engine.runGamePure picksRed gs (S.cast S.alice oid))
     Spec.assertEqWith s "the Bolt is on the stack" (length (GameState.stack after)) 1
