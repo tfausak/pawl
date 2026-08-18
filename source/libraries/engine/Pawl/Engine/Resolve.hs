@@ -3056,13 +3056,37 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- chosen: producedTypes offers none rather than inventing one, and adding
       -- nothing is the honest answer here for the same reason.
       [] -> pure ()
-      -- Not implemented: a resolving ability adding mana whose type is the
-      -- player's own choice (CR 105.4's five colours). Picking one would be the
-      -- engine making that choice, and the existing prompt -- Cost.chooseManaYield
-      -- -- asks about an activation's cost and yield together, which a resolution
-      -- has neither of. No triggered ability in the pool adds mana of any colour
-      -- (#1571).
-      _ : _ : _ -> pure ()
+      -- Several types is CR 105.4's choice -- Quirion Sentinel's "add one mana of
+      -- any color" -- and the choice is the RECIPIENT's, not the engine's and not
+      -- unconditionally the controller's: CR 106.3 has the effect instruct a
+      -- player to add the mana, and that is the player each unit's pool belongs
+      -- to (CR 106.4). Every producer in the pool says "you", so today's
+      -- recipient IS the controller; a card naming somebody else would move the
+      -- question with the pool rather than leaving it behind.
+      --
+      -- CR 101.4: several recipients each choose, so they are asked in APNAP
+      -- order -- apnapOrder supplies the ORDER and the ref the MEMBERSHIP, the
+      -- Search arm's split just below. A recipient apnapOrder does not name keeps
+      -- its place at the end rather than being dropped, since dropping one would
+      -- swallow the mana CR 106.4 puts in their pool.
+      first : second : more ->
+        let offered = first NonEmpty.:| (second : more)
+            named = playerRefPlayers legal controller gs0 ref
+            ordered = filter (\pid -> List.elem pid named) (Game.apnapOrder gs0)
+            recipients = ordered <> filter (\pid -> List.notElem pid ordered) named
+         in Monad.forM_ recipients $ \pid -> do
+              gs1 <- State.get
+              answer <- Game.choose (Prompt.ChooseManaType (Decide.deciderFor pid gs1) pid resolving offered)
+              -- FILTERED, NOT TRUSTED, the ChooseBolster posture: an answer naming
+              -- a type never offered falls back to the first candidate, since the
+              -- instruction is mandatory and must put mana in a pool.
+              let manaType = if List.elem answer (NonEmpty.toList offered) then answer else first
+                  unit =
+                    ManaUnit.MkManaUnit
+                      { ManaUnit.manaType = manaType,
+                        ManaUnit.tags = Mana.productionTagsGiven Map.empty source gs0
+                      }
+              State.modify' (Mana.addMana pid [unit])
   Effect.Search (Search.MkSearch searcherRef ownerRef quantity filter_ upTo destination) ->
     -- CR 701.23a: match each library card against "the given description",
     -- through the card's own CR 613 projection. Rule 613.1 starts from the actual
