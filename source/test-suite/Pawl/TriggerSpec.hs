@@ -11157,7 +11157,7 @@ amuletSpec s registry =
         -- The ABILITY half, which is the whole of the payload's `kind = Nothing`
         -- and the leg Dormant Gomazoa's printing cannot reach: Ravenous Rats'
         -- SPELL targets nothing, and its CR 603.3d enters trigger targets alice.
-        Spec.it s "CR 113.3 an opponent's ABILITY naming alice is countered too" $ do
+        Spec.it s "CR 113.3c an opponent's TRIGGERED ABILITY naming alice is countered too" $ do
           (_, _, _, ratsId, _, _, gs) <- board
           let atAlice = Recipient.ToPlayer S.alice
               entered = S.runPure (aimedPaying atAlice S.carol) (S.runPure (aimedPaying atAlice S.carol) gs (S.cast S.bob ratsId)) Stack.resolveTop
