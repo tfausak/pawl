@@ -370,7 +370,7 @@ data Gathered = MkGathered
     gLayer :: Layer,
     -- CR 613.6's decision point: the lowest layer reached by any part of this
     -- part's effect. A caller outside the fold carries it rather than re-deriving
-    -- it at the wrong layer (#326). Equal to gLayer for a one-part effect.
+    -- it at the wrong layer. Equal to gLayer for a one-part effect.
     gLowest :: Layer,
     gTimestamp :: Timestamp,
     gModification :: Modification
@@ -713,8 +713,7 @@ milledIt oid event = case event of
 -- list holds neither: only the caller knows whether it reads a live object or CR
 -- 608.2h's record of one, and only the caller knows how deep the fold it stands
 -- in has got. `peers` must be a bounded reader -- a full projection taken here
--- re-enters gather, whose CR 604.2 gate is object-independent, and loops (#1729,
--- #1758).
+-- re-enters gather, whose CR 604.2 gate is object-independent, and loops.
 viewOfCharacteristics :: Count.ViewOf -> ObjectId -> ProjectedCharacteristics -> Maybe PlayerId.PlayerId -> Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> GameState -> Filter.View
 viewOfCharacteristics peers oid pc controller counters gs =
   Filter.MkView
@@ -864,7 +863,7 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
             -- Quantity.evaluate, not Quantity.determine: CR 208.2a's "use 0
             -- instead" belongs to a CDA, so a printed star with none behind it is
             -- Nothing. A star given its value by CR 208.2b reports Nothing off the
-            -- battlefield (#76); one with a CDA is filled at layer 7a.
+            -- battlefield; one with a CDA is filled at layer 7a.
             PC.power = case Face.power face of
               Nothing -> Nothing
               Just (Power.MkPower q) -> Quantity.evaluate seedViewOf seedContext gs oid q,
@@ -1085,7 +1084,7 @@ setLandSubtypeEffectsGiven functioning gs =
           then [(ContinuousEffect.source eff, ContinuousEffect.affected eff)]
           else []
       -- The affected set is REWRITTEN here, the same CR 612 word swap gatherStatic
-      -- applies to the same ability's set (#624). The two must agree, or the halves
+      -- applies to the same ability's set. The two must agree, or the halves
       -- of one rule disagree about which permanents an ability names. Hoisted out
       -- of gather's walk so the fold runs once per battlefield permanent rather
       -- than once per permanent per projection. The MODIFICATIONS stay unrewritten,
@@ -1946,7 +1945,7 @@ abilityRemovalAfter gs =
 
 -- CR 613.1f: does this modification remove abilities? Total: a new
 -- ability-removing Modification must break this build rather than silently answer
--- False and reopen #297.
+-- False.
 removesAbilities :: Modification -> Bool
 removesAbilities m = case m of
   Modification.LoseAllAbilities -> True
@@ -3262,6 +3261,6 @@ givesControlTo :: PlayerId.PlayerId -> ContinuousEffect.ContinuousEffect Card.Ty
 givesControlTo pid eff = case ContinuousEffect.modification eff of
   Modification.SetController who -> who == pid
   -- Names no player, so it cannot be classified from the effect alone: CR 109.5
-  -- makes its player the current controller of the source. The residual is #199.
+  -- makes its player the current controller of the source.
   Modification.SetControllerToSource -> False
   _ -> False

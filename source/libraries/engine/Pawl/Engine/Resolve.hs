@@ -1276,7 +1276,7 @@ gateHolds controller source chosen clause = case Clause.condition clause of
 -- CR 603.5 / 608.2d: does this clause's instruction list happen at all? A
 -- mandatory clause always does; an optional one is its controller's call, made
 -- HERE as the effect is applied. The unit is CR 608.2e's clause and not the whole
--- mode, so a "may" printed on one sentence leaves its neighbours alone (#335).
+-- mode, so a "may" printed on one sentence leaves its neighbours alone.
 --
 -- `controller` is who "you" means (CR 405.4 for a spell, CR 113.8 for an ability)
 -- and therefore who is asked, through Decide.deciderFor so a player controlled
@@ -1306,7 +1306,7 @@ exercises resolving controller idx cIdx clause = case Clause.optionality clause 
 -- CANNOT pay (CR 118.3), asked on neither limb; the payer declines, which only an
 -- OPTIONAL cost reaches; or the payer chose to pay -- the one place the answer is
 -- not the raw choice, since Pawl.Engine.Cost.pay restores the entry state and an
--- Unpaid result is a complete no-op (#417, #56).
+-- Unpaid result is a complete no-op.
 --
 -- The cost is paid AGAINST `source` rather than the resolving stack object (CR
 -- 113.7a); the two are the same object for a spell.
@@ -2017,7 +2017,7 @@ recordExiledWith source before gs =
 --
 -- `resolving` is the object ON THE STACK -- the spell, or the ABILITY object --
 -- where every slot this fold defines is bound, where CR 603.7c's captured
--- environment is read back, and where CR 601.2b's announced X lives (#544). Not
+-- environment is read back, and where CR 601.2b's announced X lives. Not
 -- `source`: for an ability the two differ (CR 113.7a), and that permanent can be
 -- gone before a later effect of the same list runs.
 applyOneEffect :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Effect Card.Type.Card -> Game ()
@@ -2237,7 +2237,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 then pure []
                 else do
                   -- CR 601.3 (Panglacial Wurm): the chance to cast is offered AT
-                  -- THE SEARCH, not when the resolution began (#57), so earlier
+                  -- THE SEARCH, not when the resolution began, so earlier
                   -- effects of the resolution have already happened. Both spells
                   -- and abilities reach here. The Wurm's "while you're searching
                   -- your library" makes the offer the SEARCHER's, and only where
@@ -2248,7 +2248,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       decider = Decide.deciderFor searcher gs
                   answer <- Game.choose (Prompt.SearchLibrary decider searcher matches cap)
                   -- CR 701.23a: every card found is one the filter admits.
-                  -- Filtered, not trusted (#222), deduplicated, and truncated to
+                  -- Filtered, not trusted, deduplicated, and truncated to
                   -- the cap. What a SHORT answer leaves is the difference between
                   -- CR 701.23b and CR 701.23d, and Filter.statesAQuality is which
                   -- rule this search is under: stating a quality it may find
@@ -2986,7 +2986,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- Every total is read ONCE, before the prompt and before any life moves (CR
   -- 608.2h); a rotation would otherwise leave two seats on one number.
   --
-  -- FILTERED, NOT TRUSTED (#222), all-or-nothing: only a whole permutation is a
+  -- FILTERED, NOT TRUSTED, all-or-nothing: only a whole permutation is a
   -- legal answer, so a bad one falls back to redistributing among nobody.
   --
   -- Not implemented: CR 119.7-8's own restrictions on a player who can't gain or
@@ -3072,7 +3072,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- elision and a short transcript are deterministic. Through
                 -- Replacement.sacrificeCandidates, which is what puts CR 101.2's
                 -- "can't be sacrificed" on this path: a prohibited permanent is
-                -- never the pick that satisfies the edict (#111).
+                -- never the pick that satisfies the edict.
                 let candidates = Replacement.sacrificeCandidates victim Nothing filter_ gs
                     decider = Decide.deciderFor victim gs
                     -- `n > 0` above, so the clamp never decides anything here.
@@ -3538,7 +3538,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- only when the card SAYS so (Filter.CanHostSubject); narrowing
           -- otherwise would answer CR 303.4j on the player's behalf. CR 609.3
           -- when Attach.hostsFor is empty. The elision at one candidate is
-          -- Attach.chooseHost's, not re-derived for an optional attach (#359).
+          -- Attach.chooseHost's, not re-derived for an optional attach.
           destination <- Attach.chooseHost controller subject (Attach.hostsFor controller source subject filter_ gs)
           -- Proposed as a bare ToObject; Event.attach re-tags it the way the
           -- subject's own enchant slot references it, and applies CR 303.4j's
@@ -3554,7 +3554,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- CR 400.7: exile through the funnel and register the incarnation for
           -- return when an opponent of `controller` (CR 102.2) BECOMES the
           -- monarch. The monarch as of now is stamped into the watch, so an
-          -- opponent who already holds the crown does not discharge it (#171).
+          -- opponent who already holds the crown does not discharge it.
           mNew <- Event.changeZoneReturning target Zone.Exile
           case mNew of
             Nothing -> pure ()
@@ -3885,7 +3885,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               Just expiry ->
                 -- CR 613.1b / 611.2c: the new controller is `controller`, baked
                 -- in now -- derived, never chosen. CR 302.6 re-Sicks it, unless
-                -- control does not actually move (#206), which is why the
+                -- control does not actually move, which is why the
                 -- question is asked PER OBJECT and against the PROJECTED
                 -- controller rather than against Object.owner.
                 --
