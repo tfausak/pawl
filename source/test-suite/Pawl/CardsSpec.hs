@@ -23,8 +23,8 @@ spec s = Spec.describe s "Pawl.Cards" $ do
   Spec.it s "each committed file re-parses to its compiled card (P3)" $ do
     root <- Registry.defaultRoot
     ps <- S.allPrintings s
-    -- Rendered once for the whole corpus rather than per file: it is one value,
-    -- and building it a thousand times is the one place this case could get
+    -- Built once for the whole corpus rather than once per file: it is one
+    -- value, and rebuilding it per file is the one place this case could get
     -- slow.
     let schema = Define.run (Codec.schema Card.codec)
     mapM_ (checkFile s root schema) ps

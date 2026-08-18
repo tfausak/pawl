@@ -7,8 +7,8 @@ import qualified System.Environment as Environment
 import qualified System.Exit as Exit
 import qualified System.IO as IO
 
--- | The card format's JSON Schema, which is otherwise reachable only from a
--- REPL. Card rather than Printing because Pawl.Registry.parseCard is what reads
+-- | Emits the card format's JSON Schema, which is otherwise reachable only
+-- from a REPL. Card rather than Printing because Pawl.Registry.parseCard is what reads
 -- a committed file and it decodes a Card; the two write the same wire.
 --
 -- Emitted on demand rather than committed as a file: a committed copy would

@@ -141,6 +141,18 @@ spec s = Spec.describe s "Pawl.JsonSchema.Validate" $ do
       (Validate.validate (Define.run (pure (Schema.fromPairs [Value.pair "pattern" (text "^a$")]))) (text "a"))
       []
 
+  -- A reference that leads back to itself without ever stepping into the value.
+  -- Define cannot build one -- its body would have to be a bare reference to
+  -- itself -- so the document is written by hand; without the guard this case
+  -- does not terminate, and the suite's timeout is what would say so.
+  Spec.it s "rejects a reference that cycles without consuming the value" $ do
+    let cyclic =
+          Value.object
+            [ Value.pair "$ref" (text "#/$defs/Loop"),
+              Value.pair "$defs" (Value.object [Value.pair "Loop" (Value.object [Value.pair "$ref" (text "#/$defs/Loop")])])
+            ]
+    Spec.assertNe s (Validate.validate cyclic (text "a")) []
+
   -- An unresolvable reference is a schema defect, and skipping it would let a
   -- broken document validate everything.
   Spec.it s "rejects an unresolvable reference" $ do
