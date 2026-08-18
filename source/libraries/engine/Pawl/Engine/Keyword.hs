@@ -1670,31 +1670,19 @@ prowess =
         )
 
 -- CR 702.121a: whenever this creature attacks, it gets +1/+1 until end of turn
--- for each opponent you attacked with a creature this combat. Rule 702 states it
--- as a triggered ability, minted here like its siblings in `abilitiesFor`.
+-- for each opponent you attacked with a creature this combat.
 --
--- The condition is battle cry's, TriggerCondition.SelfAttacks: rule 702.121a's
--- event is the bearer's own declaration. Attacking a PLANESWALKER fires it just
--- the same -- CR 508.1a chooses the attackers and CR 508.1b only then says what
--- each attacks, so what the planeswalker changes is the bonus, not the trigger.
+-- The condition is battle cry's SelfAttacks. Attacking a PLANESWALKER fires it
+-- just the same -- CR 508.1a chooses the attackers and CR 508.1b only then says
+-- what each attacks -- so what the planeswalker changes is the bonus.
 --
--- "IT" is the bearer, so the payload is prowess', Filter.IsSource -- a singleton
--- CR 611.2c fixes as the effect begins.
+-- "IT" is the bearer, so the payload is prowess'.
 --
--- The BONUS is the one payload in this module that is not a literal:
--- Quantity.OpponentsAttacked reads CR 508.3b's record of who was declared
--- attacked, against CR 109.5's "you" -- the ability's controller (CR 603.3a).
--- Zero is an ordinary answer, not a failure: a creature that attacked only a
--- planeswalker gets +0/+0.
---
--- CR 611.2d freezes that number as this resolves
--- (Projection.freezeQuantities), which is what the printed duration needs -- the
--- pump lasts until end of turn and CR 511.3 clears the record at end of combat,
--- so a live re-read would shrink it to 0 the moment combat ended.
---
--- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability is
--- placed -- rule 702.121a leaves nothing to choose, and has no "if" clause, so
--- intervening = Nothing.
+-- The BONUS is the one payload here that is not a literal:
+-- Quantity.OpponentsAttacked reads CR 508.3b's record against CR 109.5's "you".
+-- Zero is an ordinary answer. CR 611.2d freezes it as this resolves, which the
+-- printed duration needs: CR 511.3 clears the record at end of combat, so a live
+-- re-read would shrink the pump to 0 the moment combat ended.
 melee :: TriggeredAbility Card
 melee =
   TriggeredAbility.MkTriggeredAbility
@@ -1717,31 +1705,19 @@ melee =
         )
 
 -- CR 702.23a: whenever this creature becomes blocked, it gets +N/+N until end of
--- turn for each creature blocking it beyond the first. Rule 702 states it as a
--- triggered ability, minted here like its siblings in `abilitiesFor`.
+-- turn for each creature blocking it beyond the first.
 --
--- The condition is bushido's blocked half, TriggerCondition.SelfBecomesBlocked --
--- CR 509.3c, which fires ONCE however many creatures blocked, where flanking's CR
--- 509.3d fires once per blocker. Rule 702.23a's bonus already counts the blockers
--- itself, so a per-blocker trigger would count them twice.
+-- The condition is bushido's blocked half, CR 509.3c, which fires ONCE however
+-- many creatures blocked, where flanking's CR 509.3d fires once per blocker. Rule
+-- 702.23a's bonus already counts the blockers itself, so a per-blocker trigger
+-- would count them twice.
 --
--- "IT" is the bearer, so the payload is melee's, Filter.IsSource -- a singleton
--- CR 611.2c fixes as the effect begins.
+-- The BONUS is N COPIES of Quantity.BlockersBeyondFirst summed through
+-- Quantity.Plus, Pawl.Types.Quantity having no product node; the fold's Literal 0
+-- base answers rampage 0 rather than failing.
 --
--- The BONUS is "N times the number of creatures blocking it beyond the first",
--- written as N COPIES of Quantity.BlockersBeyondFirst summed through
--- Quantity.Plus. Pawl.Types.Quantity has no product node, and adding one for this
--- would be a second way to write a number no other card needs; rampage 0 is not a
--- printing, but the fold's Literal 0 base answers it rather than failing.
---
--- CR 702.23b -- "calculated only once per combat, when the triggered ability
--- resolves" -- is CR 611.2d's freeze (Projection.freezeQuantities) and needs
--- nothing of its own: the number is read as this resolves, and a blocker removed
--- afterwards cannot move it.
---
--- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability is
--- placed -- rule 702.23a leaves nothing to choose, and has no "if" clause, so
--- intervening = Nothing.
+-- CR 702.23b's "calculated only once per combat" is CR 611.2d's freeze and needs
+-- nothing of its own.
 rampage :: Natural -> TriggeredAbility Card
 rampage n =
   TriggeredAbility.MkTriggeredAbility
@@ -1764,32 +1740,20 @@ rampage n =
         )
 
 -- CR 702.25a: whenever this creature becomes blocked by a creature without
--- flanking, the blocking creature gets -1/-1 until end of turn. Rule 702 states
--- it as a triggered ability, minted here like its siblings in `abilitiesFor`.
+-- flanking, the blocking creature gets -1/-1 until end of turn.
 --
--- CR 509.3d is the event -- "becomes blocked by a creature", which triggers once
--- for each creature that blocks -- and NOT CR 509.3c's "becomes blocked", which
--- fires once however many blockers there are. Two blockers on one flanker is
--- therefore two triggers and two -1/-1s, each landing on its own blocker. Bushido
--- below is the sibling that reads that other, grouped event.
+-- CR 509.3d is the event -- "becomes blocked by a creature", once for each
+-- creature that blocks -- and NOT CR 509.3c's "becomes blocked", which fires once
+-- however many blockers there are. Two blockers on one flanker is two triggers and
+-- two -1/-1s. Bushido below reads that other, grouped event.
 --
 -- "WITHOUT FLANKING" rides the condition rather than the payload, which is rule
 -- 509.3f: a blocker's characteristics are checked as it becomes a blocking
--- creature, so a creature that gains flanking afterwards is still pumped down and
--- one that loses it is still spared. The card type conjunct is the rule's printed
--- "a creature"; CR 509.1a admits nothing else as a blocker, so it narrows
--- nothing today.
+-- creature, so a creature that gains flanking afterwards is still pumped down.
 --
--- "THE BLOCKING CREATURE" is the object the event named, bound under the reserved
--- Binding.blockingCreature slot by Pawl.Engine.Event.eventBindings -- an ordinary
--- slot read, exactly as poisonous' "that player" is, and NOT a set sweep over
--- whoever is blocking at resolution: rule 702.25a names the one creature whose
--- block fired this ability.
---
--- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability is
--- placed -- rule 702.25a leaves nothing to choose, and has no "if" clause, so
--- intervening = Nothing. CR 702.25b's separate instances are abilitiesFor's
--- replicate, as for the four single-ability siblings above.
+-- "THE BLOCKING CREATURE" is the object the event named, bound under
+-- Binding.blockingCreature -- an ordinary slot read, and NOT a set sweep over
+-- whoever is blocking at resolution.
 flanking :: TriggeredAbility Card
 flanking =
   TriggeredAbility.MkTriggeredAbility
@@ -1815,31 +1779,19 @@ flankingEffect =
     )
 
 -- CR 702.83a: whenever a creature you control attacks alone, that creature gets
--- +1/+1 until end of turn. Rule 702 states it as a triggered ability, minted
--- here like its siblings in `abilitiesFor`.
+-- +1/+1 until end of turn.
 --
--- The first whose ability is borne by a BYSTANDER on both sides at once. Battle
--- cry's condition is the bearer's own attack and prowess' payload is the bearer
--- itself; here the condition watches somebody else's declaration AND the payload
--- pumps somebody else, so the bearer appears in neither. It supplies only CR
--- 109.5's "you" -- the ability's controller (CR 603.3a) -- which is what
--- Filter.ControlledBy You is read against, and the Filter context's source.
+-- The ability is borne by a BYSTANDER on both sides at once: the condition watches
+-- somebody else's declaration AND the payload pumps somebody else, so the bearer
+-- appears in neither. It supplies only CR 109.5's "you" -- the ability's
+-- controller (CR 603.3a) -- and the Filter context's source.
 --
--- ALONE is TriggerCondition.CreatureAttacksAlone's own, not a Filter conjunct:
--- CR 506.5 makes it a fact about the declaration rather than a characteristic
--- (that constructor's Haddock argues it). What is left for the Filter is the
--- printed "a creature you control" -- the card type, which CR 508.1a narrows to
--- nothing today, and the relation, which does the work.
+-- ALONE is TriggerCondition.CreatureAttacksAlone's own, not a Filter conjunct: CR
+-- 506.5 makes it a fact about the declaration rather than a characteristic.
 --
--- "THAT CREATURE" is the creature the event named, read out of the reserved
--- Binding.attackingCreature slot -- NOT Filter.IsSource, which is prowess'
--- payload and would pump the wrong permanent whenever a card other than the
--- exalted bearer attacks. ObjectRef.InSlot for flanking's reason: rule 702.83a
--- names the one creature whose declaration fired this.
---
--- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability is
--- placed -- rule 702.83a leaves nothing to choose, and has no "if" clause, so
--- intervening = Nothing.
+-- "THAT CREATURE" is the creature the event named, read out of
+-- Binding.attackingCreature -- NOT Filter.IsSource, which would pump the wrong
+-- permanent whenever a card other than the exalted bearer attacks.
 exalted :: TriggeredAbility Card
 exalted =
   TriggeredAbility.MkTriggeredAbility
@@ -1863,26 +1815,17 @@ exalted =
         )
 
 -- CR 702.45a: "'Bushido N' means 'Whenever this creature blocks or becomes
--- blocked, it gets +N/+N until end of turn.'" Rule 702 states it as a triggered
--- ability, and it is the only one whose sentence names
--- TWO events: "blocks" is CR 509.3a and "becomes blocked" is CR 509.3c, two
--- separate trigger conditions.
+-- blocked, it gets +N/+N until end of turn.'" The one keyword whose sentence names
+-- TWO events: "blocks" is CR 509.3a and "becomes blocked" is CR 509.3c.
 --
 -- So this returns a LIST of two abilities where its siblings return one. The
--- alternative -- one TriggeredAbility with a disjunctive condition -- would need
--- a TriggerCondition combinator nothing else in rule 702 wants, and the split
--- costs nothing: CR 603.2 triggers an ability once per occurrence of its event,
--- so one ability watching two events and two abilities watching one each put the
--- same number of objects on the stack however many of the events happen.
+-- alternative -- one TriggeredAbility with a disjunctive condition -- would need a
+-- TriggerCondition combinator nothing else in rule 702 wants, and the split costs
+-- nothing: CR 603.2 triggers once per occurrence, so both spellings put the same
+-- number of objects on the stack.
 --
--- The payload is prowess', with N in place of its 1: "it" is the bearer, so
--- ObjectRef.EachMatching Filter.IsSource, and CR 611.2c fixes that singleton as
--- the effect begins. Both abilities carry the same payload, because rule 702.45a
--- states one.
---
--- Single mode, no targets, ChooseExactly 1, so nothing is asked as either
--- ability is placed -- rule 702.45a leaves nothing to choose, and has no "if"
--- clause, so intervening = Nothing.
+-- The payload is prowess' with N in place of its 1, and both abilities carry it,
+-- rule 702.45a stating one.
 bushido :: Natural -> [TriggeredAbility Card]
 bushido n = [bushidoBlocks n, bushidoBecomesBlocked n]
 
@@ -1916,27 +1859,18 @@ bushidoHalf condition n =
         )
 
 -- CR 702.68a: "'Frenzy N' means 'Whenever this creature attacks and isn't
--- blocked, it gets +N/+0 until end of turn.'" Rule 702 states it as a triggered
--- ability, and it is bushidoHalf with one term changed: the toughness bonus is
--- zero, because rule 702.68a's bonus is +N/+0 where rule 702.45a's is +N/+N.
+-- blocked, it gets +N/+0 until end of turn.'" bushidoHalf with the toughness bonus
+-- zeroed.
 --
--- The BONUS is a continuous effect from a RESOLVING ability (CR 611.2), not
--- from a static one: the keyword mints a trigger, the trigger uses the stack,
--- and a player can respond to it. It modifies power without setting it, so CR
--- 613.4c's layer 7c is where it applies, and CR 611.2a is the duration --
--- "until end of turn" is stated by the ability, which CR 514.2 ends.
+-- The BONUS is a continuous effect from a RESOLVING ability (CR 611.2): it
+-- modifies power without setting it, so CR 613.4c's layer 7c applies it, and CR
+-- 611.2a is the duration.
 --
 -- The condition is TriggerCondition.SelfAttacksUnblocked, which the glossary's
 -- "attacks and isn't blocked" entry sends to CR 509.1h -- so the bonus lands in
--- the declare blockers step, after the declaration, rather than with the
--- attack triggers of CR 508.2. Rule 509.1h's last sentence is what keeps a
--- creature whose only blocker left combat from getting it.
---
--- Same payload shape as bushido's: "it" is the bearer, so
--- ObjectRef.EachMatching Filter.IsSource, and CR 611.2c fixes that singleton as
--- the effect begins. Single mode, no targets, ChooseExactly 1, so nothing is
--- asked as the ability is placed -- rule 702.68a leaves nothing to choose, and
--- has no "if" clause, so intervening = Nothing.
+-- the declare blockers step, after the declaration, rather than with CR 508.2's
+-- attack triggers. Rule 509.1h's last sentence keeps a creature whose only blocker
+-- left combat from getting it.
 frenzy :: Natural -> TriggeredAbility Card
 frenzy n =
   TriggeredAbility.MkTriggeredAbility
@@ -1958,21 +1892,13 @@ frenzy n =
         )
 
 -- CR 702.130a: whenever this creature becomes blocked, defending player loses N
--- life. Rule 702 states it as a triggered ability, and it adds nothing new --
--- its condition is bushido's CR 509.3c half and its player is annihilator's CR
--- 508.5 one.
---
--- "DEFENDING PLAYER" is read off GameEvent.AttackerBlocked through the reserved
--- Binding.triggerPlayer slot, exactly as annihilator reads it off
--- GameEvent.AttackerDeclared. NOT the ability's controller: CR 603.3a makes that
--- the ATTACKING creature's controller, and the life leaves whom they attacked.
+-- life. Its condition is bushido's CR 509.3c half and its player is annihilator's
+-- CR 508.5 one, read off GameEvent.AttackerBlocked through Binding.triggerPlayer.
+-- NOT the ability's controller: CR 603.3a makes that the ATTACKING creature's
+-- controller, and the life leaves whom they attacked.
 --
 -- Effect.LoseLife and not damage: rule 702.130a says "loses N life", so this is CR
 -- 119.3's life loss and none of CR 120's damage machinery sees it.
---
--- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability is
--- placed -- rule 702.130a leaves nothing to choose, and has no "if" clause, so
--- intervening = Nothing.
 afflict :: Natural -> TriggeredAbility Card
 afflict n =
   TriggeredAbility.MkTriggeredAbility
@@ -1993,46 +1919,24 @@ afflict n =
         )
 
 -- CR 702.134a: whenever this creature attacks, put a +1/+1 counter on target
--- attacking creature with power less than this creature's power. Rule 702 states
--- it as a triggered ability, and it is the first that TARGETS -- so the first to
--- declare a target slot here rather than an empty Map.
+-- attacking creature with power less than this creature's power. The first minted
+-- ability that TARGETS: the slot is filled by CR 603.3d as the ability is placed
+-- and re-checked by CR 608.2b as it resolves. A REAL choice, asked of the
+-- controller, since with two smaller attackers the rules leave which one open.
 --
--- The slot is filled by CR 603.3d as the ability is placed
--- (Pawl.Engine.Engine.placeBorne) and re-checked by CR 608.2b as it resolves,
--- both through Pawl.Engine.Target. A REAL choice, asked of the controller: with
--- two smaller attackers the rules leave which one open, so nothing here elides
--- it.
---
--- CR 508.3a is what "attacks" means, so the condition is annihilator's and battle
--- cry's -- SelfAttacks, EveryTime, rule 702.134a stating no "for the first time
--- each turn" narrowing.
---
--- The target slot's three parts are the rule's three printed words.
--- Pool.Creatures is "creature" (CR 109.2 draws it from the battlefield),
--- IsAttacking is "attacking" (CR 508.1k), and Filter.PowerLessThanSource is
--- "with power less than this creature's power" -- a comparison against the
--- SOURCE, which is why that atom carries no literal. No controller conjunct,
--- because rule 702.134a states none: CR 508.1 makes every attacking creature
--- the active player's, so a creature an opponent controls is never in the set
--- to be excluded.
---
--- The BEARER excludes itself with no `Not IsSource` of its own -- nothing has
--- power less than its own power -- which is why the atom is strict rather than
--- "no greater than".
---
--- A COUNTER and not battle cry's ModifyTarget: rule 702.134a puts a counter on, so
--- it is CR 122.6's funnel (and CR 614.16's replacement opportunity), and what it
--- grants outlives the turn because CR 613.4c reads the counter every projection.
+-- The target slot's three parts are the rule's three printed words;
+-- Filter.PowerLessThanSource compares against the SOURCE, which is why that atom
+-- carries no literal. No controller conjunct, rule 702.134a stating none: CR 508.1
+-- makes every attacking creature the active player's. The BEARER excludes itself
+-- with no `Not IsSource`, nothing having power less than its own power, which is
+-- why the atom is strict.
 --
 -- Effect.Mentor and not Effect.PutCounters, for evolve's reason one rule over: CR
 -- 702.134c makes "a creature mentors another creature" a trigger event, so the
--- placement has to be distinguishable from every other +1/+1 counter, and only the
--- resolution knows which creature rule 702.134a's chosen target turned out to be.
--- The counter still goes through Pawl.Engine.Event.putCounters, so the funnel above
--- is unaffected; Pawl.TriggerSpec's Doubling Season case proves it.
---
--- Single mode, ChooseExactly 1, and no "if" clause, so intervening = Nothing --
--- the only thing rule 702.134a leaves to choose is the target.
+-- placement has to be distinguishable from every other +1/+1 counter. The counter
+-- still goes through Event.putCounters, so CR 122.6's funnel and CR 614.16's
+-- replacement opportunity are unaffected; Pawl.TriggerSpec's Doubling Season case
+-- proves it.
 mentor :: TriggeredAbility Card
 mentor =
   TriggeredAbility.MkTriggeredAbility
@@ -2050,41 +1954,26 @@ mentor =
 
 -- The slot rule 702.134a's one target is chosen into. Named here rather than in
 -- Pawl.Engine.Binding, which holds the RESERVED names a card may not use: this is
--- an ordinary target slot, declared by the ability that reads it, and it can
--- collide with nothing -- a card's slots live on that card's own abilities.
+-- an ordinary target slot, declared by the ability that reads it.
 mentorTarget :: SlotName.SlotName
 mentorTarget = SlotName.MkSlotName (Text.pack "mentored")
 
 -- CR 702.149a: whenever this creature and at least one other creature with power
--- greater than this creature's power attack, put a +1/+1 counter on this
--- creature. Rule 702 states it as a triggered ability, minted here like its
--- siblings in `abilitiesFor`.
+-- greater than this creature's power attack, put a +1/+1 counter on this creature.
+-- Mentor's clause with the comparison reversed and the target dropped: rule
+-- 702.149a pumps the BEARER, so there is nothing to choose and no slot.
 --
--- Mentor's clause with the comparison reversed and the target dropped, which is
--- the whole of the difference: rule 702.149a pumps the BEARER, so there is
--- nothing to choose and no slot -- Filter.IsSource, prowess' payload, rather than
--- mentor's Binding.
+-- The comparison therefore rides the CONDITION. CR 702.149a's companion is part of
+-- the trigger event, not an intervening-if clause, so it is checked once as the
+-- attackers are declared and never again on resolution -- a bigger co-attacker
+-- that dies in response still leaves the counter.
 --
--- The comparison therefore rides the CONDITION. CR 702.149a's companion is part
--- of the trigger event ("this creature AND at least one other ... attack"), not
--- an intervening-if clause, so it is checked once as the attackers are declared
--- and never again on resolution -- a bigger co-attacker that dies in response
--- still leaves the counter. TriggerCondition.SelfAttacksWithAnother is where that
--- lands; intervening = Nothing for that reason as much as for the usual one.
+-- "Other" is the condition's own, an identity check the Filter has no atom for. No
+-- controller conjunct, for mentor's reason.
 --
--- The Filter is the rule's printed words: the card type conjunct is "creature",
--- which CR 508.1a narrows to nothing today, and Filter.PowerGreaterThanSource is
--- "with power greater than this creature's power". "Other" is the condition's own
--- -- an identity check the Filter has no atom for, since Filter.IsSource is the
--- one it would need negated and the condition already excludes the bearer. No
--- controller conjunct, for mentor's reason: CR 508.1 makes every attacker the
--- active player's.
---
--- A COUNTER and not ModifyTarget, again for mentor's reasons -- CR 122.6's funnel,
--- and CR 613.4c's reading every projection. Through Effect.Train, evolve's opcode
--- one rule over: rule 702.149c makes "when this creature trains" mean "when a
--- resolving training ability puts one or more +1/+1 counters on this creature", so
--- the placement has to be distinguishable from any other +1/+1 counter arriving.
+-- Through Effect.Train, evolve's opcode one rule over: rule 702.149c makes "when
+-- this creature trains" mean the placement, so it has to be distinguishable from
+-- any other +1/+1 counter arriving.
 training :: TriggeredAbility Card
 training =
   TriggeredAbility.MkTriggeredAbility
@@ -2103,30 +1992,23 @@ training =
 
 -- CR 702.21a: ward [cost]. "Whenever this permanent becomes the target of a spell
 -- or ability an opponent controls, counter that spell or ability unless that
--- player pays [cost]." Rule 702 states it as a triggered ability, minted here like
--- its siblings in `abilitiesFor`.
+-- player pays [cost]."
 --
 -- ONE CLAUSE and no branching opcode, fabricate's shape: CR 118.12a rewrites "[do
 -- something] unless [a player does something else]" as an offer followed by the
--- thing, so the Counter is the clause's "if they don't" branch and
--- Pawl.Types.PayGate is the offer. CR 118.12 puts that payment at RESOLUTION,
--- which is what rule 702.21a needs -- the opponent has already paid to cast.
+-- thing, so the Counter is the clause's "if they don't" branch and the PayGate is
+-- the offer. CR 118.12 puts that payment at RESOLUTION, which is what rule 702.21a
+-- needs.
 --
--- THE PAYER IS THE TARGETER'S CONTROLLER, not the bearer's: rule 702.21a's "that
--- player" is the opponent whose spell or ability named the bearer, and
--- Resolve.payerOf reads a slot bound to an object as whoever controls it -- so
--- the same Binding.targetingObject slot answers both halves of the sentence.
--- Binding.you would be the ward controller and would offer the cost to the wrong
--- player.
+-- THE PAYER IS THE TARGETER'S CONTROLLER, not the bearer's, so the same
+-- Binding.targetingObject slot answers both halves of the sentence; Binding.you
+-- would offer the cost to the wrong player.
 --
--- "THAT SPELL OR ABILITY" is the object the event named, read out of the reserved
--- Binding.targetingObject slot -- flanking's shape, and NOT a target slot: rule
--- 702.21a targets nothing, so nothing here is re-checked at CR 608.2b and a
+-- "THAT SPELL OR ABILITY" is read out of that same slot and is NOT a target slot:
+-- rule 702.21a targets nothing, so nothing here is re-checked at CR 608.2b and a
 -- shroud-bearing spell is countered as readily as any other.
 --
 -- Optionality.Mandatory: the gate's offer IS the only choice rule 702.21a gives.
--- Single mode, ChooseExactly 1, and intervening = Nothing -- the rule has no "if"
--- clause.
 ward :: Cost Keyword -> TriggeredAbility Card
 ward cost =
   TriggeredAbility.MkTriggeredAbility
@@ -2186,28 +2068,18 @@ decayed =
 
 -- CR 603.7: the delayed triggered abilities RULE 702 declares, keyed by the name
 -- its own arming opcode names. Pawl.Engine.Resolve falls back to this map when a
--- name is on no face's Face.delayedAbilities, which is every arm a MINTED ability
--- performs: the join Pawl.Types.AbilityName describes runs from a card's text to
--- that card's declarations, and a keyword has no card text to declare the far end
--- in.
+-- name is on no face's Face.delayedAbilities, a keyword having no card text to
+-- declare the far end in.
 --
--- Read by NAME and never off the board, which is what CR 603.7 asks for: the
--- ability that armed the delayed one is what defines it, so a source that has
--- since lost the keyword -- or left the battlefield -- still sacrifices. Deriving
--- the ability from the source's keywords instead would answer differently, and
--- wrongly.
+-- Read by NAME and never off the board, which is what CR 603.7 asks for: a source
+-- that has since lost the keyword -- or left the battlefield -- still sacrifices.
 --
--- NOT a nested ability inside the opcode, which is the other way to say this.
--- Pawl.Types.Effect is first-order and non-recursive on purpose; a
--- TriggeredAbility payload would make it recursive and add a `card` parameter to
--- every effect in the DSL, for one keyword.
+-- NOT a nested ability inside the opcode: Pawl.Types.Effect is first-order and
+-- non-recursive on purpose.
 --
--- The two ends cannot drift, `decayed` above arming the same constant this map is
--- keyed by. What no type enforces is a LATER keyword whose arm is written and
--- whose row here is forgotten: a dangling name is a silent no-op, caught by that
--- keyword's own gameplay test rather than by the build. Pawl.CardSpec closes the
--- other direction, keeping the two namespaces disjoint so no card's declaration
--- can shadow a row here.
+-- What no type enforces is a LATER keyword whose arm is written and whose row here
+-- is forgotten -- a dangling name is a silent no-op. Pawl.CardSpec closes the
+-- other direction, so no card's declaration can shadow a row here.
 mintedDelayedAbilities :: Map AbilityName (TriggeredAbility Card)
 mintedDelayedAbilities = Map.singleton decayedSacrificeName decayedSacrifice
 
@@ -2224,14 +2096,12 @@ decayedSacrificeName = AbilityName.MkAbilityName (Text.pack "decayed")
 
 -- CR 702.147a's "sacrifice it at end of combat", as CR 511.2 states the timing:
 -- abilities that trigger "at end of combat" trigger as the end of combat step
--- begins. TurnScope.EachTurn, because rule 702.147a names no player's turn --
--- the ability is armed during a combat and CR 603.7b spends it at that combat's
--- own end of combat step, so the scope never has a second turn to admit.
+-- begins. TurnScope.EachTurn, rule 702.147a naming no player's turn.
 --
--- Effect.Sacrifice against Binding.triggerSource, vanishing's payload exactly:
--- rule 702.147a says "it", and CR 603.7c makes that the environment captured as
--- the ability was armed rather than a fresh read. CR 701.21a keeps it a
--- sacrifice and not a destruction, so an indestructible attacker still goes.
+-- Effect.Sacrifice against Binding.triggerSource: rule 702.147a says "it", and CR
+-- 603.7c makes that the environment captured as the ability was armed rather than
+-- a fresh read. CR 701.21a keeps it a sacrifice and not a destruction, so an
+-- indestructible attacker still goes.
 decayedSacrifice :: TriggeredAbility Card
 decayedSacrifice =
   TriggeredAbility.MkTriggeredAbility
