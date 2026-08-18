@@ -5,7 +5,8 @@ import qualified Numeric.Natural as Natural
 -- | CR 613.7: within a layer, continuous effects apply in timestamp order. A
 -- monotonic counter (GameState.nextTimestamp) stamps every object as it enters a
 -- zone (CR 613.7d, and CR 613.7a gives a permanent's static-ability effect the
--- same stamp) and every stored continuous effect as it begins. One comparable
+-- same stamp), every stored continuous effect as it begins, and every counter as
+-- it is put on (CR 613.7c). One comparable
 -- sequence is what lets a static ability (Humility) and a stored effect
 -- (Serpent's Gift) order against each other in layer 6.
 --

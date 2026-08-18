@@ -355,6 +355,7 @@ addCreature printing pid gs =
             Object.sickness = Sickness.Settled pid,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.counterTimestamps = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
@@ -580,6 +581,7 @@ addToken card pid gs =
             Object.sickness = Sickness.Settled pid,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.counterTimestamps = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
@@ -628,6 +630,7 @@ addLibraryCard printing pid gs =
             Object.sickness = Sickness.Sick,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.counterTimestamps = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
@@ -680,6 +683,7 @@ addGraveyardCard printing pid gs =
             Object.sickness = Sickness.Sick,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.counterTimestamps = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
@@ -737,6 +741,7 @@ addExiledCard printing pid gs =
             Object.sickness = Sickness.Sick,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.counterTimestamps = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
@@ -799,6 +804,7 @@ addHandCard printing pid gs =
             Object.sickness = Sickness.Settled pid,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.counterTimestamps = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
@@ -870,6 +876,7 @@ landsFor land pid n base =
                   Object.sickness = Sickness.Settled pid,
                   Object.bindings = Map.empty,
                   Object.counters = Map.empty,
+                  Object.counterTimestamps = Map.empty,
                   Object.attachedTo = Nothing,
                   Object.chosenColor = Nothing,
                   Object.chosenSubtype = Nothing,
@@ -917,6 +924,7 @@ handOne printing base =
             Object.sickness = Sickness.Settled alice,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.counterTimestamps = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
@@ -970,6 +978,7 @@ pikerInHand land piker n ph =
             Object.sickness = Sickness.Settled alice,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.counterTimestamps = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
@@ -1375,11 +1384,17 @@ tapObject oid gs =
 
 -- Put `n` counters of a kind directly onto an object's per-incarnation state,
 -- bypassing the PutCounters opcode -- so a projection or SBA test can set up
--- counters without resolving a spell.
+-- counters without resolving a spell. Stamps the kind (CR 613.7c) as the real
+-- funnel does, so the placement orders after everything already on the board.
 addCounter :: CounterKind.CounterKind Keyword.Keyword -> Natural -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 addCounter kind n oid gs =
-  let bump obj = obj {Object.counters = Map.insertWith (+) kind n (Object.counters obj)}
-   in gs {GameState.objects = Map.adjust bump oid (GameState.objects gs)}
+  let (ts, gs1) = Game.freshTimestamp gs
+      bump obj =
+        obj
+          { Object.counters = Map.insertWith (+) kind n (Object.counters obj),
+            Object.counterTimestamps = Map.insert kind ts (Object.counterTimestamps obj)
+          }
+   in gs1 {GameState.objects = Map.adjust bump oid (GameState.objects gs1)}
 
 -- CR 303.4b: attach `rider` to `host` directly, without casting. A STATE fixture
 -- (the shape addCreature and withEffect already have), not a synthetic card --
@@ -1472,6 +1487,7 @@ oneMountainState mountain ph =
             Object.sickness = Sickness.Sick,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.counterTimestamps = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
@@ -1645,6 +1661,7 @@ spellOnStack printing pid gs =
             Object.sickness = Sickness.Settled pid,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.counterTimestamps = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
