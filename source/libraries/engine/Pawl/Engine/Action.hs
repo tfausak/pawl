@@ -109,8 +109,8 @@ playableLands pid gs =
 -- an instant".
 --
 -- Read off the CARD (Card.combined) and never a projection, the field's own rule
--- in Pawl.Types.Face: the ability functions in the hand, which pawl's projection
--- does not reach (#160). A hand member with no card behind it -- a token, an
+-- in Pawl.Types.Face: the ability functions in the hand, where this reader takes
+-- the printed card (#1859). A hand member with no card behind it -- a token, an
 -- ability -- contributes nothing, playableLands' reading one function above.
 --
 -- The permission is a CLASSIFICATION and not an identity: this asks whether the

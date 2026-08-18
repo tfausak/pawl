@@ -7,11 +7,12 @@ import qualified Pawl.Types.ObjectId as ObjectId
 
 -- | What a continuous effect applies to. CR 611.2c: a resolution effect's set is
 -- LOCKED when it begins (TheseObjects -- a bounced-and-returned creature is a new
--- id the effect no longer names). A static ability's set is DYNAMIC: Matching and
--- MatchingAnywhere (any object currently matching a Filter, on the battlefield or
--- in any projected zone), Attached (the one object the source is attached to, if
--- any) and AttachedPlayerControls (what the enchanted PLAYER controls) -- all
--- four are re-derived each projection, never captured once.
+-- id the effect no longer names). A static ability's set is DYNAMIC: Matching,
+-- MatchingAnywhere and MatchingOffBattlefield (any object currently matching a
+-- Filter, respectively on the battlefield, in any zone, and in any zone but the
+-- battlefield), Attached (the one object the source is attached to, if any) and
+-- AttachedPlayerControls (what the enchanted PLAYER controls) -- every one of
+-- them re-derived each projection, never captured once.
 --
 -- The one crossing between the two is StaticAbility.lingers: an ability whose
 -- text keeps its effect alive past its own permanent hands a STORED effect over
@@ -31,8 +32,11 @@ data Affected
     -- that aren't on the battlefield, spells, and permanents" is the first
     -- affected set in the pool that is not scoped to the battlefield, and the
     -- ONLY reason this is a separate arm rather than a zone payload on Matching:
-    -- every other card in the pool depends on that gate, since Bad Moon's "black
-    -- creatures get +1/+1" must not reach a creature card in a graveyard.
+    -- most of the pool depends on that gate, since Bad Moon's "black creatures
+    -- get +1/+1" must not reach a creature card in a graveyard.
+    --
+    -- The gate is a THREE-way question, not a flag, which is why
+    -- MatchingOffBattlefield below is a third arm rather than a Bool here.
     --
     -- The set the CR describes is every object in every zone, and both readers
     -- now answer that way: Projection.viewOfObject has never had a zone gate, and
@@ -60,9 +64,9 @@ data Affected
     MatchingOffBattlefield (Filter.Filter Keyword.Keyword)
   | -- | CR 303.4m: the object this ability's SOURCE is attached to -- "enchanted
     -- creature". Neither a fixed id set nor a predicate over candidates:
-    -- TheseObjects is fixed at resolution (CR 611.2c) and Matching /
-    -- MatchingAnywhere are predicates re-derived per candidate, while this is
-    -- re-derived from the SOURCE's own state.
+    -- TheseObjects is fixed at resolution (CR 611.2c) and the three Matching arms
+    -- are predicates re-derived per candidate, while this is re-derived from the
+    -- SOURCE's own state.
     --
     -- The set is {o} when the source is attached to o, and EMPTY when it is
     -- unattached -- an Aura in the graveyard, or one the CR 704.5m sweep has not

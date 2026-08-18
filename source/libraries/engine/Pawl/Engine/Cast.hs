@@ -651,9 +651,9 @@ controlsLegendaryCreatureOrPlaneswalker pid gs =
 -- attacked this step".
 --
 -- The exact counterweight to permissionsWith below, and read the way its LIBRARY
--- caller reads keywords: off the card, never through the projection (CR 113.6e,
--- which for this pool means a hand, where no pool effect changes a card's
--- keywords -- #160). ALL of them must hold, which is what CR 601.3's "no ... prohibits"
+-- caller reads keywords: off the card, never through the projection (CR 113.6e;
+-- an effect granting or removing a printed restriction there is missed, #1859).
+-- ALL of them must hold, which is what CR 601.3's "no ... prohibits"
 -- means; one permission, by contrast, suffices.
 --
 -- Casing on the arms is a classification, not an effect's identity:
@@ -881,9 +881,7 @@ graveyardKeywords oid gs = Map.keysSet (Projection.keywordsOf oid gs)
 -- the two callers read them from different places, and each is right for its
 -- zone: a card in a GRAVEYARD is read through the projection, since an ability
 -- granted to it there grants rule 702.34a's permission as much as a printed
--- keyword does; a card in a LIBRARY is read as printed, since nothing in the
--- pool changes such a card and the projection's own gather reaches neither it
--- nor a hand (#160).
+-- keyword does; a card in a LIBRARY is read as printed instead (#1859).
 --
 -- The face's own type line is what answers rule 702.34a's "if the resulting
 -- spell is an instant or sorcery spell", and it is the PROPOSED face's because

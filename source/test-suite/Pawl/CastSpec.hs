@@ -2423,6 +2423,10 @@ flashSpec s registry = Spec.describe s "Flash" $ do
   -- in the hand before Teferi arrives, so "the effect applied as it was drawn"
   -- puts it there on neither. Only an effect applying to a card SITTING in a hand
   -- puts it there on exactly one.
+  --
+  -- Not implemented, so the card file omits it: Teferi's third clause, "each
+  -- opponent can cast spells only any time they could cast a sorcery" (#1860).
+  -- Bob casts nothing here, so nothing below turns on it.
   Spec.it s "CR 702.8a/613.1f Teferi gives a creature card in hand flash, and it is cast on bob's turn" $ do
     forest <- S.printingOf s registry "Forest"
     warMammoth <- S.printingOf s registry "War Mammoth"
