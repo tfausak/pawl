@@ -5,7 +5,7 @@
 -- CR 903.8's permission and tax, CR 903.9a's state-based action), the
 -- Player.commander and Player.commanderCasts fields, Deck's commander, the
 -- Zone.Command arm of Pawl.Engine.Cast.castableZones, and the CR 903.8 increase
--- Pawl.Engine.Cost.allAdjustments folds into CR 601.2f. Also the commander half
+-- Pawl.Engine.Cost.spellAdjustments folds into CR 601.2f. Also the commander half
 -- of Pawl.Engine.Setup's subgame pair -- CR 729.2c in and CR 729.5c out -- and
 -- the commander half of its restart, CR 727.5a. Those live here rather than in
 -- Pawl.SetupSpec because they need a designated commander and this is the file

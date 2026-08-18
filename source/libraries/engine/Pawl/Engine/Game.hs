@@ -694,6 +694,7 @@ castOf event = case event of
   GameEvent.ControlChanged {} -> Nothing
   GameEvent.VentureMarkerEntered {} -> Nothing
   GameEvent.BecameTarget {} -> Nothing
+  GameEvent.BecameAttached {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
   GameEvent.Scried _ -> Nothing
@@ -750,6 +751,7 @@ discardOf event = case event of
   GameEvent.ControlChanged {} -> Nothing
   GameEvent.VentureMarkerEntered {} -> Nothing
   GameEvent.BecameTarget {} -> Nothing
+  GameEvent.BecameAttached {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
   GameEvent.Scried _ -> Nothing
@@ -804,6 +806,7 @@ enteredBattlefield event = case event of
   GameEvent.ControlChanged {} -> Nothing
   GameEvent.VentureMarkerEntered {} -> Nothing
   GameEvent.BecameTarget {} -> Nothing
+  GameEvent.BecameAttached {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
   GameEvent.Scried _ -> Nothing
@@ -877,6 +880,7 @@ damagedPlayer event = case event of
   GameEvent.ControlChanged {} -> Nothing
   GameEvent.VentureMarkerEntered {} -> Nothing
   GameEvent.BecameTarget {} -> Nothing
+  GameEvent.BecameAttached {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
   GameEvent.Scried _ -> Nothing

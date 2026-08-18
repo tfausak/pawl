@@ -3,6 +3,7 @@ module Pawl.Types.GameEvent where
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
+import qualified Pawl.Types.BecameAttached as BecameAttached
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BlockerDeclared as BlockerDeclared
@@ -715,6 +716,25 @@ data GameEvent
     -- targets, an ACTIVATED ability records no cast event at all, and this is one
     -- event per target rather than one per announcement.
     BecameTarget BecameTarget.BecameTarget
+  | -- | CR 701.3a: an Aura, Equipment or Fortification BECAME ATTACHED to an
+    -- object or player -- rule 303.4b's "enchants" for an Aura. The payload's
+    -- `host` is a Recipient for BecameTarget's reason, CR 702.5a's enchant
+    -- ability being able to name a player.
+    --
+    -- Emitted by Pawl.Engine.Event.attach for rule 701.3's move, and by that
+    -- module's zone-change funnel for a permanent that ARRIVES attached -- CR
+    -- 608.3c's resolving Aura spell and CR 303.4f's entry choice. Two sites and
+    -- one event, because the printings that read it ("whenever an Aura becomes
+    -- attached to this creature") do not distinguish the routes.
+    --
+    -- NOT emitted by Pawl.Engine.Phasing, which is CR 702.26j: a permanent
+    -- phasing in keeps the Object.attachedTo it phased out with, so there is no
+    -- attachment for that path to record. Pawl.PhasingSpec holds the fence.
+    --
+    -- Not derivable from GameEvent.Moved: an attachment on the battlefield is no
+    -- zone change at all, and an Aura that entered attached says nothing in its
+    -- ZoneChange about what it landed on.
+    BecameAttached BecameAttached.BecameAttached
   | -- | CR 800.4a: a permanent left the GAME, rather than the battlefield,
     -- because its owner left the game. The ObjectId is the id it had while it
     -- existed -- the key Pawl.Engine.Departure files its CR 608.2h last known

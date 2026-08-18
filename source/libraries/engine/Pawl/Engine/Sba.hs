@@ -704,6 +704,10 @@ performStateBasedActions = Event.simultaneously $ do
   -- CR 704.5n / 704.5p: the Equipment does NOT follow its creature -- it detaches
   -- and stays. Not a zone change, so unlike the Aura above it does not funnel
   -- through Pawl.Engine.Event: no Moved event, no replacement, no trigger.
+  --
+  -- Not implemented: CR 701.3d's becoming UNATTACHED, which this write is one
+  -- producer of. The attaching half is GameEvent.BecameAttached; there is no
+  -- event and no trigger condition for the other direction (#1838).
   State.modify' (\g -> g {GameState.objects = List.foldl' (flip (Map.adjust (\o -> o {Object.attachedTo = Nothing}))) (GameState.objects g) detaching})
   -- CR 704.5g/h: destruction through the funnel, Regenerable -- the point rather
   -- than a default, since CR 701.19a's shield exists to replace exactly this

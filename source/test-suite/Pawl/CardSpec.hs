@@ -665,6 +665,9 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PermanentExplores _ -> []
   -- CR 701.43d carries nothing at all, so no Count either.
   TriggerCondition.SelfExerted -> []
+  -- CR 701.3a's carries a Filter, and a Filter holds no Count for
+  -- PermanentTurnedFaceUp's reason.
+  TriggerCondition.SelfBecomesAttachedBy _ -> []
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> []
   TriggerCondition.SelfDies -> []
@@ -1623,11 +1626,11 @@ triggeredAbilityOffends ability =
 --   * Binding.variableX, and ONLY when the ability's own cost prints an {X}:
 --     CR 601.2b's "the player announces the value of that variable", measured
 --     against what CR 602.2b calls "an activated ability's analog to a spell's
---     mana cost ... its activation cost" (Cinder Elemental). Nothing reads it as
---     a slot today -- a printed X is Quantity.X, whose own half of the contract
---     is the CR 602.2b sweep below -- but the activation really does bind it, so
---     leaving it out would reject a read that works (#14 is what would make one
---     sayable).
+--     mana cost ... its activation cost" (Cinder Elemental). A printed X is an
+--     ordinary slot read since #14 retired Quantity.X, so it arrives here like
+--     any other, and the activation really does bind it -- leaving it out would
+--     reject a read that works. The cast side's bullet in cardOffends below
+--     states the same thing about a spell's cost.
 --   * Resolve.definedSlots, the slot an effect of this ability MINTS rather than
 --     reads. The same exemption every sibling carrier takes.
 --
@@ -2670,6 +2673,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PermanentExplores f -> [f]
   -- CR 701.43d carries nothing, so no Filter either.
   TriggerCondition.SelfExerted -> []
+  -- CR 701.3a's carries one over the ATTACHMENT -- Bramble Elemental's "an
+  -- Aura" -- which this sweep must see for PermanentTurnedFaceUp's reason.
+  TriggerCondition.SelfBecomesAttachedBy f -> [f]
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> []
   TriggerCondition.SelfDies -> []

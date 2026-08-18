@@ -93,7 +93,8 @@ codec =
       Arm.payload "PlayerSurveils" PlayerRelation.codec TriggerCondition.PlayerSurveils (\x -> case x of TriggerCondition.PlayerSurveils y -> Just y; _ -> Nothing),
       Arm.nullary "SelfBecomesPlotted" TriggerCondition.SelfBecomesPlotted,
       Arm.payload "PermanentExplores" filterCodec TriggerCondition.PermanentExplores (\x -> case x of TriggerCondition.PermanentExplores y -> Just y; _ -> Nothing),
-      Arm.nullary "SelfExerted" TriggerCondition.SelfExerted
+      Arm.nullary "SelfExerted" TriggerCondition.SelfExerted,
+      Arm.payload "SelfBecomesAttachedBy" filterCodec TriggerCondition.SelfBecomesAttachedBy (\x -> case x of TriggerCondition.SelfBecomesAttachedBy y -> Just y; _ -> Nothing)
     ]
   where
     filterCodec = Filter.codec Keyword.codec

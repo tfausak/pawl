@@ -8,7 +8,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 
 -- BOTH players are a PlayerId and they are NOT interchangeable, so they are named
 -- rather than positional: a swap would report the change backwards, and
--- Pawl.Engine.Event.sampleControl only mints the event when the two differ.
+-- Pawl.Engine.Engine.sampleControl only mints the event when the two differ.
 data ControlChanged = MkControlChanged
   { object :: ObjectId.ObjectId,
     before :: PlayerId.PlayerId,

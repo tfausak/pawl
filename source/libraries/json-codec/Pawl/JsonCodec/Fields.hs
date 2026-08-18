@@ -4,7 +4,7 @@
 -- decoder, the schema's @properties@ and its @required@ all come out of one
 -- expression.
 --
--- 'Fields' has no 'Monad' instance and cannot get one: 'encodeFields' never
+-- 'Fields' has no 'Monad' instance and cannot get one: its 'encode' field never
 -- mentions @a@ at all, so '>>=' would have no @a@ to hand its continuation on
 -- the encoding side. (Contravariance in @o@ alone would not rule out 'Monad'
 -- in @a@ -- @newtype F o a = F (o -> Maybe a)@ is contravariant in @o@ and is
@@ -33,7 +33,7 @@ import qualified Pawl.JsonSchema.Schema as Schema
 
 -- | Assumes distinct keys across the 'required'/'defaulted' fields composed
 -- into one 'Fields': 'Common.field' (via 'lookupPair') takes the first match
--- on decode, so a duplicate key is dead code, and 'encodeFields' does not
+-- on decode, so a duplicate key is dead code, and 'encode' does not
 -- dedupe either, so a duplicate emits two identical JSON object members --
 -- the first of which wins on the next decode.
 data Fields o a = MkFields
@@ -95,7 +95,7 @@ defaulted key d c get =
     }
 
 -- | Like 'object', but runs a check against the assembled record after
--- 'decodeFields' succeeds, rejecting it on 'Left' -- e.g. 'TypeLine' rejecting
+-- 'decode' succeeds, rejecting it on 'Left' -- e.g. 'TypeLine' rejecting
 -- an empty @types@ set per CR 205.1. Encoding cannot fail, so the check never
 -- runs there, and the schema is unaffected by it: JSON Schema could express
 -- some such rules (@minItems@ for a non-empty set), but the rule being

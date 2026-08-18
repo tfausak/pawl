@@ -138,10 +138,14 @@ import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 --
 -- triggeredAbilitiesOf derives its abilities from a projection's POST-LAYER
 -- keyword counts, so Humility takes all of those abilities away for free
--- and an Aura's layer-6 grant adds them. Its one caller is
--- Pawl.Engine.Event's EVENT scan; rule 702 has no state-triggered (CR 603.8) or
--- delayed (CR 603.7) keyword ability, so the first keyword that needs one must
--- widen those two scans.
+-- and an Aura's layer-6 grant adds them. Its one caller outside this module is
+-- Pawl.Engine.Projection.mintedTriggeredAbilitiesOf, which wraps what this
+-- returns in the object's CR 612 text changes and is what Pawl.Engine.Event's
+-- EVENT scan reads; printedTriggeredAbilitiesOf below is the in-module one.
+-- Rule 702 has no
+-- state-triggered (CR 603.8) or delayed (CR 603.7) keyword ability, so the first
+-- keyword that needs one must widen Event's two scans -- and would reach them
+-- through that same wrapper.
 --
 -- Rule 702.34a's flashback shows how wide this voice is: ONE keyword becomes a
 -- cost (flashbackCost), a casting permission (castingPermissionsOf) and a

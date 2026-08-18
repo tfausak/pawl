@@ -213,7 +213,7 @@ to agents as written. What it doesn't say:
 4.  Find the sites `-Werror` won't. A `{}` or `_` pattern absorbs a new
     constructor or field silently; the recurring ones are
     `Pawl.Engine.Event`'s `eventBindings` fallthrough, `Pawl.Engine.Filter`'s
-    `boundSlots` (eight arms then `_ -> Set.empty`), `Pawl.TriggerSpec`'s
+    `boundSlots` (nine arms then `_ -> Set.empty`), `Pawl.TriggerSpec`'s
     hand-kept `everyTriggerCondition` and `representativeEvents`, and
     `Pawl.CardSpec`'s filter and keyword traversals. No codec is forced either
     --- every `Arm.tagged` list carries its own `_ -> Nothing`, and only

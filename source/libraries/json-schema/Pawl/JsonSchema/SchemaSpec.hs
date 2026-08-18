@@ -80,7 +80,7 @@ spec s = Spec.describe s "Pawl.JsonSchema.Schema" $ do
         ]
 
   -- The value shape is pinned and the KEYS are not, which is exactly what
-  -- Pawl.JsonCodec.Common.decodeTextMap accepts. No propertyNames: a schema
+  -- Pawl.JsonCodec.Common.textMap accepts. No propertyNames: a schema
   -- constraining keys would claim more than the decoder guarantees. The exact
   -- keyword set is asserted, so this also pins mapOf apart from `object [] []`
   -- -- that emits properties and required, and would fail here.

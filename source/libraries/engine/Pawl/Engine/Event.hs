@@ -54,6 +54,7 @@ import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
+import qualified Pawl.Types.BecameAttached as BecameAttached
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
 import Pawl.Types.Binding (Binding)
@@ -387,6 +388,7 @@ movedOf event = case event of
   GameEvent.ControlChanged {} -> Nothing
   GameEvent.VentureMarkerEntered {} -> Nothing
   GameEvent.BecameTarget {} -> Nothing
+  GameEvent.BecameAttached {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
   GameEvent.Scried _ -> Nothing
@@ -429,6 +431,7 @@ damageOf event = case event of
   GameEvent.ControlChanged {} -> Nothing
   GameEvent.VentureMarkerEntered {} -> Nothing
   GameEvent.BecameTarget {} -> Nothing
+  GameEvent.BecameAttached {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
   GameEvent.Scried _ -> Nothing
@@ -471,6 +474,7 @@ revealOf event = case event of
   GameEvent.ControlChanged {} -> Nothing
   GameEvent.VentureMarkerEntered {} -> Nothing
   GameEvent.BecameTarget {} -> Nothing
+  GameEvent.BecameAttached {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
   GameEvent.Scried _ -> Nothing
@@ -1696,7 +1700,7 @@ apply batch candidate event =
               decision <- Game.choose (Prompt.ChooseTurnUpAttachment (Decide.deciderFor controller gs) controller oid)
               Monad.when (decision == OptionalDecision.Exercises) $ do
                 chosen <- Attach.chooseHost controller oid hosts
-                Monad.mapM_ (Attach.attach oid . Recipient.ToObject) chosen
+                Monad.mapM_ (attach oid . Recipient.ToObject) chosen
             pure (Just event)
     -- Unreachable: `applies` admits TurnUpR only against WouldTurnFaceUp.
     (ReplacementEffect.TurnUpR {}, _) -> pure (Just event)
@@ -2324,8 +2328,13 @@ changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requeste
 -- changeZoneReturning with an attachment seed. Per CR 303.4 attachment is a
 -- property of entering, not a step after it: the CR 614.1c entry replacement loop
 -- and the Moved event both run before this returns, so an Aura attached afterward
--- would be unattached during both. No card in the pool observes the difference
--- today; the seed buys the ordering rather than a passing test.
+-- would be unattached during both.
+--
+-- The seed is also what the CR 701.3a attachment event further down is read off,
+-- so Bramble Elemental's "whenever an Aura becomes attached to this creature"
+-- turns on it -- Pawl.TriggerSpec's "CR 608.3c whole card" case is the proof.
+-- The ORDERING against the entry loop and the Moved event is the rule's rather
+-- than anything a card in data/cards reads.
 --
 -- Stack's Aura branch is the only caller supplying a seed. An Aura entering by any
 -- other route is CR 303.4f's, and the body below asks its controller what it will
@@ -2836,6 +2845,30 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
               -- once CR 400.7 has minted a new incarnation (CR 603.10a's look-back
               -- reads it). Recorded LAST, so the entry loop's choices are locked in
               -- before any trigger or SBA can observe the object.
+              -- CR 608.3c and CR 303.4f: a permanent that ARRIVES attached became
+              -- attached, which is the half Event.attach cannot record -- there is
+              -- no CR 701.3 move here, the seed goes on the incarnation `mkObj`
+              -- mints and the id it names did not exist a moment ago. Bramble
+              -- Elemental's "whenever an Aura becomes attached to this creature"
+              -- fires for a cast Pacifism through this line and for Crown of the
+              -- Ages through the other one.
+              --
+              -- Gated on the SETTLED destination, `unlocking`'s reading: a seed
+              -- rides along on every move (mkObj writes the field whatever the
+              -- zone), and only the battlefield has attachments. CR 614.6's
+              -- redirect elsewhere leaves it unread and unrecorded.
+              --
+              -- Carries `newId`, the CR 400.7 incarnation, rather than the id the
+              -- Aura spell had on the stack: that is the object a trigger scan
+              -- will find attached.
+              Monad.forM_ (if dest == Zone.Battlefield then entrySeed else Nothing) $ \host ->
+                State.modify'
+                  . recordEvent
+                  $ GameEvent.BecameAttached
+                    BecameAttached.MkBecameAttached
+                      { BecameAttached.attachment = newId,
+                        BecameAttached.host = host
+                      }
               State.modify' (recordEvent (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange oid newId fromZone dest) snapshot)))
               pure (Just newId)
 
@@ -3090,6 +3123,49 @@ becameTarget source kind controller chosen =
             BecameTarget.controller = controller
           }
 
+-- CR 701.3b and CR 701.3c: store the attachment, restamp, and record it.
+--
+-- CR 303.4j for an Aura -- "the Aura doesn't move" -- and CR 701.3b's first
+-- sentence for the rest. A FAILURE MODE, not a fizzle: the only thing that does
+-- not happen is the move, and in particular the subject stays attached to its old
+-- host rather than becoming unattached, so CR 704.5m has nothing to bury. Nothing
+-- is recorded on that branch either, which is CR 701.3b in as many words -- the
+-- permanent did not become attached.
+--
+-- CR 701.3b's SECOND sentence is checked here rather than left to the caller:
+-- attaching a permanent to the object or player it is already attached to "does
+-- nothing", so there is no restamp and no event. Two of the three callers cannot
+-- reach it -- Attach.hostsFor never offers the current host -- and CR 702.6a's
+-- equip, whose target is any creature its controller owns, can.
+--
+-- CR 701.3c: attaching to a DIFFERENT object gives it a new timestamp, which CR
+-- 613.7 orders layer effects by.
+--
+-- LIVES HERE rather than in Pawl.Engine.Attach, which is where the legality
+-- reading it asks (Attach.attachmentFor) still lives: Event imports Attach, so a
+-- recordEvent call from there would invert the edge. All three call sites -- this
+-- module's CR 303.4k rewrite and Pawl.Engine.Resolve's Attach and AttachTarget
+-- opcodes -- already see this module.
+--
+-- The event carries the tag attachmentFor produced rather than the caller's
+-- `destination`, so a reader sees the same Recipient Object.attachedTo holds.
+attach :: ObjectId -> Recipient.Recipient -> Game ()
+attach subject destination = do
+  gs <- State.get
+  case Attach.attachmentFor subject destination gs of
+    Nothing -> pure ()
+    Just attachment -> Monad.unless (fmap Object.attachedTo (Game.lookupObject subject gs) == Just (Just attachment)) $ do
+      let (ts, gs1) = Game.freshTimestamp gs
+          move o = o {Object.attachedTo = Just attachment, Object.timestamp = ts}
+      State.put gs1 {GameState.objects = Map.adjust move subject (GameState.objects gs1)}
+      State.modify'
+        . recordEvent
+        $ GameEvent.BecameAttached
+          BecameAttached.MkBecameAttached
+            { BecameAttached.attachment = subject,
+              BecameAttached.host = attachment
+            }
+
 -- CR 611.1 / 613.11: does a rules-modifying continuous effect stop this spell or
 -- ability from being countered (Spider-Punk, Prowling Serpopard)? The victim's
 -- controller is the player the effect is anchored against -- CR 113.8 for an
@@ -3101,8 +3177,9 @@ becameTarget source kind controller chosen =
 -- The typed question, so this module never sees a PlayerEffect constructor;
 -- Pawl.Engine.PlayerEffect.cantBeCountered is where the casing lives.
 --
--- Projection.controllerOf, which is what every other reader of a stack object's
--- controller already asks (Replacement.decider, PlayerEffect.matchesSpell). For a
+-- Projection.controllerOf, which is what every other reader of an affected
+-- object's controller already asks (PlayerEffect.matchesObject, and
+-- Replacement.chooserOf for CR 616.1's chooser). For a
 -- SPELL that is a re-derivation rather than the stored fact CR 405.4 describes,
 -- and it falls back to the owner (#83); a spell cast from a zone its owner does
 -- not hold would therefore be read against the wrong player here.
@@ -3558,6 +3635,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -3624,6 +3702,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -3665,6 +3744,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -3712,6 +3792,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -3763,6 +3844,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -3822,6 +3904,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -3876,6 +3959,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -3938,6 +4022,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -3987,6 +4072,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4044,6 +4130,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4098,6 +4185,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4152,6 +4240,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4205,6 +4294,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4259,6 +4349,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4325,6 +4416,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4380,6 +4472,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4433,6 +4526,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4493,6 +4587,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4547,6 +4642,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4605,6 +4701,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4650,6 +4747,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4711,6 +4809,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4762,6 +4861,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4818,6 +4918,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4870,6 +4971,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4919,6 +5021,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4968,6 +5071,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5020,6 +5124,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5072,6 +5177,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5137,6 +5243,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5205,6 +5312,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
   -- CR 702.55b/702.55c: SelfDies' zone pair, asked of the object the BEARER
   -- HAUNTS rather than of the bearer itself -- so the id compared against
   -- ZoneChange.departed is the one GameState.haunting files the bearer under, and
@@ -5253,6 +5361,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5305,6 +5414,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5366,6 +5476,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5423,6 +5534,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5485,6 +5597,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5514,6 +5627,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5561,6 +5675,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5651,6 +5766,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5719,6 +5835,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5742,6 +5859,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTarget t ->
       Recipient.objectOf (BecameTarget.targeted t) == Just bearer
         && PlayerRelation.holds relation you (BecameTarget.controller t)
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5801,6 +5919,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
       Recipient.playerOf (BecameTarget.targeted t) == Just you
         && maybe True (== BecameTarget.kind t) (ControllerBecomesTarget.kind c)
         && PlayerRelation.holds (ControllerBecomesTarget.relation c) you (BecameTarget.controller t)
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5860,6 +5979,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5912,6 +6032,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5982,6 +6103,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -6030,6 +6152,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -6084,6 +6207,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -6126,6 +6250,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -6177,6 +6302,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -6237,6 +6363,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -6285,6 +6412,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -6368,6 +6496,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -6419,6 +6548,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
       Map.lookup slot (Binding.objectSlots bindings) == Just oid && before == you
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -6464,6 +6594,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   TriggerCondition.RoomEntered room -> case event of
     GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered _ oid entered) -> oid == bearer && entered == room
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -6540,6 +6671,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried scryer -> PlayerRelation.holds relation you scryer
@@ -6582,6 +6714,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -6626,6 +6759,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -6677,6 +6811,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -6723,6 +6858,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -6730,6 +6866,67 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted oid -> oid == bearer
+  -- CR 701.3a read from the HOST: something became attached to the BEARER, and
+  -- the Filter narrows WHAT. Two questions, and the split is the condition's
+  -- shape -- a bare id comparison for the host (SelfEnters' arm) and a Filter
+  -- read for the attachment (PermanentTurnedFaceUp's arm), which is why the
+  -- constructor carries one payload and matches on two objects.
+  --
+  -- Recipient.objectOf and not equality on the whole Recipient: CR 701.3a's
+  -- destination is tagged by the attaching permanent's own rules text
+  -- (Pawl.Engine.Attach.attachmentFor), so an Aura arrives as a ToCreature and
+  -- an Equipment as a ToCreature while nothing promises the bearer would be
+  -- named the same way twice. A ToPlayer host has no object and declines here,
+  -- which is right: the bearer of this condition is a permanent.
+  --
+  -- viewWithLastKnown for PermanentTurnedFaceUp's reason -- an attachment that
+  -- is gone by the CR 117.5 boundary is still read as it was (CR 608.2h)
+  -- instead of vanishing from the match.
+  TriggerCondition.SelfBecomesAttachedBy f -> case event of
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached a ->
+      Recipient.objectOf (BecameAttached.host a) == Just bearer
+        && ( case Projection.viewWithLastKnown (BecameAttached.attachment a) gs (BecameAttached.attachment a) of
+               Nothing -> False
+               Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
+           )
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Exerted _ -> False
 
 -- CR 603.3b: is this trigger condition "another ability triggering"? The
 -- classification the rule's two-part placement turns on -- False puts a trigger
@@ -6767,6 +6964,10 @@ reactsToAbilityTriggering cond = case cond of
   -- PLAYER takes, and CR 508.1g puts it in a turn-based action rather than in a
   -- resolving ability.
   TriggerCondition.SelfExerted -> False
+  -- And CR 701.3a's attach is a keyword ACTION too, taken by a resolving effect
+  -- or by a permanent entering the battlefield -- never an ability triggering, so
+  -- CR 603.3b's first pass again.
+  TriggerCondition.SelfBecomesAttachedBy _ -> False
   -- Everything else names something that happened to the board or to a player,
   -- which is CR 603.3b's first class in as many words.
   TriggerCondition.SelfEnters -> False
@@ -7297,6 +7498,13 @@ eventBindingSlots cond = case cond of
   -- slot, so a binding here would be a second name for one object. Glory-Bound
   -- Initiate reads it as Filter.IsSource.
   TriggerCondition.SelfExerted -> Set.empty
+  -- Empty DELIBERATELY. CR 701.3a's event names two objects, and the bearer is
+  -- one of them -- CR 113.7a's source slot already names the host. The other,
+  -- the attachment, has no printed reader: Bramble Elemental says "create two
+  -- 1\/1 green Saproling creature tokens" and names no "it". Enormous Energy
+  -- Blade's "tap that creature" is the printing that earns a slot, and it reads
+  -- the event from the other end (gap #1837).
+  TriggerCondition.SelfBecomesAttachedBy _ -> Set.empty
   -- CR 603.6a's two written forms differ only in which object the bearer is.
   -- SelfEnters matches on `object == bearer`, so CR 113.7a's source slot already
   -- names the entrant and `became` would be a second name for one object.
@@ -7689,6 +7897,11 @@ looksBack condition = case condition of
   -- The same answer once more, and the most plainly: CR 701.43c can only exert a
   -- permanent that is ON the battlefield, so nothing has changed zones.
   TriggerCondition.SelfExerted -> False
+  -- CR 603.10a's list does not reach an attachment either. CR 701.3a moves a
+  -- permanent ONTO another one without changing its zone, and the one route that
+  -- is a zone change -- CR 608.3c's Aura spell arriving attached -- leaves both
+  -- objects on the battlefield for a live read.
+  TriggerCondition.SelfBecomesAttachedBy _ -> False
   -- CR 603.6c's two written forms, which CR 603.10a names first:
   -- leaves-the-battlefield abilities. CR 700.4 narrows the second to a
   -- graveyard, and narrowing the destination does not leave the family.
@@ -8012,6 +8225,7 @@ eventTriggers events gs =
         GameEvent.ControlChanged {} -> Map.empty
         GameEvent.VentureMarkerEntered {} -> Map.empty
         GameEvent.BecameTarget {} -> Map.empty
+        GameEvent.BecameAttached {} -> Map.empty
       -- CR 603.10a's look-back at the permanent this event removed: every
       -- ability it had, unfiltered, for the reason `battlefieldAbilitiesOf`
       -- above gives.
@@ -8143,6 +8357,7 @@ eventTriggers events gs =
         GameEvent.ControlChanged {} -> Map.empty
         GameEvent.VentureMarkerEntered {} -> Map.empty
         GameEvent.BecameTarget {} -> Map.empty
+        GameEvent.BecameAttached {} -> Map.empty
         GameEvent.LeftTheGame _ -> Map.empty
         GameEvent.Milled {} -> Map.empty
         GameEvent.Scried _ -> Map.empty
@@ -8332,6 +8547,7 @@ eventTriggers events gs =
         GameEvent.ControlChanged {} -> Map.empty
         GameEvent.VentureMarkerEntered {} -> Map.empty
         GameEvent.BecameTarget {} -> Map.empty
+        GameEvent.BecameAttached {} -> Map.empty
         GameEvent.LeftTheGame _ -> Map.empty
         GameEvent.Milled {} -> Map.empty
         GameEvent.Scried _ -> Map.empty
@@ -8445,6 +8661,7 @@ eventTriggers events gs =
         GameEvent.ControlChanged {} -> Map.empty
         GameEvent.VentureMarkerEntered {} -> Map.empty
         GameEvent.BecameTarget {} -> Map.empty
+        GameEvent.BecameAttached {} -> Map.empty
         GameEvent.LeftTheGame _ -> Map.empty
         GameEvent.Milled {} -> Map.empty
         GameEvent.Scried _ -> Map.empty
@@ -8588,6 +8805,10 @@ zonesTriggeredFrom cond = case cond of
   -- than a default: an object that isn't on the battlefield can't be exerted, so
   -- the bearer is standing there when its own exert is recorded.
   TriggerCondition.SelfExerted -> battlefield
+  -- CR 113.6's default, and CR 701.3a makes it the only possible answer for the
+  -- exert arm's reason: the host of an attachment is a permanent, so the bearer
+  -- is on the battlefield whenever this can match.
+  TriggerCondition.SelfBecomesAttachedBy _ -> battlefield
   -- EXILE, and this arm is CR 113.6k's exception rather than its default:
   -- CR 702.170b's special action exiles the card as it becomes plotted, so
   -- the object bearing Aloe Alchemist's "when this card becomes plotted" is
@@ -8820,6 +9041,9 @@ controllerTurnScoped cond = case cond of
   -- "you" is the ability's controller, so a stolen Glory-Bound Initiate is
   -- exerted on its thief's turn rather than on its owner's.
   TriggerCondition.SelfExerted -> False
+  -- CR 701.3a names no turn: an Aura can be cast, and an Equipment equipped, on
+  -- any turn its controller has priority for.
+  TriggerCondition.SelfBecomesAttachedBy _ -> False
   -- One of the two arms carrying a TurnScope, and the one the lint below this
   -- was written for (CR 603.3a, CR 109.5).
   TriggerCondition.StepBegins (StepBegins.MkStepBegins _ TurnScope.ControllersTurn) -> True
@@ -9043,6 +9267,10 @@ stateTriggers gs
               -- own log entry, and CR 701.43b makes "already exerted" no bar to
               -- exerting again -- so there is no standing state to be true.
               TriggerCondition.SelfExerted -> False
+              -- CR 603.2 once more: becoming attached is something that HAPPENS,
+              -- with its own log entry. Standing attached is a state, but no
+              -- condition here asks about it.
+              TriggerCondition.SelfBecomesAttachedBy _ -> False
               -- CR 603.6a is an EVENT trigger, matched against the log; nothing
               -- about it is a CR 603.8 state.
               TriggerCondition.PermanentEnters _ -> False

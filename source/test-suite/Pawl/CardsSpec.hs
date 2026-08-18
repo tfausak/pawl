@@ -1,4 +1,6 @@
--- Covers data/cards/*.json and Pawl.Slug.slugify.
+-- Covers data/cards/*.json and the file-naming rule, Pawl.Registry.filedAs and
+-- Pawl.Registry.cardPath -- through which it reaches Pawl.Slug.fromText, whose
+-- own spec is Pawl.SlugSpec.
 module Pawl.CardsSpec where
 
 import qualified Data.ByteString as ByteString

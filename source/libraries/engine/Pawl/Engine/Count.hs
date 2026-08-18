@@ -495,6 +495,7 @@ snapshotView gs shape event = case event of
   -- CR 601.2c's targeting names two objects by id and snapshots no
   -- characteristics, so no EventShape names it either.
   GameEvent.BecameTarget {} -> Nothing
+  GameEvent.BecameAttached {} -> Nothing
   -- CR 701.17a names its cards by id and snapshots no characteristics.
   GameEvent.Milled {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
