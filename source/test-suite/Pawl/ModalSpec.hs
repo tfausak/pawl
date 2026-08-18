@@ -1106,8 +1106,10 @@ chooseOneOrBothSpec s registry = Spec.describe s "ChooseOneOrBoth (CR 700.2)" $ 
 
 -- Modal.combinations' two halves, side by side: the same inputs under CR 700.2d's
 -- default and under its exception. The enumeration Pawl.Engine.Mana reads when a
--- mana ability has several modes, which no card in the pool prints -- so it is
--- checked directly.
+-- mana ability has several modes: Synthetic Prismatic Wellspring is the pool's
+-- carrier, and Pawl.ManaSpec's wellspringSpec drives it through a card. What is
+-- checked directly here is only the boundary that card cannot show -- fewer
+-- options than the count.
 combinationsSpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 combinationsSpec s = Spec.describe s "Combinations (CR 700.2d)" $ do
   Spec.it s "without repeats, size-2 sublists of three options" $

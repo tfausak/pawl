@@ -29,9 +29,12 @@ data Clause card = MkClause
     -- THIS clause's effects rather than on the whole ability, which is why the
     -- rider rides the same carrier CR 603.5's "may" does. CR 701.37a's
     -- monstrosity (Nessian Asp) is two instructions rather than adapt's one, but
-    -- its gate still covers the whole ability; CR 701.47a's amass prints the
-    -- other shape, gating a proper prefix, and no card in the pool reaches it, so
-    -- the clause-vs-mode scope is unproven (#1086).
+    -- its gate still covers the whole ability; Into the Wilds gates the SECOND
+    -- of two clauses in one mode and Burst Lightning gates each of two, which is
+    -- what makes the CLAUSE the carrier -- a mode-level gate is fixed at CR
+    -- 601.2b and could not let the look happen and the put not. CR 701.47a's
+    -- amass is not the witness: it landed as one Effect.Amass opcode whose gate
+    -- is the engine's, so it writes no condition here.
     --
     -- Read as this clause is APPLIED (CR 608.2c's "in the order written"), not
     -- once at CR 601.2b -- so an earlier clause's effects can flip it. Nothing

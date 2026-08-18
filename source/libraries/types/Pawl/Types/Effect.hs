@@ -907,8 +907,10 @@ data Effect card
     --
     -- Still targetless in itself: a slot this reads may have been filled by
     -- TARGETING (CR 601.2c), which is how The Master, Transcendent's "target
-    -- player gets two rad counters" is written -- but nothing here demands it,
-    -- and no card in the pool aims POISON counters that way (#120).
+    -- player gets two rad counters" and Hand of the Praetors' "target player
+    -- gets a poison counter" are both written -- but nothing here demands it,
+    -- and CR 702.70a's poisonous fills the very same slot from its own trigger
+    -- event.
     GainPlayerCounters PlayerCounters.PlayerCounters
   | -- | CR 122: the players the PlayerRef names each LOSE N counters of a
     -- player-counter kind -- CR 728.1's "removes one rad counter from
