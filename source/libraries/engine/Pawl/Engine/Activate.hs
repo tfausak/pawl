@@ -70,12 +70,19 @@ sicknessOkGiven pcs pid srcId ability =
 -- hand: the ones rule 702 mints for the card's printed keywords, which is
 -- cycling (CR 702.29a) and reinforce (CR 702.77a) today, read off the PRINTED
 -- card because no pool effect changes a card's abilities in a hand (#160); CR 113.6b is the rule
--- that lets an ability name its own zone. In a graveyard: the PRINTED abilities
--- whose own cost or effect names the graveyard, per CR 113.6m -- see
--- graveyardAbilitiesOf. Anywhere else: nothing -- flashback and rule 702's other
+-- that lets an ability name its own zone -- PLUS the card's own printed
+-- abilities that name the hand, per CR 113.6j and CR 113.6m (Faerie Macabre's
+-- "Discard this card: ..."). In a graveyard: the PRINTED abilities
+-- whose own cost or effect names the graveyard, per CR 113.6m -- both zones
+-- through zoneAbilitiesOf. Anywhere else: nothing -- flashback and rule 702's other
 -- zone abilities are CASTING permissions (CR 702.34a), so they reach
 -- Pawl.Engine.Cast instead. The first ability ACTIVATED from a fourth zone adds
--- an arm here.
+-- an arm here: CR 113.6j reaches "any zone in which its cost can be paid", and
+-- Cost.zoneOfComponent names only the hand and the graveyard, so no cost in the
+-- vocabulary is payable from a library or from exile. CR 113.6m's EFFECT half
+-- could name another zone through a MoveToZone's `origin`, and every such
+-- `origin` in `data/cards/` states the graveyard -- Jarad, Golgari Lich Lord,
+-- Reassembling Skeleton and Squee, Goblin Nabob, swept 2026-08-18.
 --
 -- CR 702.29b and CR 702.77b are why this gates ACTIVATION and not existence: a
 -- cycling or reinforce ability keeps existing in every zone, so an effect
@@ -109,13 +116,23 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
   -- your graveyard to the battlefield" is payable by a Skeleton standing on the
   -- battlefield, and only this filter stops it being offered there.
   Just Zone.Battlefield -> filter (functionsIn Zone.Battlefield) (Projection.abilitiesGiven pcs oid gs)
+  -- CR 113.6j: the MINTED abilities rule 702 gives the printed keywords, plus the
+  -- card's own AUTHORED ones that name the hand. The two are disjoint by
+  -- construction -- handAbilitiesOf reads Face.keywords and zoneAbilitiesOf reads
+  -- Face.activatedAbilities -- so nothing is offered twice.
   Just Zone.Hand -> case Game.faceOf oid gs of
     Nothing -> []
-    Just face -> Keyword.handAbilitiesOf (Face.keywords face)
-  Just Zone.Graveyard -> graveyardAbilitiesOf oid gs
+    Just face -> Keyword.handAbilitiesOf (Face.keywords face) <> zoneAbilitiesOf Zone.Hand oid gs
+  Just Zone.Graveyard -> zoneAbilitiesOf Zone.Graveyard oid gs
   _ -> []
 
--- CR 113.6m + CR 702.178b: the abilities a card in a GRAVEYARD offers.
+-- CR 113.6j + CR 113.6m + CR 702.178b: the AUTHORED abilities a card outside the
+-- battlefield offers from the zone it is in. Two zones ask it today -- the
+-- graveyard, and the hand for Faerie Macabre's "Discard this card: Exile up to
+-- two target cards from graveyards" -- and the zone is a parameter because
+-- nothing in the reading below is about which zone it is: CR 113.6j says an
+-- ability functions "from any zone in which its cost can be paid", and
+-- functionsIn is the same question asked of whichever zone the card is in.
 --
 -- CR 113.6m -- "an ability whose cost or effect specifies that it moves the
 -- object it's on out of a particular zone functions only in that zone" -- is why
@@ -137,7 +154,7 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
 --
 -- The PRINTED abilities, not the projection's: no pool effect changes the
 -- abilities of a card off the battlefield (#160), the Face.castingPermissions
--- precedent. Not a claim
+-- precedent, which Keyword.hasFlash spells out for the hand in particular. Not a claim
 -- about the rules -- CR 613.1f does reach a card outside the battlefield -- and
 -- observationally identical while nothing can rewrite a graveyard card's text.
 --
@@ -150,10 +167,10 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
 --
 -- The VIEW is Projection.fullView, matching Projection.abilitiesGiven: nothing
 -- here is inside the layer fold, so there is no circularity to bound against.
-graveyardAbilitiesOf :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card]
-graveyardAbilitiesOf oid gs = case (Game.faceOf oid gs, Game.lookupObject oid gs) of
+zoneAbilitiesOf :: Zone.Zone -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card]
+zoneAbilitiesOf zone oid gs = case (Game.faceOf oid gs, Game.lookupObject oid gs) of
   (Just face, Just obj) ->
-    let functionsHere = functionsIn Zone.Graveyard
+    let functionsHere = functionsIn zone
         granted ability = case ActivatedAbility.condition ability of
           Nothing -> True
           Just cond -> Condition.holds (Projection.fullView gs) (Filter.contextFor (Just (Object.owner obj)) (Just oid)) gs oid cond
@@ -464,8 +481,10 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
 -- keeps them off the stack).
 --
 -- CR 701.20a's duration -- revealed until the ability leaves the stack -- is not
--- modeled, and is vacuous for every card in the pool: cycling and reinforce both
--- discard the card as a cost (CR 702.29a, CR 702.77a), so it is in a public
+-- modeled, and is vacuous for every card in `data/cards/`: every ability a hand
+-- offers there discards the card as a cost, whether rule 702 minted that cost
+-- (CR 702.29a's cycling, CR 702.77a's reinforce) or the card authored it (Faerie
+-- Macabre, CR 113.6j), so the card is in a public
 -- graveyard a moment later. A forecast ability (CR 702.57a) is the shape that
 -- would make the duration observable; none is in the pool (#185, #282).
 revealIfHidden :: PlayerId -> ObjectId -> Game ()

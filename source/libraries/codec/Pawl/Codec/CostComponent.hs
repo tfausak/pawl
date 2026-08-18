@@ -39,7 +39,10 @@ codec keywordCodec =
       -- CR 702.29c makes true only of a cycling ability's cost -- and a cycling
       -- ability is minted from the keyword by Pawl.Engine.Keyword rather than
       -- authored. So this stays nullary over the Ordinary cause, which leaves
-      -- ToPayCyclingCost unspellable by card data.
+      -- ToPayCyclingCost unspellable by card data. Faerie Macabre is the card
+      -- that writes this arm, and Pawl.ActivateSpec's "CR 702.29c an authored
+      -- discard-this cost is not a cycle" is what proves the cause it decodes to
+      -- -- a round trip cannot, the wire having one spelling for both causes.
       Arm.nullary "DiscardThis" (CostComponent.DiscardThis DiscardCause.Ordinary),
       Arm.payload "PayEnergy" Common.natural CostComponent.PayEnergy (\x -> case x of CostComponent.PayEnergy y -> Just y; _ -> Nothing),
       Arm.payload "AddLoyaltyToThis" Common.natural CostComponent.AddLoyaltyToThis (\x -> case x of CostComponent.AddLoyaltyToThis y -> Just y; _ -> Nothing),

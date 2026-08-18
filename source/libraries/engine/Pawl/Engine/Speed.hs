@@ -18,7 +18,7 @@
 -- long as your speed is 4, this object has '[Ability]'" -- so it is card data and
 -- not rules-core machinery: it rides Pawl.Types.ActivatedAbility.condition, read
 -- back by Pawl.Engine.Projection.abilitiesGiven on the battlefield and by
--- Pawl.Engine.Activate.graveyardAbilitiesOf where CR 702.178b's zone clause sends
+-- Pawl.Engine.Activate.zoneAbilitiesOf where CR 702.178b's zone clause sends
 -- it. All this module owes it is the number the clause compares against, and
 -- Pawl.Engine.Quantity's Speed arm.
 module Pawl.Engine.Speed where
