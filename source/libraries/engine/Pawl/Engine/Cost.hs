@@ -235,7 +235,7 @@ candidateCostsFor name oid gs = case Game.lookupObject oid gs of
           -- until its controller has discarded a card this turn, and its printed
           -- cost is unpayable (CR 118.6), so the whole card is.
           --
-          -- CR 109.5's "you" is the OWNER, as Activate.graveyardAbilitiesOf reads it
+          -- CR 109.5's "you" is the OWNER, as Activate.zoneAbilitiesOf reads it
           -- for a condition on a card outside the battlefield: pawl has no way to
           -- cast a card from another player's HAND or GRAVEYARD -- CR 400.1 files
           -- both by player and Cast.zoneCandidates hands out only the caster's own
