@@ -196,10 +196,14 @@ yourRingBearer =
 --
 -- Effect.LoseLife and not damage: rule 701.54c says "loses 3 life", so this is CR
 -- 119.3's life loss and none of CR 120's damage machinery sees it. PlayerRef's
--- Relative Opponent is "each opponent" -- CR 102.2's every other player, read
--- against that same controller, and not the player who was dealt the damage: the
--- rule drains the whole table and only coincides with the damaged seat in a
--- two-player game.
+-- Relative Opponent is "each opponent" -- CR 102.2's other player, and CR 102.3's
+-- every player not on your team -- read against that same controller, and NOT
+-- against the player who was dealt the damage: the rule drains the whole table
+-- and only coincides with the damaged seat in a two-player game.
+--
+-- Not proved in a two-player suite, which is the only one Pawl.RingSpec builds
+-- here: "each opponent" and "the defending player" are one seat there, so the
+-- clause is a regression fence rather than a proved behaviour.
 theRingDrainsOnCombatDamage :: TriggeredAbility.TriggeredAbility Card.Card
 theRingDrainsOnCombatDamage =
   TriggeredAbility.MkTriggeredAbility

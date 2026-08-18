@@ -537,9 +537,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
     escape <- S.printingOf s registry "Birthday Escape"
     piker <- S.printingOf s registry "Goblin Piker"
     let (spells, _, _, board) = ringCombatBoard island escape piker 4 [piker] []
-        -- S.identityAnswer, alice controlling one creature: CR 701.54a leaves
-        -- nothing to ask, and the designation is pinned by the count of
-        -- attackers rather than by the answer.
+        -- S.identityAnswer is enough here: alice controls one creature, so CR
+        -- 701.54a leaves nothing to ask and no answer can move the designation.
+        -- The case below puts a second creature on the board and pins it.
         after = drainThrough (castEscapes S.identityAnswer 4 spells board)
     -- 20 - 2 combat damage - 3 life. The GAMEPLAY assertion, and first: the two
     -- readings of the rule differ here and nowhere earlier.
