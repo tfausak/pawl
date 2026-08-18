@@ -1168,11 +1168,12 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   -- Jungle Wayfinder -- "{2}{G} Creature -- Elf Warrior 3/3. When this creature
   -- enters, each player may search their library for a basic land card, reveal
   -- it, put it into their hand, then shuffle." Oracle text verified against
-  -- api.scryfall.com. The whole-card proof of CR 701.23a's COUPLING: "each
-  -- player searches THEIR library" is one instruction applied per player, so the
-  -- searcher and the library's owner are the same seat on every pass. Extract,
-  -- five cases above, is the card that separates the two readings from the other
-  -- side -- there the searcher and the owner are deliberately different players.
+  -- api.scryfall.com. The whole-card proof that a search's searcher and its
+  -- library's owner can be COUPLED: rule 701.23a says only how to look, and
+  -- "each player searches THEIR library" is the card's own sentence naming one
+  -- instruction applied per player, so the two seats are the same on every pass.
+  -- The Extract cases above separate the two readings from the other side --
+  -- there the searcher and the owner are deliberately different players.
   --
   -- Three seats, so a cross-product engine is off by a factor of three rather
   -- than of two, and each library holds a DIFFERENT basic (alice Islands, bob

@@ -1470,11 +1470,12 @@ playerRefPlayers legal controller gs ref = case ref of
   -- it names one specific player who arrived from elsewhere.
   PlayerRef.Specific pid -> [pid]
   -- NOBODY, and not a hole: the reference names whichever player a fold has
-  -- reached, and this function holds no fold. Its two answerable positions
-  -- substitute it before they ever call here -- Pawl.Engine.Quantity's playersOf
-  -- inside a Count, and the Effect.Search arm's ownersFor for a search whose
-  -- owner is its searcher -- so what reaches this arm is a reference in a
-  -- position with no candidate at all, and the opcode is a no-op.
+  -- reached, and this function is handed no fold. The two positions that DO
+  -- answer it never route through here -- Pawl.Engine.Quantity's playersOf reads
+  -- it off the view a Count's fold supplies, and the Effect.Search arm's
+  -- ownersFor substitutes the searcher for a search whose owner is its own
+  -- searcher -- so what reaches this arm is a reference in a position with no
+  -- candidate at all, and the opcode is a no-op.
   PlayerRef.Candidate -> []
   -- CR 608.2h: the controller of the object the slot names, through last known
   -- information -- the clause naming the player generally MOVED it first, and CR
@@ -2224,7 +2225,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- "Each player searches THEIR library" (Jungle Wayfinder) is ONE
               -- instruction applied per player, not the cross product of two
               -- folds: the library read is whichever searcher this pass has
-              -- reached. That is Pawl.Types.PlayerRef.Candidate's reading, and
+              -- reached. Rule 701.23a says only how to look, so which library
+              -- that is comes from the card's own sentence rather than from the
+              -- rule. That is Pawl.Types.PlayerRef.Candidate's reading, and
               -- the substitution is the same move Pawl.Engine.Quantity
               -- .forCandidate makes for a per-player amount. Every other ref
               -- names a set of its own, so Extract's You/InSlot pair still
