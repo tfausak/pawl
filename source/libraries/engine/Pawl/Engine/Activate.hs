@@ -478,10 +478,10 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
 -- keeps them off the stack).
 --
 -- CR 701.20a's duration -- revealed until the ability leaves the stack -- is not
--- modeled, and is vacuous for every card in the pool: every ability a hand
--- offers today discards the card as a cost, whether rule 702 minted the cost (CR
--- 702.29a's cycling, CR 702.77a's reinforce) or the card authored it (Faerie
--- Macabre, CR 113.6j), so it is in a public
+-- modeled, and is vacuous for every card in `data/cards/`: every ability a hand
+-- offers there discards the card as a cost, whether rule 702 minted that cost
+-- (CR 702.29a's cycling, CR 702.77a's reinforce) or the card authored it (Faerie
+-- Macabre, CR 113.6j), so the card is in a public
 -- graveyard a moment later. A forecast ability (CR 702.57a) is the shape that
 -- would make the duration observable; none is in the pool (#185, #282).
 revealIfHidden :: PlayerId -> ObjectId -> Game ()
