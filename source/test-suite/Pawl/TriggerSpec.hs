@@ -10872,6 +10872,30 @@ wardSpec s registry =
           Spec.assertEqWith s "only the Growth is on the stack" (length (GameState.stack onStack)) 1
           Spec.assertEqWith s "nobody was offered a ward cost" (payResponses transcript) []
           Spec.assertEqWith s "and the Growth resolved" (S.powerToughnessOf guardId after) (Just (6, 4))
+        -- The BEARER, moved on its own, and the pair's third axis after the
+        -- relation: bob's Giant Growth names an ordinary creature standing
+        -- beside the Honor Guard instead of the Guard. Rule 702.21a's subject is
+        -- "this permanent", so a BecameTarget naming anything else must not fire
+        -- it -- and with the Guard the board's only creature (every case above)
+        -- an engine that fired on ANY targeted object would be green throughout.
+        --
+        -- The Piker is added here rather than in `board` so the cases above keep
+        -- the one-creature board their identityAnswer targeting relies on, and
+        -- this case pins its own target instead.
+        Spec.it s "CR 702.21a a spell naming a DIFFERENT permanent fires nothing" $ do
+          (guardId, bobsGrowth, _, gs) <- boardOf
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (pikerId, withPiker) = S.addCreature piker S.alice gs
+              aimedAtPiker :: Prompt.Prompt r -> r
+              aimedAtPiker p = case p of
+                Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter (== Recipient.ToCreature pikerId) candidates) sets
+                _ -> paysFor S.bob p
+              onStack = S.runPure aimedAtPiker (S.runPure aimedAtPiker withPiker (S.cast S.bob bobsGrowth)) Engine.settleForPriority
+              ((_, after), transcript) = Replay.record aimedAtPiker onStack Stack.resolveTop
+          Spec.assertEqWith s "only the Growth is on the stack" (length (GameState.stack onStack)) 1
+          Spec.assertEqWith s "nobody was offered a ward cost" (payResponses transcript) []
+          Spec.assertEqWith s "and the Growth resolved onto the PIKER" (S.powerToughnessOf pikerId after) (Just (5, 4))
+          Spec.assertEqWith s "leaving the Guard a 3/1" (S.powerToughnessOf guardId after) (Just (3, 1))
         -- Rule 702.21 states no "each instance" sentence, so two instances are
         -- two abilities for CR 603.2's general reason. Asserted of the MINT, as
         -- fabricate's multiplicity is: no printing carries ward twice.
