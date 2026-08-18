@@ -447,9 +447,11 @@ attackerAssignment gs contested (attacker, target) = case Projection.powerOf att
                 -- CR 702.19e's attacker -- which does get here, with its
                 -- planeswalker off the battlefield -- reads the combat record's
                 -- defending player, which CR 508.5's second sentence says is that
-                -- planeswalker's controller. A battle that has left is the one
-                -- shape that could reach the fallback (#1248); answering with the
-                -- CR 510.1c default is the conservative reading there.
+                -- planeswalker's controller. An attacker whose BATTLE has left
+                -- reads that same record (CR 506.4c / 506.2), so the chooser is
+                -- CR 702.22j's defending player there too. What is left for the
+                -- fallback is a battle still on the battlefield designating
+                -- nobody, which CR 310.11's repair does not leave standing.
                 let banded = any (\b -> Projection.hasKeyword Keyword.Banding b gs) blockers
                     chooser = if banded then Maybe.fromMaybe pid defending else pid
                     thresholdOf b = if trample then blockerThreshold gs attacker b else 0
