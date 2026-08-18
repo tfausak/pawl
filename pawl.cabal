@@ -1298,11 +1298,13 @@ test-suite pawl-test-suite
     Pawl.DungeonSpec
     Pawl.EngineSpec
     Pawl.EventSpec
+    Pawl.EventTriggerSpec
     Pawl.ExileSpec
     Pawl.ExpirySpec
     Pawl.FaceDownSpec
     Pawl.FilterSpec
     Pawl.GameSpec
+    Pawl.KeywordTriggerSpec
     Pawl.ManaSpec
     Pawl.ModalDoubleFacedSpec
     Pawl.ModalSpec
@@ -1332,6 +1334,7 @@ test-suite pawl-test-suite
     Pawl.TriggerSpec
     Pawl.TurnSpec
     Pawl.UntapRestrictionSpec
+    Pawl.ZoneTriggerSpec
 
   type: exitcode-stdio-1.0
 

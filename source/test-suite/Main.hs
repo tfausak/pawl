@@ -287,6 +287,7 @@ import qualified Pawl.DetainSpec
 import qualified Pawl.DungeonSpec
 import qualified Pawl.EngineSpec
 import qualified Pawl.EventSpec
+import qualified Pawl.EventTriggerSpec
 import qualified Pawl.ExileSpec
 import qualified Pawl.ExpirySpec
 import qualified Pawl.Extra.BuilderSpec
@@ -319,6 +320,7 @@ import qualified Pawl.JsonPointer.TokenSpec
 import qualified Pawl.JsonSchema.DefineSpec
 import qualified Pawl.JsonSchema.NameSpec
 import qualified Pawl.JsonSchema.SchemaSpec
+import qualified Pawl.KeywordTriggerSpec
 import qualified Pawl.ManaSpec
 import qualified Pawl.ModalDoubleFacedSpec
 import qualified Pawl.ModalSpec
@@ -351,6 +353,7 @@ import qualified Pawl.TriggerSpec
 import qualified Pawl.TurnSpec
 import qualified Pawl.UntapRestrictionSpec
 import qualified Pawl.Uri.FragmentSpec
+import qualified Pawl.ZoneTriggerSpec
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -691,6 +694,7 @@ spec s registry = do
   Pawl.DepartureSpec.spec s registry
   Pawl.DetainSpec.spec s registry
   Pawl.EventSpec.spec s registry
+  Pawl.EventTriggerSpec.spec s registry
   Pawl.ExileSpec.spec s registry
   Pawl.ExpirySpec.spec s registry
   Pawl.Extra.BuilderSpec.spec s
@@ -723,6 +727,7 @@ spec s registry = do
   Pawl.JsonSchema.DefineSpec.spec s
   Pawl.JsonSchema.NameSpec.spec s
   Pawl.JsonSchema.SchemaSpec.spec s
+  Pawl.KeywordTriggerSpec.spec s registry
   Pawl.ManaSpec.spec s registry
   Pawl.ModalDoubleFacedSpec.spec s registry
   Pawl.ModalSpec.spec s registry
@@ -754,3 +759,4 @@ spec s registry = do
   Pawl.TurnSpec.spec s registry
   Pawl.UntapRestrictionSpec.spec s registry
   Pawl.Uri.FragmentSpec.spec s
+  Pawl.ZoneTriggerSpec.spec s registry
