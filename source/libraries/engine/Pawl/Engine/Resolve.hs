@@ -2589,6 +2589,10 @@ offerCast resolving caster slot optionality offer = do
       -- quantity here is the HALF's -- its name, its alternative cost, its
       -- candidates and so its CR 118.8c excuse -- which is why the whole tuple is
       -- built inside this function rather than once for the card.
+      --
+      -- The excuse being the half's is the one part of that no test observes: no
+      -- printing pairs a multi-half layout with a hidden-zone additional cost, so
+      -- hoisting it out of this function leaves the suite green (see #1814).
       proposal oid face =
         let name = Face.name face
             -- CR 118.9a: at most ONE alternative cost, so the applied one

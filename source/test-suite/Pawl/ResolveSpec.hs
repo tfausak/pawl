@@ -10483,7 +10483,7 @@ wildEvocationSpec s registry =
       -- WHO controls the permanent bob's card became, which is the one reading
       -- that separates "that player casts it" from "the resolving controller
       -- casts it". NOT the owner: S.countOnBattlefieldByName indexes the
-      -- battlefield by owner (CR 108.1), and the card is bob's whoever cast it,
+      -- battlefield by owner (CR 108.3), and the card is bob's whoever cast it,
       -- so a count alone is green under either reading.
       controllerOfNamed n gs =
         Maybe.listToMaybe
@@ -10665,7 +10665,7 @@ wildEvocationSpec s registry =
           Spec.assertEqWith s "the Adventure half was cast, and it destroyed the Bonesplitter" (S.onBattlefield bonesplitterId gs, S.onBattlefield bonesplitterId after) (True, False)
           -- BY NAME, and CR 715.4 is why the exiled card answers to the creature's
           -- name. Transcribed from Pawl.AdventureSpec's CR 715.3d case, with bob's
-          -- exile because bob owns the card (CR 108.1).
+          -- exile because bob owns the card (CR 108.3).
           Spec.assertEqWith
             s
             "CR 715.3d: the adventurer card was exiled rather than put into a graveyard"
