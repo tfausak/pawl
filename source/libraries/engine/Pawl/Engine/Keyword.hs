@@ -409,9 +409,8 @@ cycling cost searchFor =
               Search.destination = SearchDestination.RevealThenHand
             }
 
--- CR 702.77a: "reinforce N-[cost]" means "[cost], Discard this card: Put N +1/+1
--- counters on target creature." Cycling's ability one clause over, and the first
--- hand ability with a TARGET: the target is chosen at CR 601.2c, before CR 601.2h
+-- CR 702.77a's whole ability. Cycling's one clause over, and the first hand
+-- ability with a TARGET: the target is chosen at CR 601.2c, before CR 601.2h
 -- pays and so before the discard, and the ability outlives the card it discards
 -- (CR 113.7a).
 --
@@ -552,14 +551,10 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Persist -> []
   Keyword.Undying -> []
 
--- CR 702.122a: "Crew N" means "Tap any number of other untapped creatures you
--- control with total power N or greater: This permanent becomes an artifact
--- creature until end of turn." The whole ability, minted from the one number the
--- keyword carries.
+-- CR 702.122a's whole ability, minted from the one number the keyword carries.
 --
 -- THE COST. Only the AGGREGATE is the component's own, total power being a
--- property of the chosen set rather than of any candidate; every other word of the
--- criterion is written in the existing Filter vocabulary. `Not IsSource` is
+-- property of the chosen set rather than of any candidate. `Not IsSource` is
 -- load-bearing: a Vehicle that has already become a creature could otherwise crew
 -- itself.
 --
@@ -579,8 +574,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
 -- the printed ability does not.
 --
 -- CR 208.3 needs no clause here: the Vehicle's printed power and toughness are
--- gated on its being a creature at Projection's read points, so adding the type is
--- the whole of CR 301.7b.
+-- gated on its being a creature at Projection's read points.
 crew :: Natural -> ActivatedAbility Card
 crew n =
   ActivatedAbility.MkActivatedAbility
@@ -616,8 +610,7 @@ crew n =
             (ObjectRef.InSlot Binding.triggerSource)
         )
 
--- CR 702.87a: "Level up [cost]" means "[Cost]: Put a level counter on this
--- permanent. Activate only as a sorcery." Outlast's twin below.
+-- CR 702.87a's whole ability, outlast's twin below.
 --
 -- THE COST is the printed one UNCHANGED -- rule 702.87a appends no ", {T}", so
 -- unlike outlast there is no CostComponent.TapThis and CR 302.6 does not reach
@@ -644,21 +637,15 @@ levelUp cost =
   where
     gain = Effect.PutCounters (PutCounters.MkPutCounters CounterKind.Level (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource))
 
--- CR 702.107a: "Outlast [cost]" means "[Cost], {T}: Put a +1/+1 counter on this
--- creature. Activate only as a sorcery." The card names the cost; every other word
--- is the rule's.
+-- CR 702.107a's whole ability, levelUp's twin; the card names only the cost.
 --
 -- THE COST is the printed one with CostComponent.TapThis APPENDED, rule 702.107a's
 -- ", {T}". Unlike crew's cost the tap symbol is the permanent's own, so CR 302.6
 -- does reach this ability and a creature that arrived this turn cannot outlast.
 --
 -- THE EFFECT names the permanent through Binding.triggerSource, so rule 702.107a's
--- "this creature" is named and never TARGETED (CR 115.10a). One counter always,
--- the rule writing that number itself where rule 702.112a leaves renown's to the
--- card.
---
--- CR 602.5d is the timing clause and the ONLY restriction, rule 702.107a stating
--- no once-per-turn limit.
+-- "this creature" is named and never TARGETED (CR 115.10a). CR 602.5d is the
+-- timing clause and the ONLY restriction.
 outlast :: Cost Keyword -> ActivatedAbility Card
 outlast cost =
   ActivatedAbility.MkActivatedAbility
@@ -919,8 +906,8 @@ entwineCost keywords =
         _ -> Nothing
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
--- CR 702.170a: what CR 116.2k's special action costs -- "you may exile this card
--- from your hand and PAY [COST]" -- or Nothing when the card has no plot.
+-- CR 702.170a: what CR 116.2k's special action costs, or Nothing when the card has
+-- no plot.
 --
 -- The cost of the ACTION and never of the cast: rule 702.170d makes the later cast
 -- free, so nothing consults this from Pawl.Engine.Cost.
@@ -933,9 +920,8 @@ plotCost keywords =
         _ -> Nothing
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
--- CR 702.143a: what a foretold card is CAST for -- "they may cast that card
--- after the current turn has ended by PAYING ANY FORETELL COST it has" -- or
--- Nothing when the card has no foretell.
+-- CR 702.143a: what a foretold card is CAST for, or Nothing when the card has no
+-- foretell.
 --
 -- The cost of the CAST and never of the special action, plotCost's mirror: CR
 -- 116.2h fixes the action's cost at {2} for every printing, so Pawl.Engine.Foretell
@@ -959,12 +945,10 @@ foretellCost keywords =
 --
 -- GATED on the clause each of the three rules puts in front of it, and the three
 -- clauses are not the same question. `castFor` is the keyword whose candidate cost
--- the cast was announced for, which is what rule 702.34a's "if the flashback cost
--- was paid" and rule 702.133a's jump-start clause each ask about; rule 702.127a
--- asks only whether the cast came from a graveyard.
---
--- The door Pawl.Engine.Cast uses, so that module installs a REPLACEMENT EFFECT it
--- never inspects rather than asking which of the three keywords a card has.
+-- the cast was announced for, which rule 702.34a's "if the flashback cost was
+-- paid" and rule 702.133a's jump-start clause each ask about; rule 702.127a asks
+-- only whether the cast came from a graveyard. Pawl.Engine.Cast installs what this
+-- returns without ever inspecting it.
 castFromGraveyardReplacementsOf :: Set Keyword -> Maybe Keyword -> [ReplacementEffect (Effect.Effect Card)]
 castFromGraveyardReplacementsOf keywords castFor =
   let paidFor keyword = castFor == Just keyword
@@ -1005,14 +989,13 @@ castFromGraveyardExile =
 --
 -- Gathered by the PROJECTION off POST-LAYER keyword COUNTS, since rule 702.136a
 -- functions on the battlefield -- so Humility takes it away and a static ability
--- granting riot adds it, both for free.
+-- granting riot adds it, both for free. The pattern is Filter.IsSource: CR 614.1c's
+-- ability is the entering object's own.
 --
 -- ONE ROW PER INSTANCE, because CR 702.136b says each instance works separately.
 -- The two rows are EQUAL VALUES, so what gives the second its own CR 614.5
 -- opportunity is the instance ordinal Replacement.collect assigns;
 -- Pawl.ReplacementSpec's "CR 702.136b riot twice" proves it.
---
--- The pattern is Filter.IsSource: CR 614.1c's ability is the entering object's own.
 --
 -- "Minted" rather than "entry" because CR 702.37b's megamorph rides the same
 -- function with a CR 614.1e replacement, so this answers with rows of two event
@@ -1407,10 +1390,8 @@ poisonous n =
             (Quantity.Literal (toInteger n))
         )
 
--- CR 702.115a: whenever this creature deals combat damage to a player, that
--- player exiles the top card of their library. Poisonous' condition and
--- poisonous' "that player" -- the same Binding.triggerPlayer slot the scan
--- stamps -- over a different payload.
+-- CR 702.115a: poisonous' condition and poisonous' "that player" -- the same
+-- Binding.triggerPlayer slot -- over a different payload.
 --
 -- The payload is a zone move rather than a mint of its own: ObjectRef.TopOfLibrary
 -- carries WHOSE library, so the whole sentence is one MoveToZone. An empty library
@@ -1452,12 +1433,8 @@ ingest =
             LibraryPlacement.defaultValue
         )
 
--- CR 702.86a: whenever this creature attacks, defending player sacrifices N
--- permanents.
---
--- CR 508.3a is what "attacks" means -- being declared as an attacker -- so the
--- condition is battle cry's SelfAttacks EveryTime, rule 702.86a stating no "for
--- the first time each turn" narrowing.
+-- CR 702.86a. CR 508.3a is what "attacks" means -- being declared as an attacker
+-- -- so the condition is battle cry's SelfAttacks EveryTime.
 --
 -- "DEFENDING PLAYER" is CR 508.5's, stamped onto GameEvent.AttackerDeclared at the
 -- declaration and read back into Binding.triggerPlayer, poisonous' "that player".
@@ -1486,11 +1463,7 @@ annihilator n =
             (Quantity.Literal (toInteger n))
         )
 
--- CR 702.91a: whenever this creature attacks, each other attacking creature gets
--- +1/+0 until end of turn.
---
--- CR 508.3a is what "attacks" means, so the condition is the self-scoped
--- SelfAttacks EveryTime, rule 702.91a stating no narrowing.
+-- CR 702.91a, on annihilator's SelfAttacks EveryTime condition.
 --
 -- "EACH OTHER ATTACKING CREATURE" is a SET, swept at resolution and then frozen
 -- (CR 611.2c), so an ObjectRef.EachMatching. The three conjuncts are the three
@@ -1539,10 +1512,8 @@ battleCry =
 -- Condition.Any because rule 702.100a's "and/or" compares two DIFFERENT
 -- characteristics. STRICTLY greater, spelled as "at least one more" since CR
 -- 208.1's power and toughness are whole numbers and Comparison has no strict arm.
---
--- CR 702.100c falls out rather than being written: a permanent that is not a
--- creature has no power or toughness (CR 208.3), and Condition.holds reads an
--- unanswerable side as False.
+-- CR 702.100c then falls out: a permanent that is not a creature has no power or
+-- toughness (CR 208.3), and Condition.holds reads an unanswerable side as False.
 --
 -- Effect.Evolve rather than Effect.PutCounters, which is rule 702.100b: one opcode
 -- is what ties the "evolves" marker to the placement. Renegade Krasis reads it.
@@ -1612,14 +1583,10 @@ prowess =
             (ObjectRef.EachMatching Filter.IsSource)
         )
 
--- CR 702.121a: whenever this creature attacks, it gets +1/+1 until end of turn
--- for each opponent you attacked with a creature this combat.
---
--- The condition is battle cry's SelfAttacks. Attacking a PLANESWALKER fires it
--- just the same -- CR 508.1a chooses the attackers and CR 508.1b only then says
--- what each attacks -- so what the planeswalker changes is the bonus.
---
--- "IT" is the bearer, so the payload is prowess'.
+-- CR 702.121a, on battle cry's SelfAttacks condition with prowess' payload.
+-- Attacking a PLANESWALKER fires it just the same -- CR 508.1a chooses the
+-- attackers and CR 508.1b only then says what each attacks -- so what the
+-- planeswalker changes is the bonus.
 --
 -- The BONUS is the one payload here that is not a literal:
 -- Quantity.OpponentsAttacked reads CR 508.3b's record against CR 109.5's "you".
@@ -1647,13 +1614,10 @@ melee =
             (ObjectRef.EachMatching Filter.IsSource)
         )
 
--- CR 702.23a: whenever this creature becomes blocked, it gets +N/+N until end of
--- turn for each creature blocking it beyond the first.
---
--- The condition is bushido's blocked half, CR 509.3c, which fires ONCE however
--- many creatures blocked, where flanking's CR 509.3d fires once per blocker. Rule
--- 702.23a's bonus already counts the blockers itself, so a per-blocker trigger
--- would count them twice.
+-- CR 702.23a. The condition is bushido's blocked half, CR 509.3c, which fires ONCE
+-- however many creatures blocked, where flanking's CR 509.3d fires once per
+-- blocker. Rule 702.23a's bonus already counts the blockers itself, so a
+-- per-blocker trigger would count them twice.
 --
 -- The BONUS is N COPIES of Quantity.BlockersBeyondFirst summed through
 -- Quantity.Plus, Pawl.Types.Quantity having no product node; the fold's Literal 0
@@ -1682,8 +1646,7 @@ rampage n =
             (ObjectRef.EachMatching Filter.IsSource)
         )
 
--- CR 702.25a: whenever this creature becomes blocked by a creature without
--- flanking, the blocking creature gets -1/-1 until end of turn.
+-- CR 702.25a.
 --
 -- CR 509.3d is the event -- "becomes blocked by a creature", once for each
 -- creature that blocks -- and NOT CR 509.3c's "becomes blocked", which fires once
@@ -1721,10 +1684,8 @@ flankingEffect =
         (ObjectRef.InSlot Binding.blockingCreature)
     )
 
--- CR 702.83a: whenever a creature you control attacks alone, that creature gets
--- +1/+1 until end of turn.
---
--- The ability is borne by a BYSTANDER on both sides at once: the condition watches
+-- CR 702.83a, the one minted ability borne by a BYSTANDER on both sides at once:
+-- the condition watches
 -- somebody else's declaration AND the payload pumps somebody else, so the bearer
 -- appears in neither. It supplies only CR 109.5's "you" -- the ability's
 -- controller (CR 603.3a) -- and the Filter context's source.
@@ -1757,9 +1718,8 @@ exalted =
             (ObjectRef.InSlot Binding.attackingCreature)
         )
 
--- CR 702.45a: "'Bushido N' means 'Whenever this creature blocks or becomes
--- blocked, it gets +N/+N until end of turn.'" The one keyword whose sentence names
--- TWO events: "blocks" is CR 509.3a and "becomes blocked" is CR 509.3c.
+-- CR 702.45a, the one keyword whose sentence names TWO events: "blocks" is CR
+-- 509.3a and "becomes blocked" is CR 509.3c.
 --
 -- So this returns a LIST of two abilities where its siblings return one. The
 -- alternative -- one TriggeredAbility with a disjunctive condition -- would need a
@@ -1801,9 +1761,7 @@ bushidoHalf condition n =
             (ObjectRef.EachMatching Filter.IsSource)
         )
 
--- CR 702.68a: "'Frenzy N' means 'Whenever this creature attacks and isn't
--- blocked, it gets +N/+0 until end of turn.'" bushidoHalf with the toughness bonus
--- zeroed.
+-- CR 702.68a: bushidoHalf with the toughness bonus zeroed.
 --
 -- The BONUS is a continuous effect from a RESOLVING ability (CR 611.2): it
 -- modifies power without setting it, so CR 613.4c's layer 7c applies it, and CR
@@ -1834,11 +1792,10 @@ frenzy n =
             (ObjectRef.EachMatching Filter.IsSource)
         )
 
--- CR 702.130a: whenever this creature becomes blocked, defending player loses N
--- life. Its condition is bushido's CR 509.3c half and its player is annihilator's
--- CR 508.5 one, read off GameEvent.AttackerBlocked through Binding.triggerPlayer.
--- NOT the ability's controller: CR 603.3a makes that the ATTACKING creature's
--- controller, and the life leaves whom they attacked.
+-- CR 702.130a: bushido's CR 509.3c condition and annihilator's CR 508.5 player,
+-- read off GameEvent.AttackerBlocked through Binding.triggerPlayer. NOT the
+-- ability's controller: CR 603.3a makes that the ATTACKING creature's controller,
+-- and the life leaves whom they attacked.
 --
 -- Effect.LoseLife and not damage: rule 702.130a says "loses N life", so this is CR
 -- 119.3's life loss and none of CR 120's damage machinery sees it.
@@ -1861,21 +1818,17 @@ afflict n =
             (Quantity.Literal (toInteger n))
         )
 
--- CR 702.134a: whenever this creature attacks, put a +1/+1 counter on target
--- attacking creature with power less than this creature's power. The first minted
--- ability that TARGETS. A REAL choice, since with two smaller attackers the rules
--- leave which one open.
+-- CR 702.134a, the first minted ability that TARGETS. A REAL choice, since with
+-- two smaller attackers the rules leave which one open.
 --
 -- Filter.PowerLessThanSource compares against the SOURCE, which is why that atom
--- carries no literal. No controller conjunct, rule 702.134a stating none. The
--- BEARER excludes itself with no `Not IsSource`, nothing having power less than
--- its own power, which is why the atom is strict.
+-- carries no literal, and is strict, which is what excludes the BEARER with no
+-- `Not IsSource`.
 --
 -- Effect.Mentor and not Effect.PutCounters, for evolve's reason one rule over: CR
 -- 702.134c makes "a creature mentors another creature" a trigger event, so the
 -- placement has to be distinguishable from every other +1/+1 counter. The counter
--- still goes through Event.putCounters, so CR 122.6's funnel and CR 614.16's
--- replacement opportunity are unaffected.
+-- still goes through Event.putCounters, so CR 122.6's funnel is unaffected.
 mentor :: TriggeredAbility Card
 mentor =
   TriggeredAbility.MkTriggeredAbility
@@ -1897,18 +1850,14 @@ mentor =
 mentorTarget :: SlotName.SlotName
 mentorTarget = SlotName.MkSlotName (Text.pack "mentored")
 
--- CR 702.149a: whenever this creature and at least one other creature with power
--- greater than this creature's power attack, put a +1/+1 counter on this creature.
--- Mentor's clause with the comparison reversed and the target dropped: rule
--- 702.149a pumps the BEARER, so there is nothing to choose and no slot.
+-- CR 702.149a: mentor's clause with the comparison reversed and the target
+-- dropped, rule 702.149a pumping the BEARER, so there is nothing to choose.
 --
 -- The comparison therefore rides the CONDITION. CR 702.149a's companion is part of
 -- the trigger event, not an intervening-if clause, so it is checked once as the
 -- attackers are declared and never again on resolution -- a bigger co-attacker
--- that dies in response still leaves the counter.
---
--- "Other" is the condition's own, an identity check the Filter has no atom for. No
--- controller conjunct, for mentor's reason.
+-- that dies in response still leaves the counter. "Other" is the condition's own,
+-- an identity check the Filter has no atom for.
 --
 -- Through Effect.Train, evolve's opcode one rule over: rule 702.149c makes "when
 -- this creature trains" mean the placement, so it has to be distinguishable from
@@ -1929,22 +1878,19 @@ training =
   where
     effect = Effect.Train Binding.triggerSource
 
--- CR 702.21a: ward [cost]. "Whenever this permanent becomes the target of a spell
--- or ability an opponent controls, counter that spell or ability unless that
--- player pays [cost]."
+-- CR 702.21a: ward [cost].
 --
 -- ONE CLAUSE and no branching opcode, fabricate's shape: CR 118.12a rewrites "[do
 -- something] unless [a player does something else]" as an offer followed by the
 -- thing, so the Counter is the clause's "if they don't" branch and the PayGate is
--- the offer, paid at RESOLUTION (CR 118.12).
+-- the offer, paid at RESOLUTION (CR 118.12). Optionality.Mandatory, since that
+-- offer IS the only choice rule 702.21a gives.
 --
 -- THE PAYER IS THE TARGETER'S CONTROLLER, not the bearer's, so the same
 -- Binding.targetingObject slot answers both halves of the sentence; Binding.you
 -- would offer the cost to the wrong player. That slot is NOT a target slot: rule
 -- 702.21a targets nothing, so nothing here is re-checked at CR 608.2b and a
 -- shroud-bearing spell is countered as readily as any other.
---
--- Optionality.Mandatory: the gate's offer IS the only choice rule 702.21a gives.
 ward :: Cost Keyword -> TriggeredAbility Card
 ward cost =
   TriggeredAbility.MkTriggeredAbility
@@ -1970,10 +1916,8 @@ ward cost =
         }
     effect = Effect.Counter (Counter.MkCounter (ObjectRef.InSlot Binding.targetingObject) Nothing)
 
--- CR 702.147a's TRIGGERED half: "When this creature attacks, sacrifice it at end
--- of combat." CR 508.3a is what "attacks" means, so the condition is mentor's and
--- provoke's -- SelfAttacks, EveryTime, rule 702.147a stating no once-a-turn
--- narrowing.
+-- CR 702.147a's TRIGGERED half. CR 508.3a is what "attacks" means, so the
+-- condition is mentor's and provoke's SelfAttacks EveryTime.
 --
 -- The payload is not a sacrifice. "At end of combat" makes the sacrifice a CR
 -- 603.7 DELAYED triggered ability, created as this one resolves, so the effect is
@@ -2052,21 +1996,17 @@ decayedSacrifice =
   where
     effect = Effect.Sacrifice Binding.triggerSource
 
--- CR 702.39a's provoke: whenever this creature attacks, you may choose to have
--- target creature defending player controls block this creature this combat if
--- able; if you do, untap that creature. The first minted payload that creates a CR
--- 509.1c blocking REQUIREMENT rather than changing a characteristic.
+-- CR 702.39a's provoke, the first minted payload that creates a CR 509.1c blocking
+-- REQUIREMENT rather than changing a characteristic.
 --
 -- The target slot is narrowed by Filter.ControlledByDefendingPlayer (CR 508.5),
 -- one atom rather than ControlledBy Opponent, which CR 506.2a makes too wide: at
 -- three seats only one opponent is the defending player (CR 508.5a).
 --
--- ONE clause holding BOTH effects, under one Optionality.Optional -- CR 608.2e's
--- span: rule 702.39a prints one "may", and its "if you do" makes the untap
--- conditional on the same answer. The requirement's ATTACKER is
--- Binding.triggerSource and never a target (CR 115.10a); its BLOCKER is the target
--- slot, so a creature that has become an illegal target by resolution (CR 608.2b)
--- leaves both effects with an empty set.
+-- ONE clause holding BOTH effects, under one Optionality.Optional -- rule 702.39a
+-- prints one "may", and its "if you do" makes the untap conditional on the same
+-- answer (CR 608.2e). The requirement's ATTACKER is Binding.triggerSource and
+-- never a target (CR 115.10a).
 provoke :: TriggeredAbility Card
 provoke =
   TriggeredAbility.MkTriggeredAbility
@@ -2094,10 +2034,8 @@ provoke =
 provokeTarget :: SlotName.SlotName
 provokeTarget = SlotName.MkSlotName (Text.pack "provoked")
 
--- CR 702.112a: when this creature deals combat damage to a player, if it isn't
--- renowned, put N +1/+1 counters on it and it becomes renowned.
---
--- Poisonous' condition with a plain placement onto Binding.triggerSource. No
+-- CR 702.112a: poisonous' condition with a plain placement onto
+-- Binding.triggerSource. No
 -- marking opcode, unlike training and evolve one rule apiece away: rule 702.112a's
 -- own marker is the DESIGNATION the next clause gives.
 --
@@ -2124,12 +2062,9 @@ renown n =
     grow = Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Literal (toInteger n)) (ObjectRef.InSlot Binding.triggerSource))
     designate = Effect.Designate (Designate.MkDesignate Designation.Renowned Binding.triggerSource)
 
--- CR 702.105a: whenever this creature attacks the player with the most life or
--- tied for most life, put a +1/+1 counter on it.
---
--- The whole of the keyword is in the CONDITION, which is why the payload is
--- renown's first effect with no second:
--- TriggerCondition.SelfAttacksPlayerWithMostLife carries it.
+-- CR 702.105a. The whole of the keyword is in the CONDITION,
+-- TriggerCondition.SelfAttacksPlayerWithMostLife, which is why the payload is
+-- renown's first effect with no second.
 --
 -- NOT an intervening "if" (CR 603.4), which is where renown puts its comparison:
 -- rule 702.105a prints no "if", and CR 608.2a would re-check one on resolution --
@@ -2149,10 +2084,8 @@ dethrone =
   where
     grow = Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource))
 
--- CR 702.79a: persist. "When this permanent is put into a graveyard from the
--- battlefield, if it had no -1/-1 counters on it, return it to the battlefield
--- under its owner's control with a -1/-1 counter on it" -- CR 700.4's dies, which
--- is why the condition below is SelfDies.
+-- CR 702.79a: persist. Its event is CR 700.4's dies, which is why the condition
+-- below is SelfDies.
 persist :: TriggeredAbility Card
 persist = returns CounterKind.MinusOneMinusOne
 
@@ -2168,13 +2101,11 @@ undying = returns CounterKind.PlusOnePlusOne
 --
 -- TWO INCARNATIONS, and the split is why this works: CR 400.7 mints a fresh object
 -- when the permanent dies, so the ability's SOURCE (CR 113.7a) and the CARD IT
--- MOVES are different ids. The intervening "if" is evaluated against the source
--- through CR 608.2h last known information -- what "it HAD no counters on it" asks
--- for -- while the move names Binding.became. Endless Cockroaches proves the
--- second half and Promising Duskmage the first.
---
--- CR 603.4's intervening "if" and not a Clause condition: the ability must not
--- trigger at all when the permanent died with a counter on it.
+-- MOVES are different ids. CR 603.4's intervening "if" -- not a Clause condition,
+-- the ability having to not trigger at all -- is evaluated against the source
+-- through CR 608.2h last known information, what "it HAD no counters on it" asks
+-- for, while the move names Binding.became. Endless Cockroaches proves the second
+-- half and Promising Duskmage the first.
 --
 -- The counter rides the ENTRY (CR 122.6a) rather than following as a second
 -- effect, so the permanent is never on the battlefield without it -- for persist,
@@ -2323,16 +2254,12 @@ spiritToken =
 --
 -- ONE CLAUSE and no branching opcode: rule 702.123a prints CR 118.12a's rewriting
 -- already performed, so CR 118.12 makes the counters a COST paid as the ability
--- resolves and the clause's own effects are its "if you don't" branch. The
--- counters go on the ability's SOURCE (CR 113.7a), so no slot is needed.
+-- resolves and the clause's own effects are its "if you don't" branch.
 --
 -- Optionality.Mandatory, because the printed "you may" IS the gate's offer.
 -- Marking the clause optional as well would ask twice and let a player decline
--- both halves, which rule 702.123a does not allow.
---
--- Binding.you is CR 109.5's answer for a triggered ability, and CR 111.2 gives
--- that same player the tokens. THE TOKEN IS MINTED HERE for afterlife's reason,
--- and reached by CR 612.2a the same way.
+-- both halves, which rule 702.123a does not allow. THE TOKEN IS MINTED HERE for
+-- afterlife's reason.
 fabricate :: Natural -> TriggeredAbility Card
 fabricate n =
   TriggeredAbility.MkTriggeredAbility
@@ -2441,16 +2368,13 @@ servoToken =
 -- the CR 700.4 dies event, one optional clause, one target slot.
 --
 -- The bearer never appears in the payload, so the CR 400.7 incarnation split is
--- inert here: the ability moves the card its TARGET names, chosen when the trigger
--- goes on the stack (CR 603.3d).
+-- inert here, and nothing excludes it from the target either: rule 702.46a does
+-- not say "another".
 --
 -- A CardsInGraveyard pool scoped to You is rule 702.46a's "your graveyard", read
 -- as CR 115.2's clause (a) -- and the reason the pool carries a GraveyardScope
 -- rather than a Filter is that CR 108.4 gives a card in a graveyard no controller.
 -- The move states no origin zone for that same reason.
---
--- Nothing excludes the bearer: rule 702.46a does not say "another", and its own
--- graveyard incarnation is an ordinary candidate whenever it matches.
 soulshift :: Natural -> TriggeredAbility Card
 soulshift n =
   TriggeredAbility.MkTriggeredAbility
@@ -2500,8 +2424,8 @@ soulshiftTarget = SlotName.MkSlotName (Text.pack "soulshifted")
 -- sorcery, is not minted (#1404).
 --
 -- THE CARD, NOT THE PERMANENT (CR 400.7): rule 702.55a's "exile IT" is the
--- graveyard incarnation the death minted, Binding.became -- undying's and
--- persist's split, and the reason this cannot name Binding.triggerSource.
+-- graveyard incarnation the death minted, Binding.became, which is why this cannot
+-- name Binding.triggerSource.
 --
 -- Effect.ExileHaunting rather than a MoveToZone to Zone.Exile, because the move is
 -- only half of it: CR 702.55b's link from the exiled card to the object targeted
@@ -2654,8 +2578,7 @@ vanishingLastCounter =
 --
 -- ONE ability with TWO clauses, not two abilities: two triggers under
 -- complementary intervening "if"s would not be equivalent, since CR 603.4
--- re-checks each at resolution -- a fade counter removed in response would leave
--- the removal half doing nothing, with no sacrifice half to have triggered.
+-- re-checks each at resolution.
 --
 -- THE CLAUSES ARE INVERTED against the printed order, and the printed order is
 -- unwritable: a gate is read as its clause is REACHED (CR 608.2c), so a sacrifice
@@ -2697,10 +2620,8 @@ fading =
 -- THE COUNT is Quantity.ObjectCounters, read off CR 113.7a's source through
 -- Projection.viewWithLastKnown. That is CR 608.2h doing the work: the permanent is
 -- in a graveyard by the time this resolves and CR 122.2 made its counters cease
--- with it, so the last known record is the only place the number still is.
--- Pawl.TriggerSpec's modularSpec proves it by emptying the record while the
--- trigger sits on the stack. ZERO counters is an ordinary answer rather than a
--- failure.
+-- with it, so the last known record is the only place the number still is
+-- (Pawl.TriggerSpec's modularSpec). ZERO counters is an ordinary answer.
 --
 -- Optionality.Optional is rule 702.43a's "you may". A REAL choice: declining with
 -- a legal target on the board leaves the counters nowhere.
