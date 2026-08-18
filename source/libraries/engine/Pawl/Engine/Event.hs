@@ -2219,7 +2219,7 @@ changeZoneEntering oid requestedDest position riders under = do
       -- manifested permanent for as long as it remains face down" is what the
       -- reason records -- which is what opens CR 701.40b's turn-face-up procedure
       -- to it (Pawl.Engine.FaceDown.canTurnFaceUp). The rider is a Bool, so it
-      -- names no other; see Pawl.Types.EntryRiders.
+      -- names no other (gap #1668); see Pawl.Types.EntryRiders.
       facing = if onto && EntryRiders.faceDown riders then Facing.faceDown FaceDownReason.Manifested else Facing.FaceUp
   if refused
     then pure Nothing

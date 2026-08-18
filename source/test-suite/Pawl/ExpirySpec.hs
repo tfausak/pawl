@@ -13,8 +13,10 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -28,11 +30,13 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.AfterTurn as AfterTurn
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Compares as Compares
@@ -47,6 +51,7 @@ import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Expiry as Expiry.Type
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -1403,6 +1408,185 @@ soulfireSpec s registry = Spec.describe s "SoulfireEruption" $ do
     Spec.assertEqWith s "the card itself is untouched, still in exile" (Game.zoneMembers Zone.Exile S.alice afterwards) [pikerId]
     Spec.assertEqWith s "and alice cannot play it on turn 5 either" (S.creaturesInPlay S.alice later, Game.zoneMembers Zone.Exile S.alice later) (0, [pikerId])
 
+-- Dovin, Hand of Control ({2}{W/U} Legendary Planeswalker -- Dovin, loyalty 5,
+-- War of the Spark; name, cost, type line and Oracle text checked against
+-- api.scryfall.com): "Artifact, instant, and sorcery spells your opponents cast
+-- cost {1} more to cast." / "-1: Until your next turn, prevent all damage that
+-- would be dealt to and dealt by target permanent an opponent controls."
+--
+-- The pool's producer of a turn-relative duration on a floating REPLACEMENT:
+-- every other Effect.Replace in data/cards/ arms to AtCleanup or Never, so
+-- CR 611.2a's sweep over GameState.replacements was reached only by hand before
+-- this card. The Hag above is the same duration on the other carrier, which is
+-- the contrast that makes this group worth its own board.
+--
+-- The printed clause's "and dealt by" direction is absent from pawl's
+-- transcription, leaving this Dovin WEAKER than the printing: damage the
+-- shielded permanent deals still lands. A shield that names its damage's SOURCE
+-- needs an object id baked into Pawl.Types.DamagePattern, which carries a baked
+-- id in the recipient direction only (gap #1327). Filter.IsBound is not a stand-in
+-- for it: that atom reads a resolution's slot map, and a floating shield is read
+-- at the damage event long after that map is gone. The last case below asserts
+-- the omission rather than describing it, and is what goes red the day the
+-- clause is completed.
+dovinAbility :: Printing.Printing -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
+dovinAbility p = take 1 (Face.activatedAbilities (S.combinedFace p))
+
+-- Fill every target slot with the offered candidates that name `oid`, FILTERING
+-- the pool's own set rather than building a recipient: Pool.Permanents tags its
+-- members ToObject, and a hand-built ToCreature of the same permanent is a
+-- different recipient that CR 608.2b would silently drop.
+aimedAtObject :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimedAtObject oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter (\r -> Recipient.objectOf r == Just oid) candidates) sets
+  _ -> S.identityAnswer p
+
+-- The same, for a recipient known outright -- Lightning Bolt's CR 115.4 slot in
+-- the tax cases below, where the pool offers players and permanents alike.
+aimedAtRecipient :: Recipient.Recipient -> Prompt.Prompt r -> r
+aimedAtRecipient recipient p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter (== recipient) candidates) sets
+  _ -> S.identityAnswer p
+
+-- alice casts Dovin off three Plains and activates the -1 at bob's Goblin Piker.
+-- Returns the shielded permanent, bob's War Mammoth, alice's own Piker, and the
+-- board.
+--
+-- bob's War Mammoth earns its place twice: it is the SECOND candidate the CR
+-- 601.2c choice picks between (CR 602.2b routes an ability's targets through
+-- that rule), so the prompt is a real choice rather than one
+-- elided for having exactly as many candidates as it needs, and it is the
+-- unshielded recipient every batch below hits alongside the shielded one -- the
+-- control leg, on the same board, differing from it in nothing but the shield.
+--
+-- Dovin is CAST rather than placed: CR 306.5b's replacement is what puts the
+-- five loyalty counters on him, and the -1 cannot be paid without one.
+dovinBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+dovinBoard = dovinBoardAimedAt const
+
+-- dovinBoard with the -1's target chosen by a function of (bob's Piker, alice's
+-- own Piker), so the filter case below can aim at a permanent the printed clause
+-- does not admit without a second board.
+dovinBoardAimedAt :: (ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId) -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+dovinBoardAimedAt pick plains piker warMammoth dovin =
+  let (shielded, gs1) = S.addCreature piker S.bob (S.landsInPlay plains 3)
+      (control, gs2) = S.addCreature warMammoth S.bob gs1
+      (attacker, gs3) = S.addCreature piker S.alice gs2
+      (gs4, handId) = S.handOne dovin gs3
+      cast = S.runPure S.identityAnswer gs4 (do S.cast S.alice handId; Stack.resolveTop)
+      -- CR 400.7 mints a new object as the spell moves, so the planeswalker is
+      -- the id the battlefield gained rather than the one that was in hand.
+      dovinId = case Set.toList (Set.difference (GameState.battlefield cast) (GameState.battlefield gs4)) of
+        oid : _ -> oid
+        [] -> S.noSource
+      activated = case dovinAbility dovin of
+        ability : _ -> S.runPure (aimedAtObject (pick shielded attacker)) cast (do Activate.activateAbility S.alice dovinId ability; Stack.resolveTop)
+        [] -> cast
+   in (shielded, control, attacker, activated)
+
+-- CR 601.2f's total, read as WHETHER one Mountain was enough for a Lightning
+-- Bolt: taxed it is not, untaxed it is. `caster` is who holds the Bolt and that
+-- Mountain, and is what tells PlayerScope.Opponents from EachPlayer.
+--
+-- The Mountain is added AFTER Dovin is cast, which is load-bearing in both
+-- directions: it keeps {2}{W/U} from being paid with it (leaving a Plains
+-- untapped and the Bolt payable whatever the tax), and it leaves alice's three
+-- Plains tapped, so in her own leg the Mountain is the only mana she has and a
+-- tax she does not pay is the only reason her Bolt gets cast.
+taxLeg :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> PlayerId.PlayerId -> Int
+taxLeg plains mountain bolt dovin withDovin caster =
+  let (withCard, dovinId) = S.handOne dovin (S.landsInPlay plains 3)
+      staged =
+        if withDovin
+          then S.runPure S.identityAnswer withCard (do S.cast S.alice dovinId; Stack.resolveTop)
+          else withCard
+      (boltId, gs) = S.addHandCard bolt caster (S.landsFor mountain caster 1 staged)
+      after = S.runPure (aimedAtRecipient (Recipient.ToPlayer S.alice)) gs (S.cast caster boltId)
+   in length (GameState.stack after)
+
+dovinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+dovinSpec s registry = Spec.describe s "DovinHandOfControl" $ do
+  let withBoard act = do
+        plains <- S.printingOf s registry "Plains"
+        piker <- S.printingOf s registry "Goblin Piker"
+        warMammoth <- S.printingOf s registry "War Mammoth"
+        dovin <- S.printingOf s registry "Dovin, Hand of Control"
+        act (dovinBoard plains piker warMammoth dovin)
+      hit src recipient n = DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+      amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
+      settleDamage gs batch = S.runPure S.identityAnswer gs (Damage.applyDamage batch)
+  Spec.it s "CR 611.2a / 615.3 the -1 installs one shield, armed to its controller's next turn"
+    . withBoard
+    $ \(_, _, _, gs) -> do
+      Spec.assertEqWith s "exactly one floating replacement" (length (GameState.replacements gs)) 1
+      Spec.assertEqWith s "CR 611.2a / 109.5: it ends at alice's next turn" (fmap ActiveReplacement.expiry (GameState.replacements gs)) [Expiry.Type.AtTurnOf S.alice]
+  Spec.it s "CR 615.1 the shielded permanent takes none of the batch, and bob's other creature takes all of its own"
+    . withBoard
+    $ \(shielded, control, attacker, gs) -> do
+      -- The two amounts DIFFER, so a board that had the two events backwards
+      -- could not satisfy both readings.
+      let after = settleDamage gs [hit attacker (Recipient.ToCreature shielded) 2, hit attacker (Recipient.ToCreature control) 3]
+      Spec.assertEqWith s "nothing is marked on the shielded permanent" (S.damageOf shielded after) (Just 0)
+      Spec.assertEqWith s "the unshielded creature takes its whole 3" (S.damageOf control after) (Just 3)
+      Spec.assertEqWith s "and only its event happened at all" (amounts after) [3]
+  Spec.it s "CR 514.2 / 611.2a neither cleanup nor the handoff into bob's turn reaches it"
+    . withBoard
+    $ \(shielded, _, attacker, gs) -> do
+      let bobsTurn = S.runPure S.identityAnswer gs Engine.handoffTurn
+          after = settleDamage bobsTurn [hit attacker (Recipient.ToCreature shielded) 2]
+      -- The behaviour first and the stored row second: a sweep that wrongly ate
+      -- the shield has to be reported as the damage it let through, not as a
+      -- count of GameState.replacements absorbing the mutation ahead of it.
+      Spec.assertEqWith s "bob's turn began" (GameState.activePlayer bobsTurn) S.bob
+      Spec.assertEqWith s "the same damage is still prevented" (S.damageOf shielded after) (Just 0)
+      Spec.assertEqWith s "cleanup leaves the row alone" (length (GameState.replacements (Expiry.dropAtCleanup gs))) 1
+      Spec.assertEqWith s "and so does the handoff" (length (GameState.replacements bobsTurn)) 1
+  Spec.it s "CR 611.2a it ends as alice's next turn begins, and the same damage then lands"
+    . withBoard
+    $ \(shielded, _, attacker, gs) -> do
+      let nextSeat g = S.runPure S.identityAnswer g Engine.handoffTurn
+          alicesNext = nextSeat (nextSeat gs)
+          after = settleDamage alicesNext [hit attacker (Recipient.ToCreature shielded) 2]
+      Spec.assertEqWith s "alice is active again" (GameState.activePlayer alicesNext) S.alice
+      -- Ordered as the case above is, and for the same reason.
+      Spec.assertEqWith s "the whole 2 is marked now" (S.damageOf shielded after) (Just 2)
+      Spec.assertEqWith s "and the event happened" (amounts after) [2]
+      Spec.assertEqWith s "the row is gone, not masked" (fmap ActiveReplacement.expiry (GameState.replacements alicesNext)) []
+  -- The omission, asserted. The printing prevents this damage and pawl's card
+  -- does not (gap #1327), so this case states what pawl's Dovin actually does
+  -- rather than leaving the divergence in a comment.
+  Spec.it s "CR 615.1 damage the shielded permanent DEALS is not prevented"
+    . withBoard
+    $ \(shielded, control, _, gs) -> do
+      let after = settleDamage gs [hit shielded (Recipient.ToCreature control) 3]
+      Spec.assertEqWith s "it lands in full" (S.damageOf control after) (Just 3)
+      Spec.assertEqWith s "and the event happened" (amounts after) [3]
+  -- "target permanent an OPPONENT controls", which nothing above reads: every
+  -- case there aims at bob's Piker, and a slot with no filter at all would offer
+  -- it just the same. Aiming at alice's own creature is what tells the two
+  -- apart -- the filter leaves the offered set with nothing naming it, so the
+  -- ability is activated with no permanent to shield and installs no row.
+  Spec.it s "CR 601.2c / 602.2b the slot offers no permanent alice controls" $ do
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    dovin <- S.printingOf s registry "Dovin, Hand of Control"
+    let (_, _, attacker, gs) = dovinBoardAimedAt (\_ hers -> hers) plains piker warMammoth dovin
+    Spec.assertEqWith s "no shield was installed" (fmap ActiveReplacement.expiry (GameState.replacements gs)) []
+    Spec.assertEqWith s "and alice's own creature takes damage as usual" (S.damageOf attacker (settleDamage gs [hit attacker (Recipient.ToCreature attacker) 4])) (Just 4)
+  -- The static clause, so the card is not half-dead data. CR 601.2f's increase,
+  -- scoped to the OPPONENTS: alice's own instant is untaxed, which is the only
+  -- thing that tells PlayerScope.Opponents from Thalia's EachPlayer.
+  Spec.it s "CR 601.2f an opponent's instant costs {1} more, and alice's does not" $ do
+    plains <- S.printingOf s registry "Plains"
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    dovin <- S.printingOf s registry "Dovin, Hand of Control"
+    let leg = taxLeg plains mountain bolt dovin
+    Spec.assertEqWith s "with no Dovin, bob's one Mountain casts the Bolt" (leg False S.bob) 1
+    Spec.assertEqWith s "under Dovin, the same Mountain does not" (leg True S.bob) 0
+    Spec.assertEqWith s "and alice's own Bolt is untaxed off hers" (leg True S.alice) 1
+
 poolSize :: PlayerId.PlayerId -> GameState.GameState -> Int
 poolSize pid gs = case Game.poolOf pid gs of
   Mana.Type.MkMana units -> length units
@@ -1420,4 +1604,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Expiry" $ do
   hagSpec s registry
   endOfNextTurnSpec s
   soulfireSpec s registry
+  dovinSpec s registry
   lingeringSpec s registry

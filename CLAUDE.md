@@ -215,6 +215,13 @@ to agents as written. What it doesn't say:
     every hit, and record in the PR which ones you read and why each is right as
     it stands.
 
+5.  Closing #N means moving every census row that cites it. #875, #876 and #877
+    annotate implemented rows with the issue numbers of what those rows still
+    don't do, and `script/check-census.sh` checks rule numbers and written
+    constructor names but never issue numbers --- so a closed number inside a
+    row is invisible to it. `grep` the issue number in the three bodies before
+    opening the PR, and edit the row in the same PR.
+
 ## Code conventions
 
 `docs/style-guide.md` is the style guide and is not repeated here. The

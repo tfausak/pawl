@@ -16,11 +16,12 @@ import qualified Pawl.Types.Uses as Uses
 -- projection re-derives a permanent's static replacement abilities live, while
 -- these are stored because the object that made them may be long gone.
 --
--- `expiry` decides when a sweep drops it (Pawl.Engine.Expiry; CR 514.2). No card
--- in the pool arms a floating replacement to anything but AtCleanup or Never, so
--- the conditional (CR 611.2b) and turn-relative (CR 611.2a) expiries reach this
--- carrier only through hand-built test fixtures, and AtTurnOf on a replacement
--- has no test at all (#84). `uses` is CR 614.3's used-up count, and the
+-- `expiry` decides when a sweep drops it (Pawl.Engine.Expiry; CR 514.2). CR
+-- 611.2a's turn-relative expiry has a printed producer here -- Dovin, Hand of
+-- Control's -1, run end to end by Pawl.ExpirySpec's DovinHandOfControl group.
+-- CR 611.2b's conditional one still has none: every other card in the pool arms
+-- a floating replacement to AtCleanup or Never, so Expiry.While reaches this
+-- carrier only through a hand-built fixture (#84). `uses` is CR 614.3's used-up count, and the
 -- prevention shields are the rows that do not use it: a CR 615.7 shield's
 -- remaining amount rides DamageRewrite.PreventNext instead, because 615.7 counts
 -- damage where this field counts applications, and an unbounded one (CR 615.3)
