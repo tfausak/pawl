@@ -3284,8 +3284,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- the same ability, reading the same linked set back off the exile the rebuild
   -- left standing (CR 727.4's additional instructions).
   --
-  -- Not implemented: CR 727.5a's exempted commander, which needs a Commander game
-  -- to observe (#1627), and CR 727.6's restarted SUBGAME (#1628).
+  -- CR 727.5a's exempted commander needs no case of its own: Setup's rebuild
+  -- drops the exempt set before it picks each owner's commander out of the pool,
+  -- and resetPlayers leaves Player.commander alone. Pawl.CommanderSpec's Restart
+  -- group proves both sentences.
+  --
+  -- Not implemented: CR 727.6's restarted SUBGAME (#1628).
   Effect.RestartGame exempt -> do
     gs <- State.get
     let exempted = case exempt of
