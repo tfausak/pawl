@@ -14,15 +14,20 @@ module Pawl.Types.ManaSpending where
 --
 -- A TYPE and not a Bool, because the axis has a second point the rules already
 -- write: "spend mana as though it were mana of any color" (CR 609.4b's own
--- wording) permits five types where AnyType permits CR 106.1b's six. No card in
--- this pool prints it, so it is a constructor this type does not have yet rather
--- than a field.
+-- wording) permits five types where AnyType permits CR 106.1b's six. Celestial
+-- Dawn prints that wording, and it is NOT a constructor here -- see below.
 --
 -- Not a per-PLAYER setting: rule 118.14's last sentence scopes the permission to
 -- the spells cast under the effect that granted it ("this applies only to mana
 -- that player spends to cast spells that way"), which is why it rides
 -- Pawl.Types.ExilePlayPermission -- one card, one player -- rather than sitting
 -- on the player.
+--
+-- The per-player half of CR 609.4b is Pawl.Types.SpendManaAsThough, and the two
+-- cannot be one type. This one is applied to a COST's demands, so no constructor
+-- of it can depend on which unit is being spent; Celestial Dawn's sentence says
+-- different things about two manas of one pool and so is applied to the SUPPLY
+-- each unit offers.
 data ManaSpending
   = -- | The default, and every cost in the game that no effect has spoken about:
     -- a demand for red mana is served by red mana.

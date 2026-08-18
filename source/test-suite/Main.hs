@@ -226,6 +226,7 @@ import qualified Pawl.Codec.SpecialActionSpec
 import qualified Pawl.Codec.SpeedDecreaseSpec
 import qualified Pawl.Codec.SpellCastSpec
 import qualified Pawl.Codec.SpellWasCastSpec
+import qualified Pawl.Codec.SpendManaAsThoughSpec
 import qualified Pawl.Codec.StackObjectKindSpec
 import qualified Pawl.Codec.StaticAbilitySpec
 import qualified Pawl.Codec.StepBeganSpec
@@ -625,6 +626,7 @@ spec s registry = do
   Pawl.Codec.SpeedDecreaseSpec.spec s
   Pawl.Codec.SpellCastSpec.spec s
   Pawl.Codec.SpellWasCastSpec.spec s
+  Pawl.Codec.SpendManaAsThoughSpec.spec s
   Pawl.Codec.StackObjectKindSpec.spec s
   Pawl.Codec.StaticAbilitySpec.spec s
   Pawl.Codec.StepBeganSpec.spec s
