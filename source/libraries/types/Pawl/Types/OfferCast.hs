@@ -21,7 +21,9 @@ data OfferCast = MkOfferCast
     --
     -- Mandatory does NOT mean the cast always happens: rule 601.3's prohibitions
     -- and an unpayable cost still stop it, which is what "if able" says out
-    -- loud. What it removes is the question.
+    -- loud. Nor does it always remove the question -- CR 118.8c hands it back
+    -- where the mandatory additional cost names cards of a stated quality in a
+    -- hidden zone, which Pawl.Engine.Cost.statesHiddenQuality classifies.
     optionality :: Optionality.Optionality,
     -- | Elided when the offer carries neither rider, which is an ordinary cast
     -- of the card.
