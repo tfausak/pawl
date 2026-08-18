@@ -2604,20 +2604,16 @@ hauntTarget = SlotName.MkSlotName (Text.pack "haunted")
 -- CR 702.94a's linked triggered ability: "When you reveal this card this way, you
 -- may cast it by paying [cost] rather than its mana cost."
 --
--- One mode, one MANDATORY clause: the "you may" governs the CASTING alone, and
--- that is Prompt.OfferedCast's own question -- Pawl.Engine.Battle.siegeDefeat
--- makes the same call for the same reason, and for the same rule (CR 608.2g).
--- Marking the clause optional would raise a second prompt for one printed "may".
+-- One MANDATORY clause: the "you may" governs the CASTING alone, which is
+-- Prompt.OfferedCast's own question (CR 608.2g). Marking the clause optional would
+-- raise a second prompt for one printed "may".
 --
--- ONE effect and no move ahead of it, which is where this parts from siegeDefeat:
--- CR 701.20b says revealing does not move the card, so what may be cast is the
--- very object the ability triggered from -- Binding.triggerSource (CR 113.7a),
--- not Binding.became. The card is in its owner's hand throughout.
+-- No move ahead of the offer: CR 701.20b says revealing does not move the card, so
+-- what may be cast is Binding.triggerSource (CR 113.7a), not Binding.became.
 --
--- The cost rides the OFFER (CastOffer.payingInstead) rather than the card,
--- because CR 118.9 makes it an alternative cost applied to the spell "from
--- another effect": Thunderous Wrath in a hand nobody drew this turn costs
--- {4}{R}{R}, and nothing about the card changes when it does not.
+-- The cost rides the OFFER (CastOffer.payingInstead) rather than the card, CR
+-- 118.9 making it an alternative cost applied "from another effect": Thunderous
+-- Wrath in a hand nobody drew this turn still costs {4}{R}{R}.
 miracle :: Cost Keyword -> TriggeredAbility Card
 miracle cost =
   TriggeredAbility.MkTriggeredAbility
@@ -2645,14 +2641,10 @@ miracle cost =
 -- card would cost if its controller took the reveal. Nothing when the card has no
 -- miracle ability at all, which is also "no window to open".
 --
--- flashbackCost's shape exactly, including the wildcard -- this asks about ONE
--- constructor rather than classifying every keyword -- and asked of the card's
--- PRINTED keywords for that function's reason: rule 702.94a's abilities function
--- in the hand (CR 113.6b), where no pool effect changes a card's keywords (#160).
---
--- ONE cost per card, morphCost's shape: the ascending-least of the miracle
--- costs the card prints, so the reveal opens a window at that price and no
--- other.
+-- flashbackCost's shape exactly, and asked of the card's PRINTED keywords for that
+-- function's reason: rule 702.94a's abilities function in the hand (CR 113.6b),
+-- where no pool effect changes a card's keywords (#160). ONE cost per card (the
+-- ascending-least), morphCost's shape.
 miracleCost :: Set Keyword -> Maybe (Cost Keyword)
 miracleCost keywords =
   let costOf keyword = case keyword of
@@ -2672,41 +2664,25 @@ miracleCost keywords =
 printedTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card]
 printedTriggeredAbilitiesOf = triggeredAbilitiesOf . Map.fromSet (const 1)
 
--- CR 702.63a's SECOND and THIRD abilities. Rule 702.63a states three and the
--- first is mintedReplacementsFor's, so vanishing is the first keyword here whose
--- rule text spans both mints. Bushido's "one instance, two abilities" shape, and
--- another of abilitiesFor's `concat` arms.
---
--- Ordered as rule 702.63a prints them, which is also the order they fire in: the
--- upkeep removal is what takes the last counter off, and the sacrifice watches
--- that removal.
+-- CR 702.63a's SECOND and THIRD abilities, the first being mintedReplacementsFor's
+-- -- so vanishing's rule text spans both mints. Ordered as rule 702.63a prints
+-- them, which is also the order they fire in: the upkeep removal takes the last
+-- counter off, and the sacrifice watches that removal.
 vanishing :: [TriggeredAbility Card]
 vanishing = [vanishingUpkeep, vanishingLastCounter]
 
 -- "At the beginning of your upkeep, if this permanent has a time counter on it,
 -- remove a time counter from it."
 --
--- TurnScope.ControllersTurn is rule 702.63a's "YOUR upkeep": CR 603.3a makes the
--- ability's controller the permanent's controller, so the scope reads off the
--- same player the rule's "you" names, and an opponent's upkeep is not this
--- trigger.
+-- TurnScope.ControllersTurn is rule 702.63a's "YOUR upkeep" (CR 603.3a).
 --
 -- THE INTERVENING "IF" is renown's, one quantity over: rule 702.63a prints "if",
--- so CR 603.4 keeps the ability off the stack on an upkeep where the counters
--- are already gone. Quantity.ObjectCounters reads the object the condition is
--- evaluated against, which for a triggered ability is CR 113.7a's source; AtLeast
--- 1 is the rule's "has a time counter on it".
+-- so CR 603.4 keeps the ability off the stack on an upkeep where the counters are
+-- already gone. CR 608.2a's re-check is unobservable here, an instance that
+-- resolved with the condition false removing nothing and raising no event.
 --
--- CR 608.2a's re-check comes with the clause and is unobservable here: an
--- instance that resolved with the condition false would remove nothing, and
--- Effect.RemoveCounters raises no event for a removal of nothing -- so no
--- vanishing board tells the two readings apart.
---
--- Effect.RemoveCounters against Binding.triggerSource for renown's reason: rule
--- 702.63a says "from it", and CR 115.10a makes a named object not a target.
---
--- ONE counter per instance, not per counter present: rule 702.63a removes a
--- single one, and CR 702.63c is what makes a second instance remove a second.
+-- ONE counter per instance, not per counter present: rule 702.63a removes a single
+-- one, and CR 702.63c is what makes a second instance remove a second.
 vanishingUpkeep :: TriggeredAbility Card
 vanishingUpkeep =
   TriggeredAbility.MkTriggeredAbility
@@ -2724,15 +2700,9 @@ vanishingUpkeep =
 
 -- "When the last time counter is removed from this permanent, sacrifice it."
 --
--- Pawl.Engine.Battle.siegeDefeat's condition with a different kind and a
--- different payload: CR 310.12b and rule 702.63a ask the same question of
--- Object.counters, which is why TriggerCondition.SelfLastCounterRemoved needed no
--- widening for this row.
---
 -- Watches the REMOVAL and not the count, so a permanent whose time counters were
--- all removed before it entered has nothing to trigger -- and an upkeep that
--- removes nothing (the intervening "if" above being false) raises no
--- GameEvent.CountersRemoved to match either.
+-- all removed before it entered has nothing to trigger, and an upkeep that removes
+-- nothing raises no GameEvent.CountersRemoved to match either.
 --
 -- Effect.Sacrifice, never Destroy: CR 701.21a says a sacrifice is not a
 -- destruction, so an indestructible permanent with vanishing still goes.
@@ -2753,34 +2723,21 @@ vanishingLastCounter =
 -- CR 702.32a's SECOND ability: "at the beginning of your upkeep, remove a fade
 -- counter from this permanent. If you can't, sacrifice the permanent."
 --
--- vanishingUpkeep's trigger condition exactly -- rule 702.32a prints the same
--- "your upkeep", so TurnScope.ControllersTurn for that arm's reason -- and
--- everything after it differs, which is why fading is not vanishing with a
--- counter kind swapped. Rule 702.32a states NO intervening "if", so this fires on
--- every one of its controller's upkeeps including the one where the pile is
--- already empty; that firing is the whole of the rule's sacrifice.
+-- vanishingUpkeep's trigger condition exactly, and everything after it differs.
+-- Rule 702.32a states NO intervening "if", so this fires on every one of its
+-- controller's upkeeps including the one where the pile is already empty; that
+-- firing is the whole of the rule's sacrifice.
 --
--- ONE ability with TWO clauses, not two: rule 702.32a's "if you can't" is a
--- second sentence of the same ability. The alternative -- two triggers under
--- complementary intervening "if"s -- is not equivalent, since CR 603.4 re-checks
--- each at resolution: a fade counter removed in response would leave the removal
--- half doing nothing, with no sacrifice half to have triggered, and the permanent
--- would survive an upkeep rule 702.32a takes it on.
+-- ONE ability with TWO clauses, not two abilities: two triggers under
+-- complementary intervening "if"s would not be equivalent, since CR 603.4
+-- re-checks each at resolution -- a fade counter removed in response would leave
+-- the removal half doing nothing, with no sacrifice half to have triggered.
 --
 -- THE CLAUSES ARE INVERTED against the printed order, and the printed order is
--- unwritable: a gate is read as its clause is REACHED (Pawl.Engine.Resolve's
--- gateHolds, CR 608.2c's written order), so a sacrifice clause standing after the
--- removal would read a pile the removal had already emptied and take the
--- permanent on the very upkeep the rule keeps it. Asking "are there none?" first
--- reads the count rule 702.32a's "can't" is about. Observably equivalent to the
--- printed order because nothing runs between two clauses of one resolution: no
--- player gets priority until it finishes (CR 117.3b), and CR 704.3 hangs both the
--- state-based actions and the waiting triggers off that same moment.
---
--- Both clauses Mandatory: rule 702.32a prints no "may" on either sentence.
---
--- Effect.Sacrifice, never Destroy, and Binding.triggerSource for the reasons
--- vanishing's two arms give.
+-- unwritable: a gate is read as its clause is REACHED (CR 608.2c), so a sacrifice
+-- clause standing after the removal would read a pile the removal had already
+-- emptied. Observably equivalent, since nothing runs between two clauses of one
+-- resolution (CR 117.3b, CR 704.3).
 fading :: TriggeredAbility Card
 fading =
   TriggeredAbility.MkTriggeredAbility
@@ -2810,37 +2767,22 @@ fading =
 -- CR 702.43a's SECOND ability: "when this permanent is put into a graveyard from
 -- the battlefield, you may put a +1/+1 counter on target artifact creature for
 -- each +1/+1 counter on this permanent." Mentor's shape -- one target slot, one
--- counter-placing effect -- with a "may" and a counted quantity where mentor has a
--- mandatory clause and a literal 1, and a plain Effect.PutCounters where that one
--- has CR 702.134c's marker to record.
+-- counter-placing effect -- with a "may" and a counted quantity, and a plain
+-- Effect.PutCounters where mentor has CR 702.134c's marker to record.
 --
--- TriggerCondition.SelfDies is CR 700.4's battlefield-to-graveyard pair, which is
--- what rule 702.43a's longhand spells out. So the ability's source is the
--- DEPARTING incarnation, the id GameState.lastKnown files under -- which is what
--- makes the count below answerable at all.
+-- THE COUNT is Quantity.ObjectCounters, read off CR 113.7a's source through
+-- Projection.viewWithLastKnown. That is CR 608.2h doing the work: the permanent is
+-- in a graveyard by the time this resolves and CR 122.2 made its counters cease
+-- with it, so the last known record is the only place the number still is.
+-- Pawl.TriggerSpec's modularSpec proves it by emptying the record while the
+-- trigger sits on the stack.
 --
--- THE COUNT is Quantity.ObjectCounters, which names no object and takes the one
--- the evaluation is aimed at: CR 113.7a's source, read through
--- Projection.viewWithLastKnown. That is CR 608.2h doing the work -- the permanent
--- is in a graveyard by the time this resolves and CR 122.2 made its counters
--- cease with it, so the last known record is the only place the number still is.
--- Promising Duskmage's intervening "if" reads the same record the same way; this
--- is the first to read it at RESOLUTION, which Pawl.TriggerSpec's modularSpec
--- proves by emptying the record while the trigger sits on the stack.
+-- Optionality.Optional is rule 702.43a's "you may". A REAL choice: declining with
+-- a legal target on the board leaves the counters nowhere.
 --
--- Optionality.Optional is rule 702.43a's "you may", asked of the controller as
--- the ability resolves (Pawl.Engine.Resolve.exercises). A REAL choice: declining
--- with a legal target on the board leaves the counters nowhere, which is why
--- nothing here elides it.
---
--- The target is Pool.Creatures narrowed to artifacts -- rule 702.43a's "target
--- artifact creature", CR 109.2 drawing the candidates from the battlefield. No
--- controller conjunct, because the rule states none, and no `Not IsSource`: the
--- bearer is in a graveyard and is not a candidate anyway.
---
--- ZERO counters is an ordinary answer rather than a failure, the position
--- Quantity.OpponentsAttacked takes: a modular permanent whose counters were all
--- removed before it died still triggers, still targets, and puts nothing on.
+-- ZERO counters is an ordinary answer rather than a failure: a modular permanent
+-- whose counters were all removed before it died still triggers, still targets,
+-- and puts nothing on.
 modular :: TriggeredAbility Card
 modular =
   TriggeredAbility.MkTriggeredAbility
