@@ -2118,40 +2118,22 @@ decayedSacrifice =
 
 -- CR 702.39a's provoke: whenever this creature attacks, you may choose to have
 -- target creature defending player controls block this creature this combat if
--- able; if you do, untap that creature. Rule 702 states it as a triggered
--- ability, and it is the first whose payload creates a CR 509.1c blocking
--- REQUIREMENT rather than changing a characteristic.
+-- able; if you do, untap that creature. The first minted payload that creates a CR
+-- 509.1c blocking REQUIREMENT rather than changing a characteristic.
 --
--- CR 508.3a is what "attacks" means, so the condition is mentor's -- SelfAttacks,
--- EveryTime, rule 702.39a stating no once-a-turn narrowing.
+-- The target slot is narrowed by Filter.ControlledByDefendingPlayer (CR 508.5),
+-- one atom rather than ControlledBy Opponent, which CR 506.2a makes too wide: at
+-- three seats only one opponent is the defending player (CR 508.5a).
 --
--- The target slot is Pool.Creatures ("creature", drawn from the battlefield by
--- CR 109.2) narrowed by Filter.ControlledByDefendingPlayer ("defending player
--- controls", CR 508.5). One atom rather than ControlledBy Opponent, which CR
--- 506.2a makes too wide: with three seats only one opponent is the defending
--- player, and CR 508.5a says an ability means that one.
+-- ONE clause holding BOTH effects, under one Optionality.Optional -- CR 608.2e's
+-- span: rule 702.39a prints one "may", and its "if you do" makes the untap
+-- conditional on the same answer.
 --
--- ONE clause holding BOTH effects, under one Optionality.Optional. That is CR
--- 608.2e's span: rule 702.39a prints one "may", and its "if you do" makes the
--- untap conditional on the same answer -- so this is one question, not two.
+-- The requirement's ATTACKER is Binding.triggerSource and never a target (CR
+-- 115.10a). Its BLOCKER is the target slot, so a creature that has become an
+-- illegal target by resolution (CR 608.2b) leaves both effects with an empty set.
 --
--- The order is rule 702.39a's -- require, then untap -- and it is not observable
--- either way: both apply while the ability resolves, and CR 509.1a reads the
--- board only at the declare blockers step. The printed reminder text says
--- "untap and block" for the same one instruction.
---
--- The requirement's ATTACKER is Binding.triggerSource and never a target: rule
--- 702.39a says "this creature", and CR 115.10a makes a named object not a target
--- (crew's argument). Its BLOCKER is the target slot, so a creature that has
--- become an illegal target by resolution (CR 608.2b) leaves both effects with an
--- empty set and provoke does nothing.
---
--- Duration.UntilEndOfCombat is "this combat" -- CR 500.5a puts the end at the end
--- of the combat PHASE, which is where CR 509.1c's requirement stops mattering
--- anyway.
---
--- Single mode, ChooseExactly 1, no intervening clause: the only things rule
--- 702.39a leaves to choose are the target and the "may".
+-- Duration.UntilEndOfCombat is "this combat" (CR 500.5a).
 provoke :: TriggeredAbility Card
 provoke =
   TriggeredAbility.MkTriggeredAbility
@@ -2180,37 +2162,24 @@ provokeTarget :: SlotName.SlotName
 provokeTarget = SlotName.MkSlotName (Text.pack "provoked")
 
 -- CR 702.112a: when this creature deals combat damage to a player, if it isn't
--- renowned, put N +1/+1 counters on it and it becomes renowned. Rule 702 states
--- it as a triggered ability, minted here like its siblings in `abilitiesFor`.
+-- renowned, put N +1/+1 counters on it and it becomes renowned.
 --
--- Poisonous' condition with a plain placement: rule 702.112a's event is the
--- bearer's combat damage to a player (SelfDealsCombatDamageToPlayer, rule
--- 702.70a's) and its counters go on the bearer (Effect.PutCounters against the
--- reserved Binding.triggerSource slot). No marking opcode, unlike training and
--- evolve one rule apiece away: rule 702.112a's own marker is the DESIGNATION the
--- next clause gives, which a later ability reads off the permanent rather than off
--- an event. Not mentor's target slot either:
--- rule 702.112a says "it", and CR 115.10a makes a named object not a target.
+-- Poisonous' condition with a plain placement onto Binding.triggerSource. No
+-- marking opcode, unlike training and evolve one rule apiece away: rule 702.112a's
+-- own marker is the DESIGNATION the next clause gives, read off the permanent
+-- rather than off an event.
 --
--- THE INTERVENING "IF" is what this row adds -- the first minted ability with one.
--- CR 603.4 checks it as the ability would trigger AND CR 608.2a again as it
--- resolves, which is exactly what CR 702.112c leans on: with two instances the
--- first to resolve designates the creature, and the second finds it renowned and
--- is removed from the stack. Pawl.Types.Clause's printed "may"/"if" (CR 608.2e)
--- would check only on resolution and let the trigger onto the stack regardless,
--- which rule 603.4 forbids.
+-- THE INTERVENING "IF" is what this row adds. CR 603.4 checks it as the ability
+-- would trigger AND CR 608.2a again as it resolves, which is what CR 702.112c
+-- leans on: with two instances the first to resolve designates the creature, and
+-- the second finds it renowned and is removed from the stack. A printed "may"/"if"
+-- clause (CR 608.2e) would check only on resolution.
 --
--- Quantity.HasDesignation Renowned AtMost 0 is "isn't renowned": the designation read as a 0/1
--- off the object the condition is evaluated against, which for a triggered ability
--- is CR 113.7a's source (Pawl.Engine.Stack's OfTrigger arm).
+-- Quantity.HasDesignation Renowned AtMost 0 is "isn't renowned", read off CR
+-- 113.7a's source.
 --
--- ONE clause holding BOTH effects, in rule 702.112a's printed order and under one
--- Optionality.Mandatory -- the rule prints one sentence and no "may". Nobody gets
--- priority between them (CR 117.3b), and no CR 614.16 counter replacement in the
--- pool reads the designation, so the order is unobservable today.
---
--- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability is
--- placed -- rule 702.112a leaves nothing to choose.
+-- ONE clause holding BOTH effects, the rule printing one sentence. Nobody gets
+-- priority between them (CR 117.3b).
 renown :: Natural -> TriggeredAbility Card
 renown n =
   TriggeredAbility.MkTriggeredAbility
@@ -2228,25 +2197,16 @@ renown n =
     designate = Effect.Designate (Designate.MkDesignate Designation.Renowned Binding.triggerSource)
 
 -- CR 702.105a: whenever this creature attacks the player with the most life or
--- tied for most life, put a +1/+1 counter on it. Rule 702 states it as a
--- triggered ability, minted like the rest of this roster.
+-- tied for most life, put a +1/+1 counter on it.
 --
--- The whole of the keyword is in the CONDITION, which is why the payload below is
--- renown's first effect with no second: rule 702.105a's "the player with the most
--- life or tied for most life" is a fact about the BOARD read against the
--- declaration, and TriggerCondition.SelfAttacksPlayerWithMostLife carries it.
+-- The whole of the keyword is in the CONDITION, which is why the payload is
+-- renown's first effect with no second:
+-- TriggerCondition.SelfAttacksPlayerWithMostLife carries it.
 --
 -- NOT an intervening "if" (CR 603.4), which is where renown puts its comparison:
--- rule 702.105a prints no "if", and CR 608.2a would re-check an intervening one on
--- resolution -- so an opponent gaining life in response would wrongly remove the
--- ability from the stack.
---
--- "It" is the bearer, CR 113.7a's source, already reserved in
--- Binding.triggerSource -- so nothing is bound off the event and this ability
--- needs no opcode of its own.
---
--- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability is
--- placed -- rule 702.105a leaves nothing to choose.
+-- rule 702.105a prints no "if", and CR 608.2a would re-check one on resolution --
+-- so an opponent gaining life in response would wrongly remove the ability from
+-- the stack.
 dethrone :: TriggeredAbility Card
 dethrone =
   TriggeredAbility.MkTriggeredAbility
@@ -2273,42 +2233,28 @@ persist = returns CounterKind.MinusOneMinusOne
 undying :: TriggeredAbility Card
 undying = returns CounterKind.PlusOnePlusOne
 
--- The sentence both keywords state, in the counter kind that tells them apart.
--- ONE body rather than two, because rules 702.79a and 702.93a differ in nothing
--- else: the kind decides which counter the permanent comes back with AND which
--- one the "if" clause looks for, and it is the same kind in both places.
+-- The sentence both keywords state, in the counter kind that tells them apart. ONE
+-- body rather than two, rules 702.79a and 702.93a differing in nothing else: the
+-- kind decides which counter the permanent comes back with AND which one the "if"
+-- clause looks for.
 --
--- TWO INCARNATIONS, and the split is the whole reason this works: CR 400.7 mints
--- a fresh object when the permanent dies, so the ability's SOURCE (CR 113.7a, the
--- permanent as it was on the battlefield) and the CARD IT MOVES (the graveyard
--- incarnation) are different ids. The intervening "if" is evaluated against the
--- source, read from CR 608.2h last known information -- which is what "it HAD no
--- counters on it" asks for -- while the move names Binding.became, the arriving
--- incarnation CR 400.7e binds. Endless Cockroaches proves the second half and
--- Promising Duskmage the first.
+-- TWO INCARNATIONS, and the split is why this works: CR 400.7 mints a fresh object
+-- when the permanent dies, so the ability's SOURCE (CR 113.7a) and the CARD IT
+-- MOVES (the graveyard incarnation) are different ids. The intervening "if" is
+-- evaluated against the source through CR 608.2h last known information -- what
+-- "it HAD no counters on it" asks for -- while the move names Binding.became.
+-- Endless Cockroaches proves the second half and Promising Duskmage the first.
 --
 -- CR 603.4's intervening "if" and not a Clause condition: the ability must not
--- trigger at all when the permanent died with a counter on it, and it is checked
--- AGAIN on resolution (CR 608.2a). AtMost 0 is "had no counters", the shape
--- renown's clause takes.
+-- trigger at all when the permanent died with a counter on it.
 --
--- The counter rides the ENTRY (EntryRiders.counters, CR 122.6a) rather than
--- following as a second effect, so the permanent is never on the battlefield
--- without it -- which for persist is the difference between a 2/2 coming back as
--- a 1/1 and a 2/2 that briefly was not.
+-- The counter rides the ENTRY (CR 122.6a) rather than following as a second
+-- effect, so the permanent is never on the battlefield without it -- for persist,
+-- the difference between a 2/2 coming back as a 1/1 and one that briefly was not.
 --
 -- `underOwner` is rule 702.79a's "under its owner's control", which CR 110.2a
--- otherwise answers with the ability's controller: a permanent stolen by CR 613's
--- layer 2 dies under the thief's control (CR 603.3a hands them the trigger) and
--- still comes back to its owner.
---
--- No stated origin zone and no bound destination slot: neither rule says where
--- the card is returned FROM -- which is what the CR 113.6m field records, and
--- this is a battlefield ability whatever it moves -- and nothing later in the
--- resolution names what arrived.
---
--- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability is
--- placed -- neither rule leaves anything to choose.
+-- otherwise answers with the ability's controller: a permanent stolen at layer 2
+-- dies under the thief's control and still comes back to its owner.
 returns :: CounterKind.CounterKind Keyword.Keyword -> TriggeredAbility Card
 returns kind =
   TriggeredAbility.MkTriggeredAbility
@@ -2346,32 +2292,21 @@ returns kind =
 -- flying." The same CR 700.4 dies event `returns` above watches, so the
 -- condition is TriggerCondition.SelfDies.
 --
--- No intervening "if" and nothing bound: rule 702.135a states one sentence with
--- no condition, and unlike undying and persist it never touches the permanent
--- that died -- so neither Binding.triggerSource nor Binding.became appears, and
--- the ability is indifferent to the CR 400.7 incarnation split.
+-- Nothing is bound: unlike undying and persist this never touches the permanent
+-- that died, so the ability is indifferent to the CR 400.7 incarnation split. CR
+-- 111.2 gives the tokens to the ability's controller, which is why
+-- EntryRiders.underOwner is inert under a Create.
 --
--- CR 111.2 gives the tokens to the ability's controller, which for a dies
--- trigger is whoever controlled the permanent as it left (CR 603.3a). That is
--- rule 111.2 rather than the rider undying and persist need:
--- EntryRiders.underOwner is inert under a Create, since a token's owner and its
--- controller are the same player by that rule.
+-- THE TOKEN IS MINTED HERE, not carried in card data: its characteristics are
+-- printed in the comprehensive rules rather than on Ministrant of Obligation, and
+-- CR 111.3 makes rule 702.135a's own adjectives the token's whole text. Both
+-- colours ride the colorIndicator, a token having no mana cost to read a colour
+-- off (CR 105.2).
 --
--- THE TOKEN IS MINTED HERE, not carried in card data, on Pawl.Engine.Ring's
--- terms: its characteristics are printed in the comprehensive rules rather than
--- on Ministrant of Obligation. CR 111.3 is what makes rule 702.135a's own
--- adjectives the token's whole text; both colours ride the colorIndicator,
--- since rule 702.135a says "white and black" and a token has no mana cost to
--- read a colour off (CR 105.2).
---
--- CR 612.2a's text change reaches the Spirit written here, even though the mint
+-- CR 612.2a's text change reaches the Spirit written here even though the mint
 -- runs after the CR 613 layer fold: layer 3 records its pairs on the projection
--- and Pawl.Engine.Projection.mintedTriggeredAbilitiesOf applies them to whatever
--- this returns. Proven by Pawl.ResolveSpec's "CR 612.2a whole card: an evolved
--- Ministrant of Obligation leaves Elves".
---
--- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability
--- is placed -- rule 702.135a leaves nothing to choose.
+-- and Projection.mintedTriggeredAbilitiesOf applies them to whatever this returns.
+-- Pawl.ResolveSpec's "CR 612.2a whole card" proves it.
 afterlife :: Natural -> TriggeredAbility Card
 afterlife n =
   TriggeredAbility.MkTriggeredAbility
@@ -2460,27 +2395,18 @@ spiritToken =
 -- tokens." Afterlife's mint over CR 603.6a's entry event, so the condition is
 -- TriggerCondition.SelfEnters; Glint-Sleeve Artisan is the printing.
 --
--- ONE CLAUSE and not two, and no branching opcode: rule 702.123a prints CR
--- 118.12a's rewriting already performed, so CR 118.12 makes the counters a COST
--- paid as the ability resolves (Pawl.Types.PayGate, over
--- CostComponent.PutPlusOneCountersOnThis) and the clause's own effects are its
--- "if you don't" branch. The counters go on the ability's SOURCE (CR 113.7a),
--- which is what rule 702.123a's "it" names, so no slot is needed for them.
+-- ONE CLAUSE and no branching opcode: rule 702.123a prints CR 118.12a's rewriting
+-- already performed, so CR 118.12 makes the counters a COST paid as the ability
+-- resolves and the clause's own effects are its "if you don't" branch. The
+-- counters go on the ability's SOURCE (CR 113.7a), so no slot is needed.
 --
 -- Optionality.Mandatory, because the printed "you may" IS the gate's offer.
 -- Marking the clause optional as well would ask twice and let a player decline
 -- both halves, which rule 702.123a does not allow.
 --
--- Binding.you is CR 109.5's answer for a triggered ability -- "the controller of
--- the object when the ability triggered" -- and CR 111.2 gives that same player
--- the tokens.
---
--- THE TOKEN IS MINTED HERE for afterlife's reason: rule 702.123a prints its
--- characteristics, so they are the rulebook's rather than the card's. A CR 612.2a
--- text change of the word "Servo" reaches it for afterlife's reason, through the
--- same mintedTriggeredAbilitiesOf.
---
--- Single mode, no targets, ChooseExactly 1: pay or not is the only choice.
+-- Binding.you is CR 109.5's answer for a triggered ability, and CR 111.2 gives
+-- that same player the tokens. THE TOKEN IS MINTED HERE for afterlife's reason,
+-- and reached by CR 612.2a the same way.
 fabricate :: Natural -> TriggeredAbility Card
 fabricate n =
   TriggeredAbility.MkTriggeredAbility
@@ -2588,30 +2514,19 @@ servoToken =
 -- your graveyard to your hand." Afterlife's condition with provoke's shape --
 -- the CR 700.4 dies event, one optional clause, one target slot.
 --
--- The bearer never appears in the payload, so the CR 400.7 incarnation split
--- undying and persist care about is inert here: the ability moves the card its
--- TARGET names, which is chosen when the trigger is put on the stack (CR 603.3d)
--- and long after the bearer's own trip to the graveyard.
+-- The bearer never appears in the payload, so the CR 400.7 incarnation split is
+-- inert here: the ability moves the card its TARGET names, chosen when the trigger
+-- goes on the stack (CR 603.3d).
 --
 -- A CardsInGraveyard pool scoped to You is rule 702.46a's "your graveyard", read
--- as CR 115.2's clause (a) -- Raise Dead's pool, and the reason the pool carries
--- a GraveyardScope rather than a Filter: CR 108.4 gives a card in a graveyard no
--- controller at all.
+-- as CR 115.2's clause (a) -- and the reason the pool carries a GraveyardScope
+-- rather than a Filter is that CR 108.4 gives a card in a graveyard no controller.
 --
--- The Filter is the rest of the printed phrase. Filter.ManaValueAtMost is CR
--- 202.3's mana value, and the bound is the keyword's own N -- so a mint that
--- dropped it would return Shimatsu the Bloodcloaked to a soulshift 3 trigger.
 -- Nothing excludes the bearer: rule 702.46a does not say "another", and its own
--- graveyard incarnation is an ordinary candidate whenever it matches -- which no
--- printing reaches, all 26 pairing an N below their own mana value.
+-- graveyard incarnation is an ordinary candidate whenever it matches.
 --
--- No stated origin zone on the move, for the reason Pawl.Types.Effect's
--- MoveToZone gives: "from your graveyard" is stated in the TARGET's pool, where
--- choosing the target enforces it. The EntryRiders are inert for a hand
--- destination and nothing later reads what arrived, so no slot is bound.
---
--- Single mode, ChooseExactly 1: the target and the "may" are all rule 702.46a
--- leaves to choose.
+-- No stated origin zone on the move: "from your graveyard" is stated in the
+-- TARGET's pool, where choosing the target enforces it.
 soulshift :: Natural -> TriggeredAbility Card
 soulshift n =
   TriggeredAbility.MkTriggeredAbility
@@ -2661,21 +2576,12 @@ soulshiftTarget = SlotName.MkSlotName (Text.pack "soulshifted")
 -- sorcery, is not minted (#1404).
 --
 -- THE CARD, NOT THE PERMANENT (CR 400.7): rule 702.55a's "exile IT" is the
--- graveyard incarnation the death minted, which is Binding.became -- undying's
--- and persist's split, and the reason this cannot name Binding.triggerSource.
--- The ability's SOURCE is the permanent as it was on the battlefield, and that
--- object no longer exists to exile.
+-- graveyard incarnation the death minted, Binding.became -- undying's and
+-- persist's split, and the reason this cannot name Binding.triggerSource.
 --
--- A bare Creatures pool with no Filter is rule 702.55a's whole phrase: "target
--- creature", nothing excluded. The bearer cannot be among the candidates anyway,
--- since it is a card in a graveyard by the time the trigger is put on the stack.
---
--- Effect.ExileHaunting rather than a MoveToZone to Zone.Exile, because the move
--- is only half of it: CR 702.55b's link from the exiled card to the object
--- targeted is what the exile-zone half of the card reads, and only that opcode
--- writes it.
---
--- Single mode, ChooseExactly 1: the target is all rule 702.55a leaves to choose.
+-- Effect.ExileHaunting rather than a MoveToZone to Zone.Exile, because the move is
+-- only half of it: CR 702.55b's link from the exiled card to the object targeted
+-- is what the exile-zone half of the card reads, and only that opcode writes it.
 haunt :: TriggeredAbility Card
 haunt =
   TriggeredAbility.MkTriggeredAbility
