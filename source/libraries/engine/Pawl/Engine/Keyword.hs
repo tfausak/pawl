@@ -1092,14 +1092,10 @@ mintedReplacementsFor keyword count = case keyword of
   -- permanent's own.
   --
   -- The rule's "IF ITS MEGAMORPH COST WAS PAID" is checked at the row's match,
-  -- Pawl.Engine.Replacement.applies: CR 701.40c gives a manifested megamorph card
-  -- a second road face up at its MANA cost, and the row is refused down that one
+  -- Replacement.applies: CR 701.40c gives a manifested megamorph card a second
+  -- road face up at its MANA cost, and the row is refused down that one
   -- (Pawl.FaceDownSpec's Misthoof Kirin pair). morphCost answers one cost per
-  -- permanent, so CR 702.37e's road has a single price and the rest of the
-  -- condition needs no test.
-  --
-  -- ONE ROW PER INSTANCE, as riot's is. Unexercised: no card grants megamorph to a
-  -- creature that already has it.
+  -- permanent, so the rest of the condition needs no test.
   Keyword.Morph (Morph.MkMorph _ MorphVariant.Mega) ->
     List.genericReplicate count (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR Filter.IsSource (TurnUpRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne 1))))
   Keyword.Menace -> []
@@ -1110,16 +1106,10 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
-  -- CR 702.54a's ONE static ability, vanishing's row with rule 702.54a's
-  -- condition on it: "if an opponent was dealt damage this turn, this permanent
-  -- enters with N +1/+1 counters on it". Filter.IsSource for riot's reason, and
-  -- the condition is Pawl.Engine.Replacement.admitsEntry's rather than this
-  -- function's -- nothing knowable from a keyword and a count can answer it.
-  --
-  -- ONE ROW PER INSTANCE, and CR 702.54c says so outright ("if an object has
-  -- multiple instances of bloodthirst, each applies separately"), so two
-  -- instances place two lots of N -- both admitted or neither, since the two rows
-  -- ask one condition of one board.
+  -- CR 702.54a's ONE static ability, vanishing's row with rule 702.54a's condition
+  -- on it. That condition is Replacement.admitsEntry's rather than this function's
+  -- -- nothing knowable from a keyword and a count can answer it. ONE ROW PER
+  -- INSTANCE (CR 702.54c), both admitted or neither.
   Keyword.Bloodthirst n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.Bloodthirst n)))
   Keyword.Haunt -> []
   Keyword.SplitSecond -> []
@@ -1145,21 +1135,13 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
   -- CR 702.145b's FIRST static ability: "if it is night and this permanent is
-  -- represented by a double-faced card, it enters transformed" -- CR 712.13a's
-  -- rule seen from the keyword side, and the one producer CR 616.1d's bucket has.
-  -- Filter.IsSource for riot's reason, one subrule over: CR 614.1d's "[this
-  -- permanent] enters . . ." is the entering object's own ability.
+  -- represented by a double-faced card, it enters transformed". Filter.IsSource
+  -- for riot's reason, CR 614.1d's "[this permanent] enters" being the entering
+  -- object's own ability. The rule's two conditions are asked by
+  -- Replacement.applies, neither being knowable from a keyword count.
   --
-  -- The rule's two conditions are asked by Pawl.Engine.Replacement.applies rather
-  -- than here, because neither is knowable from a keyword count: the designation
-  -- is the game's and the layout is the entering object's.
-  --
-  -- ONE ROW PER INSTANCE for riot's reason, and safe twice over for neither of
-  -- riot's: the second row is a distinct CandidateId, so CR 614.5 would let it
-  -- apply, and it would write the same back face the first one did. Idempotent,
-  -- because the write names Card.backFace outright rather than the successor of
-  -- whatever face is up now. Unreachable anyway -- rule 702.145a puts daybound on
-  -- a front face, and nothing in the pool grants a second instance.
+  -- ONE ROW PER INSTANCE, and a second row is idempotent: the write names
+  -- Card.backFace outright rather than the successor of whatever face is up now.
   Keyword.Daybound -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource EntryRewrite.EntersTransformed))
   -- CR 702.145e gives nightbound only TWO static abilities, and neither rewrites
   -- an entry: the enters-transformed half is daybound's alone.
@@ -1904,23 +1886,19 @@ afflict n =
 
 -- CR 702.134a: whenever this creature attacks, put a +1/+1 counter on target
 -- attacking creature with power less than this creature's power. The first minted
--- ability that TARGETS: the slot is filled by CR 603.3d as the ability is placed
--- and re-checked by CR 608.2b as it resolves. A REAL choice, asked of the
--- controller, since with two smaller attackers the rules leave which one open.
+-- ability that TARGETS. A REAL choice, since with two smaller attackers the rules
+-- leave which one open.
 --
--- The target slot's three parts are the rule's three printed words;
 -- Filter.PowerLessThanSource compares against the SOURCE, which is why that atom
--- carries no literal. No controller conjunct, rule 702.134a stating none: CR 508.1
--- makes every attacking creature the active player's. The BEARER excludes itself
--- with no `Not IsSource`, nothing having power less than its own power, which is
--- why the atom is strict.
+-- carries no literal. No controller conjunct, rule 702.134a stating none. The
+-- BEARER excludes itself with no `Not IsSource`, nothing having power less than
+-- its own power, which is why the atom is strict.
 --
 -- Effect.Mentor and not Effect.PutCounters, for evolve's reason one rule over: CR
 -- 702.134c makes "a creature mentors another creature" a trigger event, so the
 -- placement has to be distinguishable from every other +1/+1 counter. The counter
 -- still goes through Event.putCounters, so CR 122.6's funnel and CR 614.16's
--- replacement opportunity are unaffected; Pawl.TriggerSpec's Doubling Season case
--- proves it.
+-- replacement opportunity are unaffected.
 mentor :: TriggeredAbility Card
 mentor =
   TriggeredAbility.MkTriggeredAbility
@@ -1981,15 +1959,12 @@ training =
 -- ONE CLAUSE and no branching opcode, fabricate's shape: CR 118.12a rewrites "[do
 -- something] unless [a player does something else]" as an offer followed by the
 -- thing, so the Counter is the clause's "if they don't" branch and the PayGate is
--- the offer. CR 118.12 puts that payment at RESOLUTION, which is what rule 702.21a
--- needs.
+-- the offer, paid at RESOLUTION (CR 118.12).
 --
 -- THE PAYER IS THE TARGETER'S CONTROLLER, not the bearer's, so the same
 -- Binding.targetingObject slot answers both halves of the sentence; Binding.you
--- would offer the cost to the wrong player.
---
--- "THAT SPELL OR ABILITY" is read out of that same slot and is NOT a target slot:
--- rule 702.21a targets nothing, so nothing here is re-checked at CR 608.2b and a
+-- would offer the cost to the wrong player. That slot is NOT a target slot: rule
+-- 702.21a targets nothing, so nothing here is re-checked at CR 608.2b and a
 -- shroud-bearing spell is countered as readily as any other.
 --
 -- Optionality.Mandatory: the gate's offer IS the only choice rule 702.21a gives.
@@ -2111,13 +2086,10 @@ decayedSacrifice =
 --
 -- ONE clause holding BOTH effects, under one Optionality.Optional -- CR 608.2e's
 -- span: rule 702.39a prints one "may", and its "if you do" makes the untap
--- conditional on the same answer.
---
--- The requirement's ATTACKER is Binding.triggerSource and never a target (CR
--- 115.10a). Its BLOCKER is the target slot, so a creature that has become an
--- illegal target by resolution (CR 608.2b) leaves both effects with an empty set.
---
--- Duration.UntilEndOfCombat is "this combat" (CR 500.5a).
+-- conditional on the same answer. The requirement's ATTACKER is
+-- Binding.triggerSource and never a target (CR 115.10a); its BLOCKER is the target
+-- slot, so a creature that has become an illegal target by resolution (CR 608.2b)
+-- leaves both effects with an empty set.
 provoke :: TriggeredAbility Card
 provoke =
   TriggeredAbility.MkTriggeredAbility
@@ -2150,8 +2122,7 @@ provokeTarget = SlotName.MkSlotName (Text.pack "provoked")
 --
 -- Poisonous' condition with a plain placement onto Binding.triggerSource. No
 -- marking opcode, unlike training and evolve one rule apiece away: rule 702.112a's
--- own marker is the DESIGNATION the next clause gives, read off the permanent
--- rather than off an event.
+-- own marker is the DESIGNATION the next clause gives.
 --
 -- THE INTERVENING "IF" is what this row adds. CR 603.4 checks it as the ability
 -- would trigger AND CR 608.2a again as it resolves, which is what CR 702.112c
@@ -2159,11 +2130,7 @@ provokeTarget = SlotName.MkSlotName (Text.pack "provoked")
 -- the second finds it renowned and is removed from the stack. A printed "may"/"if"
 -- clause (CR 608.2e) would check only on resolution.
 --
--- Quantity.HasDesignation Renowned AtMost 0 is "isn't renowned", read off CR
--- 113.7a's source.
---
--- ONE clause holding BOTH effects, the rule printing one sentence. Nobody gets
--- priority between them (CR 117.3b).
+-- ONE clause holding BOTH effects, the rule printing one sentence.
 renown :: Natural -> TriggeredAbility Card
 renown n =
   TriggeredAbility.MkTriggeredAbility
