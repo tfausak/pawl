@@ -804,6 +804,40 @@ combatReplaySpec s =
           -- replaying as the other.
           let p = Prompt.ChooseRingBearer decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
           Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseLegend (ObjectId.MkObjectId 7))) Nothing
+        -- CR 709.3 / 712.11b / 715.3: which half of a multi-faced object a player
+        -- chose to cast off an offer is a decision, so it has to survive a
+        -- transcript like any other.
+        Spec.it s "ChooseOfferedCastFace round-trips through the transcript" $ do
+          let a = CardName.MkCardName (Text.pack "Embereth Shieldbreaker")
+              b = CardName.MkCardName (Text.pack "Battle Display")
+              p = Prompt.ChooseOfferedCastFace decider S.alice oid (a NonEmpty.:| [b])
+          Spec.assertEqWith s "choosing the Adventure half round trips" (Replay.decode p (Replay.encode p b)) (Just b)
+          -- Discriminating: a decode that ignored the response and returned the
+          -- head would pass one leg by accident.
+          Spec.assertEqWith s "choosing the creature half round trips" (Replay.decode p (Replay.encode p a)) (Just a)
+        Spec.it s "an offered-half choice does not decode as a named card" $ do
+          -- Discriminating: fails if ChooseOfferedCastFace reuses ChoseCardName
+          -- rather than getting its own constructor. Both are a Prompt over one
+          -- CardName, so nothing but a distinct constructor keeps a transcript of
+          -- one from replaying as the other.
+          let a = CardName.MkCardName (Text.pack "Embereth Shieldbreaker")
+              p = Prompt.ChooseOfferedCastFace decider S.alice oid (a NonEmpty.:| [])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseCardName a)) Nothing
+        Spec.it s "a short transcript casts the first half offered" $
+          -- CR 709.3a / 712.11c: every offered half was gated on its own, so the
+          -- first is legal.
+          Spec.assertEqWith
+            s
+            "the head"
+            ( Replay.defaultAnswer
+                ( Prompt.ChooseOfferedCastFace
+                    decider
+                    S.alice
+                    oid
+                    (CardName.MkCardName (Text.pack "Embereth Shieldbreaker") NonEmpty.:| [CardName.MkCardName (Text.pack "Battle Display")])
+                )
+            )
+            (CardName.MkCardName (Text.pack "Embereth Shieldbreaker"))
         -- CR 701.39a: which creature a bolstering player put the counters on is a
         -- decision, so it has to survive a transcript like any other.
         Spec.it s "ChooseBolster round-trips through the transcript" $ do

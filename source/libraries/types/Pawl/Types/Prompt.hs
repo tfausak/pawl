@@ -1384,6 +1384,21 @@ data Prompt r where
   -- nothing to ask -- the card is no longer where the effect left it (CR 608.2h),
   -- or the cast is one Cast.castableWhenOffered says cannot legally happen.
   OfferedCast :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> CardName.CardName -> Prompt OptionalDecision.OptionalDecision
+  -- | CR 709.3 / 712.11b / 715.3: WHICH HALF of the multi-faced object a
+  -- resolving effect offered (CR 608.2g) is being cast. The ObjectId is the card
+  -- offered and the NonEmpty names the castable halves, each already gated on its
+  -- own by Cast.castableWhenOffered -- CR 709.3a and CR 712.11c both say only the
+  -- chosen half is evaluated, so a half that could not be cast is not among them.
+  --
+  -- Asked BEFORE OfferedCast's "may", and asked under Optionality.Mandatory too:
+  -- CR 118.8c's excuse is a property of the cost of the spell BEING CAST, and
+  -- which spell that is, is exactly what this choice settles.
+  --
+  -- Raised only where two or more halves survive that gate, which is
+  -- ChoosePlayer's and ChooseProtector's elision: one legal option is one
+  -- outcome. Same shape and same reason as CastWhileSearching's per-half entries,
+  -- which pair the object with the name of the half being proposed.
+  ChooseOfferedCastFace :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty CardName.CardName -> Prompt CardName.CardName
   -- | CR 702.94a / CR 121.9: whether this player reveals the card they are
   -- drawing, from their hand, as they draw it -- miracle's static half. The
   -- ObjectId is the card just drawn and the CardName is its face, for

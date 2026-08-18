@@ -10401,15 +10401,16 @@ wildEvocationSpec s registry =
       board evocation cards =
         let (_, withEvocation) = S.addCreature evocation S.alice (Setup.emptyGame S.bothPlayers)
          in List.foldl' (\g p -> snd (S.addHandCard p S.bob g)) withEvocation (reverse cards)
-      -- BOB's upkeep, which is the half TurnScope.EachTurn buys: under
-      -- ControllersTurn the trigger would not fire here at all.
+      -- BOB's upkeep, stamped and recorded: the half TurnScope.EachTurn buys,
+      -- since under ControllersTurn the trigger would not fire here at all.
+      atBobsUpkeep gs =
+        let upkeep = Phase.Beginning BeginningStep.Upkeep
+         in Event.recordEvent
+              (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.bob))
+              (gs {GameState.phase = upkeep, GameState.activePlayer = S.bob})
       runBobsUpkeep :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
       runBobsUpkeep answer gs =
-        let upkeep = Phase.Beginning BeginningStep.Upkeep
-            began =
-              Event.recordEvent
-                (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.bob))
-                (gs {GameState.phase = upkeep, GameState.activePlayer = S.bob})
+        let began = atBobsUpkeep gs
             settled = S.runPure answer began Engine.settleForPriority
          in S.runPure answer settled Engine.priorityLoop
       -- Bob's library, which `board` leaves empty. LOAD-BEARING for every leg
@@ -10427,7 +10428,11 @@ wildEvocationSpec s registry =
           h : _ -> h
           [] -> NonEmpty.head offered
         _ -> S.identityAnswer p
-      -- The same, counting the cast offers CR 608.2g's "allows" half would raise.
+      -- The same, counting every question the offer puts to a player: CR 608.2g's
+      -- "allows" half, and CR 709.3's half-choice beside it. BOTH, so that "nobody
+      -- was asked" means what it says on a board where the offered card has two
+      -- castable halves.
+      --
       -- Threaded through State rather than pinned, since two OfferedCast prompts
       -- over one board are structurally identical and a pure answerer could not
       -- tell them apart.
@@ -10438,15 +10443,34 @@ wildEvocationSpec s registry =
               Prompt.OfferedCast {} -> do
                 State.modify (+ 1)
                 pure (S.identityAnswer p)
+              Prompt.ChooseOfferedCastFace {} -> do
+                State.modify (+ 1)
+                pure (S.identityAnswer p)
               _ -> pure (rolling i p)
-            upkeep = Phase.Beginning BeginningStep.Upkeep
-            began =
-              Event.recordEvent
-                (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.bob))
-                (gs {GameState.phase = upkeep, GameState.activePlayer = S.bob})
          in State.execState
-              (Engine.runGame counting began (Engine.settleForPriority >> Engine.priorityLoop))
+              (Engine.runGame counting (atBobsUpkeep gs) (Engine.settleForPriority >> Engine.priorityLoop))
               0
+      -- The halves CR 709.3's prompt actually offered, one entry per prompt
+      -- raised, in the order the prompt carried them.
+      halvesOffered :: GameState.GameState -> [[CardName.CardName]]
+      halvesOffered gs =
+        let recording :: Prompt.Prompt r -> State.State [[CardName.CardName]] r
+            recording p = case p of
+              Prompt.ChooseOfferedCastFace _ _ _ options -> do
+                State.modify (<> [NonEmpty.toList options])
+                pure (NonEmpty.head options)
+              _ -> pure (rolling 0 p)
+         in State.execState
+              (Engine.runGame recording (atBobsUpkeep gs) (Engine.settleForPriority >> Engine.priorityLoop))
+              []
+      -- Test B's answerer, pinning CR 709.3's half BY NAME. Returns the wanted
+      -- name whether or not it was offered: Resolve.offerCast rejects rather than
+      -- repairs, so a leg whose half stopped being offered goes red instead of
+      -- quietly casting the other one.
+      choosingHalf :: CardName.CardName -> Prompt.Prompt r -> r
+      choosingHalf want p = case p of
+        Prompt.ChooseOfferedCastFace {} -> want
+        _ -> rolling 0 p
       -- The same again, TAKING the offer. S.identityAnswer bottoms out in
       -- Replay.defaultAnswer, whose Prompt.OfferedCast arm declines, so a leg
       -- asserting a cast HAPPENED on an excused branch would otherwise pass
@@ -10459,7 +10483,7 @@ wildEvocationSpec s registry =
       -- WHO controls the permanent bob's card became, which is the one reading
       -- that separates "that player casts it" from "the resolving controller
       -- casts it". NOT the owner: S.countOnBattlefieldByName indexes the
-      -- battlefield by owner (CR 108.1), and the card is bob's whoever cast it,
+      -- battlefield by owner (CR 108.3), and the card is bob's whoever cast it,
       -- so a count alone is green under either reading.
       controllerOfNamed n gs =
         Maybe.listToMaybe
@@ -10618,6 +10642,67 @@ wildEvocationSpec s registry =
           Spec.assertEqWith s "nothing was revealed" (revealed after) []
           Spec.assertEqWith s "bob's hand is still empty" (bobsHand after) []
           Spec.assertEqWith s "stack empty: the trigger resolved" (length (GameState.stack after)) 0
+        -- CR 709.3a / 715.3a: the offer is evaluated PER HALF, so a prohibition
+        -- that stops one half leaves the other on offer. Void Winnower forbids
+        -- bob casting a spell with an even mana value; Embereth Shieldbreaker's
+        -- {1}{R} is 2 and its Adventure half Battle Display's {R} is 1, so exactly
+        -- one half survives -- and one legal option is one outcome, so CR 709.3's
+        -- choice is not put to anyone.
+        --
+        -- The Bonesplitter is alice's, and it is what makes Battle Display's
+        -- "destroy target artifact" fillable (CR 601.2c): without it the Adventure
+        -- half would be gated out too and the case would prove nothing.
+        Spec.it s "CR 709.3a an offered cast reaches the half the front face's prohibition leaves alone" $ do
+          evocation <- S.printingOf s registry "Wild Evocation"
+          winnower <- S.printingOf s registry "Void Winnower"
+          bonesplitter <- S.printingOf s registry "Bonesplitter"
+          shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
+          piker <- S.printingOf s registry "Goblin Piker"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          let (_, withWinnower) = S.addCreature winnower S.alice (board evocation [shieldbreaker, piker, maiden])
+              (bonesplitterId, gs) = S.addCreature bonesplitter S.alice withWinnower
+              after = runBobsUpkeep (rolling 0) gs
+          Spec.assertEqWith s "the Adventure half was cast, and it destroyed the Bonesplitter" (S.onBattlefield bonesplitterId gs, S.onBattlefield bonesplitterId after) (True, False)
+          -- BY NAME, and CR 715.4 is why the exiled card answers to the creature's
+          -- name. Transcribed from Pawl.AdventureSpec's CR 715.3d case, with bob's
+          -- exile because bob owns the card (CR 108.3).
+          Spec.assertEqWith
+            s
+            "CR 715.3d: the adventurer card was exiled rather than put into a graveyard"
+            (fmap (\o -> Projection.namesOf o after) (Game.zoneMembers Zone.Exile S.bob after))
+            [Set.singleton (named "Embereth Shieldbreaker")]
+          Spec.assertEqWith s "the front half was never cast, so no creature entered" (S.countOnBattlefieldByName (named "Embereth Shieldbreaker") S.bob after) 0
+          Spec.assertEqWith s "bob's other two cards never moved" (bobsHand after) ["Goblin Piker", "Bird Maiden"]
+          Spec.assertEqWith s "one surviving half is one outcome, so nothing was asked" (offersUnder 0 gs) 0
+          Spec.assertEqWith s "stack empty: the trigger and the spell both resolved" (length (GameState.stack after)) 0
+        -- The same board minus the Winnower, which is the pair that proves the
+        -- gate above is doing the choosing rather than the fan-out always taking
+        -- the last half: both halves are castable here, so CR 709.3's choice is
+        -- real and is put to BOB, the player the offer names.
+        --
+        -- Two legs off one board differing only in the answer, so neither
+        -- direction of a hard-coded pick survives.
+        Spec.it s "CR 709.3 two castable halves are offered to the caster, and the answer decides which is cast" $ do
+          evocation <- S.printingOf s registry "Wild Evocation"
+          bonesplitter <- S.printingOf s registry "Bonesplitter"
+          shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
+          piker <- S.printingOf s registry "Goblin Piker"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          let (bonesplitterId, gs) = S.addCreature bonesplitter S.alice (board evocation [shieldbreaker, piker, maiden])
+              adventureLeg = runBobsUpkeep (choosingHalf (named "Battle Display")) gs
+              creatureLeg = runBobsUpkeep (choosingHalf (named "Embereth Shieldbreaker")) gs
+          Spec.assertEqWith s "the Adventure answer destroys the Bonesplitter and the creature answer leaves it" (S.onBattlefield bonesplitterId adventureLeg, S.onBattlefield bonesplitterId creatureLeg) (False, True)
+          Spec.assertEqWith s "CR 608.2g: the creature half resolved under BOB's control, not alice's" (controllerOfNamed "Embereth Shieldbreaker" creatureLeg) (Just S.bob)
+          Spec.assertEqWith
+            s
+            "CR 715.3d: only the leg that cast the Adventure exiles the card"
+            ( fmap (\o -> Projection.namesOf o adventureLeg) (Game.zoneMembers Zone.Exile S.bob adventureLeg),
+              Game.zoneMembers Zone.Exile S.bob creatureLeg
+            )
+            ([Set.singleton (named "Embereth Shieldbreaker")], [])
+          Spec.assertEqWith s "exactly one half-choice, carrying both halves in printed order" (halvesOffered gs) [[named "Embereth Shieldbreaker", named "Battle Display"]]
+          Spec.assertEqWith s "and that is the only question: CR 608.2g's may is not asked of a mandatory offer" (offersUnder 0 gs) 1
+          Spec.assertEqWith s "stack empty in both legs" (length (GameState.stack adventureLeg), length (GameState.stack creatureLeg)) (0, 0)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
