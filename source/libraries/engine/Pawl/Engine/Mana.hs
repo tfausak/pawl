@@ -462,8 +462,11 @@ supplyOf unit =
 --
 -- A UNION over the applicable clauses, with no CR 613.11 timestamp ordering,
 -- because a union has nothing to order: two clauses that permit different types
--- are not in conflict. Two clauses that BOTH say "only" would be, and no card
--- prints a pair (Pawl.Types.SpendManaAsThough).
+-- are not in conflict, so neither running first changes the answer. Two clauses
+-- that both said "only" of the same mana would each be permitting what the other
+-- forbids, and the union is the reading that keeps CR 101.2 out of it -- an
+-- "only" clause names types the mana may be spent as rather than saying "can't".
+-- No printing pairs them, so no board tells that reading from another.
 spendableAs :: [SpendManaAsThough.SpendManaAsThough] -> ManaType -> Set.Set ManaType
 spendableAs clauses manaType =
   case filter (\clause -> ManaFilter.matchesType (SpendManaAsThough.which clause) manaType) clauses of
@@ -642,8 +645,8 @@ substituteX x (ManaCost.MkManaCost symbols) =
 --
 -- The CLAUSES are the payer's CR 609.4b permissions, threaded from the caller
 -- rather than read off a board because this helper has neither a player nor a
--- state: `spend` resolves them once (Pawl.Engine.Cost.payMana) and hands them
--- down. Empty is the ordinary board.
+-- state. Pawl.Engine.Cost.payMana resolves them from the board once per pass and
+-- hands them down through `spend`; empty is the ordinary board.
 removals :: [SpendManaAsThough.SpendManaAsThough] -> Demand -> [ManaUnit] -> [[ManaUnit]]
 removals clauses wanted units = Maybe.mapMaybe without (zip [0 :: Int ..] units)
   where

@@ -2624,6 +2624,22 @@ celestialDawnSpec s registry = Spec.describe s "Celestial Dawn" $ do
     Spec.assertBool s (not (payable S.bob blue (seat S.bob [white]))) "and bob's white mana does not pay {U}"
     Spec.assertBool s (payable S.alice blue (seat S.alice [white])) "where alice's does"
 
+  -- CR 613.11 covers every cost this player pays, not only a spell's. Nothing in
+  -- Pawl.Engine.Activate threads the clause -- the rewrite is read off the board
+  -- inside the payability and payment funnels -- so an activation is covered by
+  -- construction, and this is the case that says so rather than the PR body.
+  -- Nessian Asp's monstrosity costs {6}{G}, which seven white mana pay only under
+  -- the enchantment.
+  Spec.it s "CR 613.11 the clause reaches an activated ability's cost" $ do
+    dawn <- S.printingOf s registry "Celestial Dawn"
+    asp <- S.printingOf s registry "Nessian Asp"
+    let seated = Mana.setPool S.alice (Mana.Type.MkMana (replicate 7 (plainOf (ManaType.Colored Color.White)))) (Setup.emptyGame S.bothPlayers)
+        (aspId, without) = S.addCreature asp S.alice seated
+        with = snd (S.addCreature dawn S.alice without)
+        canActivate gs = any (\ability -> Activate.activatable S.alice aspId ability gs) (Activate.abilitiesFor aspId gs)
+    Spec.assertBool s (canActivate with) "under Celestial Dawn seven white mana pay the {6}{G}"
+    Spec.assertBool s (not (canActivate without)) "and without it the same seven cannot"
+
   -- The BOARD side of the same question. Pawl.Engine.Mana models an untapped
   -- source as a supply of what it could produce, on a path that never touches the
   -- pool, so a rewrite applied to the pool alone answers this one wrongly -- and
