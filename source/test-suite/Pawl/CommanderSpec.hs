@@ -6,9 +6,10 @@
 -- Player.commander and Player.commanderCasts fields, Deck's commander, the
 -- Zone.Command arm of Pawl.Engine.Cast.castableZones, and the CR 903.8 increase
 -- Pawl.Engine.Cost.allAdjustments folds into CR 601.2f. Also the commander half
--- of Pawl.Engine.Setup's subgame pair -- CR 729.2c in and CR 729.5c out -- which
--- lives here rather than in Pawl.SetupSpec because it needs a designated
--- commander and this is the file that builds one.
+-- of Pawl.Engine.Setup's subgame pair -- CR 729.2c in and CR 729.5c out -- and
+-- the commander half of its restart, CR 727.5a. Those live here rather than in
+-- Pawl.SetupSpec because they need a designated commander and this is the file
+-- that builds one.
 --
 -- Shimatsu the Bloodcloaked is the card pool for every group but CR 903.10a's,
 -- which needs a commander that can attack and says why it uses its own: {3}{R}
@@ -107,6 +108,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Commander" $ do
   taxSpec s registry
   commanderDamageSpec s registry
   subgameSpec s registry
+  restartSpec s registry
 
 designationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 designationSpec s registry = Spec.describe s "Designation" $ do
@@ -525,3 +527,53 @@ subgameSpec s registry = Spec.describe s "Subgame" $ do
     Spec.assertEqWith s "and bob has nothing left in the subgame" (Map.keys (Map.filter (\o -> Object.owner o == S.bob) (GameState.objects departed))) []
     Spec.assertEqWith s "both are back in the main-game command zone" (fmap (\oid -> fmap Object.owner (Game.lookupObject oid after)) (inCommandZone after)) [Just S.alice, Just S.bob]
     Spec.assertEqWith s "and neither was funnelled into a library" (length (Game.zoneMembers Zone.Library S.alice after) + length (Game.zoneMembers Zone.Library S.bob after)) 0
+
+restartSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+restartSpec s registry = Spec.describe s "Restart" $ do
+  -- CR 727.5a: "in a Commander game, a commander that has been exempted from the
+  -- procedure that restarts the game won't begin the new game in the command
+  -- zone. However, it remains that deck's commander for the new game."
+  --
+  -- Two assertions, one per sentence, on one pair of boards that differ in the
+  -- exempt set and in nothing else. Both halves live in Pawl.Engine.Setup and
+  -- this is what proves them: the first in startGameFromCards, which drops the
+  -- exempt objects before it picks each owner's commander out of the rebuilt
+  -- pool; the second in resetPlayers, which deliberately leaves Player.commander
+  -- alone.
+  Spec.it s "CR 727.5a an exempted commander does not begin the new game in the command zone but is still the deck's commander" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+    let gs = commanderBoard mountain shimatsu 4
+    case inCommandZone gs of
+      [cmd] -> do
+        -- Exile first, because CR 727.5's only producer (Karn Liberated)
+        -- exiles before it restarts, and because startGameFromCards intersects
+        -- the exempt set with GameState.exile -- an exemption naming a card in
+        -- the command zone reaches nothing at all.
+        let exiled = S.runPure S.identityAnswer gs (Event.changeZone cmd Zone.Exile)
+            -- CR 400.7 mints a fresh id on the way to exile, so the exempt set
+            -- has to name the POST-move object, read back out of the zone.
+            oid = case Set.toAscList (GameState.exile exiled) of
+              o : _ -> o
+              [] -> S.noSource
+            after = S.runPure S.identityAnswer exiled (Setup.restartGame S.performer (Set.singleton oid) S.alice)
+            kept = S.runPure S.identityAnswer exiled (Setup.restartGame S.performer Set.empty S.alice)
+        -- Pins the fixture: without these every assertion below could hold
+        -- because there was no commander in exile to exempt.
+        Spec.assertEqWith s "the commander really reached exile, as one object" (length (Set.toAscList (GameState.exile exiled))) 1
+        Spec.assertEqWith s "and is still alice's commander there" (Commander.isCommander oid exiled) True
+        -- CR 727.5a's first sentence: the discriminating assertion.
+        Spec.assertEqWith s "the exempted commander is not in the new game's command zone" (inCommandZone after) []
+        Spec.assertEqWith s "CR 727.5: it stayed in exile, where the exemption left it" (Set.member oid (GameState.exile after)) True
+        -- CR 727.5a's second sentence, read both off the player and off the
+        -- object, since Commander.isCommander is what every other rule asks.
+        Spec.assertEqWith s "it remains that deck's commander" (fmap Player.commander (Map.lookup S.alice (GameState.players after))) (Just (Just shimatsu))
+        Spec.assertEqWith s "so the exiled card is still recognised as her commander" (Commander.isCommander oid after) True
+        -- The control leg, and the reason the first assertion is not passing on
+        -- an engine that never refills the command zone: the SAME board and the
+        -- SAME restart, exempting nothing, puts the very same object back (CR
+        -- 903.6). startGameFromCards reuses the object as a key, so the id is
+        -- comparable across the rebuild.
+        Spec.assertEqWith s "control leg: unexempted, CR 903.6 puts it back in the command zone" (inCommandZone kept) [oid]
+        Spec.assertEqWith s "and it left exile to get there" (Set.member oid (GameState.exile kept)) False
+      _ -> Spec.assertFailure s "fixture should give alice one commander in the command zone"
