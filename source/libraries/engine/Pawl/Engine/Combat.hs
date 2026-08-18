@@ -1326,7 +1326,10 @@ combatants c = Set.union (Map.keysSet (Combat.attackers c)) (Set.unions (Map.ele
 -- is keyed by the ATTACKER and survives Game.removeFromCombat, and stillAttacked
 -- re-derives the attacked-ness live off the projection. Pawl.CombatSpec's
 -- CreaturePlaneswalkerInCombat group is the proof, on a Jace Beleren that blocks
--- one attacker while another is aimed at him.
+-- one attacker while another is aimed at him: one leg strips his creature-ness
+-- alone and he keeps being attacked, and one strips both card types at once (Song
+-- of the Dryads) and neither role survives, without this function ever naming the
+-- second.
 --
 -- A combatant with no entry in Combat.joinedUnder is left alone by the CONTROL
 -- clause, because there is nothing to compare it against and this only ever
