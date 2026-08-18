@@ -95,7 +95,7 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
     Spec.it s "decodes a present key" $
       Spec.assertEq s (Common.defaultedField "k" (0 :: Integer) Common.asInteger [Value.pair "k" (Value.integer 1)]) (Right 1)
     -- A present null goes to the decoder rather than short-circuiting to the
-    -- default, which is what lets 'maybe' keep accepting an explicit null.
+    -- default, which is what lets Common.maybe keep accepting an explicit null.
     Spec.it s "hands a present null to the decoder" $
       Spec.assertEq
         s
@@ -103,15 +103,15 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
         (Right Nothing)
   Spec.describe s "defaultedField accepts the verbose form" $ do
     -- The key is PRESENT, so 'defaultedField' hands the value straight to the
-    -- decoder; the result equals the default only because 'maybe' reads
+    -- decoder; the result equals the default only because Common.maybe reads
     -- an explicit null as Nothing on its own.
-    Spec.it s "an explicit null decodes to Nothing via maybe, not via the default" $
+    Spec.it s "an explicit null decodes to Nothing via Common.maybe, not via the default" $
       Spec.assertEq
         s
         (Common.defaultedField "k" Nothing (Codec.decode (Common.maybe Common.integer)) [Value.pair "k" Value.null])
         (Right (Nothing :: Maybe Integer))
-    -- Same shape: 'list' on an explicit empty array, not the default.
-    Spec.it s "an explicit empty array decodes to [] via list, not via the default" $
+    -- Same shape: Common.list on an explicit empty array, not the default.
+    Spec.it s "an explicit empty array decodes to [] via Common.list, not via the default" $
       Spec.assertEq
         s
         (Common.defaultedField "k" [] (Codec.decode (Common.list Common.integer)) [Value.pair "k" (Value.array [])])

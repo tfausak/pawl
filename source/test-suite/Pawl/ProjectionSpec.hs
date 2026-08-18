@@ -623,9 +623,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- variable such as X. X is bound on the SPELL, which by the time these
   -- assertions run is in its owner's graveyard: CR 608.2n puts it there "as
   -- the final part of an instant or sorcery spell's resolution". A stored
-  -- `Quantity.InSlot Binding.variableX` would be re-read against the PIKER all the same --
-  -- applyModification evaluates against the AFFECTED object wherever the
-  -- source sits -- and the Piker carries no such binding, so the delta is
+  -- `Quantity.InSlot Binding.variableX` would be re-read against the PIKER all
+  -- the same -- applyModification evaluates against the AFFECTED object wherever
+  -- the source sits -- and the Piker carries no such binding, so the delta is
   -- unevaluable and addPT drops it, leaving the printed 2/1. Frozen, the pump
   -- is a pair of Literals and survives for the rest of the turn.
   Spec.it s "CR 608.2h/611.2d Untamed Might's X is frozen at resolution, not re-read" $ do

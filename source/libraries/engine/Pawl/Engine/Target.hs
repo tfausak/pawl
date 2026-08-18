@@ -327,8 +327,9 @@ admittedGiven pcs grants pools perspective bindings source slot gs =
 -- carries a player ability, and this asks it once per player candidate. That is
 -- the same cost class the cast path already pays on such a board (Cast.castable
 -- reaches `applying` through Cost.spellAdjustments, once per card in hand per
--- legalActions pass), and the benchmarks were unmoved. Hoisting `applying` per enumeration the
--- way `pcs` is hoisted is #435's question, and #578 would catch it regressing.
+-- legalActions pass), and the benchmarks were unmoved. Hoisting `applying` per
+-- enumeration the way `pcs` is hoisted is #435's question, and #578 would catch
+-- it regressing.
 --
 -- EXHAUSTIVE over Recipient rather than routed through Recipient.objectOf: with
 -- the player arm split out, an objectOf-shaped match would leave a Nothing branch
