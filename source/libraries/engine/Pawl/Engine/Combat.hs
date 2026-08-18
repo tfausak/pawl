@@ -64,65 +64,34 @@ emptyCombat =
       Combat.defender = Nothing
     }
 
--- CR 511.3: as soon as the end of combat step ends, all creatures, battles and
--- planeswalkers are removed from combat -- which by CR 506.4 is what stops them
--- being attacking and blocking creatures. Resetting `defender` alongside them is
--- CR 506.2, not CR 511.3: the designation is scoped to the combat phase, so it
--- cannot survive the phase ending. Combat.blockersDeclared is the same kind of
--- passenger, on CR 506.7c's authority: "if a turn has multiple combat phases,
--- such spells may be cast at an appropriate time during any of them", so the
--- next combat phase has to ask CR 506.7b's question again from scratch.
+-- CR 511.3: as the end of combat step ends, everything is removed from combat.
+-- Combat.defender is reset alongside on CR 506.2's authority (the designation is
+-- scoped to the combat phase) and Combat.blockersDeclared on CR 506.7c's (the
+-- next combat phase asks CR 506.7b's question afresh).
 --
--- Engine.runStep calls this as the end of combat step ENDS, alongside CR 500.5's
--- mana emptying -- not from runTurnBasedActions, which is a step's opening and
--- which CR 511.1 says this step has none of. Neighbours in time only: CR 703.4q
--- makes that emptying a turn-based action, and this is not one.
+-- Engine.runStep calls this as the step ENDS, not from runTurnBasedActions: CR
+-- 511.1 gives this step no turn-based action.
 clearCombat :: GameState -> GameState
 clearCombat gs = gs {GameState.combat = emptyCombat}
 
 -- CR 508.8: if no creatures were declared as attackers or put onto the
 -- battlefield attacking, skip the declare blockers and combat damage steps.
+-- Engine.runStepThatBegan asks it as the declare attackers step ENDS.
 --
--- BOTH of that rule's clauses are the same question of Combat.attacked, because
--- both things that can make one true write that set: declareAttackers below, and
--- putOntoBattlefieldAttacking. Engine.runStepThatBegan asks it as the declare
--- attackers step ENDS -- after the priority round in which an attack trigger
--- resolves -- rather than the moment the turn-based action finishes.
---
--- That set and NOT Map.null on Combat.attackers, which is the same question only
--- while nothing leaves combat. CR 508.8 asks whether a creature WAS declared or
--- put onto the battlefield attacking, and CR 508.1k makes that a different
--- question from whether one is attacking now: CR 506.4's removal takes away the
--- attacking, never the declaration. Asking the map skipped both steps for a lone
--- attacker that a Ray of Command took during the step.
---
--- A creature put onto the battlefield attacking LATER than that step cannot
--- un-skip anything, and does not need to: the steps this drops are the only ones
--- of THIS combat phase it could enter during. A CR 500.8 additional combat phase
--- later in the turn reaches its own declare attackers step and asks this
--- question again for itself.
+-- Combat.attacked and NOT Map.null on Combat.attackers: CR 506.4's removal takes
+-- away the attacking, never the declaration, so asking the map skipped both steps
+-- for a lone attacker a Ray of Command took during the step.
 skipEmptyCombat :: GameState -> GameState
 skipEmptyCombat gs =
   if Set.null (Combat.attacked (GameState.combat gs))
     then gs {GameState.remaining = Turn.dropSkippedCombatSteps (GameState.phase gs) (GameState.remaining gs)}
     else gs
 
--- CR 506.2a: the candidates the attacking player chooses from. Read only by
--- chooseDefender; the CHOSEN one lives in Combat.defender.
+-- CR 506.2a: the candidates the attacking player chooses from (CR 102.1, CR
+-- 806.1). Not implemented: CR 102.3's teammates, pawl having no teams (#175).
 --
--- Three rules get from CR 506.2a's "one of their opponents" to this list. CR
--- 102.1: a player is one of the people IN THE GAME, so someone who has left is
--- not a player and cannot be an opponent. CR 806.1: in a free-for-all the players
--- compete as individuals, so every other player is an opponent. CR 102.3 is the
--- one reading this is wrong for -- a teammate is not an opponent -- and pawl has
--- no teams to express (#175). Same argument Count.playersFor's
--- PlayerRelation.Opponent arm carries.
---
--- SEATING order (Game.stillPlayingInOrder), not player-id order: the seating
--- roster is the game's own ordering for anything player-shaped (CR 103.1), while
--- Game.stillPlaying's order is an artifact of reading the players map. It makes
--- the first candidate the next seat rather than the lowest id, which is what an
--- interpreter that takes the head should get.
+-- SEATING order (CR 103.1), not player-id order, so the first candidate is the
+-- next seat rather than the lowest id.
 attackableOpponents :: GameState -> [PlayerId]
 attackableOpponents gs = filter (/= GameState.activePlayer gs) (Game.stillPlayingInOrder gs)
 
@@ -130,19 +99,15 @@ attackableOpponents gs = filter (/= GameState.activePlayer gs) (Game.stillPlayin
 -- -- which player, planeswalker or battle. CR 506.2's second sentence is the
 -- same list scoped to a two-player game.
 --
--- The defending player is FIRST, which is not cosmetic: it is the candidate that
--- exists on every board, so an interpreter that takes the head gets the answer
--- every attack in a battle-less, planeswalker-less pool used to get, and
--- Replay.defaultAnswer's fallback is the same one for the same reason.
+-- The defending player is FIRST, the one candidate that exists on every board, so
+-- an interpreter taking the head gets what Replay.defaultAnswer's fallback gives.
 --
--- CR 802's attack-multiple-players option would put a SECOND player on this
--- list, and pawl has no options concept to read it from (#175) -- the defending
--- player is the argument, so this function needs no change when it arrives.
+-- Not implemented: CR 802's attack-multiple-players option, which would put a
+-- second player on this list (#175).
 --
--- Read at DECLARATION and again at damage assignment (stillAttacked below), and
--- both readings are derived rather than stored on purpose: every clause of CR
--- 506.4 that stops a planeswalker being attacked is a change to exactly what
--- this filter asks about, so re-asking IS performing the removal.
+-- Read at DECLARATION and again at damage assignment (stillAttacked below),
+-- derived both times: every clause of CR 506.4 that stops a planeswalker being
+-- attacked changes what this filter asks, so re-asking IS the removal.
 attackTargets :: PlayerId -> GameState -> NonEmpty.NonEmpty AttackTarget.AttackTarget
 attackTargets defender gs =
   AttackTarget.OfPlayer defender
@@ -150,11 +115,8 @@ attackTargets defender gs =
       <> fmap AttackTarget.OfBattle (attackableBattles defender gs)
 
 -- CR 306.6 / CR 508.1b: the planeswalkers a defending player controls, in
--- ascending id order (Projection.controls walks the battlefield, which is a Set).
---
--- Battlefield-scoped by construction, since that is where Projection.controls
--- looks, and PROJECTED rather than printed for isPlaneswalkerOf's own reason:
--- CR 613.1d puts card types in layer 4.
+-- ascending id order. Battlefield-scoped by construction, and PROJECTED rather
+-- than printed: CR 613.1d puts card types in layer 4.
 attackablePlaneswalkers :: PlayerId -> GameState -> [ObjectId]
 attackablePlaneswalkers defender gs =
   filter (\oid -> Projection.isPlaneswalkerOf oid gs) (Projection.controls defender gs)
@@ -162,30 +124,14 @@ attackablePlaneswalkers defender gs =
 -- CR 310.5 / CR 508.1b: the battles a defending player PROTECTS, in ascending id
 -- order.
 --
--- Protects, not controls -- and that is the whole rule rather than a nicety. CR
--- 310.9b: "A battle can be attacked by any attacking player for whom its protector
--- is a defending player. Notably, a Siege battle can be attacked by its own
--- controller." Since CR 310.12a puts a Siege's protector among its controller's
--- opponents, filtering by the protector is what admits the active player's OWN
--- battle to this list, which filtering by the controller (attackablePlaneswalkers'
--- rule, CR 306.6) would never do. So this walks the whole battlefield rather than
--- Projection.controls' one player's slice.
+-- Protects, not controls (CR 310.9b), which is what admits the active player's own
+-- Siege -- CR 310.12a puts its protector among its controller's opponents -- and
+-- why this walks the whole battlefield. CR 310.9b's first sentence needs no check:
+-- the argument is the DEFENDING player, drawn from the active player's opponents.
 --
--- CR 310.9b's first sentence -- "a battle's protector can never attack it" -- needs
--- no check of its own here: the argument is the DEFENDING player, whom CR 506.2a
--- draws from the active player's opponents, so a battle on this list is protected
--- by someone the attacking player is not.
---
--- PROJECTED card types (Battle.isBattle) for attackablePlaneswalkers' reason: CR
--- 613.1d puts card types in layer 4, so a permanent that became a battle is one and
--- a battle that stopped being one is not. The protector survives that (CR 310.9g),
--- which is exactly why the type has to be re-asked rather than assumed from the
--- designation being present.
---
--- The designation is asked FIRST and the projection only of what survives it,
--- which is what keeps this off the hot path: Object.protector is Nothing for every
--- permanent that is not a battle, so on a board with no battle nothing is
--- projected at all and this costs one Map lookup per permanent (#200).
+-- PROJECTED card types (CR 613.1d), since the protector survives a permanent
+-- ceasing to be a battle (CR 310.9g). The designation is asked FIRST, so a board
+-- with no battle projects nothing (#200).
 attackableBattles :: PlayerId -> GameState -> [ObjectId]
 attackableBattles defender gs =
   let protects oid = Battle.protectorOf oid gs == Just defender
@@ -193,119 +139,65 @@ attackableBattles defender gs =
    in filter (\oid -> protects oid && isOne oid) (Set.toAscList (GameState.battlefield gs))
 
 -- "only if you've been attacked this step", asked of the player a printed clause
--- says "you" about.
+-- says "you" about -- read once here, and conjoined by both
+-- CastingRestriction.AttackedThisStep and ActivationRestriction.AttackedThisStep.
 --
--- TWO readers, one question: Pawl.Types.CastingRestriction.AttackedThisStep
--- (Rally the Troops) and Pawl.Types.ActivationRestriction.AttackedThisStep
--- (Kongming's Contraptions) spell the same clause, and CR 307.5's ban on the two
--- gates agreeing is about casting PROHIBITIONS, not about a fact of the combat
--- record. So the record is read once, here, and each gate conjoins it itself.
+-- Combat.declaredAttacked and NOT Combat.attacked, CR 508.8's wider set: CR 508.4
+-- says a creature put onto the battlefield attacking never "attacked", and CR
+-- 508.3b spells out the player side. Membership in that HISTORICAL set, since CR
+-- 506.4's removal does not un-attack anybody. An OfPlayer entry naming this player
+-- is already the "is a defending player" conjunct.
 --
--- CR 506.2 (CR 507.1 where the seat count makes it a choice) settles who the
--- defending player is, so the question left is whether any creature was DECLARED
--- attacking THIS PLAYER rather than a planeswalker of theirs -- exactly
--- membership in Combat.declaredAttacked. DECLARED, and not "or put onto the
--- battlefield attacking": CR 508.4 says such creatures never "attacked", and CR
--- 508.3b spells out the player side. So this reads Combat.declaredAttacked and
--- NOT Combat.attacked, CR 508.8's wider set; the two fields exist because the two
--- rules disagree (see Pawl.Types.Combat). Eightfold Maze's ruling pins the
--- reading: a creature needs to have attacked YOU, which is why this cannot be
--- emptiness of the record, and CR 306.6 is what made it observable.
---
--- Membership in the HISTORICAL set rather than a search of Combat.attackers,
--- because CR 506.4 removing the lone attacker from combat does not un-attack
--- anybody. No separate Combat.defender test either: only a defending player can
--- be attacked, so an OfPlayer entry naming this player IS that conjunct.
---
--- "THIS STEP" is read off the combat record, which CR 511.3 scopes to the whole
--- combat PHASE. The two spans coincide for every card in the pool because this
--- set is written ONLY by declareAttackers below, CR 508.1's turn-based action.
--- That is a fact about the pool rather than a rule (#447): what remains open is a
--- second declaration inside one phase.
+-- "THIS STEP" is read off a record CR 511.3 scopes to the whole combat PHASE. Not
+-- implemented: a second declaration inside one phase, which is what would tell the
+-- two spans apart (#447).
 attackedThisStep :: PlayerId -> GameState -> Bool
 attackedThisStep pid gs =
   Set.member (AttackTarget.OfPlayer pid) (Combat.declaredAttacked (GameState.combat gs))
 
 -- CR 506.7b: is the game past the point "only during combat after blockers are
--- declared" names?
+-- declared" names? Shared by CastingRestriction.AfterBlockersDeclared and
+-- ActivationRestriction.AfterBlockersDeclared, which CR 506.7g makes one rule.
+-- Asked of the game and not of a player, CR 506.7 describing a point in the turn.
 --
--- TWO readers and one question, exactly as attackedThisStep above:
--- Pawl.Types.CastingRestriction.AfterBlockersDeclared (Curtain of Light) and
--- Pawl.Types.ActivationRestriction.AfterBlockersDeclared (Trap Runner). Here the
--- sharing is a RULE rather than an observation -- CR 506.7g says rules 506.7 and
--- 506.7a-f govern such an activation just as they govern such a cast.
---
--- Asked of the game and not of a player: CR 506.7 describes a point in the turn,
--- and neither printing narrows it by seat.
---
--- No conjunct about the current phase, which is CR 511.3 rather than an
--- omission. Combat.blockersDeclared is written only by declareBlockers below and
--- cleared only by clearCombat, so it is True for exactly the declare blockers,
--- combat damage and end of combat steps of a combat phase whose declare blockers
--- step ran -- CR 506.7f's skipped step and CR 506.7c's second combat phase both
--- falling out of that. It inherits one caveat with the rest of the record: a
--- combat phase whose end of combat STEP alone is skipped never reaches
--- clearCombat, and Pawl.Engine.Engine.skipWholePhase's note is where that case
--- is written down.
+-- No conjunct about the current phase, which is CR 511.3 rather than an omission:
+-- declareBlockers is the only writer and clearCombat the only clearer. A combat
+-- phase whose end of combat STEP alone is skipped never reaches clearCombat --
+-- Pawl.Engine.Engine.skipWholePhase's note has that case.
 afterBlockersDeclared :: GameState -> Bool
 afterBlockersDeclared = Combat.blockersDeclared . GameState.combat
 
 -- CR 506.4: is this planeswalker still one that is being attacked -- or has it
 -- been removed from combat since the declaration?
 --
--- Asked where the answer is USED rather than sampled into the combat record the
--- way removeChanged samples its two clauses, and the difference is invisible:
--- Damage.combatRecipient asks it at CR 510.1's assignment, whose own CR 510.1b is
--- phrased for precisely this case, and Battle.isBeingAttacked asks the record for
--- CR 704.5x's rider, which needs only whether a battle is named at all.
--- Defender.playerOf, CR 508.5's reader, needs no removal test of its own: the
--- defending player of a creature attacking a planeswalker is the record's
--- defending player whether or not the planeswalker is still there (rule 508.5's
--- second sentence). The remaining readers of a target look only for
--- AttackTarget.OfPlayer -- AttackCost.costsOn's attack taxes,
--- Quantity.attackedOpponent's CR 702.121a melee, Event's CR 702.105a dethrone,
--- Pawl.Types.TriggerCondition's attacked player -- and a rule that removes a
--- PLANESWALKER from combat cannot change what those answer.
+-- Asked where the answer is USED (Damage.combatRecipient, at CR 510.1's
+-- assignment) rather than sampled into the record, because CR 506.4c is emphatic
+-- that Combat.attackers' KEYS must not change: the creature continues to be an
+-- attacking creature, attacking nothing, and may be blocked.
 --
--- Every other reader of Combat.attackers takes its KEYS (Projection's
--- Filter.IsAttacking, blockCeiling, declareBlockers, Damage.dealCombatDamage),
--- and CR 506.4c is emphatic that the keys must NOT change here: the creature
--- continues to be an attacking creature, attacking nothing, and may be blocked.
+-- Keeping the entry naming a departed planeswalker is required rather than merely
+-- harmless: CR 702.19e is stated as an exception to CR 506.4c, so the entry is
+-- what lets Damage.combatRecipient tell "was attacking a planeswalker that is
+-- gone" from "was never attacking anything" (Thrasta, Tempest's Roar).
 --
--- So the state pawl stores -- an attacker whose recorded target is no longer
--- attackable -- and the state the rules describe are observationally the same
--- board, and keeping the record is required rather than merely harmless: rule
--- 702.19e is stated as an exception to CR 506.4c, so the entry naming the
--- planeswalker is what lets Damage.combatRecipient tell "was attacking a
--- planeswalker that is gone" from "was never attacking anything" (Thrasta,
--- Tempest's Roar is the printing). What no board can yet show is a trigger that
--- reads WHICH PERMANENT was attacked -- CR 508.3b's planeswalker and battle
--- forms -- since GameEvent.AttackerDeclared carries no target (gap #538). WHOM
--- it attacked is a different question and is answerable: the event carries CR
--- 508.5's defending player, which TriggerCondition.CreatureAttacksYou reads
--- (Marchesa's Decree).
+-- Not implemented: a trigger reading WHICH PERMANENT was attacked, CR 508.3b's
+-- planeswalker and battle forms, GameEvent.AttackerDeclared carrying no target
+-- (#538). WHOM it attacked is answerable -- the event carries CR 508.5's
+-- defending player.
 stillAttacked :: ObjectId -> GameState -> Bool
 stillAttacked oid gs = case Combat.defender (GameState.combat gs) of
-  -- No defending player is no attack (see Pawl.Types.Combat's defender field), so
-  -- nothing of theirs is being attacked either.
+  -- No defending player is no attack (see Pawl.Types.Combat's defender field).
   Nothing -> False
   Just defender -> List.elem oid (attackablePlaneswalkers defender gs)
 
 -- CR 506.4 for a battle: is this one still being attacked, or has it left the
--- battlefield since the declaration? stillAttacked's twin, asked at the same one
--- place -- Damage.combatRecipient's CR 510.1b assignment -- and built the same way,
--- out of the candidate list CR 508.1b drew the declaration from.
---
--- Reusing attackableBattles rather than testing the zone directly is what keeps
--- the two readings in step: a battle that stopped being a battle (CR 613.1d) is off
--- the list for the same reason a planeswalker that stopped being one is, and CR
--- 506.4's "leaves the battlefield" falls out of the list being battlefield-scoped.
+-- battlefield since the declaration? stillAttacked's twin, built out of the same
+-- candidate list CR 508.1b drew the declaration from -- so CR 613.1d's type change
+-- and CR 506.4's "leaves the battlefield" both fall out of the list.
 --
 -- The list also asks who protects the battle, so a protector moved to a third
--- player mid-combat (CR 310.9f) reads here as removed from combat -- which is
--- what rule 506.4 says, since the 2026-08-07 update named the protector beside
--- the controller in its list. No effect in the pool can move a designation
--- (#853), so nothing observes the agreement either way.
+-- player mid-combat (CR 310.9f) reads here as removed from combat, which is what
+-- rule 506.4 says. Not implemented: any effect that moves a designation (#853).
 stillAttackedBattle :: ObjectId -> GameState -> Bool
 stillAttackedBattle oid gs = case Combat.defender (GameState.combat gs) of
   Nothing -> False
@@ -318,38 +210,23 @@ isCreatureObjectGiven :: Map ObjectId PC.ProjectedCharacteristics -> ObjectId ->
 isCreatureObjectGiven = Projection.isCreatureGiven
 
 -- CR 508.1a: an attacking creature must be untapped, controlled by the active
--- player, and not summoning sick (CR 302.6). Together with the PER-CREATURE half
--- of CR 508.1c's restrictions, which are the last two conjuncts: the rules ask
--- them as separate steps, and pawl answers both here because a creature failing
--- one of these is in no legal declaration at all, so failing it is
--- indistinguishable from never having been a candidate.
+-- player, and not summoning sick (CR 302.6), plus the PER-CREATURE half of CR
+-- 508.1c: a creature failing one of those is in no legal declaration at all.
 --
--- Only that half. CR 508.1c's other shape is SET-SHAPED -- Bonded Construct's
--- "can't attack alone" is a fact about the whole declaration -- and a creature
--- carrying one is still a candidate, since some declaration containing it is
--- legal. That shape is asked in attackDeclarationAllowed and never here; taking
--- it off the candidate list would forbid the declaration CR 508.1c's own Example
--- calls legal. So CR 508.1c is answered in two places, one per shape -- the
--- split canBlockGiven describes for CR 509.1b, without its middle PAIRWISE case:
--- NOT IMPLEMENTED on the attacking side, where a restriction naming what the
--- attack is aimed at (Blazing Archon) has no carrier (#1686).
+-- CR 508.1c's SET-SHAPED half (Bonded Construct's "can't attack alone") is
+-- attackDeclarationAllowed's, since such a creature is still a candidate -- taking
+-- it off the list would forbid the declaration CR 508.1c's own Example calls
+-- legal. Not implemented: the PAIRWISE shape, a restriction naming what the attack
+-- is aimed at (Blazing Archon), which has no carrier (#1686).
 --
--- NOT IMPLEMENTED: CR 508.1a's "they can't also be battles". The creature test
--- below already excludes every battle in the pool, since none is also a creature
--- (#898).
+-- Not implemented: CR 508.1a's "they can't also be battles". No battle in the pool
+-- is also a creature, so the creature test below already excludes them (#898).
 --
 -- canAttackGiven is the half a LOOP wants: `grants`, `pcs` and `restricted` are
 -- each one battlefield-wide walk, taken once per declaration pass by
--- legalAttackers below rather than once per candidate, which is what kept the
--- pass from being quadratic in the battlefield (#200).
--- Projection.projectGiven carries the argument for why a shared board is the
--- same answer, and for why it is valid only within one pure pass over one
--- GameState.
---
--- canAttack itself passes Map.empty for the projection, so a lone query projects
--- per read. It does NOT pass an empty restriction set: an absent projection is a
--- cache miss the projection recovers from, while an absent restriction is a
--- wrong answer.
+-- legalAttackers rather than once per candidate (#200). An absent projection is a
+-- cache miss the projection recovers from, while an absent restriction set is a
+-- wrong answer -- which is why canAttack computes one.
 canAttack :: PlayerId -> ObjectId -> GameState -> Bool
 canAttack pid oid gs = canAttackGiven (Projection.controlGrants gs) Map.empty (CombatRestriction.cantAttack [oid] gs) pid oid gs
 
@@ -360,11 +237,8 @@ canAttackGiven grants pcs restricted pid oid gs = case Game.lookupObject oid gs 
     Projection.controllerOfGiven grants Set.empty oid gs == Just pid
       && GameState.activePlayer gs == pid
       -- CR 506.3 wants a permanent, so the test is battlefield MEMBERSHIP and not
-      -- Object.zone: CR 702.26b makes a phased-out permanent one the game treats
-      -- as not existing, and its zone still reads Zone.Battlefield (CR 702.26d).
-      -- legalAttackers below never offers one, since it filters
-      -- Projection.controlsGiven, which walks the same set -- this conjunct is what
-      -- makes the predicate agree when asked about an id off that menu.
+      -- Object.zone: a phased-out permanent is one the game treats as not
+      -- existing (CR 702.26b) whose zone still reads Zone.Battlefield (CR 702.26d).
       && Set.member oid (GameState.battlefield gs)
       && Object.tapped obj == TapState.Untapped
       -- CR 302.6, relaxed by CR 702.10b: a creature with haste can attack even if
@@ -373,10 +247,7 @@ canAttackGiven grants pcs restricted pid oid gs = case Game.lookupObject oid gs 
       && Summoning.settledOrHastyGiven pcs pid oid gs
       && isCreatureObjectGiven pcs oid gs
       -- CR 508.1c through CR 702.3b: a creature with defender can't attack. It may
-      -- still block -- 702.3b says nothing about blocking. A KEYWORD and not a
-      -- CombatRestriction, because rule 702 is part of the rulebook: casing on a
-      -- keyword is the closed half reading its own rules, where a printed "can't
-      -- attack" is open-half card data.
+      -- still block -- 702.3b says nothing about blocking.
       && not (Projection.hasKeywordGiven pcs Keyword.Defender oid gs)
       -- CR 508.1c: every PRINTED attacking restriction in force (Pacifism).
       && not (Set.member oid restricted)
