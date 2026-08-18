@@ -253,7 +253,9 @@ takes ten minutes now and forty as its own dispatch is folded in.
 - **Landing a capability a census tracks means editing the census in the same
   PR** --- #875 (CR 116 special actions), #876 (CR 701 keyword actions), #877
   (CR 702 keyword abilities). `script/check-census.sh` catches the eponymous
-  case; #875 and a row landed under another name are yours alone.
+  case on #876 and #877, and holds #875's rows to set equality with `Action`'s
+  constructors by the `Action.X` names they write. A row landed under another
+  name, or under no constructor of the tracked type at all, is yours alone.
 - **Landing a capability means reading what it unblocked**; `CLAUDE.md` has
   the query. Say in the PR which dependents are now workable.
 - **Closing #N means re-deriving every inline `(#N)` in the tree**, not just
