@@ -638,23 +638,16 @@ crew n =
 -- unlike outlast there is no CostComponent.TapThis and CR 302.6 does not reach
 -- this ability: a leveler that arrived this turn can level up.
 --
--- THE EFFECT names the permanent through the engine-reserved
--- Binding.triggerSource slot, so rule 702.87a's "this permanent" is named and
--- never TARGETED (CR 115.10a), outlast's posture. One counter, always: rule
--- 702.87a writes that number itself, so what this keyword's payload varies is
--- the cost and never the count.
+-- THE EFFECT names the permanent through Binding.triggerSource, so rule 702.87a's
+-- "this permanent" is named and never TARGETED (CR 115.10a), outlast's posture.
 --
--- THE COUNTER grants nothing by itself
--- (Pawl.Engine.Projection.counterGathered). CR 711.2a's level symbols are
--- ordinary conditional static abilities on the card, reading this tally through
--- Quantity.ObjectCounters, which is why the keyword mints only the counter and
--- the card carries everything the level symbols say.
+-- THE COUNTER grants nothing by itself: CR 711.2a's level symbols are ordinary
+-- conditional static abilities on the card, reading this tally through
+-- Quantity.ObjectCounters.
 --
--- CR 602.5d is the timing clause and the ONLY restriction, outlast's again. The
--- condition is Nothing because CR 711.4 says so outright: "each leveler
--- permanent has its level up ability at all times; it may be activated
--- regardless of how many level counters are on that permanent" -- so it is still
--- offered past the last level symbol's range.
+-- CR 602.5d is the timing clause and the ONLY restriction. The condition is
+-- Nothing because CR 711.4 says so outright, so the ability is still offered past
+-- the last level symbol's range.
 levelUp :: Cost Keyword -> ActivatedAbility Card
 levelUp cost =
   ActivatedAbility.MkActivatedAbility
@@ -670,27 +663,20 @@ levelUp cost =
     gain = Effect.PutCounters (PutCounters.MkPutCounters CounterKind.Level (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource))
 
 -- CR 702.107a: "Outlast [cost]" means "[Cost], {T}: Put a +1/+1 counter on this
--- creature. Activate only as a sorcery." The card names the cost; every other
--- word is the rule's, so the tap symbol, the counter and the timing clause are
--- minted here rather than carried as card data.
+-- creature. Activate only as a sorcery." The card names the cost; every other word
+-- is the rule's.
 --
--- THE COST is the printed one with CostComponent.TapThis APPENDED, which is what
--- rule 702.107a's ", {T}" is. Unlike crew's cost the tap symbol is the
--- permanent's own, so CR 302.6 does reach this ability -- Cost.requiresSicknessCheck
--- tests for exactly this component, and a creature that arrived this turn cannot
--- outlast. Appended rather than prepended because CR 601.2h pays a cost as a whole
--- and the order is only what the rule prints.
+-- THE COST is the printed one with CostComponent.TapThis APPENDED, rule 702.107a's
+-- ", {T}". Unlike crew's cost the tap symbol is the permanent's own, so CR 302.6
+-- does reach this ability and a creature that arrived this turn cannot outlast.
 --
--- THE EFFECT names the permanent through the engine-reserved
--- Binding.triggerSource slot, so rule 702.107a's "this creature" is named and
--- never TARGETED (CR 115.10a), crew's posture. One counter, always: rule 702.107a
--- writes that number itself, where rule 702.112a leaves renown's to the card --
--- so what this keyword's payload varies is the cost and never the count.
+-- THE EFFECT names the permanent through Binding.triggerSource, so rule 702.107a's
+-- "this creature" is named and never TARGETED (CR 115.10a). One counter always,
+-- the rule writing that number itself where rule 702.112a leaves renown's to the
+-- card.
 --
--- CR 602.5d is the timing clause, and it is the ONLY restriction -- rule 702.107a
--- states no once-per-turn limit, so CR 117.1b's default stands for everything
--- else. The condition is Nothing for cycling's reason: the ability is granted
--- outright, with no "as long as".
+-- CR 602.5d is the timing clause and the ONLY restriction, rule 702.107a stating
+-- no once-per-turn limit.
 outlast :: Cost Keyword -> ActivatedAbility Card
 outlast cost =
   ActivatedAbility.MkActivatedAbility
@@ -706,36 +692,29 @@ outlast cost =
     grow = Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource))
 
 -- CR 601.3: the casting permissions rule 702 gives a card for holding a keyword.
--- A card's own printed permissions (Face.castingPermissions) are a separate,
--- additive list; Pawl.Engine.Cast reads both.
+-- A card's own printed permissions are a separate, additive list.
 --
--- WHICH keyword set is the caller's to choose, and the two callers choose
--- differently: a card in a GRAVEYARD is read through the projection, so a
--- granted flashback grants its permission too, while a card in a LIBRARY is read
--- as printed, no pool effect changing a card's keywords there (#160).
+-- WHICH keyword set is the caller's to choose: a card in a GRAVEYARD is read
+-- through the projection, so a granted flashback grants its permission too, while
+-- a card in a LIBRARY is read as printed (#160).
 --
 -- The card types come along because rule 702.34a's permission is CONDITIONAL on
--- them. They are the types of the one FACE being proposed, which is the caller's
--- doing -- see Pawl.Engine.Cast.permissionsWith for why that is the right face.
+-- them, and they are the types of the one FACE being proposed.
 castingPermissionsOf :: Set CardType.CardType -> Set Keyword -> [CastingPermission]
 castingPermissionsOf cardTypes = concatMap (permissionsFor cardTypes) . Set.toAscList
 
--- Exhaustive, exactly as abilitiesFor is, and for the same reason: rule 702 is
--- full of keywords that grant a zone permission (madness, retrace, escape,
--- disturb), so the next one added must break this build rather than silently
--- grant nothing.
+-- Exhaustive, exactly as abilitiesFor is: the next keyword that grants a zone
+-- permission must break this build rather than silently grant nothing.
 permissionsFor :: Set CardType.CardType -> Keyword -> [CastingPermission]
 permissionsFor cardTypes keyword = case keyword of
   -- CR 702.34a: "You may cast this card from your graveyard IF THE RESULTING
   -- SPELL IS AN INSTANT OR SORCERY SPELL by paying [cost] rather than paying its
   -- mana cost." The clause gates the permission itself, so a card that fails it
-  -- gets no permission at all rather than a permission it cannot use --
-  -- Pawl.CastSpec's "FlashbackCardType" group proves both directions.
+  -- gets no permission at all (Pawl.CastSpec's "FlashbackCardType" group).
   --
-  -- Gated HERE rather than in Pawl.Engine.Cast.permitsCastFromGraveyard because
-  -- the condition belongs to rule 702.34a, not to CastFromGraveyard: a card that
-  -- PRINTS the same permission need not restrict itself to instants and
-  -- sorceries, and must not inherit flashback's clause.
+  -- Gated HERE rather than in Cast.permitsCastFromGraveyard: the condition belongs
+  -- to rule 702.34a, and a card that PRINTS the same permission must not inherit
+  -- flashback's clause.
   Keyword.Flashback _
     | Set.member CardType.Instant cardTypes || Set.member CardType.Sorcery cardTypes ->
         [CastingPermission.CastFromGraveyard]
@@ -751,12 +730,10 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
   Keyword.FirstStrike -> []
-  -- CR 702.8a grants no permission either, and it is the near miss flashback's
-  -- neighbour makes worth stating: its SECOND sentence widens the TIME a cast may
-  -- be proposed at (Pawl.Engine.Cast.instantSpeed) and names no zone, while its
-  -- first names the zones the ABILITY functions in rather than the zones the card
-  -- may be cast from. So a card with flash is castable from exactly the zones it
-  -- was castable from without it.
+  -- CR 702.8a grants no permission, and it is the near miss worth stating: its
+  -- SECOND sentence widens the TIME a cast may be proposed at (Cast.instantSpeed)
+  -- and names no zone, while its first names the zones the ABILITY functions in
+  -- rather than the zones the card may be cast from.
   Keyword.Flash -> []
   Keyword.Flying -> []
   Keyword.Haste -> []
@@ -775,20 +752,14 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Phasing -> []
   Keyword.Shadow -> []
   Keyword.Horsemanship -> []
-  -- CR 702.127a's FIRST static ability: "you may cast this half of this split card
-  -- from your graveyard". Ungated, unlike flashback's arm above -- rule 702.127a
-  -- carries no instant-or-sorcery clause, because rule 702.127a's own first
-  -- sentence already confines aftermath to split cards.
-  --
-  -- The rule's SECOND ability, "can't be cast from any zone other than a
-  -- graveyard", is not a permission and is not here: a prohibition is
-  -- Pawl.Engine.Cast's to apply, at its Zone.Hand arm.
+  -- CR 702.127a's FIRST static ability. Ungated, unlike flashback's arm above,
+  -- rule 702.127a's own first sentence already confining aftermath to split cards.
+  -- Its SECOND ability, "can't be cast from any zone other than a graveyard", is a
+  -- PROHIBITION and so Pawl.Engine.Cast's, at its Zone.Hand arm.
   Keyword.Aftermath -> [CastingPermission.CastFromGraveyard]
-  -- CR 702.133a's FIRST static ability, gated exactly as flashback's arm above:
-  -- rule 702.133a prints flashback's "if the resulting spell is an instant or
-  -- sorcery spell" word for word. What the two rules do NOT share is the cost --
-  -- flashback replaces the mana cost and this one adds a discard to it -- and that
-  -- half is Pawl.Engine.Cost.costsFor's, the same split flashback takes.
+  -- CR 702.133a's FIRST static ability, gated exactly as flashback's arm above.
+  -- What the two rules do NOT share is the cost -- flashback replaces the mana
+  -- cost and this one adds a discard to it -- and that half is Cost.costsFor's.
   Keyword.JumpStart
     | Set.member CardType.Instant cardTypes || Set.member CardType.Sorcery cardTypes ->
         [CastingPermission.CastFromGraveyard]
@@ -844,20 +815,14 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Decayed -> []
   Keyword.Training -> []
   Keyword.Toxic _ -> []
-  -- CR 702.170a is a static ability functioning in a HAND, and what it grants
-  -- is CR 116.2k's special action rather than a cast: nothing here. CR
-  -- 702.170d's permission to cast the card from EXILE belongs to the PLOTTED
-  -- card and not to the keyword -- "a plotted card may be cast this way even if
-  -- it doesn't have the plot ability while in exile" -- so it is object state
-  -- (Object.plotted) that Pawl.Engine.Cast.permitsCastFromExile reads, the
-  -- shape CR 715.3d's Adventure permission already has.
+  -- CR 702.170a is a static ability functioning in a HAND, and what it grants is
+  -- CR 116.2k's special action rather than a cast. CR 702.170d's permission to cast
+  -- from EXILE belongs to the PLOTTED card and not to the keyword, so it is object
+  -- state (Object.plotted) that Cast.permitsCastFromExile reads.
   Keyword.Plot _ -> []
-  -- CR 702.143a, the arm above's argument unchanged: the static ability
-  -- functions in a HAND and what it grants there is CR 116.2h's special action.
-  -- The permission to cast the card from EXILE belongs to the FORETOLD card --
-  -- CR 702.143d gives one to a card that never had the keyword -- so it is
-  -- object state (Object.foretold) that Pawl.Engine.Cast.permitsCastFromExile
-  -- reads.
+  -- CR 702.143a, the arm above's argument unchanged: CR 116.2h's special action in
+  -- a hand, and CR 702.143d's permission belonging to the FORETOLD card
+  -- (Object.foretold) rather than the keyword.
   Keyword.Foretell _ -> []
   -- CR 702.94a's cast is one CR 608.2g offers during the linked ability's
   -- resolution, so it is not a standing CR 601.3 permission the way flashback's
@@ -872,12 +837,8 @@ permissionsFor cardTypes keyword = case keyword of
 
 -- | CR 702.127a's SECOND static ability: "this half of this split card can't be
 -- cast from any zone other than a graveyard". A PROHIBITION, so it is a question
--- Pawl.Engine.Cast asks of the zone it is about to offer rather than anything
--- minted here -- the counterweight to the CastFromGraveyard permission
--- permissionsFor grants for the same keyword.
---
--- Membership rather than a count: rule 702.127a takes no parameter and a second
--- instance would forbid nothing further.
+-- Pawl.Engine.Cast asks of the zone it is about to offer. Membership rather than a
+-- count, rule 702.127a taking no parameter.
 hasAftermath :: Set Keyword -> Bool
 hasAftermath = Set.member Keyword.Aftermath
 
@@ -886,61 +847,23 @@ hasAftermath = Set.member Keyword.Aftermath
 -- Pawl.Engine.Cast.instantSpeed, which turns it into the CR 302.1 / 307.1 window
 -- being lifted for that one card.
 --
--- MEMBERSHIP, not a count: CR 702.8b makes multiple instances of flash on the
--- same object redundant, so a second one has nothing left to widen.
+-- MEMBERSHIP, not a count: CR 702.8b makes multiple instances redundant.
 --
--- Two separate facts make reading a Set of PRINTED keywords right here, and
--- neither of them is the other.
---
--- WHERE the ability functions is the rules half: rule 702.8a's first sentence
--- and CR 113.6e put it in any zone the card could be played from, and on the
--- stack. So a hand and a graveyard are zones this must be readable in at all,
--- which is why the caller asks a card rather than a permanent.
---
--- WHETHER printed is the right source is the engine half, and the rules do NOT
--- say it is: CR 613.1 names no zone, and CR 122.1b's keyword counter reaches a
--- card outside the battlefield explicitly. What makes the printed read safe is
--- that it is INDISTINGUISHABLE from a projected one today, which is a claim about
--- pawl's pool rather than about Magic. That takes all five of
--- Pawl.Types.Affected:
---
---   * Matching and AttachedPlayerControls are gated on battlefield membership,
---     structurally, inside Projection.affects.
---   * Attached names the object the SOURCE is attached to, which an Aura only
---     ever has while both are on the battlefield.
---   * TheseObjects is CR 611.2c's frozen set, and Magical Hack's ChangeText
---     already stores one naming a spell on the STACK. What stops it here is the
---     pool: no Pawl.Types.Pool arm names a card in a hand at all.
---   * MatchingAnywhere is gated nowhere, and both readers project a card off the
---     battlefield -- Projection.viewOfObject always did, Projection.viewUpTo
---     since #623 -- so a card in a hand is as reachable as a permanent. Only the
---     pool stops it: Viral Spawning grants a keyword to a card in a GRAVEYARD
---     already, and no effect in the pool grants or removes FLASH off the
---     battlefield.
---
--- So the printed read and a projected one agree on every board pawl can build
--- (#160). The same posture handAbilitiesOf above takes (#567), and
--- castingPermissionsOf above is the read that has already parted.
---
--- A membership test rather than an exhaustive case: this asks about ONE named
--- constructor rather than classifying every keyword, so a new arm has nothing to
--- say here.
+-- Rule 702.8a's first sentence and CR 113.6e put the ability in any zone the card
+-- could be played from, and on the stack, which is why the caller asks a card
+-- rather than a permanent. PRINTED keywords are indistinguishable from projected
+-- ones on every board pawl can build (#160), which is a claim about the pool
+-- rather than about Magic; the same posture handAbilitiesOf takes.
 hasFlash :: Set Keyword -> Bool
 hasFlash = Set.member Keyword.Flash
 
 -- | CR 702.133a's ADDITIONAL cost, "discarding a card": whether this card's
--- keywords add one to a cast from a graveyard. Read by
--- Pawl.Engine.Cost.costsFor, which -- as it does for flashback and aftermath --
--- consults it only while the object is in a graveyard, the zone half of the same
--- sentence.
+-- keywords add one to a cast from a graveyard. Read by Cost.costsFor only while
+-- the object is in a graveyard, the zone half of the same sentence.
 --
 -- A Bool rather than flashbackCost's Maybe Cost: rule 702.133a states the cost
--- itself, so there is nothing to read off the card, and the CostComponent it
--- turns into is costsFor's to name.
---
--- Membership rather than a count: rule 702.133a takes no parameter, and pawl has
--- no printing with two jump-start abilities to say whether a second would add a
--- second discard.
+-- itself, so there is nothing to read off the card. Membership rather than a
+-- count, the rule taking no parameter.
 hasJumpStart :: Set Keyword -> Bool
 hasJumpStart = Set.member Keyword.JumpStart
 
@@ -949,13 +872,10 @@ hasJumpStart = Set.member Keyword.JumpStart
 -- ONLY while the object is in a graveyard -- the zone half of the same sentence.
 --
 -- A wildcard rather than an exhaustive case: this asks about ONE named
--- constructor rather than classifying every keyword, so a new arm has nothing to
--- say here.
+-- constructor rather than classifying every keyword.
 --
--- Nothing beyond the FIRST flashback cost is reachable, and rule 702.34a states
--- no limit on how many a card may have. The set this is asked of is the
--- PROJECTED one in a graveyard, so a card with a printed flashback and a granted
--- one has two costs and CR 601.2b a choice between them; only the lesser (Set
+-- Nothing beyond the FIRST flashback cost is reachable, where rule 702.34a states
+-- no limit and CR 601.2b would give a choice between them; only the lesser (Set
 -- order) is offered (gap #294).
 flashbackCost :: Set Keyword -> Maybe (Cost Keyword)
 flashbackCost keywords =
@@ -969,33 +889,21 @@ flashbackCost keywords =
 -- when the card has no morph ability. Read by Pawl.Engine.FaceDown.
 --
 -- NOT the cost of the morph CAST: rule 702.37a writes that one into the rule
--- itself ("by paying {3}"), so it comes from Pawl.Engine.Cost.faceDownCost and
--- never from a card.
+-- itself ("by paying {3}"), so it comes from Cost.faceDownCost.
 --
 -- Asked of the card's PRINTED keywords, which for morph is the rule's own scope:
--- CR 702.37a says the ability "functions in any zone from which you could play
--- the card it's on", and CR 702.37e reads it off "the permanent's morph cost
--- WOULD BE IF IT WERE FACE UP" -- a face-down permanent projects no keywords at
--- all (CR 708.2a), so a projected read would find nothing to pay.
+-- CR 702.37a's ability "functions in any zone from which you could play the card
+-- it's on", and a face-down permanent projects no keywords at all (CR 708.2a), so
+-- a projected read would find nothing to pay.
 --
--- CR 702.37b: MEGAMORPH REACHES HERE TOO, and that is the whole reason
--- Pawl.Types.Keyword's Morph carries a variant instead of having a sibling
--- constructor. "A megamorph cost is a morph cost", so this function must answer
--- for both -- and the case below has a WILDCARD, so a `Megamorph` constructor
--- beside `Morph` would have fallen through it to Nothing, silently making every
--- megamorph card uncastable face down (Pawl.Engine.Cast gates the face-down cast
--- on this answer) and unturnable face up (FaceDown.canTurnFaceUp does too), with
--- nothing for -Werror to report. Widening the constructor made this line a build
--- failure until it was read again.
+-- CR 702.37b: MEGAMORPH REACHES HERE TOO, which is why Pawl.Types.Keyword's Morph
+-- carries a variant rather than having a sibling constructor -- the case below is
+-- a WILDCARD, so a `Megamorph` constructor beside `Morph` would fall through to
+-- Nothing and silently make every megamorph card uncastable face down and
+-- unturnable face up, with nothing for -Werror to report.
 --
--- A wildcard rather than an exhaustive case, exactly as flashbackCost above.
---
--- ONE cost per card. The keyword set holds every printed instance and this takes
--- the ascending-least of them, ordered by Pawl.Types.Morph's derived Ord, which
--- compares the Cost before the variant. So a card printing two morph abilities
--- has one payable road, and that answer is what "the permanent's morph cost"
--- means to every reader of it -- Pawl.Engine.Cast, FaceDown.canTurnFaceUp, and
--- the megamorph row mintedReplacementsFor puts on the same permanent.
+-- ONE cost per card: the ascending-least printed instance, ordered by
+-- Pawl.Types.Morph's derived Ord, which compares the Cost before the variant.
 morphCost :: Set Keyword -> Maybe (Cost Keyword)
 morphCost keywords =
   let costOf keyword = case keyword of
@@ -1004,10 +912,8 @@ morphCost keywords =
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
 -- CR 702.33a: the ADDITIONAL cost this card's controller may pay as they cast it,
--- or Nothing when it has no kicker. Read by Pawl.Engine.Cast, which offers it at
--- CR 601.2b and adds it to whichever candidate cost was announced (CR 601.2f).
---
--- A wildcard rather than an exhaustive case, exactly as flashbackCost above.
+-- or Nothing when it has no kicker. Offered at CR 601.2b and added to whichever
+-- candidate cost was announced (CR 601.2f). A wildcard, flashbackCost's shape.
 --
 -- Nothing beyond the FIRST kicker cost is reachable, so CR 702.33b's "kicker
 -- [cost 1] and/or [cost 2]" is unrepresented (gap #1235).
@@ -1018,12 +924,10 @@ kickerCost keywords =
         _ -> Nothing
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
--- CR 702.42a: the ADDITIONAL cost this card's controller may pay to choose all
--- of its modes, or Nothing when it has no entwine. Read by Pawl.Engine.Cast,
--- which offers it at CR 601.2b and adds it to whichever candidate cost was
--- announced (CR 601.2f).
---
--- A wildcard rather than an exhaustive case, exactly as flashbackCost above.
+-- CR 702.42a: the ADDITIONAL cost this card's controller may pay to choose all of
+-- its modes, or Nothing when it has no entwine. Offered at CR 601.2b and added to
+-- whichever candidate cost was announced (CR 601.2f). A wildcard, flashbackCost's
+-- shape.
 --
 -- Nothing beyond the FIRST entwine cost is reachable: a card printing two
 -- entwine abilities is expressible and unrepresented (gap #474).
@@ -1035,18 +939,12 @@ entwineCost keywords =
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
 -- CR 702.170a: what CR 116.2k's special action costs -- "you may exile this card
--- from your hand and PAY [COST]" -- or Nothing when the card has no plot. Read by
--- Pawl.Engine.Plot, which is the only caller.
+-- from your hand and PAY [COST]" -- or Nothing when the card has no plot.
 --
--- The cost of the ACTION and never of the cast, which is the mirror of
--- flashbackCost above: rule 702.170d makes the later cast free, so nothing
--- consults this from Pawl.Engine.Cost.
+-- The cost of the ACTION and never of the cast: rule 702.170d makes the later cast
+-- free, so nothing consults this from Pawl.Engine.Cost.
 --
--- A wildcard rather than an exhaustive case, exactly as flashbackCost.
---
--- ONE cost per card, morphCost's shape: the ascending-least of the plot costs
--- the card prints, so a card printing two plot abilities offers CR 116.2k's
--- action at that price and no other.
+-- A wildcard, and ONE cost per card (the ascending-least), morphCost's shape.
 plotCost :: Set Keyword -> Maybe (Cost Keyword)
 plotCost keywords =
   let costOf keyword = case keyword of
@@ -1056,18 +954,13 @@ plotCost keywords =
 
 -- CR 702.143a: what a foretold card is CAST for -- "they may cast that card
 -- after the current turn has ended by PAYING ANY FORETELL COST it has" -- or
--- Nothing when the card has no foretell. Read by Pawl.Engine.Cost, and by
--- Pawl.Engine.Foretell only to answer whether the keyword is there at all.
+-- Nothing when the card has no foretell.
 --
--- The cost of the CAST and never of the special action, which is the mirror of
--- plotCost above and flashbackCost's shape exactly: CR 116.2h fixes the action's
--- cost at {2} for every printing, so Pawl.Engine.Foretell mints that itself.
+-- The cost of the CAST and never of the special action, plotCost's mirror: CR
+-- 116.2h fixes the action's cost at {2} for every printing, so Pawl.Engine.Foretell
+-- mints that itself.
 --
--- A wildcard rather than an exhaustive case, exactly as flashbackCost.
---
--- ONE cost per card, morphCost's shape: the ascending-least of the foretell
--- costs the card prints, so rule 702.143a's "ANY foretell cost it has" is
--- answered with that one.
+-- A wildcard, and ONE cost per card (the ascending-least), morphCost's shape.
 foretellCost :: Set Keyword -> Maybe (Cost Keyword)
 foretellCost keywords =
   let costOf keyword = case keyword of
@@ -1079,58 +972,43 @@ foretellCost keywords =
 -- words: the ability functioning while the card is on the stack, exiling it
 -- instead of putting it anywhere else as it leaves.
 --
--- Filter.IsSource, because the rule says "this card" -- the spell itself and no
--- other object. Evaluated against the spell's own projected view, which exists
--- for as long as the spell does; Pawl.Engine.Event proposes the move before it
--- performs one, so the object is still on the stack when this is asked.
+-- Filter.IsSource, because the rule says "this card". Pawl.Engine.Event proposes
+-- the move before it performs one, so the object is still on the stack when this
+-- is asked.
 --
--- The destination is Graveyard rather than "anywhere else": a
--- Pawl.Types.ZoneChangePattern names ONE destination, and the graveyard is the
--- only place a spell leaves the stack for in this pool (CR 608.2n, the CR 608.2b
--- fizzle, CR 701.6a's counter) (#293).
+-- The destination is Graveyard rather than "anywhere else": a ZoneChangePattern
+-- names ONE destination, and the graveyard is the only place a spell leaves the
+-- stack for in this pool (#293).
 --
--- GATED on the clause each of the three rules puts in front of it, and the
--- three clauses are not the same question. `castFor` is the keyword whose
--- candidate cost the cast was announced for (Pawl.Engine.Cost.candidateCostsFor,
--- settled by Pawl.Engine.Cast.castProposed), which is what rule 702.34a's "if
--- the flashback cost was paid" and rule 702.133a's "if this spell was cast using
--- its jump-start ability" each ask about; rule 702.127a's aftermath asks only
--- whether the cast came from a graveyard, which the caller has established
--- before it calls at all.
+-- GATED on the clause each of the three rules puts in front of it, and the three
+-- clauses are not the same question. `castFor` is the keyword whose candidate cost
+-- the cast was announced for, which is what rule 702.34a's "if the flashback cost
+-- was paid" and rule 702.133a's jump-start clause each ask about; rule 702.127a
+-- asks only whether the cast came from a graveyard, which the caller has already
+-- established.
 --
--- The door Pawl.Engine.Cast uses, so that module installs a REPLACEMENT EFFECT
--- it never inspects rather than asking which of the three keywords a card has.
+-- The door Pawl.Engine.Cast uses, so that module installs a REPLACEMENT EFFECT it
+-- never inspects rather than asking which of the three keywords a card has.
 castFromGraveyardReplacementsOf :: Set Keyword -> Maybe Keyword -> [ReplacementEffect (Effect.Effect Card)]
 castFromGraveyardReplacementsOf keywords castFor =
   let paidFor keyword = castFor == Just keyword
    in -- The cost the cast PAID FOR, and not merely a flashback the card has:
-      -- Pawl.Engine.Cost offers the flashback cost from the same graveyard that
-      -- a CR 601.3 permission offers the printed cost from, and paying the
-      -- latter leaves rule 702.34a's clause unsatisfied.
-      --
-      -- Compared against the cost-bearing keyword itself, which is how a card
-      -- with two flashback abilities (#294) answers for the one it was cast
-      -- for rather than for both.
+      -- paying the printed cost under a CR 601.3 permission leaves rule 702.34a's
+      -- clause unsatisfied. Compared against the cost-bearing keyword itself,
+      -- which is how a card with two flashback abilities (#294) answers for the
+      -- one it was cast for rather than for both.
       [castFromGraveyardExile | any paidFor (Maybe.maybeToList (fmap Keyword.Flashback (flashbackCost keywords)))]
-        -- CR 702.127a's THIRD static ability: "if this spell was cast from a
-        -- graveyard, exile it instead of putting it anywhere else any time it would
-        -- leave the stack" -- word for word CR 702.34a's second ability, so it is the
-        -- same effect and not a sibling. Both are installed by Pawl.Engine.Cast on the
-        -- stack incarnation, and only when the cast really came from a graveyard,
-        -- which is the "if this spell was cast from a graveyard" condition.
-        --
-        -- The one of the three that does NOT read `castFor`: rule 702.127a
-        -- conditions its exile on the zone alone, so an aftermath half cast
-        -- from a graveyard for any cost is exiled.
+        -- CR 702.127a's THIRD static ability, word for word CR 702.34a's second
+        -- ability, so it is the same effect and not a sibling. The one of the
+        -- three that does NOT read `castFor`: rule 702.127a conditions its exile
+        -- on the zone alone, so an aftermath half cast from a graveyard for any
+        -- cost is exiled.
         <> [castFromGraveyardExile | Set.member Keyword.Aftermath keywords]
-        -- CR 702.133a's SECOND static ability, "if this spell was cast using its
-        -- jump-start ability, exile this card instead of putting it anywhere else any
-        -- time it would leave the stack" -- the third rule to print that sentence, so
-        -- the third to share the one effect. Its "using its jump-start ability" is
-        -- flashback's "if the flashback cost was paid" under another name, and reads
-        -- the same record: the jump-start candidate is the printed cost plus rule
-        -- 702.133a's discard, which a permission offering the printed cost alone is
-        -- not.
+        -- CR 702.133a's SECOND static ability, the third rule to print that
+        -- sentence and so the third to share the one effect. Its "using its
+        -- jump-start ability" reads the same record flashback's clause does: the
+        -- jump-start candidate is the printed cost plus rule 702.133a's discard,
+        -- which a permission offering the printed cost alone is not.
         <> [castFromGraveyardExile | hasJumpStart keywords, paidFor Keyword.JumpStart]
 
 castFromGraveyardExile :: ReplacementEffect (Effect.Effect Card)
@@ -1147,68 +1025,45 @@ castFromGraveyardExile =
 
 -- CR 702.136a: the AS-ENTERS REPLACEMENT rule 702 gives a permanent for holding
 -- riot -- "You may have this permanent enter with an additional +1/+1 counter on
--- it. If you don't, it gains haste." The same voice the minted triggered
--- abilities (rule 702.70a), the minted hand ability (rule 702.29a) and
--- flashback's exile replacement (rule 702.34a) speak in: the card says which
--- keyword, the rule says what it means.
+-- it. If you don't, it gains haste."
 --
--- The FIRST minted replacement that functions on the battlefield, where
--- castFromGraveyardExile's is installed by Pawl.Engine.Cast on a spell -- which
--- is why this one is gathered by the projection and that one is not.
+-- Gathered by the PROJECTION, where castFromGraveyardExile's row is installed by
+-- Pawl.Engine.Cast on a spell. POST-LAYER keyword COUNTS, since rule 702.136a
+-- functions on the battlefield, so Humility takes it away and a static ability
+-- granting riot adds it, both for free.
 --
--- POST-LAYER keyword COUNTS, like triggeredAbilitiesOf and unlike
--- handAbilitiesOf's printed set -- rule 702.136a functions on the battlefield, so
--- Humility takes it away and a static ability that grants riot (Spider-Punk's
--- "other Spiders you control have riot") adds it, both for free.
+-- ONE ROW PER INSTANCE, because CR 702.136b says each instance works separately.
+-- The two rows are EQUAL VALUES, so what gives the second its own CR 614.5
+-- opportunity is the instance ordinal Replacement.collect assigns; the proving
+-- test is Pawl.ReplacementSpec's "CR 702.136b riot twice".
 --
--- ONE ROW PER INSTANCE, because CR 702.136b says each instance works separately:
--- a creature with riot twice is asked twice, and may take a counter for one
--- instance and haste for the other. The two rows are EQUAL VALUES, so what gives
--- the second its own CR 614.5 opportunity is the instance ordinal
--- Pawl.Engine.Replacement.collect assigns (see Pawl.Types.CandidateId); the
--- proving test is Pawl.ReplacementSpec's "CR 702.136b riot twice".
+-- The pattern is Filter.IsSource: CR 614.1c's ability is the entering object's own.
 --
--- The pattern is Filter.IsSource: CR 614.1c's ability is the entering object's
--- own.
---
--- CR 702.37b's megamorph rides the same function, and the name is "minted"
--- rather than "entry" because of it: rule 702.37b's second clause is a CR 614.1e
--- replacement rather than a CR 614.1c one, so this answers with rows of two
--- different event classes. Every caller passes the whole list to the CR 616.1
--- loop, which matches each row against the event it is offered, so no caller has
--- to tell them apart.
+-- "Minted" rather than "entry" because CR 702.37b's megamorph rides the same
+-- function with a CR 614.1e replacement, so this answers with rows of two event
+-- classes; the CR 616.1 loop matches each row against the event it is offered.
 mintedReplacementsOf :: Map Keyword Natural -> [ReplacementEffect (Effect.Effect Card)]
 mintedReplacementsOf counts = concatMap (uncurry mintedReplacementsFor) (Map.toAscList counts)
 
--- Exhaustive for abilitiesFor's reason: rule 702 keeps adding abilities that
--- rewrite an entry, and the next one must break this build rather than silently
--- produce nothing.
+-- Exhaustive for abilitiesFor's reason: the next keyword that rewrites an entry
+-- must break this build rather than silently produce nothing.
 mintedReplacementsFor :: Keyword -> Natural -> [ReplacementEffect (Effect.Effect Card)]
 mintedReplacementsFor keyword count = case keyword of
   Keyword.Riot -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource EntryRewrite.Riot))
-  -- CR 702.98a's FIRST static ability, riot's row with the declining half
-  -- deleted: "You may have this permanent enter with an additional +1/+1
-  -- counter on it." Filter.IsSource for riot's reason, and ONE ROW PER INSTANCE
-  -- -- two instances are two abilities, so two counters are offered.
+  -- CR 702.98a's FIRST static ability, riot's row with the declining half deleted.
+  -- Filter.IsSource and one row per instance for riot's reasons.
   Keyword.Unleash -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource EntryRewrite.Unleash))
-  -- CR 702.63a's FIRST ability: "this permanent enters with N time counters on
-  -- it", a CR 614.1c self-replacement in riot's exact position, down to
-  -- Filter.IsSource. Where riot's rewrite asks a question and this one does not,
-  -- so the count rides the rewrite rather than a prompt.
-  --
-  -- ONE ROW PER INSTANCE for riot's reason, and CR 702.63c makes the counters
-  -- add up: two instances of vanishing 2 enter the permanent with four time
-  -- counters, since each rewrite places its own N.
+  -- CR 702.63a's FIRST ability, a CR 614.1c self-replacement in riot's exact
+  -- position. Riot's rewrite asks a question and this one does not, so the count
+  -- rides the rewrite rather than a prompt. ONE ROW PER INSTANCE, and CR 702.63c
+  -- makes the counters add up, each rewrite placing its own N.
   Keyword.Vanishing n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Time n))))
-  -- CR 702.32a's FIRST ability, vanishing's row in the fade counter: "this
-  -- permanent enters with N fade counters on it". One row per instance for riot's
-  -- reason, so two instances would place two lots of N -- rule 702.32 states no
-  -- multiplicity clause of its own, and no printing carries fading twice.
+  -- CR 702.32a's FIRST ability, vanishing's row in the fade counter. One row per
+  -- instance for riot's reason, rule 702.32 stating no multiplicity clause.
   Keyword.Fading n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Fade n))))
   Keyword.Frenzy _ -> []
-  -- CR 702.43a's FIRST ability, vanishing's row with a different counter kind:
-  -- "this permanent enters with N +1/+1 counters on it". One row per instance
-  -- for the same reason, and CR 702.43b makes them add up.
+  -- CR 702.43a's FIRST ability, vanishing's row with a different counter kind. One
+  -- row per instance, and CR 702.43b makes them add up.
   Keyword.Modular n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne n))))
   Keyword.Crew _ -> []
   Keyword.Fabricate _ -> []
@@ -1244,25 +1099,18 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Morph (Morph.MkMorph _ MorphVariant.Plain) -> []
   -- CR 702.37b's SECOND clause, minted the way riot's is: "As this permanent is
   -- turned face up, put a +1/+1 counter on it if its megamorph cost was paid to
-  -- turn it face up." The card says only which variant and rule 702.37b says what
-  -- it means, so no megamorph card writes a replacement effect of its own.
+  -- turn it face up." Filter.IsSource, because CR 614.1e's ability is the turning
+  -- permanent's own.
   --
-  -- Filter.IsSource, because CR 614.1e's ability is the turning permanent's own
-  -- ("As THIS permanent is turned face up").
+  -- The rule's "IF ITS MEGAMORPH COST WAS PAID" is checked at the row's match,
+  -- Pawl.Engine.Replacement.applies: CR 701.40c gives a manifested megamorph card
+  -- a second road face up at its MANA cost, and the row is refused down that one
+  -- (Pawl.FaceDownSpec's Misthoof Kirin pair). morphCost answers one cost per
+  -- permanent, so CR 702.37e's road has a single price and the rest of the
+  -- condition needs no test.
   --
-  -- The rule's "IF ITS MEGAMORPH COST WAS PAID" is not checked here but at the
-  -- row's match, Pawl.Engine.Replacement.applies: CR 701.40c gives a manifested
-  -- megamorph card a second road face up at its MANA cost, and the row is refused
-  -- down that one. Pawl.FaceDownSpec's Misthoof Kirin pair is the proof.
-  --
-  -- The rest of the condition asks about the COST rather than the road, and this
-  -- row does not distinguish two costs: Keyword.morphCost answers one cost per
-  -- permanent, so CR 702.37e's road has a single price and this row applies down
-  -- it whichever morph ability that price was printed by.
-  --
-  -- ONE ROW PER INSTANCE, as riot's is, and reached the same way -- the instance
-  -- ordinal, not the effect value, is what separates two equal rows. Unexercised
-  -- here: no card grants megamorph to a creature that already has it.
+  -- ONE ROW PER INSTANCE, as riot's is. Unexercised: no card grants megamorph to a
+  -- creature that already has it.
   Keyword.Morph (Morph.MkMorph _ MorphVariant.Mega) ->
     List.genericReplicate count (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR Filter.IsSource (TurnUpRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne 1))))
   Keyword.Menace -> []
