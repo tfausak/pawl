@@ -182,8 +182,12 @@ became = SlotName.MkSlotName (Text.pack "became")
 --     life".
 --   * Its mirror, a player losing life -- Exquisite Blood's "you gain that much
 --     life".
---   * CR 510.2's combat damage to a player -- Shroofus Sproutsire's "create that
---     many 1/1 green Saproling creature tokens".
+--   * CR 510.2's combat damage to a player, in both its bearer-scoped and its
+--     filtered form -- Questing Beast's "it deals that much damage to target
+--     planeswalker that player controls", Shroofus Sproutsire's "create that many
+--     1/1 green Saproling creature tokens".
+--   * CR 120.3's damage to the bearer -- Coalhauler Swine's "it deals that much
+--     damage to each player".
 --
 -- No ability bears two conditions, so they can never collide on one object, and
 -- Pawl.Engine.Event.eventBindingSlots is what tells the card lint which of them

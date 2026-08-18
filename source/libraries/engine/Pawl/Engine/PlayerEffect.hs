@@ -885,7 +885,10 @@ spellCostAdjustments pid oid gs =
           CostAdjustments.reductions = fmap (\amount -> (amount, 0)) (Maybe.mapMaybe reductionOf effects),
           -- Empty, for Pawl.Types.CostAdjustments.components' stated reason: a
           -- spell's additional costs are its own card text and arrive through
-          -- Pawl.Engine.Cost.plus, so no player effect adds one here.
+          -- Pawl.Engine.Cost.plus. No player effect adds one here because none
+          -- can -- PlayerEffect has no spell-side sibling of AddActivationCost,
+          -- which is what Drought's "spells cost an additional 'Sacrifice a
+          -- Swamp' to cast" would need (gap #1679).
           CostAdjustments.components = []
         }
 

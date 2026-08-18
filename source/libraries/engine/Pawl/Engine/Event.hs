@@ -6873,9 +6873,21 @@ eventBindings cond event = case (cond, event) of
   (TriggerCondition.StepBegins {}, GameEvent.StepBegan ev) ->
     Binding.setTriggerPlayer (StepBegan.player ev) Map.empty
   -- CR 702.70a's "that player": the player the bearer dealt combat damage to.
+  --
+  -- HOW MUCH, alongside it: Questing Beast's "it deals THAT MUCH damage to target
+  -- planeswalker that player controls" counts the damage the event carried, under
+  -- the same reserved slot CR 615.13's prevention and CR 119.9's life gain stamp
+  -- (see Binding.eventAmount) and the same one the bystander arm below stamps.
+  --
+  -- Both stamped on the ToPlayer branch alone. The other four recipients are
+  -- events this condition does not admit -- matchesTrigger requires
+  -- isPlayerRecipient -- so claiming a slot there would name a match that never
+  -- happened. Given a match both are unconditional, which is what
+  -- eventBindingSlots' per-condition promise needs: every GameEvent.DamageDealt
+  -- carries a DamageEvent.amount.
   (TriggerCondition.SelfDealsCombatDamageToPlayer, GameEvent.DamageDealt ev) ->
     case DamageEvent.target ev of
-      Recipient.ToPlayer pid -> Binding.setTriggerPlayer pid Map.empty
+      Recipient.ToPlayer pid -> Binding.setTriggerPlayer pid (Binding.setEventAmount (DamageEvent.amount ev) Map.empty)
       Recipient.ToCreature _ -> Map.empty
       Recipient.ToPlaneswalker _ -> Map.empty
       Recipient.ToBattle _ -> Map.empty
@@ -6892,15 +6904,18 @@ eventBindings cond event = case (cond, event) of
   -- power: CR 702.19b lets a trampler assign part of its power to a blocker, so
   -- the two come apart on exactly the board Pawl.TriggerSpec's shroofusSpec runs.
   --
-  -- Both unconditional given a match, which is what eventBindingSlots'
-  -- per-condition promise needs: every GameEvent.DamageDealt carries a
-  -- DamageEvent.source and a DamageEvent.amount.
+  -- The DAMAGED PLAYER beside them, under the same `triggerPlayer` slot the
+  -- self-scoped arm above stamps: Larceny's "whenever a creature you control deals
+  -- combat damage to a player, THAT PLAYER discards a card" names a seat that is
+  -- neither the bearer's controller nor the damager's.
   --
-  -- The DAMAGED PLAYER is not bound alongside them. The event names one and CR
-  -- 702.70a's `triggerPlayer` is the slot it would take, but no card in the pool
-  -- reads it under this condition (#1175).
+  -- All three unconditional given a match, which is what eventBindingSlots'
+  -- per-condition promise needs: every GameEvent.DamageDealt carries a
+  -- DamageEvent.source and a DamageEvent.amount, and matchesTrigger has already
+  -- required isPlayerRecipient of the target -- so Recipient.playerOf's Nothing is
+  -- unreachable for an event this condition admitted.
   (TriggerCondition.PermanentDealsCombatDamageToPlayer _, GameEvent.DamageDealt ev) ->
-    Binding.setCombatDamager (DamageEvent.source ev) (Binding.setEventAmount (DamageEvent.amount ev) Map.empty)
+    maybe id Binding.setTriggerPlayer (Recipient.playerOf (DamageEvent.target ev)) (Binding.setCombatDamager (DamageEvent.source ev) (Binding.setEventAmount (DamageEvent.amount ev) Map.empty))
   -- CR 400.7e: a zone-change trigger can find the new object the card became in
   -- the zone it moved to, if that zone is public. CR 603.6c and CR 603.6e say it
   -- from the other side.
@@ -7198,9 +7213,8 @@ eventBindings cond event = case (cond, event) of
   -- The DAMAGER gets no slot alongside it. The event names one and
   -- Binding.combatDamager is the slot it would take, but no printing points at it
   -- under this condition: a Scryfall sweep of "is dealt damage" against "the
-  -- source" / "that source" matches nothing at all, so unlike the damaged player
-  -- of the bystander arm above (#1175) this one has no card waiting on it. The
-  -- RECIPIENT needs no slot either -- matchesTrigger has just proved it is the
+  -- source" / "that source" matches nothing at all, so no card is waiting on it.
+  -- The RECIPIENT needs no slot either -- matchesTrigger has just proved it is the
   -- bearer, whom CR 113.7a's source slot already names.
   (TriggerCondition.SelfIsDealtDamage, GameEvent.DamageDealt ev) ->
     Binding.setEventAmount (DamageEvent.amount ev) Map.empty
@@ -7294,7 +7308,11 @@ eventBindingSlots cond = case cond of
   -- contributes anything to one.
   TriggerCondition.StateIs _ -> Set.empty
   -- CR 702.70a's "that player": the player the bearer dealt combat damage to.
-  TriggerCondition.SelfDealsCombatDamageToPlayer -> Set.singleton Binding.triggerPlayer
+  --
+  -- CR 510.2's amount beside it, which Questing Beast's "that much" reads: the
+  -- same slot CR 615.13's prevention and CR 119.9's life gain stamp. Guaranteed
+  -- given a match -- every DamageDealt event carries an amount.
+  TriggerCondition.SelfDealsCombatDamageToPlayer -> Set.fromList [Binding.eventAmount, Binding.triggerPlayer]
   -- CR 120.3's amount for enrage, which Coalhauler Swine's "it deals that much
   -- damage to each player" reads: the same slot CR 615.13's prevention and CR
   -- 119.9's life gain stamp, and guaranteed given a match -- every DamageDealt
@@ -7315,9 +7333,10 @@ eventBindingSlots cond = case cond of
   -- guaranteed given a match for the same reason -- every DamageDealt event carries
   -- an amount.
   --
-  -- No `triggerPlayer`: the event names the damaged player too, and no card in the
-  -- pool reads it under this condition (#1175).
-  TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> Set.fromList [Binding.combatDamager, Binding.eventAmount]
+  -- CR 603.2's "that player" beside them, which Larceny's "that player discards a
+  -- card" reads -- the same slot the self-scoped arm above stamps. Guaranteed
+  -- given a match: matchesTrigger admits only a player recipient here.
+  TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> Set.fromList [Binding.combatDamager, Binding.eventAmount, Binding.triggerPlayer]
   -- CR 725.2's inherent ability is borne by no card, and its bindings come from
   -- Monarch.inherentMatch rather than eventBindings -- so a card declaring this
   -- condition would honestly get nothing from the event.

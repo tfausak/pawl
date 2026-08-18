@@ -406,8 +406,10 @@ data Quantity
     --
     -- Rule 702.54b's variant asks a DIFFERENT question -- "the total damage your
     -- opponents have been dealt this turn", which sums amounts where this counts
-    -- players -- and no quantity is implemented for it; the keyword it belongs to
-    -- is not either (#877).
+    -- players. Not implemented: no quantity measures that sum, and
+    -- Keyword.Bloodthirst's payload is a printed Natural that cannot say X
+    -- (#1588). The keyword itself IS implemented -- rule 702.54a's N form, whose
+    -- condition is this quantity (Bloodrage Vampire).
     --
     -- A LEAF, like LifeTotal, Speed and CardsDiscardedThisTurn: it holds no Quantity.
     PlayersDealtDamageThisTurn PlayerRef.PlayerRef

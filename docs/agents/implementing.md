@@ -103,12 +103,31 @@ has bitten.
 - **One mutation at a time, and read the failure.** Red is not the bar: it
   must go red for the *intended* reason, in the intended place. A mutation that
   fails a dozen unrelated cases, or the target case with a different message
-  than the behaviour predicts, has proved something else.
-- **Order the assertions so the mutation reaches the real one.** A cheap proxy
-  --- a prompt count, a zone size, a list length --- placed before the
-  gameplay-level assertion absorbs the mutation and goes red first, and the
-  failure you read is about the proxy. The behaviour under test asserts first;
-  the proxy is a supporting check after it.
+  than the behaviour predicts, has proved something else --- as has one that
+  reddens an assertion other than the gameplay-level one, per the bullet below.
+- **Name the assertion the mutation reddened, every time.** Not "the case went
+  red" --- the assertion's own message --- then ask whether it is the
+  gameplay-level assertion this unit exists to prove. If it is not, the
+  mutation proved nothing: a cheap proxy ahead of it --- a prompt count, a zone
+  size, a list length --- absorbed it and reported itself, and the real
+  assertion may never have run. Reorder so the behavioural assertion precedes
+  every proxy, keep the proxy after it as a supporting check, and re-run. Do
+  this even when the red looks right: a proxy's message usually names the same
+  objects the behaviour does, which is why reading it as confirmation is the
+  easy mistake, and agents who had already read this advice have made it
+  anyway. `Pawl.ExpirySpec`'s "CR 514.2 / 611.2a neither cleanup nor the
+  handoff into bob's turn reaches it" case is the worked example in the tree,
+  comment included.
+- **Ordering the gameplay assertion first is necessary, not sufficient.** It
+  also has to be able to DIFFER under the mutation: if the board has not
+  advanced far enough, both readings of the rule produce the same value, and
+  the assertion is vacuous however early it sits --- so the mutation lands on
+  the next assertion down anyway. PR #1806's counter case resolved only the
+  stack's TOP object, which cannot tell "the spell was countered" from "the
+  spell is still on the stack", so the life total was identical either way. Ask
+  what a wrong implementation would have produced at the moment you read the
+  value; for a counter that means resolving the stack down, not resolving one
+  object.
 - **Never `git checkout <file>` to revert a mutation** --- real edits have been
   lost that way. Copy the file to a backup first and move it back.
 - **Build a negative as a pair of boards differing in exactly one thing.** A

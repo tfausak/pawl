@@ -84,7 +84,9 @@ to agents as written. What it doesn't say:
     survives the squash.
   - the CR citations behind it
   - the design calls made, and the alternatives rejected
-  - how it was verified: suite count before -> after and the proving test
+  - how it was verified: suite count before -> after, the proving test, and for
+    each mutation the assertion it reddened, named. A mutation reported only as
+    "went red" is one nobody diagnosed.
   - whether the rules core cases on an effect's *identity* --- an explicit "no"
   - what was deferred
 
@@ -200,7 +202,9 @@ to agents as written. What it doesn't say:
 
 3.  Mutate the change away and re-run. A green suite is not evidence the test
     proves anything. Break the line you just wrote, confirm the new test
-    *fails*, put it back. If nothing fails, say so in the PR rather than
+    *fails*, put it back. Read WHICH assertion failed: if it is not the
+    gameplay-level one, an assertion ahead of it absorbed the mutation and the
+    behaviour is unproven. If nothing fails, say so in the PR rather than
     implying coverage. `docs/agents/implementing.md` lists the traps.
 
 4.  Find the sites `-Werror` won't. A `{}` or `_` pattern absorbs a new
