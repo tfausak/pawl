@@ -347,9 +347,9 @@ effectSpec s registry = Spec.describe s "Effect" $ do
     -- send it straight back out again.
     Spec.assertEqWith s "and it does not phase out again at once" (Phasing.phasedOutStatus victim bobs) Nothing
   -- CR 506.4, restated as CR 702.26b's last sentence: "a permanent that phases out
-  -- is removed from combat." Reality Ripple is the only route to it -- CR 502.1's
+  -- is removed from combat." An effect is the only route to it -- CR 502.1's
   -- action runs in the untap step, the turn's first, so nothing is ever in combat
-  -- when it fires.
+  -- when it fires -- and Reality Ripple is the one this group is built on.
   --
   -- alice phases out one of her OWN two attackers, so bob's life total counts the
   -- clause: 2 instead of 4. The control is the same declaration with no Ripple
@@ -716,6 +716,11 @@ departureSpec s registry = Spec.describe s "Departure" $ do
 -- Reality Ripple is what reaches it: an Equipment is an artifact (CR 301.5), so
 -- rule 702.26i needs no Aura or Equipment carrying the phasing keyword -- which is
 -- as well, since none has been printed.
+--
+-- Clever Concealment reaches the two things Reality Ripple's one artifact,
+-- creature or land target cannot: CR 702.26h's tie-break, which needs a permanent
+-- and its own Equipment named together, and rule 702.26i's PLAYER clause, which
+-- needs an enchant-player Aura (CR 702.5d) phased out directly.
 attachedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 attachedSpec s registry = Spec.describe s "Attached" $ do
   -- CR 702.26b's "treated as though it does not exist", read off the equipped
@@ -839,3 +844,27 @@ attachedSpec s registry = Spec.describe s "Attached" $ do
     Spec.assertEqWith s "the Equipment still phased out meanwhile" (Phasing.isPhasedOut equip dead) True
     Spec.assertEqWith s "it phases in" (onBattlefield equip back) True
     Spec.assertEqWith s "unattached, its host being gone" (attachedHostOf equip back) Nothing
+  -- CR 702.26i's PLAYER clause: "the object or player it was attached to when it
+  -- phased out, if that object is still in the same zone or that player is still
+  -- in the game". A permanent attached to a player is an Aura (CR 702.5d), and
+  -- Clever Concealment is what phases one out DIRECTLY -- "any number of target
+  -- nonland permanents you control" names the Aura itself, where Reality Ripple's
+  -- artifact, creature or land cannot.
+  --
+  -- alice's Curse of Death's Hold on BOB, so the Aura's controller and its host
+  -- are different seats and CR 702.26a's schedule is alice's while rule 702.26i's
+  -- question is about bob. Attached directly, which is enchantedCrocodile's
+  -- posture above and for its reason.
+  Spec.it s "CR 702.26i an Aura attached to a PLAYER phases in still attached" $ do
+    plains <- S.printingOf s registry "Plains"
+    curse <- S.printingOf s registry "Curse of Death's Hold"
+    conceal <- S.printingOf s registry "Clever Concealment"
+    let (aura, withAura) = S.addCreature curse S.alice (S.landsFor plains S.alice 4 (Setup.emptyGame S.bothPlayers))
+        (board, spell) = S.handOne conceal (S.attachTo aura (Recipient.ToPlayer S.bob) withAura)
+        gone = concealAll (Set.singleton aura) spell board
+        back = untapStep S.alice gone
+    Spec.assertEqWith s "setup: the Aura is on bob" (attachedHostOf aura board) (Just (Recipient.ToPlayer S.bob))
+    Spec.assertEqWith s "it phased out DIRECTLY, under alice who controls it" (Phasing.phasedOutStatus aura gone) (Just (PhasedOut.Directly S.alice))
+    Spec.assertEqWith s "still attached while away" (attachedHostOf aura gone) (Just (Recipient.ToPlayer S.bob))
+    Spec.assertEqWith s "and phases in still on bob, who is still in the game" (attachedHostOf aura back) (Just (Recipient.ToPlayer S.bob))
+    Spec.assertEqWith s "back on the battlefield" (onBattlefield aura back) True

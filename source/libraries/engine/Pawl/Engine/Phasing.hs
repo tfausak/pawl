@@ -345,11 +345,12 @@ phaseIn _ oid gs =
 -- Attached to nothing at all answers True: rule 702.26i has nothing to say about
 -- it, and there is no attachment to lose.
 --
--- The PLAYER arm has no producer and no test that discriminates it: a permanent
--- attached to a player is an Aura (CR 702.5d), which Reality Ripple cannot target
--- and which no printing gives phasing, so nothing can phase one out directly. It
--- is rule 702.26i's own second clause written out rather than elided, and a
--- regression fence rather than a proof.
+-- The PLAYER arm is rule 702.26i's own second clause, and Clever Concealment is
+-- what reaches it: a permanent attached to a player is an Aura (CR 702.5d), which
+-- Reality Ripple's artifact, creature or land cannot name and which no printing
+-- gives phasing, but which "any number of target nonland permanents you control"
+-- does name. Pawl.PhasingSpec's "CR 702.26i an Aura attached to a PLAYER phases in
+-- still attached" is the case.
 hostRemains :: ObjectId -> GameState -> Bool
 hostRemains oid gs = case Game.lookupObject oid gs >>= Object.attachedTo of
   Nothing -> True
