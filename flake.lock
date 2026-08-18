@@ -7,11 +7,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1786995520,
-        "narHash": "sha256-yAfo3wATnBKhI1kyaKoZHqFW/k4fOb9dwe+7i3c31M0=",
+        "lastModified": 1786995937,
+        "narHash": "sha256-CuOhN8cRKmTvx2FmnwHiId3JVQvNGtBQdqjlOeHOzRg=",
         "owner": "tfausak",
         "repo": "cabal-gild-nix",
-        "rev": "d64701f95352b0977dd194c2efb458b188ff1379",
+        "rev": "74857ad6d32a33bf3ca1071c7d746c9388621e09",
         "type": "github"
       },
       "original": {
@@ -28,11 +28,11 @@
         "systems": "systems"
       },
       "locked": {
-        "lastModified": 1786748620,
-        "narHash": "sha256-K+sJmUXFksrB7pLvrcv8jIDGKxN52QtV1sIKXhT8MZo=",
+        "lastModified": 1787000716,
+        "narHash": "sha256-OvS7Bs6A2b7GsqcLdvWJ8HWn6ppj4wVbH0J8olARNA8=",
         "owner": "sadjow",
         "repo": "claude-code-nix",
-        "rev": "fd727a3f341b079ba5387b770c5caef86bdae3e6",
+        "rev": "2a8a4d8d8f3d5d49cede737a0df1b49992ffb7e5",
         "type": "github"
       },
       "original": {

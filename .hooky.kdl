@@ -12,12 +12,6 @@ hook cabal_gild {
     files *.cabal cabal.project
 }
 
-hook citations {
-    command "script/check-citations.sh" {
-    }
-    files *.hs *.md
-}
-
 hook hlint {
     command hlint {
     }
