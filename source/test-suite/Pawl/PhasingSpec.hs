@@ -196,8 +196,8 @@ equippedBoard island piker bonesplitter ripple =
         (equip, withEquip) = S.addCreature bonesplitter S.alice withHost
      in ((host, equip), S.attach equip host withEquip)
 
--- CR 704.3's sweep, and the whole priority loop, at the answerer these boards
--- take. Duplicated from Pawl.ExpirySpec rather than hoisted into Pawl.Support,
+-- The sweep every settle runs, and the whole priority loop, at the answerer
+-- these boards take. Duplicated from Pawl.ExpirySpec rather than hoisted into Pawl.Support,
 -- which rebuilds every spec in the tree.
 settleFor :: GameState.GameState -> GameState.GameState
 settleFor gs = S.runPure S.identityAnswer gs Engine.settleForPriority

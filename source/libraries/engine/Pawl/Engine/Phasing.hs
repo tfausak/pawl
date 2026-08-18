@@ -61,7 +61,7 @@
 -- CR 702.26k's clause is Pawl.Engine.Game.removeFromZones, and CR 800.4a's exile
 -- clause is vacuous for a phased-out permanent, which no battlefield walk finds.
 --
--- CR 702.26f, the other continuous-effect consequence of being gone, needs
+-- CR 702.26f, one of the two continuous-effect consequences of being gone, needs
 -- nothing here: a "for as long as" duration (CR 611.2b) is a Condition counting
 -- the battlefield, so phaseOut's Set.delete below is what ends it, and
 -- Pawl.Engine.Expiry.sweepConditional DELETES rather than suspends, which is
