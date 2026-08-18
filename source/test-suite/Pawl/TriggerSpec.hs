@@ -4,8 +4,8 @@
 -- 603.7 delayed triggers and their object slots, the CR 603.3b ordering prompt,
 -- and the CR 603.4 / 608.2a intervening "if".
 --
--- The triggers themselves live in the three sibling modules: Pawl.
--- KeywordTriggerSpec (CR 702 keywords), Pawl.ZoneTriggerSpec (CR 400 zone
+-- The triggers themselves live in three sibling modules --
+-- Pawl.KeywordTriggerSpec (CR 702 keywords), Pawl.ZoneTriggerSpec (zone
 -- changes) and Pawl.EventTriggerSpec (everything else). All four report under
 -- the same describe name, so the split is invisible to a tasty pattern.
 {-# LANGUAGE GADTs #-}
