@@ -567,11 +567,11 @@ battlefieldAbilitiesFor keyword count = case keyword of
 -- creature until end of turn." The whole ability, minted from the one number the
 -- keyword carries.
 --
--- THE COST. Every word of rule 702.122a's criterion is written in the existing
--- Filter vocabulary rather than baked into the component; only the AGGREGATE is
--- the component's own, total power being a property of the chosen set rather than
--- of any candidate. `Not IsSource` is load-bearing: a Vehicle that has already
--- become a creature could otherwise crew itself.
+-- THE COST. Only the AGGREGATE is the component's own, total power being a
+-- property of the chosen set rather than of any candidate; every other word of the
+-- criterion is written in the existing Filter vocabulary. `Not IsSource` is
+-- load-bearing: a Vehicle that has already become a creature could otherwise crew
+-- itself.
 --
 -- CR 302.6 does NOT reach this cost, in either direction. The Vehicle needs no
 -- haste, the tap symbol not being in the cost; and a creature that arrived this
@@ -580,21 +580,17 @@ battlefieldAbilitiesFor keyword count = case keyword of
 --
 -- THE EFFECT. "Becomes an artifact creature" ADDS two card types and sets nothing,
 -- which is CR 205.1b naming this exact phrase -- so the Vehicle stays a Vehicle,
--- and AddCardType is right where its sibling SetCardType's CR 205.1a replacement
--- would take the artifact type and the Vehicle subtype away. TWO of them (CR
--- 300.1) in one mode, since CR 613.7b stamps both at the moment this one
--- resolution creates them. Layer 4 either way (CR 613.1d).
+-- and AddCardType is right where SetCardType's CR 205.1a replacement would take
+-- the artifact type and the Vehicle subtype away. TWO of them (CR 300.1) in one
+-- mode, since CR 613.7b stamps both at once. Layer 4 either way (CR 613.1d).
 --
 -- Binding.triggerSource, so the Vehicle is named and never TARGETED (CR 115.10a):
 -- a targeted crew would fizzle to shroud and fire "becomes the target" triggers
--- that the printed ability does not.
+-- the printed ability does not.
 --
 -- CR 208.3 needs no clause here: the Vehicle's printed power and toughness are
 -- gated on its being a creature at Projection's read points, so adding the type is
 -- the whole of CR 301.7b.
---
--- No restriction clause, rule 702.122a stating no timing restriction, and its "any
--- number of times" needs no expression.
 crew :: Natural -> ActivatedAbility Card
 crew n =
   ActivatedAbility.MkActivatedAbility
@@ -892,9 +888,8 @@ flashbackCost keywords =
 -- itself ("by paying {3}"), so it comes from Cost.faceDownCost.
 --
 -- Asked of the card's PRINTED keywords, which for morph is the rule's own scope:
--- CR 702.37a's ability "functions in any zone from which you could play the card
--- it's on", and a face-down permanent projects no keywords at all (CR 708.2a), so
--- a projected read would find nothing to pay.
+-- a face-down permanent projects no keywords at all (CR 708.2a), so a projected
+-- read would find nothing to pay.
 --
 -- CR 702.37b: MEGAMORPH REACHES HERE TOO, which is why Pawl.Types.Keyword's Morph
 -- carries a variant rather than having a sibling constructor -- the case below is
@@ -972,20 +967,15 @@ foretellCost keywords =
 -- words: the ability functioning while the card is on the stack, exiling it
 -- instead of putting it anywhere else as it leaves.
 --
--- Filter.IsSource, because the rule says "this card". Pawl.Engine.Event proposes
--- the move before it performs one, so the object is still on the stack when this
--- is asked.
---
--- The destination is Graveyard rather than "anywhere else": a ZoneChangePattern
--- names ONE destination, and the graveyard is the only place a spell leaves the
--- stack for in this pool (#293).
+-- Filter.IsSource, because the rule says "this card". The destination is Graveyard
+-- rather than "anywhere else": a ZoneChangePattern names ONE destination, and the
+-- graveyard is the only place a spell leaves the stack for in this pool (#293).
 --
 -- GATED on the clause each of the three rules puts in front of it, and the three
 -- clauses are not the same question. `castFor` is the keyword whose candidate cost
 -- the cast was announced for, which is what rule 702.34a's "if the flashback cost
 -- was paid" and rule 702.133a's jump-start clause each ask about; rule 702.127a
--- asks only whether the cast came from a graveyard, which the caller has already
--- established.
+-- asks only whether the cast came from a graveyard.
 --
 -- The door Pawl.Engine.Cast uses, so that module installs a REPLACEMENT EFFECT it
 -- never inspects rather than asking which of the three keywords a card has.
@@ -1027,21 +1017,20 @@ castFromGraveyardExile =
 -- riot -- "You may have this permanent enter with an additional +1/+1 counter on
 -- it. If you don't, it gains haste."
 --
--- Gathered by the PROJECTION, where castFromGraveyardExile's row is installed by
--- Pawl.Engine.Cast on a spell. POST-LAYER keyword COUNTS, since rule 702.136a
--- functions on the battlefield, so Humility takes it away and a static ability
+-- Gathered by the PROJECTION off POST-LAYER keyword COUNTS, since rule 702.136a
+-- functions on the battlefield -- so Humility takes it away and a static ability
 -- granting riot adds it, both for free.
 --
 -- ONE ROW PER INSTANCE, because CR 702.136b says each instance works separately.
 -- The two rows are EQUAL VALUES, so what gives the second its own CR 614.5
--- opportunity is the instance ordinal Replacement.collect assigns; the proving
--- test is Pawl.ReplacementSpec's "CR 702.136b riot twice".
+-- opportunity is the instance ordinal Replacement.collect assigns;
+-- Pawl.ReplacementSpec's "CR 702.136b riot twice" proves it.
 --
 -- The pattern is Filter.IsSource: CR 614.1c's ability is the entering object's own.
 --
 -- "Minted" rather than "entry" because CR 702.37b's megamorph rides the same
 -- function with a CR 614.1e replacement, so this answers with rows of two event
--- classes; the CR 616.1 loop matches each row against the event it is offered.
+-- classes; the CR 616.1 loop matches each against the event it is offered.
 mintedReplacementsOf :: Map Keyword Natural -> [ReplacementEffect (Effect.Effect Card)]
 mintedReplacementsOf counts = concatMap (uncurry mintedReplacementsFor) (Map.toAscList counts)
 
@@ -1575,34 +1564,29 @@ battleCry =
 -- and/or toughness is greater than this creature's, put a +1/+1 counter on this
 -- creature.
 --
--- The condition is TriggerCondition.PermanentEnters, the event being somebody ELSE
--- entering, so the Filter is the rule's two printed words. The bearer is NOT
--- excluded, which is the rule rather than an omission: a creature entering
--- compares itself against itself, which no comparison below can answer true.
+-- The bearer is NOT excluded from the condition's Filter, which is the rule rather
+-- than an omission: a creature entering compares itself against itself, which no
+-- comparison below can answer true.
 --
--- The comparison rides the intervening "if" (CR 603.4) and not the condition's
--- Filter, where training's lives, because rule 702.100a prints "if": CR 608.2a
--- re-checks it as the ability resolves, so pumping the bearer in response takes
--- the counter away.
+-- The comparison rides the intervening "if" (CR 603.4) and not the Filter, where
+-- training's lives, because rule 702.100a prints "if": CR 608.2a re-checks it as
+-- the ability resolves, so pumping the bearer in response takes the counter away.
 --
 -- "THAT CREATURE" is the entrant, neither the bearer nor a target, so the
 -- condition reaches it through Quantity.AgainstSlot at Binding.became. Read
 -- through CR 608.2h, so an entrant killed while the trigger waits is compared at
--- the power and toughness it last had on the battlefield; Pawl.TriggerSpec's
--- Evolve group proves it at the resolution check.
+-- the power and toughness it last had on the battlefield.
 --
 -- Condition.Any because rule 702.100a's "and/or" compares two DIFFERENT
--- characteristics, and one Compares reads one pair of quantities. STRICTLY
--- greater, spelled as "at least one more" since CR 208.1's power and toughness are
--- whole numbers and Comparison has no strict arm.
+-- characteristics. STRICTLY greater, spelled as "at least one more" since CR
+-- 208.1's power and toughness are whole numbers and Comparison has no strict arm.
 --
 -- CR 702.100c falls out rather than being written: a permanent that is not a
 -- creature has no power or toughness (CR 208.3), and Condition.holds reads an
 -- unanswerable side as False.
 --
--- THE COUNTER goes on through Effect.Evolve rather than Effect.PutCounters, which
--- is rule 702.100b: one opcode is what ties the "evolves" marker to the placement.
--- Renegade Krasis reads it.
+-- Effect.Evolve rather than Effect.PutCounters, which is rule 702.100b: one opcode
+-- is what ties the "evolves" marker to the placement. Renegade Krasis reads it.
 evolve :: TriggeredAbility Card
 evolve =
   TriggeredAbility.MkTriggeredAbility
@@ -2240,10 +2224,10 @@ undying = returns CounterKind.PlusOnePlusOne
 --
 -- TWO INCARNATIONS, and the split is why this works: CR 400.7 mints a fresh object
 -- when the permanent dies, so the ability's SOURCE (CR 113.7a) and the CARD IT
--- MOVES (the graveyard incarnation) are different ids. The intervening "if" is
--- evaluated against the source through CR 608.2h last known information -- what
--- "it HAD no counters on it" asks for -- while the move names Binding.became.
--- Endless Cockroaches proves the second half and Promising Duskmage the first.
+-- MOVES are different ids. The intervening "if" is evaluated against the source
+-- through CR 608.2h last known information -- what "it HAD no counters on it" asks
+-- for -- while the move names Binding.became. Endless Cockroaches proves the
+-- second half and Promising Duskmage the first.
 --
 -- CR 603.4's intervening "if" and not a Clause condition: the ability must not
 -- trigger at all when the permanent died with a counter on it.
@@ -2298,15 +2282,13 @@ returns kind =
 -- EntryRiders.underOwner is inert under a Create.
 --
 -- THE TOKEN IS MINTED HERE, not carried in card data: its characteristics are
--- printed in the comprehensive rules rather than on Ministrant of Obligation, and
--- CR 111.3 makes rule 702.135a's own adjectives the token's whole text. Both
--- colours ride the colorIndicator, a token having no mana cost to read a colour
--- off (CR 105.2).
+-- printed in the comprehensive rules, and CR 111.3 makes rule 702.135a's own
+-- adjectives the token's whole text. Both colours ride the colorIndicator, a token
+-- having no mana cost to read a colour off (CR 105.2).
 --
 -- CR 612.2a's text change reaches the Spirit written here even though the mint
 -- runs after the CR 613 layer fold: layer 3 records its pairs on the projection
 -- and Projection.mintedTriggeredAbilitiesOf applies them to whatever this returns.
--- Pawl.ResolveSpec's "CR 612.2a whole card" proves it.
 afterlife :: Natural -> TriggeredAbility Card
 afterlife n =
   TriggeredAbility.MkTriggeredAbility
