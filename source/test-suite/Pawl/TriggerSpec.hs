@@ -11122,12 +11122,19 @@ amuletSpec s registry =
               }
           )
       -- Cast one spell at `r`, settle so any trigger reaches the stack, then
-      -- resolve the top under the same answerer. The answerer is written out at
-      -- each use rather than bound once: it is polymorphic in the prompt's
-      -- answer type, and a let-bound copy would be pinned to one.
+      -- resolve the stack DOWN under the same answerer. The answerer is written
+      -- out at each use rather than bound once: it is polymorphic in the
+      -- prompt's answer type, and a let-bound copy would be pinned to one.
+      --
+      -- TWO resolutions, not one, and that is what makes the life readings
+      -- load-bearing: a trigger that counters nothing leaves the Bolt sitting on
+      -- the stack, and one resolution cannot tell that apart from a Bolt that
+      -- was countered. Stack.resolveTop is a no-op on an empty stack, so the
+      -- second is harmless when the first emptied it.
+      resolveDown = Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop
       castThenResolve r payer caster oid gs =
         let onStack = S.runPure (aimedPaying r payer) (S.runPure (aimedPaying r payer) gs (S.cast caster oid)) Engine.settleForPriority
-            ((_, after), transcript) = Replay.record (aimedPaying r payer) onStack Stack.resolveTop
+            ((_, after), transcript) = Replay.record (aimedPaying r payer) onStack resolveDown
          in (onStack, after, transcript)
    in Spec.describe s "CR 601.2c a player becoming the target of a spell OR an ability" $ do
         -- The positive, and the whole point of the card.
@@ -11144,9 +11151,7 @@ amuletSpec s registry =
         -- NOTHING but bob's answer.
         Spec.it s "CR 118.12a paying the {1} leaves the spell to resolve" $ do
           (_, _, bobsBolt, _, _, _, gs) <- board
-          let atAlice = Recipient.ToPlayer S.alice
-              onStack = S.runPure (aimedPaying atAlice S.bob) (S.runPure (aimedPaying atAlice S.bob) gs (S.cast S.bob bobsBolt)) Engine.settleForPriority
-              ((_, after), transcript) = Replay.record (aimedPaying atAlice S.bob) onStack (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop)
+          let (_, after, transcript) = castThenResolve (Recipient.ToPlayer S.alice) S.bob S.bob bobsBolt gs
           Spec.assertEqWith s "the Bolt resolved onto alice" (S.lifeOf S.alice after) (Just 17)
           Spec.assertEqWith s "bob was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
         -- The ABILITY half, which is the whole of the payload's `kind = Nothing`
@@ -11157,7 +11162,7 @@ amuletSpec s registry =
           let atAlice = Recipient.ToPlayer S.alice
               entered = S.runPure (aimedPaying atAlice S.carol) (S.runPure (aimedPaying atAlice S.carol) gs (S.cast S.bob ratsId)) Stack.resolveTop
               triggerOnStack = S.runPure (aimedPaying atAlice S.carol) entered Engine.settleForPriority
-              ((_, after), transcript) = Replay.record (aimedPaying atAlice S.carol) triggerOnStack Stack.resolveTop
+              ((_, after), transcript) = Replay.record (aimedPaying atAlice S.carol) triggerOnStack resolveDown
           Spec.assertEqWith s "alice starts with one card in hand" (S.handSize S.alice gs) 1
           Spec.assertEqWith s "CR 701.6a the discard ability was countered, so alice still holds it" (S.handSize S.alice after) 1
           Spec.assertEqWith s "bob was asked exactly once, and declined" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Declines]
