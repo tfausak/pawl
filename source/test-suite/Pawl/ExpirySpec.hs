@@ -1461,7 +1461,13 @@ aimedAtRecipient recipient p = case p of
 -- Dovin is CAST rather than placed: CR 306.5b's replacement is what puts the
 -- five loyalty counters on him, and the -1 cannot be paid without one.
 dovinBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-dovinBoard plains piker warMammoth dovin =
+dovinBoard = dovinBoardAimedAt const
+
+-- dovinBoard with the -1's target chosen by a function of (bob's Piker, alice's
+-- own Piker), so the filter case below can aim at a permanent the printed clause
+-- does not admit without a second board.
+dovinBoardAimedAt :: (ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId) -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+dovinBoardAimedAt pick plains piker warMammoth dovin =
   let (shielded, gs1) = S.addCreature piker S.bob (S.landsInPlay plains 3)
       (control, gs2) = S.addCreature warMammoth S.bob gs1
       (attacker, gs3) = S.addCreature piker S.alice gs2
@@ -1473,7 +1479,7 @@ dovinBoard plains piker warMammoth dovin =
         oid : _ -> oid
         [] -> S.noSource
       activated = case dovinAbility dovin of
-        ability : _ -> S.runPure (aimedAtObject shielded) cast (do Activate.activateAbility S.alice dovinId ability; Stack.resolveTop)
+        ability : _ -> S.runPure (aimedAtObject (pick shielded attacker)) cast (do Activate.activateAbility S.alice dovinId ability; Stack.resolveTop)
         [] -> cast
    in (shielded, control, attacker, activated)
 
@@ -1527,10 +1533,13 @@ dovinSpec s registry = Spec.describe s "DovinHandOfControl" $ do
     $ \(shielded, _, attacker, gs) -> do
       let bobsTurn = S.runPure S.identityAnswer gs Engine.handoffTurn
           after = settleDamage bobsTurn [hit attacker (Recipient.ToCreature shielded) 2]
-      Spec.assertEqWith s "cleanup leaves it alone" (length (GameState.replacements (Expiry.dropAtCleanup gs))) 1
+      -- The behaviour first and the stored row second: a sweep that wrongly ate
+      -- the shield has to be reported as the damage it let through, not as a
+      -- count of GameState.replacements absorbing the mutation ahead of it.
       Spec.assertEqWith s "bob's turn began" (GameState.activePlayer bobsTurn) S.bob
-      Spec.assertEqWith s "and the shield came through the handoff" (length (GameState.replacements bobsTurn)) 1
-      Spec.assertEqWith s "so the same damage is still prevented" (S.damageOf shielded after) (Just 0)
+      Spec.assertEqWith s "the same damage is still prevented" (S.damageOf shielded after) (Just 0)
+      Spec.assertEqWith s "cleanup leaves the row alone" (length (GameState.replacements (Expiry.dropAtCleanup gs))) 1
+      Spec.assertEqWith s "and so does the handoff" (length (GameState.replacements bobsTurn)) 1
   Spec.it s "CR 611.2a it ends as alice's next turn begins, and the same damage then lands"
     . withBoard
     $ \(shielded, _, attacker, gs) -> do
@@ -1538,9 +1547,10 @@ dovinSpec s registry = Spec.describe s "DovinHandOfControl" $ do
           alicesNext = nextSeat (nextSeat gs)
           after = settleDamage alicesNext [hit attacker (Recipient.ToCreature shielded) 2]
       Spec.assertEqWith s "alice is active again" (GameState.activePlayer alicesNext) S.alice
-      Spec.assertEqWith s "the shield is gone, not masked" (fmap ActiveReplacement.expiry (GameState.replacements alicesNext)) []
+      -- Ordered as the case above is, and for the same reason.
       Spec.assertEqWith s "the whole 2 is marked now" (S.damageOf shielded after) (Just 2)
       Spec.assertEqWith s "and the event happened" (amounts after) [2]
+      Spec.assertEqWith s "the row is gone, not masked" (fmap ActiveReplacement.expiry (GameState.replacements alicesNext)) []
   -- The omission, asserted. The printing prevents this damage and pawl's card
   -- does not (gap #1327), so this case states what pawl's Dovin actually does
   -- rather than leaving the divergence in a comment.
@@ -1550,6 +1560,19 @@ dovinSpec s registry = Spec.describe s "DovinHandOfControl" $ do
       let after = settleDamage gs [hit shielded (Recipient.ToCreature control) 3]
       Spec.assertEqWith s "it lands in full" (S.damageOf control after) (Just 3)
       Spec.assertEqWith s "and the event happened" (amounts after) [3]
+  -- "target permanent an OPPONENT controls", which nothing above reads: every
+  -- case there aims at bob's Piker, and a slot with no filter at all would offer
+  -- it just the same. Aiming at alice's own creature is what tells the two
+  -- apart -- the filter leaves the offered set with nothing naming it, so CR
+  -- 608.2b's ability has no legal target and installs no shield.
+  Spec.it s "CR 601.2c the slot offers no permanent alice controls" $ do
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    dovin <- S.printingOf s registry "Dovin, Hand of Control"
+    let (_, _, attacker, gs) = dovinBoardAimedAt (\_ hers -> hers) plains piker warMammoth dovin
+    Spec.assertEqWith s "no shield was installed" (fmap ActiveReplacement.expiry (GameState.replacements gs)) []
+    Spec.assertEqWith s "and alice's own creature takes damage as usual" (S.damageOf attacker (settleDamage gs [hit attacker (Recipient.ToCreature attacker) 4])) (Just 4)
   -- The static clause, so the card is not half-dead data. CR 601.2f's increase,
   -- scoped to the OPPONENTS: alice's own instant is untaxed, which is the only
   -- thing that tells PlayerScope.Opponents from Thalia's EachPlayer.
