@@ -2546,9 +2546,11 @@ slotOne slot resolving gs = do
 -- OPTIONAL one leaves the card exactly where the earlier effect put it, which
 -- for CR 310.12b is exile.
 --
--- Not implemented: CR 118.8c excuses a mandatory cast whose additional cost
--- names cards of a stated quality in a hidden zone, which needs a classification
--- of the face's additional costs this function does not ask for (#110).
+-- CR 118.8c is the one exception to that: a cast an effect instructs "if able"
+-- whose mandatory additional cost involves cards of a stated quality in a hidden
+-- zone is not required, so `excused` turns the mandatory branch back into a may.
+-- Cost.statesHiddenQuality is the classification, asked of the CANDIDATE costs
+-- and never of the card.
 --
 -- The caster is a parameter and not the resolving controller: rule 608.2g says
 -- "a player", and CR 601.2's announcements belong to that player. The opcode's
@@ -2597,19 +2599,38 @@ offerCast resolving caster slot optionality offer = do
             proposed = Cast.asProposed oid name Facing.FaceUp gs
             candidates = maybe (Cost.costsFor name oid proposed) pure applied
         Monad.guard (Cast.castableWhenOffered caster oid name candidates proposed)
-        pure (oid, name, applied)
+        -- CR 118.8c, read off the same candidates the cast will be announced
+        -- with. The candidates and not Face.additionalCosts: CR 118.9d keeps the
+        -- face's additional costs on an alternative cost, so every candidate
+        -- already carries them, and this is the more faithful spelling of "that
+        -- spell has a mandatory additional cost". The rule's other half -- a cost
+        -- APPLIED from another effect (CR 118.8) -- arrives as
+        -- CostAdjustments.components, which spellAdjustments hard-sets empty and
+        -- only PlayerEffect.AddActivationCost ever writes, so it cannot reach a
+        -- spell at all and reading the candidates is exhaustive.
+        --
+        -- Attached to Optionality.Mandatory, whose antecedent is the printed
+        -- phrase "if able": every printing instructing a cast states it that way,
+        -- so the two coincide and a producer instructing one WITHOUT "if able"
+        -- would be the reason to split them.
+        pure (oid, name, applied, any Cost.statesHiddenQuality candidates)
   case offered of
     Nothing -> pure ()
-    Just (oid, name, applied) -> do
+    Just (oid, name, applied, excused) -> do
       let cast = Cast.castSpellWith applied caster oid name Facing.FaceUp
+          -- The SAME prompt on both paths: CR 118.8c creates no new decision, it
+          -- says the player "isn't required to", which is the may this already
+          -- knows how to ask.
+          mayCast = do
+            let decider = Decide.deciderFor caster gs
+            decision <- Game.choose (Prompt.OfferedCast decider caster oid name)
+            case decision of
+              OptionalDecision.Declines -> pure ()
+              OptionalDecision.Exercises -> cast
       case optionality of
-        Optionality.Mandatory -> cast
-        Optionality.Optional -> do
-          let decider = Decide.deciderFor caster gs
-          decision <- Game.choose (Prompt.OfferedCast decider caster oid name)
-          case decision of
-            OptionalDecision.Declines -> pure ()
-            OptionalDecision.Exercises -> cast
+        Optionality.Mandatory | not excused -> cast
+        Optionality.Mandatory -> mayCast
+        Optionality.Optional -> mayCast
 
 -- CR 615.3: install one floating damage row over `recipient`, for a duration.
 -- The shared body of Effect.PreventNextDamage's, Effect.PreventAllDamage's and
