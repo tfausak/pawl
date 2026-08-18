@@ -61,8 +61,15 @@
 -- CR 702.26k's clause is Pawl.Engine.Game.removeFromZones, and CR 800.4a's exile
 -- clause is vacuous for a phased-out permanent, which no battlefield walk finds.
 --
--- Not implemented: CR 702.26e/f, the continuous-effect consequences of being
--- gone, which the pool cannot reach (#930).
+-- CR 702.26f, one of the two continuous-effect consequences of being gone, needs
+-- nothing here: a "for as long as" duration (CR 611.2b) is a Condition counting
+-- the battlefield, so phaseOut's Set.delete below is what ends it, and
+-- Pawl.Engine.Expiry.sweepConditional DELETES rather than suspends, which is
+-- rule 702.26f's second sentence. Pawl.PhasingSpec's "CR 702.26f a
+-- for-as-long-as duration ends when its permanent phases out" is the proof.
+--
+-- Not implemented: CR 702.26e for the three arms of
+-- Pawl.Engine.Projection.affects that carry no battlefield conjunct (#1866).
 module Pawl.Engine.Phasing where
 
 import qualified Data.Map.Strict as Map
