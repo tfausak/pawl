@@ -74,6 +74,8 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Source as Source
@@ -302,6 +304,10 @@ siegeDefeat =
       Effect.OfferCast
         OfferCast.MkOfferCast
           { OfferCast.slot = Binding.became,
+            -- Rule 310.12b's "YOU may cast it": the trigger's controller, which
+            -- is the resolving controller, and a "may".
+            OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
+            OfferCast.optionality = Optionality.Optional,
             OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = True, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing}
           }
 

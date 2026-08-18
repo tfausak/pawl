@@ -458,10 +458,12 @@ library codec
     Pawl.Codec.ReplaceSpec
     Pawl.Codec.RequireBlock
     Pawl.Codec.RequireBlockSpec
+    Pawl.Codec.Reveal
     Pawl.Codec.RevealCause
     Pawl.Codec.RevealCauseSpec
     Pawl.Codec.Revealed
     Pawl.Codec.RevealedSpec
+    Pawl.Codec.RevealSpec
     Pawl.Codec.RoomIndex
     Pawl.Codec.RoomIndexSpec
     Pawl.Codec.Rounding
@@ -1129,6 +1131,7 @@ library types
     Pawl.Types.Response
     Pawl.Types.RestartSignal
     Pawl.Types.Result
+    Pawl.Types.Reveal
     Pawl.Types.RevealCause
     Pawl.Types.Revealed
     Pawl.Types.RoomIndex

@@ -26,8 +26,10 @@
           {
             "type": "Reveal",
             "value": {
-              "type": "InSlot",
-              "value": "self"
+              "ref": {
+                "type": "InSlot",
+                "value": "self"
+              }
             }
           },
           {

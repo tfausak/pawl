@@ -73,6 +73,7 @@ import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Onset as Onset
+import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -94,6 +95,7 @@ import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.RequireBlock as RequireBlock
+import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
@@ -422,8 +424,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Reveal (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))))
-      " {\"type\":\"Reveal\",\"value\":{\"type\":\"InSlot\",\"value\":\"self\"}} "
+      (Effect.Reveal (Reveal.MkReveal (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))) Nothing))
+      " {\"type\":\"Reveal\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"self\"}}} "
   -- Into the Wilds' "look at the top card of your library", whose slot the next
   -- clause reads back.
   Spec.it s "LookAt" $
@@ -816,9 +818,10 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
             }
       )
       " {\"type\":\"ShuffleIntoLibrary\",\"value\":{\"library\":{\"type\":\"InSlot\",\"value\":\"player\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"cards\"}}} "
-  -- CR 608.2g. Written by no card -- rule 310.12b's battles and rule 702's
-  -- keywords mint this opcode in the engine (Pawl.Engine.Battle,
-  -- Pawl.Engine.Keyword) -- so this fixture is the whole of its wire coverage.
+  -- CR 608.2g, in the shape rule 310.12b's battles and rule 702's keywords mint
+  -- in the engine (Pawl.Engine.Battle, Pawl.Engine.Keyword): both defaulted keys
+  -- elided. Wild Evocation is the one card that writes them, and
+  -- Pawl.Codec.OfferCastSpec covers that spelling.
   Spec.it s "OfferCast" $ do
     Common.assertJsonCodec
       s
@@ -827,6 +830,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       ( Effect.OfferCast
           OfferCast.MkOfferCast
             { OfferCast.slot = SlotName.MkSlotName (Text.pack "exiled"),
+              OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
+              OfferCast.optionality = Optionality.Optional,
               OfferCast.offer = CastOffer.defaultValue
             }
       )
@@ -839,6 +844,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       ( Effect.OfferCast
           OfferCast.MkOfferCast
             { OfferCast.slot = SlotName.MkSlotName (Text.pack "exiled"),
+              OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
+              OfferCast.optionality = Optionality.Optional,
               OfferCast.offer =
                 CastOffer.Type.MkCastOffer
                   { CastOffer.Type.transformed = True,
