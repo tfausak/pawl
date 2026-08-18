@@ -1288,6 +1288,7 @@ test-suite pawl-test-suite
     Pawl.CopySpec
     Pawl.CoreSpec
     Pawl.CostSpec
+    Pawl.CounterspellSpec
     Pawl.CountSpec
     Pawl.CrewSpec
     Pawl.DamageSpec
@@ -1304,8 +1305,11 @@ test-suite pawl-test-suite
     Pawl.FaceDownSpec
     Pawl.FilterSpec
     Pawl.GameSpec
+    Pawl.InvestigateSpec
     Pawl.KeywordTriggerSpec
+    Pawl.LibraryOrderSpec
     Pawl.ManaSpec
+    Pawl.MassEffectSpec
     Pawl.ModalDoubleFacedSpec
     Pawl.ModalSpec
     Pawl.MulliganSpec
@@ -1334,6 +1338,8 @@ test-suite pawl-test-suite
     Pawl.TriggerSpec
     Pawl.TurnSpec
     Pawl.UntapRestrictionSpec
+    Pawl.VariableEffectSpec
+    Pawl.ZoneChangeSpec
     Pawl.ZoneTriggerSpec
 
   type: exitcode-stdio-1.0

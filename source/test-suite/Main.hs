@@ -277,6 +277,7 @@ import qualified Pawl.CopySpec
 import qualified Pawl.CoreSpec
 import qualified Pawl.CostSpec
 import qualified Pawl.CountSpec
+import qualified Pawl.CounterspellSpec
 import qualified Pawl.CrewSpec
 import qualified Pawl.DamageSpec
 import qualified Pawl.DaytimeSpec
@@ -303,6 +304,7 @@ import qualified Pawl.Extra.Word8Spec
 import qualified Pawl.FaceDownSpec
 import qualified Pawl.FilterSpec
 import qualified Pawl.GameSpec
+import qualified Pawl.InvestigateSpec
 import qualified Pawl.Json.ArraySpec
 import qualified Pawl.Json.BooleanSpec
 import qualified Pawl.Json.NullSpec
@@ -321,7 +323,9 @@ import qualified Pawl.JsonSchema.DefineSpec
 import qualified Pawl.JsonSchema.NameSpec
 import qualified Pawl.JsonSchema.SchemaSpec
 import qualified Pawl.KeywordTriggerSpec
+import qualified Pawl.LibraryOrderSpec
 import qualified Pawl.ManaSpec
+import qualified Pawl.MassEffectSpec
 import qualified Pawl.ModalDoubleFacedSpec
 import qualified Pawl.ModalSpec
 import qualified Pawl.MulliganSpec
@@ -353,6 +357,8 @@ import qualified Pawl.TriggerSpec
 import qualified Pawl.TurnSpec
 import qualified Pawl.UntapRestrictionSpec
 import qualified Pawl.Uri.FragmentSpec
+import qualified Pawl.VariableEffectSpec
+import qualified Pawl.ZoneChangeSpec
 import qualified Pawl.ZoneTriggerSpec
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -685,6 +691,7 @@ spec s registry = do
   Pawl.CoreSpec.spec s registry
   Pawl.CostSpec.spec s registry
   Pawl.CountSpec.spec s registry
+  Pawl.CounterspellSpec.spec s registry
   Pawl.CrewSpec.spec s registry
   Pawl.DamageSpec.spec s registry
   Pawl.DungeonSpec.spec s registry
@@ -727,8 +734,11 @@ spec s registry = do
   Pawl.JsonSchema.DefineSpec.spec s
   Pawl.JsonSchema.NameSpec.spec s
   Pawl.JsonSchema.SchemaSpec.spec s
+  Pawl.InvestigateSpec.spec s registry
   Pawl.KeywordTriggerSpec.spec s registry
+  Pawl.LibraryOrderSpec.spec s registry
   Pawl.ManaSpec.spec s registry
+  Pawl.MassEffectSpec.spec s registry
   Pawl.ModalDoubleFacedSpec.spec s registry
   Pawl.ModalSpec.spec s registry
   Pawl.MulliganSpec.spec s registry
@@ -759,4 +769,6 @@ spec s registry = do
   Pawl.TurnSpec.spec s registry
   Pawl.UntapRestrictionSpec.spec s registry
   Pawl.Uri.FragmentSpec.spec s
+  Pawl.VariableEffectSpec.spec s registry
+  Pawl.ZoneChangeSpec.spec s registry
   Pawl.ZoneTriggerSpec.spec s registry
