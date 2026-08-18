@@ -1020,6 +1020,7 @@ placeBorne srcId pending = do
             Object.sickness = Sickness.Settled controller,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.counterTimestamps = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,

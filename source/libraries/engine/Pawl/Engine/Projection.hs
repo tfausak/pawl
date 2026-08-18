@@ -3208,15 +3208,20 @@ staticLives :: (Layer -> Condition.Type.Condition -> Bool) -> [(Subtype.Type.Sub
 staticLives functioning changes lowest sa =
   maybe True (\c -> functioning lowest (if null changes then c else rewriteCondition changes c)) (StaticAbility.condition sa)
 
--- CR 122.1a / 613.4c: +1/+1 and -1/-1 counters modify P/T in layer 7c. Each
--- object's counters are emitted as ONE synthetic 7c ModifyPowerToughness carrying
--- the net delta, folded by the same path as Giant Growth. Layer 7c is purely
--- additive, so pre-combining the counters is unobservable; a zero delta emits
+-- CR 122.1a / 613.4c: +1/+1 and -1/-1 counters modify P/T in layer 7c. One
+-- synthetic 7c ModifyPowerToughness per KIND, carrying that kind's whole delta
+-- and folded by the same path as Giant Growth; a kind with no counters emits
 -- nothing.
 --
 -- CR 122.1b / 613.1f: a keyword counter grants its keyword instead, in layer 6.
 -- One grant per counter rather than per kind, since the layer-6 arm counts
 -- instances.
+--
+-- CR 613.7c: each is stamped with the moment its kind's counters were put on,
+-- which is Object.counterTimestamps -- NOT the permanent's own entry timestamp,
+-- which would order a keyword counter against a CR 613.1f ability removal by
+-- when the creature arrived. Rule 613.7c is also why one stamp per kind is
+-- enough, and why the two P\/T kinds cannot share an emission.
 counterGathered :: GameState -> [Gathered]
 counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs))
   where
@@ -3224,25 +3229,24 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
       Nothing -> []
       Just obj ->
         let cs = Object.counters obj
-            at lyr m =
+            at kind lyr m =
               MkGathered
                 { gEffect = Nothing,
                   gSource = oid,
                   gAffected = Affected.TheseObjects (Set.singleton oid),
                   gLayer = lyr,
                   gLowest = lyr,
-                  gTimestamp = Object.timestamp obj,
+                  gTimestamp = Map.findWithDefault (Object.timestamp obj) kind (Object.counterTimestamps obj),
                   gModification = m
                 }
-            plus = toInteger (Map.findWithDefault 0 CounterKind.PlusOnePlusOne cs)
-            minus = toInteger (Map.findWithDefault 0 CounterKind.MinusOneMinusOne cs)
-            d = plus - minus
-            pt =
-              [ at Layer.ModifyPT (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal d) (Quantity.Type.Literal d)))
-              | d /= 0
+            deltaOf kind sign =
+              [ at kind Layer.ModifyPT (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal d) (Quantity.Type.Literal d)))
+              | let d = sign * toInteger (Map.findWithDefault 0 kind cs),
+                d /= 0
               ]
+            pt = deltaOf CounterKind.PlusOnePlusOne 1 <> deltaOf CounterKind.MinusOneMinusOne (-1)
             grantOf (kind, n) = case kind of
-              CounterKind.Keyword kw -> List.genericReplicate n (at Layer.Ability (Modification.GainKeyword kw))
+              CounterKind.Keyword kw -> List.genericReplicate n (at kind Layer.Ability (Modification.GainKeyword kw))
               CounterKind.PlusOnePlusOne -> []
               CounterKind.MinusOneMinusOne -> []
               -- CR 122.1e: a loyalty counter grants nothing, and no CR 613 layer
@@ -3292,8 +3296,9 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
 -- Rule 701.60c's other half, "this creature can't block", is a combat restriction
 -- rather than a characteristic, and lives in Pawl.Engine.CombatRestriction.
 --
--- The permanent's own timestamp, counterGathered's choice: the grant has no
--- source of its own to take one from. It is load-bearing only against a CR 613.1f
+-- The permanent's own timestamp: the grant has no source of its own to take one
+-- from, and no rule gives a designation the moment-of-placement stamp CR 613.7c
+-- gives a counter. It is load-bearing only against a CR 613.1f
 -- removal, layer-6 grants being commutative among themselves -- and rule 701.60c's
 -- other half reads the SAME timestamp through abilityRemovalAfter, so one sentence
 -- gets one order. Pawl.CombatSpec's suspectedAbilityRemovalSpec is the pair of
