@@ -1020,6 +1020,7 @@ placeBorne srcId pending = do
             Object.sickness = Sickness.Settled controller,
             Object.bindings = Map.empty,
             Object.counters = Map.empty,
+            Object.counterTimestamps = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
@@ -1302,8 +1303,9 @@ performSettle = do
 -- the halting problem, so the question this answers is not "is this a loop?" but
 -- "has this gone on longer than any real game would?". The MARGIN is what makes
 -- it safe. GameState.nextTimestamp advances on the events CR 104.4b names -- an
--- object entering a zone (CR 613.7d) and a continuous effect beginning (CR
--- 613.7a) -- and a game in which no player can act issues about one per turn, the
+-- object entering a zone (CR 613.7d), a continuous effect beginning (CR 613.7a)
+-- and a counter being put on (CR 613.7c) -- and a game in which no player can act
+-- issues about one per turn, the
 -- draw. So the slowest way a real game ends, decking out from a 60-card library
 -- (CR 704.5b), spends on the order of fifty of these, roughly twenty times under
 -- the limit. A two-card recursion loop issues several per cycle and arrives in a

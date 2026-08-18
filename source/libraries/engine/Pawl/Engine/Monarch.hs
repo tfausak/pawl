@@ -178,6 +178,7 @@ placeInherent pending = do
             Object.sickness = Sickness.Settled controller,
             Object.bindings = bindings,
             Object.counters = Map.empty,
+            Object.counterTimestamps = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
             Object.chosenSubtype = Nothing,
