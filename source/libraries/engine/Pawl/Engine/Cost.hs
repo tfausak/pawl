@@ -13,7 +13,8 @@
 -- Pawl.Engine.Activate and Pawl.Engine.Resolve learn nothing about which
 -- components exist: they ask "can this be paid" and "pay it", and read the
 -- classifications this module derives -- requiresSicknessCheck for CR 302.6,
--- isLoyaltyCost for CR 606.2/606.3, and zoneFunctionedFrom for CR 113.6m.
+-- isLoyaltyCost for CR 606.2/606.3, zoneFunctionedFrom for CR 113.6m, and
+-- statesHiddenQuality for CR 118.8c.
 module Pawl.Engine.Cost where
 
 import qualified Control.Monad as Monad
@@ -1089,6 +1090,62 @@ zoneOfComponent component = case component of
   -- PutPlusOneCountersOnThis's answer for its reason: CR 122.6 puts the counters
   -- on a creature already on the battlefield, so nothing moves out of any zone.
   CostComponent.Blight _ -> Nothing
+
+-- CR 118.8c: does this cost include "actions involving cards with a stated
+-- quality in a hidden zone"? The CLASSIFICATION Pawl.Engine.Resolve.offerCast
+-- reads to decide whether a cast an effect INSTRUCTS "if able" is excused, in
+-- zoneFunctionedFrom's shape -- so that module still learns nothing about which
+-- components exist, and nothing about which card carries them.
+--
+-- Two conjuncts, and BOTH have to hold. The zone must be hidden (CR 400.2: only
+-- library and hand are, so every graveyard- and battlefield-facing component
+-- fails here whatever its filter says), and the cards must be described by a
+-- STATED QUALITY rather than by a bare quantity. Filter.statesAQuality is the
+-- second conjunct, already written for CR 701.23b/701.23d's identical phrase one
+-- rule over.
+--
+-- NOT zoneOfComponent, which answers CR 113.6m's different question about the
+-- object the cost is ON and so answers Nothing for DiscardCards. Reading it here
+-- would excuse nothing at all.
+--
+-- EXHAUSTIVE with no wildcard, loyaltyAmountOf's posture: a new component's
+-- answer is a claim about that component, to be made by someone reading it.
+statesHiddenQuality :: Cost Keyword.Type.Keyword -> Bool
+statesHiddenQuality cost = any componentStatesHiddenQuality (Cost.components cost)
+
+componentStatesHiddenQuality :: CostComponent.CostComponent Keyword.Type.Keyword -> Bool
+componentStatesHiddenQuality component = case component of
+  -- The one True-capable arm: CR 701.9a discards from the HAND, CR 400.2's
+  -- hidden zone, and the criterion is what the rule calls the stated quality.
+  -- Magmatic Insight's "discard a land card" states one; Cathartic Reunion's
+  -- "discard two cards" and CR 702.133a's jump-start cost -- both And [] -- name
+  -- a quantity and nothing else, which is CR 701.23d's side of the same line.
+  CostComponent.DiscardCards d -> Filter.statesAQuality (DiscardCards.whichCards d)
+  -- The hidden zone WITHOUT a quality: CR 702.29a's "discard this card" names
+  -- the object the cost is on, so no card is described at all and the player has
+  -- no card to fail to find. False, and argued rather than lumped in below.
+  CostComponent.DiscardThis -> False
+  -- Cards, but in a PUBLIC zone (CR 400.2), so the first conjunct fails however
+  -- specific the filter is: these three read the battlefield.
+  CostComponent.Sacrifice {} -> False
+  CostComponent.TapForTotalPower {} -> False
+  CostComponent.TapPermanents {} -> False
+  -- The same, one zone over: the graveyard is public too.
+  CostComponent.ExileThisFromGraveyard -> False
+  CostComponent.ExileCardsFromGraveyard {} -> False
+  CostComponent.ExileTopFromGraveyard _ -> False
+  -- No cards at all, so there is no "action involving cards" to classify: these
+  -- move the object the cost is on, life, energy or counters.
+  CostComponent.TapThis -> False
+  CostComponent.UntapThis -> False
+  CostComponent.SacrificeThis -> False
+  CostComponent.PayLife _ -> False
+  CostComponent.PayLifeX -> False
+  CostComponent.PayEnergy _ -> False
+  CostComponent.AddLoyaltyToThis _ -> False
+  CostComponent.RemoveLoyaltyFromThis _ -> False
+  CostComponent.PutPlusOneCountersOnThis _ -> False
+  CostComponent.Blight _ -> False
 
 -- CR 306.5c: a planeswalker's loyalty is the number of loyalty counters on it.
 -- Zero for an object with none, which CR 704.5i then reads as loyalty 0 -- so

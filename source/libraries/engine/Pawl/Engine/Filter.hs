@@ -1275,9 +1275,11 @@ manaValueThresholds predicate = case predicate of
 -- filter states one may find fewer cards than it asks for, or none, even when the
 -- zone holds them (701.23b); a search "simply for a quantity of cards" -- "a
 -- card", which is the whole of Extract's filter -- must find that many if the
--- zone can supply them (701.23d). Pawl.Engine.Resolve's Search arm is the caller,
--- and the answer is the difference between an answer of "nothing" being honoured
--- and being overridden.
+-- zone can supply them (701.23d). Pawl.Engine.Resolve's Search arm is one
+-- caller, and there the answer is the difference between an answer of "nothing"
+-- being honoured and being overridden. Pawl.Engine.Cost.statesHiddenQuality is
+-- the other: CR 118.8c spells "cards with a stated quality" exactly as CR
+-- 701.23b does, so one predicate answers both.
 --
 -- Derived rather than stored on the opcode: the two are not independent -- the
 -- rule reads the search's own description of what it looks for -- so a stored
