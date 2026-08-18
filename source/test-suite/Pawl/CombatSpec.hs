@@ -4658,7 +4658,7 @@ creaturePlaneswalkerBoard jace elves coating march plains waxWane =
            in Just (coated, atJace, atBob, jaceId, marchId)
         _ -> Nothing
 
--- Declare both Pikers and announce CR 508.1b's targets by attacker: `atJace` at
+-- Declare both attackers and announce CR 508.1b's targets by attacker: `atJace` at
 -- the planeswalker, `atBob` at the defending player. Casts nothing, so the declare
 -- attackers step played under this leaves the Wane for a later step -- attackOnly's
 -- reason above.
@@ -4711,7 +4711,8 @@ blockAndWane jaceId atBob marchId p = case p of
 -- membership, tap state, creature-ness and CR 509.1b's restrictions, none of which
 -- excludes a permanent that is itself being attacked.
 --
--- Four pool cards, every oracle text checked against Scryfall:
+-- Four pool cards carry the rule, every oracle text checked against Scryfall (two
+-- Llanowar Elves and a Plains are scaffolding -- see creaturePlaneswalkerBoard):
 --
 --   * Jace Beleren ({1}{U}{U} Legendary Planeswalker -- Jace) is bob's, and the
 --     permanent that holds both roles.
@@ -4762,7 +4763,7 @@ creaturePlaneswalkerCombatSpec s registry = Spec.describe s "CreaturePlaneswalke
             atEnd = runToEndOfCombat (blockAndWane jaceId atBob marchId) atBlockers
             attackers = Combat.Type.attackers (GameState.combat atEnd)
         Spec.assertEqWith s "the leg hands over at the declare blockers step, so the block is declared before the kill" (GameState.phase atBlockers) (Phase.Combat CombatStep.DeclareBlockers)
-        Spec.assertEqWith s "one Piker really was announced at the planeswalker (CR 508.1b)" (Map.lookup atJace (Combat.Type.attackers (GameState.combat atBlockers))) (Just (AttackTarget.OfPlaneswalker jaceId))
+        Spec.assertEqWith s "one attacker really was announced at the planeswalker (CR 508.1b)" (Map.lookup atJace (Combat.Type.attackers (GameState.combat atBlockers))) (Just (AttackTarget.OfPlaneswalker jaceId))
         Spec.assertEqWith s "and the other at bob" (Map.lookup atBob (Combat.Type.attackers (GameState.combat atBlockers))) (Just (AttackTarget.OfPlayer S.bob))
         Spec.assertEqWith s "the leg reached the end of combat step, where the record still reads live (CR 511.3)" (GameState.phase atEnd) (Phase.Combat CombatStep.EndOfCombat)
         Spec.assertBool s (not (S.onBattlefield marchId atEnd)) "the Wane really did destroy March of the Machines"
@@ -4810,7 +4811,7 @@ creaturePlaneswalkerCombatSpec s registry = Spec.describe s "CreaturePlaneswalke
         -- attacker aimed at him) - 1 (the attacker he blocks) = 3, where the leg
         -- above reads 4 because only the first of those two ever lands.
         Spec.assertEqWith s "and both attackers' 1 came off his loyalty" (S.counterOf CounterKind.Loyalty jaceId atEnd) 3
-        Spec.assertBool s (S.onBattlefield jaceId atEnd) "CR 704.5i: which is not lethal"
+        Spec.assertBool s (S.onBattlefield jaceId atEnd) "CR 704.5g and CR 704.5i: 2 marked on a 3-toughness creature and 3 loyalty left, so neither is lethal"
         Spec.assertEqWith s "and he is being attacked all along (CR 508.1b)" (Map.lookup atJace (Combat.Type.attackers (GameState.combat atEnd))) (Just (AttackTarget.OfPlaneswalker jaceId))
 
 -- CR 508.4: "If a creature is put onto the battlefield attacking, its controller
