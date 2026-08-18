@@ -52,6 +52,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -221,7 +222,7 @@ existenceSpec s registry = Spec.describe s "Existence" $ do
     Spec.assertEqWith s "one ability functions on the battlefield" (length (Activate.abilitiesFor fieldId onField)) 1
     Spec.assertBool
       s
-      (not (any (elem CostComponent.DiscardThis . Cost.components . ActivatedAbility.cost) (Activate.abilitiesFor fieldId onField)))
+      (not (any (elem (CostComponent.DiscardThis DiscardCause.Ordinary) . Cost.components . ActivatedAbility.cost) (Activate.abilitiesFor fieldId onField)))
       "and it is not the one whose cost discards the card"
 
 -- Was an activation of THIS source offered? `any isActivate` cannot say, and both

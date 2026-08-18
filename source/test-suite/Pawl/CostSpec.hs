@@ -153,16 +153,16 @@ doorSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       let (onField, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           (inHand, gs1) = S.addHandCard piker S.alice gs0
-      Spec.assertBool s (Cost.canPayComponent S.alice inHand CostComponent.DiscardThis gs1) "a card in hand pays"
-      Spec.assertBool s (not (Cost.canPayComponent S.alice onField CostComponent.DiscardThis gs1)) "a permanent does not"
-      Spec.assertBool s (not (Cost.canPayComponent S.bob inHand CostComponent.DiscardThis gs1)) "and it is not the other player's to discard"
+      Spec.assertBool s (Cost.canPayComponent S.alice inHand (CostComponent.DiscardThis DiscardCause.Ordinary) gs1) "a card in hand pays"
+      Spec.assertBool s (not (Cost.canPayComponent S.alice onField (CostComponent.DiscardThis DiscardCause.Ordinary) gs1)) "a permanent does not"
+      Spec.assertBool s (not (Cost.canPayComponent S.bob inHand (CostComponent.DiscardThis DiscardCause.Ordinary) gs1)) "and it is not the other player's to discard"
     -- CR 701.9a through Event.changeZone, the CR 400.7 funnel: the discarded
     -- card lands in its owner's graveyard as a new incarnation, so the old id
     -- is gone rather than moved.
     Spec.it s "CR 701.9a paying DiscardThis puts that card in the graveyard" $ do
       piker <- S.printingOf s registry "Goblin Piker"
       let (inHand, gs0) = S.addHandCard piker S.alice (Setup.emptyGame S.bothPlayers)
-          after = S.runPure S.identityAnswer gs0 (Cost.payComponent S.alice inHand CostComponent.DiscardThis)
+          after = S.runPure S.identityAnswer gs0 (Cost.payComponent S.alice inHand (CostComponent.DiscardThis DiscardCause.Ordinary))
       Spec.assertEqWith s "the hand is empty" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
       Spec.assertEqWith s "and the card is in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
     -- CR 118.6 vs CR 118.5a: the distinction the Maybe carries. Nothing is an
