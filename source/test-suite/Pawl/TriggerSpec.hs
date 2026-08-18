@@ -88,7 +88,11 @@
 -- creates a CR 509.1c blocking requirement, with Goblin Grappler --
 -- `provokeSpec`. CR 603.2's "that player" narrowing a TARGET SLOT rather than an
 -- effect's operand -- Filter.ControlledByBound, baked to the player the event
--- named -- with Trygon Predator at three seats -- `trygonPredatorSpec`. CR
+-- named -- with Trygon Predator at three seats -- `trygonPredatorSpec`, and that
+-- same condition's OTHER slot read in the same trigger, the event's amount aimed
+-- at a planeswalker the bound player controls, with Questing Beast --
+-- `questingBeastSpec`, and that player slot stamped by the FILTERED twin of the
+-- condition and read by a bystander, with Larceny -- `larcenySpec`. CR
 -- 702.112 renown, the first minted
 -- ability with CR 603.4's intervening "if", with Rhox Maulers, plus CR 702.112b's
 -- designation watched from outside, with Valeron Wardens -- `renownSpec`. CR
@@ -5618,6 +5622,137 @@ trygonPredatorSpec s registry =
               Spec.assertBool s (S.onBattlefield carols stolen) "bob controls it now, so the ability fizzles"
               Spec.assertBool s (not (S.onBattlefield carols kept)) "and without the change it is destroyed"
             _ -> Spec.assertFailure s "fixture should give carol a Moon"
+
+-- BOTH halves of one DamageDealt event read by one bearer-scoped trigger:
+-- Questing Beast {2}{G}{G} Legendary Creature -- Beast 4/4, "whenever Questing
+-- Beast deals combat damage to an opponent, it deals THAT MUCH damage to target
+-- planeswalker THAT PLAYER controls". The amount rides
+-- Pawl.Engine.Binding.eventAmount and the player Binding.triggerPlayer, and the
+-- target slot narrows by Filter.ControlledByBound off the second -- so the two
+-- slots the condition stamps are read at once, one as a Quantity and one as a
+-- filter.
+--
+-- THREE SEATS, bob and carol holding the same planeswalker printing, so "that
+-- player controls" is a different set from "an opponent controls" and from "a
+-- planeswalker" (trygonPredatorSpec above makes the same distinction for the
+-- destroy half of the pattern).
+--
+-- THREE DISTINCT NUMBERS, so the loyalty count names one reading of "that much"
+-- and rejects two: a -1/-1 counter makes the Beast a 3/3 before it connects, so
+-- the event carries 3 rather than the printed 4, and four +1/+1 counters added
+-- AFTER the damage but BEFORE the ability resolves leave it a 7/7, so a payload
+-- reading the source's power at resolution would take 7. Both walkers start on 6
+-- loyalty counters, which survives 3 and 4 and dies to 7.
+--
+-- "An opponent" is deliberately not transcribed, and this is a rules equivalence
+-- rather than an elision: CR 508.1a lets only the active player's creatures
+-- attack, CR 506.2 and CR 506.2a make the defending player one of the attacking
+-- player's opponents, CR 510.1b assigns an unblocked creature's combat damage to
+-- what it is attacking, and CR 506.4 removes a permanent from combat if its
+-- controller changes. A creature can only ever deal combat damage to a player who
+-- is its controller's opponent, so the nullary condition admits exactly the
+-- printed events.
+questingBeastSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+questingBeastSpec s registry =
+  let plan :: Prompt.Prompt r -> r
+      plan p = case p of
+        Prompt.ChooseDefender {} -> S.carol
+        -- CR 508.1b's choice pinned to the PLAYER: carol's own planeswalker is a
+        -- legal attack target too, and attacking it would deal no combat damage
+        -- to a player at all.
+        Prompt.ChooseAttackTarget _ _ _ options -> Maybe.fromMaybe (NonEmpty.head options) (List.find (== AttackTarget.OfPlayer S.carol) (NonEmpty.toList options))
+        Prompt.ChooseTargets _ _ _ asked -> fmap (maybe Set.empty Set.singleton . Set.lookupMin . snd) asked
+        Prompt.DeclareBlockers {} -> Map.empty
+        _ -> S.aggressiveAnswer p
+      board = do
+        beast <- S.printingOf s registry "Questing Beast"
+        karn <- S.printingOf s registry "Karn Liberated"
+        let (gs0, mine, theirs, others) = S.threePlayerCombat [beast] [karn] [karn]
+            loyal = List.foldl' (flip (S.addCounter CounterKind.Loyalty 6)) gs0 (theirs <> others)
+            shrunk = List.foldl' (flip (S.addCounter CounterKind.MinusOneMinusOne 1)) loyal mine
+            -- The same seam trygonPredatorSpec uses: the declarations run as
+            -- steps, the damage is dealt by hand, and settleForPriority places
+            -- the trigger -- which leaves a state where the ability is on the
+            -- stack and has not resolved.
+            atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) plan shrunk
+            fought = S.runPure plan atDamage Damage.dealCombatDamage
+            placed = S.runPure plan fought Engine.settleForPriority
+        pure (mine, theirs, others, shrunk, placed)
+   in Spec.describe s "QuestingBeast" $ do
+        -- THE proving test, at gameplay level: what carol's planeswalker lost.
+        Spec.it s "CR 120.3c whole card: that much is the damage the event carried" $ do
+          (mine, theirs, others, before, placed) <- board
+          case (mine, theirs, others) of
+            ([beastId], [bobs], [carols]) -> do
+              let bumped = S.addCounter CounterKind.PlusOnePlusOne 4 beastId placed
+                  after = S.runPure plan bumped Engine.priorityLoop
+              -- The fixture's own preconditions, asserted rather than assumed:
+              -- neither can be reddened by the binding under test.
+              Spec.assertEqWith s "the -1/-1 counter makes the Beast a 3/3 before it connects" (S.powerToughnessOf beastId before) (Just (3, 3))
+              Spec.assertEqWith s "and both walkers start on 6 loyalty" (S.counterOf CounterKind.Loyalty bobs before, S.counterOf CounterKind.Loyalty carols before) (6, 6)
+              Spec.assertEqWith s "CR 120.3c: 6 - 3, not 6 - 4 and not dead on 7" (S.counterOf CounterKind.Loyalty carols after) 3
+              Spec.assertEqWith s "and bob's planeswalker is untouched" (S.counterOf CounterKind.Loyalty bobs after) 6
+              Spec.assertEqWith s "CR 510.1b: carol herself took the Beast's 3" (S.lifeOf S.carol after) (Just 17)
+              Spec.assertEqWith s "CR 704.5q: the Beast is a 7/7 by the time the ability resolves" (S.powerToughnessOf beastId after) (Just (7, 7))
+            _ -> Spec.assertFailure s "fixture should give alice a Beast and bob and carol a planeswalker each"
+        -- The slots themselves, read back off the placed ability rather than
+        -- inferred from what happened -- so this says which player the event
+        -- named and which permanent the filter OFFERED.
+        Spec.it s "CR 603.3d the slot admits only the damaged player's planeswalker" $ do
+          (_, theirs, others, _, placed) <- board
+          case (theirs, others, GameState.stack placed) of
+            ([bobs], [carols], [abilityId]) -> do
+              let bindings = maybe Map.empty Object.bindings (Game.lookupObject abilityId placed)
+                  slotOf name = Map.lookup (SlotName.MkSlotName (Text.pack name)) (Binding.targetsOf bindings)
+              Spec.assertEqWith s "carol took the damage, so she is the player the event bound" (slotOf "thatPlayer") (Just (Set.singleton (Recipient.ToPlayer S.carol)))
+              Spec.assertEqWith s "and carol's planeswalker is the one target the slot admitted" (slotOf "target") (Just (Set.singleton (Recipient.ToObject carols)))
+              Spec.assertBool s (bobs /= carols) "the two planeswalkers are distinct objects"
+            _ -> Spec.assertFailure s "fixture should give bob and carol a planeswalker each and place one trigger"
+
+-- The same "that player", stamped by the FILTERED twin of that condition and read
+-- by a BYSTANDER: Larceny {3}{B}{B} Enchantment, "whenever a creature you control
+-- deals combat damage to a player, that player discards a card". The whole card is
+-- that one clause, so every reading below is the condition's.
+--
+-- THREE SEATS, each holding three cards, so the damaged player (carol), the
+-- damager's controller (alice) and a bystanding opponent (bob) are three
+-- different hands -- and three cards apiece makes "discarded once" (two left)
+-- distinguishable from "discarded twice" (one) and from "not at all" (three).
+larcenySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+larcenySpec s registry =
+  let plan :: Prompt.Prompt r -> r
+      plan p = case p of
+        Prompt.ChooseDefender {} -> S.carol
+        Prompt.ChooseAttackTarget _ _ _ options -> Maybe.fromMaybe (NonEmpty.head options) (List.find (== AttackTarget.OfPlayer S.carol) (NonEmpty.toList options))
+        Prompt.DeclareBlockers {} -> Map.empty
+        _ -> S.aggressiveAnswer p
+      board = do
+        larceny <- S.printingOf s registry "Larceny"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (gs0, _, _, _) = S.threePlayerCombat [larceny, piker] [] []
+            stocked = List.foldl' (\g pid -> List.foldl' (\g' _ -> snd (S.addHandCard piker pid g')) g [(), (), ()]) gs0 [S.alice, S.bob, S.carol]
+            atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) plan stocked
+            fought = S.runPure plan atDamage Damage.dealCombatDamage
+            placed = S.runPure plan fought Engine.settleForPriority
+        pure (stocked, placed)
+   in Spec.describe s "Larceny" $ do
+        -- THE proving test, at gameplay level: whose hand shrank.
+        Spec.it s "CR 603.2 whole card: the DAMAGED player discards, not the damager's controller" $ do
+          (before, placed) <- board
+          let after = S.runPure plan placed Engine.priorityLoop
+          Spec.assertEqWith s "all three seats start on three cards" (S.handSize S.alice before, S.handSize S.bob before, S.handSize S.carol before) (3, 3, 3)
+          Spec.assertEqWith s "carol was dealt the combat damage, so carol discarded exactly one" (S.handSize S.carol after) 2
+          Spec.assertEqWith s "alice, whose creature dealt it, discarded none" (S.handSize S.alice after) 3
+          Spec.assertEqWith s "and bob, who was not in the combat, none either" (S.handSize S.bob after) 3
+          Spec.assertEqWith s "CR 510.1b: the Piker's 2 reached carol" (S.lifeOf S.carol after) (Just 18)
+        -- The slot itself, read off the placed ability.
+        Spec.it s "CR 603.2 the damaged player is what the event stamped" $ do
+          (_, placed) <- board
+          case GameState.stack placed of
+            [abilityId] -> do
+              let bindings = maybe Map.empty Object.bindings (Game.lookupObject abilityId placed)
+              Spec.assertEqWith s "thatPlayer is carol" (Map.lookup (SlotName.MkSlotName (Text.pack "thatPlayer")) (Binding.targetsOf bindings)) (Just (Set.singleton (Recipient.ToPlayer S.carol)))
+            other -> Spec.assertFailure s ("expected exactly one placed trigger, got " <> show (length other))
 
 -- CR 702.39a's provoke, which rule 702 states as a triggered
 -- ability and the FIRST whose payload creates a CR 509.1c blocking REQUIREMENT
@@ -14046,6 +14181,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   decayedSpec s registry
   provokeSpec s registry
   trygonPredatorSpec s registry
+  questingBeastSpec s registry
+  larcenySpec s registry
   evolveSpec s registry
   krasisSpec s registry
   renownSpec s registry
