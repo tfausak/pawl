@@ -1158,6 +1158,21 @@ theftChain s registry islands swamps hack = do
       after = S.runPure S.identityAnswer hacked Stack.resolveTop
   pure (pikerId, after)
 
+-- SYNTHETIC. "Synthetic Conditional Theft" {1}{U} Sorcery: "Gain control of
+-- target creature for as long as you control a Swamp." CR 611.2b's duration
+-- naming a word CR 612.2 can swap, which no printing reaches: the Scryfall
+-- sweep o:"for as long as", 2026-08-18, returns 223 cards, and in every one the
+-- duration names its own source -- by card name (Dragonlord Silumgar, Merieke Ri
+-- Berit), as "this creature"/"this Saga"/"this Equipment", or by a counter on a
+-- land. Where a creature type or a land type does appear beside such a duration
+-- it sits in the TARGET filter, which rewriteTargetSlot already rewrites --
+-- Olivia Voldaren's "target Vampire", Hivis of the Scale's "target Dragon",
+-- Seasinger's "whose controller controls an Island". CR 612.2's closing sentence
+-- forbids a subtype swap changing a card name, so a duration naming its source
+-- by name is unreachable by construction. Nothing in the CR forbids the card, so
+-- it is legitimate and only unprinted; Olivia Voldaren gaining a Vampire-naming
+-- DURATION is what would refute the claim.
+--
 -- CR 612.1 reaching a stored effect's DURATION, which is printed text like any
 -- other. The first two cases are what makes the third discriminating: they pin
 -- that the Theft works at all, and that its "for as long as" duration genuinely
