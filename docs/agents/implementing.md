@@ -65,8 +65,8 @@ change done"), and say in the PR which ones you read and why each is correct.
 A comment asserting a limit the engine used to have ("pawl's projection does
 not reach a hand", "walks the battlefield only", "all four of
 `Pawl.Types.Affected`") becomes false the moment the limit lifts, and nothing
-catches it: no issue number for `script/check-gaps.sh`, nothing for `-Werror`.
-It is not mechanically checkable, so do not propose a script for it.
+catches it: `-Werror` is silent, and no check reads prose. It is not
+mechanically checkable, so do not propose a script for it.
 
 When your change lets a capability reach somewhere it previously did not, grep
 the tree before you push for prose asserting the old limit --- the name of what
@@ -94,19 +94,19 @@ pawl's own identifier rather than from the printed template, so it missed cards
 that say the thing in the words a card says it in. So never write the bare form
 --- "nothing prints one", "no printing does this", "the sweep matches nothing".
 Two shapes are admissible. Prefer the citation: the claim is almost always the
-REASON a slot or constructor is unbuilt, which makes it an elision, and
-`Not implemented: ... (#N)` or `(gap #N)` puts it under
-`script/check-gaps.sh`, which reddens that exact line the day the issue closes.
-That is the only automatic trigger available, and its absence is how all three
-survived their own PR's self-review. Where there is genuinely nothing to cite,
-record the QUERY and its date instead of the conclusion --- Scryfall
-`o:"deals damage to" o:"that source"`, 2026-08-18, no hit --- so the next
-reader re-runs it rather than inheriting it. Either shape: build the query from
-the printed template, taken from a card already in `data/cards/` or from the
-CR's own wording, never from the constructor name; scope the noun, since "the
-pool" reads as `data/cards/` in some comments and as every printing ever
-released in others; and name the card that WOULD refute you, so a reader can
-check the claim without re-deriving the query.
+REASON a slot or constructor is unbuilt, which makes it an elision, and `Not
+implemented: ... (#N)` or `(gap #N)` ties it to an issue a reader can check,
+which a bare absolute gives them no way to do. Nothing reddens when that issue
+closes --- there is no automatic trigger for any of this, which is how all
+three survived their own PR's self-review, so the grep is yours. Where there is
+genuinely nothing to cite, record the QUERY and its date instead of the
+conclusion --- Scryfall `o:"deals damage to" o:"that source"`, 2026-08-18, no
+hit --- so the next reader re-runs it rather than inheriting it. Either shape:
+build the query from the printed template, taken from a card already in
+`data/cards/` or from the CR's own wording, never from the constructor name;
+scope the noun, since "the pool" reads as `data/cards/` in some comments and as
+every printing ever released in others; and name the card that WOULD refute
+you, so a reader can check the claim without re-deriving the query.
 `Pawl.Types.SpendManaAsThough`'s `only` field is the model in the tree ---
 scoped to `data/cards/`, cited to #1804, and it names Chromatic Orrery as the
 card that separates the two readings.
@@ -306,10 +306,9 @@ takes ten minutes now and forty as its own dispatch is folded in.
   taking **both** sides, then re-run the mutations.
 - **Landing a capability a census tracks means editing the census in the same
   PR** --- #875 (CR 116 special actions), #876 (CR 701 keyword actions), #877
-  (CR 702 keyword abilities). `script/check-census.sh` catches the eponymous
-  case on #876 and #877, and holds #875's rows to set equality with `Action`'s
-  constructors by the `Action.X` names they write. A row landed under another
-  name, or under no constructor of the tracked type at all, is yours alone.
+  (CR 702 keyword abilities). Nothing checks the three bodies, so every row is
+  yours: the eponymous case, a row landed under another name, and a row under no
+  constructor of the tracked type at all.
 - **Landing a capability means reading what it unblocked**; `CLAUDE.md` has
   the query. Say in the PR which dependents are now workable.
 - **Closing #N means re-deriving every inline `(#N)` in the tree**, not just the
@@ -317,23 +316,22 @@ takes ten minutes now and forty as its own dispatch is folded in.
   them by grepping the BARE number over the whole tree, not by trusting the file
   set a brief or an issue body names --- that set has been incomplete three
   times in one session, and each miss was a live elision citing an issue the PR
-  closed, which is CI's Tracker job red on merge. A citation can also arrive
-  after the brief was written, from a PR that landed while you worked, so grep
-  again after the last merge from `origin/main`.
+  closed, left in the tree claiming a capability was missing that had landed
+  months earlier. A citation can also arrive after the brief was written, from a
+  PR that landed while you worked, so grep again after the last merge from
+  `origin/main`.
 
-Before pushing: stage, `hooky fix` (`CLAUDE.md`), stage again. Two hooks bite
+Before pushing: stage, `hooky fix` (`CLAUDE.md`), stage again. One hook bites
 differently by hand: `script/format-json.sh` takes `MODE FILE...` and passes
-vacuously when run bare, and `script/check-citations.sh` defaults to the whole
-tree --- run it bare after taking a CR update, since a renumbering breaks
-citations in files you never touched. It proves only that the rule NUMBER
-exists: a citation naming a real rule that does not say what the sentence claims
-passes silently, which is how `CR 108.1` (the Oracle-card-reference rule) sat in
-this file citing ownership (CR 108.3) through weeks of green CI. Re-reading the
-rule is the only check there is. The same renumbering breaks them in issue
-bodies, where nothing checks anything: after taking a CR update, grep the open
-tracker for the renumbered rules and correct the bodies in a comment. Two checks are NOT hooks because they
-read GitHub: `script/check-census.sh` and `script/check-gaps.sh`. Both take a
-second and run in CI's Tracker job, which you will not be waiting for, so run
-them yourself.
+vacuously when run bare.
+
+Nothing checks a `CR` citation. Re-reading the rule in `docs/rules.txt` is the
+only check there is, and it always was the load-bearing one: a citation naming a
+real rule that does not say what the sentence claims passed the old script
+silently, which is how `CR 108.1` (the Oracle-card-reference rule) sat in this
+file citing ownership (CR 108.3) through weeks of green CI. A CR update
+renumbers rules in the tree and in issue bodies alike, so after taking one, grep
+the renumbered rules across both and correct them --- the tree in the PR, the
+bodies in a comment.
 
 Then stop. Do not wait on CI, and do not start another unit.
