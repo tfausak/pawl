@@ -2537,10 +2537,9 @@ payable = Mana.canPay Cost.manaActivations
 -- doesn't change that cost, and it doesn't change what mana was actually spent to
 -- pay that cost."
 --
--- Celestial Dawn's third sentence is the pool's only printing of that rule as a
--- CR 613.11 continuous effect on a PLAYER: "You may spend white mana as though it
--- were mana of any color. You may spend other mana only as though it were
--- colorless mana." Both halves are here because they land together -- the
+-- Celestial Dawn's third sentence prints that rule as a CR 613.11 continuous
+-- effect on a PLAYER: "You may spend white mana as though it were mana of any
+-- color. You may spend other mana only as though it were colorless mana." Both halves are here because they land together -- the
 -- permission alone would leave the card more permissive than printed, which is
 -- what pawl's Celestial Dawn used to be.
 --

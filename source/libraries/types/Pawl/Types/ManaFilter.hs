@@ -29,9 +29,8 @@ data ManaFilter
     --
     -- A COMPLEMENT OF ONE TYPE and not a general `Not ManaFilter`. Every
     -- printed "other mana" is worded against a single named type, so recursion
-    -- would buy nothing this type's two readers
-    -- (Pawl.Engine.ManaFilter.matchesType is the only interpreter) can use, and
-    -- CR 106.1b's closed list means the complement is always writable the long
-    -- way.
+    -- would buy nothing Pawl.Engine.ManaFilter -- which interprets this whole
+    -- type in one comparison -- could use, and CR 106.1b's closed list means a
+    -- wider complement is always writable the long way.
     NotOfType ManaType.ManaType
   deriving (Eq, Ord, Show)

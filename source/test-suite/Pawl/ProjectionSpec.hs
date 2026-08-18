@@ -1397,7 +1397,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
 
   -- Not implemented, so the card file omits it: Celestial Dawn's colour clause
   -- for spells you control and nonland cards you own off the battlefield (#160).
-  -- Nothing below reads a colour off the battlefield. Its other clauses are
+  -- Nothing below looks at a card outside the battlefield. Its other clauses are
   -- printed in full, the mana sentence included -- CR 609.4b's two halves are a
   -- pair of PlayerEffect.SpendManaAsThough entries, proved in Pawl.ManaSpec.
   --
