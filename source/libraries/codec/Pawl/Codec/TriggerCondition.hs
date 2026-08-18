@@ -2,6 +2,7 @@ module Pawl.Codec.TriggerCondition where
 
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.Condition as Condition
+import qualified Pawl.Codec.ControllerBecomesTarget as ControllerBecomesTarget
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
@@ -73,7 +74,7 @@ codec =
       Arm.payload "SpellCast" SpellCast.codec TriggerCondition.SpellCast (\x -> case x of TriggerCondition.SpellCast y -> Just y; _ -> Nothing),
       Arm.nullary "SelfCast" TriggerCondition.SelfCast,
       Arm.payload "SelfBecomesTargeted" PlayerRelation.codec TriggerCondition.SelfBecomesTargeted (\x -> case x of TriggerCondition.SelfBecomesTargeted y -> Just y; _ -> Nothing),
-      Arm.nullary "ControllerBecomesTargetOfSpell" TriggerCondition.ControllerBecomesTargetOfSpell,
+      Arm.payload "ControllerBecomesTarget" ControllerBecomesTarget.codec TriggerCondition.ControllerBecomesTarget (\x -> case x of TriggerCondition.ControllerBecomesTarget y -> Just y; _ -> Nothing),
       Arm.payload "SelfHalfUnlocked" CardName.codec TriggerCondition.SelfHalfUnlocked (\x -> case x of TriggerCondition.SelfHalfUnlocked y -> Just y; _ -> Nothing),
       Arm.payload "RoomFullyUnlocked" PlayerRelation.codec TriggerCondition.RoomFullyUnlocked (\x -> case x of TriggerCondition.RoomFullyUnlocked y -> Just y; _ -> Nothing),
       Arm.payload "AnyOf" (Common.list codec) TriggerCondition.AnyOf (\x -> case x of TriggerCondition.AnyOf y -> Just y; _ -> Nothing),

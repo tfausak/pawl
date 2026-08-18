@@ -688,8 +688,9 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfCast -> []
   -- CR 702.21a's condition carries a PlayerRelation and no Count.
   TriggerCondition.SelfBecomesTargeted _ -> []
-  -- Its player-side sibling is nullary, so it carries no Count either.
-  TriggerCondition.ControllerBecomesTargetOfSpell -> []
+  -- Its player-side sibling carries a PlayerRelation and a StackObjectKind, and
+  -- no Count either.
+  TriggerCondition.ControllerBecomesTarget {} -> []
 
 -- Every Count reachable from one effect: its own Quantity/Duration fields,
 -- and -- for Create/CreateEmblem -- every Count in the embedded token/emblem
@@ -2689,9 +2690,10 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- Rule 702.21a names the bearer as well, and asks only a relation of the
   -- targeting object's controller -- no Filter over the object itself.
   TriggerCondition.SelfBecomesTargeted _ -> []
-  -- CR 601.2c from the player's side names CR 109.5's "you" and a kind read off
-  -- the event, so there is no Filter here either.
-  TriggerCondition.ControllerBecomesTargetOfSpell -> []
+  -- CR 601.2c from the player's side names CR 109.5's "you", a relation over the
+  -- targeting object's controller and a kind read off the event, so there is no
+  -- Filter here either.
+  TriggerCondition.ControllerBecomesTarget {} -> []
 
 -- CR 613.11: which objects a player effect names -- a cost modifier's (CR
 -- 601.2f), a timing permission's (CR 601.3b) or a countering prohibition's (CR

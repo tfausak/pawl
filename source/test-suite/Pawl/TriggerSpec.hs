@@ -279,6 +279,7 @@ import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ControlChanged as ControlChanged
+import qualified Pawl.Types.ControllerBecomesTarget as ControllerBecomesTarget
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterChange as CounterChange
@@ -9750,11 +9751,13 @@ representativeEvents cond =
         -- since matchesTrigger reads `you` from the bearer's side and this list
         -- pins the binding rather than the match.
         TriggerCondition.SelfBecomesTargeted _ -> one (GameEvent.BecameTarget (BecameTarget.MkBecameTarget (Recipient.ToObject departed) arrived StackObjectKind.Ability S.alice))
-        -- The same event one recipient over, and the kind this condition asks
-        -- for: a targeted PLAYER, by a SPELL. Both fields differ from the arm
-        -- above, which is what keeps the eventBindings/eventBindingSlots pin
-        -- honest across the two new axes.
-        TriggerCondition.ControllerBecomesTargetOfSpell -> one (GameEvent.BecameTarget (BecameTarget.MkBecameTarget (Recipient.ToPlayer S.alice) arrived StackObjectKind.Spell S.alice))
+        -- The same event one recipient over: a targeted PLAYER, which is the axis
+        -- separating this condition from the arm above. The kind is taken FROM
+        -- the condition so each inhabitant listed below gets an event it
+        -- genuinely admits -- Dormant Gomazoa's Just Spell and Amulet of
+        -- Safekeeping's Nothing, for which Spell is as representative as Ability.
+        -- The controller is bob, an opponent of the targeted alice.
+        TriggerCondition.ControllerBecomesTarget c -> one (GameEvent.BecameTarget (BecameTarget.MkBecameTarget (Recipient.ToPlayer S.alice) arrived (Maybe.fromMaybe StackObjectKind.Spell (ControllerBecomesTarget.kind c)) S.bob))
         -- CR 709.5h's own event, on the BEARER and naming the same door the
         -- condition does, so the pair really matches -- the door below is the one
         -- everyTriggerCondition names.
@@ -9915,7 +9918,12 @@ everyTriggerCondition =
     -- unseen if only rule 702.21a's own Opponent were listed.
     TriggerCondition.SelfBecomesTargeted PlayerRelation.Opponent,
     TriggerCondition.SelfBecomesTargeted PlayerRelation.You,
-    TriggerCondition.ControllerBecomesTargetOfSpell,
+    -- BOTH inhabitants, for the SelfBecomesTargeted pair's reason just above and
+    -- one axis more: the payload narrows on a relation AND on a kind, and the
+    -- arity change alone would leave a single entry compiling. Amulet of
+    -- Safekeeping's pair first, then Dormant Gomazoa's.
+    TriggerCondition.ControllerBecomesTarget (ControllerBecomesTarget.MkControllerBecomesTarget PlayerRelation.Opponent Nothing),
+    TriggerCondition.ControllerBecomesTarget (ControllerBecomesTarget.MkControllerBecomesTarget PlayerRelation.AnyPlayer (Just StackObjectKind.Spell)),
     TriggerCondition.SelfHalfUnlocked (CardName.MkCardName (Text.pack "Steaming Sauna")),
     TriggerCondition.RoomFullyUnlocked PlayerRelation.You,
     -- Balemurk Leech's own pair, and not an arbitrary one: PermanentEnters binds
@@ -11040,6 +11048,152 @@ gomazoaSpec s registry =
           let untapped = S.runPure S.identityAnswer (gs {GameState.activePlayer = S.alice}) (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
           Spec.assertEqWith s "the Gomazoa is still tapped" (tapStateOf gomazoaId untapped) (Just TapState.Tapped)
           Spec.assertEqWith s "and the Piker untapped" (tapStateOf pikerId untapped) (Just TapState.Untapped)
+
+-- CR 601.2c read from the targeted PLAYER's side again, with the two narrowings
+-- Dormant Gomazoa above does not print. Amulet of Safekeeping, {2} Artifact:
+-- "Whenever you become the target of a spell or ability an opponent controls,
+-- counter that spell or ability unless its controller pays {1}. / Creature
+-- tokens get -1/-0."
+--
+-- What is new over the Gomazoa is the whole of the condition's payload: the
+-- ABILITY half of CR 601.2c (its "a spell or ability" narrows to neither limb,
+-- so CR 602.2b's and CR 603.3d's road counts too), and a PlayerRelation over CR
+-- 405.4's controller of the targeting object. On the payload side it is the
+-- first CARD-authored payGate whose payer is a reserved BINDING slot rather than
+-- a target slot -- rule 702.21a's ward mints that shape, and Amulet writes it.
+--
+-- LIFE AND HAND SIZE ARE THE SIGNALS, never a stack height or a graveyard
+-- length: a countered Lightning Bolt is exactly "alice is still at 20", and a
+-- countered discard ability is exactly "alice still holds her card". The stack
+-- and graveyard readings are controls, and they come AFTER.
+--
+-- THREE SEATS: alice controls the Amulet, bob casts everything, and carol is a
+-- targeted player who is neither.
+amuletSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+amuletSpec s registry =
+  let -- Pins every target slot at one recipient AND pays wherever `who` is
+      -- offered a cost. The offered set is FILTERED rather than replaced,
+      -- gomazoaSpec's reason: a leg naming a recipient the engine never offered
+      -- chooses nothing instead of quietly passing a target CR 608.2b's re-read
+      -- would drop.
+      aimedPaying :: Recipient.Recipient -> PlayerId.PlayerId -> Prompt.Prompt r -> r
+      aimedPaying r who p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter (== r) candidates) sets
+        _ -> paysFor who p
+      goblinTokens gs = filter (\oid -> fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack "Goblin Token"))) (Set.toList (GameState.battlefield gs))
+      board = do
+        mountain <- S.printingOf s registry "Mountain"
+        swamp <- S.printingOf s registry "Swamp"
+        island <- S.printingOf s registry "Island"
+        amulet <- S.printingOf s registry "Amulet of Safekeeping"
+        piker <- S.printingOf s registry "Goblin Piker"
+        bolt <- S.printingOf s registry "Lightning Bolt"
+        rats <- S.printingOf s registry "Ravenous Rats"
+        fodder <- S.printingOf s registry "Dragon Fodder"
+        -- bob's five lands cover every leg's spell AND the {1} on top of it:
+        -- {R} plus one for the Bolt, {1}{B} plus one for the Rats, {1}{R} for
+        -- the Fodder. alice's one Mountain covers her own Bolt and nothing else.
+        let g0 = S.landsFor swamp S.bob 2 (S.landsFor mountain S.bob 3 (S.landsFor mountain S.alice 1 S.threePlayerGame))
+            (amuletId, g1) = S.addCreature amulet S.alice g0
+            -- The static leg's other half: a NONTOKEN creature standing beside
+            -- the tokens, which is what makes Filter.IsToken load-bearing.
+            (pikerId, g2) = S.addCreature piker S.bob g1
+            (bobsBolt, g3) = S.addHandCard bolt S.bob g2
+            (ratsId, g4) = S.addHandCard rats S.bob g3
+            (fodderId, g5) = S.addHandCard fodder S.bob g4
+            -- alice's ONE card in hand, which is both the Ravenous Rats leg's
+            -- precondition -- a hand to discard from -- and the relation leg's
+            -- spell.
+            (alicesBolt, g6) = S.addHandCard bolt S.alice g5
+            -- CR 104.3c: nothing here draws, but an empty library is a loss
+            -- waiting for any leg that advances.
+            stocked = List.foldl' (\g pid -> snd (S.addLibraryCard island pid g)) g6 [S.alice, S.bob, S.carol, S.alice, S.bob, S.carol]
+        pure
+          ( amuletId,
+            pikerId,
+            bobsBolt,
+            ratsId,
+            fodderId,
+            alicesBolt,
+            stocked
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.bob,
+                GameState.priority = Just S.bob
+              }
+          )
+      -- Cast one spell at `r`, settle so any trigger reaches the stack, then
+      -- resolve the top under the same answerer. The answerer is written out at
+      -- each use rather than bound once: it is polymorphic in the prompt's
+      -- answer type, and a let-bound copy would be pinned to one.
+      castThenResolve r payer caster oid gs =
+        let onStack = S.runPure (aimedPaying r payer) (S.runPure (aimedPaying r payer) gs (S.cast caster oid)) Engine.settleForPriority
+            ((_, after), transcript) = Replay.record (aimedPaying r payer) onStack Stack.resolveTop
+         in (onStack, after, transcript)
+   in Spec.describe s "CR 601.2c a player becoming the target of a spell OR an ability" $ do
+        -- The positive, and the whole point of the card.
+        Spec.it s "CR 601.2c whole card: an opponent's SPELL naming alice is countered when its controller declines" $ do
+          (_, _, bobsBolt, _, _, _, gs) <- board
+          let (onStack, after, transcript) = castThenResolve (Recipient.ToPlayer S.alice) S.carol S.bob bobsBolt gs
+          Spec.assertEqWith s "CR 701.6a the Bolt never resolved, so alice is still at 20" (S.lifeOf S.alice after) (Just 20)
+          Spec.assertEqWith s "CR 405.4 bob, the Bolt's controller, was asked exactly once and declined" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Declines]
+          -- The controls: the spell really was cast, and the trigger really
+          -- reached the stack over it.
+          Spec.assertEqWith s "the Bolt and the trigger were both on the stack" (length (GameState.stack onStack)) 2
+          Spec.assertEqWith s "CR 701.6a and the countered Bolt is in bob's graveyard" (Seq.length (Map.findWithDefault Seq.empty S.bob (GameState.graveyard after))) 1
+        -- The same board and the same cast as the case above, differing in
+        -- NOTHING but bob's answer.
+        Spec.it s "CR 118.12a paying the {1} leaves the spell to resolve" $ do
+          (_, _, bobsBolt, _, _, _, gs) <- board
+          let atAlice = Recipient.ToPlayer S.alice
+              onStack = S.runPure (aimedPaying atAlice S.bob) (S.runPure (aimedPaying atAlice S.bob) gs (S.cast S.bob bobsBolt)) Engine.settleForPriority
+              ((_, after), transcript) = Replay.record (aimedPaying atAlice S.bob) onStack (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop)
+          Spec.assertEqWith s "the Bolt resolved onto alice" (S.lifeOf S.alice after) (Just 17)
+          Spec.assertEqWith s "bob was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
+        -- The ABILITY half, which is the whole of the payload's `kind = Nothing`
+        -- and the leg Dormant Gomazoa's printing cannot reach: Ravenous Rats'
+        -- SPELL targets nothing, and its CR 603.3d enters trigger targets alice.
+        Spec.it s "CR 113.3 an opponent's ABILITY naming alice is countered too" $ do
+          (_, _, _, ratsId, _, _, gs) <- board
+          let atAlice = Recipient.ToPlayer S.alice
+              entered = S.runPure (aimedPaying atAlice S.carol) (S.runPure (aimedPaying atAlice S.carol) gs (S.cast S.bob ratsId)) Stack.resolveTop
+              triggerOnStack = S.runPure (aimedPaying atAlice S.carol) entered Engine.settleForPriority
+              ((_, after), transcript) = Replay.record (aimedPaying atAlice S.carol) triggerOnStack Stack.resolveTop
+          Spec.assertEqWith s "alice starts with one card in hand" (S.handSize S.alice gs) 1
+          Spec.assertEqWith s "CR 701.6a the discard ability was countered, so alice still holds it" (S.handSize S.alice after) 1
+          Spec.assertEqWith s "bob was asked exactly once, and declined" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Declines]
+          -- The controls that stop this leg passing because nothing happened at
+          -- all: the Rats' SPELL resolved, and its ability really reached the
+          -- stack under the Amulet's trigger.
+          Spec.assertEqWith s "the Rats are on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Ravenous Rats")) S.bob after) 1
+          Spec.assertEqWith s "CR 603.3d the Rats' trigger and the Amulet's were both on the stack" (length (GameState.stack triggerOnStack)) 2
+        -- The RELATION, moved on its own: the same board and the same spell at
+        -- the same seat, differing only in who casts it. CR 405.4's controller
+        -- is then alice herself, whom PlayerRelation.Opponent excludes.
+        Spec.it s "CR 405.4 the Amulet controller's OWN spell naming her fires nothing" $ do
+          (_, _, _, _, _, alicesBolt, gs) <- board
+          let (onStack, after, transcript) = castThenResolve (Recipient.ToPlayer S.alice) S.carol S.alice alicesBolt gs
+          Spec.assertEqWith s "her own Bolt resolved onto her" (S.lifeOf S.alice after) (Just 17)
+          Spec.assertEqWith s "and nobody was offered the {1}" (payResponses transcript) []
+          Spec.assertEqWith s "only the Bolt was on the stack" (length (GameState.stack onStack)) 1
+        -- The RECIPIENT, moved on its own: the same cast by the same player, one
+        -- seat over. CR 109.5's "you" is the Amulet's controller, and carol is
+        -- neither that nor the caster.
+        Spec.it s "CR 109.5 an opponent's spell naming ANOTHER player fires nothing" $ do
+          (_, _, bobsBolt, _, _, _, gs) <- board
+          let (onStack, after, transcript) = castThenResolve (Recipient.ToPlayer S.carol) S.carol S.bob bobsBolt gs
+          Spec.assertEqWith s "the Bolt resolved onto carol" (S.lifeOf S.carol after) (Just 17)
+          Spec.assertEqWith s "and alice is untouched" (S.lifeOf S.alice after) (Just 20)
+          Spec.assertEqWith s "and nobody was offered the {1}" (payResponses transcript) []
+          Spec.assertEqWith s "only the Bolt was on the stack" (length (GameState.stack onStack)) 1
+        -- The card's second line, CR 111.6 read through CR 613.1g's layer 7:
+        -- Dragon Fodder's two 1/1 Goblin TOKENS against a nontoken Goblin Piker
+        -- standing on the same board. CR 704.5f does not reach the tokens -- a
+        -- 0/1 is alive -- so this stays a power/toughness reading.
+        Spec.it s "CR 111.6 creature TOKENS get -1/-0 and nontoken creatures do not" $ do
+          (_, pikerId, _, _, fodderId, _, gs) <- board
+          let resolved = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast S.bob fodderId)) Stack.resolveTop
+          Spec.assertEqWith s "CR 613.1g the two Goblin tokens are 0/1" (fmap (\oid -> S.powerToughnessOf oid resolved) (goblinTokens resolved)) [Just (0, 1), Just (0, 1)]
+          Spec.assertEqWith s "and the nontoken Piker is untouched" (S.powerToughnessOf pikerId resolved) (Just (2, 1))
 
 -- The CR 603.5 "may" answers in a transcript, in order -- paysFor's
 -- payResponses one Response constructor over. A transcript with no
@@ -13922,6 +14076,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   fabricateSpec s registry
   wardSpec s registry
   gomazoaSpec s registry
+  amuletSpec s registry
   soulshiftSpec s registry
   hauntSpec s registry
   strippedTriggerSpec s registry
