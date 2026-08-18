@@ -504,6 +504,8 @@ library codec
     Pawl.Codec.SpellCastSpec
     Pawl.Codec.SpellWasCast
     Pawl.Codec.SpellWasCastSpec
+    Pawl.Codec.SpendManaAsThough
+    Pawl.Codec.SpendManaAsThoughSpec
     Pawl.Codec.StackObjectKind
     Pawl.Codec.StackObjectKindSpec
     Pawl.Codec.StaticAbility
@@ -1162,6 +1164,7 @@ library types
     Pawl.Types.SpeedDecrease
     Pawl.Types.SpellCast
     Pawl.Types.SpellWasCast
+    Pawl.Types.SpendManaAsThough
     Pawl.Types.StackObjectKind
     Pawl.Types.StaticAbility
     Pawl.Types.Status

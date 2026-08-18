@@ -26,6 +26,85 @@
         }
       ],
       "name": "Celestial Dawn",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "SpendManaAsThough",
+            "value": {
+              "asThough": [
+                {
+                  "type": "Colored",
+                  "value": {
+                    "type": "White"
+                  }
+                },
+                {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Blue"
+                  }
+                },
+                {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Black"
+                  }
+                },
+                {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Red"
+                  }
+                },
+                {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Green"
+                  }
+                }
+              ],
+              "only": false,
+              "which": {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "White"
+                  }
+                }
+              }
+            }
+          },
+          "scope": {
+            "type": "You"
+          }
+        },
+        {
+          "effect": {
+            "type": "SpendManaAsThough",
+            "value": {
+              "asThough": [
+                {
+                  "type": "Colorless"
+                }
+              ],
+              "only": true,
+              "which": {
+                "type": "NotOfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "White"
+                  }
+                }
+              }
+            }
+          },
+          "scope": {
+            "type": "You"
+          }
+        }
+      ],
       "staticAbilities": [
         {
           "affected": {

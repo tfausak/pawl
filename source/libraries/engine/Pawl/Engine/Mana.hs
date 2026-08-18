@@ -14,6 +14,7 @@ import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.ManaAbility as ManaAbility
+import qualified Pawl.Engine.ManaFilter as ManaFilter
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
@@ -54,6 +55,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
 import Pawl.Types.Subtype (Subtype)
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -435,6 +437,62 @@ supplyOf unit =
       supplyTags = ManaUnit.tags unit
     }
 
+-- CR 609.4b, applied to ONE mana type: what a mana of this type may be spent as
+-- under a player's continuous effects (Celestial Dawn). The mana's own type when
+-- nothing speaks about it.
+--
+-- THE SUPPLY SIDE, which is what makes this a different function from `relax`
+-- rather than a constructor of ManaSpending. Rule 118.14's permission is about a
+-- COST and so is applied to that cost's demands; this one is about a MANA, and
+-- says different things about two manas of one pool -- "you may spend white mana
+-- as though it were mana of any color. You may spend other mana only as though it
+-- were colorless mana". No transform of a demand can depend on which unit is
+-- being spent.
+--
+-- CR 609.4b's limit is respected the same way `relax` respects it: the pool is
+-- not rewritten, so what was actually spent is still whatever the units are, and
+-- the ManaCost is not rewritten either. Only the question "could this one mana
+-- serve that one demand?" changes.
+--
+-- The clause's own set REPLACES the mana's type when the clause says "only", and
+-- is added to it otherwise (Pawl.Types.SpendManaAsThough.only). Celestial Dawn's
+-- restriction is the first case -- a red mana under it can pay {1} and {C} and no
+-- longer {R} -- and its permission is the second, though nothing observes the
+-- difference there, since "mana of any color" already contains white.
+--
+-- A UNION over the applicable clauses, with no CR 613.11 timestamp ordering,
+-- because a union has nothing to order: two clauses that permit different types
+-- are not in conflict, so neither running first changes the answer. Two clauses
+-- that both said "only" of the same mana would each be permitting what the other
+-- forbids, and the union is the reading that keeps CR 101.2 out of it -- an
+-- "only" clause names types the mana may be spent as rather than saying "can't".
+-- No printing pairs them, so no board tells that reading from another.
+spendableAs :: [SpendManaAsThough.SpendManaAsThough] -> ManaType -> Set.Set ManaType
+spendableAs clauses manaType =
+  case filter (\clause -> ManaFilter.matchesType (SpendManaAsThough.which clause) manaType) clauses of
+    [] -> Set.singleton manaType
+    applicable ->
+      Set.unions
+        ( [Set.singleton manaType | not (any SpendManaAsThough.only applicable)]
+            <> fmap SpendManaAsThough.asThough applicable
+        )
+
+-- The same, applied to a whole supply: every type it could be becomes every type
+-- that one could be spent as.
+--
+-- Per TYPE and then unioned, which is exact for the open case `sourceOptions`
+-- builds: a source that could make any colour is a real choice, so under
+-- Celestial Dawn it can make white and spend it as any colour, or make red and
+-- spend it as colorless, and the union is the set of demands it could serve.
+--
+-- The TAGS ride through untouched, CR 107.4h's reason and the same one `relax`
+-- gives: a clause about which types a mana may be spent as says nothing about
+-- where it came from, so a snow demand still wants a snow supply.
+rewriteSupply :: [SpendManaAsThough.SpendManaAsThough] -> Supply -> Supply
+rewriteSupply clauses supply = case clauses of
+  [] -> supply
+  _ -> supply {supplyTypes = Set.unions (fmap (spendableAs clauses) (Set.toList (supplyTypes supply)))}
+
 -- A demand for one mana of one of these types, however it was produced -- every
 -- TYPED symbol but CR 107.4h's {S}. A symbol demanding no particular mana
 -- (Generic, and either symbol's second way) builds no demand at all.
@@ -584,11 +642,16 @@ substituteX x (ManaCost.MkManaCost symbols) =
 
 -- Every way to remove one unit that satisfies `wanted`, one result per candidate
 -- unit. The branching point of the search below.
-removals :: Demand -> [ManaUnit] -> [[ManaUnit]]
-removals wanted units = Maybe.mapMaybe without (zip [0 :: Int ..] units)
+--
+-- The CLAUSES are the payer's CR 609.4b permissions, threaded from the caller
+-- rather than read off a board because this helper has neither a player nor a
+-- state. Pawl.Engine.Cost.payMana resolves them from the board once per pass and
+-- hands them down through `spend`; empty is the ordinary board.
+removals :: [SpendManaAsThough.SpendManaAsThough] -> Demand -> [ManaUnit] -> [[ManaUnit]]
+removals clauses wanted units = Maybe.mapMaybe without (zip [0 :: Int ..] units)
   where
     without (i, u) =
-      if serves (supplyOf u) wanted
+      if serves (rewriteSupply clauses (supplyOf u)) wanted
         then Just (take i units <> drop (i + 1) units)
         else Nothing
 
@@ -602,11 +665,11 @@ removals wanted units = Maybe.mapMaybe without (zip [0 :: Int ..] units)
 -- that covers the rest. A mana cost is a handful of symbols, so the search is
 -- trivially small, and being exact means canPay's Hall condition and this never
 -- disagree about whether a cost is payable.
-spendDemands :: [ManaUnit] -> [Demand] -> Maybe [ManaUnit]
-spendDemands units demands = case demands of
+spendDemands :: [SpendManaAsThough.SpendManaAsThough] -> [ManaUnit] -> [Demand] -> Maybe [ManaUnit]
+spendDemands clauses units demands = case demands of
   [] -> Just units
   wanted : rest ->
-    Maybe.listToMaybe (Maybe.mapMaybe (\left -> spendDemands left rest) (removals wanted units))
+    Maybe.listToMaybe (Maybe.mapMaybe (\left -> spendDemands clauses left rest) (removals clauses wanted units))
 
 takeAny :: [ManaUnit] -> a -> Maybe [ManaUnit]
 takeAny units _ = case units of
@@ -637,11 +700,11 @@ takeAny units _ = case units of
 -- at all. payCost passes `lifeNeeded`, the least life any PAYABLE resolution
 -- costs, so a cost the board can pay with mana is capped at zero life and the
 -- loop is forced to tap for it.
-spend :: ManaSpending -> Natural -> ManaCost -> Mana -> Maybe (Mana, Natural)
-spend spending budget cost (Mana.MkMana units) =
+spend :: [SpendManaAsThough.SpendManaAsThough] -> ManaSpending -> Natural -> ManaCost -> Mana -> Maybe (Mana, Natural)
+spend clauses spending budget cost (Mana.MkMana units) =
   let attempt (demands, generic, life) = do
         Monad.guard (life <= budget)
-        afterTyped <- spendDemands units demands
+        afterTyped <- spendDemands clauses units demands
         left <- Monad.foldM takeAny afterTyped [1 .. generic]
         pure (Mana.MkMana left, life)
    in Maybe.listToMaybe (Maybe.mapMaybe attempt (resolutions spending cost))
@@ -957,12 +1020,12 @@ canPayCommittingGiven capacity spending sources pcs pid committed claimed cost g
 -- The TAGS mix by union, and there too the union is exact: manaOptionsOfGiven
 -- stamps one tag set on every unit of every yield of a source, because CR 106.3
 -- makes them all facts about that one source.
-sourceOptions :: [(Activations.Activations, Mana)] -> [([Supply], [Claim], Natural)]
-sourceOptions supplies =
+sourceOptions :: [SpendManaAsThough.SpendManaAsThough] -> [(Activations.Activations, Mana)] -> [([Supply], [Claim], Natural)]
+sourceOptions clauses supplies =
   let unitLists = [(activations, unitsOf yield) | (activations, yield) <- supplies]
       (narrow, wide) = List.partition (\(_, units) -> length units <= 1) unitLists
       grouped = [(activations, collapsed units) | (activations, units) <- Map.toList (Map.fromListWith (<>) narrow)]
-      apart = [(activations, fmap supplyOf units) | (activations, units) <- wide]
+      apart = [(activations, fmap (rewriteSupply clauses . supplyOf) units) | (activations, units) <- wide]
    in List.nub (concatMap optionsFor (grouped <> apart))
   where
     optionsFor (activations, offered) =
@@ -976,10 +1039,12 @@ sourceOptions supplies =
       if null units
         then []
         else
-          [ MkSupply
-              { supplyTypes = Set.fromList (fmap ManaUnit.manaType units),
-                supplyTags = Set.unions (fmap ManaUnit.tags units)
-              }
+          [ rewriteSupply
+              clauses
+              MkSupply
+                { supplyTypes = Set.fromList (fmap ManaUnit.manaType units),
+                  supplyTags = Set.unions (fmap ManaUnit.tags units)
+                }
           ]
 
 -- The resolutions of `cost` this player could actually pay right now, in
@@ -1110,8 +1175,14 @@ payableResolutions capacity spending pid committed claimed cost gs =
 payableResolutionsGiven :: Capacity -> ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
 payableResolutionsGiven capacity spending sources pcs pid committed claimed cost gs =
   let Mana.MkMana units = Game.poolOf pid gs
-      pooled = fmap supplyOf units
-      options = fmap (\oid -> sourceOptions (manaSuppliesGiven capacity pcs pid oid gs)) sources
+      -- CR 609.4b, resolved ONCE for this whole question and applied to both
+      -- halves of the board: a rewrite reaching the pool but not the untapped
+      -- sources (or the other way round) would make this disagree with `spend`
+      -- about what is payable, and the symptom is an action the engine offers and
+      -- then cannot pay.
+      clauses = PlayerEffect.spendManaAsThough pid gs
+      pooled = fmap (rewriteSupply clauses . supplyOf) units
+      options = fmap (\oid -> sourceOptions clauses (manaSuppliesGiven capacity pcs pid oid gs)) sources
       -- One option taken from each source, appended to the pool: `sequenceA` over
       -- the list applicative is that product, and it is [[]] -- one board, the
       -- pool alone -- when the player controls no source at all. Each board

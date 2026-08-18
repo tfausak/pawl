@@ -2507,6 +2507,155 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   burningTreeSpec s registry
   shizukoSpec s registry
   quirionSpec s registry
+  celestialDawnSpec s registry
+
+-- One mana of one type carrying no production tag: what a basic land really puts
+-- in a pool, and the unit the Celestial Dawn cases below seat directly.
+plainOf :: ManaType.ManaType -> ManaUnit.ManaUnit
+plainOf manaType = ManaUnit.MkManaUnit {ManaUnit.manaType = manaType, ManaUnit.tags = Set.empty}
+
+-- A cost of exactly one symbol, so a payability answer is about that symbol and
+-- nothing else.
+oneSymbol :: ManaSymbol.ManaSymbol -> ManaCost.ManaCost
+oneSymbol symbol = ManaCost.MkManaCost [symbol]
+
+-- Alice's board with Celestial Dawn out and `units` seated in her pool, paired
+-- with the same board WITHOUT the enchantment. Every case below reads both, so
+-- each answer is a pair of boards differing in exactly one permanent.
+dawnBoards :: Printing.Printing -> [ManaUnit.ManaUnit] -> (GameState.GameState, GameState.GameState)
+dawnBoards dawn units =
+  let seated = Mana.setPool S.alice (Mana.Type.MkMana units) (Setup.emptyGame S.bothPlayers)
+   in (snd (S.addCreature dawn S.alice seated), seated)
+
+-- Can this player pay this cost on this board? The payABILITY half; the cases
+-- that also drive a payment say so.
+payable :: PlayerId.PlayerId -> ManaCost.ManaCost -> GameState.GameState -> Bool
+payable = Mana.canPay Cost.manaActivations
+
+-- CR 609.4b: "If an effect allows a player to spend mana 'as though it were mana
+-- of any [type or color],' this affects only how the player may pay a cost. It
+-- doesn't change that cost, and it doesn't change what mana was actually spent to
+-- pay that cost."
+--
+-- Celestial Dawn's third sentence prints that rule as a CR 613.11 continuous
+-- effect on a PLAYER: "You may spend white mana as though it were mana of any
+-- color. You may spend other mana only as though it were colorless mana." Both halves are here because they land together -- the
+-- permission alone would leave the card more permissive than printed, which is
+-- what pawl's Celestial Dawn used to be.
+--
+-- Every case is a PAIR of boards differing only in whether the enchantment is
+-- out, because a payability answer on one board passes for reasons nobody chose.
+-- The pool is seated directly rather than tapped for: Celestial Dawn's own first
+-- clause makes every land alice controls a Plains, so a non-white mana cannot
+-- come off a land she controls at all, and a fixture that forgot it would assert
+-- about white mana twice.
+celestialDawnSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+celestialDawnSpec s registry = Spec.describe s "Celestial Dawn" $ do
+  -- The permission, at the level a player sees it: the mana is spent and the
+  -- pool is one unit shorter. Payability is asserted beside it, because
+  -- Pawl.Engine.Mana keeps `canPay`'s Hall condition and `spend`'s exact search
+  -- in agreement through one `serves`, and a supply rewrite applied to only one
+  -- of them would offer a cast it then could not pay.
+  Spec.it s "CR 609.4b white mana pays a {U} cost" $ do
+    dawn <- S.printingOf s registry "Celestial Dawn"
+    let (with, without) = dawnBoards dawn [plainOf (ManaType.Colored Color.White)]
+        blue = oneSymbol (ManaSymbol.OfType (ManaType.Colored Color.Blue))
+    Spec.assertBool s (payable S.alice blue with) "under Celestial Dawn the {U} cost is payable"
+    Spec.assertBool s (not (payable S.alice blue without)) "and without it the same white mana cannot"
+    let (paid, after) = S.runPureWith S.identityAnswer with (Cost.payMana ManaSpending.AsProduced S.alice blue)
+    Spec.assertBool s paid "the payment goes through, not merely the gate"
+    Spec.assertEqWith s "and it spent the white unit" (poolUnits after) []
+
+  -- The half that makes the issue rules-correctness rather than a gap: before
+  -- this, alice's red mana paid a {R} cost, which the card forbids. The generic
+  -- leg is the control -- "other mana" is still mana, so {1} is still payable --
+  -- and the seated unit's own type is asserted so the case cannot pass by having
+  -- seated white mana after all.
+  Spec.it s "CR 609.4b non-white mana is spendable only as colorless" $ do
+    dawn <- S.printingOf s registry "Celestial Dawn"
+    let red = plainOf (ManaType.Colored Color.Red)
+        (with, without) = dawnBoards dawn [red]
+        redCost = oneSymbol (ManaSymbol.OfType (ManaType.Colored Color.Red))
+        colorless = oneSymbol (ManaSymbol.OfType ManaType.Colorless)
+    Spec.assertEqWith s "the seated unit really is red" (poolUnits with) [red]
+    Spec.assertBool s (not (payable S.alice redCost with)) "under Celestial Dawn the {R} cost is not payable"
+    Spec.assertBool s (payable S.alice redCost without) "and without it the same mana pays it"
+    Spec.assertBool s (payable S.alice colorless with) "the same red mana pays {C}, which is what it may be spent as"
+    Spec.assertBool s (payable S.alice (oneSymbol (ManaSymbol.Generic 1)) with) "and {1}, which CR 107.4b lets any mana pay"
+    let (paid, _) = S.runPureWith S.identityAnswer with (Cost.payMana ManaSpending.AsProduced S.alice redCost)
+    Spec.assertBool s (not paid) "the payment fails too, not only the gate"
+
+  -- CR 609.4b's wording is "mana of any COLOR", which is CR 106.1a's five and not
+  -- CR 106.1b's six. The white mana that pays any coloured cost still cannot pay
+  -- CR 107.4c's {C}.
+  Spec.it s "CR 106.1a any COLOR is five types, so white mana still cannot pay {C}" $ do
+    dawn <- S.printingOf s registry "Celestial Dawn"
+    let (with, _) = dawnBoards dawn [plainOf (ManaType.Colored Color.White)]
+        colorless = oneSymbol (ManaSymbol.OfType ManaType.Colorless)
+        green = oneSymbol (ManaSymbol.OfType (ManaType.Colored Color.Green))
+    Spec.assertBool s (payable S.alice green with) "the fifth colour is payable"
+    Spec.assertBool s (not (payable S.alice colorless with)) "and {C} is not"
+
+  -- CR 107.4h: the {S} symbol constrains where a mana came from, and CR 609.4b
+  -- speaks only of types and colors. So the clause widens what a mana may be
+  -- spent AS without making a nonsnow mana snow.
+  Spec.it s "CR 107.4h the clause does not make a nonsnow white mana pay {S}" $ do
+    dawn <- S.printingOf s registry "Celestial Dawn"
+    let snowWhite = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.White, ManaUnit.tags = Set.singleton ProductionTag.Snow}
+        (plainBoard, _) = dawnBoards dawn [plainOf (ManaType.Colored Color.White)]
+        (snowBoard, _) = dawnBoards dawn [snowWhite]
+    Spec.assertBool s (not (payable S.alice snowCost plainBoard)) "the nonsnow white mana does not pay {S}"
+    Spec.assertBool s (payable S.alice snowCost snowBoard) "and the snow one does, so the tags rode through"
+
+  -- CR 613.11 through the carrier's PlayerScope.You: "you may spend" is one
+  -- player's permission, and a rewrite applied to the table would be invisible on
+  -- a one-seat board. Bob's board is alice's with the pool seated under him
+  -- instead, so the two differ only in whose mana it is.
+  Spec.it s "CR 613.11 only Celestial Dawn's controller spends mana that way" $ do
+    dawn <- S.printingOf s registry "Celestial Dawn"
+    let red = plainOf (ManaType.Colored Color.Red)
+        white = plainOf (ManaType.Colored Color.White)
+        seat pid units = snd (S.addCreature dawn S.alice (Mana.setPool pid (Mana.Type.MkMana units) (Setup.emptyGame S.bothPlayers)))
+        redCost = oneSymbol (ManaSymbol.OfType (ManaType.Colored Color.Red))
+        blue = oneSymbol (ManaSymbol.OfType (ManaType.Colored Color.Blue))
+    Spec.assertBool s (payable S.bob redCost (seat S.bob [red])) "bob's red mana still pays {R}"
+    Spec.assertBool s (not (payable S.alice redCost (seat S.alice [red]))) "where alice's does not"
+    Spec.assertBool s (not (payable S.bob blue (seat S.bob [white]))) "and bob's white mana does not pay {U}"
+    Spec.assertBool s (payable S.alice blue (seat S.alice [white])) "where alice's does"
+
+  -- CR 613.11 covers every cost this player pays, not only a spell's. Nothing in
+  -- Pawl.Engine.Activate threads the clause -- the rewrite is read off the board
+  -- inside the payability and payment funnels -- so an activation is covered by
+  -- construction, and this is the case that says so rather than the PR body.
+  -- Nessian Asp's monstrosity costs {6}{G}, which seven white mana pay only under
+  -- the enchantment.
+  Spec.it s "CR 613.11 the clause reaches an activated ability's cost" $ do
+    dawn <- S.printingOf s registry "Celestial Dawn"
+    asp <- S.printingOf s registry "Nessian Asp"
+    let seated = Mana.setPool S.alice (Mana.Type.MkMana (replicate 7 (plainOf (ManaType.Colored Color.White)))) (Setup.emptyGame S.bothPlayers)
+        (aspId, without) = S.addCreature asp S.alice seated
+        with = snd (S.addCreature dawn S.alice without)
+        canActivate gs = any (\ability -> Activate.activatable S.alice aspId ability gs) (Activate.abilitiesFor aspId gs)
+    Spec.assertBool s (canActivate with) "under Celestial Dawn seven white mana pay the {6}{G}"
+    Spec.assertBool s (not (canActivate without)) "and without it the same seven cannot"
+
+  -- The BOARD side of the same question. Pawl.Engine.Mana models an untapped
+  -- source as a supply of what it could produce, on a path that never touches the
+  -- pool, so a rewrite applied to the pool alone answers this one wrongly -- and
+  -- the symptom would be a cast offered and then unpayable. Celestial Dawn's own
+  -- first clause supplies the fixture: alice's Forest is a Plains and taps for
+  -- white.
+  Spec.it s "CR 609.4b an untapped land alice controls pays a {U} cost too" $ do
+    dawn <- S.printingOf s registry "Celestial Dawn"
+    forest <- S.printingOf s registry "Forest"
+    let land = S.landsInPlay forest 1
+        with = snd (S.addCreature dawn S.alice land)
+        blue = oneSymbol (ManaSymbol.OfType (ManaType.Colored Color.Blue))
+    Spec.assertBool s (payable S.alice blue with) "the Forest-turned-Plains pays {U}"
+    Spec.assertBool s (not (payable S.alice blue land)) "and without the enchantment it pays neither {U} nor, being a Forest, white"
+    let (paid, after) = S.runPureWith S.identityAnswer with (Cost.payMana ManaSpending.AsProduced S.alice blue)
+    Spec.assertBool s paid "and the payment really taps it"
+    Spec.assertEqWith s "with nothing left floating" (poolSize S.alice after) 0
 
 -- Icehide Golem's whole printed cost. Restated rather than read off the card,
 -- for the reason javelinCost gives; Pawl.CardsSpec pins it against
@@ -2608,12 +2757,12 @@ snowSpec s registry = Spec.describe s "Snow" $ do
     Spec.assertEqWith
       s
       "snow first"
-      (Mana.spend ManaSpending.AsProduced 0 snowCost (Mana.Type.MkMana [snowRed, plainRed]))
+      (Mana.spend [] ManaSpending.AsProduced 0 snowCost (Mana.Type.MkMana [snowRed, plainRed]))
       (Just (Mana.Type.MkMana [plainRed], 0))
     Spec.assertEqWith
       s
       "snow last"
-      (Mana.spend ManaSpending.AsProduced 0 snowCost (Mana.Type.MkMana [plainRed, snowRed]))
+      (Mana.spend [] ManaSpending.AsProduced 0 snowCost (Mana.Type.MkMana [plainRed, snowRed]))
       (Just (Mana.Type.MkMana [plainRed], 0))
 
   -- CR 202.2d's colour-granting list names the hybrid and Phyrexian symbols and
@@ -2958,7 +3107,7 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
      in Spec.assertEqWith
           s
           "the {R} is spent and both {C} remain -- the other half would spend both {C} and leave the {R}"
-          (Mana.spend ManaSpending.AsProduced 0 (ManaCost.MkManaCost [twoOrRed]) (Mana.Type.MkMana [red, colorless, colorless]))
+          (Mana.spend [] ManaSpending.AsProduced 0 (ManaCost.MkManaCost [twoOrRed]) (Mana.Type.MkMana [red, colorless, colorless]))
           (Just (Mana.Type.MkMana [colorless, colorless], 0))
 
   -- CR 601.2b: "If a cost that will be paid as the spell is being cast

@@ -30,5 +30,13 @@ spec s = Spec.describe s "Pawl.Codec.ManaFilter" $ do
       ManaFilter.codec
       (ManaFilter.OfType ManaType.Colorless)
       " {\"type\":\"OfType\",\"value\":{\"type\":\"Colorless\"}} "
+  -- Celestial Dawn's "other mana", the complement of the type its first clause
+  -- named.
+  Spec.it s "NotOfType" $
+    Common.assertCodec
+      s
+      ManaFilter.codec
+      (ManaFilter.NotOfType (ManaType.Colored Color.White))
+      " {\"type\":\"NotOfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"White\"}}} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s ManaFilter.codec

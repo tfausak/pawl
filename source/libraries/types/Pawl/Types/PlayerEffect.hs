@@ -10,6 +10,7 @@ import qualified Pawl.Types.ManaFilter as ManaFilter
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
+import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
 
 -- | CR 611.1's third clause: a continuous effect affecting players or the rules
 -- of the game rather than the characteristics of an object. The player analogue
@@ -207,6 +208,31 @@ data PlayerEffect
     -- is not a player-axis property at all and so is not reachable by widening
     -- this filter (#352).
     DontLoseUnspentMana ManaFilter.ManaFilter
+  | -- | CR 609.4b / 613.11 / Celestial Dawn: this player may spend the mana the
+    -- payload's filter names as though it were mana of the types the payload
+    -- names.
+    --
+    -- A PLAYER-AXIS continuous effect, where Pawl.Types.ManaSpending is CR
+    -- 118.14's per-cost one. Rule 118.14's last sentence scopes that permission
+    -- to the spells cast under the effect that granted it, so it rides
+    -- Pawl.Types.ExilePlayPermission; Celestial Dawn grants no cast permission
+    -- and covers every cost its controller pays, which is this carrier.
+    --
+    -- The SUPPLY side and not the demand side, which is why the two cannot be
+    -- one type. Pawl.Engine.Mana.relax applies a ManaSpending to a cost's
+    -- DEMANDS -- "this cost accepts anything" -- and a transform of a demand
+    -- cannot depend on which unit is being spent. Celestial Dawn's sentence says
+    -- different things about two manas of one pool, so it is applied to the
+    -- SUPPLY each unit offers (Pawl.Engine.Mana.rewriteSupply).
+    --
+    -- ONE clause per entry, so Celestial Dawn writes two: the permission over
+    -- white and the restriction over "other mana". That is how the card prints
+    -- them, and it keeps the payload from encoding one card's sentence
+    -- structure.
+    --
+    -- WHOSE mana is the carrier's PlayerScope, as for every arm here --
+    -- Celestial Dawn says "you may spend" and so writes PlayerScope.You.
+    SpendManaAsThough SpendManaAsThough.SpendManaAsThough
   | -- | CR 702.18a / 702.11c: this player can't be the target of spells or
     -- abilities controlled by the players the scope names. Ivory Mask ("You have
     -- shroud") and Leyline of Sanctity ("You have hexproof") are the two
