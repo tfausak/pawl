@@ -1128,12 +1128,13 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
         Spec.assertEqWith s "CR 109.5 and stayed tapped" (fmap Object.tapped (Game.lookupObject morphling after)) (Just TapState.Tapped)
         Spec.assertEqWith s "as did the Pine Walker" (fmap Object.tapped (Game.lookupObject watcher after)) (Just TapState.Tapped)
 
-  -- CR 708.8's last sentence for the new payload: an Ainok Tracker cast FACE UP
-  -- was never turned face up, so alice's Pine Walker untaps nothing. The pair to
-  -- the Farseer case one group up, and the leg that rules out a matcher that
-  -- fired on a battlefield ENTRY -- which the case above cannot, its subject
-  -- having entered face down on the same board.
-  Spec.it s "CR 708.8 Pine Walker does not untap a creature cast face up" $ do
+  -- CR 708.7 for the new payload: turning face up is something only a FACE-DOWN
+  -- permanent can be doing, so an Ainok Tracker cast face up was never turned
+  -- over and alice's Pine Walker untaps nothing. The pair to the Farseer case
+  -- just above, and the leg that rules out a matcher that fired on a battlefield
+  -- ENTRY -- which the positive case cannot, its subject having entered face down
+  -- on the same board.
+  Spec.it s "CR 708.7 Pine Walker does not untap a creature cast face up" $ do
     mountain <- S.printingOf s registry "Mountain"
     ainok <- S.printingOf s registry "Ainok Tracker"
     walker <- S.printingOf s registry "Pine Walker"
@@ -1196,7 +1197,7 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
 -- real negative rather than a permanent that was not there yet.
 --
 -- The watcher's CONTROLLER is a parameter because CR 109.5 is what the Pine
--- Walker pair below turns on: the same board with the watcher under bob is the
+-- Walker pair above turns on: the same board with the watcher under bob is the
 -- negative, differing from the positive in exactly that one thing. The morph cast
 -- stays alice's either way (castAndResolve is hers).
 farseerBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> Int -> Maybe (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
