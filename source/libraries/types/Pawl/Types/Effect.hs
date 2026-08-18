@@ -771,8 +771,8 @@ data Effect card
     --
     -- An ObjectRef, the same one DealDamage takes, because CR 115.4's "any target"
     -- reaches a PLAYER and only Resolve.objectRefRecipients answers in that
-    -- vocabulary. One shield per recipient (CR 615.11's shape for free, though no
-    -- card in the pool names more than one).
+    -- vocabulary. One shield per recipient (CR 615.11's shape for free), though
+    -- no card in the pool names more than one (gap #1108).
     --
     -- NOT a Replace carrying a DamageR, for exactly SkipNextPhase's reason: the
     -- pattern must name the shielded permanent or player, known only at
