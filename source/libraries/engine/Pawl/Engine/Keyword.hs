@@ -1191,62 +1191,42 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Persist -> []
   Keyword.Undying -> []
 
--- CR 702.136a again, in the SHORT-CIRCUIT's voice:
--- Pawl.Engine.Projection.replacementsAffecting skips the whole board when no
--- permanent's BASE card could hold a replacement effect, and a riot row is minted
--- from the projection rather than printed in a face's list -- so, like the
--- planeswalker disjunct beside it, the gate has to be told which keywords mint
--- one.
---
--- Membership rather than a count, because the gate asks whether there is any.
---
--- CR 702.37b's megamorph row is behind the same gate, and needs it as much as
--- riot does: FaceDown.turnFaceUp raises its event against a board whose only
--- replacement effect may be the minted one, so a gate that answered False for
--- megamorph would collect nothing and put no counter on.
+-- The SHORT-CIRCUIT's voice: Projection.replacementsAffecting skips the whole
+-- board when no permanent's BASE card could hold a replacement effect, and a
+-- minted row is not printed in a face's list, so the gate has to be told which
+-- keywords mint one. Membership rather than a count, the gate asking whether
+-- there is any.
 mintsReplacement :: Keyword -> Bool
 mintsReplacement keyword = not (null (mintedReplacementsFor keyword 1))
 
 -- CR 508.1c / CR 509.1b: every combat restriction rule 702 gives an object for
--- holding a keyword. Pawl.Engine.CombatRestriction.inForce adds these to the ones
--- a face PRINTS, which until unleash were the only ones there were.
+-- holding a keyword. CombatRestriction.inForce adds these to the ones a face
+-- PRINTS.
 --
--- The FOURTH mint point, beside `abilitiesFor`, `battlefieldAbilitiesFor` and
--- `mintedReplacementsFor`, rather than an arm of one of those: a combat
--- restriction is not an ability object at all -- nothing puts it on the stack and
--- nothing activates it -- and it is not a replacement, since it rewrites no
--- event. It is a fact CR 613.11 has a reader ask about, which is what the three
--- printed-restriction siblings are too.
+-- Its own mint point rather than an arm of the three above: a combat restriction
+-- is not an ability object -- nothing puts it on the stack -- and rewrites no
+-- event. It is a fact CR 613.11 has a reader ask about.
 --
--- MEMBERSHIP and not the per-keyword count `mintedReplacementsOf` takes: a
--- restriction is read by asking whether the creature is in the forbidden set, so
--- a second copy of "can't block" forbids nothing further.
+-- MEMBERSHIP and not a per-keyword count: a restriction is read by asking whether
+-- the creature is in the forbidden set, so a second copy forbids nothing further.
 mintedCombatRestrictionsOf :: Map Keyword Natural -> [CombatRestriction.CombatRestriction]
 mintedCombatRestrictionsOf = concatMap mintedCombatRestrictionsFor . Map.keys
 
--- Exhaustive for `abilitiesFor`'s reason: rule 702 keeps adding abilities that
--- forbid an attack or a block, and the next one must break this build rather than
--- silently forbid nothing.
+-- Exhaustive for `abilitiesFor`'s reason: the next keyword that forbids an attack
+-- or a block must break this build rather than silently forbid nothing.
 mintedCombatRestrictionsFor :: Keyword -> [CombatRestriction.CombatRestriction]
 mintedCombatRestrictionsFor keyword = case keyword of
   -- CR 702.98a's SECOND static ability: "This permanent can't block as long as it
   -- has a +1/+1 counter on it."
   --
-  -- The counter clause rides the AFFECTED SET rather than the gate beside it,
-  -- because the two have opposite polarity: CR 509.1b's gate is the condition a
+  -- The counter clause rides the AFFECTED SET rather than the `unless` gate beside
+  -- it, the two having opposite polarity: CR 509.1b's gate is the condition a
   -- creature can't block UNLESS, and this is a condition it can't block WHILE. An
-  -- affected set is re-derived every read (Pawl.Types.Affected), so a counter
-  -- arriving or leaving is seen at the next declaration with nothing to unwind --
-  -- which is also rule 702.98a's "as long as".
+  -- affected set is re-derived every read, which is also rule 702.98a's "as long
+  -- as".
   --
   -- ANY +1/+1 counter, not the one unleash's own entry replacement may have
-  -- placed: rule 702.98a says "a +1/+1 counter", so a counter from anywhere shuts
-  -- blocking off.
-  --
-  -- CR 702.3b's defender is the keyword that does NOT come through here, and the
-  -- difference is the gate: "a creature with defender can't attack" is
-  -- unconditional, so Pawl.Engine.Combat reads the keyword directly and needs no
-  -- carrier.
+  -- placed: rule 702.98a says "a +1/+1 counter".
   Keyword.Unleash ->
     [ CombatRestriction.CantBlock
         AffectedUnless.MkAffectedUnless
@@ -1321,10 +1301,8 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Rampage _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
-  -- CR 702.147a's static half: "This creature can't block." Unleash's row above
-  -- with the counter clause and nothing else removed -- rule 702.147a states the
-  -- restriction flat, so the affected set is the source alone and the CR 509.1b
-  -- "unless" gate is Nothing.
+  -- CR 702.147a's static half: "This creature can't block." Unleash's row with the
+  -- counter clause removed, rule 702.147a stating the restriction flat.
   Keyword.Decayed -> [CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless (Affected.Matching Filter.IsSource) Nothing)]
   Keyword.Training -> []
   Keyword.Toxic _ -> []
@@ -1352,17 +1330,14 @@ mintsCombatRestriction = not . null . mintedCombatRestrictionsFor
 -- Filter.HasKeywordFamily matches on, so that Flensing Raptor's "creature you
 -- control with toxic" reaches toxic 1 and toxic 3 alike (CR 702.164a).
 --
--- Nothing for a NULLARY keyword, and not because the answer is unknown: a nullary
--- keyword has no payload to drop, so Filter.HasKeyword already asks its family
--- question exactly. Pawl.Types.KeywordFamily has no constructor for one, which is
--- what keeps "a creature with flying" from having two spellings.
+-- Nothing for a NULLARY keyword, and not because the answer is unknown: it has no
+-- payload to drop, so Filter.HasKeyword already asks its family question exactly.
+-- KeywordFamily has no constructor for one, which keeps "a creature with flying"
+-- from having two spellings.
 --
--- EXHAUSTIVE, with no wildcard, and that is the point of writing it out. This
--- classification is a second enumeration to keep in step with rule 702 --
--- Pawl.Types.CounterKind refuses one for CR 122.1b's fifteen counter keywords for
--- exactly that reason -- and the case below is what makes the difference: adding
--- a Keyword constructor fails to compile until its family is decided. A wildcard
--- would silently answer Nothing for the next parameterized keyword.
+-- EXHAUSTIVE, with no wildcard: adding a Keyword constructor must fail to compile
+-- until its family is decided, where a wildcard would silently answer Nothing for
+-- the next parameterized keyword.
 familyOf :: Keyword -> Maybe KeywordFamily.KeywordFamily
 familyOf keyword = case keyword of
   Keyword.Hexproof _ -> Just KeywordFamily.Hexproof
@@ -1460,15 +1435,10 @@ familyOf keyword = case keyword of
 -- to that many poison counters.
 --
 -- "That player" is the player the trigger's own event named, which
--- Pawl.Engine.Event.eventBindings stamps under the reserved Binding.triggerPlayer
--- slot as the trigger is gathered -- so the payload is an ordinary slot read and
--- this ability needs no opcode of its own. NOT the ability's controller: CR
--- 603.3a makes that the creature's controller, and the poison goes to their
--- victim.
---
--- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability
--- is placed -- rule 702.70a leaves nothing to choose, and has no "if" clause, so
--- intervening = Nothing.
+-- Event.eventBindings stamps under the reserved Binding.triggerPlayer slot -- so
+-- the payload is an ordinary slot read and needs no opcode. NOT the ability's
+-- controller: CR 603.3a makes that the creature's controller, and the poison goes
+-- to their victim.
 poisonous :: Natural -> TriggeredAbility Card
 poisonous n =
   TriggeredAbility.MkTriggeredAbility
@@ -1494,22 +1464,15 @@ poisonous n =
 -- poisonous' "that player" -- the same Binding.triggerPlayer slot the scan
 -- stamps -- over a different payload.
 --
--- The payload is a zone move rather than a mint of its own: CR 400.7's funnel
--- takes ObjectRef.TopOfLibrary, whose PlayerRef is WHOSE library, so "that
--- player exiles the top card of their library" is one MoveToZone and needs no
--- opcode. An empty library exiles nothing, which is what rule 702.115a's silence
--- about a shortfall asks for -- objectRefObjects takes 1 of an empty pile.
+-- The payload is a zone move rather than a mint of its own: ObjectRef.TopOfLibrary
+-- carries WHOSE library, so the whole sentence is one MoveToZone. An empty library
+-- exiles nothing, which is what rule 702.115a's silence about a shortfall asks
+-- for.
 --
--- Face up, and no rider says otherwise: CR 406.3 makes an exiled card face up by
--- default and rule 702.115a states no exception. The EntryRiders and the
--- LibraryPlacement are both inert for an exile destination, no slot is bound
--- because nothing later reads what arrived --
--- rule 702.115a has no second sentence -- and the origin zone is Nothing because
--- the REF states it: TopOfLibrary can only name a card already in that library,
--- so CR 113.6m has nothing left to read off the field.
---
--- Single mode, no targets (CR 115.10a: the top card of a library is never one),
--- ChooseExactly 1, no intervening "if": rule 702.115a leaves nothing to ask.
+-- Face up, CR 406.3's default with no exception stated. The EntryRiders and the
+-- LibraryPlacement are inert for an exile destination, no slot is bound since
+-- nothing later reads what arrived, and the origin zone is Nothing because
+-- TopOfLibrary can only name a card already in that library.
 ingest :: TriggeredAbility Card
 ingest =
   TriggeredAbility.MkTriggeredAbility
@@ -1542,33 +1505,19 @@ ingest =
         )
 
 -- CR 702.86a: whenever this creature attacks, defending player sacrifices N
--- permanents. Rule 702 states it as a triggered ability, minted exactly as rule
--- 702.70a's poisonous above and rule 702.91a's battle cry below are -- handed to
--- the ordinary CR 603 machinery, which never learns a keyword produced it.
+-- permanents.
 --
 -- CR 508.3a is what "attacks" means -- being declared as an attacker -- so the
--- condition is battle cry's: the self-scoped SelfAttacks, EveryTime, rule
--- 702.86a stating no "for the first time each turn" narrowing.
+-- condition is battle cry's SelfAttacks EveryTime, rule 702.86a stating no "for
+-- the first time each turn" narrowing.
 --
--- "DEFENDING PLAYER" is CR 508.5's, resolved off what this creature is attacking
--- at the moment of declaration and stamped onto GameEvent.AttackerDeclared
--- there; Pawl.Engine.Event.eventBindings reads it back into the reserved
--- Binding.triggerPlayer slot as the trigger is gathered. So this is an ordinary
--- slot read and needs no opcode of its own, precisely as poisonous' "that
--- player" is. NOT the ability's controller: CR 603.3a makes that the attacking
--- creature's controller, and the sacrifice falls on whom they attacked.
+-- "DEFENDING PLAYER" is CR 508.5's, stamped onto GameEvent.AttackerDeclared at the
+-- declaration and read back into Binding.triggerPlayer, poisonous' "that player".
+-- NOT the ability's controller (CR 603.3a).
 --
--- The sacrifice is CR 701.21a's edict, Effect.PlayerSacrifices -- so the
--- SACRIFICING PLAYER chooses which permanents go, which that opcode prompts for
--- (CR 609.3 short-circuits the choice when they have no more than N).
---
--- The Filter is the empty conjunction, which admits every permanent the victim
--- controls: rule 702.86a says "N permanents" with no qualification, so a filter
--- naming a card type would be narrower than the rule.
---
--- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability
--- is placed -- rule 702.86a leaves nothing to choose, and has no "if" clause, so
--- intervening = Nothing.
+-- The sacrifice is CR 701.21a's edict, so the SACRIFICING PLAYER chooses which
+-- permanents go. The Filter is the empty conjunction: rule 702.86a says "N
+-- permanents" with no qualification.
 annihilator :: Natural -> TriggeredAbility Card
 annihilator n =
   TriggeredAbility.MkTriggeredAbility
@@ -1590,30 +1539,16 @@ annihilator n =
         )
 
 -- CR 702.91a: whenever this creature attacks, each other attacking creature gets
--- +1/+0 until end of turn. Rule 702.70a's poisonous above and rule 702.86a's
--- annihilator are the other two keywords in this pool stated as triggered
--- abilities, and this is built the same way: minted here and handed to the
--- ordinary CR 603 machinery, which never learns a keyword produced it.
+-- +1/+0 until end of turn.
 --
--- CR 508.3a is what "attacks" means -- being declared as an attacker -- so the
--- condition is the self-scoped SelfAttacks, EveryTime: rule 702.91a states no
--- "for the first time each turn" narrowing.
+-- CR 508.3a is what "attacks" means, so the condition is the self-scoped
+-- SelfAttacks EveryTime, rule 702.91a stating no narrowing.
 --
 -- "EACH OTHER ATTACKING CREATURE" is a SET, swept at resolution and then frozen
--- (CR 611.2c), which is exactly Trumpet Blast's ObjectRef.EachMatching -- so this
--- needs no opcode of its own either. The three conjuncts are the three printed
--- words: a creature (CR 109.2 draws the set from the battlefield), attacking,
--- and OTHER, which is `Not IsSource` -- the spelling Filter.IsSource fixes for
--- "another" (#163), and the reason a battle-crying creature never pumps itself.
---
--- The tokens Hero of Bladehold's SECOND ability puts onto the battlefield
--- attacking are in the set or not according to WHEN this resolves, and that is
--- the whole of CR 603.3b's ordering choice: CR 611.2c fixes the affected set as
--- the effect begins, so a token that arrives afterwards is not pumped.
---
--- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability
--- is placed -- rule 702.91a leaves nothing to choose, and has no "if" clause, so
--- intervening = Nothing.
+-- (CR 611.2c), so an ObjectRef.EachMatching. The three conjuncts are the three
+-- printed words; OTHER is `Not IsSource`, which is why a battle-crying creature
+-- never pumps itself, and CR 611.2c fixing the set as the effect begins is why a
+-- token that arrives afterwards is not pumped.
 battleCry :: TriggeredAbility Card
 battleCry =
   TriggeredAbility.MkTriggeredAbility
@@ -1636,72 +1571,37 @@ battleCry =
             )
         )
 
--- CR 702.108a: whenever you cast a noncreature spell, this creature gets +1/+1
--- until end of turn. Rule 702 states it as a triggered ability, minted here like
--- its siblings and handed to the same CR 603 machinery.
---
--- The first minted trigger whose event is NOT its bearer's combat: CR 601.2i's
--- "any abilities that trigger when a spell is cast trigger at this time" is the
--- event, so the condition is TriggerCondition.SpellCast -- the constructor Young
--- Pyromancer already writes, read the same way. "You cast" is
--- Filter.ControlledBy You against CR 109.5's "you", the ability's controller (CR
--- 603.3a); "a noncreature spell" is Filter.Not of the card type, which is the
--- printed word and not a disjunction of the other types. TurnScope.EachTurn
--- because rule 702.108a names no turn (Brineborn Cutthroat's OpponentsTurn is
--- the arm that would).
---
--- "THIS CREATURE" is the bearer, so the payload is battle cry's with
--- Filter.IsSource rather than its negation -- and unlike battle cry's set this
--- one is a singleton, which CR 611.2c fixes as the effect begins all the same.
---
--- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability
--- is placed -- rule 702.108a leaves nothing to choose, and has no "if" clause,
--- so intervening = Nothing.
 -- CR 702.100a: whenever a creature you control enters, if that creature's power
 -- and/or toughness is greater than this creature's, put a +1/+1 counter on this
--- creature. Minted here like the triggered keywords around it, per instance --
--- CR 702.100d says each triggers separately.
+-- creature.
 --
--- The condition is CR 603.6a's other written form,
--- TriggerCondition.PermanentEnters: the event is somebody ELSE entering, so the
--- Filter is the rule's two printed words, "creature" and "you control". The
--- bearer is NOT excluded, and that is the rule rather than an omission -- rule
--- 702.100a says "a creature", and a creature entering compares itself against
--- itself, which no comparison below can answer true.
+-- The condition is TriggerCondition.PermanentEnters, the event being somebody ELSE
+-- entering, so the Filter is the rule's two printed words. The bearer is NOT
+-- excluded, which is the rule rather than an omission: a creature entering
+-- compares itself against itself, which no comparison below can answer true.
 --
 -- The comparison rides the intervening "if" (CR 603.4) and not the condition's
--- Filter, which is where training's lives, because rule 702.100a prints "if":
--- CR 608.2a re-checks it as the ability resolves, so pumping the bearer in
--- response takes the counter away, and the two spellings are told apart on
--- exactly that board.
+-- Filter, where training's lives, because rule 702.100a prints "if": CR 608.2a
+-- re-checks it as the ability resolves, so pumping the bearer in response takes
+-- the counter away.
 --
--- "THAT CREATURE" is the entrant, which is neither the bearer nor a target, so
--- the condition reaches it through Quantity.AgainstSlot at the entrant's own
--- reserved slot (Binding.became, stamped by Event.eventBindings). Both
--- intervening checks fill Filter.Context's slotObjects from the trigger's
--- bindings, which is what makes that read answerable, and both read it through
--- CR 608.2h -- an entrant killed while the trigger waits is compared at the power
--- and toughness it last had on the battlefield, which rule 702.100a's rulings
--- state outright. Pawl.TriggerSpec's Evolve group proves it at the resolution
--- check, the only one that can observe it.
+-- "THAT CREATURE" is the entrant, neither the bearer nor a target, so the
+-- condition reaches it through Quantity.AgainstSlot at Binding.became. Read
+-- through CR 608.2h, so an entrant killed while the trigger waits is compared at
+-- the power and toughness it last had on the battlefield; Pawl.TriggerSpec's
+-- Evolve group proves it at the resolution check.
 --
 -- Condition.Any because rule 702.100a's "and/or" compares two DIFFERENT
--- characteristics; no single Compares states it, since one comparison reads one
--- pair of quantities.
---
--- STRICTLY greater, spelled as "at least one more" for the reason
--- Pawl.Engine.Speed.belowMaxSpeed spells its bound the other way: CR 208.1's
--- power and toughness are whole numbers and Pawl.Types.Comparison has no strict
--- arm, so the two state the same set.
+-- characteristics, and one Compares reads one pair of quantities. STRICTLY
+-- greater, spelled as "at least one more" since CR 208.1's power and toughness are
+-- whole numbers and Comparison has no strict arm.
 --
 -- CR 702.100c falls out rather than being written: a permanent that is not a
--- creature has no power or toughness (CR 208.3), Quantity.Plus of an
--- unanswerable side is unanswerable, and Condition.holds reads an unanswerable
--- side as False. So a bearer that has stopped being a creature never evolves.
+-- creature has no power or toughness (CR 208.3), and Condition.holds reads an
+-- unanswerable side as False.
 --
--- THE COUNTER goes on through Effect.Evolve rather than Effect.PutCounters,
--- which is rule 702.100b: the creature "evolves" when that placement puts one or
--- more counters on it, and one opcode is what ties the marker to the placement.
+-- THE COUNTER goes on through Effect.Evolve rather than Effect.PutCounters, which
+-- is rule 702.100b: one opcode is what ties the "evolves" marker to the placement.
 -- Renegade Krasis reads it.
 evolve :: TriggeredAbility Card
 evolve =
@@ -1726,6 +1626,18 @@ evolve =
             (Quantity.Plus (Plus.MkPlus quantity (Quantity.Literal 1)))
         )
 
+-- CR 702.108a: whenever you cast a noncreature spell, this creature gets +1/+1
+-- until end of turn.
+--
+-- The first minted trigger whose event is NOT its bearer's combat: CR 601.2i is
+-- the event, so the condition is TriggerCondition.SpellCast. "You cast" is
+-- Filter.ControlledBy You against CR 109.5's "you", the ability's controller (CR
+-- 603.3a); "a noncreature spell" is Filter.Not of the card type, the printed word
+-- rather than a disjunction of the other types. TurnScope.EachTurn because rule
+-- 702.108a names no turn.
+--
+-- "THIS CREATURE" is the bearer, so the payload is battle cry's with
+-- Filter.IsSource rather than its negation.
 prowess :: TriggeredAbility Card
 prowess =
   TriggeredAbility.MkTriggeredAbility
