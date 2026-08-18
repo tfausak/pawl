@@ -216,9 +216,9 @@ data Face card = MkFace
     -- change the card's mana cost, so 'manaCost' above and every reader of mana
     -- value is unaffected.
     --
-    -- CR 118.8c is not implemented: a player instructed to cast a spell "if able"
-    -- is still required to cast one whose mandatory additional cost involves cards
-    -- of a stated quality in a hidden zone (#110).
+    -- CR 118.8c reads these through Pawl.Engine.Cost.statesHiddenQuality, which is
+    -- why a cost naming cards of a stated quality in a hidden zone (Magmatic
+    -- Insight's discarded land) excuses a cast an effect instructs "if able".
     additionalCosts :: [CostComponent.CostComponent Keyword.Keyword],
     -- | CR 118.9: this face's printed alternative costs, which its controller MAY
     -- pay rather than the spell's mana cost (Fireblast). CR 118.9c: this does not

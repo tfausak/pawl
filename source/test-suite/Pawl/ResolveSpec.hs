@@ -10411,6 +10411,11 @@ wildEvocationSpec s registry =
                 (gs {GameState.phase = upkeep, GameState.activePlayer = S.bob})
             settled = S.runPure answer began Engine.settleForPriority
          in S.runPure answer settled Engine.priorityLoop
+      -- Bob's library, which `board` leaves empty. LOAD-BEARING for every leg
+      -- whose cast resolves a draw: CR 704.5b makes a draw from an empty library
+      -- lose bob the game at the next SBA check, and the assertions would then be
+      -- read off a board he has left (CR 800.4).
+      withLibrary ps gs = List.foldl' (\g p -> snd (S.addLibraryCard p S.bob g)) gs ps
       -- randomRevealSpec's answerer, pinned by INDEX for its reason: one that
       -- hunted the offer for a castable card would go on answering legally after
       -- a mutation broke which card the engine honours.
@@ -10440,6 +10445,14 @@ wildEvocationSpec s registry =
          in State.execState
               (Engine.runGame counting began (Engine.settleForPriority >> Engine.priorityLoop))
               0
+      -- The same again, TAKING the offer. S.identityAnswer bottoms out in
+      -- Replay.defaultAnswer, whose Prompt.OfferedCast arm declines, so a leg
+      -- asserting a cast HAPPENED on an excused branch would otherwise pass
+      -- because nothing happens either way.
+      exercising :: Int -> Prompt.Prompt r -> r
+      exercising i p = case p of
+        Prompt.OfferedCast {} -> OptionalDecision.Exercises
+        _ -> rolling i p
       named n = CardName.MkCardName (Text.pack n)
       -- WHO controls the permanent bob's card became, which is the one reading
       -- that separates "that player casts it" from "the resolving controller
@@ -10530,6 +10543,68 @@ wildEvocationSpec s registry =
           Spec.assertEqWith s "bob still showed it, though (CR 701.20a)" (revealed after) [(S.bob, ["Plummet"])]
           Spec.assertEqWith s "stack empty: the trigger resolved and did nothing" (length (GameState.stack after)) 0
           Spec.assertEqWith s "and no question was put on the wire" (offersUnder 0 gs) 0
+        -- CR 118.8c, and the pair below it. Magmatic Insight's mandatory
+        -- additional cost is "discard a land card": an action involving cards
+        -- with a STATED QUALITY (CR 701.23b's phrase) in the HAND, CR 400.2's
+        -- hidden zone. So the "if able" instruction stops being an instruction
+        -- and becomes a may -- one Prompt.OfferedCast, which the stock answerer
+        -- declines.
+        --
+        -- The Forest is in hand throughout, so the cost is payable: this is CR
+        -- 118.8c's "even if those cards are present in that zone" and not the CR
+        -- 601.3 guard the Plummet leg above exercises. The leg after next proves
+        -- payability by taking the offer on this very board.
+        Spec.it s "CR 118.8c a mandatory cast whose cost names a card of a stated quality in hand is offered, not forced" $ do
+          evocation <- S.printingOf s registry "Wild Evocation"
+          insight <- S.printingOf s registry "Magmatic Insight"
+          forest <- S.printingOf s registry "Forest"
+          piker <- S.printingOf s registry "Goblin Piker"
+          wraith <- S.printingOf s registry "Bog Wraith"
+          let gs = withLibrary [wraith] (board evocation [insight, forest, piker])
+              after = runBobsUpkeep (rolling 0) gs
+          Spec.assertEqWith s "bob was ASKED, which is the whole of CR 118.8c" (offersUnder 0 gs) 1
+          Spec.assertEqWith s "and declining left the Insight in hand with the land undiscarded" (bobsHand after) ["Magmatic Insight", "Forest", "Goblin Piker"]
+          Spec.assertEqWith s "so nothing was discarded and nothing resolved" (bobsGraveyard after) []
+          Spec.assertEqWith s "bob still showed the card (CR 701.20a runs before the offer)" (revealed after) [(S.bob, ["Magmatic Insight"])]
+          Spec.assertEqWith s "stack empty: the trigger resolved and the cast was declined" (length (GameState.stack after)) 0
+          Spec.assertEqWith s "and no card was drawn, so the library is untouched" (length (Game.zoneMembers Zone.Library S.bob after)) 1
+        -- The discriminating negative, one Filter apart. Cathartic Reunion's cost
+        -- is "discard two cards" -- the same component, the same hidden zone, but
+        -- a bare QUANTITY (CR 701.23d), which states no quality. So CR 118.8c does
+        -- not reach it and the cast stays mandatory. This is what proves the
+        -- classification reads the component's own criterion rather than which
+        -- card is being cast.
+        Spec.it s "CR 118.8c a cost naming a bare quantity of cards is not excused" $ do
+          evocation <- S.printingOf s registry "Wild Evocation"
+          reunion <- S.printingOf s registry "Cathartic Reunion"
+          piker <- S.printingOf s registry "Goblin Piker"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          wraith <- S.printingOf s registry "Bog Wraith"
+          bolt <- S.printingOf s registry "Lightning Bolt"
+          plummet <- S.printingOf s registry "Plummet"
+          let gs = withLibrary [wraith, bolt, plummet] (board evocation [reunion, piker, maiden])
+              after = runBobsUpkeep (rolling 0) gs
+          Spec.assertEqWith s "nobody was asked: this cast is still an instruction" (offersUnder 0 gs) 0
+          Spec.assertEqWith s "the two discards joined the Reunion in the graveyard (CR 608.2n)" (List.sort (bobsGraveyard after)) ["Bird Maiden", "Cathartic Reunion", "Goblin Piker"]
+          Spec.assertEqWith s "and the three drawn cards are what bob holds, so he did not deck himself (CR 704.5b)" (List.sort (bobsHand after)) ["Bog Wraith", "Lightning Bolt", "Plummet"]
+          Spec.assertEqWith s "stack empty: the trigger and the Reunion both resolved" (length (GameState.stack after)) 0
+        -- The payability witness for the first leg: the SAME board, the offer
+        -- taken. Without it "bob was asked" would be consistent with an excuse
+        -- gated on the cost being unpayable, which is a different rule (CR 601.3,
+        -- the Plummet leg above) that raises no prompt at all.
+        Spec.it s "CR 118.8c the excused cast can still be taken, and the stated-quality cost paid" $ do
+          evocation <- S.printingOf s registry "Wild Evocation"
+          insight <- S.printingOf s registry "Magmatic Insight"
+          forest <- S.printingOf s registry "Forest"
+          piker <- S.printingOf s registry "Goblin Piker"
+          wraith <- S.printingOf s registry "Bog Wraith"
+          bolt <- S.printingOf s registry "Lightning Bolt"
+          let gs = withLibrary [wraith, bolt] (board evocation [insight, forest, piker])
+              after = runBobsUpkeep (exercising 0) gs
+          Spec.assertEqWith s "the Forest was discarded to pay the cost, and the Insight resolved after it" (List.sort (bobsGraveyard after)) ["Forest", "Magmatic Insight"]
+          Spec.assertEqWith s "bob drew two, so the spell really resolved" (List.sort (bobsHand after)) ["Bog Wraith", "Goblin Piker", "Lightning Bolt"]
+          Spec.assertEqWith s "and nothing was put onto the battlefield as a land" (S.countOnBattlefieldByName (named "Forest") S.bob after) 0
+          Spec.assertEqWith s "stack empty: the trigger and the Insight both resolved" (length (GameState.stack after)) 0
         -- CR 609.3 at the empty end: the reveal names nothing, so the slot goes
         -- unbound, Resolve.slotOne answers Nothing and the "otherwise" clause --
         -- whose AtMost 0 count DOES hold over an empty hand -- offers nothing.
