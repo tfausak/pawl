@@ -1148,8 +1148,43 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
         -- below is CR 708.7 and not an empty battlefield.
         Spec.assertEqWith s "CR 110.5b the printed 3/3 arrived" (S.powerToughnessOf permanent settled) (Just (3, 3))
         Spec.assertEqWith s "face up" (fmap Object.facing (Game.lookupObject permanent settled)) (Just Facing.FaceUp)
-        Spec.assertEqWith s "CR 708.8 nothing was turned face up, so it stayed tapped" (fmap Object.tapped (Game.lookupObject permanent settled)) (Just TapState.Tapped)
+        Spec.assertEqWith s "CR 708.7 nothing was turned face up, so it stayed tapped" (fmap Object.tapped (Game.lookupObject permanent settled)) (Just TapState.Tapped)
         Spec.assertEqWith s "and so did the Pine Walker" (fmap Object.tapped (Game.lookupObject watcher settled)) (Just TapState.Tapped)
+
+  -- The Filter's OTHER half, which the two legs above cannot see: Pine Walker
+  -- says "a CREATURE you control", and Gift of Doom turned face up is an Aura.
+  -- Same event, same controller, same slot -- only the subject's card type
+  -- differs, so this is what tells CR 708.7's condition apart from one that
+  -- watched every permanent (which is Aven Farseer's, one group up).
+  --
+  -- CR 708.2a is why the Aura is the right subject rather than a trap: face DOWN
+  -- it is a 2/2 creature, so a matcher reading the permanent before the turning
+  -- would admit it and untap it. The condition's live read (CR 603.10) is what
+  -- makes the answer No.
+  Spec.it s "CR 708.7 Pine Walker does not untap an Aura turned face up" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    gift <- S.printingOf s registry "Gift of Doom"
+    walker <- S.printingOf s registry "Pine Walker"
+    let (gs0, card) = morphBoard swamp gift 3
+        (fodder, gs1) = S.addCreature piker S.alice gs0
+        (mine, gs2) = S.addCreature mammoth S.alice gs1
+        (watcher, gs3) = S.addCreature walker S.alice gs2
+        (board, entered) = castAndResolve gift (Facing.faceDown FaceDownReason.Morphed) gs3 card
+    case entered of
+      Nothing -> Spec.assertFailure s "the morph cast of Gift of Doom did not reach the battlefield"
+      Just aura -> do
+        let before = S.runPure S.identityAnswer (S.tapObject watcher (S.tapObject aura board)) Engine.priorityLoop
+            after = S.runPure (giftAnswer fodder mine) before (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph aura >> Engine.priorityLoop)
+        -- The controls: it really did turn over, it really is alice's, and it
+        -- really is no longer a creature. So the tap state below is the Filter's
+        -- HasCardType and not a permanent that never turned face up.
+        Spec.assertEqWith s "CR 110.5 the Aura is face up" (fmap Object.facing (Game.lookupObject aura after)) (Just Facing.FaceUp)
+        Spec.assertEqWith s "CR 110.2 and alice's, as the watcher is" (Projection.controllerOf aura after) (Just S.alice)
+        Spec.assertBool s (not (Projection.isCreatureOf aura after)) "CR 708.8 and no longer CR 708.2a's 2/2 creature"
+        Spec.assertEqWith s "CR 708.7 so nothing untapped it" (fmap Object.tapped (Game.lookupObject aura after)) (Just TapState.Tapped)
+        Spec.assertEqWith s "nor the Pine Walker" (fmap Object.tapped (Game.lookupObject watcher after)) (Just TapState.Tapped)
 
 -- `who` with the watcher printing already on the battlefield and one of alice's
 -- face-down permanents of the morph printing beside it, on a board of `n` lands

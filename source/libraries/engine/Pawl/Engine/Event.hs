@@ -7467,9 +7467,9 @@ eventBindingSlots cond = case cond of
   -- fallthrough would answer the same for a condition nobody wrote an arm for.
   --
   -- The permanent is not bound because CR 603.10a's look-back keeps the pre-move
-  -- id out of the graveyard: `became` names the incarnation a zone change
-  -- produced (CR 400.7e), and this event is recorded BEFORE the move, so the id it
-  -- carries is the one that no longer exists. The player is not bound because
+  -- id out of the graveyard: under a zone change `became` names the incarnation
+  -- the move produced (CR 400.7e), and this event is recorded BEFORE the move, so
+  -- the id it carries is the one that no longer exists. The player is not bound because
   -- Mayhem Devil's "deals 1 damage to any target" names nobody the event did.
   -- A card saying "that player" or "return it to its owner's hand" is what earns
   -- a slot here (#977).
