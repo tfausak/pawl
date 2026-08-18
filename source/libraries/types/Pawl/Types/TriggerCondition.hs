@@ -79,8 +79,9 @@ data TriggerCondition
     -- triggers this twice. Pinned by Pawl.TriggerSpec.
     --
     -- Binds how much that one event dealt under Pawl.Engine.Binding.eventAmount,
-    -- which is Coalhauler Swine's "that much". The DAMAGER gets no slot -- no
-    -- printing reads it here -- and neither does the recipient, who is the bearer.
+    -- which is Coalhauler Swine's "that much", and CR 120.1's source of the damage
+    -- under Pawl.Engine.Binding.combatDamager, which is Belltower Sphinx's "that
+    -- source". The RECIPIENT gets no slot, being the bearer.
     SelfIsDealtDamage
   | -- | CR 603.2 / 509-510 again, read by a BYSTANDER: a permanent the Filter
     -- admits dealt combat damage to a player -- Tovolar, Dire Overlord's

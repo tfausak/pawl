@@ -7210,14 +7210,21 @@ eventBindings cond event = case (cond, event) of
   -- promise needs: every GameEvent.DamageDealt carries a DamageEvent.amount,
   -- whichever of CR 120.3's damage kinds it is.
   --
-  -- The DAMAGER gets no slot alongside it. The event names one and
-  -- Binding.combatDamager is the slot it would take, but no printing points at it
-  -- under this condition: a Scryfall sweep of "is dealt damage" against "the
-  -- source" / "that source" matches nothing at all, so no card is waiting on it.
-  -- The RECIPIENT needs no slot either -- matchesTrigger has just proved it is the
+  -- The DAMAGER takes Binding.combatDamager beside it, which is CR 120.1's "an
+  -- object that deals damage is the source of that damage" -- Belltower Sphinx's
+  -- "that source's controller mills that many cards", read through
+  -- PlayerRef.ControllerOfBound. Also unconditional given a match:
+  -- DamageEvent.source is an ObjectId outright, so there is nothing to fail.
+  --
+  -- The slot is not combat-scoped here even though its name is: CR 120.1 makes
+  -- every damage event name a source, and Belltower Sphinx's trigger admits a
+  -- Prodigal Sorcerer's ping as readily as a blocker's. Pinned by
+  -- Pawl.TriggerSpec's noncombat board.
+  --
+  -- The RECIPIENT needs no slot -- matchesTrigger has just proved it is the
   -- bearer, whom CR 113.7a's source slot already names.
   (TriggerCondition.SelfIsDealtDamage, GameEvent.DamageDealt ev) ->
-    Binding.setEventAmount (DamageEvent.amount ev) Map.empty
+    Binding.setCombatDamager (DamageEvent.source ev) (Binding.setEventAmount (DamageEvent.amount ev) Map.empty)
   -- CR 603.1b's multi-condition ability reaches this fallthrough and stamps
   -- nothing, which agrees with eventBindingSlots' intersection for the pool's one
   -- AnyOf and is pinned by Pawl.TriggerSpec against every event either branch
@@ -7319,9 +7326,10 @@ eventBindingSlots cond = case cond of
   -- event carries an amount, whichever of CR 120.3's two damage kinds this
   -- unfiltered condition admitted.
   --
-  -- No slot for the DAMAGER, the event's other nameable half, and none for the
-  -- recipient, who is the bearer. See the eventBindings arm above for both.
-  TriggerCondition.SelfIsDealtDamage -> Set.singleton Binding.eventAmount
+  -- Plus CR 120.1's source, which Belltower Sphinx's "that source's controller"
+  -- reads, and equally guaranteed -- every DamageDealt event carries one. No slot
+  -- for the recipient, who is the bearer. See the eventBindings arm above.
+  TriggerCondition.SelfIsDealtDamage -> Set.fromList [Binding.combatDamager, Binding.eventAmount]
   -- CR 510.2's damager, which the bystander's form needs and the self-scoped one
   -- above does not: there the damager IS the bearer, already bound as CR 113.7a's
   -- source. Aragorn, Hornburg Hero's "double the number of +1/+1 counters on it"
