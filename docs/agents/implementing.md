@@ -325,7 +325,11 @@ Before pushing: stage, `hooky fix` (`CLAUDE.md`), stage again. Two hooks bite
 differently by hand: `script/format-json.sh` takes `MODE FILE...` and passes
 vacuously when run bare, and `script/check-citations.sh` defaults to the whole
 tree --- run it bare after taking a CR update, since a renumbering breaks
-citations in files you never touched. The same renumbering breaks them in issue
+citations in files you never touched. It proves only that the rule NUMBER
+exists: a citation naming a real rule that does not say what the sentence claims
+passes silently, which is how `CR 108.1` (the Oracle-card-reference rule) sat in
+this file citing ownership (CR 108.3) through weeks of green CI. Re-reading the
+rule is the only check there is. The same renumbering breaks them in issue
 bodies, where nothing checks anything: after taking a CR update, grep the open
 tracker for the renumbered rules and correct the bodies in a comment. Two checks are NOT hooks because they
 read GitHub: `script/check-census.sh` and `script/check-gaps.sh`. Both take a
