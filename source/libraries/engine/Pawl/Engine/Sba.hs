@@ -798,7 +798,7 @@ performStateBasedActions = Event.simultaneously $ do
       -- named something. A regenerated creature still counts as destroyed, which
       -- the CR 704.3 settle loop re-checks and -- because the regen healed the
       -- damage -- terminates.
-      acted = not (null legendVictims) || not (null worldLosers) || not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null detaching) || not (null revving) || not (null told) || not (null undefended) || not (null returningCommanders) || not (null finishedDungeons)
+      acted = not (null legendVictims) || not (null worldLosers) || not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null detaching) || not (null revving) || not (null told) || not (null undefended) || not (null returningCommanders) || not (null finishedDungeons) || not (null routed)
   -- CR 104.1: a game ends the moment a result is reached, so a later pass may
   -- not replace one. The existing result therefore wins; this pass only settles
   -- an outcome when the game did not already have one. Same ordering as
