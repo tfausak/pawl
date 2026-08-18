@@ -4768,7 +4768,8 @@ blockAndSong jaceId atBob p = case p of
 --     card: CR 205.1a makes the set REPLACE the existing card types, so the
 --     animated Jace stops being a creature and a planeswalker in one resolution.
 --     It is the only card in data/cards/ carrying SetCardType (grep the
---     constructor name), which is why the mirror leg below has no producer.
+--     constructor name), and it sets Land, which is why the mirror leg below is
+--     still waiting on card data.
 --   * Vedalken Orrery ({4} Artifact, "You may cast spells as though they had
 --     flash") is alice's, and is what makes that cast reachable: CR 303.1 admits
 --     an enchantment only in a main phase, and the block has to be declared first.
@@ -4776,9 +4777,10 @@ blockAndSong jaceId atBob p = case p of
 --     nothing here: attackJaceAndBob declares only the two Elves as attackers.
 --
 -- The mirror case, where the permanent stops being a PLANESWALKER and stays a
--- creature, is unproven here rather than asserted: it needs an effect that sets
--- the card type to one a creature keeps, and the Song -- the pool's lone
--- SetCardType -- sets it to Land.
+-- creature, is unproven here rather than asserted (gap #1846): it needs an effect
+-- that sets the card type to Creature, and the Song -- data/cards/'s lone
+-- SetCardType -- sets Land. Kenrith's Transformation prints one and is not in the
+-- pool yet.
 --
 -- Every leg hands over at the declare blockers step, typeChangeRemovalSpec's
 -- pattern, so the block is declared before the type change lands, and stops at the
