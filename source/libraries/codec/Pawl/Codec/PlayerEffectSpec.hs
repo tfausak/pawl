@@ -1,5 +1,6 @@
 module Pawl.Codec.PlayerEffectSpec where
 
+import qualified Data.Set as Set
 import qualified Pawl.Codec.PlayerEffect as PlayerEffect
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
@@ -20,6 +21,7 @@ import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.Sacrifice as Sacrifice
+import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
 import qualified Pawl.Types.Subtype as Subtype
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -160,6 +162,33 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       (PlayerEffect.DontLoseUnspentMana (ManaFilter.OfType (ManaType.Colored Color.Green)))
       " {\"type\":\"DontLoseUnspentMana\",\"value\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}}} "
+  -- CR 609.4b / Celestial Dawn's mana sentence, whose two clauses are one
+  -- PlayerEffect entry each -- a codec that dropped the payload's `only` would
+  -- round-trip one of them and not both.
+  Spec.it s "SpendManaAsThough, Celestial Dawn's permission" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      ( PlayerEffect.SpendManaAsThough
+          SpendManaAsThough.MkSpendManaAsThough
+            { SpendManaAsThough.which = ManaFilter.OfType (ManaType.Colored Color.White),
+              SpendManaAsThough.asThough = Set.singleton (ManaType.Colored Color.Blue),
+              SpendManaAsThough.only = False
+            }
+      )
+      " {\"type\":\"SpendManaAsThough\",\"value\":{\"which\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"White\"}}},\"asThough\":[{\"type\":\"Colored\",\"value\":{\"type\":\"Blue\"}}],\"only\":false}} "
+  Spec.it s "SpendManaAsThough, Celestial Dawn's restriction" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      ( PlayerEffect.SpendManaAsThough
+          SpendManaAsThough.MkSpendManaAsThough
+            { SpendManaAsThough.which = ManaFilter.NotOfType (ManaType.Colored Color.White),
+              SpendManaAsThough.asThough = Set.singleton ManaType.Colorless,
+              SpendManaAsThough.only = True
+            }
+      )
+      " {\"type\":\"SpendManaAsThough\",\"value\":{\"which\":{\"type\":\"NotOfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"White\"}}},\"asThough\":[{\"type\":\"Colorless\"}],\"only\":true}} "
   -- CR 702.18a / Ivory Mask: shroud names no player, so the scope is everybody.
   Spec.it s "CantBeTargetedBy, shroud's EachPlayer" $
     Common.assertCodec

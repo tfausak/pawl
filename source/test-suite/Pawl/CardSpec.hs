@@ -2725,6 +2725,9 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 500.5 carries a ManaFilter, not a Filter: the set it names is MANA, and
   -- this traversal is about the spells a player effect names.
   PlayerEffect.DontLoseUnspentMana _ -> []
+  -- CR 609.4b carries a ManaFilter and a set of mana types, for the same reason:
+  -- what it names is MANA.
+  PlayerEffect.SpendManaAsThough _ -> []
   -- CR 702.18a / 702.11c carry a PlayerScope, not a Filter: the set they name is
   -- players, and this traversal is about the spells a player effect names.
   PlayerEffect.CantBeTargetedBy _ -> []
@@ -2804,6 +2807,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.NoMaximumHandSize -> False
   PlayerEffect.SetMaximumHandSize _ -> False
   PlayerEffect.DontLoseUnspentMana _ -> False
+  PlayerEffect.SpendManaAsThough _ -> False
   PlayerEffect.CantBeTargetedBy _ -> False
   PlayerEffect.CastAsThoughItHadFlash _ -> False
   PlayerEffect.CantBeCountered _ -> False
@@ -2847,6 +2851,7 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.NoMaximumHandSize -> False
   PlayerEffect.SetMaximumHandSize _ -> False
   PlayerEffect.DontLoseUnspentMana _ -> False
+  PlayerEffect.SpendManaAsThough _ -> False
   PlayerEffect.CantBeTargetedBy _ -> False
   PlayerEffect.CastAsThoughItHadFlash _ -> False
   PlayerEffect.CantBeCountered _ -> False

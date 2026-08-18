@@ -57,6 +57,7 @@ import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
+import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
 import Pawl.Types.Subtype (Subtype)
 import Pawl.Types.Timestamp (Timestamp)
 
@@ -396,6 +397,7 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.NoMaximumHandSize -> effect
   PlayerEffect.SetMaximumHandSize _ -> effect
   PlayerEffect.DontLoseUnspentMana _ -> effect
+  PlayerEffect.SpendManaAsThough _ -> effect
   PlayerEffect.CantBeTargetedBy _ -> effect
   PlayerEffect.DamageCantBePrevented _ -> effect
   PlayerEffect.CantSearchLibraries -> effect
@@ -493,6 +495,7 @@ prohibitsCasting pid oid name gs =
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.SpendManaAsThough _ -> False
         -- CR 702.18a / 702.11c restrict TARGETING, not casting: a player with
         -- shroud may cast anything, and Pawl.Engine.Target.targetable is where
         -- the restriction lands (CR 115.4, CR 601.2c).
@@ -590,6 +593,7 @@ prohibitsPlayingLand pid names gs =
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         -- CR 305.1 again: a land is never cast, so a permission about the timing
         -- of a CAST has nothing to widen here either.
@@ -639,6 +643,7 @@ prohibitsSearching pid gs =
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.CantBeCountered _ -> False
@@ -684,6 +689,7 @@ prohibitsBecomingMonarch pid gs =
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.SpendManaAsThough _ -> False
         -- CR 702.18a/702.11c stop a SPELL from choosing this player as a target.
         -- CR 725.1's effect need not target to crown them (Palace Jailer's "you
         -- become the monarch" names nobody), so shroud is not an eligibility
@@ -830,6 +836,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
@@ -857,6 +864,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
@@ -926,6 +934,7 @@ activationCostAdjustments pid srcId gs =
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
@@ -956,6 +965,7 @@ activationCostAdjustments pid srcId gs =
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
@@ -1024,6 +1034,7 @@ mayCastAsThoughItHadFlash pid oid gs =
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
@@ -1083,6 +1094,7 @@ mayCastFromGraveyard pid oid gs =
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
@@ -1151,6 +1163,7 @@ mayCastFromHandWithoutPayingManaCost pid oid gs =
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
@@ -1203,6 +1216,7 @@ mayPlayLandsFromGraveyard pid gs =
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
@@ -1266,6 +1280,7 @@ protectedFromTargeting caster pid gs =
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         -- CR 701.6a grants no targeting immunity: Pawl.Types.Counterability
         -- says the same about CR 113.6g, and a Cancel at a spell Spider-Punk
@@ -1326,6 +1341,7 @@ landPlaysAllowed pid gs =
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
@@ -1377,6 +1393,7 @@ maximumHandSize pid gs =
         PlayerEffect.AddActivationCost {} -> current
         PlayerEffect.PlayAdditionalLands _ -> current
         PlayerEffect.DontLoseUnspentMana _ -> current
+        PlayerEffect.SpendManaAsThough _ -> current
         PlayerEffect.CantBeTargetedBy _ -> current
         PlayerEffect.CastAsThoughItHadFlash _ -> current
         PlayerEffect.CantBeCountered _ -> current
@@ -1418,6 +1435,7 @@ keepsUnspentMana :: PlayerId -> GameState -> ManaUnit -> Bool
 keepsUnspentMana pid gs =
   let keeps effect = case effect of
         PlayerEffect.DontLoseUnspentMana f -> Just f
+        PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
@@ -1442,6 +1460,51 @@ keepsUnspentMana pid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
       filters = Maybe.mapMaybe (keeps . snd) (applying pid gs)
    in \unit -> any (\f -> ManaFilter.matches f unit) filters
+
+-- CR 609.4b / 613.11: the clauses saying what this player may spend their mana
+-- as though it were (Celestial Dawn). The typed question Pawl.Engine.Mana asks
+-- at its funnel, so that module never sees a PlayerEffect constructor.
+--
+-- The CLAUSES and not an answer, because the answer is per-mana and this is
+-- per-player: Pawl.Engine.Mana.spendableAs folds them against one mana type,
+-- which is where the ManaFilter and CR 106.1b's types belong. Taking pid and the
+-- state FIRST, as keepsUnspentMana does, so a caller resolving one payment
+-- gathers the effects once.
+--
+-- Read LIVE through `applying`, like every other question here, so a Celestial
+-- Dawn destroyed with a payment half made is simply not found (CR 604.2).
+--
+-- No ordering. CR 613.11 sorts continuous effects by timestamp, and there is
+-- nothing here to sort: `spendableAs` unions what the applicable clauses permit,
+-- and union does not care which ran first.
+spendManaAsThough :: PlayerId -> GameState -> [SpendManaAsThough.SpendManaAsThough]
+spendManaAsThough pid gs =
+  let spends effect = case effect of
+        PlayerEffect.SpendManaAsThough clause -> Just clause
+        PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantCastMoreThan _ -> Nothing
+        PlayerEffect.CantCastChosenName -> Nothing
+        PlayerEffect.CantPlayLandChosenName -> Nothing
+        PlayerEffect.IncreaseSpellCost {} -> Nothing
+        PlayerEffect.ReduceSpellCost {} -> Nothing
+        PlayerEffect.ReduceActivationCost {} -> Nothing
+        PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.PlayAdditionalLands _ -> Nothing
+        PlayerEffect.NoMaximumHandSize -> Nothing
+        PlayerEffect.SetMaximumHandSize _ -> Nothing
+        PlayerEffect.CantBeTargetedBy _ -> Nothing
+        PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.CantBeCountered _ -> Nothing
+        PlayerEffect.DamageCantBePrevented _ -> Nothing
+        PlayerEffect.CantSearchLibraries -> Nothing
+        PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantCastMatching _ -> Nothing
+        PlayerEffect.CantPlayLands -> Nothing
+        PlayerEffect.CastFromGraveyard _ -> Nothing
+        PlayerEffect.PlayLandsFromGraveyard -> Nothing
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
+   in Maybe.mapMaybe (spends . snd) (applying pid gs)
 
 -- CR 701.6a / 613.11: can this spell or ability on the stack be countered
 -- (Spider-Punk, Prowling Serpopard)? The typed question
@@ -1490,6 +1553,7 @@ cantBeCountered pid oid gs =
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         -- Spider-Punk's OTHER sentence, and no part of this answer: CR 615.12
@@ -1570,6 +1634,7 @@ unpreventable gs =
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
    in concatMap (\pid -> Maybe.mapMaybe says (applying pid gs)) (Game.stillPlaying gs)

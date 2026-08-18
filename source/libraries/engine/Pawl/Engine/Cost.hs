@@ -2159,7 +2159,14 @@ payMana spending pid cost = do
   pure paid
   where
     -- What the pool would leave if the cost were paid out of it right now.
-    settlement gs = Mana.spend spending (Maybe.fromMaybe 0 (Mana.lifeNeeded manaActivations spending pid cost gs)) cost (Game.poolOf pid gs)
+    --
+    -- CR 609.4b's clauses are resolved from the board on EVERY pass, beside the
+    -- pool they speak about, rather than captured at entry: they are a CR 613.11
+    -- continuous effect and not a permission the cast carried in, so a Celestial
+    -- Dawn that leaves mid-payment stops applying (CR 604.2). That is the
+    -- opposite of `spending`, which rule 118.14 fixes when the cast was
+    -- permitted.
+    settlement gs = Mana.spend (PlayerEffect.spendManaAsThough pid gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded manaActivations spending pid cost gs)) cost (Game.poolOf pid gs)
     window refused = do
       gs <- State.get
       let covered = Maybe.isJust (settlement gs)

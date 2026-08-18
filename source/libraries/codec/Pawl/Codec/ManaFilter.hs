@@ -9,5 +9,6 @@ codec :: Codec.Codec ManaFilter.ManaFilter
 codec =
   Arm.tagged
     [ Arm.nullary "Any" ManaFilter.Any,
-      Arm.payload "OfType" ManaType.codec ManaFilter.OfType (\x -> case x of ManaFilter.OfType y -> Just y; _ -> Nothing)
+      Arm.payload "OfType" ManaType.codec ManaFilter.OfType (\x -> case x of ManaFilter.OfType y -> Just y; _ -> Nothing),
+      Arm.payload "NotOfType" ManaType.codec ManaFilter.NotOfType (\x -> case x of ManaFilter.NotOfType y -> Just y; _ -> Nothing)
     ]
