@@ -1,5 +1,6 @@
 module Pawl.Types.DealDamage where
 
+import qualified Pawl.Types.ExcessDestination as ExcessDestination
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
@@ -43,6 +44,27 @@ data DealDamage = MkDealDamage
     -- one that has become illegal (CR 608.2b) leaves the instruction with no
     -- source and it does as much as it can, which is nothing -- not damage from
     -- the resolving object instead.
-    dealer :: Maybe SlotName.SlotName
+    dealer :: Maybe SlotName.SlotName,
+    -- | WHERE THE EXCESS GOES -- CR 120.4a's first sentence, which happens only
+    -- when "an effect that's causing damage to be dealt STATES that excess
+    -- damage that would be dealt to a permanent is dealt to another permanent or
+    -- player instead". The effect states it, so the instruction carries it:
+    -- Flame Spill's "Excess damage is dealt to that creature's controller
+    -- instead".
+    --
+    -- Nothing is what a card that says nothing about excess carries: the damage
+    -- event is not rewritten at all and the whole amount lands on the recipient,
+    -- however much of it CR 120.6 makes redundant. Lightning Bolt at a 2/1 marks
+    -- three.
+    --
+    -- Here rather than on Pawl.Types.DamageEvent, where the amount and the
+    -- recipient live, because CR 120.4a's rewrite is keyed to the EFFECT and
+    -- combat damage can never state it (CR 510.1's assignment is not an effect).
+    -- Pawl.Engine.Damage.redirectExcess does the rewriting, on the events
+    -- Pawl.Engine.Resolve's DealDamage arm has built and before
+    -- Pawl.Engine.Damage.applyDamage sees them -- CR 120.4a strictly before CR
+    -- 120.4b, which is observable: a prevention effect on the redirected player
+    -- applies to the redirected half.
+    excess :: Maybe ExcessDestination.ExcessDestination
   }
   deriving (Eq, Ord, Show)

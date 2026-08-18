@@ -365,7 +365,9 @@ slotsOf :: Effect Card.Type.Card -> Map.Map SlotName SlotArity
 slotsOf effect = case effect of
   -- The dealer is a slot READ like any other (CR 120.2b), and one object rather
   -- than a set: a damage event has one source (CR 120.1).
-  Effect.DealDamage (DealDamage.MkDealDamage ref quantity dealer) ->
+  -- The excess destination names no slot: CR 120.4a's "that creature's
+  -- controller" is read off the damaged permanent, not off the card.
+  Effect.DealDamage (DealDamage.MkDealDamage ref quantity dealer _) ->
     joinTwo
       (joinTwo (objectRefSlots ref) (quantitySlots quantity))
       (maybe Map.empty oneSlot dealer)
@@ -651,7 +653,7 @@ conditionSlots condition = case condition of
 -- answer there. Which four, and why not all of them, is on objectRefQuantities.
 slotsAreExhaustive :: Effect Card.Type.Card -> Bool
 slotsAreExhaustive effect = case effect of
-  Effect.DealDamage (DealDamage.MkDealDamage _ quantity _) -> Quantity.slotsAreExhaustive quantity
+  Effect.DealDamage (DealDamage.MkDealDamage _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) ->
     durationSlotsAreExhaustive duration
       && all Quantity.slotsAreExhaustive (Projection.quantitiesOf modification)
@@ -809,7 +811,7 @@ readsX :: [Effect Card.Type.Card] -> Bool
 readsX = any effectReadsX
   where
     effectReadsX effect = case effect of
-      Effect.DealDamage (DealDamage.MkDealDamage _ quantity _) -> Quantity.readsX quantity
+      Effect.DealDamage (DealDamage.MkDealDamage _ quantity _ _) -> Quantity.readsX quantity
       -- Untamed Might's "+X/+X" is an X the effect itself does not carry: it sits
       -- inside the Modification, reached through Projection.quantitiesOf.
       Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> any Quantity.readsX (Projection.quantitiesOf modification)
@@ -2894,7 +2896,7 @@ recordExiledWith source before gs =
 -- source to pay leaves the announced value only on the ability object (#544).
 applyOneEffect :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Effect Card.Type.Card -> Game ()
 applyOneEffect runSubgame resolving source controller legal chosen effect = case effect of
-  Effect.DealDamage (DealDamage.MkDealDamage ref quantity dealer) -> do
+  Effect.DealDamage (DealDamage.MkDealDamage ref quantity dealer excess) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
@@ -2975,7 +2977,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                     pure (Damage.damageEvent gs DamageKind.Noncombat dealt recipient (Integer.toNaturalSaturating n))
                 )
                 recipients
-        Monad.unless (null events) $ do
+            -- CR 120.4a, and BEFORE applyDamage's CR 120.4b: an effect that
+            -- states where its excess damage goes has its events rewritten
+            -- here, against the same pre-effect state every amount was read
+            -- against -- which is the state "damage already marked on the
+            -- creature" asks about.
+            rewritten = Damage.redirectExcess gs excess events
+        Monad.unless (null rewritten) $ do
           -- The applied effect IS the event (the M3a spec, section 4):
           -- constructing these DamageEvents and funneling them is the whole
           -- application. CR 120.3e / 120.3a live in applyDamage.
@@ -2984,7 +2992,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- is processed simultaneously" is what Corrosive Gale's "each creature
           -- with flying" needs, and applyDamage is the funnel that keeps it (its
           -- haddock carries the CR 615/616 reading of a batch).
-          Damage.applyDamage events
+          Damage.applyDamage rewritten
           -- CR 615.5's "immediately afterward", for damage a resolution deals:
           -- a shield this damage spent runs its additional effect here, inside
           -- the same resolution, rather than waiting for the next SBA check.
