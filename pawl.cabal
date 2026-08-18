@@ -1282,6 +1282,7 @@ test-suite pawl-test-suite
     Pawl.CastSpec
     Pawl.CodecIntegrationSpec
     Pawl.ColorSpec
+    Pawl.CombatEffectSpec
     Pawl.CombatSpec
     Pawl.CommanderSpec
     Pawl.ConditionSpec
