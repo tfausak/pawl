@@ -2805,6 +2805,25 @@ victorManchaSpec s registry = Spec.describe s "VictorMancha" $ do
         -- what stops him is that the permission names alice.
         Spec.assertEqWith s "bob is offered his own hand and nothing else" (offeredPlays S.bob bobsTurn) [A.Play hisMountain Nothing]
       other -> Spec.assertFailure s ("expected exactly one exiled card, got " <> show (length other))
+  -- The negative of the pair, and the same one the cast side takes above: Victor
+  -- leaves, CR 611.2b's duration ends, and the same board with the same Swamp in
+  -- the same zone offers nothing but the hand.
+  Spec.it s "CR 611.2b the land play goes with the permission" $ do
+    plains <- S.printingOf s registry "Plains"
+    victor <- S.printingOf s registry "Victor Mancha, Runaway"
+    swamp <- S.printingOf s registry "Swamp"
+    mountain <- S.printingOf s registry "Mountain"
+    let (_, victors, placed) = victorTriggered plains victor swamp
+        resolved = S.runPure S.identityAnswer placed Stack.resolveTop
+        (herMountain, after) = S.addHandCard mountain S.alice (inHerMainPhase resolved)
+        dead = S.runPure S.identityAnswer after (Event.destroy Regenerability.Regenerable victors)
+        swept = S.runPure S.identityAnswer dead Engine.settleForPriority
+    case Game.zoneMembers Zone.Exile S.alice after of
+      [exiledId] -> do
+        Spec.assertBool s (elem (A.Play exiledId Nothing) (offeredPlays S.alice after)) "offered while Victor stands"
+        Spec.assertBool s (elem exiledId (Game.zoneMembers Zone.Exile S.alice swept)) "the Swamp is still in exile"
+        Spec.assertEqWith s "and only her hand is offered now" (offeredPlays S.alice swept) [A.Play herMountain Nothing]
+      other -> Spec.assertFailure s ("expected exactly one exiled card, got " <> show (length other))
   -- CR 715.3d's closing clause: "it can't be cast as an Adventure THIS WAY,
   -- although other effects that allow a player to cast it may allow a player to
   -- cast it as an Adventure". Victor is one of those other effects, so the
@@ -2837,25 +2856,6 @@ victorManchaSpec s registry = Spec.describe s "VictorMancha" $ do
         Spec.assertEqWith s "two Mountains untapped, so neither half is priced out" (S.tappedCount S.alice after) 5
         Spec.assertBool s (offeredCast exiledId shieldbreakerName after) "the creature half is offered, as it would be under CR 715.3d's own permission too"
         Spec.assertBool s (offeredCast exiledId battleDisplayName after) "and so is the Adventure half, which CR 715.3d's own permission would refuse"
-      other -> Spec.assertFailure s ("expected exactly one exiled card, got " <> show (length other))
-  -- The negative of the pair, and the same one the cast side takes above: Victor
-  -- leaves, CR 611.2b's duration ends, and the same board with the same Swamp in
-  -- the same zone offers nothing but the hand.
-  Spec.it s "CR 611.2b the land play goes with the permission" $ do
-    plains <- S.printingOf s registry "Plains"
-    victor <- S.printingOf s registry "Victor Mancha, Runaway"
-    swamp <- S.printingOf s registry "Swamp"
-    mountain <- S.printingOf s registry "Mountain"
-    let (_, victors, placed) = victorTriggered plains victor swamp
-        resolved = S.runPure S.identityAnswer placed Stack.resolveTop
-        (herMountain, after) = S.addHandCard mountain S.alice (inHerMainPhase resolved)
-        dead = S.runPure S.identityAnswer after (Event.destroy Regenerability.Regenerable victors)
-        swept = S.runPure S.identityAnswer dead Engine.settleForPriority
-    case Game.zoneMembers Zone.Exile S.alice after of
-      [exiledId] -> do
-        Spec.assertBool s (elem (A.Play exiledId Nothing) (offeredPlays S.alice after)) "offered while Victor stands"
-        Spec.assertBool s (elem exiledId (Game.zoneMembers Zone.Exile S.alice swept)) "the Swamp is still in exile"
-        Spec.assertEqWith s "and only her hand is offered now" (offeredPlays S.alice swept) [A.Play herMountain Nothing]
       other -> Spec.assertFailure s ("expected exactly one exiled card, got " <> show (length other))
 
 -- Dire Fleet Daredevil {1}{R} Creature -- Human Pirate 2/1: "First strike. When
