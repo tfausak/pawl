@@ -20,6 +20,7 @@ import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -82,6 +83,9 @@ data Response
     -- the whole yield of one activation, so a Sol Ring's is two units, beside
     -- what CR 602.2b charged for it.
     ChoseManaYield ManaOption.ManaOption
+  | -- | CR 601.2h: the one mana the payer chose to spend on the symbol being
+    -- paid.
+    ChoseManaToSpend ManaUnit.ManaUnit
   | -- | CR 701.34a: the permanents and players a proliferating player chose. A
     -- pair rather than two constructors, because one prompt asks one question.
     ChoseProliferation (Set.Set ObjectId.ObjectId, Set.Set PlayerId.PlayerId)

@@ -1427,13 +1427,18 @@ payMana spending pid cost = do
               window (if produced then refused else Set.insert oid refused)
     -- CR 601.2h: the window is closed, so the cost is paid out of what is there
     -- -- and simply is not paid when the player floated too little.
+    --
+    -- WHICH mana goes is the payer's (Mana.spendChosen), so this asks rather
+    -- than reading `settlement`'s assignment: that one answers only whether the
+    -- pool pays.
     settle :: Game Bool
     settle = do
       gs <- State.get
-      case settlement gs of
+      case Mana.plan (PlayerEffect.spendManaAsThough pid gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded manaActivations spending pid cost gs)) cost (Game.poolOf pid gs) of
         Nothing -> pure False
-        Just (left, life) -> do
-          State.put (Event.payLife pid life (Mana.setPool pid left gs))
+        Just (steps, life) -> do
+          left <- Mana.spendChosen pid (PlayerEffect.spendManaAsThough pid gs) steps (Game.poolOf pid gs)
+          State.modify' (Event.payLife pid life . Mana.setPool pid left)
           pure True
 
 -- Which source to tap next, or none. `covered` says whether the pool already

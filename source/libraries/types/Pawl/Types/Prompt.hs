@@ -29,6 +29,7 @@ import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
@@ -108,6 +109,16 @@ data Prompt r where
   -- source taps once, so all four ask which single activation. Candidates are
   -- deduplicated by the whole option (Mana.manaOptionsOf).
   ChooseManaYield :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ManaOption.ManaOption -> Prompt ManaOption.ManaOption
+  -- | CR 601.2h: which mana in the payer's pool goes toward one symbol of a
+  -- cost, asked once per mana spent. CR 107.4b makes a generic symbol one of
+  -- these too, since any type pays it.
+  --
+  -- Choose, not target. Candidates are the units that could pay this symbol and
+  -- still leave the rest of the cost payable, DEDUPLICATED: two units that are
+  -- equal are one option. Elided where every way of paying leaves the same pool
+  -- (Pawl.Engine.Mana.leftovers), which is the whole of what a payment can leave
+  -- behind.
+  ChooseManaToSpend :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty ManaUnit.ManaUnit -> Prompt ManaUnit.ManaUnit
   -- | CR 701.34a. The lists are every permanent and player holding a counter;
   -- the answer is the subset of each that gets one more of every kind it has.
   -- Choose, not target. Elided only when both lists are empty: "any number"

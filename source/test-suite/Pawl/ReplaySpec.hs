@@ -58,6 +58,7 @@ import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
+import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Response as Response
@@ -633,6 +634,16 @@ combatReplaySpec s =
           -- Discriminating for the same reason the pair above is: a decode
           -- that returned the head would pass one leg by accident.
           Spec.assertEqWith s "red round trips" (Replay.decode p (Replay.encode p red)) (Just red)
+        -- CR 601.2h: which mana was spent is a decision, so it has to survive a
+        -- transcript like any other. The pair differs in one field, so a decode
+        -- returning the head would pass one leg by accident.
+        Spec.it s "ChooseManaToSpend round-trips through the transcript" $ do
+          let plain = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}
+              snow = plain {ManaUnit.tags = Set.singleton ProductionTag.Snow}
+              p = Prompt.ChooseManaToSpend decider S.alice (plain NonEmpty.:| [snow])
+          Spec.assertEqWith s "the plain one round trips" (Replay.decode p (Replay.encode p plain)) (Just plain)
+          Spec.assertEqWith s "the snow one round trips" (Replay.decode p (Replay.encode p snow)) (Just snow)
+          Spec.assertEqWith s "and a yield does not decode as one" (Replay.decode p (Response.ChoseManaYield (oneMana Color.Red))) Nothing
         Spec.it s "a mana-source choice does not decode as a mana-yield choice" $ do
           -- Discriminating: this fails if ChooseManaYield reuses ChoseManaSource
           -- rather than getting its own constructor.
