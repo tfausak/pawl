@@ -86,6 +86,31 @@ and constructor names for the counting absolutes (`one`, `only`, `no card`,
 `the pool's`) before you push, and rewrite each hit to say what the pool now
 holds. PR #1788 made three such comments false, and only that sweep found them.
 
+Writing a NEW negative is the same defect from the front, and three PRs in one
+session introduced a false absolute in the very PR that deleted an older one.
+The mechanical cause each time: a negative Scryfall result is evidence about
+the QUERY, not about the pool, and every one of those queries was built from
+pawl's own identifier rather than from the printed template, so it missed cards
+that say the thing in the words a card says it in. So never write the bare form
+--- "nothing prints one", "no printing does this", "the sweep matches nothing".
+Two shapes are admissible. Prefer the citation: the claim is almost always the
+REASON a slot or constructor is unbuilt, which makes it an elision, and
+`Not implemented: ... (#N)` or `(gap #N)` puts it under
+`script/check-gaps.sh`, which reddens that exact line the day the issue closes.
+That is the only automatic trigger available, and its absence is how all three
+survived their own PR's self-review. Where there is genuinely nothing to cite,
+record the QUERY and its date instead of the conclusion --- Scryfall
+`o:"deals damage to" o:"that source"`, 2026-08-18, no hit --- so the next
+reader re-runs it rather than inheriting it. Either shape: build the query from
+the printed template, taken from a card already in `data/cards/` or from the
+CR's own wording, never from the constructor name; scope the noun, since "the
+pool" reads as `data/cards/` in some comments and as every printing ever
+released in others; and name the card that WOULD refute you, so a reader can
+check the claim without re-deriving the query.
+`Pawl.Types.SpendManaAsThough`'s `only` field is the model in the tree ---
+scoped to `data/cards/`, cited to #1804, and it names Chromatic Orrery as the
+card that separates the two readings.
+
 ## Stale reads
 
 pawl's recurring defect shape is a consumer reading a snapshot where the rule
@@ -201,7 +226,7 @@ Each of these has shipped a green-but-meaningless test in this repository:
   negative that lacks it differs from the positive in two things, not one.
 - **A `Pawl.Support` counter may index by a different question than your
   assertion's wording.** `S.countOnBattlefieldByName` takes a `PlayerId`, but
-  `Game.zoneMembers` indexes the battlefield by OWNER (CR 108.1), so it cannot
+  `Game.zoneMembers` indexes the battlefield by OWNER (CR 108.3), so it cannot
   see who CONTROLS anything --- an assertion about a controller written through
   it is green under both readings. Read the helper before trusting its
   parameter's name; `Projection.controllerOf` is the control question.
