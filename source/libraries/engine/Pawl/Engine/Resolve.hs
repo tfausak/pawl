@@ -2526,7 +2526,10 @@ slotOne slot resolving gs = do
 --      resolving to an object any more.
 --   2. WHICH FACE (CR 712.11a). `transformed` puts the back face on the stack and
 --      CR 712.8c gives the resulting spell that face's characteristics; without
---      the rider it is CR 712.11's default, the card's front face.
+--      the rider it is Card.castableFaces, which is one face for a Normal or
+--      Transforming card (CR 712.11's default) and every half for the four
+--      layouts whose caster chooses -- CR 709.3 for Split and Room, CR 715.3 for
+--      Adventure, CR 712.11b for a modal double-faced card.
 --   3. WHAT IT COSTS (CR 118.9). `withoutPayingManaCost` applies the alternative
 --      cost the rule names by that very phrase, and `payingInstead` applies a
 --      STATED one (CR 702.94a); without either rider the candidates are CR
@@ -2535,6 +2538,13 @@ slotOne slot resolving gs = do
 --      half of CR 601.3, an affordable cost, and a fillable target set. Asked
 --      BEFORE the prompt, so the player is never offered a cast the announcement
 --      would only reverse.
+--
+-- Questions 3 and 4 are asked of EACH half separately (CR 709.3a, CR 712.11c),
+-- so a half the caster is prohibited from casting takes only itself out of the
+-- offer. Where more than one survives, CR 709.3's choice is put to the caster --
+-- Prompt.ChooseOfferedCastFace -- and it is put BEFORE the "may" below, because
+-- CR 118.8c's excuse is a property of the cost of the spell BEING CAST and this
+-- choice is what settles which spell that is.
 --
 -- Then, and only then, the "may" -- and only where the opcode says CR 608.2g
 -- "allows" rather than "instructs". At Optionality.Mandatory the cast is not a
@@ -2563,18 +2573,27 @@ slotOne slot resolving gs = do
 offerCast :: ObjectId -> PlayerId -> SlotName -> Optionality.Optionality -> CastOffer.CastOffer -> Game ()
 offerCast resolving caster slot optionality offer = do
   gs <- State.get
-  let offered = do
-        oid <- slotOne slot resolving gs
-        card <- Game.cardOf oid gs
-        -- CR 712.11a for the transformed rider; CR 712.11's default otherwise.
-        -- Nothing for a card with no back face at all, which is CR 712.14a's
-        -- answer to the same instruction one zone over: an offer that cannot be
-        -- made is not made.
-        --
-        -- CR 709.3's half-choice is not offered on the untransformed branch: the
-        -- front face is taken, which for every layout but Split is the only
-        -- castable face there is (#904).
-        face <- if CastOffer.transformed offer then Card.backFace card else Just (Card.frontFace card)
+  let -- CR 712.11a for the transformed rider, which names ONE face; CR 709.3,
+      -- CR 712.11b and CR 715.3 otherwise, each of which says the caster chooses
+      -- which half before putting it onto the stack. Card.castableFaces is that
+      -- list, so the layouts stay its question and not this one.
+      --
+      -- Nothing for a card with no back face at all, which is CR 712.14a's answer
+      -- to the same instruction one zone over: an offer that cannot be made is not
+      -- made.
+      faces card
+        | CastOffer.transformed offer = fmap pure (Card.backFace card)
+        | otherwise = Just (Card.castableFaces card)
+      -- One proposal per half, gated on its own: CR 709.3a and CR 712.11c both say
+      -- only the chosen half is evaluated to see whether it can be cast. Every
+      -- quantity here is the HALF's -- its name, its alternative cost, its
+      -- candidates and so its CR 118.8c excuse -- which is why the whole tuple is
+      -- built inside this function rather than once for the card.
+      --
+      -- The excuse being the half's is the one part of that no test observes: no
+      -- printing pairs a multi-half layout with a hidden-zone additional cost, so
+      -- hoisting it out of this function leaves the suite green (see #1814).
+      proposal oid face =
         let name = Face.name face
             -- CR 118.9a: at most ONE alternative cost, so the applied one
             -- replaces the candidates rather than joining them.
@@ -2598,23 +2617,45 @@ offerCast resolving caster slot optionality offer = do
             -- nothing about turning the card over.
             proposed = Cast.asProposed oid name Facing.FaceUp gs
             candidates = maybe (Cost.costsFor name oid proposed) pure applied
-        Monad.guard (Cast.castableWhenOffered caster oid name candidates proposed)
-        -- CR 118.8c, read off the same candidates the cast will be announced
-        -- with. The candidates and not Face.additionalCosts: CR 118.9d keeps the
-        -- face's additional costs on an alternative cost, so every candidate
-        -- already carries them, and this is the more faithful spelling of "that
-        -- spell has a mandatory additional cost". The rule's other half -- a cost
-        -- APPLIED from another effect (CR 118.8) -- arrives as
-        -- CostAdjustments.components, which spellAdjustments hard-sets empty and
-        -- only PlayerEffect.AddActivationCost ever writes, so it cannot reach a
-        -- spell at all and reading the candidates is exhaustive.
-        --
-        -- Attached to Optionality.Mandatory, whose antecedent is the printed
-        -- phrase "if able": every printing instructing a cast states it that way,
-        -- so the two coincide and a producer instructing one WITHOUT "if able"
-        -- would be the reason to split them.
-        pure (oid, name, applied, any Cost.statesHiddenQuality candidates)
-  case offered of
+         in if Cast.castableWhenOffered caster oid name candidates proposed
+              then
+                -- CR 118.8c, read off the same candidates the cast will be
+                -- announced with. The candidates and not Face.additionalCosts: CR
+                -- 118.9d keeps the face's additional costs on an alternative cost,
+                -- so every candidate already carries them, and this is the more
+                -- faithful spelling of "that spell has a mandatory additional
+                -- cost". The rule's other half -- a cost APPLIED from another
+                -- effect (CR 118.8) -- arrives as CostAdjustments.components, which
+                -- spellAdjustments hard-sets empty and only
+                -- PlayerEffect.AddActivationCost ever writes, so it cannot reach a
+                -- spell at all and reading the candidates is exhaustive.
+                --
+                -- Attached to Optionality.Mandatory, whose antecedent is the
+                -- printed phrase "if able": every printing instructing a cast
+                -- states it that way, so the two coincide and a producer
+                -- instructing one WITHOUT "if able" would be the reason to split
+                -- them.
+                Just (oid, name, applied, any Cost.statesHiddenQuality candidates)
+              else Nothing
+      offers = Maybe.fromMaybe [] $ do
+        oid <- slotOne slot resolving gs
+        card <- Game.cardOf oid gs
+        fmap (Maybe.mapMaybe (proposal oid)) (faces card)
+  -- No survivor is no offer; ONE survivor is one outcome, so CR 709.3's choice
+  -- is elided there rather than asked -- Prompt.ChoosePlayer's and
+  -- Prompt.ChooseProtector's posture. Two or more is the caster's decision.
+  chosen <- case offers of
+    [] -> pure Nothing
+    [sole] -> pure (Just sole)
+    first : rest -> do
+      let decider = Decide.deciderFor caster gs
+          nameOf (_, name, _, _) = name
+          oidOf (oid, _, _, _) = oid
+      picked <- Game.choose (Prompt.ChooseOfferedCastFace decider caster (oidOf first) (fmap nameOf (first NonEmpty.:| rest)))
+      -- Reject-not-repair, castWhileSearching's posture: a name the offer did not
+      -- include is no cast at all, never a half the engine picked instead.
+      pure (List.find ((== picked) . nameOf) offers)
+  case chosen of
     Nothing -> pure ()
     Just (oid, name, applied, excused) -> do
       let cast = Cast.castSpellWith applied caster oid name Facing.FaceUp
