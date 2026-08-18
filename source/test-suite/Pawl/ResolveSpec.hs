@@ -10413,8 +10413,9 @@ wildEvocationSpec s registry =
          in S.runPure answer settled Engine.priorityLoop
       -- Bob's library, which `board` leaves empty. LOAD-BEARING for every leg
       -- whose cast resolves a draw: CR 704.5b makes a draw from an empty library
-      -- lose bob the game at the next SBA check, and the assertions would then be
-      -- read off a board he has left (CR 800.4).
+      -- lose bob the game at the next SBA check, which on a two-seat board hands
+      -- alice the game (CR 104.2a) and leaves the assertions reading a finished
+      -- one.
       withLibrary ps gs = List.foldl' (\g p -> snd (S.addLibraryCard p S.bob g)) gs ps
       -- randomRevealSpec's answerer, pinned by INDEX for its reason: one that
       -- hunted the offer for a castable card would go on answering legally after

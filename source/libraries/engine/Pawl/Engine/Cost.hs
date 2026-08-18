@@ -1115,7 +1115,7 @@ statesHiddenQuality cost = any componentStatesHiddenQuality (Cost.components cos
 
 componentStatesHiddenQuality :: CostComponent.CostComponent Keyword.Type.Keyword -> Bool
 componentStatesHiddenQuality component = case component of
-  -- The one True-capable arm: CR 601.2f's discard is from the HAND, CR 400.2's
+  -- The one True-capable arm: CR 701.9a discards from the HAND, CR 400.2's
   -- hidden zone, and the criterion is what the rule calls the stated quality.
   -- Magmatic Insight's "discard a land card" states one; Cathartic Reunion's
   -- "discard two cards" and CR 702.133a's jump-start cost -- both And [] -- name
