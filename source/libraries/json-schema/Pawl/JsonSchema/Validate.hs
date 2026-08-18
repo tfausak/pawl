@@ -10,6 +10,7 @@
 module Pawl.JsonSchema.Validate where
 
 import qualified Data.List as List
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Decimal as Decimal
@@ -35,23 +36,58 @@ data Failure = MkFailure
   }
   deriving (Eq, Ord, Show)
 
+-- | A schema document as 'Define.run' builds one -- the root schema, and the
+-- @$defs@ every @$ref@ resolves against -- with the definitions indexed by the
+-- reference that reaches each one. Building that index is the expensive half of
+-- a validation and does not depend on the value, so validating a corpus
+-- 'prepare's once and reuses the result.
+data Document = MkDocument
+  { root :: Value.Value,
+    definitions :: Map.Map Text.Text Value.Value
+  }
+
+-- | Indexes a document's definitions by re-encoding each @$defs@ name the way
+-- 'Define.reference' writes one, rather than by decoding the reference. That
+-- inverts the exact function which produced it, so a name carrying a @/@ or a
+-- @~@ that 'Pointer.encode' escapes, or a character that
+-- 'Pawl.Uri.Fragment.encode' percent-encodes, resolves without this module
+-- owning a decoder for any of it. The card schema really does contain both
+-- kinds: @Cost Keyword@ is filed under that name and referenced as
+-- @Cost%20Keyword@.
+prepare :: Value.Value -> Document
+prepare value =
+  MkDocument
+    { root = value,
+      definitions = case value of
+        Value.Object o -> case member (Text.pack "$defs") o of
+          Just (Value.Object defs) ->
+            Map.fromList
+              . fmap (\p -> (Define.fragment . Name.MkName . String.unwrap $ Pair.name p, Pair.value p))
+              $ Object.unwrap defs
+          _ -> Map.empty
+        _ -> Map.empty
+    }
+
 -- | What a check needs beyond a schema and a value: the document every @$ref@
 -- resolves against, where in the value we are, and which references have been
 -- followed since the last step INTO the value.
 data Context = MkContext
-  { document :: Value.Value,
+  { document :: Document,
     location :: Pointer.Pointer,
     seen :: Set.Set Text.Text
   }
 
--- | Validates a value against a whole schema document as 'Define.run' builds
--- one: the document is both the root schema and the carrier of the @$defs@
--- every @$ref@ resolves against. An empty list means the value is valid.
+-- | Validates a value against a whole schema document. An empty list means the
+-- value is valid.
 validate :: Value.Value -> Value.Value -> [Failure]
-validate d =
+validate = validateWith . prepare
+
+-- | 'validate' against an already 'prepare'd document.
+validateWith :: Document -> Value.Value -> [Failure]
+validateWith d =
   check
     MkContext {document = d, location = Pointer.MkPointer [], seen = Set.empty}
-    d
+    (root d)
 
 check :: Context -> Value.Value -> Value.Value -> [Failure]
 check c schema value = case schema of
@@ -102,26 +138,10 @@ checkRef c argument value = case argument of
     let target = String.unwrap s
      in if Set.member target $ seen c
           then [failure c $ Text.pack "cyclic $ref " <> target]
-          else case resolve (document c) target of
+          else case Map.lookup target (definitions (document c)) of
             Nothing -> [failure c $ Text.pack "unresolvable $ref " <> target]
             Just schema -> check c {seen = Set.insert target $ seen c} schema value
   _ -> [failure c $ Text.pack "expected $ref to be a string but got " <> render argument]
-
--- | Resolves a reference by re-encoding each @$defs@ name the way
--- 'Define.reference' writes one and comparing, rather than by decoding the
--- reference. That inverts the exact function which produced it, so a name
--- carrying a @/@ or a @~@ that 'Pointer.encode' escapes, or a character
--- 'Pawl.Uri.Fragment.encode' percent-encodes, resolves without this module
--- owning a decoder for any of it.
-resolve :: Value.Value -> Text.Text -> Maybe Value.Value
-resolve d target = case d of
-  Value.Object o -> case member (Text.pack "$defs") o of
-    Just (Value.Object defs) ->
-      fmap Pair.value
-        . List.find ((== target) . Define.fragment . Name.MkName . String.unwrap . Pair.name)
-        $ Object.unwrap defs
-    _ -> Nothing
-  _ -> Nothing
 
 checkType :: Context -> Value.Value -> Value.Value -> [Failure]
 checkType c argument value = case argument of
@@ -330,17 +350,13 @@ checkAdditionalProperties c schema argument value = case value of
 checkOneOf :: Context -> Value.Value -> Value.Value -> [Failure]
 checkOneOf c argument value = case argument of
   Value.Array branches ->
-    let matched = filter (null . (\schema -> check c schema value)) $ Array.unwrap branches
-     in if length matched == 1
-          then []
-          else
-            [ failure c $
-                Text.pack "expected exactly one oneOf branch to match "
-                  <> render value
-                  <> Text.pack " but "
-                  <> Text.pack (show $ length matched)
-                  <> Text.pack " did"
-            ]
+    -- Counted through take 2, so a union with many arms stops at the second
+    -- match instead of checking the value against every remaining arm.
+    let matched = length . take 2 . filter (null . (\schema -> check c schema value)) $ Array.unwrap branches
+     in case matched of
+          1 -> []
+          0 -> [failure c $ Text.pack "no oneOf branch matched " <> render value]
+          _ -> [failure c $ Text.pack "more than one oneOf branch matched " <> render value]
   _ -> [failure c $ Text.pack "expected oneOf to be an array but got " <> render argument]
 
 checkAllOf :: Context -> Value.Value -> Value.Value -> [Failure]
