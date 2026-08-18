@@ -29,10 +29,14 @@
 -- opponent controls and gain control of it until end of turn" is the pool's way
 -- to phase out a creature under a player who does not own it.
 --
--- What is NOT asserted, because no card in the pool can reach it: CR 702.26e/f's
--- continuous-effect consequences (#930), and CR 702.26h's directly-and-indirectly
--- tie-break, which needs an effect naming a permanent and its own Equipment at
--- once (#1723).
+-- Clever Concealment joins them as the only printing here whose target slot takes
+-- CR 601.2c's variable number: "any number of target nonland permanents you
+-- control phase out" is what names a permanent and its own Equipment in one
+-- announcement, which is CR 702.26h's tie-break. Its convoke is not implemented
+-- (#877), so pawl's copy pays {2}{W}{W} in full -- stricter than printed.
+--
+-- Not implemented: CR 702.26e/f's continuous-effect consequences, which no card
+-- in the pool can reach (#930).
 module Pawl.PhasingSpec where
 
 import qualified Control.Monad as Monad
@@ -50,6 +54,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -170,6 +175,49 @@ equippedBoard island piker bonesplitter ripple =
     let (host, withHost) = S.addCreature piker S.alice gs
         (equip, withEquip) = S.addCreature bonesplitter S.alice withHost
      in ((host, equip), S.attach equip host withEquip)
+
+-- CR 601.2c's whole announcement for Clever Concealment: as many targets as
+-- `oids` names, and exactly those objects taken out of the offered set.
+--
+-- FILTERS the offered set, which is aimedAt's posture above and for its reason.
+-- Not S.preferring, though: that takes the slot's ANNOUNCED number, so an
+-- announcement that had degraded to one would silently hand back one recipient
+-- and the case below would pass without ever naming both permanents. Filtering
+-- makes a degraded announcement a count mismatch the engine reacts to.
+aimedAtAll :: Set.Set ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimedAtAll oids p = case p of
+  Prompt.AnnounceTargets _ _ _ offers -> fmap (const (Natural.length oids)) offers
+  Prompt.ChooseTargets _ _ _ sets ->
+    fmap (\(_, legal) -> Set.filter (maybe False (`Set.member` oids) . Recipient.objectOf) legal) sets
+  _ -> S.aggressiveAnswer p
+
+-- alice casts `spell` naming every one of `oids` and resolves it.
+concealAll :: Set.Set ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+concealAll oids spell gs =
+  S.runPure (aimedAtAll oids) gs $ do
+    S.cast S.alice spell
+    Monad.void Stack.resolveTop
+
+-- equippedBoard's Clever Concealment twin: alice's Goblin Piker with a
+-- Bonesplitter on it, four Plains, and the spell in hand. Four Plains is EXACTLY
+-- {2}{W}{W}, which is rippleBoard's two-Island reasoning carried over -- a board
+-- that could not pay would leave the spell in hand and the assertions downstream
+-- would pass for the wrong reason, which is why the case asserts the phased-in
+-- setup first. The Plains are the only other permanents alice controls and the
+-- slot's filter is "nonland", so the Piker and the Bonesplitter are the whole
+-- offer and announcing two is announcing all of it.
+concealBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  ((ObjectId.ObjectId, ObjectId.ObjectId), ObjectId.ObjectId, GameState.GameState)
+concealBoard plains piker bonesplitter conceal =
+  let base = S.landsFor plains S.alice 4 (Setup.emptyGame S.bothPlayers)
+      (host, withHost) = S.addCreature piker S.alice base
+      (equip, withEquip) = S.addCreature bonesplitter S.alice withHost
+      (board, spell) = S.handOne conceal (S.attach equip host withEquip)
+   in ((host, equip), spell, board)
 
 -- Three seats, bob with two Goblin Pikers, and alice holding a Ray of Command
 -- and two Reality Ripples with the mana for all three: {3}{U} and {1}{U} twice
@@ -299,9 +347,9 @@ effectSpec s registry = Spec.describe s "Effect" $ do
     -- send it straight back out again.
     Spec.assertEqWith s "and it does not phase out again at once" (Phasing.phasedOutStatus victim bobs) Nothing
   -- CR 506.4, restated as CR 702.26b's last sentence: "a permanent that phases out
-  -- is removed from combat." Reality Ripple is the only route to it -- CR 502.1's
+  -- is removed from combat." An effect is the only route to it -- CR 502.1's
   -- action runs in the untap step, the turn's first, so nothing is ever in combat
-  -- when it fires.
+  -- when it fires -- and Reality Ripple is the one this group is built on.
   --
   -- alice phases out one of her OWN two attackers, so bob's life total counts the
   -- clause: 2 instead of 4. The control is the same declaration with no Ripple
@@ -668,6 +716,11 @@ departureSpec s registry = Spec.describe s "Departure" $ do
 -- Reality Ripple is what reaches it: an Equipment is an artifact (CR 301.5), so
 -- rule 702.26i needs no Aura or Equipment carrying the phasing keyword -- which is
 -- as well, since none has been printed.
+--
+-- Clever Concealment reaches the two things Reality Ripple's one artifact,
+-- creature or land target cannot: CR 702.26h's tie-break, which needs a permanent
+-- and its own Equipment named together, and rule 702.26i's PLAYER clause, which
+-- needs an enchant-player Aura (CR 702.5d) phased out directly.
 attachedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 attachedSpec s registry = Spec.describe s "Attached" $ do
   -- CR 702.26b's "treated as though it does not exist", read off the equipped
@@ -692,10 +745,9 @@ attachedSpec s registry = Spec.describe s "Attached" $ do
   -- the row says Indirectly instead.
   --
   -- NOT CR 702.26h, whose tie-break needs an object that would phase out BOTH ways
-  -- at once -- an effect naming a permanent and its own Equipment in one event.
-  -- Reality Ripple has one target, and no printing in the pool sweeps a set that
-  -- way, so that branch of Pawl.Engine.Phasing.phaseOutSet is not implemented in
-  -- the sense of being unobservable (#1723).
+  -- at once. Reality Ripple has one target, so neither of these two boards can put
+  -- the Equipment in both categories. This case is the MINIMAL PAIR for the Clever
+  -- Concealment case below, where it is in both.
   Spec.it s "CR 702.26g the same Equipment phases out directly or indirectly by what was targeted" $ do
     island <- S.printingOf s registry "Island"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -709,6 +761,45 @@ attachedSpec s registry = Spec.describe s "Attached" $ do
     Spec.assertEqWith s "aimed at the host, the Equipment phased out INDIRECTLY" (Phasing.phasedOutStatus equip atHost) (Just (PhasedOut.Indirectly S.alice))
     Spec.assertEqWith s "the host itself directly" (Phasing.phasedOutStatus host atHost) (Just (PhasedOut.Directly S.alice))
     Spec.assertEqWith s "and both are gone" (fmap (`onBattlefield` atHost) [host, equip]) [False, False]
+  -- CR 702.26h: an object that would phase out DIRECTLY (the effect names it) and
+  -- INDIRECTLY (its host is leaving in the same event) "just phases out
+  -- indirectly". Clever Concealment's "any number of target nonland permanents you
+  -- control" is what can name a permanent and its own Equipment at once, so the
+  -- whole set reaches Pawl.Engine.Phasing.phaseOutSet in one call and the two rules
+  -- disagree about the Equipment for the first time.
+  --
+  -- The MINIMAL PAIR is the case above, on the same Piker-and-Bonesplitter board
+  -- through the same attach: there the Equipment is dragged only, and its row is
+  -- Indirectly for rule 702.26g's reason alone. Here it is dragged AND named, and
+  -- rule 702.26h is the only thing keeping the row Indirectly.
+  --
+  -- What this case does NOT prove is the two rows' RETURN SCHEDULES, and the card
+  -- is why: rule 702.26a phases a direct row back at its own stored player's untap
+  -- step while an indirect row rides its host back, and Clever Concealment's "you
+  -- control" makes both rows store alice and both hosts alice's, so the two
+  -- readings return together on every board it can build. Separating them needs a
+  -- phase-out spanning two controllers' attached permanents (gap #1822).
+  Spec.it s "CR 702.26h an object named AND dragged phases out indirectly" $ do
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    conceal <- S.printingOf s registry "Clever Concealment"
+    let ((host, equip), spell, board) = concealBoard plains piker bonesplitter conceal
+        both = concealAll (Set.fromList [host, equip]) spell board
+    -- Asserted before the outcome, so a version that never cast or never resolved
+    -- fails here rather than passing below by never having moved anything.
+    Spec.assertEqWith s "setup: equipped, the Piker is 4/1" (Projection.powerOf host board) (Just 4)
+    -- CR 702.26h itself, and the only assertion in the file that turns on WHICH of
+    -- the two ways an object came to be in `leaving`.
+    Spec.assertEqWith s "the Equipment, named AND dragged, phased out INDIRECTLY" (Phasing.phasedOutStatus equip both) (Just (PhasedOut.Indirectly S.alice))
+    Spec.assertEqWith s "the host, named only, directly" (Phasing.phasedOutStatus host both) (Just (PhasedOut.Directly S.alice))
+    Spec.assertEqWith s "and both left the battlefield" (fmap (`onBattlefield` both) [host, equip]) [False, False]
+    -- CR 702.26c: both come back at alice's untap step, which is what says the
+    -- Indirectly row is rule 702.26g's ride-along and not a dead row.
+    let back = untapStep S.alice both
+    Spec.assertEqWith s "both phase in" (fmap (`onBattlefield` back) [host, equip]) [True, True]
+    Spec.assertEqWith s "still attached" (attachedHostOf equip back) (Just (Recipient.ToCreature host))
+    Spec.assertEqWith s "and the Piker is 4/1 again" (Projection.powerOf host back) (Just 4)
   -- CR 702.26i's first sentence: a directly phased-out Equipment "will phase in
   -- attached to the object ... it was attached to when it phased out, if that
   -- object is still in the same zone".
@@ -753,3 +844,27 @@ attachedSpec s registry = Spec.describe s "Attached" $ do
     Spec.assertEqWith s "the Equipment still phased out meanwhile" (Phasing.isPhasedOut equip dead) True
     Spec.assertEqWith s "it phases in" (onBattlefield equip back) True
     Spec.assertEqWith s "unattached, its host being gone" (attachedHostOf equip back) Nothing
+  -- CR 702.26i's PLAYER clause: "the object or player it was attached to when it
+  -- phased out, if that object is still in the same zone or that player is still
+  -- in the game". A permanent attached to a player is an Aura (CR 702.5d), and
+  -- Clever Concealment is what phases one out DIRECTLY -- "any number of target
+  -- nonland permanents you control" names the Aura itself, where Reality Ripple's
+  -- artifact, creature or land cannot.
+  --
+  -- alice's Curse of Death's Hold on BOB, so the Aura's controller and its host
+  -- are different seats and CR 702.26a's schedule is alice's while rule 702.26i's
+  -- question is about bob. Attached directly, which is enchantedCrocodile's
+  -- posture above and for its reason.
+  Spec.it s "CR 702.26i an Aura attached to a PLAYER phases in still attached" $ do
+    plains <- S.printingOf s registry "Plains"
+    curse <- S.printingOf s registry "Curse of Death's Hold"
+    conceal <- S.printingOf s registry "Clever Concealment"
+    let (aura, withAura) = S.addCreature curse S.alice (S.landsFor plains S.alice 4 (Setup.emptyGame S.bothPlayers))
+        (board, spell) = S.handOne conceal (S.attachTo aura (Recipient.ToPlayer S.bob) withAura)
+        gone = concealAll (Set.singleton aura) spell board
+        back = untapStep S.alice gone
+    Spec.assertEqWith s "setup: the Aura is on bob" (attachedHostOf aura board) (Just (Recipient.ToPlayer S.bob))
+    Spec.assertEqWith s "it phased out DIRECTLY, under alice who controls it" (Phasing.phasedOutStatus aura gone) (Just (PhasedOut.Directly S.alice))
+    Spec.assertEqWith s "still attached while away" (attachedHostOf aura gone) (Just (Recipient.ToPlayer S.bob))
+    Spec.assertEqWith s "and phases in still on bob, who is still in the game" (attachedHostOf aura back) (Just (Recipient.ToPlayer S.bob))
+    Spec.assertEqWith s "back on the battlefield" (onBattlefield aura back) True
