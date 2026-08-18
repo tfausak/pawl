@@ -1045,7 +1045,7 @@ hasJumpStart = Set.member Keyword.JumpStart
 -- no limit on how many a card may have. The set this is asked of is the
 -- PROJECTED one in a graveyard, so a card with a printed flashback and a granted
 -- one has two costs and CR 601.2b a choice between them; only the lesser (Set
--- order) is offered (#294).
+-- order) is offered (gap #294).
 flashbackCost :: Set Keyword -> Maybe (Cost Keyword)
 flashbackCost keywords =
   let costOf keyword = case keyword of
@@ -1080,8 +1080,8 @@ flashbackCost keywords =
 -- A wildcard rather than an exhaustive case, exactly as flashbackCost above.
 --
 -- Nothing beyond the FIRST morph cost is reachable: a card printing two morph
--- abilities is expressible and unrepresented, as for flashback and entwine, and
--- no printing does it.
+-- abilities is expressible and unrepresented, as for flashback and entwine
+-- (gap #1677).
 morphCost :: Set Keyword -> Maybe (Cost Keyword)
 morphCost keywords =
   let costOf keyword = case keyword of
@@ -1131,8 +1131,8 @@ entwineCost keywords =
 -- A wildcard rather than an exhaustive case, exactly as flashbackCost.
 --
 -- Nothing beyond the FIRST plot cost is reachable: a card printing two plot
--- abilities is expressible and unrepresented, as for flashback and entwine, and
--- no printing does it.
+-- abilities is expressible and unrepresented, as for flashback and entwine
+-- (gap #1677).
 plotCost :: Set Keyword -> Maybe (Cost Keyword)
 plotCost keywords =
   let costOf keyword = case keyword of
@@ -1153,7 +1153,7 @@ plotCost keywords =
 --
 -- Nothing beyond the FIRST foretell cost is reachable: a card printing two
 -- foretell abilities is expressible and unrepresented, as for flashback and
--- entwine, and no printing does it.
+-- entwine (gap #1677).
 foretellCost :: Set Keyword -> Maybe (Cost Keyword)
 foretellCost keywords =
   let costOf keyword = case keyword of
@@ -3201,7 +3201,8 @@ miracle cost =
 -- in the hand (CR 113.6b), where no pool effect changes a card's keywords (#160).
 --
 -- Nothing beyond the FIRST miracle cost is reachable, also for flashbackCost's
--- reason. No printing carries miracle twice.
+-- reason: a card printing two miracle abilities is expressible and
+-- unrepresented (gap #1677).
 miracleCost :: Set Keyword -> Maybe (Cost Keyword)
 miracleCost keywords =
   let costOf keyword = case keyword of
