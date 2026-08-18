@@ -2534,10 +2534,15 @@ slotOne slot resolving gs = do
 -- "allows" rather than "instructs". At Optionality.Mandatory the cast is not a
 -- decision, so there is nothing to ask and Prompt.OfferedCast is elided, which
 -- is the posture Game.choose's haddock expects of every prompt site: ask only
--- the branch that genuinely has two answers. Question 4 above is what "if able"
--- means (CR 118.8's family), and it is asked either way -- a mandatory offer the
--- caster cannot take is simply not made. Declining an OPTIONAL one leaves the
--- card exactly where the earlier effect put it, which for CR 310.12b is exile.
+-- the branch that genuinely has two answers. Question 4 above is what a printed
+-- "if able" comes to (CR 601.3, CR 609.3) and it is asked either way -- a
+-- mandatory offer the caster cannot take is simply not made. Declining an
+-- OPTIONAL one leaves the card exactly where the earlier effect put it, which
+-- for CR 310.12b is exile.
+--
+-- Not implemented: CR 118.8c excuses a mandatory cast whose additional cost
+-- names cards of a stated quality in a hidden zone, which needs a classification
+-- of the face's additional costs this function does not ask for (#110).
 --
 -- The caster is a parameter and not the resolving controller: rule 608.2g says
 -- "a player", and CR 601.2's announcements belong to that player. The opcode's
@@ -4122,10 +4127,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- since nothing moves and nothing is decided in between.
   Effect.Reveal (Reveal.MkReveal ref mSlot) -> do
     gs <- State.get
-    -- The slot, when the card named one. bindSlot and NOT bindObjectsSlot: only
-    -- the SINGLE binding is visible to Filter.IsBound and to slotOne (#1532),
-    -- which are the two readers Wild Evocation's later clauses use. LookAt's arm
-    -- below makes the same call the same way, dispatching on how many arrived.
+    -- Show one card, and name it if the card asked for a name. bindSlot and NOT
+    -- bindObjectsSlot: only the SINGLE binding is visible to Filter.IsBound and
+    -- to slotOne (#1532), which are the two readers Wild Evocation's later
+    -- clauses use. A random reveal names exactly one card per seat, so the
+    -- one-versus-many line LookAt's arm draws is drawn below instead, at the
+    -- branch whose ref can name several.
     let showOne pid oid = do
           Event.reveal RevealCause.Ordinary pid oid
           Monad.forM_ mSlot $ \slot -> State.modify' (bindSlot resolving slot oid)
