@@ -356,16 +356,21 @@ data TriggerCondition
     -- the attacker into Pawl.Engine.Binding.blockedCreature for the payload's
     -- "that creature" to read.
     --
-    -- No Filter over the attacker, unlike SelfBecomesBlockedBy. The printings that
-    -- narrow it -- Netcaster Spider's "a creature with flying" -- are not served
-    -- (#1253); SelfBlocksOneOrMore's Filter is a different arity and does not
-    -- cover them.
+    -- The Filter is a predicate over the ATTACKER blocked -- Netcaster Spider's
+    -- "a creature with flying", Crimson Roc's "without flying", Loyal Sentry's
+    -- unnarrowed "a creature". Read at the scan, which is rule 509.3f's "at the
+    -- point blockers are declared" for SelfBecomesBlockedBy's reason.
+    --
+    -- Not SelfBlocksOneOrMore's Filter, which is the same predicate at a
+    -- different ARITY: that form reads the grouped GameEvent.BlocksDeclared and
+    -- fires once for the whole declaration, where this one fires once per
+    -- attacker blocked. A creature blocking two fliers tells them apart.
     --
     -- Rule 509.3b's other producer, an effect that causes the bearer to block,
     -- records no event and so does not reach this (#1146). CR 509.4's creature
     -- put onto the battlefield blocking is excluded by the rule itself, and by
     -- the same construction that excludes it from SelfBlocks.
-    SelfBlocksCreature
+    SelfBlocksCreature (Filter.Filter Keyword.Keyword)
   | -- | CR 509.3e: "whenever [a creature] blocks two or more creatures" --
     -- Lairwatch Giant's. SelfBlocks with a floor on the number, matched against
     -- the same grouped GameEvent.BlocksDeclared and self-scoped the same way.

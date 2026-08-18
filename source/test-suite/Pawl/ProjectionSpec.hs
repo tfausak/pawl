@@ -1021,6 +1021,31 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     -- And hacked, the trigger the projection hands out asks the new question.
     Spec.assertEqWith s "hacked, the trigger counts Islands" (asksAbout hacked) [Subtype.Type.Island]
 
+  -- CR 612.1 into the OTHER place a trigger condition keeps card text: the
+  -- Filter that rule 509.3's narrowed forms carry. Hand-built for the reason the
+  -- cross-family case below is -- no printing in the pool puts a SUBTYPE word in
+  -- one of these Filters (Netcaster Spider's says "with flying", Serra
+  -- Inquisitors' "black"), so no board can make the swap visible and an arm that
+  -- returned the condition unchanged would pass every gameplay case in
+  -- Pawl.TriggerSpec.
+  Spec.it s "CR 612.1 a rule 509.3 condition's Filter is rewritten, and its nullary sibling is not" $ do
+    let rewrite = Projection.rewriteTriggerCondition [(Subtype.Type.Wraith, Subtype.Type.Elf)]
+    Spec.assertEqWith
+      s
+      "CR 509.3b's Filter over the attacker blocked takes the swap"
+      (rewrite (TriggerCondition.SelfBlocksCreature (Filter.Type.HasSubtype Subtype.Type.Wraith)))
+      (TriggerCondition.SelfBlocksCreature (Filter.Type.HasSubtype Subtype.Type.Elf))
+    Spec.assertEqWith
+      s
+      "CR 509.3d's, read from the other side, takes it too"
+      (rewrite (TriggerCondition.SelfBecomesBlockedBy (Filter.Type.HasSubtype Subtype.Type.Wraith)))
+      (TriggerCondition.SelfBecomesBlockedBy (Filter.Type.HasSubtype Subtype.Type.Elf))
+    Spec.assertEqWith
+      s
+      "and CR 509.3a's nullary form holds no word to swap"
+      (rewrite TriggerCondition.SelfBlocks)
+      TriggerCondition.SelfBlocks
+
   -- A CREATURE type word in a type line, swapped -- the half CR 612.2 names
   -- second, and the half no pair could reach before Artificial Evolution. Bog
   -- Wraith's printed Wraith moves to Elf.
