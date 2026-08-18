@@ -581,7 +581,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     -- The Filter half of read-point 3 (Resolve.modesOf) rests on this case
     -- alone: no real instant or sorcery SETS a land's subtype. The Modification
     -- half of the same read-point is Turn to Frog's SetCreatureSubtype under an
-    -- Artificial Evolution (the ArtificialEvolution group below), and
+    -- Artificial Evolution (Pawl.CounterspellSpec's ArtificialEvolution group), and
     -- Pawl.ActivateSpec's Tidal Warrior chain reaches the same
     -- Projection.rewriteEffect ModifyTarget arm through an ACTIVATED ability.
     island <- S.printingOf s registry "Island"

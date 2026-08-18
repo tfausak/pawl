@@ -340,9 +340,13 @@ subsystem gets a new `Pawl.<Area>Spec` wired into `Main.hs`'s `spec`, or into
 when adding a module, since `hooky fix` has skipped that case.
 
 One subsystem may span several spec modules --- `Pawl.TriggerSpec` and its
-`Keyword`/`Zone`/`Event` siblings --- which all `describe` under the same name,
-so the split costs a tasty pattern nothing.
+`Keyword`/`Zone`/`Event` siblings, `Pawl.ResolveSpec` and its six --- which all
+`describe` under the same name, so the split costs a tasty pattern nothing. Cut
+such a split along the FILE's order rather than the `spec` call order: helpers
+sit next to the group that uses them, so contiguous ranges keep the closure
+together and leave "the case above" reading true.
 
 Shared fixtures live in `Pawl.Support`, imported `qualified ... as S` --- the
 one documented exception to alias-to-last-component; a group-local helper stays
-with its group, including one two sibling spec modules each keep a copy of.
+with its group, and a helper two or more sibling modules want is duplicated
+rather than hoisted, since `Pawl.Support` rebuilds every spec in the tree.
