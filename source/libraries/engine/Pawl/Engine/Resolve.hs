@@ -3701,7 +3701,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- WHICH objects move, gathered first and moved second, so that the CR
           -- 401.2 and CR 401.4 questions between the two steps are asked of the
           -- whole batch. BOTH branches go through it: a stated placement is
-          -- settled the same way, and an InSlot move is a batch of at most one.
+          -- settled the same way, and an InSlot move is a batch of however many
+          -- the slot names.
           targets <- case ref of
             -- NOT routed through objectRefObjects, and that is the whole reason
             -- this arm branches by hand rather than sweeping both cases. That
@@ -3745,13 +3746,21 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 Just objects -> pure (Foldable.toList objects)
                 Nothing -> do
                   bound <- if Map.member slot chosen then pure Nothing else State.gets (slotOne slot resolving)
+                  -- EVERY still-legal target in the slot, not one: this reader
+                  -- takes a batch, which is what objectRefSlots already declares
+                  -- of a MoveToZone's InSlot (SlotArity.Many) and what
+                  -- objectRefObjects' own InSlot arm reads. Faerie Macabre's
+                  -- "Exile UP TO TWO target cards from graveyards" is the
+                  -- producer; legalOne declines a slot naming several
+                  -- (Binding.onlyOne), so such a card used to move nothing at
+                  -- all. Identical for a singular slot -- a one-element set is
+                  -- the same one recipient -- and CR 608.2b's illegal ones are
+                  -- already dropped from `legal`. An empty list is a slot
+                  -- nothing bound, every target gone illegal, or CR 115.6's
+                  -- zero targets chosen.
                   pure $ case bound of
                     Just oid -> [oid]
-                    Nothing -> case legalOne slot legal of
-                      Just recipient -> Maybe.maybeToList (Recipient.objectOf recipient)
-                      -- Illegal slot (CR 608.2b), a non-object recipient, or a slot
-                      -- nothing ever bound.
-                      _ -> []
+                    Nothing -> Maybe.mapMaybe Recipient.objectOf (legalMany slot legal)
             -- Evacuation's "return all creatures to their owners' hands". Swept
             -- ONCE from the PRE-MOVE state, which is CR 608.2c's "in the order
             -- written" read together with CR 608.2f's "each such action is

@@ -6,7 +6,7 @@
 -- Pawl.Engine.Quantity's Speed arm (CR 702.179e/702.179f), CR 702.178a's max
 -- speed gate -- Pawl.Types.ActivatedAbility's condition, applied by
 -- Pawl.Engine.Projection.abilitiesGiven -- and CR 702.178b's zone clause, applied
--- by Pawl.Engine.Activate.graveyardAbilitiesOf. Also Pawl.Types.Effect's
+-- by Pawl.Engine.Activate.zoneAbilitiesOf. Also Pawl.Types.Effect's
 -- DecreaseSpeed arm and its Pawl.Types.SpeedDecrease payload, and the two
 -- references Spikeshell Harrier reaches "that opponent" through --
 -- Pawl.Types.PlayerRef's ControllerOfBound and Pawl.Types.Filter's

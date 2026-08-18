@@ -142,7 +142,9 @@ data CostComponent keyword
     -- of the components that do.
     DiscardCards (DiscardCards.DiscardCards keyword)
   | -- | CR 702.29a's and CR 702.77a's "Discard this card": discard the card the
-    -- cost is on, from the hand it is in. Two rules print the same clause, so
+    -- cost is on, from the hand it is in. Two rules print that clause and cards
+    -- print it themselves (Faerie Macabre's "Discard this card: Exile up to two
+    -- target cards from graveyards"), so
     -- the component carries the Pawl.Types.DiscardCause the payment logs -- CR
     -- 702.29c's "when you cycle this card" means "when you discard this card to
     -- pay an activation cost OF A CYCLING ABILITY", and rule 702.77 never says

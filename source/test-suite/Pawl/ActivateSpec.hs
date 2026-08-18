@@ -513,6 +513,7 @@ lastKnownSpec s registry = Spec.describe s "LastKnownInformation" $ do
 
   cyclingSpec s registry
   reinforceSpec s registry
+  authoredHandAbilitySpec s registry
 
 -- CR 702.29: cycling, the first activated ability in the pool that is activated
 -- from a zone other than the battlefield. Barkhide Mauler is a {4}{G} 4/4 whose
@@ -963,6 +964,103 @@ reinforceSpec s registry = Spec.describe s "Reinforce" $ do
         gs = g1 {GameState.priority = Just S.alice}
     Spec.assertEqWith s "nothing minted for it on the battlefield" (Activate.abilitiesFor guardId gs) []
     Spec.assertBool s (not (any isActivate (Action.legalActions S.alice gs))) "and no Activate offered"
+
+-- CR 113.6j: an activated ability a card AUTHORS, functioning from the hand
+-- because its cost can only be paid there. Faerie Macabre is a {1}{B}{B} 2/2 with
+-- flying and "Discard this card: Exile up to two target cards from graveyards" --
+-- the first card in the pool to write a DiscardThis cost component itself, where
+-- cycling and reinforce have theirs minted from a keyword (CR 702.29a, CR
+-- 702.77a). Nothing else on the card can produce the ability under test.
+--
+-- The board: alice holds the Macabre and nothing else, bob's graveyard holds a
+-- Goblin Piker and a Barkhide Mauler, and alice's holds a Forest that nothing
+-- aims at. THREE candidates for a two-target announcement, so the choice is a
+-- real one, and the Forest is what tells "exiled the targets" from "swept the
+-- graveyards". No land is needed: the whole activation cost is the discard.
+macabreBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+macabreBoard s registry = do
+  macabre <- S.printingOf s registry "Faerie Macabre"
+  piker <- S.printingOf s registry "Goblin Piker"
+  mauler <- S.printingOf s registry "Barkhide Mauler"
+  forest <- S.printingOf s registry "Forest"
+  let (pikerId, g0) = S.addGraveyardCard piker S.bob (Setup.emptyGame S.bothPlayers)
+      (maulerId, g1) = S.addGraveyardCard mauler S.bob g0
+      (_, g2) = S.addGraveyardCard forest S.alice g1
+      (g3, macabreId) = S.handOne macabre g2
+  pure (macabreId, pikerId, maulerId, g3 {GameState.priority = Just S.alice})
+
+-- Aims at exactly these cards by FILTERING the offered recipients rather than
+-- building one: a hand-built Recipient of another tag is a different recipient,
+-- and CR 608.2b's re-read drops it with no error.
+aimAtCards :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+aimAtCards oids p =
+  let isWanted recipient = case recipient of
+        Recipient.ToObject oid -> elem oid oids
+        _ -> False
+   in case p of
+        Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, legal) -> Set.filter isWanted legal) asked
+        _ -> S.identityAnswer p
+
+-- The card names in one player's copy of a zone, sorted. Written by NAME rather
+-- than by object id because CR 400.7 mints a new incarnation on every zone
+-- change, so the id a fixture placed a card under answers Nothing the moment the
+-- card moves -- which is indistinguishable from "moved somewhere else".
+namesIn :: Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
+namesIn zone pid gs = List.sort (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
+
+named :: String -> CardName.CardName
+named = CardName.MkCardName . Text.pack
+
+authoredHandAbilitySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+authoredHandAbilitySpec s registry = Spec.describe s "Authored hand ability" $ do
+  -- CR 113.6j: "An object's activated ability that has a cost that can't be paid
+  -- while the object is on the battlefield functions from any zone in which its
+  -- cost can be paid." CR 113.6m names that zone -- the cost discards the object
+  -- itself, so Cost.zoneOfComponent answers the hand -- and this is the whole
+  -- card, end to end, from a hand.
+  --
+  -- Driven through the offered list rather than a hand-built ability: an engine
+  -- that never offers the ability activates nothing, so the exile below is what
+  -- goes red rather than a count ahead of it.
+  Spec.it s "CR 113.6j an authored discard-this ability functions from the hand" $ do
+    (macabreId, pikerId, maulerId, gs) <- macabreBoard s registry
+    let abilities = Activate.abilitiesFor macabreId gs
+        activated = S.runPure (aimAtCards [pikerId, maulerId]) gs (mapM_ (Activate.activateAbility S.alice macabreId) abilities)
+        after = S.runPure (aimAtCards [pikerId, maulerId]) activated Stack.resolveTop
+    Spec.assertEqWith s "both targeted graveyard cards are exiled" (namesIn Zone.Exile S.bob after) [named "Barkhide Mauler", named "Goblin Piker"]
+    Spec.assertEqWith s "so bob's graveyard is empty" (namesIn Zone.Graveyard S.bob after) []
+    -- CR 115.6's "up to two" is a maximum and not a sweep: alice's own Forest was
+    -- offered and not chosen, so it stays where it is -- beside the Macabre the
+    -- cost discarded (CR 404.1).
+    Spec.assertEqWith s "and the third card in a graveyard, which nothing targeted, is still there" (namesIn Zone.Graveyard S.alice after) [named "Faerie Macabre", named "Forest"]
+    Spec.assertEqWith s "alice exiled nothing of her own" (namesIn Zone.Exile S.alice after) []
+    Spec.assertEqWith s "exactly the one printed ability was offered from the hand" (length abilities) 1
+    Spec.assertBool s (not (null (activationsOf macabreId (Action.legalActions S.alice gs)))) "and the enumeration offers it as an action"
+    Spec.assertEqWith s "the Macabre paid its own cost out of the hand" (namesIn Zone.Hand S.alice activated) []
+    Spec.assertEqWith s "and is in its owner's graveyard (CR 404.1) while its ability is still on the stack" (namesIn Zone.Graveyard S.alice activated) [named "Faerie Macabre", named "Forest"]
+    Spec.assertEqWith s "the ability was on the stack" (length (GameState.stack activated)) 1
+
+  -- CR 702.29c: only a CYCLING ability's discard is a cycle. Faerie Macabre's is
+  -- authored, so Pawl.Codec.CostComponent decodes it to DiscardCause.Ordinary --
+  -- the wire has one spelling for both causes, so nothing but this silence can
+  -- tell the two apart. Prickly Marmoset ("Whenever you cycle a card, this
+  -- creature gets +2/+0 until end of turn") is the observer, under the same seat
+  -- that pays the cost so CR 603.3a's "you" is alice either way, and the
+  -- reinforce group one over runs the same shape for the MINTED discard.
+  --
+  -- Distinct numbers: the Marmoset is a 2/3 and a 4/3 pumped.
+  Spec.it s "CR 702.29c an authored discard-this cost is not a cycle" $ do
+    marmoset <- S.printingOf s registry "Prickly Marmoset"
+    (macabreId, pikerId, maulerId, board) <- macabreBoard s registry
+    let (marmosetId, gs) = S.addCreature marmoset S.alice board
+        abilities = Activate.abilitiesFor macabreId gs
+        activated = S.runPure (aimAtCards [pikerId, maulerId]) gs (mapM_ (Activate.activateAbility S.alice macabreId) abilities)
+        placed = S.runPure (aimAtCards [pikerId, maulerId]) activated Engine.settleForPriority
+        after = S.runPure (aimAtCards [pikerId, maulerId]) placed Stack.resolveTop
+    Spec.assertEqWith s "the Marmoset starts a 2/3" (S.powerToughnessOf marmosetId gs) (Just (2, 3))
+    Spec.assertEqWith s "and is untouched by a discard that is not a cycle" (S.powerToughnessOf marmosetId after) (Just (2, 3))
+    Spec.assertEqWith s "the activation really happened -- both targets are exiled" (namesIn Zone.Exile S.bob after) [named "Barkhide Mauler", named "Goblin Piker"]
+    Spec.assertEqWith s "only the Macabre's ability was on the stack -- no cycling trigger joined it" (length (GameState.stack placed)) 1
 
 isActivate :: A.Action -> Bool
 isActivate a = case a of
