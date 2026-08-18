@@ -4772,7 +4772,8 @@ blockAndSong jaceId atBob p = case p of
 --     still waiting on card data.
 --   * Vedalken Orrery ({4} Artifact, "You may cast spells as though they had
 --     flash") is alice's, and is what makes that cast reachable: CR 303.1 admits
---     an enchantment only in a main phase, and the block has to be declared first.
+--     an enchantment only in a main phase, and the block has to be declared first
+--     (CR 601.3b for the permission, CR 702.8a for the window it carries).
 --     March animates it too, exactly as it animates the Coating, which changes
 --     nothing here: attackJaceAndBob declares only the two Elves as attackers.
 --
@@ -4875,9 +4876,9 @@ creaturePlaneswalkerCombatSpec s registry = Spec.describe s "CreaturePlaneswalke
         -- the shared board with green would make Wax castable in the leg above and
         -- falsify blockAndWane's "a lone Plains cannot pay its {G}". The Orrery is
         -- what makes the cast reachable at all: the Song is an enchantment, so CR
-        -- 303.1 would leave it in hand for the whole combat phase, and CR 702.8a's
-        -- permission -- "you may cast spells as though they had flash" -- is what
-        -- lets it be cast once the block has been declared.
+        -- 303.1 would leave it in hand for the whole combat phase, and the Orrery's
+        -- CR 601.3b permission carries CR 702.8a's window -- any time you could
+        -- cast an instant -- so it is castable once the block has been declared.
         let (_, gs1) = S.addCreature forest S.alice gs0
             (_, gs2) = S.addCreature forest S.alice gs1
             (_, gs3) = S.addCreature forest S.alice gs2
