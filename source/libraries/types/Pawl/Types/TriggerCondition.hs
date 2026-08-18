@@ -54,6 +54,11 @@ data TriggerCondition
     StateIs Condition.Condition
   | -- | CR 603.2 / 509-510: the bearer dealt combat damage to a player, read off
     -- the DamageDealt event history.
+    --
+    -- Binds CR 702.70a's "that player" under
+    -- Pawl.Engine.Binding.triggerPlayer and the amount that one event dealt under
+    -- Pawl.Engine.Binding.eventAmount, which is Questing Beast's "that much". The
+    -- DAMAGER needs no slot -- it is the bearer, already CR 113.7a's source.
     SelfDealsCombatDamageToPlayer
   | -- | CR 120.3: the bearer WAS DEALT damage -- the enrage trigger's event
     -- (Ripjaw Raptor's "whenever this creature is dealt damage"). The mirror of
@@ -94,8 +99,9 @@ data TriggerCondition
     -- Binds CR 510.2's damager under Pawl.Engine.Binding.combatDamager, which the
     -- self form needs no slot for -- there the damager is the bearer -- and the
     -- amount it dealt under Pawl.Engine.Binding.eventAmount, which is Shroofus
-    -- Sproutsire's "that many". The damaged player gets none: the event names one,
-    -- and nothing in the pool reads it here (#1175).
+    -- Sproutsire's "that many", and the damaged player under
+    -- Pawl.Engine.Binding.triggerPlayer, which is Larceny's "that player" -- the
+    -- same slot the self form stamps, for the same CR 603.2 reference.
     PermanentDealsCombatDamageToPlayer (Filter.Filter Keyword.Keyword)
   | -- | CR 725.2: a creature dealt combat damage to the monarch. NOT bearer-scoped
     -- (any creature); matched only via Pawl.Engine.Monarch.inherentMatch, never through a
