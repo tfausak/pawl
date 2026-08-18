@@ -95,7 +95,7 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
     Spec.it s "decodes a present key" $
       Spec.assertEq s (Common.defaultedField "k" (0 :: Integer) Common.asInteger [Value.pair "k" (Value.integer 1)]) (Right 1)
     -- A present null goes to the decoder rather than short-circuiting to the
-    -- default, which is what lets decodeMaybe keep accepting an explicit null.
+    -- default, which is what lets 'maybe' keep accepting an explicit null.
     Spec.it s "hands a present null to the decoder" $
       Spec.assertEq
         s
@@ -103,15 +103,15 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
         (Right Nothing)
   Spec.describe s "defaultedField accepts the verbose form" $ do
     -- The key is PRESENT, so 'defaultedField' hands the value straight to the
-    -- decoder; the result equals the default only because 'decodeMaybe' reads
+    -- decoder; the result equals the default only because 'maybe' reads
     -- an explicit null as Nothing on its own.
-    Spec.it s "an explicit null decodes to Nothing via decodeMaybe, not via the default" $
+    Spec.it s "an explicit null decodes to Nothing via maybe, not via the default" $
       Spec.assertEq
         s
         (Common.defaultedField "k" Nothing (Codec.decode (Common.maybe Common.integer)) [Value.pair "k" Value.null])
         (Right (Nothing :: Maybe Integer))
-    -- Same shape: 'decodeList' on an explicit empty array, not the default.
-    Spec.it s "an explicit empty array decodes to [] via decodeList, not via the default" $
+    -- Same shape: 'list' on an explicit empty array, not the default.
+    Spec.it s "an explicit empty array decodes to [] via list, not via the default" $
       Spec.assertEq
         s
         (Common.defaultedField "k" [] (Codec.decode (Common.list Common.integer)) [Value.pair "k" (Value.array [])])
@@ -207,7 +207,7 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
         (Common.multiset Common.integer)
         (Map.fromList [(1, 2), (2, 1)] :: Map.Map Integer Natural.Natural)
         "[1,1,2]"
-    -- decodeMultiset recounts, so the wire order need not match the key order
+    -- Common.multiset recounts, so the wire order need not match the key order
     -- the encoder would have produced.
     Spec.it s "recounts repeats regardless of input order" $
       Spec.assertEq
@@ -234,7 +234,7 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
         (Codec.decode (Common.textMap id id Common.integer) =<< Common.parse (Text.pack "{}"))
         (Right Map.empty :: Either Text.Text (Map.Map Text.Text Integer))
     -- Pawl.Json.Object does not dedupe, so a repeated key genuinely reaches the
-    -- decoder. Rejected rather than letting the first win, which is decodeSet's
+    -- decoder. Rejected rather than letting the first win, which is Common.set's
     -- posture for the same reason.
     Spec.it s "rejects a repeated key" $
       Spec.assertBool

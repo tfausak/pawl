@@ -5,7 +5,7 @@
 --
 -- `pay` serves TWO contexts, and only the first is CR 601.2g/h: a cost paid as a
 -- spell is cast or an ability activated, and CR 118.12's cost paid when one
--- RESOLVES (Pawl.Engine.Resolve.paid). `total`'s CR 601.2f adjustments reach only
+-- RESOLVES (Pawl.Engine.Resolve.payGatePaid). `total`'s CR 601.2f adjustments reach only
 -- the first, because that rule totals the cost of a spell being cast or an ability
 -- being activated and a resolution cost is neither.
 --
@@ -2006,7 +2006,7 @@ canPayComponent pid oid component gs = case component of
 -- is captured and restored on any rejection, so an Unpaid result is a complete
 -- no-op even though paying is monadic and a component may prompt. That no-op is
 -- what CR 118.12's resolution-time caller rests on too, where an Unpaid result
--- lands on the same branch as a refusal (Pawl.Engine.Resolve.paid).
+-- lands on the same branch as a refusal (Pawl.Engine.Resolve.payGatePaid).
 pay :: ManaSpending.ManaSpending -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
 pay spending pid oid cost = do
   before <- State.get

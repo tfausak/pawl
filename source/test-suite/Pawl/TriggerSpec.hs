@@ -1099,10 +1099,12 @@ historySpec s registry =
         -- at the time. Scryfall's ruling says this explicitly: the count
         -- "includes ... creatures put into a graveyard before Khabál Ghoul
         -- entered the battlefield." This test cannot fail against today's
-        -- `Pawl.Engine.Quantity.countOf`, which takes no `ObjectId` at all and so
-        -- has no way to scope the fold to the Ghoul's own lifetime -- it is
-        -- a regression gate on the ruling, pinned ahead of that signature
-        -- ever gaining one.
+        -- `Pawl.Engine.Count.evaluate`, whose `Scope.InHistory` arm folds the
+        -- whole of `GameState.events` and is handed no `ObjectId` at all --
+        -- `Pawl.Engine.Quantity.evaluate` has the Ghoul's id but does not
+        -- forward it into that call -- so there is no way to scope the fold to
+        -- the Ghoul's own lifetime. It is a regression gate on the ruling,
+        -- pinned ahead of that signature ever gaining one.
         Spec.it s "CR 608.2i a creature that died before the Ghoul entered is still counted" $ do
           piker <- S.printingOf s registry "Goblin Piker"
           khabalGhoul <- S.printingOf s registry "Khabál Ghoul"

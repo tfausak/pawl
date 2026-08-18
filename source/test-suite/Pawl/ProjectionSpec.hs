@@ -623,7 +623,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- variable such as X. X is bound on the SPELL, which by the time these
   -- assertions run is in its owner's graveyard: CR 608.2n puts it there "as
   -- the final part of an instant or sorcery spell's resolution". A stored
-  -- `Quantity.X` would be re-read against the PIKER all the same --
+  -- `Quantity.InSlot Binding.variableX` would be re-read against the PIKER all the same --
   -- applyModification evaluates against the AFFECTED object wherever the
   -- source sits -- and the Piker carries no such binding, so the delta is
   -- unevaluable and addPT drops it, leaving the printed 2/1. Frozen, the pump

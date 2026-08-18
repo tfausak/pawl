@@ -232,9 +232,9 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
 
 -- Binding's own per-constructor coverage (the empty binding, and every field
 -- populated at once) and its toJsonMap/fromJsonMap sort-by-slot-name proof
--- live in Pawl.Codec.BindingSpec now. Quantity.fromJsonPair -- the
--- characteristicPT pair's decoder -- is exercised directly in
--- Pawl.Codec.QuantitySpec, not here: BindingSpec's "every field populated"
+-- live in Pawl.Codec.BindingSpec now. Pawl.Codec.CharacteristicPT.codec -- the
+-- characteristicPT pair, whose two keys are each a Quantity -- is exercised
+-- directly in Pawl.Codec.CharacteristicPTSpec, not here: BindingSpec's "every field populated"
 -- case sets Binding.copy from ProjectedCharacteristicsSpec.testCharacteristics,
 -- whose characteristicPT is Nothing, so the key is absent and
 -- Common.defaultedField never calls the decoder.

@@ -79,7 +79,7 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
     Spec.it s "a missing transformed key decodes as False" $
       Common.assertFromJson s (Codec.decode EntryRiders.codec) "{\"tapped\":{\"type\":\"Untapped\"},\"attacking\":false}" EntryRiders.defaultValue
     -- An explicit null is tolerated only for a Maybe field, composed with
-    -- Common.decodeMaybe. `tapped` isn't one, so a null is a decode error
+    -- Common.maybe. `tapped` isn't one, so a null is a decode error
     -- rather than a second spelling of the default.
     Spec.it s "an explicit null tapped is now a decode error" $
       Spec.assertBool

@@ -46,15 +46,17 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- player spends to cast spells that way". One permission, one card, one player,
 -- so the rider expires exactly when the permission does and needs no sweep of
 -- its own. CR 609.4b is the limit on what it may do -- it changes neither the
--- cost nor what mana was actually spent -- and Pawl.Engine.Mana.relax is the one
--- place that reads it.
+-- cost nor what mana was actually spent. Pawl.Engine.Cast.spendingFor is the one
+-- place that reads this field, and Pawl.Engine.Mana.relax is what acts on the
+-- value it hands back.
 --
 -- `origin` is which rule granted this permission, and CR 715.3d's closing clause
 -- is the one place it is read: "it can't be cast as an Adventure this way,
 -- ALTHOUGH OTHER EFFECTS that allow a player to cast it may allow a player to
 -- cast it as an Adventure". Without it the Adventure exclusion narrows every
 -- permission this field can hold, where the rule scopes it to 715.3d's own --
--- Pawl.Engine.Cast.permitsCastFromExile is the only reader, and Pawl.CastSpec's
+-- Pawl.Engine.Cast.grantedByAdventureRule -- the helper permitsCastFromExile
+-- calls in its Adventure conjunct -- is the only reader, and Pawl.CastSpec's
 -- "CR 715.3d another effect's permission allows the Adventure half" against
 -- Pawl.AdventureSpec's "CR 715.3d from exile the creature is castable and the
 -- Adventure is not" is the pair that proves it.

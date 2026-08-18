@@ -204,7 +204,7 @@ targetable pid oid name gs = case proposedFace oid name gs of
 -- Pawl.CastSpec's mis-coloured-mana pair).
 --
 -- CR 118.13a's announcement is measured against the same total, and castSpell
--- hands Cost.totalMana in for exactly that reason: a gate and an offer that
+-- hands Cost.totalManas in for exactly that reason: a gate and an offer that
 -- disagree about what a cost is are two ways of getting the same question wrong.
 -- castSpell asks this same predicate again once the announced X exists (#417).
 --

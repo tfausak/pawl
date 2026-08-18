@@ -52,8 +52,10 @@ import qualified Pawl.Types.Zone as Zone
 -- designation to name (Card.hasSharedTypeLine), and only a permanent on the
 -- battlefield can have one.
 --
--- Answers the FACES rather than their names, because the one caller needs the
--- mana cost off each (CR 709.5e's unlock cost). Read off the object's own STORED
+-- Answers the FACES rather than their names, because two of its three callers
+-- need the mana cost off each (CR 709.5e's unlock cost): canUnlock and unlock
+-- below, both through unlockCostOf. The third, unlockable, takes only the name.
+-- Read off the object's own STORED
 -- card, never a projected view: CR 709.5 makes which half a characteristic is in
 -- a copiable value, so the doors of a Room that became a copy of another Room
 -- are the copy's -- which falls out of Game.cardOf answering with the card
