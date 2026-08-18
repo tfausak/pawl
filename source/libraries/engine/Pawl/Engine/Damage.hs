@@ -713,8 +713,8 @@ damagedCardTypes gs recipient =
    in Set.union tagged projected
 
 -- CR 120.4a: the bar a permanent's own characteristics set, below which none of
--- an effect's damage to it is EXCESS. One number per recipient, so the rewrite
--- above is arithmetic on the event and never a second classification of the
+-- an effect's damage to it is EXCESS. One number per recipient, so redirectExcess
+-- below is arithmetic on the event and never a second classification of the
 -- permanent.
 --
 -- One entry per CR 120.1a card type the recipient HAS, read off damagedCardTypes
@@ -731,9 +731,9 @@ damagedCardTypes gs recipient =
 -- "if the first permanent has multiple card types ... the excess damage is the
 -- greatest of the calculated amounts for each of the card types it has", and the
 -- greatest excess is what the lowest bar leaves. Only reachable for a permanent
--- that is more than one of the three at once -- Pawl.DamageSpec's
--- CreatureAndPlaneswalker group builds one out of Liquimetal Coating and March
--- of the Machines -- and one card type is the ordinary case.
+-- that is more than one of the three at once, which takes Liquimetal Coating and
+-- March of the Machines to build (Pawl.DamageSpec's ExcessDamage group casts
+-- Flame Spill at that Jace Beleren); one card type is the ordinary case.
 --
 -- Nothing when the recipient has none of them: a player (CR 120.3a's business,
 -- and not a permanent at all) or an object that is no longer there to project.
@@ -745,14 +745,14 @@ damagedCardTypes gs recipient =
 -- Pawl.Engine.Resolve's DealDamage arm resolves one dealer for the whole
 -- instruction, and pawl deals no two effects' damage simultaneously.
 excessThreshold :: GameState -> ObjectId -> Recipient.Recipient -> Maybe Natural
-excessThreshold gs dealer recipient = do
+excessThreshold gs source recipient = do
   oid <- Recipient.objectOf recipient
   let types = damagedCardTypes gs recipient
       bars =
         [ bar
         | (cardType, bar) <-
             [ ( CardType.Creature,
-                if Projection.hasKeyword Keyword.Deathtouch dealer gs
+                if Projection.hasKeyword Keyword.Deathtouch source gs
                   then 1
                   else lethalRemaining gs oid
               ),
@@ -775,10 +775,10 @@ excessThreshold gs dealer recipient = do
 -- observable: a prevention effect protecting the redirected player applies to
 -- the redirected half alone.
 --
--- Nothing is every damage the engine deals but Flame Spill's: no rewrite, and
--- the whole amount stays where the effect aimed it. Combat never reaches here at
--- all -- CR 120.4a's subject is an effect, and Pawl.Engine.Resolve's DealDamage
--- arm is the only caller.
+-- Nothing -- the effect stated no destination -- means no rewrite at all, and the
+-- whole amount stays where the effect aimed it. Combat never reaches here either:
+-- CR 120.4a's subject is an effect, and Pawl.Engine.Resolve's DealDamage arm is
+-- the only caller.
 --
 -- The redirected half is built through damageEvent, the one place a damage event
 -- is made, so it carries the same source and the same deal-time riders (CR

@@ -52,9 +52,10 @@ data DealDamage = MkDealDamage
     -- Flame Spill's "Excess damage is dealt to that creature's controller
     -- instead".
     --
-    -- Nothing is every other damage-dealing card: the damage event is not
-    -- rewritten at all and the whole amount lands on the recipient, however much
-    -- of it CR 120.6 makes redundant. Lightning Bolt at a 2/1 marks three.
+    -- Nothing is what a card that says nothing about excess carries: the damage
+    -- event is not rewritten at all and the whole amount lands on the recipient,
+    -- however much of it CR 120.6 makes redundant. Lightning Bolt at a 2/1 marks
+    -- three.
     --
     -- Here rather than on Pawl.Types.DamageEvent, where the amount and the
     -- recipient live, because CR 120.4a's rewrite is keyed to the EFFECT and
