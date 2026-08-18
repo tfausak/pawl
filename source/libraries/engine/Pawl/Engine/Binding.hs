@@ -383,11 +383,16 @@ blockedCreature = SlotName.MkSlotName (Text.pack "thatAttacker")
 attackingCreature :: SlotName
 attackingCreature = SlotName.MkSlotName (Text.pack "thatAttackingCreature")
 
--- CR 510.2: the reserved slot under which the PERMANENT THAT DEALT the combat
--- damage is bound -- Aragorn, Hornburg Hero's "double the number of +1/+1
+-- CR 120.1: the reserved slot under which the OBJECT THAT DEALT the damage --
+-- its source -- is bound: Aragorn, Hornburg Hero's "double the number of +1/+1
 -- counters on IT". Stamped by Pawl.Engine.Event.eventBindings off the same
 -- GameEvent.DamageDealt the condition matched, so the payload is an ordinary slot
 -- read rather than a "the creature that hit them" opcode.
+--
+-- The name is combat's but the slot is not: SelfIsDealtDamage stamps it for CR
+-- 120.3's noncombat damage too, which is Belltower Sphinx's "that source's
+-- controller". The wire spelling is `thatDamager` and cards already write it, so
+-- the name stays.
 --
 -- Distinct from `triggerSource` (CR 113.7a) for the reason `attackingCreature`
 -- is: the bystander form of the condition watches every permanent its controller

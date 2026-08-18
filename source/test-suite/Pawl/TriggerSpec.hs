@@ -12728,6 +12728,74 @@ enrageSpec s registry =
               Spec.assertEqWith s "2 then 1, so 3 each -- not 3 twice" (S.lifeOf S.alice after, S.lifeOf S.bob after) (Just 17, Just 17)
               Spec.assertEqWith s "with both blockers' damage marked on the Swine" (damageOn swineId after) (Just 3)
 
+-- CR 120.1's SOURCE of the damage, the half of the same event enrage above does
+-- not read: Belltower Sphinx, {4}{U} Creature -- Sphinx 2/5, "Flying. Whenever a
+-- source deals damage to this creature, that source's controller mills that many
+-- cards." Its payload is PlayerRef.ControllerOfBound over the slot
+-- Pawl.Engine.Event.eventBindings stamps from DamageEvent.source.
+--
+-- NONCOMBAT events throughout, which is the point: the slot is spelled
+-- `combatDamager` for CR 510.2's sake, and a stamp that filtered on DamageKind
+-- would leave every board here unmilled.
+--
+-- THREE SEATS, because "that source's controller" over two collapses onto "the
+-- opponent" -- and the pair of boards below is what separates them: the same
+-- Sphinx is hit by bob's Piker on one and carol's on the other, so a payload
+-- reading a fixed relation mills the wrong seat rather than no seat at all.
+--
+-- The amounts are 3 and 6, neither of which is the Sphinx's power (2) or
+-- toughness (5) nor the Goblin Piker damager's power (2), so a binding reading a
+-- characteristic fails both boards rather than passing one by luck. 6 is lethal
+-- (CR 704.5g) and the Sphinx dies, which the mill does not care about: CR 603.2
+-- captured the amount when the ability triggered.
+belltowerSphinxSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+belltowerSphinxSpec s registry =
+  let resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      dealing events gs = resolveAll (settle (S.runPure S.identityAnswer gs (Damage.applyDamage events)))
+      -- Every library is stocked past the largest mill, or the mill runs out of
+      -- cards and both readings of the rule produce the same graveyard.
+      stock printing pid n gs = List.foldl' (\g _ -> snd (S.addLibraryCard printing pid g)) gs [1 .. (n :: Int)]
+      noncombat src target amount = DamageEvent.MkDamageEvent src (Recipient.ToCreature target) amount False False False 0 Nothing DamageKind.Noncombat
+      graveyardSize pid gs = length (Game.zoneMembers Zone.Graveyard pid gs)
+      graves g = (graveyardSize S.alice g, graveyardSize S.bob g, graveyardSize S.carol g)
+      damageOn oid gs = fmap Object.damage (Game.lookupObject oid gs)
+      -- One board for both cases: alice's Sphinx, and an IDENTICAL Goblin Piker
+      -- under each of the two opponents, so the pair below differs in the damager
+      -- alone.
+      board sphinx piker =
+        let (sphinxId, g1) = S.addCreature sphinx S.alice S.threePlayerGame
+            (bobsId, g2) = S.addCreature piker S.bob g1
+            (carolsId, g3) = S.addCreature piker S.carol g2
+         in (sphinxId, bobsId, carolsId, stock piker S.alice 9 (stock piker S.bob 9 (stock piker S.carol 9 g3)))
+   in Spec.describe s "CR 120.1 that source's controller" $ do
+        Spec.it s "CR 120.1 the damager's controller mills, and the count is the event's amount" $ do
+          sphinx <- S.printingOf s registry "Belltower Sphinx"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (sphinxId, bobsId, _, gs) = board sphinx piker
+              byBobThree = dealing [noncombat bobsId sphinxId 3] gs
+              byBobSix = dealing [noncombat bobsId sphinxId 6] gs
+          Spec.assertEqWith s "every graveyard starts empty" (graves gs) (0, 0, 0)
+          Spec.assertEqWith s "bob's Piker deals 3, so bob mills 3 and nobody else mills" (graves byBobThree) (0, 3, 0)
+          -- alice's 1 is the dead Sphinx itself (CR 704.5g), not a mill.
+          Spec.assertEqWith s "the same board with a 6-damage event mills 6" (graves byBobSix) (1, 6, 0)
+          Spec.assertEqWith s "and the damage really landed on the Sphinx" (damageOn sphinxId byBobThree) (Just 3)
+          Spec.assertEqWith s "6 was lethal, so the Sphinx is gone -- CR 603.2 had already captured the amount" (damageOn sphinxId byBobSix) Nothing
+        -- The SEAT, as a pair of boards differing in exactly one thing: which
+        -- opponent's Piker dealt the damage. A payload reading a fixed relation --
+        -- PlayerRef.Relative Opponent, or the bearer's controller -- mills the same
+        -- seat on both, which two seats could not have told apart.
+        Spec.it s "CR 120.1 the seat is the damager's controller, not a fixed relation" $ do
+          sphinx <- S.printingOf s registry "Belltower Sphinx"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (sphinxId, bobsId, carolsId, gs) = board sphinx piker
+              byBob = dealing [noncombat bobsId sphinxId 3] gs
+              byCarol = dealing [noncombat carolsId sphinxId 3] gs
+          Spec.assertEqWith s "every graveyard starts empty" (graves gs) (0, 0, 0)
+          Spec.assertEqWith s "bob's Piker deals it, so bob mills" (graves byBob) (0, 3, 0)
+          Spec.assertEqWith s "carol's identical Piker deals the same 3, and now it is CAROL who mills" (graves byCarol) (0, 0, 3)
+          Spec.assertEqWith s "the same damage landed on the Sphinx either way" (fmap (damageOn sphinxId) [byBob, byCarol]) [Just 3, Just 3]
+
 -- The life-GAIN group's mirror: "whenever an opponent loses life", which the
 -- rules give no CR 119.9 of its own. What counts as a loss is therefore fixed by
 -- the three sites that RECORD one, and this group walks all three:
@@ -14238,6 +14306,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   lifeGainAmountSpec s registry
   falseCureSpec s registry
   enrageSpec s registry
+  belltowerSphinxSpec s registry
   lifeLossTriggerSpec s registry
   mindcrankSpec s registry
   masterOfLaketownSpec s registry
