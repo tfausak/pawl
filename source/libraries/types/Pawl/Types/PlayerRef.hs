@@ -73,10 +73,17 @@ data PlayerRef
     -- never at that count's per-member quantity, which the fold below still
     -- supplies its own candidate for.
     --
+    -- Pawl.Types.Search.owner is that second reading one type over, and the one
+    -- position outside a quantity that answers it: Jungle Wayfinder's "each
+    -- player may search THEIR library" is one instruction per player, so the
+    -- library read is the searcher this pass reached, and
+    -- Pawl.Engine.Resolve's Effect.Search arm substitutes it there.
+    --
     -- Undeterminable ANYWHERE ELSE, deliberately: an evaluation aimed at an object
-    -- or at nothing has no candidate player, so a card writing this outside those
-    -- two positions reads Nothing and its effect does nothing. That is the honest
-    -- answer rather than a silent substitution of "you".
+    -- or at nothing has no candidate player, so a card writing this outside a
+    -- position some fold supplies a candidate for reads Nothing and its effect
+    -- does nothing. That is the honest answer rather than a silent substitution
+    -- of "you".
     Candidate
   | -- | CR 108.4 / 110.2: the CONTROLLER of the object a slot names --
     -- Spikeshell Harrier's "return target creature or Vehicle an opponent

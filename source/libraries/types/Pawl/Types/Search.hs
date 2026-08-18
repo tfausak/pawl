@@ -15,6 +15,15 @@ import qualified Pawl.Types.SearchDestination as SearchDestination
 -- positional payload lets a card file swap the searcher and the owner and still
 -- decode. Every other producer says the same ref twice, which is exactly the
 -- shape under which such a swap goes unnoticed.
+--
+-- Independent does not mean unrelated. Two independent refs cross, so a card
+-- whose searcher names the whole table -- Jungle Wayfinder's "each player may
+-- search THEIR library" -- would have every player search every library, which
+-- is a different and strictly larger instruction. The COUPLED reading is spelled
+-- by an `owner` of PlayerRef.Candidate: the library read is whichever searcher
+-- the resolution has reached. CR 701.23a says only how to LOOK, so WHICH library
+-- is the card's own sentence, and "their library" names the searcher's -- one
+-- instruction applied per player rather than a fold of its own.
 data Search = MkSearch
   { searcher :: PlayerRef.PlayerRef,
     owner :: PlayerRef.PlayerRef,
