@@ -1314,10 +1314,19 @@ combatants c = Set.union (Map.keysSet (Combat.attackers c)) (Set.unions (Map.ele
 --
 -- Creatures only, which is what `combatants` gathers: an ATTACKED planeswalker or
 -- battle is not in that set, and CR 506.4's clauses about either are answered at
--- stillAttacked and stillAttackedBattle instead. CR 506.4d/e and the
+-- stillAttacked and stillAttackedBattle instead. CR 506.4e and the
 -- becomes-a-battle clause are not implemented (#981). CR 506.4's phases-out
 -- clause is not this function's: Pawl.Engine.Phasing.phaseOut performs it itself,
 -- and Pawl.PhasingSpec proves it on Reality Ripple's attacker.
+--
+-- CR 506.4d falls out of that same split rather than being performed anywhere. A
+-- permanent that is both a blocking creature and an attacked planeswalker is in
+-- `combatants` as a BLOCKER value, never as an attacker key, so losing its
+-- creature-ness removes only the block; the attacker's own Combat.attackers entry
+-- is keyed by the ATTACKER and survives Game.removeFromCombat, and stillAttacked
+-- re-derives the attacked-ness live off the projection. Pawl.CombatSpec's
+-- CreaturePlaneswalkerInCombat group is the proof, on a Jace Beleren that blocks
+-- one attacker while another is aimed at him.
 --
 -- A combatant with no entry in Combat.joinedUnder is left alone by the CONTROL
 -- clause, because there is nothing to compare it against and this only ever

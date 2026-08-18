@@ -19,6 +19,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Departure as Departure
@@ -41,6 +42,7 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
@@ -4589,6 +4591,225 @@ typeChangeRemovalSpec s registry = Spec.describe s "TypeChangeRemoval" $ do
         Spec.assertBool s (not (S.onBattlefield attacker traded) && not (S.onBattlefield land traded)) "control leg: with Living Plane left alone the Piker and the Forest trade"
       _ -> Spec.assertFailure s "fixture should give alice a Piker and bob Opalescence, Living Plane and a Forest"
 
+-- Aims every target slot at one object. Liquimetal Coating's "target permanent"
+-- and Wane's "target enchantment" both draw from Pool.Permanents, so the offered
+-- recipients are Recipient.ToObject and the choice has to be answered rather than
+-- forced by construction (Pawl.ProjectionSpec.aimAtObject's shape).
+aimAtObject :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtObject oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
+  _ -> S.identityAnswer p
+
+-- The right half of Wax // Wane (CR 709.4a), which is the half the cast has to
+-- name: {W} "Destroy target enchantment".
+waneName :: CardName.CardName
+waneName = CardName.MkCardName (Text.pack "Wane")
+
+isWaneCast :: A.Action -> Bool
+isWaneCast a = case a of
+  A.Cast _ name _ -> name == waneName
+  _ -> False
+
+-- alice attacks with two Llanowar Elves -- one announced at bob's Jace Beleren
+-- (CR 508.1b), one at bob himself -- while holding a Plains and a Wax // Wane;
+-- her Liquimetal Coating has already been activated on Jace and her March of the
+-- Machines has animated him into a 3/3 artifact creature planeswalker. Returns
+-- the state, the attacker aimed at Jace, the attacker aimed at bob, Jace, and
+-- March.
+--
+-- The Coating is activated through the WHOLE-CARD path -- Activate.activateAbility
+-- and Stack.resolveTop, Pawl.ProjectionSpec's "CR 613.8b whole cards" machinery --
+-- rather than through a state fixture, because the activation is reachable: the
+-- Coating is seated Settled and its only cost is {T}.
+--
+-- ONE-POWER attackers, and the choice is forced by the control leg. There Jace is
+-- dealt damage TWICE -- once as the blocker of the attacker he blocks, once as the
+-- planeswalker the other attacker is aimed at -- and CR 120.3c and CR 120.3e both
+-- apply to each event, because he holds both card types (Pawl.DamageSpec's
+-- CreatureAndPlaneswalker group). So the marks accumulate on a 3/3: two Goblin
+-- Pikers would mark 4 and CR 704.5g would destroy him, turning the control leg
+-- into a leaves-the-battlefield test. Llanowar Elves' mana ability is never
+-- activated -- both answerers pass, and an attacking Elf is tapped anyway.
+--
+-- FIVE loyalty counters, where jaceBoard places three: the two legs then read 4
+-- and 3, each distinct from the other and from the starting 5, and neither
+-- reaches CR 704.5i's zero.
+creaturePlaneswalkerBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Maybe (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+creaturePlaneswalkerBoard jace elves coating march plains waxWane =
+  let (gs0, mine, theirs) = S.combatBoardOf [elves, elves] [jace]
+      (marchId, gs1) = S.addCreature march S.alice gs0
+      (coatingId, gs2) = S.addCreature coating S.alice gs1
+      (_, gs3) = S.addCreature plains S.alice gs2
+      (_, gs4) = S.addHandCard waxWane S.alice gs3
+   in case (mine, theirs, Face.activatedAbilities (S.combinedFace coating)) of
+        ([atJace, atBob], [jaceId], coat : _) ->
+          let ready = (S.addCounter CounterKind.Loyalty 5 jaceId gs4) {GameState.priority = Just S.alice}
+              coated =
+                S.runPure (aimAtObject jaceId) ready $ do
+                  Activate.activateAbility S.alice coatingId coat
+                  Stack.resolveTop
+           in Just (coated, atJace, atBob, jaceId, marchId)
+        _ -> Nothing
+
+-- Declare both Pikers and announce CR 508.1b's targets by attacker: `atJace` at
+-- the planeswalker, `atBob` at the defending player. Casts nothing, so the declare
+-- attackers step played under this leaves the Wane for a later step -- attackOnly's
+-- reason above.
+attackJaceAndBob :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+attackJaceAndBob atJace atBob p = case p of
+  Prompt.DeclareAttackers _ _ ids -> filter (\oid -> oid == atJace || oid == atBob) ids
+  Prompt.ChooseAttackTarget _ _ oid options ->
+    if oid == atJace
+      then attackThePlaneswalker p
+      else case filter (not . isPlaneswalkerTarget) (NonEmpty.toList options) of
+        target : _ -> target
+        [] -> NonEmpty.head options
+  Prompt.ChooseAction {} -> A.Pass
+  _ -> S.aggressiveAnswer p
+
+-- Block the attacker aimed at bob with Jace, and cast nothing: the control leg,
+-- where March of the Machines is left alone and Jace stays a creature.
+--
+-- The PLAYER-directed attacker and not the one aimed at Jace, so the two roles CR
+-- 506.4d names are held against two different attackers -- which is what makes the
+-- blocking half and the attacked half separately observable.
+blockWithJace :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+blockWithJace jaceId atBob p = case p of
+  Prompt.DeclareBlockers {} -> Map.singleton jaceId (Set.singleton atBob)
+  Prompt.ChooseAction {} -> A.Pass
+  _ -> S.aggressiveAnswer p
+
+-- blockWithJace, plus: whoever is offered the cast takes Wane and aims it at
+-- March of the Machines. The Wax half is never offered -- a lone Plains cannot pay
+-- its {G} -- but the filter names the half anyway, since CR 709.3 makes which half
+-- is cast a choice rather than a consequence of the board.
+blockAndWane :: ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+blockAndWane jaceId atBob marchId p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject marchId))) sets
+  Prompt.ChooseAction _ _ actions -> case filter isWaneCast actions of
+    a : _ -> a
+    [] -> A.Pass
+  _ -> blockWithJace jaceId atBob p
+
+-- CR 506.4d: "A permanent that's both a blocking creature and a planeswalker
+-- that's being attacked is removed from combat if it stops being both a creature
+-- and a planeswalker. If it stops being one of those card types but continues to
+-- be the other, it continues to be either a blocking creature or a planeswalker
+-- that's being attacked, whichever is appropriate."
+--
+-- The combat POSITION #981 said no board could reach. It is reachable, and nothing
+-- in the engine stood in the way: both roles belong to the DEFENDING player -- CR
+-- 508.1b's attacked planeswalker is one they control (CR 306.6) and CR 509.1a's
+-- blockers are theirs too -- and canBlockGiven gates on controller, battlefield
+-- membership, tap state, creature-ness and CR 509.1b's restrictions, none of which
+-- excludes a permanent that is itself being attacked.
+--
+-- Four pool cards, every oracle text checked against Scryfall:
+--
+--   * Jace Beleren ({1}{U}{U} Legendary Planeswalker -- Jace) is bob's, and the
+--     permanent that holds both roles.
+--   * Liquimetal Coating ({2} Artifact, "{T}: Target permanent becomes an artifact
+--     in addition to its other types until end of turn") is alice's; its target
+--     slot carries no filter, so it reaches an opponent's planeswalker.
+--   * March of the Machines ({3}{U} Enchantment, "Each noncreature artifact is an
+--     artifact creature with power and toughness each equal to its mana value")
+--     animates the coated Jace. CR 613.8's dependency is what makes the pair work:
+--     March is the older effect, so timestamp order alone would ask it about a
+--     Jace that is not yet an artifact. Pawl.ProjectionSpec's "CR 613.8b whole
+--     cards" case pins that on this very pair, and Jace's mana value 3 is why a
+--     planeswalker survives where that case's land -- mana value 0 -- is buried by
+--     CR 704.5f.
+--   * Wane ({W} Instant, "Destroy target enchantment", the right half of
+--     Wax // Wane) kills March after blockers are declared. Liquimetal's effect is
+--     UntilEndOfTurn and outlives its source, so Jace stops being a CREATURE while
+--     staying an artifact PLANESWALKER (CR 611.3b for the animation ending, CR
+--     613.1d for card types being a layer-4 read) -- exactly CR 506.4d's "stops
+--     being one of those card types but continues to be the other".
+--
+-- No board in the pool can build the mirror case, where the permanent stops being
+-- a PLANESWALKER and stays a creature: nothing removes the planeswalker card type.
+-- That leg and the both-at-once leg are unproven here rather than asserted.
+--
+-- Both legs hand over at the declare blockers step, typeChangeRemovalSpec's
+-- pattern, so the block is declared before the kill lands, and stop at the end of
+-- combat step where CR 511.3 leaves the record live.
+creaturePlaneswalkerCombatSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+creaturePlaneswalkerCombatSpec s registry = Spec.describe s "CreaturePlaneswalkerInCombat" $ do
+  Spec.it s "CR 506.4d whole cards: a blocking Jace that stops being a creature is still a planeswalker that's being attacked" $ do
+    jace <- S.printingOf s registry "Jace Beleren"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    coating <- S.printingOf s registry "Liquimetal Coating"
+    march <- S.printingOf s registry "March of the Machines"
+    plains <- S.printingOf s registry "Plains"
+    waxWane <- S.printingOf s registry "Wane"
+    case creaturePlaneswalkerBoard jace elves coating march plains waxWane of
+      Nothing -> Spec.assertFailure s "fixture should give alice two Llanowar Elves and a Coating with one activated ability, and bob a Jace"
+      Just (gs, atJace, atBob, jaceId, marchId) -> do
+        -- The fixture pins. Without these the discriminating assertions below can
+        -- pass for the wrong reason: a Jace that was never animated is never a
+        -- blocking creature, and every later reading is about a different rule.
+        Spec.assertBool s (Set.member CardType.Artifact (Projection.cardTypesOf jaceId gs)) "CR 205.1b: the Coating made Jace an artifact"
+        Spec.assertBool s (Projection.isCreatureOf jaceId gs) "CR 613.8: so March animates him"
+        Spec.assertEqWith s "a 3/3, his mana value" (S.powerToughnessOf jaceId gs) (Just (3, 3))
+        let atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (attackJaceAndBob atJace atBob) gs
+            atEnd = runToEndOfCombat (blockAndWane jaceId atBob marchId) atBlockers
+            attackers = Combat.Type.attackers (GameState.combat atEnd)
+        Spec.assertEqWith s "the leg hands over at the declare blockers step, so the block is declared before the kill" (GameState.phase atBlockers) (Phase.Combat CombatStep.DeclareBlockers)
+        Spec.assertEqWith s "one Piker really was announced at the planeswalker (CR 508.1b)" (Map.lookup atJace (Combat.Type.attackers (GameState.combat atBlockers))) (Just (AttackTarget.OfPlaneswalker jaceId))
+        Spec.assertEqWith s "and the other at bob" (Map.lookup atBob (Combat.Type.attackers (GameState.combat atBlockers))) (Just (AttackTarget.OfPlayer S.bob))
+        Spec.assertEqWith s "the leg reached the end of combat step, where the record still reads live (CR 511.3)" (GameState.phase atEnd) (Phase.Combat CombatStep.EndOfCombat)
+        Spec.assertBool s (not (S.onBattlefield marchId atEnd)) "the Wane really did destroy March of the Machines"
+        Spec.assertBool s (not (Projection.isCreatureOf jaceId atEnd)) "CR 611.3b: so Jace stopped being a creature"
+        Spec.assertBool s (Projection.isPlaneswalkerOf jaceId atEnd) "and is still a planeswalker"
+        Spec.assertBool s (S.onBattlefield jaceId atEnd) "and still on the battlefield, so this is the card-types clause and not the leaves-the-battlefield one"
+        -- CR 506.4d's first half: he "continues to be a planeswalker that's being
+        -- attacked". The record is keyed by the ATTACKER -- Jace is an attack
+        -- TARGET, never an attacker -- so this is the entry an engine that treated
+        -- removal from combat as removing attacked-ness too would have deleted.
+        Spec.assertEqWith s "CR 506.4d: he continues to be a planeswalker that's being attacked" (Map.lookup atJace attackers) (Just (AttackTarget.OfPlaneswalker jaceId))
+        Spec.assertEqWith s "CR 306.8 / 120.3c: so the attacker's 1 came off his loyalty" (S.counterOf CounterKind.Loyalty jaceId atEnd) 4
+        -- CR 506.4d's second half: he stopped being a creature, so he stops being
+        -- a blocking one.
+        Spec.assertEqWith s "CR 506.4: Jace is blocking nothing" (Combat.blockersOf atBob atEnd) Set.empty
+        Spec.assertBool s (Combat.isBlocked atBob atEnd) "CR 509.1h: but that attacker remains blocked"
+        Spec.assertEqWith s "CR 510.1c: so it assigns no combat damage, and nothing was marked on Jace" (S.damageOf jaceId atEnd) (Just 0)
+        Spec.assertEqWith s "and bob takes nothing from it" (S.lifeOf S.bob atEnd) (Just 20)
+  Spec.it s "CR 506.4d the control leg: with March left alone Jace blocks, survives, and is attacked too" $ do
+    -- The same board, the same block, differing in exactly one thing: alice never
+    -- casts the Wane. Without it an engine that swept Jace out of combat on any
+    -- resolution -- or that never let him block at all -- would pass the case
+    -- above.
+    jace <- S.printingOf s registry "Jace Beleren"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    coating <- S.printingOf s registry "Liquimetal Coating"
+    march <- S.printingOf s registry "March of the Machines"
+    plains <- S.printingOf s registry "Plains"
+    waxWane <- S.printingOf s registry "Wane"
+    case creaturePlaneswalkerBoard jace elves coating march plains waxWane of
+      Nothing -> Spec.assertFailure s "fixture should give alice two Llanowar Elves and a Coating with one activated ability, and bob a Jace"
+      Just (gs, atJace, atBob, jaceId, marchId) -> do
+        let atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (attackJaceAndBob atJace atBob) gs
+            atEnd = runToEndOfCombat (blockWithJace jaceId atBob) atBlockers
+        Spec.assertBool s (S.onBattlefield marchId atEnd) "March of the Machines survives"
+        Spec.assertBool s (Projection.isCreatureOf jaceId atEnd) "so Jace is still a creature"
+        Spec.assertEqWith s "and still blocking the attacker aimed at bob" (Combat.blockersOf atBob atEnd) (Set.singleton jaceId)
+        Spec.assertBool s (not (S.onBattlefield atBob atEnd)) "which his 3 power kills"
+        Spec.assertEqWith s "CR 120.3e: both attackers' damage is marked on him as a creature" (S.damageOf jaceId atEnd) (Just 2)
+        -- CR 120.3c AND CR 120.3e off each damage event, which is the reading
+        -- Pawl.DamageSpec's CreatureAndPlaneswalker group proves: 5 - 1 (the
+        -- attacker aimed at him) - 1 (the attacker he blocks) = 3, where the leg
+        -- above reads 4 because only the first of those two ever lands.
+        Spec.assertEqWith s "and both attackers' 1 came off his loyalty" (S.counterOf CounterKind.Loyalty jaceId atEnd) 3
+        Spec.assertBool s (S.onBattlefield jaceId atEnd) "CR 704.5i: which is not lethal"
+        Spec.assertEqWith s "and he is being attacked all along (CR 508.1b)" (Map.lookup atJace (Combat.Type.attackers (GameState.combat atEnd))) (Just (AttackTarget.OfPlaneswalker jaceId))
+
 -- CR 508.4: "If a creature is put onto the battlefield attacking, its controller
 -- chooses which defending player ... it's attacking ... Such creatures are
 -- 'attacking' but, for the purposes of trigger events and effects, they never
@@ -6291,6 +6512,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   becomesBlockedSpec s registry
   castingWindowSpec s registry
   typeChangeRemovalSpec s registry
+  creaturePlaneswalkerCombatSpec s registry
   effectRemovalSpec s registry
   putOntoBattlefieldAttackingSpec s registry
   towershellSpec s registry
