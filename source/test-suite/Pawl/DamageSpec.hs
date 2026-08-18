@@ -2548,6 +2548,43 @@ excessDamageSpec s registry = Spec.describe s "ExcessDamage" $ do
     Spec.assertEqWith s "CR 120.4a: 4 is under the 0/8's bar, so bob loses nothing" (S.lifeOf S.bob after) (S.lifeOf S.bob before)
     Spec.assertEqWith s "and all 4 are marked on the Wall" (S.damageOf wallId after) (Just 4)
     Spec.assertBool s (S.onBattlefield wallId (S.settleSba after)) "CR 704.5g: 4 is not lethal to a 0/8"
+  -- CR 120.4a's last clause: "if the first permanent has multiple card types
+  -- from among the list of creature, planeswalker, and battle, the excess damage
+  -- is the greatest of the calculated amounts for each of the card types it
+  -- has." The animated Jace Beleren of the CreatureAndPlaneswalker group above
+  -- is the board that HAS two of them, with one damage marked on him so that the
+  -- two bars differ: CR 120.6's lethal damage is 3 - 1 = 2, and CR 306.5c's
+  -- loyalty is 3. The greatest excess is therefore 2, off the LOWER bar -- and 1
+  -- off the higher one, which is what reading the rule the other way round
+  -- gives.
+  Spec.it s "CR 120.4a the excess is the greatest across the card types the permanent has" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    jace <- S.printingOf s registry "Jace Beleren"
+    march <- S.printingOf s registry "March of the Machines"
+    coating <- S.printingOf s registry "Liquimetal Coating"
+    flameSpill <- S.printingOf s registry "Flame Spill"
+    let (handGs, jaceInHand) = S.handOne jace (S.landsInPlay island 3)
+        board = S.runPure S.identityAnswer handGs (do S.cast S.alice jaceInHand; Stack.resolveTop)
+        jaceId = permanentNamed "Jace Beleren" board
+        (_, withMarch) = S.addCreature march S.alice board
+        (coatingId, withCoating) = S.addCreature coating S.alice withMarch
+        ready = (S.landsFor mountain S.alice 3 withCoating) {GameState.priority = Just S.alice}
+    case Face.activatedAbilities (S.combinedFace coating) of
+      coat : _ -> do
+        let coated = S.runPure (aimedAt jaceId) ready (do Activate.activateAbility S.alice coatingId coat; Stack.resolveTop)
+            (before, spellId) = S.handOne flameSpill (S.markDamage jaceId 1 coated)
+            after = S.runPure (aimedAt jaceId) before (do S.cast S.alice spellId; Stack.resolveTop)
+        Spec.assertEqWith s "CR 120.4a: 2 is excess, the greatest of the two card types' amounts" (S.lifeOf S.alice after) (fmap (subtract 2) (S.lifeOf S.alice before))
+        Spec.assertEqWith s "so 2 of the 4 stayed, on top of the 1 already marked" (S.damageOf jaceId after) (Just 3)
+        Spec.assertEqWith s "CR 120.3c: and those 2 took two loyalty counters off" (S.counterOf CounterKind.Loyalty jaceId after) 1
+        -- The preconditions the arithmetic above rests on, asserted after it so
+        -- that no mutation of the rewrite is absorbed here first.
+        Spec.assertBool s (Projection.isCreatureOf jaceId before) "CR 205.1b: the Coating and March made him a creature"
+        Spec.assertBool s (Set.member CardType.Planeswalker (Projection.cardTypesOf jaceId before)) "and he is still a planeswalker"
+        Spec.assertEqWith s "a 3/3 with 1 marked, so CR 120.6's bar is 2" (S.powerToughnessOf jaceId before) (Just (3, 3))
+        Spec.assertEqWith s "CR 306.5c: while his loyalty is 3" (S.counterOf CounterKind.Loyalty jaceId before) 3
+      _ -> Spec.assertFailure s "Liquimetal Coating should print an activated ability"
   Spec.it s "CR 120.4a/120.6 the bar is lethal damage, not toughness" $ do
     mountain <- S.printingOf s registry "Mountain"
     flameSpill <- S.printingOf s registry "Flame Spill"
