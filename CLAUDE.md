@@ -330,9 +330,19 @@ so they cost essentially nothing and stay runnable by any consumer.
 In the engine, tests go in the subsystem spec under `source/test-suite/Pawl/`
 that near-mirrors the module under test (`Pawl.Engine.Foo` -> `Pawl.FooSpec`
 --- the specs keep the shorter name, since the test suite covers more than the
-engine). Each exposes `tests :: TestTree` and heads with a comment listing the
-modules it covers; `Main.hs` only aggregates them. A new subsystem gets a new
-`Pawl.<Area>Spec` wired into `Main.hs`'s `testTree` and added to the test-suite
-`other-modules` list. Shared fixtures live in `Pawl.Support`, imported
-`qualified ... as S` --- the one documented exception to
-alias-to-last-component; a group-local helper stays with its group.
+engine). Each exposes `spec :: Spec.Spec m n -> Registry.Registry m -> n ()`
+--- the same shape as a library spec, plus the registry --- and heads with a
+comment listing the modules it covers; `Main.hs` only aggregates them. A new
+subsystem gets a new `Pawl.<Area>Spec` wired into `Main.hs`'s `spec`, or into
+`testTree` if it needs its own timeout. The test-suite `other-modules` list is
+`-- cabal-gild: discover`-generated like every other module list: stage
+`pawl.cabal` rather than editing it, and run `cabal-gild pawl.cabal` directly
+when adding a module, since `hooky fix` has skipped that case.
+
+One subsystem may span several spec modules --- `Pawl.TriggerSpec` and its
+`Keyword`/`Zone`/`Event` siblings --- which all `describe` under the same name,
+so the split costs a tasty pattern nothing.
+
+Shared fixtures live in `Pawl.Support`, imported `qualified ... as S` --- the
+one documented exception to alias-to-last-component; a group-local helper stays
+with its group, including one two sibling spec modules each keep a copy of.
