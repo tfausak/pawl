@@ -142,16 +142,13 @@ data Object = MkObject
     -- zones. A +1/+1 or -1/-1 count feeds P/T via the projection (CR 122.1a /
     -- 613.4c); both kinds present trigger the CR 704.5q annihilation SBA.
     counters :: Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural,
-    -- | CR 613.7c: when the counters of each kind above were put on. Keyed by
-    -- kind rather than per counter because rule 613.7c restamps every counter of
-    -- a kind when another of that kind arrives, so one kind has one timestamp.
-    --
-    -- Written by the placement funnel, Pawl.Engine.Event.putCounters. A kind
-    -- absent here while present in `counters` falls back to the object's own
-    -- timestamp in Pawl.Engine.Projection.counterGathered; that is Cost's
-    -- loyalty, which CR 122.1e keeps out of every layer. A kind left here after
-    -- its last counter is removed is inert, since `counters` decides what the
-    -- projection emits at all.
+    -- | CR 613.7c: when each kind's counters were put on. One timestamp per
+    -- kind, because rule 613.7c restamps a kind's counters when another of that
+    -- kind arrives. Written by Pawl.Engine.Event.putCounters; a kind missing
+    -- here falls back to this object's own timestamp, which today is only
+    -- Pawl.Engine.Cost's loyalty, a kind no CR 613 layer reads. A
+    -- stamp left behind by a removed kind is inert -- `counters` decides what
+    -- the projection emits.
     counterTimestamps :: Map.Map (CounterKind.CounterKind Keyword.Keyword) Timestamp.Timestamp,
     -- | The object OR PLAYER this permanent is attached to -- what CR 303.4b calls
     -- "enchanted" for an Aura and CR 301.5a calls "equipped" for an Equipment.

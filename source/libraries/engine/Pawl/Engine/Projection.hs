@@ -3217,11 +3217,11 @@ staticLives functioning changes lowest sa =
 -- One grant per counter rather than per kind, since the layer-6 arm counts
 -- instances.
 --
--- CR 613.7c: each is stamped with the moment its kind's counters were put on,
--- which is Object.counterTimestamps -- NOT the permanent's own entry timestamp,
--- which would order a keyword counter against a CR 613.1f ability removal by
--- when the creature arrived. Rule 613.7c is also why one stamp per kind is
--- enough, and why the two P\/T kinds cannot share an emission.
+-- CR 613.7c: each is stamped from Object.counterTimestamps, the moment its kind
+-- was put on -- not the permanent's entry timestamp, which would order a keyword
+-- counter against a CR 613.1f removal by when the creature arrived. That is also
+-- why the two P\/T kinds emit separately rather than as one net delta: each
+-- carries its own stamp, and layer 7c is additive, so the split costs nothing.
 counterGathered :: GameState -> [Gathered]
 counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs))
   where
