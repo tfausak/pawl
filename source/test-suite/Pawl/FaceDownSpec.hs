@@ -1004,7 +1004,7 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
     mountain <- S.printingOf s registry "Mountain"
     ainok <- S.printingOf s registry "Ainok Tracker"
     farseer <- S.printingOf s registry "Aven Farseer"
-    case farseerBoard mountain farseer ainok 8 of
+    case farseerBoard mountain farseer ainok S.alice 8 of
       Nothing -> Spec.assertFailure s "the morph cast did not reach the battlefield"
       Just (board, watcher, morphling) -> do
         -- The bearer and the event's subject are two different objects, which is
@@ -1059,17 +1059,115 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
         Spec.assertEqWith s "CR 708.7 nothing was turned face up, so the Farseer took no counter" (S.counterOf CounterKind.PlusOnePlusOne watcher settled) 0
         Spec.assertEqWith s "and is still the printed 1/1" (S.powerToughnessOf watcher settled) (Just (1, 1))
 
--- alice with Aven Farseer already on the battlefield and a face-down permanent
--- of the morph printing beside it, on a board of `n` lands three of which CR
--- 702.37a's {3} has tapped. Nothing if the morph cast did not land.
+  -- THE PROVING TEST for CR 400.7e's `became` slot under CR 708.7's condition.
+  -- Pine Walker's "whenever this creature or another creature you control is
+  -- turned face up, untap THAT CREATURE" is the first printing in the pool whose
+  -- payload points at the permanent the event names rather than at itself, so it
+  -- is what settles that the slot stretches this far.
+  --
+  -- Aven Farseer's case above is the same event read the same way and cannot
+  -- stand in: its counter goes on the WATCHER, which CR 113.7a's source slot
+  -- already names, so it would pass with no binding stamped at all.
+  --
+  -- BOTH PERMANENTS TAPPED FIRST (CR 701.26b: only a tapped permanent can be
+  -- untapped), which is the vacuity guard. An engine that untapped nothing, one
+  -- that untapped the bearer, and one that untapped everything are then three
+  -- different boards, and each object is read by id.
+  --
+  -- AINOK TRACKER for the Farseer case's own reason -- it bears no triggered
+  -- ability at all, so the only condition that can fire on this board is Pine
+  -- Walker's, and a bug firing it under SelfTurnedFaceUp would be visible rather
+  -- than masked by a second trigger.
+  --
+  -- Tap state and not P/T is the signal, deliberately: a face-down permanent is
+  -- CR 708.2a's 2/2 and Pine Walker is a 5/5, so a power reading would be one
+  -- coincidence away from proving nothing.
+  Spec.it s "CR 708.7 Pine Walker untaps the permanent that turned face up, not itself" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    ainok <- S.printingOf s registry "Ainok Tracker"
+    walker <- S.printingOf s registry "Pine Walker"
+    case farseerBoard mountain walker ainok S.alice 8 of
+      Nothing -> Spec.assertFailure s "the morph cast did not reach the battlefield"
+      Just (board, watcher, morphling) -> do
+        Spec.assertBool s (watcher /= morphling) "the watcher and the permanent that turns over are two objects"
+        let before = S.runPure S.identityAnswer (S.tapObject watcher (S.tapObject morphling board)) Engine.priorityLoop
+        Spec.assertEqWith s "CR 701.26b the subject starts tapped" (fmap Object.tapped (Game.lookupObject morphling before)) (Just TapState.Tapped)
+        Spec.assertEqWith s "and so does the watcher" (fmap Object.tapped (Game.lookupObject watcher before)) (Just TapState.Tapped)
+        -- The control: the action really is on offer, so a silent board below
+        -- cannot be a permanent that simply never turned over.
+        Spec.assertEqWith s "CR 702.37e the action is available" (FaceDown.turnableFaceUp S.alice before) [(morphling, TurnUpProcedure.Morph)]
+        let after = S.runPure S.identityAnswer before (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph morphling >> Engine.priorityLoop)
+        Spec.assertEqWith s "CR 110.5 it is face up" (fmap Object.facing (Game.lookupObject morphling after)) (Just Facing.FaceUp)
+        -- CR 708.7 through CR 603.2, read through the bound slot: the SUBJECT.
+        Spec.assertEqWith s "CR 400.7e the permanent that turned over untapped" (fmap Object.tapped (Game.lookupObject morphling after)) (Just TapState.Untapped)
+        -- And NOT the bearer, which is what separates `became` from CR 113.7a's
+        -- source slot -- the two the Farseer case cannot tell apart.
+        Spec.assertEqWith s "CR 113.7a Pine Walker itself is still tapped" (fmap Object.tapped (Game.lookupObject watcher after)) (Just TapState.Tapped)
+
+  -- CR 109.5's "you", and the negative half of the pair: the SAME board with the
+  -- same alice-controlled Ainok Tracker turning over, differing only in that Pine
+  -- Walker is bob's. "A creature YOU control" is then false of the subject, so the
+  -- ability never triggers and nothing untaps.
+  --
+  -- The positive above is what makes this meaningful -- a tapped permanent is the
+  -- default nothing-happened state, so an absence proves something only against a
+  -- board where the presence was shown on the same fixture.
+  Spec.it s "CR 109.5 a Pine Walker bob controls does not untap alice's permanent" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    ainok <- S.printingOf s registry "Ainok Tracker"
+    walker <- S.printingOf s registry "Pine Walker"
+    case farseerBoard mountain walker ainok S.bob 8 of
+      Nothing -> Spec.assertFailure s "the morph cast did not reach the battlefield"
+      Just (board, watcher, morphling) -> do
+        -- The control: the watcher really is bob's, so the silence below is CR
+        -- 109.5 and not a Pine Walker that failed to reach the battlefield.
+        Spec.assertEqWith s "CR 110.2 the watcher is bob's" (Projection.controllerOf watcher board) (Just S.bob)
+        let before = S.runPure S.identityAnswer (S.tapObject watcher (S.tapObject morphling board)) Engine.priorityLoop
+            after = S.runPure S.identityAnswer before (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph morphling >> Engine.priorityLoop)
+        Spec.assertEqWith s "CR 110.5 it did turn face up" (fmap Object.facing (Game.lookupObject morphling after)) (Just Facing.FaceUp)
+        Spec.assertEqWith s "CR 109.5 and stayed tapped" (fmap Object.tapped (Game.lookupObject morphling after)) (Just TapState.Tapped)
+        Spec.assertEqWith s "as did the Pine Walker" (fmap Object.tapped (Game.lookupObject watcher after)) (Just TapState.Tapped)
+
+  -- CR 708.8's last sentence for the new payload: an Ainok Tracker cast FACE UP
+  -- was never turned face up, so alice's Pine Walker untaps nothing. The pair to
+  -- the Farseer case one group up, and the leg that rules out a matcher that
+  -- fired on a battlefield ENTRY -- which the case above cannot, its subject
+  -- having entered face down on the same board.
+  Spec.it s "CR 708.8 Pine Walker does not untap a creature cast face up" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    ainok <- S.printingOf s registry "Ainok Tracker"
+    walker <- S.printingOf s registry "Pine Walker"
+    let (base, card) = morphBoard mountain ainok 6
+        (watcher, seated) = S.addCreature walker S.alice base
+        (cast, entered) = castAndResolve ainok Facing.FaceUp seated card
+    case entered of
+      Nothing -> Spec.assertFailure s "the ordinary cast did not reach the battlefield"
+      Just permanent -> do
+        let settled = S.runPure S.identityAnswer (S.tapObject watcher (S.tapObject permanent cast)) Engine.priorityLoop
+        -- The control: it really did arrive, face up and printed, so the silence
+        -- below is CR 708.7 and not an empty battlefield.
+        Spec.assertEqWith s "CR 110.5b the printed 3/3 arrived" (S.powerToughnessOf permanent settled) (Just (3, 3))
+        Spec.assertEqWith s "face up" (fmap Object.facing (Game.lookupObject permanent settled)) (Just Facing.FaceUp)
+        Spec.assertEqWith s "CR 708.8 nothing was turned face up, so it stayed tapped" (fmap Object.tapped (Game.lookupObject permanent settled)) (Just TapState.Tapped)
+        Spec.assertEqWith s "and so did the Pine Walker" (fmap Object.tapped (Game.lookupObject watcher settled)) (Just TapState.Tapped)
+
+-- `who` with the watcher printing already on the battlefield and one of alice's
+-- face-down permanents of the morph printing beside it, on a board of `n` lands
+-- three of which CR 702.37a's {3} has tapped. Nothing if the morph cast did not
+-- land.
 --
--- The Farseer is seated BEFORE the cast on purpose: it is therefore watching when
+-- The watcher is seated BEFORE the cast on purpose: it is therefore watching when
 -- the face-down permanent enters, which is what makes the before assertions a
 -- real negative rather than a permanent that was not there yet.
-farseerBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Maybe (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
-farseerBoard land farseer morph n =
+--
+-- The watcher's CONTROLLER is a parameter because CR 109.5 is what the Pine
+-- Walker pair below turns on: the same board with the watcher under bob is the
+-- negative, differing from the positive in exactly that one thing. The morph cast
+-- stays alice's either way (castAndResolve is hers).
+farseerBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> Int -> Maybe (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+farseerBoard land farseer morph who n =
   let (gs0, card) = morphBoard land morph n
-      (watcher, gs1) = S.addCreature farseer S.alice gs0
+      (watcher, gs1) = S.addCreature farseer who gs0
       (after, entered) = castAndResolve morph (Facing.faceDown FaceDownReason.Morphed) gs1 card
    in fmap (\permanent -> (after, watcher, permanent)) entered
 

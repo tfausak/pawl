@@ -6904,6 +6904,33 @@ eventBindings cond event = case (cond, event) of
   -- presence depend on the entrant, which eventBindingSlots cannot express.
   (TriggerCondition.PermanentEnters _, GameEvent.Moved (Moved.MkMoved zc _)) ->
     Binding.setBecame (ZoneChange.object zc) Map.empty
+  -- CR 708.7's "that creature": the permanent that was turned face up, which Pine
+  -- Walker untaps. The bearer is a bystander here -- CR 113.7a's source slot names
+  -- the WATCHER, and on Pine Walker's own board the two are different permanents --
+  -- so the subject needs a name of its own.
+  --
+  -- THE SAME SLOT the zone-change arms above stamp, deliberately widened rather
+  -- than a fresh one. Turning face up is NOT a zone change: CR 708.8 restores the
+  -- permanent's copiable values and leaves it on the battlefield, so CR 400.7
+  -- mints no new id and nothing here is an incarnation a card became. What carries
+  -- the widening is that CR 400.7e's slot is the printed word "it"/"that
+  -- creature" -- the thing the event names, which the ability's source is not --
+  -- and Resolve, where the slot is read, never learns which condition placed the
+  -- ability, so a second slot would be two names for one notion kept apart by
+  -- every reader for a distinction no rule draws. It is also the only choice that
+  -- can ever serve CR 603.1b's AnyOf, whose slots eventBindingSlots INTERSECTS: a
+  -- fresh name would make the intersection with PermanentEnters empty forever
+  -- (#963).
+  --
+  -- Unconditional given a match, which is what eventBindingSlots' per-condition
+  -- promise needs: every GameEvent.TurnedFaceUp carries exactly one ObjectId, and
+  -- it is the only thing the event carries. Bound whatever the Filter admitted,
+  -- for the PermanentEnters arm's reason.
+  --
+  -- SelfTurnedFaceUp gets no such arm: there the subject IS the bearer, whom CR
+  -- 113.7a's source slot already names.
+  (TriggerCondition.PermanentTurnedFaceUp _, GameEvent.TurnedFaceUp oid) ->
+    Binding.setBecame oid Map.empty
   -- "That player": the discarder, which CR 701.9a makes one player and the event
   -- carries directly. The same reserved slot CR 702.70a's poisonous uses, for the
   -- same reason -- a player the EVENT names, which CR 109.5's `you` cannot stand
@@ -7406,23 +7433,21 @@ eventBindingSlots cond = case cond of
   -- condition that had been forgotten, which is exactly why it is spelled out
   -- here: Pawl.TriggerSpec pins the two against each other.
   TriggerCondition.SelfTurnedFaceUp -> Set.empty
-  -- The SAME event read by a bystander, and the answer is the same for a DIFFERENT
-  -- reason. Here CR 113.7a's source slot names the WATCHER rather than the
-  -- permanent that turned over, so a slot for the subject would be honest -- but
-  -- no printing this constructor answers reads one: Aven Farseer puts its counter
-  -- on itself, Aphetto Runecaster draws a card and Bonethorn Valesk aims its
-  -- damage. Claiming a slot would promise something eventBindings never fills,
-  -- which is RoomFullyUnlocked's position above.
+  -- The SAME event read by a bystander, and here the answer is NOT empty. CR
+  -- 113.7a's source slot names the WATCHER rather than the permanent that turned
+  -- over, so the subject needs a slot of its own, and Pine Walker's "untap that
+  -- creature" is the printing that reads it. The zone-change slot, widened; see
+  -- eventBindings' arm for why it is that slot and not a new one.
   --
-  -- `became` is what such a slot would have to be rather than a new one, CR 400.7e
-  -- being one rule with several readings -- but turning face up is NOT a zone
-  -- change (CR 708.8 leaves one permanent with one id), so nothing here is an
-  -- incarnation a card became, and the card that reads the subject is the one that
-  -- has to settle whether that slot stretches this far (#1004).
-  TriggerCondition.PermanentTurnedFaceUp _ -> Set.empty
-  -- Another deliberate empty: Valeron Wardens draws a card and names no "it", so
-  -- there is no subject to claim a slot for. The arm above says what a card
-  -- reading the renowned permanent would have to settle first.
+  -- ALWAYS bound and never sometimes, which is what Binding.became's own contract
+  -- demands: GameEvent.TurnedFaceUp carries one ObjectId unconditionally, so
+  -- unlike CR 400.7e's hidden-destination case (#505) there is no shape of this
+  -- event that withholds it.
+  TriggerCondition.PermanentTurnedFaceUp _ -> Set.singleton Binding.became
+  -- A deliberate empty: Valeron Wardens draws a card and names no "it", so there
+  -- is no subject to claim a slot for. The arm above is the worked example of what
+  -- a card reading the designated permanent would take -- CR 400.7e's slot, since
+  -- the event names one object and CR 113.7a's source names the watcher.
   TriggerCondition.PermanentBecomesDesignated {} -> Set.empty
   -- Empty too: rule 702.100b's event names the creature that evolved, and that is
   -- the bearer -- Renegade Krasis says "this creature", so there is no "it" to

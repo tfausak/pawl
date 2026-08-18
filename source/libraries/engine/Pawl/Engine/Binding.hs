@@ -111,7 +111,8 @@ triggerPlayer :: SlotName
 triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 
 -- CR 400.7e / CR 603.6c: the reserved slot under which a zone-change trigger's
--- ARRIVING incarnation is bound.
+-- ARRIVING incarnation is bound -- and, since CR 708.7's readers took it, the
+-- slot for the object an event trigger's event NAMES more generally.
 --
 -- ONE slot for both directions of a zone change, because CR 400.7e is one rule
 -- about whatever moved, not a rule about the ability's bearer:
@@ -132,6 +133,15 @@ triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 --   * this slot is the CARD, wherever the move put it. Everything the ability
 --     DOES to itself, because the other no longer exists to be moved.
 --
+-- A THIRD reader, and not a zone change at all: CR 708.7's "whenever a permanent
+-- is turned face up", whose subject Pine Walker untaps. CR 708.8 leaves one
+-- permanent with one id there, so this slot and `triggerSource` name two
+-- unrelated OBJECTS rather than two incarnations of one card -- the Aether Flash
+-- shape above, not the Endless Cockroaches one. It is this slot and not a fresh
+-- one because CR 400.7e's slot is the printed word "it", the thing the EVENT
+-- names, and Pawl.Engine.Resolve never learns which condition placed the ability
+-- it is reading a slot for.
+--
 -- Collapsing them either way is a silent wrong answer, not a type error:
 -- binding only the source makes every such effect a no-op on a dead id, and
 -- rebinding the source to the arrival redirects every viewWithLastKnown
@@ -141,8 +151,8 @@ triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 -- whose own effect performs the move binds the arrival here too, through
 -- Effect.MoveToZone's CR 400.7 slot. Rule 310.12b's "exile it, then you may cast
 -- it" is that shape (Pawl.Engine.Battle.siegeDefeat), and the two writers cannot
--- collide -- eventBindings stamps this slot only for the zone-change conditions
--- listed in Event.eventBindingSlots, and a counter-removal condition is not one.
+-- collide -- eventBindings stamps this slot only for the conditions
+-- Event.eventBindingSlots names, and a counter-removal condition is not one.
 -- No CARD may bind it, which Pawl.CardSpec's reservedBindings sweep enforces.
 --
 -- Stamped by Pawl.Engine.Event.eventBindings alongside `triggerPlayer`, and not
