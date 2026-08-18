@@ -32,11 +32,9 @@
 -- cannot express (#774). His combat-damage trigger IS modeled, and is read by
 -- Pawl.TriggerSpec's `tovolarSpec` rather than here.
 --
--- Moonmist's second sentence is NOT IMPLEMENTED by its card file, and no case
--- here asserts on it: "prevent all combat damage that would be dealt this turn
--- by creatures other than Werewolves and Wolves" is expressible today -- Fog's
--- Replace/DamageR/PreventAll over a whatSource Filter, the way Luminesce names
--- black and red sources -- and is simply not written yet (#1825).
+-- Moonmist's second sentence is modeled by its card file and proved by
+-- Pawl.ReplacementSpec's Moonmist group, not here: it is a CR 615.1 prevention
+-- effect and has nothing to do with day or night.
 module Pawl.DaytimeSpec where
 
 import qualified Data.Maybe as Maybe

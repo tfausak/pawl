@@ -1914,6 +1914,80 @@ luminesceSpec s registry = Spec.describe s "Luminesce (CR 615.1, CR 609.7b)" $ d
       Spec.assertEqWith s "while red, the Piker's 2 is prevented whole" (S.lifeOf S.alice asPrinted) (Just 20)
       Spec.assertEqWith s "once green, the same 2 is dealt" (S.lifeOf S.alice after) (Just 18)
 
+-- CR 615.1 / 609.7b again, on two axes at once: a shield that names its source by
+-- CHARACTERISTIC and narrows by DAMAGE KIND. Its producer is Moonmist ({1}{G}
+-- Instant, "Transform all Humans. Prevent all combat damage that would be dealt
+-- this turn by creatures other than Werewolves and Wolves"). Luminesce with a
+-- subtype EXCLUSION where Luminesce has a colour list, plus the kind narrowing
+-- Luminesce's card has not.
+--
+-- THE VACUITY TRAP is that "prevented" and "prevents everything" leave the same
+-- board when every source matches or none does, so the batch carries THREE
+-- sources whose readings all differ: a Wolf (Russet Wolves), a Werewolf (Tovolar,
+-- Dire Overlord) and neither (Goblin Piker). The discriminating assertion is on
+-- the SURVIVING EVENTS' SOURCE IDS rather than on alice's life, because the Wolf
+-- and the Werewolf deal the same 3: a life total cannot tell "Werewolf dropped
+-- from the Or" from "Wolf dropped from the Or", and would pass under either.
+--
+-- Tovolar's front face is a Human Werewolf, so Moonmist's OWN first sentence
+-- names him -- and CR 702.145b's third static ability refuses it (Pawl.DaytimeSpec's
+-- restrictionSpec is the proof). Nothing here rests on which way that goes: the
+-- damage amounts are hand-built rather than read off power, and both of his faces
+-- are Werewolves.
+--
+-- The DAMAGE BATCH is hand-built and the SPELL is not, for mendingHandsSpec's
+-- reason.
+moonmistSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+moonmistSpec s registry = Spec.describe s "Moonmist (CR 615.1, CR 609.7b)" $ do
+  let hit kind src n = DamageEvent.MkDamageEvent src (Recipient.ToPlayer S.alice) n False False False 0 Nothing kind
+      sources gs = fmap DamageEvent.source (S.damageEventsOf gs)
+      withBoard act = do
+        forest <- S.printingOf s registry "Forest"
+        wolfPrinting <- S.printingOf s registry "Russet Wolves"
+        werewolfPrinting <- S.printingOf s registry "Tovolar, Dire Overlord"
+        pikerPrinting <- S.printingOf s registry "Goblin Piker"
+        moonmist <- S.printingOf s registry "Moonmist"
+        let base = S.landsInPlay forest 2
+            (wolf, g1) = S.addCreature wolfPrinting S.bob base
+            (werewolf, g2) = S.addCreature werewolfPrinting S.bob g1
+            (piker, g3) = S.addCreature pikerPrinting S.bob g2
+            (g4, spellId) = S.handOne moonmist g3
+        act wolf werewolf piker (castAndResolve S.castAnswer g4 spellId)
+  Spec.it s "CR 615.1 the Piker's combat 2 is prevented and the Wolf's and the Werewolf's 3s land"
+    . withBoard
+    $ \wolf werewolf piker shielded -> do
+      let batch = [hit DamageKind.Combat wolf 3, hit DamageKind.Combat werewolf 3, hit DamageKind.Combat piker 2]
+          after = S.runPure S.identityAnswer shielded (Damage.applyDamage batch)
+      -- The behavioural assertion leads, so no proxy below it can absorb a
+      -- mutation to the card's filter and report itself instead.
+      Spec.assertEqWith s "the Wolf's and the Werewolf's events happened, the Piker's did not" (sources after) [wolf, werewolf]
+      Spec.assertEqWith s "so alice loses 3 and 3 and no more" (S.lifeOf S.alice after) (Just 14)
+      Spec.assertEqWith s "supporting: the shield is a floating replacement" (length (GameState.replacements shielded)) 1
+      Spec.assertEqWith s "supporting: alice started on 20" (S.lifeOf S.alice shielded) (Just 20)
+      Spec.assertEqWith s "and it lasts the turn rather than being used up (CR 615.3)" (length (GameState.replacements after)) 1
+  -- The KIND half, which luminesceSpec's card cannot reach: the very same Piker
+  -- dealing the very same 2 as NONCOMBAT damage is not prevented. A card file that
+  -- dropped whichKind passes the case above and fails this one.
+  Spec.it s "CR 615.1 the same source's NONCOMBAT 2 is not prevented"
+    . withBoard
+    $ \_ _ piker shielded -> do
+      let after = S.runPure S.identityAnswer shielded (Damage.applyDamage [hit DamageKind.Noncombat piker 2])
+      Spec.assertEqWith s "the event happened" (sources after) [piker]
+      Spec.assertEqWith s "and alice took it" (S.lifeOf S.alice after) (Just 18)
+  -- CR 609.7b's RECHECK, which is what makes this a filter rather than a list of
+  -- objects captured when the shield was made: the Piker's damage is prevented
+  -- while it is not a Wolf, and dealt in full once it is one. One board, one
+  -- shield, and the only thing that differs between the two readings is a subtype
+  -- the projection adds after the shield already exists.
+  Spec.it s "CR 609.7b the shield rechecks the source: a Piker made a Wolf deals its 2"
+    . withBoard
+    $ \_ _ piker shielded -> do
+      let lupine = S.withEffect piker (Modification.AddCreatureSubtype Subtype.Wolf)
+          after = S.runPure S.identityAnswer (lupine shielded) (Damage.applyDamage [hit DamageKind.Combat piker 2])
+          asPrinted = S.runPure S.identityAnswer shielded (Damage.applyDamage [hit DamageKind.Combat piker 2])
+      Spec.assertEqWith s "while a Goblin Warrior, the 2 is prevented whole" (S.lifeOf S.alice asPrinted) (Just 20)
+      Spec.assertEqWith s "once a Wolf, the same 2 is dealt" (S.lifeOf S.alice after) (Just 18)
+
 -- CR 615.13's trigger, whose one producer in the pool is Selfless Squire ({3}{W}
 -- Creature -- Human Soldier 1/1, Flash, "When this creature enters, prevent all
 -- damage that would be dealt to you this turn. Whenever damage that would be
@@ -3148,6 +3222,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   excruciatorSpec s registry
   questingBeastSpec s registry
   luminesceSpec s registry
+  moonmistSpec s registry
   selflessSquireSpec s registry
   turnTheTablesSpec s registry
   gatherSpecimensSpec s registry
