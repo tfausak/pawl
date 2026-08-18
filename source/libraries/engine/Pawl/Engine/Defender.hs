@@ -7,6 +7,7 @@
 module Pawl.Engine.Defender where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Combat as Combat
@@ -47,17 +48,29 @@ import Pawl.Types.PlayerId (PlayerId)
 -- the per-attacker record again when it arrives.
 --
 -- Nothing means the target names no player: no defending player at all (outside
--- combat), a battle that has left the battlefield, or a battle mid-repair with no
--- designation (CR 310.11).
---
--- The BATTLE arm still reads live, so CR 508.5's second sentence is unanswered for
--- a battle removed from combat -- its protector goes with it and this answers
--- Nothing (#1248).
+-- combat), or a battle mid-repair with no designation (CR 310.11).
 playerOf :: AttackTarget.AttackTarget -> GameState -> Maybe PlayerId
 playerOf target gs = case target of
   AttackTarget.OfPlayer pid -> Just pid
   AttackTarget.OfPlaneswalker _ -> Combat.defender (GameState.combat gs)
-  AttackTarget.OfBattle oid -> Battle.protectorOf oid gs
+  -- CR 310.9d while the battle is there: the protector is the defending player
+  -- relative to it, including CR 310.11's mid-repair battle whose designation
+  -- names nobody. Once it has left, CR 506.4c keeps the creature attacking with
+  -- no battle to read, so the answer is CR 506.2's defending player -- the one
+  -- the combat record holds. Battlefield membership rather than a missing
+  -- object, the question attackableBattles already asks, so it does not rest on
+  -- the departed id having been purged from GameState.objects.
+  --
+  -- The GUARD itself is a regression fence rather than a proven behavior. An
+  -- attacked battle's protector and Combat.defender cannot differ today:
+  -- attackableBattles admits a battle only when they agree, CR 506.4 removes a
+  -- battle from combat the moment its protector changes, and CR 704.5x's rider
+  -- suspends the repair while it is attacked -- so on every board pawl can build
+  -- the two arms answer the same seat, and no test separates them. The elision
+  -- that keeps it that way is Combat.stillAttackedBattle's, see #853.
+  AttackTarget.OfBattle oid
+    | Set.member oid (GameState.battlefield gs) -> Battle.protectorOf oid gs
+    | otherwise -> Combat.defender (GameState.combat gs)
 
 -- The same rule, asked of the attacking CREATURE rather than of what it attacks
 -- -- which is the shape every caller outside Pawl.Engine.Damage wants, rule 508.5

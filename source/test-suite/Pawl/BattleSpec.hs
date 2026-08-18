@@ -11,8 +11,9 @@
 -- Pawl.Engine.Battle but is rule 310 all the same: CR 310.5's attackable battle
 -- (Combat.attackableBattles), CR 310.9b including its "notably, a Siege battle can
 -- be attacked by its own controller", CR 310.9c's blocking, and CR 310.9d with CR
--- 508.5 (Defender.playerOf). Those are attackSpec below; Pawl.CombatSpec
--- keeps rule 508's own cases.
+-- 508.5 (Defender.playerOf) -- including CR 506.4c's attacker left attacking a
+-- battle that has gone, whose defending player is CR 506.2's. Those are attackSpec
+-- below; Pawl.CombatSpec keeps rule 508's own cases.
 --
 -- Also the pieces rule 310 needed underneath it, exercised here because this is
 -- where a card reaches them: Pawl.Types.Defense, CounterKind.Defense,
@@ -42,7 +43,9 @@
 -- Sorcery, "deals 2 damage to any target") are the pool's two plainest CR 115.4
 -- spells, and 3 + 2 is exactly the Siege's printed defense of 5. Distinct amounts
 -- on purpose: a defense-5 battle taking 5 at once could not tell "removed all the
--- counters" from "removed the right number".
+-- counters" from "removed the right number". attackSpec borrows the Bolt too, cast
+-- twice inside the declare attackers step, since Firebolt is a sorcery and CR
+-- 307.1 keeps it out of combat.
 --
 -- And the second half of CR 310.12b's sentence, "then you may cast it transformed
 -- without paying its mana cost": CR 608.2g's offered cast, CR 118.9's alternative
@@ -372,6 +375,57 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
         let after = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
         Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) after) "legal"
       _ -> Spec.assertFailure s "fixture should have a Wraith and a blocker"
+
+  Spec.it s "CR 506.4c / 506.2 the same block stays illegal once the Siege has left the battlefield" $ do
+    -- Two Bolts take the Siege's five defense counters off inside the declare
+    -- attackers step, CR 310.12b exiles it, and CR 506.4c leaves the Wraith an
+    -- attacking creature that is attacking nothing. Its swampwalk still refers to
+    -- a defending player, and CR 506.2's is the one the combat record holds --
+    -- carol, the seat with the Swamp. Reading the departed battle live finds no
+    -- object at all and would call this block legal.
+    (gs, battle, mine, _, hers) <- battleCombatOf s registry S.carol S.carol ["Bog Wraith"] [] ["Goblin Piker", "Swamp"]
+    (armed, bolts) <- twoBolts s registry gs
+    case (mine, hers, bolts) of
+      ([wraith], blocker : _, [one, two]) -> do
+        let after = S.runPure (attackTheBattle battle) armed (Combat.declareAttackers S.alice)
+            burned = castAt battle S.alice two (castAt battle S.alice one after)
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) burned)) "carol's Swamp still stops the block"
+        Spec.assertBool s (not (Set.member battle (GameState.battlefield burned))) "CR 310.12b: the second Bolt took the last defense counter"
+        Spec.assertEqWith
+          s
+          "CR 506.4c: still attacking the battle it was declared against"
+          (Map.lookup wraith (Combat.Type.attackers (GameState.combat burned)))
+          (Just (AttackTarget.OfBattle battle))
+      _ -> Spec.assertFailure s "fixture should have a Wraith, a blocker and two Bolts"
+  Spec.it s "CR 702.14c the same removal with an ISLAND leaves the block legal" $ do
+    -- THE FALSIFIER for the case above, and its anti-vacuity control: the same
+    -- board differing in carol's one land. Without it, "illegal" above would pass
+    -- on an engine that took the exiled battle to mean nothing may block that
+    -- attacker at all -- CR 509.1a's "a battle they protect", which pawl checks
+    -- through Combat.defender rather than per pair.
+    (gs, battle, mine, _, hers) <- battleCombatOf s registry S.carol S.carol ["Bog Wraith"] [] ["Goblin Piker", "Island"]
+    (armed, bolts) <- twoBolts s registry gs
+    case (mine, hers, bolts) of
+      ([wraith], blocker : _, [one, two]) -> do
+        let after = S.runPure (attackTheBattle battle) armed (Combat.declareAttackers S.alice)
+            burned = castAt battle S.alice two (castAt battle S.alice one after)
+        Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) burned) "no Swamp on carol's side, so the block is legal"
+        Spec.assertBool s (not (Set.member battle (GameState.battlefield burned))) "the Siege is gone here too"
+      _ -> Spec.assertFailure s "fixture should have a Wraith, a blocker and two Bolts"
+  Spec.it s "CR 506.2 the departed battle's CONTROLLER is not the seat that is read" $ do
+    -- THE FALSIFIER for falling back to the battle's last known controller rather
+    -- than to the combat record. The Swamp sits with alice, who controlled the
+    -- Siege and attacks with the Wraith; carol, the defending player, holds an
+    -- Island. A controller-reading fallback would call this block illegal.
+    (gs, battle, mine, _, hers) <- battleCombatOf s registry S.carol S.carol ["Bog Wraith", "Swamp"] [] ["Goblin Piker", "Island"]
+    (armed, bolts) <- twoBolts s registry gs
+    case (mine, hers, bolts) of
+      (wraith : _, blocker : _, [one, two]) -> do
+        let after = S.runPure (attackTheBattle battle) armed (Combat.declareAttackers S.alice)
+            burned = castAt battle S.alice two (castAt battle S.alice one after)
+        Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) burned) "alice's Swamp is not the defending player's"
+        Spec.assertBool s (not (Set.member battle (GameState.battlefield burned))) "the Siege is gone here too"
+      _ -> Spec.assertFailure s "fixture should have a Wraith, a blocker and two Bolts"
 
   Spec.it s "CR 310.9c a creature the protector does not control can't block the battle's attacker" $ do
     -- CR 310.9c: "creatures controlled by other players can't block those
@@ -711,6 +765,25 @@ invasionsIn wanted zone gs =
   let isCopy oid = fmap S.nameOf (Game.cardOf oid gs) == Just wanted
       members pid = Game.zoneMembers zone pid gs
    in length (concatMap (filter isCopy . members) (Map.keys (GameState.players gs)))
+
+-- Two more Mountains for alice and two Lightning Bolts in her hand, so a case can
+-- burn a defense-5 Siege off the battlefield INSIDE the declare attackers step: 3
+-- then 3, the second clamped by the floor Pawl.Engine.Damage documents. Not the
+-- Bolt/Firebolt pair damageSpec uses for an exact 5 -- Firebolt is a SORCERY, and
+-- CR 307.1 keeps it out of combat.
+twoBolts ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  GameState.GameState ->
+  m (GameState.GameState, [ObjectId.ObjectId])
+twoBolts s registry gs = do
+  mountain <- S.printingOf s registry "Mountain"
+  bolt <- S.printingOf s registry "Lightning Bolt"
+  let landed = List.foldl' (\g _ -> snd (S.addCreature mountain S.alice g)) gs [1 :: Int, 2]
+      (one, g1) = S.addHandCard bolt S.alice landed
+      (two, g2) = S.addHandCard bolt S.alice g1
+  pure (g2, [one, two])
 
 -- alice's three-seat board with the Siege on it (carol protects), plus one Mountain
 -- and one hand card per named spell -- so each is castable for its {R} without any
