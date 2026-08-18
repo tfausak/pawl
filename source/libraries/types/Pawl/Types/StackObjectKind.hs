@@ -21,8 +21,13 @@ data StackObjectKind
   | -- | CR 113.3b and CR 113.3c's abilities, the two categories that use the
     -- stack -- Pawl.Engine.Activate's and Pawl.Engine.Engine's announcements.
     --
-    -- NOT split into activated and triggered. Both reach CR 601.2c by the same
-    -- two rules and no printing in the pool reads the difference, so per
-    -- docs/design.md section 4 the third constructor is not built.
+    -- Not implemented: the split into activated and triggered (#1815). Both
+    -- reach CR 601.2c by the same two rules, so one constructor answers every
+    -- card in data/cards today. Professor Hojo is the printing that separates
+    -- them -- "whenever one or more creatures you control become the target of
+    -- an activated ability, draw a card" is a BecameTarget trigger reading
+    -- activated and not triggered -- so pawl cannot carry that card until the
+    -- third constructor exists: one Ability would draw off a triggered ability
+    -- too, weaker than printed.
     Ability
   deriving (Bounded, Enum, Eq, Ord, Show)

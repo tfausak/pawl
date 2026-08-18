@@ -61,11 +61,8 @@
 -- CR 702.26k's clause is Pawl.Engine.Game.removeFromZones, and CR 800.4a's exile
 -- clause is vacuous for a phased-out permanent, which no battlefield walk finds.
 --
--- WHAT IS NOT IMPLEMENTED, none of which the pool can reach:
---
---   * CR 702.26e/f, the continuous-effect consequences of being gone (#930).
---   * CR 702.26h's own half of `phaseOutSet`'s tie-break, which needs an effect
---     that phases out a permanent and its own Equipment together (#1723).
+-- Not implemented: CR 702.26e/f, the continuous-effect consequences of being
+-- gone, which the pool cannot reach (#930).
 module Pawl.Engine.Phasing where
 
 import qualified Data.Map.Strict as Map
@@ -125,9 +122,11 @@ phaseOutSet fallback hosts gs =
       -- indirectly, which is exactly "its host is leaving too" -- so this is
       -- the rule and not a tie-break invented for it. It is also CR 702.26g for
       -- everything the closure added, the two rules being one expression here.
-      -- Rule 702.26h's own half -- an object named by the effect AND dragged in the
-      -- same event -- is not implemented in the sense of being unobservable, no
-      -- producer phasing out such a set (#1723).
+      -- Rule 702.26h's own half -- an object named by the effect AND dragged in
+      -- the same event -- is what makes the host test come FIRST rather than
+      -- second, and Pawl.PhasingSpec's "CR 702.26h an object named AND dragged
+      -- phases out indirectly" is the case that proves it, Clever Concealment
+      -- naming a creature and its own Equipment in one announcement.
       status oid
         | maybe False (`Set.member` leaving) (hostOf oid gs) = PhasedOut.Indirectly (heldBy fallback oid gs)
         -- CR 702.26a schedules the return by who controlled the permanent when it
