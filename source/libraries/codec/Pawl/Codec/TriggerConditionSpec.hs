@@ -413,6 +413,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.SelfBecomesTargeted PlayerRelation.Opponent)
       " {\"type\":\"SelfBecomesTargeted\",\"value\":{\"type\":\"Opponent\"}} "
+  -- The same rule from the PLAYER's side, Dormant Gomazoa's: nullary, because
+  -- "you" is CR 109.5's and the "a spell" half rides on the event's kind rather
+  -- than on a payload here.
+  Spec.it s "ControllerBecomesTargetOfSpell" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.ControllerBecomesTargetOfSpell
+      " {\"type\":\"ControllerBecomesTargetOfSpell\"} "
   Spec.it s "SelfCast" $
     Common.assertCodec
       s

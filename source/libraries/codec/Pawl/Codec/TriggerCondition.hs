@@ -73,6 +73,7 @@ codec =
       Arm.payload "SpellCast" SpellCast.codec TriggerCondition.SpellCast (\x -> case x of TriggerCondition.SpellCast y -> Just y; _ -> Nothing),
       Arm.nullary "SelfCast" TriggerCondition.SelfCast,
       Arm.payload "SelfBecomesTargeted" PlayerRelation.codec TriggerCondition.SelfBecomesTargeted (\x -> case x of TriggerCondition.SelfBecomesTargeted y -> Just y; _ -> Nothing),
+      Arm.nullary "ControllerBecomesTargetOfSpell" TriggerCondition.ControllerBecomesTargetOfSpell,
       Arm.payload "SelfHalfUnlocked" CardName.codec TriggerCondition.SelfHalfUnlocked (\x -> case x of TriggerCondition.SelfHalfUnlocked y -> Just y; _ -> Nothing),
       Arm.payload "RoomFullyUnlocked" PlayerRelation.codec TriggerCondition.RoomFullyUnlocked (\x -> case x of TriggerCondition.RoomFullyUnlocked y -> Just y; _ -> Nothing),
       Arm.payload "AnyOf" (Common.list codec) TriggerCondition.AnyOf (\x -> case x of TriggerCondition.AnyOf y -> Just y; _ -> Nothing),
