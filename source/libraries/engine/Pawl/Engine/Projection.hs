@@ -2339,7 +2339,9 @@ rewriteTriggerCondition pairs condition = case condition of
   -- for CR 612.1 to swap.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> condition
   TriggerCondition.SelfBlocks -> condition
-  TriggerCondition.SelfBlocksCreature -> condition
+  -- CR 509.3b's Filter is a predicate over the ATTACKER blocked, so a subtype
+  -- rewrite reaches it exactly as it reaches SelfBecomesBlockedBy's below.
+  TriggerCondition.SelfBlocksCreature f -> TriggerCondition.SelfBlocksCreature (Filter.rewrite pairs f)
   TriggerCondition.SelfBlocksAtLeast _ -> condition
   -- CR 509.3e's Filter is a predicate over the attackers blocked, so a subtype
   -- rewrite reaches it too.

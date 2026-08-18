@@ -24,7 +24,13 @@
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "SelfBlocksCreature"
+            "type": "SelfBlocksCreature",
+            "value": {
+              "type": "HasCardType",
+              "value": {
+                "type": "Creature"
+              }
+            }
           },
           "modal": {
             "modes": [

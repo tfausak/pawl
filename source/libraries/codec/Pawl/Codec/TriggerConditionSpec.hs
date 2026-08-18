@@ -214,14 +214,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.SelfBlocks
       " {\"type\":\"SelfBlocks\"} "
-  -- CR 509.3b, nullary too: the attacker it names is a BINDING rather than a
-  -- payload on the condition, so a distinct tag is the whole encoding.
+  -- CR 509.3b, which carries a Filter over the ATTACKER the bearer blocked --
+  -- Netcaster Spider's "a creature with flying". The attacker is also a BINDING,
+  -- and that is a separate thing the payload reads rather than an encoding of it.
   Spec.it s "SelfBlocksCreature" $
     Common.assertCodec
       s
       TriggerCondition.codec
-      TriggerCondition.SelfBlocksCreature
-      " {\"type\":\"SelfBlocksCreature\"} "
+      (TriggerCondition.SelfBlocksCreature (Filter.HasKeyword Keyword.Flying))
+      " {\"type\":\"SelfBlocksCreature\",\"value\":{\"type\":\"HasKeyword\",\"value\":{\"type\":\"Flying\"}}} "
   -- CR 509.3e, and NOT nullary: the floor is the card's own number.
   Spec.it s "SelfBlocksAtLeast" $
     Common.assertCodec
