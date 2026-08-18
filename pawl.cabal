@@ -808,6 +808,7 @@ library json-schema
   import: library
   build-depends:
     containers ^>=0.7,
+    pawl:decimal,
     pawl:extra,
     pawl:json,
     pawl:json-pointer,
@@ -825,6 +826,8 @@ library json-schema
     Pawl.JsonSchema.NameSpec
     Pawl.JsonSchema.Schema
     Pawl.JsonSchema.SchemaSpec
+    Pawl.JsonSchema.Validate
+    Pawl.JsonSchema.ValidateSpec
 
 -- The registry provides a way to load and cache card data from disk.
 library registry
@@ -1237,6 +1240,13 @@ library uri
 
 executable pawl
   import: executable
+  build-depends:
+    bytestring ^>=0.12.2,
+    pawl:codec,
+    pawl:json,
+    pawl:json-codec,
+    pawl:json-schema,
+
   ghc-options: -threaded
   hs-source-dirs: source/executable
   main-is: Main.hs
