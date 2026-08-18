@@ -858,6 +858,58 @@ lastKnownRiderSpec s registry =
           Spec.assertEqWith s "so alice gains nothing -- the live read won" (S.lifeOf S.alice after) (Just 20)
           Spec.assertEqWith s "and bob took the ping" (S.lifeOf S.bob after) (Just 19)
 
+    -- CR 704.8: a permanent that leaves the battlefield alongside other
+    -- state-based actions has its last known information derived from the board
+    -- before ANY of them was performed.
+    --
+    -- Opalescence animates Bad Moon into a creature, and Bad Moon's own +1/+1
+    -- reaches itself and the Berserker alike, so alice has a 3/3 and a 3/3 with
+    -- 3 damage marked on each: CR 704.5g destroys both in one pass. Deathknell
+    -- Berserker's intervening if (CR 603.4) asks whether its power was 3 or
+    -- more, and Bad Moon's grant is the only thing that gets it there -- so the
+    -- Zombie token appears iff the Berserker was read against a board Bad Moon
+    -- had not yet left.
+    --
+    -- BOTH ID ORDERS, for the reason Pawl.ZoneTriggerSpec's CR 603.10a case
+    -- runs both: the two boards differ in nothing a rule can see, and Event
+    -- reaches the lower id first. The Moon-first board is the one that answered
+    -- no token.
+    Spec.it s "CR 704.8 a creature destroyed beside Bad Moon is read with Bad Moon still there, in either id order" $ do
+      opalescence <- S.printingOf s registry "Opalescence"
+      badMoon <- S.printingOf s registry "Bad Moon"
+      deathknellBerserker <- S.printingOf s registry "Deathknell Berserker"
+      let board moonFirst =
+            let withOpal = snd (S.addCreature opalescence S.alice sbaBase)
+                (moon, berserker, placed) =
+                  if moonFirst
+                    then
+                      let (m, g1) = S.addCreature badMoon S.alice withOpal
+                          (b, g2) = S.addCreature deathknellBerserker S.alice g1
+                       in (m, b, g2)
+                    else
+                      let (b, g1) = S.addCreature deathknellBerserker S.alice withOpal
+                          (m, g2) = S.addCreature badMoon S.alice g1
+                       in (m, b, g2)
+             in (moon, berserker, S.markDamage moon 3 (S.markDamage berserker 3 placed))
+          run moonFirst =
+            let (moon, berserker, marked) = board moonFirst
+                settled = S.runPure S.identityAnswer marked Engine.settleForPriority
+             in (moon, berserker, marked, S.runPure S.identityAnswer settled Stack.resolveTop)
+          (moonFirstMoon, moonFirstBerserker, moonFirstMarked, moonFirstAfter) = run True
+          (berserkerFirstMoon, berserkerFirstBerserker, berserkerFirstMarked, berserkerFirstAfter) = run False
+      Spec.assertEqWith s "a Zombie token with Bad Moon minted first" (length (S.tokensOf moonFirstAfter)) 1
+      Spec.assertEqWith s "and one with the Berserker minted first" (length (S.tokensOf berserkerFirstAfter)) 1
+      -- The premises the reading above rests on: the grant is really there
+      -- before the pass, the two victims really are in one pass, and the two
+      -- boards really do differ in which one Event reaches first.
+      Spec.assertEqWith s "Opalescence makes Bad Moon a 3/3" (S.powerToughnessOf moonFirstMoon moonFirstMarked) (Just (3, 3))
+      Spec.assertEqWith s "and Bad Moon makes the Berserker a 3/3" (S.powerToughnessOf moonFirstBerserker moonFirstMarked) (Just (3, 3))
+      Spec.assertBool s (moonFirstMoon < moonFirstBerserker) "Bad Moon is reached first on the Moon-first board"
+      Spec.assertBool s (berserkerFirstBerserker < berserkerFirstMoon) "and the Berserker first on the other"
+      Spec.assertEqWith s "both cards reached the graveyard either way" (fmap (length . Game.zoneMembers Zone.Graveyard S.alice) [moonFirstAfter, berserkerFirstAfter]) [2, 2]
+      Spec.assertEqWith s "leaving her Opalescence and the token on the battlefield" (fmap (length . Game.zoneMembers Zone.Battlefield S.alice) [moonFirstAfter, berserkerFirstAfter]) [2, 2]
+      Spec.assertEqWith s "with the same board on the twin" (S.powerToughnessOf berserkerFirstBerserker berserkerFirstMarked) (Just (3, 3))
+
 sbaBase :: GameState.GameState
 sbaBase = Setup.emptyGame S.bothPlayers
 

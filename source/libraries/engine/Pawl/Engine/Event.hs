@@ -2379,13 +2379,25 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
     Just obj -> do
       let pid = Object.owner obj
           fromZone = Object.zone obj
+          -- CR 704.8: inside a batch, last known information is read from the
+          -- board the batch began on, not from the live one -- so a permanent
+          -- leaving alongside others is not projected against a board its
+          -- siblings have already left. Departure.depart reads its own record
+          -- the same way for CR 800.4a's first clause.
+          --
+          -- Live for an id the batch board does not hold: destroyIn follows the
+          -- object its replacement loop settled on, which CR 614.6 lets a
+          -- rewrite redirect to one that board never held.
+          lki = case asOf of
+            Just before | Maybe.isJust (Game.lookupObject oid before) -> before
+            _ -> gs
           -- CR 608.2h: last known information -- the object as it exists in the
           -- zone it is LEAVING, projected against the pre-move state. Forced
           -- eagerly (Moved's snapshot field is strict) rather than left as a thunk
           -- retaining the whole pre-move GameState for a turn. The price of an
           -- honest history: a token has no printed card to re-derive from (CR
           -- 111.1).
-          snapshot = Projection.project oid gs
+          snapshot = Projection.project oid lki
           -- CR 613.1b: the OTHER half of last known information, read from the
           -- same pre-move state. Control is not a characteristic (CR 109.3's
           -- list does not include it), so it cannot ride `snapshot`; it is kept
@@ -2396,7 +2408,8 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
           -- The `Object.owner` fallback is unreachable rather than a guess:
           -- Projection.controllerOfGiven's own base case returns
           -- `Just (Object.owner obj)` for any id that resolves, and `oid`
-          -- resolves here (this branch matched `Just obj`). It is written as a
+          -- resolves in `lki` (either it is `gs`, which this branch matched
+          -- `Just obj` against, or the guard above found it). It is written as a
           -- fallback only because controllerOf's type is honest about ids that
           -- do not.
           --
@@ -2406,16 +2419,16 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
           -- change (goldfish / casting / fighting / fighting-aura, 2p):
           -- 15.2/133/24.6/569 ms -> 15.5/134/25.2/575 ms -- every move inside
           -- one run-to-run stddev, so no gate was moved to buy it back.
-          lastController = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
+          lastController = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid lki)
       -- CR 614.4: replacements exist before the event, so the loop reads them from
       -- the PRE-MOVE state. CR 614.6: the modified event is what actually happens.
       --
-      -- `obj` and `snapshot` are read from `gs` before this runs and still used
-      -- after it returns, which is sound despite Replacement's AsCopy arm calling
+      -- `obj` and `snapshot` are read before this runs and still used after it
+      -- returns, which is sound despite Replacement's AsCopy arm calling
       -- State.modify': this is a WouldChangeZone loop, restricted to ZoneChangeR
       -- candidates, so it cannot reach the EntryR arm AsCopy lives under -- and
-      -- `gs` is an immutable value, so no downstream modify' can change what
-      -- `snapshot` captured. Extending either loop to mutate state these bindings
+      -- `gs` and `lki` are immutable values, so no downstream modify' can change
+      -- what `snapshot` captured. Extending either loop to mutate state these bindings
       -- read would mean re-deriving them after that loop.
       --
       -- Both ids are `oid` in the PROPOSED event: nothing has moved yet.
