@@ -10,6 +10,7 @@
 -- directly, so what is asserted is the whole path from card JSON to designation.
 module Pawl.RingSpec where
 
+import qualified Control.Monad as Monad
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -165,18 +166,20 @@ isLegendary :: ObjectId -> GameState.GameState -> Bool
 isLegendary oid gs = Set.member Supertype.Legendary (Projection.supertypesOf oid gs)
 
 -- Drive a main-phase board through combat to actual damage, then let CR 117.5 put
--- what triggered on the stack and resolve it.
+-- what triggered on the stack and resolve the WHOLE stack.
 --
--- Stack.resolveTop is a no-op on an empty stack, so the three-temptation board --
--- where nothing may trigger at all -- runs the IDENTICAL sequence to the
--- four-temptation one. The second settle is what performs CR 119.3's life loss's
--- consequences.
+-- Four settle-and-resolve rounds, not one: no board below puts more than two
+-- attackers into combat, so four is slack, and resolving only the top object
+-- cannot tell one trigger from two -- which is exactly the difference a Filter
+-- reaching every attacker rather than the Ring-bearer alone makes. Stack.resolveTop
+-- is a no-op on an empty stack, so a board where nothing triggers at all runs the
+-- IDENTICAL sequence. The trailing settle performs CR 119.3's consequences.
 drainThrough :: GameState.GameState -> GameState.GameState
 drainThrough gs =
   S.runPure
     S.aggressiveAnswer
     (intoCombat gs)
-    (Combat.declareBlockers >> Damage.dealCombatDamage >> Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
+    (Combat.declareBlockers >> Damage.dealCombatDamage >> Monad.replicateM_ (4 :: Int) (Engine.settleForPriority >> Stack.resolveTop) >> Engine.settleForPriority)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
