@@ -40,6 +40,13 @@ capability that was not missing. Verify at the *carrier*: the specific type or
 function that would hold the behaviour. Read it, and name it in the finding.
 "Needs X" with no carrier named is not a derivation.
 
+**Check which issue you are aiming at, and which HALF of it.** A sweep splits an
+issue in two and leaves the original title standing over both. #160 and #1631
+wore one title, and a brief was derived against the half that was not the unit.
+Before deriving anything, read the body for a "split out of #N" or "the other
+half stays on #N" line and read the issue it names; then say in the brief which
+half it closes and which it leaves.
+
 **A false claim can live in a code comment.** When an issue looks blocked
 because a comment says nothing in the pool can do X, check the comment.
 
@@ -109,6 +116,10 @@ the critical path. A brief is dispatch-ready when it carries:
 - the **proving test** at gameplay level, drafted as code against the fixtures
   in `Pawl.Support` and the spec module it belongs in, with the exact
   assertions. You cannot run it; say so
+- the **discrimination argument** for that test --- the buggy trace and the
+  correct trace, walked over the exact board you drafted, and the asserted
+  quantity where they diverge. See "Discriminating power" below. A brief
+  asserting only that the test "fails today" has not made this argument
 - the **files it touches** --- the dispatcher schedules by this and will not
   overlap two units on one file
 - the **falsifying mutation** for each, and what it must break. If you cannot
@@ -118,3 +129,39 @@ the critical path. A brief is dispatch-ready when it carries:
 - the **CR citations**, quoted from `docs/rules.txt` and grepped by number
 
 Cite identifiers to grep for, not line numbers.
+
+## Discriminating power
+
+A drafted test is a claim about TWO implementations, and it is worth
+dispatching only if the buggy one fails it. Deriving that the code is wrong is
+not deriving that the board you drafted can see it wrong; the gap between those
+two has shipped a brief whose test the bug satisfied, caught by the
+implementer's mutation coming back green.
+
+So before the test goes in the brief, walk both implementations over the exact
+board and write the walks down.
+
+- Name the asserted quantity --- a count, a zone's contents, a controller ---
+  and give its value under each implementation. Equal values mean the board
+  cannot discriminate: change the BOARD, never the assertion.
+- Walk the buggy implementation to the END, through the rules that fire on the
+  way. #1683's board gave each player one basic land and asserted a hand of
+  one; the cross product does raise the extra search, but CR 400.3 sends the
+  found card to its OWNER's hand, so both implementations end at one card
+  each. A second card in one library separates them.
+- Justify every element of the board --- why two seats and not three, why two
+  different lands and not the same one. An element you cannot justify is
+  usually the one hiding the collapse.
+- Prefer a quantity a partial fix cannot reach by another route. A count that
+  mere de-duplication would also repair proves less than the identity of the
+  thing counted; assert both, gameplay count first.
+- Where the divergence is in a TIME rather than a value, say which moment is
+  read. An effect that ends and one that merely pauses agree at the first read
+  and differ at the second, so a test asserting only the first proves the
+  weaker claim.
+
+This is not the falsifying-mutation bullet from another angle, and neither
+substitutes for the other: the mutation asks whether the assertion is wired to
+the code, this asks whether the BOARD can tell the two answers apart. When no
+board separates them, say so --- "every candidate board makes the two readings
+agree" is already a finding, and it is the one listed under "What a finding is".
