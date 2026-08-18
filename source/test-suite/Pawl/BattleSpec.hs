@@ -612,6 +612,17 @@ defeatSpec s registry = Spec.describe s "Defeat" $ do
     (entered, battle) <- castInvasionThreeSeated s registry (protectTo S.carol)
     let drained = drain battle entered
     Spec.assertEqWith s "it is named" (Battle.defeated (Projection.projectAll drained) [] drained) [battle]
+  Spec.it s "CR 704.3 and the pass that buries it reports that an action was performed" $ do
+    -- CR 704.3: the check repeats while a state-based action was performed, so a
+    -- pass whose only action is a defeat must SAY it acted -- otherwise
+    -- Engine.performSettle stops one pass early and CR 514.3a's cleanup exception
+    -- never fires. The same drained board as the case above, whose classifier
+    -- assertion is what says the defeat is the only thing this pass does.
+    (entered, battle) <- castInvasionThreeSeated s registry (protectTo S.carol)
+    let drained = drain battle entered
+        (acted, after) = S.runPureWith S.identityAnswer drained Sba.performStateBasedActions
+    Spec.assertBool s acted "the pass reports the defeat"
+    Spec.assertBool s (not (S.onBattlefield battle after)) "and the battle has left the battlefield"
   Spec.it s "CR 704.5v and is NOT while its defeat ability is still owed a resolution" $ do
     -- THE FALSIFIER for the rider, on the identical board with CR 310.12b's own
     -- event still unscanned. Pawl.Engine.Engine.performSettle runs the state-based
