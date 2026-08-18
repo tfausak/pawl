@@ -716,8 +716,97 @@ takeAny units _ = case units of
   _ : rest -> Just rest
   [] -> Nothing
 
+-- A payment as the sequence of ONE-MANA choices it is: a typed symbol's demand,
+-- then one entry per generic mana, which CR 107.4b lets any type pay.
+--
+-- Typed first for the reason `spend` gives: generic takes any unit, so paying it
+-- first could strand a demand nothing else serves.
+paymentSteps :: [Demand] -> Natural -> [Maybe Demand]
+paymentSteps demands generic = fmap Just demands <> replicate (Natural.toIntSaturating generic) Nothing
+
+-- Could this one unit pay that one step?
+paysStep :: [SpendManaAsThough.SpendManaAsThough] -> Maybe Demand -> ManaUnit -> Bool
+paysStep clauses step unit = case step of
+  Nothing -> True
+  Just wanted -> serves (rewriteSupply clauses (supplyOf unit)) wanted
+
+-- Every pool these steps could leave behind, as a SET of sorted pools -- which is
+-- what makes it a count of outcomes a player could tell apart rather than of
+-- assignments. Equal units collapse, and so do two orders of the same spend.
+--
+-- Set-at-a-time rather than a search per assignment, so the work is bounded by
+-- the number of distinct sub-pools rather than by the permutations (#595).
+leftovers :: [SpendManaAsThough.SpendManaAsThough] -> [Maybe Demand] -> [ManaUnit] -> Set.Set [ManaUnit]
+leftovers clauses steps units = List.foldl' advance (Set.singleton (List.sort units)) steps
+  where
+    advance pools step =
+      Set.fromList
+        [ List.delete unit pool
+        | pool <- Set.toList pools,
+          unit <- Set.toAscList (Set.fromList pool),
+          paysStep clauses step unit
+        ]
+
+-- The distinct units that could pay the next step and still leave the rest of the
+-- payment possible. The offer `spendChosen` asks over; a unit that pays this step
+-- and strands a later one is no option at all (CR 601.2h forbids a partial
+-- payment).
+spendable :: [SpendManaAsThough.SpendManaAsThough] -> [Maybe Demand] -> [ManaUnit] -> [ManaUnit]
+spendable clauses steps units = case steps of
+  [] -> []
+  step : rest ->
+    [ unit
+    | unit <- Set.toAscList (Set.fromList units),
+      paysStep clauses step unit,
+      not (Set.null (leftovers clauses rest (List.delete unit units)))
+    ]
+
+-- The resolution a payment out of this pool will take -- the one `spend` settles
+-- on -- as the steps it decomposes into and the life it commits.
+plan :: [SpendManaAsThough.SpendManaAsThough] -> ManaSpending -> Natural -> ManaCost -> Mana -> Maybe ([Maybe Demand], Natural)
+plan clauses spending budget cost (Mana.MkMana units) =
+  Maybe.listToMaybe
+    [ (steps, life)
+    | (demands, generic, life) <- resolutions spending cost,
+      life <= budget,
+      let steps = paymentSteps demands generic,
+      not (Set.null (leftovers clauses steps units))
+    ]
+
+-- CR 601.2h: the PLAYER pays the cost, so which mana leaves their pool is theirs
+-- to choose, CR 107.4b's generic symbol included. Answers the pool that is left.
+--
+-- Asked only where the choice is observable: the payment must be able to leave
+-- more than one pool, and the candidates are deduplicated, so two units that are
+-- equal are one option and a payment that empties the pool however it is made
+-- asks nothing.
+--
+-- FILTERED, NOT TRUSTED, the Pawl.Engine.Cost.chooseSource posture.
+spendChosen :: PlayerId -> [SpendManaAsThough.SpendManaAsThough] -> [Maybe Demand] -> Mana -> Game Mana
+spendChosen pid clauses steps0 (Mana.MkMana units0) = fmap Mana.MkMana (go steps0 units0)
+  where
+    go steps units = case steps of
+      [] -> pure units
+      _ : rest -> case spendable clauses steps units of
+        -- Unreachable from `plan`, which offers these steps only where some
+        -- payment completes them.
+        [] -> pure units
+        first : others -> do
+          chosen <-
+            if null others || Set.size (leftovers clauses steps units) < 2
+              then pure first
+              else do
+                gs <- State.get
+                answer <- Game.choose (Prompt.ChooseManaToSpend (Decide.deciderFor pid gs) pid (first NonEmpty.:| others))
+                pure (if List.elem answer (first : others) then answer else first)
+          go rest (List.delete chosen units)
+
 -- Spend a pool against a cost, within a budget of `budget` life. Nothing when no
 -- resolution fits; otherwise the pool that is left and the life to pay for it.
+--
+-- ONE assignment of the several that may fit, so this answers WHETHER the pool
+-- pays rather than what the payment leaves. The payment itself is `plan` and
+-- `spendChosen`, where CR 601.2h's choice is the player's.
 --
 -- Typed symbols are matched FIRST because they are the constrained ones: generic
 -- takes any unit, so paying it first could consume the only red and strand a

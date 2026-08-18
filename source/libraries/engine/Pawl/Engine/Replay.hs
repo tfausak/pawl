@@ -58,6 +58,7 @@ encode p answer = case p of
   Prompt.ChooseManaSource {} -> Response.ChoseManaSource answer
   Prompt.ChooseExtraManaSource {} -> Response.ChoseExtraManaSource answer
   Prompt.ChooseManaYield {} -> Response.ChoseManaYield answer
+  Prompt.ChooseManaToSpend {} -> Response.ChoseManaToSpend answer
   Prompt.ChooseProliferate {} -> Response.ChoseProliferation answer
   Prompt.ChooseRedistribution {} -> Response.ChoseRedistribution answer
   Prompt.ChooseRingBearer {} -> Response.ChoseRingBearer answer
@@ -175,6 +176,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseExtraManaSource {} -> case response of
     Response.ChoseExtraManaSource oid -> Just oid
+    _ -> Nothing
+  Prompt.ChooseManaToSpend {} -> case response of
+    Response.ChoseManaToSpend unit -> Just unit
     _ -> Nothing
   Prompt.ChooseManaYield {} -> case response of
     Response.ChoseManaYield mana -> Just mana
@@ -446,6 +450,9 @@ defaultAnswer p = case p of
   -- Every offered yield is producible: tapForMana only offers what the source
   -- can make.
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
+  -- Every offered unit pays the symbol and leaves the rest of the cost payable
+  -- (Pawl.Engine.Mana.spendable), so the head is a legal payment.
+  Prompt.ChooseManaToSpend _ _ candidates -> NonEmpty.head candidates
   -- CR 701.34a: any number includes none, so declining is always legal.
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
   -- Redistributing among nobody: "any number of players" includes none, and the
