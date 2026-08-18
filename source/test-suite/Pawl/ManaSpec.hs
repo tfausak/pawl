@@ -2586,6 +2586,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   shizukoSpec s registry
   quirionSpec s registry
   celestialDawnSpec s registry
+  spendChoiceSpec s registry
 
 -- One mana of one type carrying no production tag: what a basic land really puts
 -- in a pool, and the unit the Celestial Dawn cases below seat directly.
@@ -4075,3 +4076,116 @@ activateAndResolve ::
 activateAndResolve answer gs oid ability =
   let ((_, activated), asked) = Replay.record answer gs (Activate.activateAbility S.alice oid ability)
    in (asked, snd (S.runPureWith answer activated Stack.resolveTop))
+
+-- CR 601.2h: "The player pays the total cost." Which mana leaves their pool is
+-- part of that payment, and CR 107.4b makes a generic symbol one of the same
+-- choices, since any type pays it.
+--
+-- Two units a rule can tell apart are what makes the choice observable at all.
+-- The board has both axes: a Snow-Covered Mountain and a Mountain each add one
+-- red mana and CR 107.4h reads the difference, while Shizuko, Caller of Autumn's
+-- CR 514.2 retention separates two green.
+spendChoiceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+spendChoiceSpec s registry = Spec.describe s "Choosing which mana to spend" $ do
+  -- Gameplay level, and the assertion that can DIFFER is the second payment:
+  -- the pool is two red mana, {R} takes one, and only a pool that still holds
+  -- the snow one pays {S}. Both lands are tapped before the payment, so CR
+  -- 601.2g's window has nothing to offer and the only question asked is which
+  -- mana to spend.
+  Spec.it s "CR 601.2h paying {R} out of a snow and a nonsnow red spends the one the payer names" $ do
+    snowMountain <- S.printingOf s registry "Snow-Covered Mountain"
+    mountain <- S.printingOf s registry "Mountain"
+    let floated = twoRedFloated snowMountain mountain
+        spends :: ManaUnit.ManaUnit -> (forall r. Prompt.Prompt r -> r)
+        spends unit p = case p of
+          Prompt.ChooseManaToSpend {} -> unit
+          _ -> S.identityAnswer p
+        payRed unit = S.runPureWith (spends unit) floated (Cost.payMana ManaSpending.AsProduced S.alice redOnly)
+        thenSnow gs = fst (S.runPureWith S.identityAnswer gs (Cost.payMana ManaSpending.AsProduced S.alice snowCost))
+        (sparedPaid, spared) = payRed plainRed
+        (spentPaid, spent) = payRed snowRed
+    Spec.assertBool s (thenSnow spared) "sparing the snow mana, {S} is still paid out of what is left"
+    Spec.assertBool s (not (thenSnow spent)) "spending it, {S} cannot be paid"
+    Spec.assertBool s (sparedPaid && spentPaid) "both boards paid the {R}"
+    Spec.assertEqWith s "and the pools say which unit went" (poolOf S.alice spared, poolOf S.alice spent) ([snowRed], [plainRed])
+
+  -- The other axis, and the same shape: CR 514.2's retention rides one unit, so
+  -- the mana the payer spares is the mana the step's end does or does not take.
+  Spec.it s "CR 601.2h paying {G} out of a retained and an ordinary green spends the one the payer names" $ do
+    let floated = seededPool [retainedGreen, plainGreen]
+        spends :: ManaUnit.ManaUnit -> (forall r. Prompt.Prompt r -> r)
+        spends unit p = case p of
+          Prompt.ChooseManaToSpend {} -> unit
+          _ -> S.identityAnswer p
+        payGreen unit = S.runPureWith (spends unit) floated (Cost.payMana ManaSpending.AsProduced S.alice greenOnly)
+        thenGreen gs = fst (S.runPureWith S.identityAnswer (Mana.emptyManaPools gs) (Cost.payMana ManaSpending.AsProduced S.alice greenOnly))
+        (sparedPaid, spared) = payGreen plainGreen
+        (spentPaid, spent) = payGreen retainedGreen
+    Spec.assertBool s (thenGreen spared) "sparing the retained green, a second {G} is paid after the pool empties"
+    Spec.assertBool s (not (thenGreen spent)) "spending it, nothing survives to pay the second"
+    Spec.assertBool s (sparedPaid && spentPaid) "both boards paid the first {G}"
+    Spec.assertEqWith s "and the pools say which unit went" (poolOf S.alice spared, poolOf S.alice spent) ([retainedGreen], [plainGreen])
+
+  -- The elision, and the reason it is sound: ManaUnit derives Eq, and two units
+  -- that are equal are the same thing. Nothing the game can ask distinguishes
+  -- them, so asking would be noise.
+  Spec.it s "CR 601.2h two equal units raise no question" $ do
+    Spec.assertEqWith s "paid, and asked nothing" (payCounting [plainRed, plainRed] redOnly) (True, 0)
+
+  -- The elision that carries the predicate. These two units ARE distinguishable
+  -- -- one is snow -- but {2} spends both whichever order they go in, so every
+  -- way of paying leaves the same pool and there is no observable choice. A
+  -- predicate written over the units rather than over the OUTCOMES would ask
+  -- here.
+  Spec.it s "CR 107.4b {2} spends the whole pool however it is paid, so nothing is asked" $ do
+    Spec.assertEqWith s "paid, and asked nothing" (payCounting [snowRed, plainRed] (ManaCost.MkManaCost [ManaSymbol.Generic 2])) (True, 0)
+
+  -- And the choice IS asked once the same pool has one unit to spare, which is
+  -- what says the case above turns on the outcome rather than on the cost's
+  -- shape.
+  Spec.it s "CR 107.4b paying {1} out of the same two units asks which" $ do
+    Spec.assertEqWith s "paid, and asked once" (payCounting [snowRed, plainRed] (ManaCost.MkManaCost [ManaSymbol.Generic 1])) (True, 1)
+
+  -- FILTERED, NOT TRUSTED, Cost.chooseSource's posture: an answer naming a unit
+  -- that was not offered must not spend one. The payment still happens, out of
+  -- the first offered unit.
+  Spec.it s "CR 601.2h an answer outside the offered set does not spend it" $ do
+    let liar p = case p of
+          Prompt.ChooseManaToSpend {} -> plainGreen
+          _ -> S.identityAnswer p
+        (paid, after) = S.runPureWith liar (seededPool [snowRed, plainRed]) (Cost.payMana ManaSpending.AsProduced S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
+    Spec.assertBool s paid "the {1} is paid"
+    Spec.assertEqWith s "out of an offered unit, and the green was never in the pool" (poolOf S.alice after) [snowRed]
+
+-- A pool and nothing else: no permanent anywhere, so CR 601.2g's window has no
+-- source to offer and the only question a payment asks is which mana to spend.
+seededPool :: [ManaUnit.ManaUnit] -> GameState.GameState
+seededPool units = Mana.addMana S.alice units (Setup.emptyGame S.bothPlayers)
+
+-- Both lands tapped for their one red each, so the pool holds CR 107.4h's pair
+-- as production really makes it.
+twoRedFloated :: Printing.Printing -> Printing.Printing -> GameState.GameState
+twoRedFloated snowMountain mountain =
+  let base = Setup.emptyGame S.bothPlayers
+      (snowId, withSnow) = S.addCreature snowMountain S.alice base
+      (plainId, withBoth) = S.addCreature mountain S.alice withSnow
+   in S.runPure S.identityAnswer withBoth (Cost.tapForMana snowId *> Cost.tapForMana plainId)
+
+-- Pay `cost` out of `units`, counting the questions asked about which mana goes.
+payCounting :: [ManaUnit.ManaUnit] -> ManaCost.ManaCost -> (Bool, Int)
+payCounting units cost =
+  let answerer :: Prompt.Prompt r -> State.State Int r
+      answerer p = case p of
+        Prompt.ChooseManaToSpend _ _ candidates -> do
+          State.modify' (+ 1)
+          pure (NonEmpty.head candidates)
+        _ -> pure (S.identityAnswer p)
+   in case State.runState (Engine.runGame answerer (seededPool units) (Cost.payMana ManaSpending.AsProduced S.alice cost)) 0 of
+        ((paid, _), asked) -> (paid, asked)
+
+-- {R} and {G} on their own, the one-symbol costs the pairs above pay.
+redOnly :: ManaCost.ManaCost
+redOnly = ManaCost.MkManaCost [redSymbol]
+
+greenOnly :: ManaCost.ManaCost
+greenOnly = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]
