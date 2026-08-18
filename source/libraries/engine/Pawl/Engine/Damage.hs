@@ -29,6 +29,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePrevented as DamagePrevented
+import qualified Pawl.Types.ExcessDestination as ExcessDestination
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
@@ -177,14 +178,31 @@ deathtouchedRecipients events =
 -- announced, where this much is knowable when the offer is made.
 blockerThreshold :: GameState -> ObjectId -> ObjectId -> Natural
 blockerThreshold gs attacker blocker =
-  let marked = maybe 0 Object.damage (Game.lookupObject blocker gs)
-      lethal :: Natural
-      lethal = case Projection.toughnessOf blocker gs of
-        Nothing -> 0
-        Just t -> Integer.toNaturalSaturating (t - toInteger marked)
+  let lethal = lethalRemaining gs blocker
    in if lethal > 0 && Projection.hasKeyword Keyword.Deathtouch attacker gs
         then 1
         else lethal
+
+-- CR 120.6: how much more damage this creature can take before "the total damage
+-- marked on [it] is greater than or equal to its toughness" -- toughness minus
+-- what is already marked, floored at 0. Read through the projection, the same
+-- way the CR 704.5g SBA reads it.
+--
+-- The bar both of its callers START from, and neither of them is this alone,
+-- because the two rules that mention deathtouch here do not agree. CR 702.2c
+-- makes any nonzero COMBAT assignment by a deathtouch source lethal, so
+-- blockerThreshold above asks for 1 -- and 0 from a creature already at its bar,
+-- which is the reading that lets a trampler spill everything past it. CR 120.4a
+-- instead says "any amount of damage greater than 1 is EXCESS damage if the
+-- source dealing that damage to a creature has deathtouch", unconditionally, so
+-- excessThreshold below asks for a flat 1 there. Each caller applies its own
+-- rather than sharing one, and this function is what they share.
+lethalRemaining :: GameState -> ObjectId -> Natural
+lethalRemaining gs oid =
+  let marked = maybe 0 Object.damage (Game.lookupObject oid gs)
+   in case Projection.toughnessOf oid gs of
+        Nothing -> 0
+        Just t -> Integer.toNaturalSaturating (t - toInteger marked)
 
 -- One damage event, with its deal-time riders read off the projection HERE
 -- rather than re-derived when they are consumed: each is a fact about the source
@@ -694,6 +712,107 @@ damagedCardTypes gs recipient =
       damageable = Set.fromList [CardType.Battle, CardType.Creature, CardType.Planeswalker]
    in Set.union tagged projected
 
+-- CR 120.4a: the bar a permanent's own characteristics set, below which none of
+-- an effect's damage to it is EXCESS. One number per recipient, so redirectExcess
+-- below is arithmetic on the event and never a second classification of the
+-- permanent.
+--
+-- One entry per CR 120.1a card type the recipient HAS, read off damagedCardTypes
+-- so this and CR 120.3's results agree about what the permanent is:
+--
+--   * a creature's bar is CR 120.6's lethal damage, "taking into account damage
+--     already marked" (lethalRemaining) -- or a flat 1 from a source with
+--     deathtouch, which is 120.4a's own sentence and not CR 702.2c's (see
+--     lethalRemaining's note on the difference).
+--   * a planeswalker's is its loyalty, which is its loyalty counters (CR 306.5c).
+--   * a battle's is its defense, which is its defense counters (CR 310.4c).
+--
+-- The MINIMUM of those, because the rule takes the maximum of the other side:
+-- "if the first permanent has multiple card types ... the excess damage is the
+-- greatest of the calculated amounts for each of the card types it has", and the
+-- greatest excess is what the lowest bar leaves. Only reachable for a permanent
+-- that is more than one of the three at once, which takes Liquimetal Coating and
+-- March of the Machines to build (Pawl.DamageSpec's ExcessDamage group casts
+-- Flame Spill at that Jace Beleren); one card type is the ordinary case.
+--
+-- Nothing when the recipient has none of them: a player (CR 120.3a's business,
+-- and not a permanent at all) or an object that is no longer there to project.
+-- Nothing means no rewrite, which is the do-as-much-as-you-can reading -- the
+-- damage is dealt as the effect otherwise says.
+--
+-- "Damage from other sources that would be dealt at the same time" is not read.
+-- Every event in one of these batches comes from the SAME source, since
+-- Pawl.Engine.Resolve's DealDamage arm resolves one dealer for the whole
+-- instruction, and pawl deals no two effects' damage simultaneously.
+excessThreshold :: GameState -> ObjectId -> Recipient.Recipient -> Maybe Natural
+excessThreshold gs source recipient = do
+  oid <- Recipient.objectOf recipient
+  let types = damagedCardTypes gs recipient
+      bars =
+        [ bar
+        | (cardType, bar) <-
+            [ ( CardType.Creature,
+                if Projection.hasKeyword Keyword.Deathtouch source gs
+                  then 1
+                  else lethalRemaining gs oid
+              ),
+              (CardType.Planeswalker, Cost.loyaltyCountersOn oid gs),
+              (CardType.Battle, Battle.defenseOn oid gs)
+            ],
+          Set.member cardType types
+        ]
+  Monad.guard (not (null bars))
+  pure (minimum bars)
+
+-- CR 120.4a, the FIRST part of CR 120.4's four-part sequence: "if an effect
+-- that's causing damage to be dealt states that excess damage that would be
+-- dealt to a permanent is dealt to another permanent or player instead, the
+-- damage event is modified accordingly".
+--
+-- The events go in raw and come out rewritten, ahead of applyDamage -- so the CR
+-- 120.4b replacement and prevention loop sees the split events rather than the
+-- original one, which is what the ordering of those two rules says and is
+-- observable: a prevention effect protecting the redirected player applies to
+-- the redirected half alone.
+--
+-- Nothing -- the effect stated no destination -- means no rewrite at all, and the
+-- whole amount stays where the effect aimed it. Combat never reaches here either:
+-- CR 120.4a's subject is an effect, and Pawl.Engine.Resolve's DealDamage arm is
+-- the only caller.
+--
+-- The redirected half is built through damageEvent, the one place a damage event
+-- is made, so it carries the same source and the same deal-time riders (CR
+-- 702.2e, CR 702.15c): a lifelink source redirecting its excess to a player
+-- still gains its controller that life.
+redirectExcess :: GameState -> Maybe ExcessDestination.ExcessDestination -> [DamageEvent.DamageEvent] -> [DamageEvent.DamageEvent]
+redirectExcess gs destination events = case destination of
+  Nothing -> events
+  -- "Excess damage is dealt to that creature's controller instead", read off the
+  -- damaged permanent rather than off the card, which names no one.
+  Just ExcessDestination.ToRecipientController -> concatMap (splitExcess gs) events
+
+-- One event, split into what the permanent can take and what its controller
+-- takes instead. Unsplit -- the singleton -- whenever any part of the rewrite
+-- has no answer: a recipient with no bar (excessThreshold), no excess to move,
+-- or a permanent whose controller cannot be read.
+--
+-- The permanent's half DROPS when its bar is 0, rather than being dealt as a 0:
+-- CR 120.8, "if a source would deal 0 damage, it does not deal damage at all",
+-- which the sibling reading in Resolve's DealDamage arm already takes for a
+-- quantity that evaluates to 0. An already-lethal creature therefore sends the
+-- whole amount on and takes no second event.
+splitExcess :: GameState -> DamageEvent.DamageEvent -> [DamageEvent.DamageEvent]
+splitExcess gs event =
+  Maybe.fromMaybe [event] $ do
+    oid <- Recipient.objectOf (DamageEvent.target event)
+    bar <- excessThreshold gs (DamageEvent.source event) (DamageEvent.target event)
+    let excess = Natural.minusSaturating (DamageEvent.amount event) bar
+    Monad.guard (excess > 0)
+    player <- Projection.controllerOf oid gs
+    pure $
+      [event {DamageEvent.amount = bar} | bar > 0]
+        <> [damageEvent gs (DamageEvent.kind event) (DamageEvent.source event) (Recipient.ToPlayer player) excess]
+
 -- CR 120.3: carry out a batch of damage events' results -- mark damage on
 -- creatures (CR 120.3e), drain life from players (CR 120.3a), take loyalty and
 -- defense counters off (CR 120.3c, CR 120.3h), place the counters infect, wither
@@ -722,8 +841,10 @@ damagedCardTypes gs recipient =
 -- half of what resolveDamageBatch answers: one Prevention per prevention effect
 -- that applied to this batch, carrying the total it prevented.
 --
--- CR 120.4b and CR 120.4c only. CR 120.4a's excess-damage rewrite does not happen
--- here or anywhere (#980).
+-- CR 120.4b and CR 120.4c only. CR 120.4a runs BEFORE this, on the event list
+-- rather than on the batch: redirectExcess above has already split any event
+-- whose effect stated where its excess goes, so what arrives here is what CR
+-- 120.4b deals. Pawl.DamageSpec's ExcessDamage group is the proof.
 applyDamage :: [DamageEvent.DamageEvent] -> Game ()
 applyDamage events = do
   (survivors, prevented) <- Event.resolveDamageBatch events

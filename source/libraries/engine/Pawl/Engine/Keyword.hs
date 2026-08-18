@@ -1079,9 +1079,12 @@ flashbackCost keywords =
 --
 -- A wildcard rather than an exhaustive case, exactly as flashbackCost above.
 --
--- Nothing beyond the FIRST morph cost is reachable: a card printing two morph
--- abilities is expressible and unrepresented, as for flashback and entwine
--- (gap #1677).
+-- ONE cost per card. The keyword set holds every printed instance and this takes
+-- the ascending-least of them, ordered by Pawl.Types.Morph's derived Ord, which
+-- compares the Cost before the variant. So a card printing two morph abilities
+-- has one payable road, and that answer is what "the permanent's morph cost"
+-- means to every reader of it -- Pawl.Engine.Cast, FaceDown.canTurnFaceUp, and
+-- the megamorph row mintedReplacementsFor puts on the same permanent.
 morphCost :: Set Keyword -> Maybe (Cost Keyword)
 morphCost keywords =
   let costOf keyword = case keyword of
@@ -1130,9 +1133,9 @@ entwineCost keywords =
 --
 -- A wildcard rather than an exhaustive case, exactly as flashbackCost.
 --
--- Nothing beyond the FIRST plot cost is reachable: a card printing two plot
--- abilities is expressible and unrepresented, as for flashback and entwine
--- (gap #1677).
+-- ONE cost per card, morphCost's shape: the ascending-least of the plot costs
+-- the card prints, so a card printing two plot abilities offers CR 116.2k's
+-- action at that price and no other.
 plotCost :: Set Keyword -> Maybe (Cost Keyword)
 plotCost keywords =
   let costOf keyword = case keyword of
@@ -1151,9 +1154,9 @@ plotCost keywords =
 --
 -- A wildcard rather than an exhaustive case, exactly as flashbackCost.
 --
--- Nothing beyond the FIRST foretell cost is reachable: a card printing two
--- foretell abilities is expressible and unrepresented, as for flashback and
--- entwine (gap #1677).
+-- ONE cost per card, morphCost's shape: the ascending-least of the foretell
+-- costs the card prints, so rule 702.143a's "ANY foretell cost it has" is
+-- answered with that one.
 foretellCost :: Set Keyword -> Maybe (Cost Keyword)
 foretellCost keywords =
   let costOf keyword = case keyword of
@@ -1341,10 +1344,10 @@ mintedReplacementsFor keyword count = case keyword of
   -- megamorph card a second road face up at its MANA cost, and the row is refused
   -- down that one. Pawl.FaceDownSpec's Misthoof Kirin pair is the proof.
   --
-  -- Not implemented: the rest of the condition, which asks about the COST and not
-  -- the road -- a permanent holding a plain morph ability beside a megamorph one
-  -- would take the counter for either cost, since Keyword.morphCost reads only
-  -- the first (#986).
+  -- The rest of the condition asks about the COST rather than the road, and this
+  -- row does not distinguish two costs: Keyword.morphCost answers one cost per
+  -- permanent, so CR 702.37e's road has a single price and this row applies down
+  -- it whichever morph ability that price was printed by.
   --
   -- ONE ROW PER INSTANCE, as riot's is, and reached the same way -- the instance
   -- ordinal, not the effect value, is what separates two equal rows. Unexercised
@@ -3200,9 +3203,9 @@ miracle cost =
 -- PRINTED keywords for that function's reason: rule 702.94a's abilities function
 -- in the hand (CR 113.6b), where no pool effect changes a card's keywords (#160).
 --
--- Nothing beyond the FIRST miracle cost is reachable, also for flashbackCost's
--- reason: a card printing two miracle abilities is expressible and
--- unrepresented (gap #1677).
+-- ONE cost per card, morphCost's shape: the ascending-least of the miracle
+-- costs the card prints, so the reveal opens a window at that price and no
+-- other.
 miracleCost :: Set Keyword -> Maybe (Cost Keyword)
 miracleCost keywords =
   let costOf keyword = case keyword of
