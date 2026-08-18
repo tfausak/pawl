@@ -122,12 +122,10 @@ import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 
--- Rule 702 in its OTHER voice. Most keywords are read where they matter --
--- Projection.hasKeyword for an evasion bit, Pawl.Engine.Damage for infect's and
--- toxic's riders -- because the rule states them as static abilities some
--- rules-core reader already asks about. The ones rule 702 spells out as TRIGGERED
--- or ACTIVATED abilities have to be MINTED here and handed to the ordinary CR 603
--- and CR 602 machinery instead.
+-- Rule 702 in its OTHER voice. Most keywords are read where they matter, the rule
+-- stating them as static abilities some rules-core reader already asks about. The
+-- ones rule 702 spells out as TRIGGERED or ACTIVATED abilities have to be MINTED
+-- here and handed to the ordinary CR 603 and CR 602 machinery instead.
 --
 -- Casing on Keyword here is legitimate for the reason Pawl.Types.Keyword's own
 -- comment gives: a keyword is a numbered rule, not an effect's identity. What
@@ -137,12 +135,10 @@ import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 -- ability, so the first keyword that needs one must widen Event's two scans.
 --
 -- Rule 702.34a's flashback shows how wide this voice is: ONE keyword becomes a
--- cost (flashbackCost), a casting permission (castingPermissionsOf) and a
--- replacement effect (castFromGraveyardExile), none of whose readers learn that
--- flashback produced them. All three are derived from a card's PRINTED keywords
--- rather than a projection's post-layer ones, because all three function in the
--- graveyard or on the stack (CR 113.6), neither of which pawl's projection
--- reaches (#160). entwineCost is read the same way (CR 702.42a).
+-- cost, a casting permission and a replacement effect, none of whose readers learn
+-- that flashback produced them. All three are derived from a card's PRINTED
+-- keywords, since all three function in the graveyard or on the stack (CR 113.6),
+-- neither of which pawl's projection reaches (#160).
 
 -- CR 702.70b: multiple instances of poisonous each trigger separately, so this
 -- returns one ability PER INSTANCE -- `Poisonous 1` twice is two abilities and two
@@ -374,11 +370,8 @@ handAbilitiesFor keyword = case keyword of
 -- a cost payment to trigger off rather than a resolution.
 --
 -- ToPayCyclingCost, which is what CR 702.29c means by "an activation cost of a
--- cycling ability" -- and it covers rule 702.29e's typecycling too, because rule
--- 702.29f makes those cycling abilities and this one function mints both.
---
--- No restriction clause, rule 702.29a stating no timing restriction, which leaves
--- CR 117.1b's default.
+-- cycling ability" -- and it covers rule 702.29e's typecycling too, rule 702.29f
+-- making those cycling abilities and this one function minting both.
 cycling :: Cost Keyword -> Maybe (Filter Keyword) -> ActivatedAbility Card
 cycling cost searchFor =
   ActivatedAbility.MkActivatedAbility
@@ -425,9 +418,6 @@ cycling cost searchFor =
 -- The discard is a COMPONENT of the activation cost for cycling's reasons. Its
 -- cause is Ordinary and not ToPayCyclingCost: rule 702.77 never says reinforce is
 -- a cycling ability, so CR 702.29c's "when you cycle this card" must not see it.
---
--- The target is Pool.Creatures unqualified, rule 702.77a printing "target
--- creature" and no more, and Mandatory, the rule stating no "may".
 --
 -- Quantity.Literal and not a counter reading: N is written on the card, where
 -- modular's count is measured off the dying permanent.
@@ -627,15 +617,11 @@ crew n =
         )
 
 -- CR 702.87a: "Level up [cost]" means "[Cost]: Put a level counter on this
--- permanent. Activate only as a sorcery." Outlast's twin below, and the two are
--- worth reading together for what differs.
+-- permanent. Activate only as a sorcery." Outlast's twin below.
 --
 -- THE COST is the printed one UNCHANGED -- rule 702.87a appends no ", {T}", so
 -- unlike outlast there is no CostComponent.TapThis and CR 302.6 does not reach
 -- this ability: a leveler that arrived this turn can level up.
---
--- THE EFFECT names the permanent through Binding.triggerSource, so rule 702.87a's
--- "this permanent" is named and never TARGETED (CR 115.10a), outlast's posture.
 --
 -- THE COUNTER grants nothing by itself: CR 711.2a's level symbols are ordinary
 -- conditional static abilities on the card, reading this tally through
@@ -1362,17 +1348,12 @@ familyOf keyword = case keyword of
   Keyword.Intimidate -> Nothing
   Keyword.Infect -> Nothing
   Keyword.Wither -> Nothing
-  -- CR 702.83a takes no parameter, so there is no variant for a card to name.
   Keyword.Exalted -> Nothing
-  -- CR 702.134a takes no parameter either, so mentor has no family of its own.
   Keyword.Mentor -> Nothing
   Keyword.Afterlife _ -> Just KeywordFamily.Afterlife
-  -- CR 702.39a takes no parameter, so provoke has no family of its own.
   Keyword.Provoke -> Nothing
   Keyword.BattleCry -> Nothing
-  -- CR 702.100a takes no parameter either, so evolve has no family of its own.
   Keyword.Evolve -> Nothing
-  -- CR 702.105a takes no parameter either, so dethrone has no family of its own.
   Keyword.Dethrone -> Nothing
   Keyword.LevelUp _ -> Just KeywordFamily.LevelUp
   Keyword.Outlast _ -> Just KeywordFamily.Outlast
@@ -1384,7 +1365,6 @@ familyOf keyword = case keyword of
   Keyword.Devoid -> Nothing
   Keyword.Ingest -> Nothing
   Keyword.Skulk -> Nothing
-  -- CR 702.121a takes no parameter, so there is no variant for a card to name.
   Keyword.Melee -> Nothing
   Keyword.Aftermath -> Nothing
   Keyword.JumpStart -> Nothing
@@ -1393,12 +1373,9 @@ familyOf keyword = case keyword of
   Keyword.Daybound -> Nothing
   Keyword.Nightbound -> Nothing
   Keyword.Decayed -> Nothing
-  -- CR 702.149a takes no parameter, so training has no family of its own.
   Keyword.Training -> Nothing
   Keyword.StartYourEngines -> Nothing
-  -- CR 701.43d takes no parameter, so exert has no family of its own.
   Keyword.Exert -> Nothing
-  -- CR 702.79a and CR 702.93a take no parameter, so neither has a family.
   Keyword.Persist -> Nothing
   Keyword.Undying -> Nothing
 
@@ -2470,12 +2447,10 @@ servoToken =
 -- A CardsInGraveyard pool scoped to You is rule 702.46a's "your graveyard", read
 -- as CR 115.2's clause (a) -- and the reason the pool carries a GraveyardScope
 -- rather than a Filter is that CR 108.4 gives a card in a graveyard no controller.
+-- The move states no origin zone for that same reason.
 --
 -- Nothing excludes the bearer: rule 702.46a does not say "another", and its own
 -- graveyard incarnation is an ordinary candidate whenever it matches.
---
--- No stated origin zone on the move: "from your graveyard" is stated in the
--- TARGET's pool, where choosing the target enforces it.
 soulshift :: Natural -> TriggeredAbility Card
 soulshift n =
   TriggeredAbility.MkTriggeredAbility
@@ -2724,14 +2699,11 @@ fading =
 -- in a graveyard by the time this resolves and CR 122.2 made its counters cease
 -- with it, so the last known record is the only place the number still is.
 -- Pawl.TriggerSpec's modularSpec proves it by emptying the record while the
--- trigger sits on the stack.
+-- trigger sits on the stack. ZERO counters is an ordinary answer rather than a
+-- failure.
 --
 -- Optionality.Optional is rule 702.43a's "you may". A REAL choice: declining with
 -- a legal target on the board leaves the counters nowhere.
---
--- ZERO counters is an ordinary answer rather than a failure: a modular permanent
--- whose counters were all removed before it died still triggers, still targets,
--- and puts nothing on.
 modular :: TriggeredAbility Card
 modular =
   TriggeredAbility.MkTriggeredAbility
