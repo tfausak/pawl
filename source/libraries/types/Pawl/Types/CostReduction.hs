@@ -19,7 +19,7 @@ import qualified Pawl.Types.Quantity as Quantity
 -- Read straight off the card by Pawl.Engine.Cost.selfReductions and NOT
 -- through the projection -- Pawl.Types.Face.castingPermissions' precedent, for
 -- its reason: the ability is consulted while the object is in a hand or on the
--- stack, neither of which Pawl.Engine.Projection.gather reaches (#160). CR
+-- stack, where this reader takes the printed card (#1859). CR
 -- 113.6d is the rule that makes an ability modifying what its own object costs
 -- to cast function on the stack.
 data CostReduction = MkCostReduction

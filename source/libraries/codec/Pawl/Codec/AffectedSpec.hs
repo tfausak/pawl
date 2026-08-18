@@ -30,6 +30,12 @@ spec s = Spec.describe s "Pawl.Codec.Affected" $ do
       Affected.codec
       (Affected.MatchingAnywhere (Filter.HasCardType CardType.Creature))
       " {\"type\":\"MatchingAnywhere\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
+  Spec.it s "MatchingOffBattlefield" $
+    Common.assertCodec
+      s
+      Affected.codec
+      (Affected.MatchingOffBattlefield (Filter.HasCardType CardType.Creature))
+      " {\"type\":\"MatchingOffBattlefield\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   -- An "each other" card text as Not IsSource nested inside Matching -- the
   -- composed form the bare atom cases above do not exercise.
   Spec.it s "Matching, Opalescence's \"each other\" shape" $

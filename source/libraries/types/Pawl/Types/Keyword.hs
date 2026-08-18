@@ -672,8 +672,8 @@ data Keyword
     -- way, you may cast it by paying [cost] rather than its mana cost."
     --
     -- Both halves live in the HAND (CR 113.6b), so both are read off a card's
-    -- PRINTED keywords, the way flashback's three readers are; nothing in the pool
-    -- changes the keywords of a card in a hand (#160). The static half is
+    -- PRINTED keywords, the way flashback's three readers are, which misses an
+    -- effect that granted miracle there (#1859). The static half is
     -- Pawl.Engine.Keyword.miracleCost, consulted by Pawl.Engine.Event's draw
     -- funnel -- the one place CR 121.9's window exists; the triggered half is
     -- minted by Pawl.Engine.Keyword.miracle, and CR 113.6k is what confines it to

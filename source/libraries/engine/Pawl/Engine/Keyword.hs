@@ -135,9 +135,12 @@ import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 --
 -- Rule 702.34a's flashback shows how wide this voice is: ONE keyword becomes a
 -- cost, a casting permission and a replacement effect, none of whose readers learn
--- that flashback produced them. All three are derived from a card's PRINTED
--- keywords, since all three function in the graveyard or on the stack (CR 113.6),
--- neither of which pawl's projection reaches (#160).
+-- that flashback produced them. All three function in the graveyard or on the
+-- stack (CR 113.6), and the graveyard reads go through the projection
+-- (Cost.costsFor, Cast.graveyardKeywords).
+--
+-- Not implemented: what is read while the object is on the STACK stays printed
+-- (#1859).
 
 -- CR 702.70b: multiple instances of poisonous each trigger separately, so this
 -- returns one ability PER INSTANCE -- `Poisonous 1` twice is two abilities and two
@@ -265,8 +268,13 @@ abilitiesFor keyword count = case keyword of
 --
 -- Printed keywords rather than a projection's post-layer ones, the same rules fact
 -- castingPermissionsOf records: CR 113.6b confines an ability to the zones it
--- states, and rules 702.29a and 702.77a state the hand -- where no pool effect
--- changes a card's abilities (#160).
+-- states, and rules 702.29a and 702.77a state the hand.
+--
+-- Not implemented: a card in a hand whose CYCLING or REINFORCE an effect granted
+-- or removed, which the printed set misses (#1859). Narrowed to those two rules
+-- rather than to keywords at large -- Teferi, Mage of Zhalfir does grant a
+-- keyword to a card in a hand, and Cast.instantSpeed reads that one through the
+-- projection.
 handAbilitiesOf :: Set Keyword -> [ActivatedAbility Card]
 handAbilitiesOf = concatMap handAbilitiesFor . Set.toAscList
 
@@ -656,8 +664,10 @@ outlast cost =
 -- A card's own printed permissions are a separate, additive list.
 --
 -- WHICH keyword set is the caller's to choose: a card in a GRAVEYARD is read
--- through the projection, so a granted flashback grants its permission too, while
--- a card in a LIBRARY is read as printed (#160).
+-- through the projection, so a granted flashback grants its permission too.
+--
+-- Not implemented: a card in a LIBRARY is read as printed instead (#1859), which
+-- is where Panglacial Wurm's permission is consulted.
 --
 -- The card types come along because rule 702.34a's permission is CONDITIONAL on
 -- them, and they are the types of the one FACE being proposed.
@@ -806,9 +816,10 @@ hasAftermath = Set.member Keyword.Aftermath
 --
 -- Rule 702.8a's first sentence and CR 113.6e put the ability in any zone the card
 -- could be played from, and on the stack, which is why the caller asks a card
--- rather than a permanent. PRINTED keywords are indistinguishable from projected
--- ones on every board pawl can build (#160), which is a claim about the pool
--- rather than about Magic; the same posture handAbilitiesOf takes.
+-- rather than a permanent. WHICH keyword set is the caller's to choose, as it is
+-- for castingPermissionsOf: Cast.instantSpeed asks this of the proposed face's
+-- printed keywords AND of the object's post-layer ones, so Teferi, Mage of
+-- Zhalfir's grant to a card in a hand reaches it (Pawl.CastSpec's Teferi pair).
 hasFlash :: Set Keyword -> Bool
 hasFlash = Set.member Keyword.Flash
 
@@ -2443,9 +2454,11 @@ miracle cost =
 -- miracle ability at all, which is also "no window to open".
 --
 -- flashbackCost's shape exactly, and asked of the card's PRINTED keywords for that
--- function's reason: rule 702.94a's abilities function in the hand (CR 113.6b),
--- where no pool effect changes a card's keywords (#160). ONE cost per card (the
--- ascending-least), morphCost's shape.
+-- function's reason: rule 702.94a's abilities function in the hand (CR 113.6b).
+-- ONE cost per card (the ascending-least), morphCost's shape.
+--
+-- Not implemented: a card in a hand whose MIRACLE an effect granted or removed
+-- (#1859).
 miracleCost :: Set Keyword -> Maybe (Cost Keyword)
 miracleCost keywords =
   let costOf keyword = case keyword of

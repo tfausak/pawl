@@ -2389,18 +2389,14 @@ flashSpec s registry = Spec.describe s "Flash" $ do
     Spec.assertEqWith s "and not on the battlefield yet" (S.creaturesInPlay S.alice cast) 0
     Spec.assertBool s (S.castable S.bob boltId cast) "bob may respond to it"
     Spec.assertEqWith s "it resolves into a creature like any other" (S.creaturesInPlay S.alice resolved) 1
-  -- Pawl.Engine.Cast reads the PRINTED keyword. This is the case that says the
-  -- CR 613 projection agrees with it for a card in a hand, so the reading is not
-  -- a shortcut that a projected read would have caught.
+  -- Cast.instantSpeed reads the CR 613 projection, and this is the case that says
+  -- the printed keyword still reaches it: a card whose flash is printed rather
+  -- than granted is castable on the same board.
   --
-  -- Humility is why that agreement is the RIGHT answer rather than a
-  -- coincidence: CR 109.2 makes its "all creatures" mean permanents on the
-  -- battlefield, and a card in a hand is not one of them, so the window stays
-  -- open and the projection says so.
-  --
-  -- Nothing in the pool could close it either way -- no effect in the pool puts
-  -- a keyword-changing modification on a card in a hand (#160).
-  -- Pawl.Engine.Keyword.hasFlash carries that argument in full.
+  -- Humility is why the projection is the RIGHT reader rather than a coincidence
+  -- here: CR 109.2 makes its "all creatures" mean permanents on the battlefield,
+  -- and a card in a hand is not one of them, so the window stays open and the
+  -- projection says so.
   Spec.it s "CR 702.8a the projection of a card in hand carries flash, and Humility does not reach it" $ do
     forest <- S.printingOf s registry "Forest"
     pouncingCheetah <- S.printingOf s registry "Pouncing Cheetah"
@@ -2411,6 +2407,76 @@ flashSpec s registry = Spec.describe s "Flash" $ do
     Spec.assertBool s (Projection.hasKeyword Keyword.Flash cheetahId humbled) "the Cheetah projects flash"
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Flash mammothId humbled)) "the Mammoth does not"
     Spec.assertBool s (S.castable S.alice cheetahId humbled) "and it is still castable on bob's turn"
+
+  -- CR 613.1f layer 6 over a card in a HAND. Teferi, Mage of Zhalfir's "creature
+  -- cards you own that aren't on the battlefield have flash" is the pool's first
+  -- effect to change a card's keywords while it sits in a hand, which is what
+  -- makes Cast.instantSpeed's projected read observable at all.
+  --
+  -- A PAIR of boards differing in exactly one thing: whether Teferi is on the
+  -- battlefield. Same four Forests, same Mammoth in the same hand, same seat
+  -- active, and S.castAnswer takes whatever cast it is OFFERED -- so on the bare
+  -- board alice is offered none and passes.
+  --
+  -- Three readings the pair separates. War Mammoth prints no flash, so "the card
+  -- always had it" would put it onto the battlefield on the bare board too. It is
+  -- in the hand before Teferi arrives, so "the effect applied as it was drawn"
+  -- puts it there on neither. Only an effect applying to a card SITTING in a hand
+  -- puts it there on exactly one.
+  --
+  -- Not implemented, so the card file omits it: Teferi's third clause, "each
+  -- opponent can cast spells only any time they could cast a sorcery" (#1860).
+  -- Bob casts nothing here, so nothing below turns on it.
+  Spec.it s "CR 702.8a/613.1f Teferi gives a creature card in hand flash, and it is cast on bob's turn" $ do
+    forest <- S.printingOf s registry "Forest"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    teferi <- S.printingOf s registry "Teferi, Mage of Zhalfir"
+    let (mammothId, bare) = teferiBoard forest warMammoth Nothing
+        withTeferi = snd (teferiBoard forest warMammoth (Just teferi))
+        play gs = S.runPure S.castAnswer gs Engine.priorityLoop
+        after = play withTeferi
+    Spec.assertEqWith s "the Mammoth is on the battlefield" (S.countOnBattlefieldByName (S.printingName warMammoth) S.alice after) 1
+    Spec.assertEqWith s "and without Teferi it never left her hand" (S.countOnBattlefieldByName (S.printingName warMammoth) S.alice (play bare)) 0
+    Spec.assertEqWith s "bob was the active player throughout" (GameState.activePlayer after) S.bob
+    Spec.assertBool s (Projection.hasKeyword Keyword.Flash mammothId withTeferi) "the card in hand projects flash"
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flash mammothId bare)) "and does not without Teferi"
+
+  -- The arm's own gate, read from the other side. Teferi's set is
+  -- Affected.MatchingOffBattlefield, so a creature ON the battlefield is outside
+  -- it -- which is the whole difference between that arm and MatchingAnywhere,
+  -- and CR 702.8a is a permission to PLAY a card, so nothing else on the board
+  -- would show it.
+  --
+  -- TWO War Mammoths on ONE board differing in exactly one thing: which zone each
+  -- is in. Same printing, same owner, same Teferi, so a set that ignored the zone
+  -- would answer alike for both.
+  Spec.it s "CR 613.1f Teferi's off-battlefield set reaches the Mammoth in hand and not the one in play" $ do
+    forest <- S.printingOf s registry "Forest"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    teferi <- S.printingOf s registry "Teferi, Mage of Zhalfir"
+    let (inHand, gs0) = teferiBoard forest warMammoth (Just teferi)
+        (inPlay, gs) = S.addCreature warMammoth S.alice gs0
+    Spec.assertBool s (Projection.hasKeyword Keyword.Flash inHand gs) "the one in hand has flash"
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flash inPlay gs)) "the one on the battlefield does not"
+
+-- Four Forests and a War Mammoth in alice's hand, on BOB's turn with alice
+-- holding priority, and Teferi on the battlefield or not. The Mammoth is {3}{G},
+-- which the four Forests pay exactly, so affordability is identical either way
+-- and the only thing that varies is the printing this takes.
+teferiBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Maybe Printing.Printing ->
+  (ObjectId.ObjectId, GameState.GameState)
+teferiBoard forest warMammoth mTeferi =
+  let (gs0, mammothId) = S.handOne warMammoth (S.landsInPlay forest 4)
+      gs1 = maybe gs0 (\teferi -> snd (S.addCreature teferi S.alice gs0)) mTeferi
+   in ( mammothId,
+        gs1
+          { GameState.activePlayer = S.bob,
+            GameState.priority = Just S.alice
+          }
+      )
 
 -- The two names Wax // Wane prints (CR 709.4a). Neither of them is "Wax//Wane",
 -- which is the combined view's stand-in and not a name the card has.

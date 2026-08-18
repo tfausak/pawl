@@ -8327,8 +8327,10 @@ eventTriggers events gs =
       -- it's cycled", the graveyard for every printing today.
       --
       -- Abilities come from the PRINTED card rather than a projection, no pool
-      -- effect changing the abilities of a card in a graveyard (#160). Rule 702's minted
-      -- abilities are not consulted either -- none functions from a graveyard.
+      -- effect changing the TRIGGERED abilities of a card in a graveyard (#1859) --
+      -- Teferi, Mage of Zhalfir's grant off the battlefield mints none. Rule 702's
+      -- minted abilities are not consulted either -- none functions from a
+      -- graveyard.
       --
       -- The controller is the OWNER, CR 113.8's second clause: a card in a
       -- graveyard has no controller (CR 108.4).
@@ -8447,7 +8449,7 @@ eventTriggers events gs =
       -- Abilities from the last known projection rather than a printed face: a
       -- ceased id has no face to look up, and `LastKnown` carries none. Identical
       -- to `inGraveyards`' printed read today, no pool effect changing the
-      -- abilities of a card in a graveyard (gap #160). Not `abilitiesOf` either --
+      -- TRIGGERED abilities of a card in a graveyard (gap #1859). Not `abilitiesOf` either --
       -- nothing rule 702 or rule 310 mints functions from a graveyard, and
       -- `inGraveyards` does not consult them, so the two graveyard sources read
       -- alike.
@@ -8532,7 +8534,7 @@ eventTriggers events gs =
       -- condition that functions on the stack and watches some other event is
       -- what would widen this.
       --
-      -- Abilities come from the PRINTED card, for `cycledCard`'s reason (#160).
+      -- Abilities come from the PRINTED card, for `cycledCard`'s reason (#1859).
       spellCast event = case event of
         GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ _) -> case Game.faceOf spell gs of
           Nothing -> Map.empty
@@ -8639,7 +8641,7 @@ eventTriggers events gs =
       -- The abilities are the PRINTED ones plus the ones rule 702 MINTS from the
       -- card's printed keywords -- and miracle's is entirely the latter, so
       -- dropping the mint would leave this source with nothing to find. Printed
-      -- keywords rather than a projection's, for `cycledCard`'s reason (#160).
+      -- keywords rather than a projection's, for `cycledCard`'s reason (#1859).
       --
       -- The controller is the OWNER, CR 113.8's second clause, for `inGraveyards`'
       -- reason: CR 108.4 gives a card in a hand no controller. Rule 702.94a's
