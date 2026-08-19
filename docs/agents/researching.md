@@ -108,6 +108,9 @@ the critical path. A brief is dispatch-ready when it carries:
   already in `data/cards/`, and a clause-by-clause expressibility check naming
   the opcode for each. If a clause must be omitted, say whether the omission
   runs stricter or weaker than printed
+- the **composition check**: for each opcode named above, the engine path the
+  producer reaches it by and what that path supplies. Per-clause existence is
+  not composition. See "Composition, not just existence" below
 - the **card JSON**, in full when the producer is not yet in `data/cards/`, in
   the wire spelling a neighbouring card uses --- transcribed from the Oracle
   text you fetched, never from the issue
@@ -165,3 +168,47 @@ substitutes for the other: the mutation asks whether the assertion is wired to
 the code, this asks whether the BOARD can tell the two answers apart. When no
 board separates them, say so --- "every candidate board makes the two readings
 agree" is already a finding, and it is the one listed under "What a finding is".
+
+## Composition, not just existence
+
+The expressibility check asks whether each clause has an opcode. It passes on
+cards whose opcodes are inert TOGETHER, because what an atom answers depends on
+the path it is reached by and not on the atom. Showstopping Surprise needed
+`EachMatching`, `IsBound`, `AgainstSlot`, `Power` and a `DealDamage` dealer; all
+of them existed, and the sweep reaching them built its `Filter.Context` through
+`Filter.contextFor`, whose slot map is empty --- so "each OTHER creature" was
+`Not (IsBound "target")` against nothing, the exclusion never fired, and the card
+damaged its own target to death. The brief verified every piece exists; the
+implementer found by building that they do not compose (#1876).
+
+The symptom is a VACUOUS ATOM: one that cannot be false, or cannot be true,
+because the field it reads was never filled on this path. It compiles, the codec
+round-trips, the card loads, and nothing is red.
+
+So for each opcode the producer needs, name the path and the context it is
+evaluated in.
+
+- Trace from the producer's shape to the call, and name the function that builds
+  the context there. `Filter.Context`'s context-relative fields are empty in
+  `Filter.contextFor`; its header says which positions that is the honest answer
+  for, and a path outside that list wanted a different builder.
+- Ask what the atom answers against an empty field. `Filter.IsBound`,
+  `SameNameAsBound`, `IsHostOfSource` and `ControlledByRecipient` each answer
+  False rather than raising, and `Quantity.AgainstSlot` answers unanswered ---
+  neither distinguishable from a rule that genuinely does not apply.
+- Read the guardrail, and say which one applies. `Pawl.CardSpec` fences some of
+  those fields with a position lint that keeps a card out of the positions where
+  they are empty; `slotObjects` and `recipient` carry no lint, so a card can
+  reach them and the brief must reason about them itself.
+- Where two opcodes must see each other, say whether one builder supplies both.
+  A slot is visible to `IsBound` only where the resolution's own map is handed
+  over (`Resolve.effectContext`), and only where it names exactly one object ---
+  a group binding is invisible to it (#1532). A target slot's own filter is
+  matched before any of that exists (`Target.admittedGiven`), and an
+  intervening-"if" reads a map filtered differently again
+  (`Binding.objectSlots`).
+
+When reading cannot settle it, say so: "these opcodes exist and I did not verify
+they compose along <path>" is an honest brief and points the implementer at the
+first thing to build. A brief that lists opcodes and stops has verified existence
+and claimed composition.
