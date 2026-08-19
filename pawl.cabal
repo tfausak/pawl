@@ -65,6 +65,16 @@ library
   other-modules: Paths_pawl
   -- cabal-gild: discover source/library
   exposed-modules:
+    Pawl.ActivateSpec
+    Pawl.AdventureSpec
+    Pawl.AuraSpec
+    Pawl.BattleSpec
+    Pawl.BindingSpec
+    Pawl.Cards
+    Pawl.CardSpec
+    Pawl.CardsSpec
+    Pawl.CaseSpec
+    Pawl.CastSpec
     Pawl.Codec.AbilityName
     Pawl.Codec.AbilityNameSpec
     Pawl.Codec.AbilityTriggered
@@ -590,8 +600,26 @@ library
     Pawl.Codec.ZoneChangeRSpec
     Pawl.Codec.ZoneChangeSpec
     Pawl.Codec.ZoneSpec
+    Pawl.CodecIntegrationSpec
+    Pawl.ColorSpec
+    Pawl.CombatEffectSpec
+    Pawl.CombatSpec
+    Pawl.CommanderSpec
+    Pawl.ConditionSpec
+    Pawl.CopySpec
+    Pawl.CoreSpec
+    Pawl.CostSpec
+    Pawl.CounterspellSpec
+    Pawl.CountSpec
+    Pawl.CrewSpec
+    Pawl.DamageSpec
+    Pawl.DaytimeSpec
+    Pawl.DecideSpec
     Pawl.Decimal
     Pawl.DecimalSpec
+    Pawl.DepartureSpec
+    Pawl.DetainSpec
+    Pawl.DungeonSpec
     Pawl.Engine.Action
     Pawl.Engine.Activate
     Pawl.Engine.Amass
@@ -660,8 +688,13 @@ library
     Pawl.Engine.Target
     Pawl.Engine.Turn
     Pawl.Engine.UntapRestriction
+    Pawl.EngineSpec
+    Pawl.EventSpec
+    Pawl.EventTriggerSpec
     Pawl.Exceptions.InvalidCorpus
     Pawl.Exceptions.MissingRoot
+    Pawl.ExileSpec
+    Pawl.ExpirySpec
     Pawl.Extra.Builder
     Pawl.Extra.BuilderSpec
     Pawl.Extra.Either
@@ -682,6 +715,10 @@ library
     Pawl.Extra.SemigroupSpec
     Pawl.Extra.Word8
     Pawl.Extra.Word8Spec
+    Pawl.FaceDownSpec
+    Pawl.FilterSpec
+    Pawl.GameSpec
+    Pawl.InvestigateSpec
     Pawl.Json.Array
     Pawl.Json.ArraySpec
     Pawl.Json.Boolean
@@ -719,10 +756,41 @@ library
     Pawl.JsonSchema.SchemaSpec
     Pawl.JsonSchema.Validate
     Pawl.JsonSchema.ValidateSpec
+    Pawl.KeywordTriggerSpec
+    Pawl.LibraryOrderSpec
+    Pawl.ManaSpec
+    Pawl.MassEffectSpec
+    Pawl.ModalDoubleFacedSpec
+    Pawl.ModalSpec
+    Pawl.MulliganSpec
+    Pawl.PerformanceSpec
+    Pawl.PhasingSpec
+    Pawl.PlaneswalkerSpec
+    Pawl.PlayerEffectSpec
+    Pawl.PowerToughnessSpec
+    Pawl.ProjectionSpec
+    Pawl.RadSpec
     Pawl.Registry
+    Pawl.RegistrySpec
+    Pawl.ReplacementSpec
+    Pawl.ReplaySpec
+    Pawl.ResolveSpec
+    Pawl.RingSpec
+    Pawl.RoomSpec
+    Pawl.SacrificeRestrictionSpec
+    Pawl.SagaSpec
+    Pawl.SetupSpec
     Pawl.Slug
     Pawl.SlugSpec
     Pawl.Spec
+    Pawl.SpecialActionSpec
+    Pawl.SpeedSpec
+    Pawl.SplitSecondSpec
+    Pawl.Support
+    Pawl.TargetSpec
+    Pawl.TransformSpec
+    Pawl.TriggerSpec
+    Pawl.TurnSpec
     Pawl.Types.AbilityName
     Pawl.Types.AbilityTriggered
     Pawl.Types.Action
@@ -1063,8 +1131,12 @@ library
     Pawl.Types.ZoneChange
     Pawl.Types.ZoneChangePattern
     Pawl.Types.ZoneChangeR
+    Pawl.UntapRestrictionSpec
     Pawl.Uri.Fragment
     Pawl.Uri.FragmentSpec
+    Pawl.VariableEffectSpec
+    Pawl.ZoneChangeSpec
+    Pawl.ZoneTriggerSpec
 
 executable pawl
   import: executable
@@ -1079,92 +1151,13 @@ executable pawl
 test-suite pawl-test-suite
   import: executable
   build-depends:
-    bytestring ^>=0.12.2,
-    containers ^>=0.7,
-    directory ^>=1.3.8,
     pawl,
     tasty ^>=1.5.4,
     tasty-hunit ^>=0.10.2,
-    text ^>=2.1.3,
     transformers ^>=0.6.1,
 
   hs-source-dirs: source/test-suite
   main-is: Main.hs
-  -- cabal-gild: discover source/test-suite --exclude source/test-suite/Main.hs
-  other-modules:
-    Pawl.ActivateSpec
-    Pawl.AdventureSpec
-    Pawl.AuraSpec
-    Pawl.BattleSpec
-    Pawl.BindingSpec
-    Pawl.Cards
-    Pawl.CardSpec
-    Pawl.CardsSpec
-    Pawl.CaseSpec
-    Pawl.CastSpec
-    Pawl.CodecIntegrationSpec
-    Pawl.ColorSpec
-    Pawl.CombatEffectSpec
-    Pawl.CombatSpec
-    Pawl.CommanderSpec
-    Pawl.ConditionSpec
-    Pawl.CopySpec
-    Pawl.CoreSpec
-    Pawl.CostSpec
-    Pawl.CounterspellSpec
-    Pawl.CountSpec
-    Pawl.CrewSpec
-    Pawl.DamageSpec
-    Pawl.DaytimeSpec
-    Pawl.DecideSpec
-    Pawl.DepartureSpec
-    Pawl.DetainSpec
-    Pawl.DungeonSpec
-    Pawl.EngineSpec
-    Pawl.EventSpec
-    Pawl.EventTriggerSpec
-    Pawl.ExileSpec
-    Pawl.ExpirySpec
-    Pawl.FaceDownSpec
-    Pawl.FilterSpec
-    Pawl.GameSpec
-    Pawl.InvestigateSpec
-    Pawl.KeywordTriggerSpec
-    Pawl.LibraryOrderSpec
-    Pawl.ManaSpec
-    Pawl.MassEffectSpec
-    Pawl.ModalDoubleFacedSpec
-    Pawl.ModalSpec
-    Pawl.MulliganSpec
-    Pawl.PerformanceSpec
-    Pawl.PhasingSpec
-    Pawl.PlaneswalkerSpec
-    Pawl.PlayerEffectSpec
-    Pawl.PowerToughnessSpec
-    Pawl.ProjectionSpec
-    Pawl.RadSpec
-    Pawl.RegistrySpec
-    Pawl.ReplacementSpec
-    Pawl.ReplaySpec
-    Pawl.ResolveSpec
-    Pawl.RingSpec
-    Pawl.RoomSpec
-    Pawl.SacrificeRestrictionSpec
-    Pawl.SagaSpec
-    Pawl.SetupSpec
-    Pawl.SpecialActionSpec
-    Pawl.SpeedSpec
-    Pawl.SplitSecondSpec
-    Pawl.Support
-    Pawl.TargetSpec
-    Pawl.TransformSpec
-    Pawl.TriggerSpec
-    Pawl.TurnSpec
-    Pawl.UntapRestrictionSpec
-    Pawl.VariableEffectSpec
-    Pawl.ZoneChangeSpec
-    Pawl.ZoneTriggerSpec
-
   type: exitcode-stdio-1.0
 
 benchmark pawl-benchmark
