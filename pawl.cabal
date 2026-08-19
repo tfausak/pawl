@@ -2,7 +2,7 @@ cabal-version: 3.0
 -- cabal-gild: version
 -- Generated with cabal-gild version 1.8.4.2
 name: pawl
-version: 0.2026.8.18
+version: 0.2026.8.19
 synopsis: Magic: the Gathering rules engine
 description:
   Pawl is a Magic: the Gathering rules engine.
