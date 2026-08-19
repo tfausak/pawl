@@ -621,8 +621,9 @@ viewOfCard face =
 -- in a library has the power its count says. Having an id is also what lets CR
 -- 701.17a's mills be looked up (CR 608.2i).
 --
--- Not implemented: this view's readers hold an object but read it as printed,
--- where the object has a CR 613 projection of its own (#160).
+-- Not implemented: this view's one remaining reader, Resolve's CR 728.1 mill
+-- tally, holds an object but reads it as printed, where the object has a CR 613
+-- projection of its own (#160).
 viewOfCardIn :: GameState -> ObjectId -> Face.Face Card.Type.Card -> Filter.View
 viewOfCardIn gs oid face =
   (viewOfCard face)

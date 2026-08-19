@@ -3676,12 +3676,15 @@ discard cause pid oid = do
 -- Per CR 701.20b nothing moves and nothing changes, so the event is the whole
 -- effect -- the rule, not a shortcut.
 --
--- The snapshot is Projection.project, deliberately not the printed-card view an
--- explore's land test reads a library card through. The two can disagree on any
--- axis a continuous effect reaches off the battlefield (#160), where a reveal has
--- to show what a player at the table would see. They now AGREE on CR 208.2a's
--- characteristic-defining power, which Projection.viewOfCardIn evaluates in every
--- zone as CR 604.3 requires. No card in the pool makes them differ today.
+-- The snapshot is Projection.project -- the object's CR 613 characteristics and
+-- deliberately not its printed card, since a reveal has to show what a player at
+-- the table would see, on every axis a continuous effect reaches off the
+-- battlefield. Resolve's CR 728.1 mill tally is the one reader left that takes
+-- the printed view instead and so could disagree with this (#160); the explore
+-- that follows this very reveal is not one of them any more, its land test
+-- taking the same projection, so what is shown and what the branch is taken from
+-- cannot part company.
+--
 -- The `cause` is CR 702.94a's "this way" (see RevealCause): every caller but the
 -- draw funnel's miracle window shows a card for a reason no rule asks about
 -- again, and passes Ordinary.

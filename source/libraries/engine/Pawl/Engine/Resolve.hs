@@ -4547,9 +4547,13 @@ fatesealOne source n pid = do
 -- 701.44b's "even if some or all of those actions were impossible".
 --
 -- The reveal is PUBLIC (CR 701.20a) and so rides Event.reveal, unlike scry's
--- private look at the same position. Not implemented: the land test reads the
--- PRINTED face through Projection.viewOfCardIn, missing a continuous effect that
--- changed the card (#160).
+-- private look at the same position.
+--
+-- "If a land card is revealed" is asked of the revealed card's own CR 613
+-- projection: rule 613.1 starts from the actual object and names no zone, so a
+-- library card is folded exactly as a permanent is, and a layer-4 type change
+-- (CR 613.1d) reaches it there. An id nothing is filed under projects no card
+-- types, so it is no land card -- the answer the printed face gave.
 exploreOne :: ObjectId -> Game ()
 exploreOne oid = do
   gs <- State.get
@@ -4562,9 +4566,7 @@ exploreOne oid = do
         top : _ -> do
           Event.reveal RevealCause.Ordinary pid top
           after <- State.get
-          let isLand = case Game.faceOf top after of
-                Nothing -> False
-                Just face -> Set.member CardType.Land (Filter.cardTypes (Projection.viewOfCardIn after top face))
+          let isLand = Set.member CardType.Land (Filter.cardTypes (Projection.viewOfObject top after))
           if isLand
             then Event.changeZone top Zone.Hand
             else do

@@ -1259,6 +1259,39 @@ exploreBoard s registry deck = do
       stocked = List.foldl' deal withSpell (reverse printings)
   pure (spell, bystander, stocked)
 
+-- exploreBoard's board with Synthetic Fossil Warren on the battlefield when
+-- `petrified`, and identical to it otherwise -- same lands, same hand, same
+-- library, same bystander. The Warren reads "Goblin cards you own that aren't on
+-- the battlefield are lands in addition to their other types": CR 613.1d's layer
+-- 4 over an Affected.MatchingOffBattlefield set, adding a card type the way CR
+-- 205.1b's "in addition to its other types" does, so the Goblin Piker on top of
+-- the library is a LAND card that no printed characteristic of it says it is.
+--
+-- Synthetic (#1910): Teferi, Mage of Zhalfir and Biotransference print this
+-- affected set, and Toph, the First Metalbender prints "are lands in addition to
+-- their other types", but nothing prints the two together -- Scryfall
+-- o:"are lands" and o:"land in addition to its other types", 2026-08-19, no card
+-- that makes an off-battlefield nonland card a land. Toph is what would refute
+-- that; its set is the battlefield.
+--
+-- The Warren reaches the battlefield AFTER the library is stocked, which is what
+-- separates "the card was always a land" and "the effect applied to it as it
+-- arrived" from a continuous effect applying to a card sitting in a library. It
+-- is scoped to GOBLIN cards so it cannot reach the Merfolk Branchwalker while
+-- that is a spell on the stack, which would change what resolves rather than
+-- what the explore reads.
+warrenBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  Bool ->
+  [String] ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+warrenBoard s registry petrified deck = do
+  warren <- S.printingOf s registry "Synthetic Fossil Warren"
+  (spell, bystander, board) <- exploreBoard s registry deck
+  pure (spell, bystander, if petrified then snd (S.addCreature warren S.alice board) else board)
+
 -- Answers Prompt.ChooseExplore with a FIXED decision, whatever the engine
 -- offers. Pinned rather than derived: an answerer that read the prompt's own
 -- fields would still produce a legal answer after a mutation broke which card
@@ -1345,6 +1378,36 @@ exploreSpec s registry = Spec.describe s "Explore" $ do
     Spec.assertEqWith s "the library is untouched, Piker still on top" (zoneNames Zone.Library after) ["Goblin Piker", "Bird Maiden"]
     Spec.assertEqWith s "nothing was binned" (zoneNames Zone.Graveyard after) []
     Spec.assertEqWith s "the bystanding creature stayed bare" (plusOnePlusOnesOn (Just bystander) after) 0
+  -- CR 701.44a's "if a land card is revealed" asked of the card's CR 613
+  -- projection rather than of its printed face. Rule 613.1 starts from the actual
+  -- object and names no zone, so the Piker the Warren made a land IS a land card
+  -- while it sits on top of the library, and the first sentence of rule 701.44a
+  -- settles it: hand, no counter, nothing asked.
+  --
+  -- The zone is the assertion. A prompt count alone would be green for a board
+  -- that never explored at all.
+  Spec.it s "CR 613.1d a revealed card a continuous effect made a land goes to hand" $ do
+    (spell, bystander, board) <- warrenBoard s registry True ["Goblin Piker", "Bird Maiden"]
+    let after = runExplore (exploreAnswer OptionalDecision.Exercises) spell board
+        walker = namedOnBattlefield "Merfolk Branchwalker" after
+    Spec.assertEqWith s "the Piker the Warren made a land is in hand" (zoneNames Zone.Hand after) ["Goblin Piker"]
+    Spec.assertEqWith s "and reached it rather than the graveyard" (zoneNames Zone.Graveyard after) []
+    Spec.assertBool s (Maybe.isJust walker) "the Branchwalker resolved onto the battlefield"
+    Spec.assertEqWith s "CR 701.44a no +1/+1 counter on the land branch" (plusOnePlusOnesOn walker after) 0
+    Spec.assertEqWith s "the Maiden it was sitting on is now the top card" (zoneNames Zone.Library after) ["Bird Maiden"]
+    Spec.assertEqWith s "the bystanding creature stayed bare" (plusOnePlusOnesOn (Just bystander) after) 0
+  -- The negative half of the pair, differing in exactly one thing: whether the
+  -- Warren is on the battlefield. Same library, same lands, same answer -- and
+  -- the answer is Exercises either way, so the graveyard here is CR 701.44a's
+  -- "otherwise" branch being taken and not a different choice.
+  Spec.it s "CR 701.44a without the Warren the same Piker is a nonland card and is binned" $ do
+    (spell, bystander, board) <- warrenBoard s registry False ["Goblin Piker", "Bird Maiden"]
+    let after = runExplore (exploreAnswer OptionalDecision.Exercises) spell board
+        walker = namedOnBattlefield "Merfolk Branchwalker" after
+    Spec.assertEqWith s "the Piker is in the graveyard" (zoneNames Zone.Graveyard after) ["Goblin Piker"]
+    Spec.assertEqWith s "and never reached the hand" (zoneNames Zone.Hand after) []
+    Spec.assertEqWith s "one +1/+1 counter" (plusOnePlusOnesOn walker after) 1
+    Spec.assertEqWith s "the bystanding creature stayed bare" (plusOnePlusOnesOn (Just bystander) after) 0
   -- CR 701.44b: the permanent explores "even if some or all of those actions were
   -- impossible". No card is revealed, so nothing is a land card and the
   -- "otherwise" branch runs -- the counter goes on with no card to ask about.
@@ -1384,6 +1447,12 @@ explorePromptSpec s registry = Spec.describe s "ExplorePrompt" $ do
   -- a land card outright, so there is nothing to ask.
   Spec.it s "CR 701.44a a revealed land card raises no question" $ do
     (spell, _, board) <- exploreBoard s registry ["Mountain", "Bird Maiden"]
+    Spec.assertEqWith s "not asked" (asks spell board) 0
+  -- The land branch reached through CR 613.1d instead of through the printed
+  -- face: rule 701.44a settles a land card outright, so a card the Warren made a
+  -- land is not asked about either.
+  Spec.it s "CR 613.1d a revealed card a continuous effect made a land raises no question" $ do
+    (spell, _, board) <- warrenBoard s registry True ["Goblin Piker", "Bird Maiden"]
     Spec.assertEqWith s "not asked" (asks spell board) 0
   -- Nothing was revealed, so there is no card the answer could be about.
   Spec.it s "CR 701.44b an empty library raises no question" $ do
@@ -1456,6 +1525,27 @@ lookAtSpec s registry = Spec.describe s "LookAt" $ do
     let after = runWildsUpkeep (wildsAnswer OptionalDecision.Declines) board
     Spec.assertEqWith s "the library is untouched" (zoneNames Zone.Library after) ["Forest", "Bird Maiden"]
     Spec.assertEqWith s "and nothing entered the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Forest")) S.alice after) 0
+  -- The SIBLING reader of the land test this unit changed, and the reason the
+  -- change did not have to touch it: Into the Wilds asks "if it's a land card"
+  -- as a Filter.HasCardType inside the effect DSL, and that path has read the CR
+  -- 613 projection of a library card since #1552. With Synthetic Fossil Warren
+  -- out, the Goblin Piker it looks at IS a land card and the clause fires --
+  -- the same answer Resolve.exploreOne's own land test now gives. Green before
+  -- this unit's change as well as after: a fence holding the two readers
+  -- together rather than a proof of the change.
+  Spec.it s "CR 613.1d a looked-at card a continuous effect made a land reaches the battlefield" $ do
+    warren <- S.printingOf s registry "Synthetic Fossil Warren"
+    board <- wildsBoard s registry ["Goblin Piker", "Bird Maiden"]
+    let after = runWildsUpkeep (wildsAnswer OptionalDecision.Exercises) (snd (S.addCreature warren S.alice board))
+    Spec.assertEqWith s "the Piker the Warren made a land left the library" (zoneNames Zone.Library after) ["Bird Maiden"]
+    Spec.assertEqWith s "and is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 1
+  -- The negative half, differing in exactly one thing: whether the Warren is on
+  -- the battlefield. Same library, same answer.
+  Spec.it s "CR 701.20e without the Warren the same Piker is no land card" $ do
+    board <- wildsBoard s registry ["Goblin Piker", "Bird Maiden"]
+    let after = runWildsUpkeep (wildsAnswer OptionalDecision.Exercises) board
+    Spec.assertEqWith s "the library is untouched" (zoneNames Zone.Library after) ["Goblin Piker", "Bird Maiden"]
+    Spec.assertEqWith s "and nothing entered the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 0
   -- CR 609.3: an empty library has no top card, so the look names nothing, the
   -- slot goes unbound and the clause after it finds no land.
   Spec.it s "CR 609.3 an empty library looks at nothing and does nothing" $ do
