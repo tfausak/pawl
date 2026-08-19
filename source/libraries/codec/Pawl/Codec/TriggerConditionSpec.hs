@@ -313,6 +313,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.SelfLeavesTheBattlefield
       " {\"type\":\"SelfLeavesTheBattlefield\"} "
+  -- CR 700.4's death read off the enchanted permanent. Nullary: the link it
+  -- matches on is board state, HauntedCreatureDies' reason.
+  Spec.it s "AttachedCreatureDies" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.AttachedCreatureDies
+      " {\"type\":\"AttachedCreatureDies\"} "
   -- CR 702.55b/702.55c's exile-zone death watch. Nullary: the link it matches on
   -- is board state, so nothing about it rides the condition.
   Spec.it s "HauntedCreatureDies" $

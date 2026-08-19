@@ -365,6 +365,33 @@ data TriggerCondition
     -- It is the one form that fires without a zone change, so its bearer can
     -- only be read from CR 608.2h last known information.
     SelfLeavesTheBattlefield
+  | -- | CR 700.4's "dies" read off the permanent the BEARER IS ATTACHED TO
+    -- (Screams from Within's "when enchanted creature dies"). PermanentDies'
+    -- battlefield-to-graveyard pair and a look-back for its reasons; WHICH
+    -- permanent is Object.attachedTo, AttachedCreatureMentors' scoping.
+    --
+    -- Attachment-scoped rather than filtered, for the reason rule 702.134c's
+    -- condition gives: CR 303.4b's "enchanted creature" is a link the Aura
+    -- records, not a class a Filter could name.
+    --
+    -- The one condition CR 113.6m's Aura clause names, which is why
+    -- Pawl.Engine.Event.zoneFunctionedFrom cases on it: the rule exempts an
+    -- ability whose trigger condition "specifies that ... the object it enchants
+    -- leaves the battlefield" from being pinned to the zone its effect moves the
+    -- object out of.
+    --
+    -- Vacuously False while the source is attached to nothing, or to a player
+    -- (CR 303.4), AttachedCreatureMentors again.
+    --
+    -- The link is read from CR 608.2h last known information where the bearer is
+    -- already gone (Pawl.Types.LastKnown.attachedTo), which is the ordinary case
+    -- rather than the exotic one: CR 704.5m buries the Aura in the same SBA batch
+    -- that buried its host, and CR 117.5 places triggers only after that batch
+    -- settles.
+    --
+    -- Not implemented: the payload finding the Aura in the graveyard, which is
+    -- CR 400.7f rather than this rule (gap #1892).
+    AttachedCreatureDies
   | -- | CR 702.55b/702.55c: "when the creature this card haunts dies", borne by
     -- the haunting CARD IN EXILE. PermanentDies' zone pair; WHICH permanent is
     -- the one GameState.haunting files the bearer against, the link

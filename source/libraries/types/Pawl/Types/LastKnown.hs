@@ -6,6 +6,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Source as Source
 
 -- | CR 608.2h: what an object WAS, filed under the id it had while it existed.
@@ -13,7 +14,7 @@ import qualified Pawl.Types.Source as Source
 -- as the object ceases, from the same pre-move state the GameEvent.Moved
 -- snapshot is taken against.
 --
--- Five things rather than the characteristics alone, because the other four
+-- Six things rather than the characteristics alone, because the other five
 -- questions CR 608.2h is asked have no home in that fold. Control is not a
 -- characteristic (CR 109.3), yet "who controlled it" is what CR 603.3a
 -- asks of a triggered ability whose source is gone. Neither is the object's
@@ -23,9 +24,10 @@ import qualified Pawl.Types.Source as Source
 -- Nor are COUNTERS -- CR 109.3's list has none -- and unlike the other two the
 -- projection actively CONSUMES them (CR 613.4c), so the record has to be taken
 -- beside it rather than out of it. The COPIABLE values are the fourth, for the
--- reason its own field gives.
+-- reason its own field gives. Nor is the ATTACHMENT, the fifth -- CR 109.3
+-- names "what an Aura enchants" as an example of what is not one.
 --
--- All five fields STRICT (!): entries are keyed by an id that no longer exists
+-- All six fields STRICT (!): entries are keyed by an id that no longer exists
 -- and are never pruned, so an unforced field would be a thunk retaining the whole
 -- pre-move GameState for the rest of the game.
 data LastKnown = MkLastKnown
@@ -66,6 +68,21 @@ data LastKnown = MkLastKnown
     -- recoverable from `source`, which knows the card but not which face was up
     -- and not whether the object was ITSELF a copy (CR 707.2's "as modified by
     -- other copy effects").
-    copiable :: !ProjectedCharacteristics.ProjectedCharacteristics
+    copiable :: !ProjectedCharacteristics.ProjectedCharacteristics,
+    -- | CR 303.4b / CR 301.5a: what it was attached to as it left -- the same
+    -- Object.attachedTo the live object carried. What "enchanted creature" and
+    -- "equipped creature" mean for an Aura or an Equipment that is itself
+    -- already gone.
+    --
+    -- Not a characteristic either (CR 109.3's list has no attachment), and not
+    -- recoverable from anything above, so it sits beside the projection for
+    -- `controller`'s reason. CR 704.5m and CR 704.5n take an Aura or an
+    -- Equipment off the battlefield in the very SBA batch that killed its host,
+    -- so a live read of the link is unavailable exactly when the rules still ask
+    -- for it -- Pawl.Types.TriggerCondition.AttachedCreatureDies is the reader.
+    --
+    -- Nothing for an object that was attached to nothing, which is every object
+    -- that is not an Aura, an Equipment or a Fortification.
+    attachedTo :: !(Maybe Recipient.Recipient)
   }
   deriving (Eq, Ord, Show)

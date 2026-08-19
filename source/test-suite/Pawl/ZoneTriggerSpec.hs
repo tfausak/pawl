@@ -106,6 +106,7 @@ import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SelfCountersReached as SelfCountersReached
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
@@ -1702,6 +1703,11 @@ representativeEvents cond =
         -- Whether the pair matches on the board below does not matter, eventBindings
         -- reading the event rather than the attachment.
         TriggerCondition.AttachedCreatureMentors -> one (GameEvent.Mentored (Mentored.MkMentored departed arrived))
+        -- CR 700.4's battlefield-to-graveyard move, the only event this condition
+        -- admits. Whether the departed permanent is the bearer's host does not
+        -- matter here: eventBindings claims nothing either way, and the floor is
+        -- what this pins.
+        TriggerCondition.AttachedCreatureDies -> one (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics))
         -- CR 702.149c's own event, and the only one this condition admits, on
         -- `departed` for SelfEvolves' reason: the pair does not match, which pins
         -- the floor for a matching pair too, this arm binding nothing either way.
@@ -1851,6 +1857,7 @@ everyTriggerCondition =
     TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated Designation.Renowned (Filter.Type.And [])),
     TriggerCondition.SelfEvolves,
     TriggerCondition.AttachedCreatureMentors,
+    TriggerCondition.AttachedCreatureDies,
     TriggerCondition.SelfTrains,
     TriggerCondition.PermanentSacrificed,
     TriggerCondition.SagaFinalChapterTriggers PlayerRelation.You,
@@ -3528,8 +3535,9 @@ bystanderSpec s registry =
 --
 -- CR 603.10a is deliberately NOT this case. There the rule's own "unless its
 -- trigger condition ... specifies that the object is put into that zone" arm
--- decides, and it is unimplemented (#819); a bystander carries any condition at
--- all, so nothing about that arm reaches here.
+-- decides, and that half of the clause is unimplemented (#819) -- the Aura half
+-- beside it is read, in `screamsFromWithinSpec` below; a bystander carries any
+-- condition at all, so nothing about either reaches here.
 --
 -- The pair, chosen so that ONE derivation is the only difference between them:
 --
@@ -3854,6 +3862,101 @@ kindredSpec s registry =
               Spec.assertBool s (Projection.isCreatureOf token after) "and it, unlike its maker, IS a creature"
             other -> Spec.assertFailure s ("expected exactly one token beside Bitterblossom, got " <> show (length other) <> " other permanents")
 
+-- CR 113.6m's Aura clause, over a whole card. The rule pins an ability whose
+-- effect moves its own object out of a zone to that zone, "unless its trigger
+-- condition ... specifies that ... the object it enchants leaves the
+-- battlefield" -- and Screams from Within ({1}{B}{B} Enchantment -- Aura,
+-- "Enchant creature / Enchanted creature gets -1/-1. / When enchanted creature
+-- dies, return this card from your graveyard to the battlefield") is the
+-- printing that turns on it. (Name, cost, type line and oracle text checked
+-- against Scryfall.)
+--
+-- Without the clause `Event.zoneFunctionedFrom` answers Graveyard off the
+-- effect, `Event.functionsIn Zone.Battlefield` is False, and `eventTriggers`'
+-- `battlefieldAbilitiesOf` filter drops the ability -- so the ability never
+-- triggers at all and the Aura sits in the graveyard CR 704.5m put it in. With
+-- the clause it answers Nothing, `zonesTriggeredFrom` gives the battlefield, and
+-- the trigger goes on the stack.
+--
+-- CR 700.4 is what makes the printed "dies" one of the departures the clause
+-- names; CR 603.10a is what lets the trigger see a host that has already left;
+-- and CR 608.2h's Pawl.Types.LastKnown.attachedTo is what lets the MATCH see the
+-- link, CR 704.5m having taken the Aura off the battlefield in the same
+-- CR 117.5 batch.
+--
+-- WHERE THIS STOPS. The trigger reaches the stack and then resolves into
+-- nothing: its effect moves "this card" out of the graveyard, and the id the
+-- ability carries is CR 113.7a's battlefield source, which CR 400.7 has already
+-- replaced. CR 400.7f is the rule that would let the payload find the graveyard
+-- incarnation, and it is unimplemented (gap #1892) -- so pawl's Screams from
+-- Within is STRICTER than printed, never returning. That is why the assertion
+-- below is the trigger's presence on the stack rather than the Aura's zone.
+--
+-- The board. alice: the enchanted Hill Giant, plus a second Hill Giant. bob: a
+-- Goblin Piker. Hill Giants rather than Pikers on alice's side because the
+-- Aura's own -1/-1 would take a 2/1 to zero toughness (CR 704.5f) and bury the
+-- enchanted creature before the test acts.
+screamsFromWithinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+screamsFromWithinSpec s registry =
+  let board = do
+        screams <- S.printingOf s registry "Screams from Within"
+        hillGiant <- S.printingOf s registry "Hill Giant"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (enchanted, g1) = S.addCreature hillGiant S.alice (Setup.emptyGame S.bothPlayers)
+            (_, g2) = S.addCreature hillGiant S.alice g1
+            (_, g3) = S.addCreature piker S.bob g2
+            (aura, g4) = S.addCreature screams S.alice g3
+        pure (enchanted, aura, screams, S.attach aura enchanted g4)
+      -- Kill the enchanted creature, then run CR 117.5's own settle: the SBA
+      -- pass buries the host and the now-unattached Aura, and the trigger is put
+      -- on the stack after it.
+      kill victim gs = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [victim] >> Engine.settleForPriority)
+   in Spec.describe s "ScreamsFromWithin" $ do
+        -- The proving leg. The discriminating quantity is what the stack holds:
+        -- the Aura's trigger with the clause, nothing without it.
+        Spec.it s "CR 113.6m an Aura whose trigger watches its host's death functions from the battlefield" $ do
+          (enchanted, aura, screams, gs) <- board
+          let after = kill enchanted gs
+          Spec.assertEqWith
+            s
+            "CR 113.6m the Aura's death trigger is on the stack"
+            (fmap (\oid -> fmap Object.source (Game.lookupObject oid after)) (GameState.stack after))
+            (fmap (Just . Source.OfTrigger aura) (Face.triggeredAbilities (S.combinedFace screams)))
+          -- The preconditions the assertion above rests on, AFTER it so neither
+          -- can absorb a mutation aimed at the clause.
+          Spec.assertEqWith s "the enchanted Hill Giant really died" (Game.lookupObject enchanted after) Nothing
+          Spec.assertEqWith s "and CR 704.5m really took the Aura off the battlefield" (Game.lookupObject aura after) Nothing
+          Spec.assertEqWith
+            s
+            "so the trigger was gathered off CR 608.2h last known information"
+            (fmap LastKnown.attachedTo (Map.lookup aura (GameState.lastKnown after)))
+            (Just (Just (Recipient.ToCreature enchanted)))
+        -- CR 603.10a's own case, and the leg that makes `looksBack`'s arm
+        -- load-bearing: the Aura leaves the battlefield in the SAME event group
+        -- as its host -- a wrath -- so the live board holds neither, and the
+        -- trigger can only be gathered from `sameGroup`, which is narrowed to the
+        -- look-back conditions. CR 400.7f's proviso names this case in as many
+        -- words ("put into that graveyard at the same time the enchanted
+        -- permanent left the battlefield").
+        Spec.it s "CR 603.10a the trigger still fires when the Aura dies in the same batch as its host" $ do
+          (enchanted, aura, screams, gs) <- board
+          let after = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [enchanted, aura] >> Engine.settleForPriority)
+          Spec.assertEqWith
+            s
+            "CR 603.10a the Aura's death trigger is still on the stack"
+            (fmap (\oid -> fmap Object.source (Game.lookupObject oid after)) (GameState.stack after))
+            (fmap (Just . Source.OfTrigger aura) (Face.triggeredAbilities (S.combinedFace screams)))
+          Spec.assertEqWith s "and both really left the battlefield in one batch" (fmap (`Game.lookupObject` after) [enchanted, aura]) [Nothing, Nothing]
+        -- The over-rejection leg, and the reason the clause is a case on the
+        -- CONDITION rather than an unconditional Nothing: Squee, Goblin Nabob's
+        -- upkeep trigger says nothing about an enchanted object, so CR 113.6m's
+        -- main sentence still pins it to the graveyard.
+        Spec.it s "CR 113.6m control: an ordinary graveyard-recursion trigger is still pinned to the graveyard" $ do
+          squee <- S.printingOf s registry "Squee, Goblin Nabob"
+          screams <- S.printingOf s registry "Screams from Within"
+          Spec.assertEqWith s "Squee's ability functions only in the graveyard" (fmap Event.zoneFunctionedFrom (Face.triggeredAbilities (S.combinedFace squee))) [Just Zone.Graveyard]
+          Spec.assertEqWith s "the Aura's names no zone at all" (fmap Event.zoneFunctionedFrom (Face.triggeredAbilities (S.combinedFace screams))) [Nothing]
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   cyclingTriggerSpec s registry
@@ -3880,6 +3983,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   amuletSpec s registry
   soulshiftSpec s registry
   hauntSpec s registry
+  screamsFromWithinSpec s registry
   strippedTriggerSpec s registry
   bystanderSpec s registry
   bystanderZoneSpec s registry
