@@ -965,10 +965,14 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
   -- CR 729.1a #137: "the spell or ability that created the subgame" -- the rule
   -- names both kinds of object, and Shahrazad and Sindbad (Unknown Event,
   -- Creature -- Human, type line and Oracle text checked against
-  -- api.scryfall.com) is the one printing whose subgame comes from an ABILITY:
-  -- "whenever this creature deals combat damage to an opponent, ... players play
-  -- a Magic subgame ... Each player who doesn't win the subgame loses half their
-  -- life, rounded up."
+  -- api.scryfall.com) is the printing that reaches the ability half: "whenever
+  -- this creature deals combat damage to an opponent, ... players play a Magic
+  -- subgame ... Each player who doesn't win the subgame loses half their life,
+  -- rounded up." Scryfall o:subgame include:extras (2026-08-19) returns five
+  -- cards, and the other four -- Shahrazad, Enter the Dungeon, The Countdown Is
+  -- at One, Tug of War -- are Sorceries; a sixth that played one from an ability
+  -- would refute nothing here, but would be the better-ranked producer if it were
+  -- black border (docs/design.md section 6).
   --
   -- THREE SEATS, and the subgame's winner is CAROL -- neither the ability's
   -- controller nor the player the combat damage was dealt to, so "the player
@@ -987,16 +991,19 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
   -- match", which pawl has no match to count over (gap #1898), and the second
   -- ability, "{T}: Draw a card and reveal it. If it isn't a land card, discard
   -- it.", whose "it" is the drawn card and which no binding names (gap #1899).
-  -- Both leave pawl's card able to do LESS than printed, never more, except that
-  -- the missing intervening "if" lets the trigger fire more than once a match.
+  -- The dropped ability leaves pawl's card able to do less than printed. The
+  -- dropped intervening "if" is the other direction -- the trigger fires on every
+  -- connection where the printed one fires at most once a match -- and CR 729.1b
+  -- charges the controller alongside everyone else who does not win, so what it
+  -- repeats favours no seat.
   --
   -- "An opponent" is not transcribed either, and that one IS a rules equivalence:
-  -- CR 508.1a lets only the active player's creatures attack, CR 506.2 makes the
-  -- defending player one of the attacking player's opponents, and CR 510.1b
-  -- assigns an unblocked creature's damage to what it is attacking, so combat
-  -- damage a creature deals to a player is always dealt to its controller's
-  -- opponent (Pawl.KeywordTriggerSpec's Questing Beast case makes the same
-  -- reading of the same printed phrase).
+  -- CR 508.1a lets only the active player's creatures attack, CR 506.2 and CR
+  -- 506.2a make the defending player one of the attacking player's opponents, and
+  -- CR 510.1b assigns an unblocked creature's damage to what it is attacking, so
+  -- combat damage a creature deals to a player is always dealt to its
+  -- controller's opponent (Pawl.KeywordTriggerSpec's Questing Beast case makes
+  -- the same reading of the same printed phrase).
   Spec.it s "CR 729.1a/729.1b #137 gameplay: a TRIGGERED ability plays the subgame, and CR 729.1b's winner is bound" $ do
     mountain <- S.printingOf s registry "Mountain"
     sindbad <- S.printingOf s registry "Shahrazad and Sindbad"

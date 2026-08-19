@@ -2457,10 +2457,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- The winner is bound onto `resolving` -- the object ON THE STACK -- and not
   -- onto `source`, because that is what the next effect's re-read looks at: both
   -- resolveSpellWith and resolveModesWith re-read the stack object's bindings
-  -- before each effect. The two coincide for a spell (CR 113.7a makes a spell its
-  -- own source) and differ for an ability, whose source is the permanent it came
-  -- from -- so binding onto `source` left an ability's follow-on reading an
-  -- unbound slot; see #137.
+  -- before each effect. The two coincide for a spell, which resolveSpellWith
+  -- passes as both, and differ for an ability, whose source is the permanent it
+  -- came from (CR 113.7) -- so binding onto `source` left an ability's follow-on
+  -- reading an unbound slot; see #137.
   Effect.PlaySubgame slot -> do
     result <- runSubgame
     case result of
