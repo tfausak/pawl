@@ -3931,6 +3931,22 @@ screamsFromWithinSpec s registry =
             "so the trigger was gathered off CR 608.2h last known information"
             (fmap LastKnown.attachedTo (Map.lookup aura (GameState.lastKnown after)))
             (Just (Just (Recipient.ToCreature enchanted)))
+        -- CR 603.10a's own case, and the leg that makes `looksBack`'s arm
+        -- load-bearing: the Aura leaves the battlefield in the SAME event group
+        -- as its host -- a wrath -- so the live board holds neither, and the
+        -- trigger can only be gathered from `sameGroup`, which is narrowed to the
+        -- look-back conditions. CR 400.7f's proviso names this case in as many
+        -- words ("put into that graveyard at the same time the enchanted
+        -- permanent left the battlefield").
+        Spec.it s "CR 603.10a the trigger still fires when the Aura dies in the same batch as its host" $ do
+          (enchanted, aura, screams, gs) <- board
+          let after = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [enchanted, aura] >> Engine.settleForPriority)
+          Spec.assertEqWith
+            s
+            "CR 603.10a the Aura's death trigger is still on the stack"
+            (fmap (\oid -> fmap Object.source (Game.lookupObject oid after)) (GameState.stack after))
+            (fmap (Just . Source.OfTrigger aura) (Face.triggeredAbilities (S.combinedFace screams)))
+          Spec.assertEqWith s "and both really left the battlefield in one batch" (fmap (`Game.lookupObject` after) [enchanted, aura]) [Nothing, Nothing]
         -- The over-rejection leg, and the reason the clause is a case on the
         -- CONDITION rather than an unconditional Nothing: Squee, Goblin Nabob's
         -- upkeep trigger says nothing about an enchanted object, so CR 113.6m's

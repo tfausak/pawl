@@ -9006,17 +9006,21 @@ eventTriggers events gs =
 -- namesake is the same sentence read off an activated one, and this is the
 -- triggered half.
 --
--- The EFFECT half alone. CR 602.1 gives an activated ability "a cost and an
--- effect"; CR 603.1 gives a triggered one "a trigger condition and an effect",
--- and no cost at all -- so Pawl.Engine.Cost, the other half of
--- Activate.zoneFunctionedFrom, has nothing to be asked here.
+-- No COST half. CR 602.1 gives an activated ability "a cost and an effect";
+-- CR 603.1 gives a triggered one "a trigger condition and an effect", and no
+-- cost at all -- so Pawl.Engine.Cost, the other half of
+-- Activate.zoneFunctionedFrom, has nothing to be asked here. The CONDITION is
+-- read instead, and only for the rule's own exception: `enchantedObjectLeaves`
+-- below.
 --
 -- ALL MODES, in printed order, for Activate.zoneFunctionedFrom's reason: CR
 -- 700.2 makes a modal ability's modes alternatives, so a zone stated by any of
 -- them is a zone the ability can move its object out of.
 --
 -- Not a case on an effect's identity: Pawl.Engine.EffectZone answers the one
--- question, and this folds its answer.
+-- question, and this folds its answer. The condition case below is not one
+-- either -- TriggerCondition is a closed-half type like Phase or Keyword, which
+-- design.md section 1 puts on the rulebook's side of the line.
 --
 -- CR 113.6m's "unless" clause is read here in the one half a trigger condition
 -- can satisfy -- the Aura half, `enchantedObjectLeaves` below. Screams from
@@ -9187,7 +9191,7 @@ zonesTriggeredFrom cond = case cond of
   -- battlefield, and Aegis of the Legion watches from there -- CR 113.6k's exception
   -- is for a condition that cannot trigger from the battlefield at all.
   TriggerCondition.AttachedCreatureMentors -> battlefield
-  -- CR 113.6's default from the Aura's side: CR 303.4 attaches an Aura to a
+  -- CR 113.6's default from the Aura's side: CR 303.4's Aura is itself a
   -- permanent on the battlefield, so its bearer watches from there, and CR
   -- 113.6k's exception -- for a condition that cannot trigger from the
   -- battlefield at all -- does not apply. What DOES apply is CR 113.6m's Aura

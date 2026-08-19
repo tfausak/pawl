@@ -14,7 +14,7 @@ import qualified Pawl.Types.Source as Source
 -- as the object ceases, from the same pre-move state the GameEvent.Moved
 -- snapshot is taken against.
 --
--- Five things rather than the characteristics alone, because the other four
+-- Six things rather than the characteristics alone, because the other five
 -- questions CR 608.2h is asked have no home in that fold. Control is not a
 -- characteristic (CR 109.3), yet "who controlled it" is what CR 603.3a
 -- asks of a triggered ability whose source is gone. Neither is the object's
@@ -24,8 +24,8 @@ import qualified Pawl.Types.Source as Source
 -- Nor are COUNTERS -- CR 109.3's list has none -- and unlike the other two the
 -- projection actively CONSUMES them (CR 613.4c), so the record has to be taken
 -- beside it rather than out of it. The COPIABLE values are the fourth, for the
--- reason its own field gives. Nor is the ATTACHMENT, the sixth, for the reason
--- its own field gives.
+-- reason its own field gives. Nor is the ATTACHMENT, the fifth -- CR 109.3
+-- names "what an Aura enchants" as an example of what is not one.
 --
 -- All six fields STRICT (!): entries are keyed by an id that no longer exists
 -- and are never pruned, so an unforced field would be a thunk retaining the whole
