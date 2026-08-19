@@ -466,10 +466,12 @@ data GameState = MkGameState
     -- is the whole point), so only Pawl.Engine.Departure's CR 800.4a sweep removes
     -- an entry, and only by its key.
     haunting :: Map.Map ObjectId.ObjectId ObjectId.ObjectId,
-    -- | CR 607.2a's linked set, as a relation: which object's ability exiled each
-    -- card now in exile. Keyed by the EXILED incarnation (the id CR 400.7 minted
-    -- as the card arrived in exile), valued by the source of the ability whose
-    -- instruction exiled it. Read only by ObjectRef.EachCardExiledWithSource.
+    -- | CR 607.2's linked set, as a relation: which object each card now in exile
+    -- is linked to. Keyed by the EXILED incarnation (the id CR 400.7 minted as
+    -- the card arrived in exile), valued by the object the link names -- rule
+    -- 607.2a's ability whose instruction exiled it, or rule 607.2b's generator of
+    -- the replacement effect that did. Read only by
+    -- ObjectRef.EachCardExiledWithSource.
     --
     -- Board state rather than a field on the exiled Object, for `haunting`'s
     -- reason one field up: it is a relation between two ids that outlives neither.
@@ -478,7 +480,8 @@ data GameState = MkGameState
     -- is read, and CR 603.10a's look-back is what makes the trigger's source the
     -- battlefield incarnation that did the exiling rather than the graveyard card.
     --
-    -- Written by Pawl.Engine.Resolve.applyEffectWith, which files every card that
+    -- Written by TWO writers, one per sub-rule (607.2b's is below). Rule 607.2a's
+    -- is Pawl.Engine.Resolve.applyEffectWith, which files every card that
     -- ARRIVED in exile while an effect ran against that effect's source. A
     -- difference over GameState.exile and not a case over the opcode: rule 607.2a
     -- asks which ability's instruction exiled the card, never which instruction it
@@ -491,8 +494,7 @@ data GameState = MkGameState
     -- on at all -- Pawl.Types.Source embeds the ability value, not an index. No
     -- printing in the pool is in that shape (#1535).
     --
-    -- CR 607.2b's link is written by the OTHER writer, Pawl.Engine.Event's zone
-    -- change funnel: an exile another object's replacement effect causes inside
+    -- Rule 607.2b's writer is Pawl.Engine.Event's zone change funnel: an exile another object's replacement effect causes inside
     -- that window links to the replacement's own object, not to whatever ability
     -- was resolving, so the funnel files it as the arriving incarnation is minted
     -- and recordExiledWith's insertWith leaves that entry standing.
