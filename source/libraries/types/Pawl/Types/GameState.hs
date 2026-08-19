@@ -283,6 +283,22 @@ data GameState = MkGameState
     -- Empty at every priority window the engine reaches, so nothing else has to
     -- know it exists.
     pendingEntryEffects :: Seq.Seq PendingEntryEffect.PendingEntryEffect,
+    -- | CR 113.6 / 614.12: the permanents entering the battlefield BESIDE the one
+    -- whose entry loop is running -- materialized here already, because
+    -- Pawl.Engine.Event settles a whole batch onto the battlefield before running
+    -- any member's entry loop, but not yet entered as far as the rules are
+    -- concerned. Their static abilities do not function, so
+    -- Pawl.Engine.Projection gathers no continuous effect from them: CR 614.12
+    -- admits only the entering permanent's OWN static abilities and "continuous
+    -- effects that already exist", and a sibling's are neither.
+    --
+    -- NEVER holds the entry loop's own subject, whose static abilities CR 614.12
+    -- does count -- Pawl.Engine.Event.runEntry writes the batch it was already
+    -- passed, and every door subtracts the subject before passing it.
+    --
+    -- Empty at every priority window the engine reaches, exactly as the two
+    -- queues above are: it is non-empty only for the span of one entry loop.
+    enteringBeside :: Set.Set ObjectId.ObjectId,
     -- | CR 611.1 / 613.11: stored PLAYER and RULES-modifying continuous effects
     -- from resolutions (Silence), each with an expiry the Pawl.Engine.Expiry
     -- sweeps consult. A permanent's printed player abilities are NOT here --

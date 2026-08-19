@@ -687,21 +687,20 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 --      Worker returned beside the Menace enters 2/2 instead of 1/1, and which
 --      answer it got depended on the order CR 608.2f gives nobody the right to
 --      decide.
---   3. Projection -- a sibling's STATIC ABILITIES are visible to a later member's
---      projection (Projection.controllerOf, copiableCharacteristics and the
---      characteristics `applies` matches on), and nothing here excludes them the
---      way `batch` excludes the sibling's replacement candidates. CR 614.12 does
---      not sanction this: a simultaneously-entering sibling's continuous effects
---      do not already exist relative to it. Not implemented. Observing it needs
---      two cards at once -- a sibling whose static ability changes one of those
---      reads (a Mycosynth Lattice-shaped type-changer, a control-changer) and an
---      entering permanent whose entry replacement reads what it changed -- and no
---      pair in `data/cards/` shares a batch: Ashaya, Soul of the Wild is the only
---      type-changer reanimation can put into one, and the pool's only entry
---      replacement that asks about land-ness is Kismet's, whose artifact-or-
---      creature-or-land filter already matches an entering creature without it
---      and names permanents an OPPONENT controls, where a reanimation batch is one
---      player's (#78).
+--   3. Projection -- a sibling's STATIC ABILITIES would otherwise be visible to
+--      every projection read a later member's entry loop makes: Kismet's filter
+--      through `applies`, the copy arm's Projection.copiableCharacteristics and
+--      isCreatureOf, Projection.controllerOf, and the SACRIFICE arm's offer, which
+--      narrows the whole battlefield by a Filter and is the read this pool
+--      observes. CR 614.12 does not sanction any of them: a simultaneously-
+--      entering sibling's continuous effects do not already exist relative to it.
+--      Excluded by GameState.enteringBeside, which runEntry writes for the span of
+--      one member's loop and Pawl.Engine.Projection.abilitySources subtracts, so
+--      the exclusion covers every read at once rather than one call site at a
+--      time. Pawl.ReplacementSpec's "a Wood Elemental reanimated beside Ashaya
+--      sacrifices nothing" is the proof: without it Ashaya, Soul of the Wild makes
+--      a bystanding Goblin Piker a Forest land, and the Wood Elemental arriving
+--      beside it eats the Piker.
 applyReplacementsIn :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent)
 applyReplacementsIn asOf batch event = do
   (outcome, _, _) <- applyReplacementsFully asOf batch event
@@ -1239,6 +1238,11 @@ apply batch candidate event =
           -- guessing at a player, and so places no counters and records no count.
           Nothing -> pure (Just event)
           Just controller -> do
+            -- The offer narrows the WHOLE battlefield by a Filter, so it is also
+            -- where CR 614.12's other half bites: a bystander is judged with the
+            -- batch's static abilities suppressed (GameState.enteringBeside),
+            -- which is channel 3 of applyReplacementsIn's note and not this
+            -- exclusion.
             let entering oid2 = oid2 == oid || Set.member oid2 batch
                 offered = filter (not . entering) (Replacement.sacrificeCandidates controller (Just oid) criterion gs)
             chosen <-
@@ -1870,8 +1874,18 @@ copiedSnapshotWithLastKnown oid gs = case Projection.lastKnownOf oid gs of
 -- engine's reading, resting on CR 614.12; no rule states it outright.
 runEntry :: Set ObjectId -> ObjectId -> Game ()
 runEntry batch oid = do
+  -- CR 113.6 / 614.12: for the span of this loop, the batch's OTHER members are
+  -- materialized but not entered, so Pawl.Engine.Projection gathers no continuous
+  -- effect from their static abilities (see GameState.enteringBeside). The
+  -- subject's own are untouched, because `batch` never holds it. Saved and
+  -- restored rather than cleared, since an entry rewrite can reach another entry
+  -- -- the SacrificeAnyNumber arm below runs a sacrifice, and RunEffects runs a
+  -- card's effects -- and the outer batch has to survive that.
+  before <- State.gets GameState.enteringBeside
+  State.modify' (\gs -> gs {GameState.enteringBeside = batch})
   Monad.void (applyReplacementsIn Nothing batch (ProposedEvent.WouldEnter oid))
   designateProtector oid
+  State.modify' (\gs -> gs {GameState.enteringBeside = before})
 
 -- CR 310.9a: "as a battle enters the battlefield, its controller chooses a player
 -- to be its protector." Run for every entering object, and a no-op for all but a
