@@ -897,9 +897,10 @@ mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
   -- control. So alice's shield on BOB's creature outlives her concession, exactly
   -- as her Giant Growth would.
   --
-  -- It lives here rather than in Pawl.DepartureSpec because Mending Hands is the
-  -- pool's one floating non-control row a test can install by casting a real card
-  -- and then read off the board; three seats because
+  -- It lives here rather than in Pawl.DepartureSpec because Mending Hands is a
+  -- floating non-control row a test can install by casting a real card and then
+  -- read off the board -- the plainest one in data/cards/, Healing Grace's
+  -- differing only by CR 609.7a's chosen source; three seats because
   -- Departure.continuesAfterDeparture is `> 2`, and carol deals the damage so
   -- nothing about the strike depends on the seat that left.
   Spec.it s "CR 800.4a a departing player's shield is not a control effect, so it stays" $ do
@@ -1499,10 +1500,12 @@ jaredCarthalionSpec s registry = Spec.describe s "Jared Carthalion, True Heir (C
 
 -- CR 615.12's damage that "can't be prevented", whose one producer in the pool
 -- is Spider-Punk ({1}{R} Legendary Creature -- Spider Human Hero 2/1, Marvel's
--- Spider-Man 92), set against the pool's one COUNTDOWN shield, Mending Hands
--- ("Prevent the next 4 damage that would be dealt to any target this turn").
--- Fog and Selfless Squire install prevention rows too, but CR 615.7's remaining
--- amount is what clause 3 is about, and Mending Hands is its one producer.
+-- Spider-Man 92), set against a COUNTDOWN shield, Mending Hands ("Prevent the
+-- next 4 damage that would be dealt to any target this turn"). Fog and Selfless
+-- Squire install prevention rows too, but CR 615.7's remaining amount is what
+-- clause 3 is about, and the countdown producers in data/cards/ are Mending
+-- Hands, Healing Grace, Test of Faith and Decorated Griffin -- Mending Hands
+-- being the one that narrows nothing else.
 --
 -- The rule's first and third clauses: the damage is dealt in full though an
 -- applicable shield is there, and "existing damage prevention shields won't be

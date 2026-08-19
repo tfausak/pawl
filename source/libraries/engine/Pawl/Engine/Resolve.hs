@@ -1982,8 +1982,9 @@ installDamageRow players controller source duration kind sourceChoice rewrite ri
               -- CR 615.7's shield is spent in DAMAGE, not in applications, so
               -- the use count is not what ends it (see Pawl.Types.Uses).
               ActiveReplacement.uses = Uses.Unlimited,
-              -- CR 614.15: these rows replace damage from any source, so none of
-              -- them is a self-replacement.
+              -- CR 614.15: a self-replacement is one that replaces the damage its
+              -- OWN resolution deals, which none of these rows does -- not even
+              -- one whose CR 609.7a choice happened to land on this very source.
               ActiveReplacement.origin = ReplacementOrigin.Other,
               ActiveReplacement.rider = rider
             }
@@ -2028,7 +2029,7 @@ chooseDamageSource controller resolving context gs filter_ = case filter_ of
 -- Not implemented: rule 609.7a's third class, "any object referred to by an
 -- object on the stack, by a replacement or prevention effect that's waiting to
 -- apply, or by a delayed triggered ability that's waiting to trigger", which
--- narrows the choice a player is offered (#1327).
+-- narrows the choice a player is offered (#1904).
 damageSourceCandidates :: Filter.Context -> GameState -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
 damageSourceCandidates context gs filter_ =
   let faceUp oid = fmap Object.facing (Game.lookupObject oid gs) == Just Facing.FaceUp
@@ -3564,9 +3565,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                     -- CR 113.7's source: the rider needs an id to run against.
                     PreventionRider.source = source
                   }
-    -- Nothing for CR 609.7a's choice: no card in the pool prints an unbounded
-    -- shield against a chosen source (Samite Ministration, Consulate
-    -- Surveillance) (gap #1327).
+    -- Nothing for CR 609.7a's choice: this opcode has no chosenSource field for
+    -- a card to write one in (Samite Ministration, Consulate Surveillance)
+    -- (gap #1902).
     State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration kind Nothing DamageRewrite.PreventAll rider) g0 recipients
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration kind srcRef destRef) -> do
     -- CR 614.9: install a floating redirection effect. BOTH sides are baked here,
@@ -3580,8 +3581,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- already gone, so no row is installed.
     case recipientsOf destRef of
       [dest] ->
-        -- Nothing for CR 609.7a's choice: Kor Chant's "by a source of your
-        -- choice" redirection has no producer in data/cards/ (gap #1327).
+        -- Nothing for CR 609.7a's choice: this opcode has no chosenSource field
+        -- either, so Kor Chant's redirection "by a source of your choice" is
+        -- unsayable (gap #1902).
         State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration kind Nothing (DamageRewrite.Redirect dest) Nothing) g0 (recipientsOf srcRef)
       _ -> pure ()
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase ref selector) -> do

@@ -1425,13 +1425,14 @@ soulfireSpec s registry = Spec.describe s "SoulfireEruption" $ do
 --
 -- The printed clause's "and dealt by" direction is absent from pawl's
 -- transcription, leaving this Dovin WEAKER than the printing: damage the
--- shielded permanent deals still lands. A shield that names its damage's SOURCE
--- needs an object id baked into Pawl.Types.DamagePattern, which carries a baked
--- id in the recipient direction only (gap #1327). Filter.IsBound is not a stand-in
--- for it: that atom reads a resolution's slot map, and a floating shield is read
--- at the damage event long after that map is gone. The last case below asserts
--- the omission rather than describing it, and is what goes red the day the
--- clause is completed.
+-- shielded permanent deals still lands. Pawl.Types.DamagePattern does carry a
+-- baked source id now (whichSource), but the only writer is CR 609.7a's player
+-- CHOICE; a shield whose source is the permanent its resolution TARGETED has no
+-- opcode field to say so (gap #1903). Filter.IsBound is not a stand-in for it:
+-- that atom reads a resolution's slot map, and a floating shield is read at the
+-- damage event long after that map is gone. The last case below asserts the
+-- omission rather than describing it, and is what goes red the day the clause is
+-- completed.
 dovinAbility :: Printing.Printing -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
 dovinAbility p = take 1 (Face.activatedAbilities (S.combinedFace p))
 
@@ -1556,7 +1557,7 @@ dovinSpec s registry = Spec.describe s "DovinHandOfControl" $ do
       Spec.assertEqWith s "and the event happened" (amounts after) [2]
       Spec.assertEqWith s "the row is gone, not masked" (fmap ActiveReplacement.expiry (GameState.replacements alicesNext)) []
   -- The omission, asserted. The printing prevents this damage and pawl's card
-  -- does not (gap #1327), so this case states what pawl's Dovin actually does
+  -- does not (gap #1903), so this case states what pawl's Dovin actually does
   -- rather than leaving the divergence in a comment.
   Spec.it s "CR 615.1 damage the shielded permanent DEALS is not prevented"
     . withBoard
