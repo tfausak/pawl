@@ -21,6 +21,8 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Replacement as Replacement
+import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Decider as Decider
 import Pawl.Types.Departure (Departure)
@@ -34,6 +36,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.ReplacementBucket as ReplacementBucket
 import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Source as Source
@@ -119,13 +122,15 @@ continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 -- More things it deliberately does NOT touch, each because CR 800.4a
 -- does not reach them:
 --
---   * GameState.continuousEffects, GameState.replacements and
---     GameState.playerEffects. CR 109.1's list of what an object is does not
---     include a stored continuous effect, so the first clause does not end one
---     just because its source left -- a departing player's Giant Growth on
---     someone else's creature keeps its +3/+3 until cleanup. The effects this
---     rule DOES end are the control-granting ones, CR 800.4a's SECOND clause and
---     so controlEffectsEnd's job.
+--   * GameState.continuousEffects, GameState.playerEffects, and every row of
+--     GameState.replacements that grants nobody control. CR 109.1's list of what
+--     an object is does not include a stored continuous effect, so the first
+--     clause does not end one just because its source left -- a departing
+--     player's Giant Growth on someone else's creature keeps its +3/+3 until
+--     cleanup. The effects this rule DOES end are the control-granting ones, CR
+--     800.4a's SECOND clause and so controlEffectsEnd's job -- which is where the
+--     control-on-entry rows of GameState.replacements are dropped
+--     (givesControlOnEntryTo), and only those.
 --
 --   * GameState.delayedTriggers. A delayed triggered ability that has not
 --     triggered is not on the stack, so by CR 109.1 it is not an object either.
@@ -234,7 +239,7 @@ objectsLeaveWith pid gs =
 -- CR 800.4a, second clause: any effects which give that player control of
 -- objects or players end.
 --
--- Three carriers, because pawl STORES control in three places:
+-- Four carriers, because pawl STORES control in four places:
 --
 --   * a stored layer-2 SetController continuous effect (Master Thief, Act of
 --     Treason -- both in the pool). Projection.givesControlTo makes the match, so
@@ -243,6 +248,29 @@ objectsLeaveWith pid gs =
 --   * GameState.pendingControl -- a Decider scheduled for a later turn
 --     (CR 723.1b). CR 800.4b says the same thing one step later, at
 --     Engine.beginTurnOf's promotion; neither is the other's spare.
+--   * a floating CR 616.1b control-on-entry replacement (Gather Specimens, the
+--     pool's producer), whose whole content is that objects enter under CR
+--     109.5's "you" -- the PlayerId this row baked when it was installed (see
+--     Pawl.Types.ActiveReplacement's `controller`). Read as a bucket
+--     (Replacement.bucketOfEffect, CR 616.1's own classification) rather than as
+--     a rewrite constructor, so the rules core classifies and never identifies.
+--
+-- That fourth carrier is a reading of CR 800.4a rather than a quotation of it,
+-- and the reading is worth writing down. The row gives its controller control of
+-- objects that do not exist yet, so the alternative is that CR 800.4a's second
+-- clause does not name it and CR 800.4b catches the entry instead. That loses
+-- twice. CR 800.4b's sentences are the entry sentences -- a token is not created,
+-- an object "remains in its current zone" -- and the second of those cannot be
+-- expressed here at all: Event.runEntry materializes the entering permanent
+-- BEFORE the CR 616.1 loop runs, so leaving a resolving creature spell on the
+-- stack would mean undoing a completed move. And a surviving row stays a CR
+-- 616.1b candidate, so a second row would put a CR 616.1b choice to the entering
+-- permanent's controller between a live rewrite and one that does nothing --
+-- Replacement.readsApplier answers True for this rewrite, so the pair is not
+-- elided as indistinguishable. Ending the row forecloses both; CR 800.4b is left
+-- untouched as the backstop for an entry that names a departed player for some
+-- other reason (CR 800.4i's last known information, an instruction directed at
+-- that player), which is where Event.createTokens' guard still stands.
 --
 -- Control has a FOURTH source that is deliberately absent from that list: a
 -- layer-2 control-granting STATIC ability (Control Magic's
@@ -289,8 +317,33 @@ controlEffectsEnd pid gs =
           GameState.activeControl = case GameState.activeControl gs of
             Just decider -> if heldBy decider then Nothing else Just decider
             Nothing -> Nothing,
-          GameState.pendingControl = Map.filter (not . heldBy) (GameState.pendingControl gs)
+          GameState.pendingControl = Map.filter (not . heldBy) (GameState.pendingControl gs),
+          GameState.replacements = filter (not . givesControlOnEntryTo pid) (GameState.replacements gs)
         }
+
+-- Is this floating row one of CR 800.4a's "effects which give that player
+-- control of any objects"? Both halves are needed: the bucket, because a
+-- departing player's Giant Growth or their damage shield grants nobody control
+-- and CR 800.4a leaves it alone; and the baked controller, because a row
+-- installed by a player still in the game is untouched however many opponents
+-- leave.
+--
+-- Both halves are proved by test rather than asserted here. Pawl.ReplacementSpec
+-- reddens on the CONTROLLER half through "CR 616.1b a departed player's row is
+-- not a candidate, so carol is not asked" (drop the comparison and bob's
+-- surviving row goes with alice's), and on the BUCKET half through "CR 800.4a a
+-- departing player's shield is not a control effect, so it stays" (drop the
+-- bucket check and a Mending Hands shield dies with its caster).
+--
+-- ActiveReplacement.controller is CR 109.5's "you" as of installation, which is
+-- also the only player any current control-on-entry rewrite can name
+-- (EntryRewrite.UnderSourceControl hands the permanent to the candidate's own
+-- controller). A future rewrite in this bucket that named somebody else would
+-- need the recipient re-derived here rather than this field read.
+givesControlOnEntryTo :: PlayerId -> ActiveReplacement.ActiveReplacement -> Bool
+givesControlOnEntryTo pid active =
+  ActiveReplacement.controller active == pid
+    && Replacement.bucketOfEffect (ActiveReplacement.effect active) == ReplacementBucket.ControlOnEntry
 
 -- CR 800.4a, third clause: objects on the stack the departing player controlled
 -- that are not represented by cards cease to exist -- an activated or triggered
