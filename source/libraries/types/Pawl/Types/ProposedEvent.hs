@@ -40,9 +40,9 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 --
 -- WouldTurnFaceUp carries the object for WouldEnter's reason: CR 708.11 has the
 -- ability applied WHILE the permanent is turning over, and
--- Pawl.Engine.FaceDown.turnFaceUp has already written the face-up status by the
--- time it raises this -- so every property a CR 614.1e replacement can modify is
--- read off, and written to, the object.
+-- Pawl.Engine.FaceDown.performTurnFaceUp has already written the face-up status
+-- by the time it raises this -- so every property a CR 614.1e replacement can
+-- modify is read off, and written to, the object.
 --
 -- It carries the PROCEDURE beside it, which no other arm needs, because CR
 -- 702.37b's rewrite is conditional on WHICH COST WAS PAID -- "put a +1/+1 counter
@@ -50,6 +50,11 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- a manifested megamorph card a second, cheaper way over that pays no megamorph
 -- cost at all. Nothing on the object records which road it came by, so the event
 -- has to.
+--
+-- MAYBE the procedure, because CR 708.7's two procedures are CR 116.2b special
+-- actions and an Effect.TurnFaceUp is neither: it takes no procedure, shows
+-- nothing and pays nothing. Nothing is what a reader gating on a paid cost -- CR
+-- 702.37b's megamorph counter, the only such reader -- correctly declines.
 --
 -- Nine arms, not every replaceable event class the rules define: each of the
 -- rest is one more arm plus the funnel that raises it.
@@ -96,8 +101,8 @@ data ProposedEvent
     -- first step of such a phase -- once for the phase, once for the step.
     WouldBeginPhase PhaseSelector.PhaseSelector PlayerId.PlayerId
   | -- | CR 614.1e / 708.11: a face-down permanent is being turned face up.
-    -- Raised by Pawl.Engine.FaceDown.turnFaceUp, the only place in the engine
-    -- that turns anything face up, and the one funnel CR 116.2b's special action
-    -- goes through.
-    WouldTurnFaceUp ObjectId.ObjectId TurnUpProcedure.TurnUpProcedure
+    -- Raised by Pawl.Engine.FaceDown.performTurnFaceUp, the only place in the
+    -- engine that turns anything face up -- the one funnel CR 116.2b's special
+    -- action and Effect.TurnFaceUp both go through.
+    WouldTurnFaceUp ObjectId.ObjectId (Maybe TurnUpProcedure.TurnUpProcedure)
   deriving (Eq, Ord, Show)

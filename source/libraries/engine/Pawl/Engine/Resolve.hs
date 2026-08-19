@@ -28,6 +28,7 @@ import qualified Pawl.Engine.Detain as Detain
 import qualified Pawl.Engine.Dungeon as Dungeon
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
+import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
@@ -104,6 +105,7 @@ import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.Facing as Facing
+import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.ForEach as ForEach
 import Pawl.Types.Game (Game)
@@ -312,6 +314,9 @@ slotsOf effect = case effect of
     joinTwo
       (joinTwo (objectRefSlots ref) (quantitySlots quantity))
       (maybe Map.empty oneSlot dealer)
+  -- BOTH fighters: CR 701.14a reads each one's power against the other, so a
+  -- slot named by only one half would still look dangling.
+  Effect.Fight (Fight.MkFight first second) -> joinTwo (oneSlot first) (oneSlot second)
   -- The modification's own quantities read slots too, through
   -- Projection.quantitiesOf.
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
@@ -337,6 +342,7 @@ slotsOf effect = case effect of
   Effect.Destroy (Destroy.MkDestroy ref _ _) -> objectRefSlots ref
   Effect.Sacrifice slot -> oneSlot slot
   Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown slot _) -> oneSlot slot
+  Effect.TurnFaceUp slot -> oneSlot slot
   Effect.RemoveFromCombat slot -> oneSlot slot
   Effect.BecomesBlocked slot -> oneSlot slot
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> objectRefSlots ref
@@ -512,6 +518,7 @@ conditionSlots condition = case condition of
 slotsAreExhaustive :: Effect Card.Type.Card -> Bool
 slotsAreExhaustive effect = case effect of
   Effect.DealDamage (DealDamage.MkDealDamage _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
+  Effect.Fight {} -> True
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) ->
     durationSlotsAreExhaustive duration
       && all Quantity.slotsAreExhaustive (Projection.quantitiesOf modification)
@@ -532,6 +539,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Destroy {} -> True
   Effect.Sacrifice _ -> True
   Effect.TurnFaceDown _ -> True
+  Effect.TurnFaceUp _ -> True
   Effect.RemoveFromCombat _ -> True
   Effect.BecomesBlocked _ -> True
   -- Three of the four whose ref may nest a Quantity; ForEach is the fourth.
@@ -647,6 +655,7 @@ readsX = any effectReadsX
   where
     effectReadsX effect = case effect of
       Effect.DealDamage (DealDamage.MkDealDamage _ quantity _ _) -> Quantity.readsX quantity
+      Effect.Fight {} -> False
       -- Untamed Might's "+X/+X" sits inside the Modification, not on the effect.
       Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> any Quantity.readsX (Projection.quantitiesOf modification)
       Effect.ChangeText {} -> False
@@ -666,6 +675,7 @@ readsX = any effectReadsX
       Effect.Destroy {} -> False
       Effect.Sacrifice _ -> False
       Effect.TurnFaceDown _ -> False
+      Effect.TurnFaceUp _ -> False
       Effect.RemoveFromCombat _ -> False
       Effect.BecomesBlocked _ -> False
       -- Commune with Lava's X sits inside the ObjectRef rather than beside it, so
@@ -746,6 +756,7 @@ searchesLibrary effect = case effect of
   Effect.Venture -> False
   Effect.PlayerSacrifices {} -> False
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> False
+  Effect.Fight {} -> False
   Effect.ModifyTarget {} -> False
   Effect.ChangeText {} -> False
   Effect.AddMana _ -> False
@@ -756,6 +767,7 @@ searchesLibrary effect = case effect of
   Effect.Destroy {} -> False
   Effect.Sacrifice _ -> False
   Effect.TurnFaceDown _ -> False
+  Effect.TurnFaceUp _ -> False
   Effect.RemoveFromCombat _ -> False
   Effect.BecomesBlocked _ -> False
   Effect.MoveToZone {} -> False
@@ -881,6 +893,7 @@ boundSlots effect = case effect of
   Effect.Fateseal {} -> Set.empty
   Effect.Explore {} -> Set.empty
   Effect.DealDamage {} -> Set.empty
+  Effect.Fight {} -> Set.empty
   Effect.ModifyTarget {} -> Set.empty
   Effect.ChangeText {} -> Set.empty
   Effect.AddMana _ -> Set.empty
@@ -898,6 +911,7 @@ boundSlots effect = case effect of
   Effect.ControlPlayerNextTurn _ -> Set.empty
   Effect.Sacrifice _ -> Set.empty
   Effect.TurnFaceDown _ -> Set.empty
+  Effect.TurnFaceUp _ -> Set.empty
   Effect.RemoveFromCombat _ -> Set.empty
   Effect.BecomesBlocked _ -> Set.empty
   Effect.Draw {} -> Set.empty
@@ -1529,7 +1543,13 @@ objectRefObjects legal resolving controller source gs ref = case ref of
     -- sweep is the one effect-borne Filter position naming what the SOURCE
     -- enchants. Read live, so an Aura moved between the trigger and its
     -- resolution acts on the host it has now.
-    let context = (Filter.contextFor (Just controller) (Just source)) {Filter.sourceAttachedTo = Projection.hostOf source gs}
+    --
+    -- Through effectContext, so the resolution's own slot bindings ride along and
+    -- a sweep can exclude what another slot already named: Showstopping Surprise's
+    -- "each OTHER creature" is `Not (IsBound "target")`. Filter.IsBound answers
+    -- False for every candidate against an empty slot map, so a bare contextFor
+    -- here would leave such a card silently sweeping in its own target.
+    let context = (effectContext controller source legal) {Filter.sourceAttachedTo = Projection.hostOf source gs}
         matching =
           filter
             (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_)
@@ -2101,6 +2121,50 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- CR 615.5's "immediately afterward": a shield this damage spent runs
           -- its additional effect inside this resolution.
           runPreventionRiders
+  -- CR 701.14. Every clause of the rule is one line here, and none of them is a
+  -- read of what the effect IS: the amounts come off the projection, the kind is
+  -- data, and the pair guard is arithmetic on two Maybes.
+  Effect.Fight (Fight.MkFight firstSlot secondSlot) -> do
+    gs <- State.get
+    -- CR 701.14b, and it is a guard on the PAIR: "if one or both creatures
+    -- instructed to fight are no longer on the battlefield or are no longer
+    -- creatures, NEITHER of them fights or deals damage". Its second sentence --
+    -- an illegal target -- is legalOne's Nothing, CR 608.2b having already
+    -- narrowed the slot.
+    --
+    -- Both powers read off the SAME pre-effect state, which is CR 701.14a's
+    -- "each of those creatures deals damage equal to its power": a fight whose
+    -- first blow shrank the second creature would read the wrong number.
+    let fighter slot = do
+          recipient <- legalOne slot legal
+          oid <- Recipient.objectOf recipient
+          Monad.guard (Set.member oid (GameState.battlefield gs))
+          Monad.guard (Projection.isCreatureOf oid gs)
+          power <- Projection.powerOf oid gs
+          pure (oid, power)
+    case (fighter firstSlot, fighter secondSlot) of
+      (Just (oneId, onePower), Just (twoId, twoPower)) -> do
+        -- CR 701.14d: "the damage dealt when a creature fights ISN'T COMBAT
+        -- DAMAGE", so DamageKind.Noncombat and never the combat damage path.
+        -- Each creature is its own blow's source (CR 120.2b), which is what makes
+        -- a fight two dealers where an Effect.DealDamage has one.
+        --
+        -- Zero is dropped rather than dealt (CR 120.8), the same guard the
+        -- DealDamage arm above writes.
+        let blow dealer victim amount =
+              [ Damage.damageEvent gs DamageKind.Noncombat dealer (Recipient.ToCreature victim) (Integer.toNaturalSaturating amount)
+              | amount > 0
+              ]
+            events = blow oneId twoId onePower <> blow twoId oneId twoPower
+        -- ONE batch: CR 701.14a's "each of those creatures deals damage" is one
+        -- action, so the two blows land simultaneously and a creature that dies
+        -- to the first still dealt the second.
+        --
+        -- Not implemented: CR 701.14c's self-fight, where both slots name one
+        -- permanent and the rule wants ONE blow of twice its power rather than
+        -- the two of its power this builds (#1875).
+        Monad.unless (null events) (Damage.applyDamage events)
+      _ -> pure ()
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     State.modify' $ \gs ->
       -- The affected objects are enumerated once, by the same sweep every
@@ -2443,7 +2507,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- it closes CR 701.40b's turn-face-up procedure and leaves CR 702.37e's
           -- open. No CR 400.7 incarnation is minted, so the object id, marked
           -- damage, counters, attachments, statuses and the CR 613.7d timestamp
-          -- all ride through -- the mirror of FaceDown.turnFaceUp.
+          -- all ride through -- the mirror of FaceDown.performTurnFaceUp.
           --
           -- CR 708.2b is the guard below: an effect that LISTS its own values
           -- would otherwise overwrite the list already there. No event is
@@ -2457,6 +2521,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   }
         -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
         _ -> gs
+  -- CR 708 through FaceDown.turnFaceUpByEffect, the funnel CR 116.2b's special
+  -- action shares: this arm decides only WHICH permanent, never what turning it
+  -- over does. CR 701.40g lives inside that funnel and so applies here without
+  -- this arm knowing the rule exists.
+  Effect.TurnFaceUp slot -> case legalOne slot legal of
+    Just recipient -> case Recipient.objectOf recipient of
+      Nothing -> pure () -- a player is not a permanent and has no face
+      Just target -> FaceDown.turnFaceUpByEffect target
+    -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
+    _ -> pure ()
   Effect.RemoveFromCombat slot ->
     State.modify' $ \gs ->
       case legalOne slot legal of

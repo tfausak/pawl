@@ -406,7 +406,7 @@ applies gs event candidate =
         -- THIS permanent is turned face up".
         --
         -- Matched against the LIVE projection, which for this event is the
-        -- permanent as it is turning over: FaceDown.turnFaceUp has already
+        -- permanent as it is turning over: FaceDown.performTurnFaceUp has already
         -- written Facing.FaceUp when it raises the event, so CR 708.11's "would
         -- have ... after it's turned face up" is answered by asking about the
         -- board rather than by a counterfactual.
@@ -417,6 +417,8 @@ applies gs event candidate =
         -- at its MANA cost, and down that road the ability does not apply at all
         -- -- so the row is refused here rather than consumed and skipped, which
         -- is CR 614.1's own shape for an ability whose condition is not met.
+        -- An Effect.TurnFaceUp carries no procedure at all and is refused for the
+        -- same sentence: it paid no cost, megamorph or otherwise.
         --
         -- Scoped to WithCounters because that rewrite has exactly one producer:
         -- Pawl.Engine.Keyword.mintedReplacementsFor's megamorph arm, whose rule
@@ -427,7 +429,7 @@ applies gs event candidate =
         (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR pat rewrite), ProposedEvent.WouldTurnFaceUp oid procedure) ->
           matchesFiltered gs candidate pat oid
             && case rewrite of
-              TurnUpRewrite.WithCounters {} -> procedure == TurnUpProcedure.Morph
+              TurnUpRewrite.WithCounters {} -> procedure == Just TurnUpProcedure.Morph
               TurnUpRewrite.MayAttachTo {} -> True
         -- Every row below falls through to False because an arm ABOVE already
         -- matches every event of that class: a row below fires only for a
