@@ -2561,10 +2561,21 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- the controller (CR 110.2a) are handed to it rather than written
         -- afterward, so CR 614.1c's entry loop and the Moved snapshot read the
         -- settled values. No CR 800.4b guard: a departed player controls no
-        -- resolving spell or ability (CR 800.4a, CR 800.4d). Answers the
-        -- incarnation, or Nothing when nothing arrived.
-        moveOne (target, position) = do
-          mNew <- Event.changeZoneEntering target zone position entry (Just controller)
+        -- resolving spell or ability (CR 800.4a, CR 800.4d). Answers the fold's
+        -- state: the ids that have arrived so far, and the incarnations in
+        -- reverse -- Nothing for a member that did not arrive.
+        --
+        -- CR 608.2f makes the whole sweep ONE event, so each member is judged
+        -- against `before` -- the board the batch began on -- and against
+        -- `sofar`, the members that have already arrived out of it. Threading a
+        -- fold rather than a mapM is what carries those two: the funnel processes
+        -- one member at a time, which is an implementation order CR 608.2f gives
+        -- nobody the right to observe, and the two values are what keep it
+        -- unobservable. `sofar` ACCUMULATES rather than naming every target up
+        -- front because a member still in its old zone is not on the battlefield
+        -- for a sweep to find anyway; only an arrived one needs excluding.
+        moveOne before (sofar, acc) (target, position) = do
+          mNew <- Event.changeZoneEnteringIn (Just before) sofar target zone position entry (Just controller)
           -- CR 614.6: the move was cancelled, or the id was already gone (CR
           -- 603.7c). Nothing entered, so there is nothing to bind.
           Monad.forM_ mNew $ \newId ->
@@ -2573,7 +2584,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- nothing. CR 506.3b refuses a controller who is not the active
             -- player, which the funnel above has already settled.
             Monad.when (EntryRiders.attacking entry) (Combat.putOntoBattlefieldAttacking newId)
-          pure mNew
+          pure (maybe sofar (`Set.insert` sofar) mNew, mNew : acc)
         -- CR 400.7j: bind what arrived into the resolving object's live bindings,
         -- where a later effect of this resolution or a delayed ability it arms
         -- (CR 603.7c) can name it. The shape follows how many arrived: one takes
@@ -2613,8 +2624,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                     Just oid -> [oid]
                     Nothing -> Maybe.mapMaybe Recipient.objectOf (legalMany slot legal)
             -- Swept ONCE from the PRE-MOVE state (CR 608.2c, CR 608.2f), in APNAP
-            -- order, then moved one at a time so every arrival gets its own CR
-            -- 616.1 opportunity. CR 400.3 files a hand arrival under Object.owner.
+            -- order, then moved one at a time, each judged against the board the
+            -- batch began on and against the siblings that have already arrived
+            -- (see moveOne). CR 400.3 files a hand arrival under Object.owner.
             ObjectRef.EachMatching _ -> do
               gs <- State.get
               pure (objectRefObjects legal resolving controller source gs ref)
@@ -2707,7 +2719,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- under this opcode names no object; the count and that rule's other
             -- exception need a design call (#1733).
             ObjectRef.RandomCardInHand _ -> pure []
-          arrived <- Monad.mapM moveOne =<< settleArrivals zone placement targets
+          arrivals <- settleArrivals zone placement targets
+          -- The batch's own board, read after CR 401.4's arrangement asks (which
+          -- move nothing) and before any member does.
+          before <- State.get
+          arrived <- fmap (reverse . snd) (Monad.foldM (moveOne before) (Set.empty, []) arrivals)
           Monad.mapM_ (\slot -> bindArrivals slot (Maybe.catMaybes arrived)) mSlot
   -- CR 701.24: shuffle the objects the ref names into their OWNERS' libraries. Two
   -- steps: CR 400.7's move through the same changeZone funnel every destination

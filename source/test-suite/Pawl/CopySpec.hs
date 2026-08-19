@@ -47,6 +47,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Zone as Zone
 
 -- The battlefield objects whose PRINTED card has this name (a printed card is
 -- unchanged by copying -- only the object's projected characteristics change).
@@ -580,6 +581,51 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         resolved = castAndResolve (rites KickerDecision.Kicks cloneId) rite board
     Spec.assertEqWith s "five tokens entered, and every one copied the Giant rather than an entering sibling" (mintedTokens resolved) (replicate 5 (Set.singleton (CardName.MkCardName (Text.pack "Hill Giant")), Just (3, 3)))
     Spec.assertEqWith s "the copied Clone itself still copied nothing" (S.powerToughnessOf cloneId resolved) (Just (1, 1))
+
+  -- THE PROVING TEST for #1738, on the CR 614.12a channel the case above proves
+  -- for a TOKEN batch. Rise of the Dark Realms returns every creature card from
+  -- every graveyard as ONE CR 608.2f event, so a Clone in that batch makes its
+  -- copy choice before the permanent enters -- and a creature card returned
+  -- beside it is not on the battlefield to be copied.
+  --
+  -- NO creature on either battlefield, which is what makes the board
+  -- discriminate: one already there is a legal copy target under both readings.
+  -- The Piker is buried FIRST so it takes the lower ObjectId and moves first
+  -- (Resolve.graveyardCardsOf sorts ascending, S.addGraveyardCard mints in call
+  -- order), which is the only order in which the per-object reading has anything
+  -- to offer; the mirrored leg pins that the answer does not depend on it.
+  --
+  -- copyNewest rather than declineCopy: under the per-object reading a real
+  -- ChooseCopyTarget is raised and taking it is what produces the second Piker,
+  -- while the correct reading raises no prompt at all (Replacement.apply skips a
+  -- forced selection with no legal candidate). So the Clone enters its printed
+  -- 0/0 and CR 704.5f puts it back into alice's graveyard.
+  Spec.it s "CR 608.2f a reanimated Clone may not copy a creature reanimated beside it (#1738)" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    rise <- S.printingOf s registry "Rise of the Dark Realms"
+    piker <- S.printingOf s registry "Goblin Piker"
+    clone <- S.printingOf s registry "Clone"
+    let outcome buried =
+          let graves = List.foldl' (\g printing -> snd (S.addGraveyardCard printing S.alice g)) (S.landsInPlay swamp 9) buried
+              after = castAndResolve copyNewest rise graves
+           in ( List.sort [Projection.namesOf oid after | oid <- Set.toList (GameState.battlefield after), Projection.isCreatureOf oid after],
+                List.sort (fmap (fmap Face.name . (`Game.faceOf` after)) (Game.zoneMembers Zone.Graveyard S.alice after))
+              )
+        pikerFirst = outcome [piker, clone]
+        cloneFirst = outcome [clone, piker]
+        named = CardName.MkCardName . Text.pack
+    Spec.assertEqWith
+      s
+      "one Piker on the battlefield, and the 0/0 Clone is back in the graveyard beside the spent sorcery (CR 704.5f)"
+      pikerFirst
+      ( [Set.singleton (named "Goblin Piker")],
+        List.sort [Just (named "Clone"), Just (named "Rise of the Dark Realms")]
+      )
+    Spec.assertEqWith
+      s
+      "and the batch's processing order changes nothing (CR 608.2f)"
+      cloneFirst
+      pikerFirst
 
   -- THE PROVING TEST for #313, and it is CR 707.4's own worked example: an
   -- Unstable Shapeshifter under a Giant Growth becomes a copy of a creature that

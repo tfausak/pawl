@@ -615,7 +615,9 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 -- the candidate set to include effects of permanents the batch is itself
 -- removing, while `batch` NARROWS the copy-target set to exclude permanents
 -- entering beside the loop's subject. Deliberately not one parameter: different
--- batches, different readers, and no call site ever supplies both.
+-- batches and different readers. Effect.MoveToZone's CR 608.2f batch
+-- (Pawl.Engine.Resolve) supplies both, and even there they hold different values
+-- -- the pre-batch board against the ids that have already arrived out of it.
 --
 -- What `asOf` does NOT freeze: the FLOATING store stays live (see
 -- Replacement.collect), because CR 614.3 has Replacement.consume spend a one-shot
@@ -647,30 +649,42 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 -- Both arms exclude the loop's own subject themselves -- legalCopyTargets'
 -- `self`, and the sacrifice arm's `entering` -- never through this set.
 --
--- `changeZone` handles one entering object at a time and passes `Set.empty`. The
--- non-empty case is `createTokens` below, which materializes every token of a
--- Create BEFORE running any of their entry loops (CR 614.16's doubled count is
--- settled once, up front), so a later token's entry loop would otherwise find
--- its siblings already sitting on the battlefield.
+-- Every `changeZone` door but changeZoneEnteringIn handles one entering object at
+-- a time and passes `Set.empty`. There are two non-empty cases, and they reach
+-- the same invariant from opposite directions. `createTokens` below materializes
+-- every token of a Create BEFORE running any of their entry loops (CR 614.16's
+-- doubled count is settled once, up front), so it knows the whole set and passes
+-- it whole. Effect.MoveToZone's CR 608.2f batch (Pawl.Engine.Resolve) moves its
+-- members through the funnel one after another, so it ACCUMULATES the set as
+-- each arrives: a member still in its old zone is not on the battlefield for a
+-- sweep to find, and one that has arrived is. Either way a later member's entry
+-- loop would otherwise find its siblings already sitting on the battlefield.
 --
--- A simultaneously-entering sibling can reach a later token's entry loop through
+-- A simultaneously-entering sibling can reach a later member's entry loop through
 -- three channels; only the first needs this explicit exclusion:
---   1. Copy targets -- excluded by `batch`. Kicked Rite of Replication on a Clone
---      is the board that observes it: five token Clones enter at once, and
---      Pawl.CopySpec's "none may copy a sibling" fails without this exclusion.
+--   1. Copy targets -- excluded by `batch`. Two boards observe it, one per
+--      producer: kicked Rite of Replication on a Clone, where five token Clones
+--      enter at once (Pawl.CopySpec's "none may copy a sibling"), and Rise of the
+--      Dark Realms over a graveyard holding a Clone, where the batch is a zone
+--      change (Pawl.CopySpec's "a reanimated Clone may not copy a creature
+--      reanimated beside it"). Both fail without this exclusion.
 --   2. Candidate collection -- reachable, and correct where it is reached. Most
 --      entry replacements a PERMANENT carries in this pool are CR 614.1c's
 --      self-only `IsSource` (Clone, Primal Plasma, CR 306.5b's loyalty), which no
 --      sibling can satisfy. Kismet prints CR 614.1d's other-objects form, so a
 --      sibling entering beside it would be collected here -- correctly, and by
---      the card's own text; no board in the pool puts Kismet itself into a batch,
---      so nothing observes it yet.
+--      the card's own text. Still no board in the pool puts Kismet itself into a
+--      batch, the CR 608.2f zone-change batches below included: Kismet's EntryR
+--      names permanents its OPPONENTS control, and the two batches the specs
+--      build (Replenish, Rise of the Dark Realms) return cards from ONE
+--      graveyard under that player's own control. So nothing observes it yet.
 --   3. Projection -- a sibling's STATIC ABILITIES would be visible to a later
---      token's projection, and nothing here excludes them the way `batch`
+--      member's projection, and nothing here excludes them the way `batch`
 --      excludes copy targets. CR 614.12 does not sanction this: a
 --      simultaneously-entering sibling's static abilities do not already exist
 --      relative to it. NOT IMPLEMENTED AT ALL, and unreached today only because
---      every token card in the pool has empty `staticAbilities` (#78).
+--      every token card in the pool has empty `staticAbilities` (#78). A CR 608.2f
+--      MoveToZone batch reaches this channel too now, and is not fixed here.
 applyReplacementsIn :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent)
 applyReplacementsIn asOf batch = fmap fst . applyReplacementsReporting asOf batch
 
@@ -2187,7 +2201,15 @@ changeZone oid requestedDest = Monad.void (changeZoneReturning oid requestedDest
 -- choose among, and running the entry loop first would fire CR 614.1c's
 -- as-enters abilities for a card that never enters.
 changeZoneEntering :: ObjectId -> Zone -> LibraryPosition.LibraryPosition -> EntryRiders.EntryRiders -> Maybe PlayerId -> Game (Maybe ObjectId)
-changeZoneEntering oid requestedDest position riders under = do
+changeZoneEntering = changeZoneEnteringIn Nothing Set.empty
+
+-- changeZoneEntering for ONE MEMBER of a CR 608.2f batch: `asOf` and `batch` are
+-- applyReplacementsIn's, and Pawl.Engine.Resolve's Effect.MoveToZone arm is the
+-- only caller that supplies either. A separate door rather than two more
+-- parameters on changeZoneEntering, changeZoneInBatch's shape one door over: the
+-- lone moves have no batch to name.
+changeZoneEnteringIn :: Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> EntryRiders.EntryRiders -> Maybe PlayerId -> Game (Maybe ObjectId)
+changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
   gs <- State.get
   let mCard = Game.cardOf oid gs
       onto = requestedDest == Zone.Battlefield
@@ -2236,7 +2258,7 @@ changeZoneEntering oid requestedDest position riders under = do
       facing = if onto && EntryRiders.faceDown riders then Facing.faceDown FaceDownReason.Manifested else Facing.FaceUp
   if refused
     then pure Nothing
-    else changeZoneAttaching Nothing oid requestedDest position Nothing (EntryRiders.tapped riders) (EntryRiders.counters riders) under' shown facing (EntryRiders.exiledFaceDown riders)
+    else changeZoneAttaching asOf batch oid requestedDest position Nothing (EntryRiders.tapped riders) (EntryRiders.counters riders) under' shown facing (EntryRiders.exiledFaceDown riders)
 
 -- changeZoneReturning for a move that carries ONE NAMED HALF of the card into
 -- its destination: CR 709.3's choice of which half of a split card is being
@@ -2269,7 +2291,7 @@ changeZoneEntering oid requestedDest position riders under = do
 -- See the `face` note in changeZoneAttaching's mkObj, and Pawl.CastSpec's "a cast
 -- redirected off the stack keeps both halves" for the case that proves it.
 changeZoneShowing :: ObjectId -> Zone -> Maybe CardName.CardName -> Game (Maybe ObjectId)
-changeZoneShowing oid requestedDest shown = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown Facing.FaceUp False
+changeZoneShowing oid requestedDest shown = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown Facing.FaceUp False
 
 -- changeZoneShowing for a move that puts the object into its destination FACE
 -- DOWN -- the CR 110.5b "unless a spell or ability says otherwise" that morph is.
@@ -2295,7 +2317,7 @@ changeZoneShowing oid requestedDest shown = changeZoneAttaching Nothing oid requ
 -- than being stored. Turning the permanent face up is what makes it observable
 -- again (CR 708.8).
 changeZoneFaceDown :: ObjectId -> Zone -> Maybe CardName.CardName -> Game (Maybe ObjectId)
-changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown (Facing.faceDown FaceDownReason.Morphed) False
+changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown (Facing.faceDown FaceDownReason.Morphed) False
 
 -- CR 601.2a's move: the card goes onto the stack and "that player becomes its
 -- controller". The caster is carried BY THE MOVE, for the reason CR 709.3a
@@ -2314,24 +2336,31 @@ changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing oid req
 -- battlefield drops the stamp, exactly as it drops the face, because CR 109.4
 -- gives an object there no controller to record.
 changeZoneCasting :: PlayerId -> ObjectId -> Zone -> Maybe CardName.CardName -> Facing.Facing -> Game (Maybe ObjectId)
-changeZoneCasting caster oid requestedDest shown facing = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just caster) shown facing False
+changeZoneCasting caster oid requestedDest shown facing = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just caster) shown facing False
 
 -- changeZone for one member of a batch of moves CR 608.2f or CR 704.3 processes
 -- SIMULTANEOUSLY. `asOf` is the board the batch began in -- or, for a batch inside
 -- a larger simultaneous event, that event's -- and is what its members' CR 616.1
 -- loops collect replacement candidates from; see applyReplacementsIn above.
 --
+-- Not the only batch door: an Effect.MoveToZone batch goes through
+-- changeZoneEnteringIn, which carries the entry riders, the library position and
+-- the entry controller this one has no parameters for. This door carries the
+-- batches whose members reach a graveyard or the command zone -- Pawl.Engine.Sba's
+-- sweeps and the destroy funnel -- so nothing enters the battlefield and there is
+-- no `batch` set for CR 614.12a to narrow.
+--
 -- A separate door rather than a fourth parameter on changeZone: a batch is the
 -- rare case, and for a single move the board it begins on IS the live one.
 changeZoneInBatch :: GameState -> ObjectId -> Zone -> Game ()
-changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneAttaching (Just asOf) oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False)
+changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneAttaching (Just asOf) Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False)
 
 -- changeZoneReturning's body, returning the destination incarnation's id: Just
 -- newId on a completed move (CR 400.7 minted a fresh id), Nothing when the id is
 -- unknown or the CR 616.1 replacement loop cancelled the move (`resolved ==
 -- Nothing`). changeZoneReturning itself is the `seed = Nothing` case below.
 changeZoneReturning :: ObjectId -> Zone -> Game (Maybe ObjectId)
-changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False
+changeZoneReturning oid requestedDest = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False
 
 -- changeZoneReturning with an attachment seed. Per CR 303.4 attachment is a
 -- property of entering, not a step after it: the CR 614.1c entry replacement loop
@@ -2348,7 +2377,10 @@ changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requeste
 -- other route is CR 303.4f's, and the body below asks its controller what it will
 -- enchant rather than letting it enter unattached -- see there.
 --
--- `asOf` is changeZoneInBatch's batch board, Nothing otherwise. `tapped` is CR
+-- `asOf` and `batch` are applyReplacementsIn's, supplied by changeZoneInBatch and
+-- by changeZoneEnteringIn; every other door names a lone move and passes Nothing
+-- and the empty set. `batch` is read twice below: CR 303.4f's host sweep
+-- subtracts it, and the CR 614.1c entry loop is handed it. `tapped` is CR
 -- 110.5b's status, Untapped for every door but changeZoneEntering. `entering` is
 -- CR 122.6a's counters the object enters the battlefield with, empty for every
 -- door but that one and inert for every destination but the battlefield.
@@ -2371,8 +2403,8 @@ changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requeste
 -- one drops it for free, and a redirect INTO one from a move that named no
 -- position carries the default -- which is the right answer, since nothing said
 -- top.
-changeZoneAttaching :: Maybe GameState -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> Maybe Recipient.Recipient -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe PlayerId -> Maybe CardName.CardName -> Facing.Facing -> Bool -> Game (Maybe ObjectId)
-changeZoneAttaching asOf oid requestedDest position seed tapped entering under shown facing concealed = do
+changeZoneAttaching :: Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> Maybe Recipient.Recipient -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe PlayerId -> Maybe CardName.CardName -> Facing.Facing -> Bool -> Game (Maybe ObjectId)
+changeZoneAttaching asOf batch oid requestedDest position seed tapped entering under shown facing concealed = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure Nothing
@@ -2732,6 +2764,15 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
           -- Attach.attachmentFor reads Projection.subtypesOf and Game.faceOf, both
           -- of which answer for an object in any zone.
           --
+          -- MINUS `batch`, which is CR 608.2f: the members of a batch enter
+          -- simultaneously, so a would-be host arriving beside this Aura is not on
+          -- the battlefield at the moment CR 303.4f's choice is made, however the
+          -- funnel happens to order the two moves. Replenish over a graveyard
+          -- holding an Aura and an enchantment creature is the board
+          -- (Pawl.AuraSpec). Subtracting the SET rather than sweeping the `asOf`
+          -- board: the set names exactly "entered beside me", where that board
+          -- would also re-offer a host the batch itself removed.
+          --
           -- Filter.CanHostSubject ALONE, because CR 303.4f's "a legal object or
           -- player according to the Aura's enchant ability and any other applicable
           -- effects" is the whole restriction -- there is no card text to intersect
@@ -2769,7 +2810,7 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
                 -- nobody, per CR 110.2 and CR 108.4a, exactly as the field's own
                 -- note above says.
                 let chooser = Maybe.fromMaybe pid under
-                    hosts = Attach.hostsFor chooser oid oid Filter.Type.CanHostSubject gs
+                    hosts = filter (\h -> not (Set.member h batch)) (Attach.hostsFor chooser oid oid Filter.Type.CanHostSubject gs)
                 chosen <- Attach.chooseHost chooser oid hosts
                 -- THE TAG the Aura's own enchant slot produced, never a hand-built
                 -- ToObject: Sba.stillLegalEnchant compares the (pool, tag) pair, so
@@ -2816,9 +2857,10 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
               newId <- placeObject pid (mkObj entrySeed) dest position
               -- CR 614.1c-d: entry replacements apply to BATTLEFIELD entries and
               -- nowhere else. CR 616.1g's nesting of one event inside another is
-              -- expressed as call nesting rather than a field. A lone entry has no
-              -- same-batch siblings (CR 614.12a; see applyReplacementsIn
-              -- for why 614.12a and not 614.13a).
+              -- expressed as call nesting rather than a field. `batch` is the
+              -- same-batch siblings, empty for every door but changeZoneEnteringIn
+              -- (CR 614.12a; see applyReplacementsIn for why 614.12a and not
+              -- 614.13a).
               Monad.when (dest == Zone.Battlefield) $ do
                 -- CR 122.6a: the counters the EFFECT says the object enters with --
                 -- undying's and persist's "with a +1/+1 counter on it". Inside the
@@ -2832,7 +2874,7 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
                 -- entry replacement in the pool reads a counter the entering object
                 -- already has, and the two are simultaneous in the rules anyway.
                 Monad.mapM_ (\(kind, n) -> Monad.void (putOwnCounters newId kind n)) (Map.toAscList entering)
-                runEntry Set.empty newId
+                runEntry batch newId
               -- CR 709.5h: an ability that triggers on a door opening fires "regardless
               -- of whether it was given that designation while entering the
               -- battlefield or after entering the battlefield", so the entry
