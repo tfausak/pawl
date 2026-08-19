@@ -24,6 +24,7 @@ import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
+import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.FaceDown as FaceDown
@@ -63,6 +64,7 @@ import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Daytime as Daytime
+import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.DestructionCause as DestructionCause
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
@@ -3815,6 +3817,71 @@ gatherSpecimensSpec s registry =
                   Spec.assertEqWith s "carol named bob's row, so alice's applies second and keeps it" (Projection.controllerOf afterBob namedBob) (Just S.alice)
                 _ -> Spec.assertFailure s "the creature did not reach the battlefield"
         _ -> Spec.assertFailure s "both Gather Specimens rows should be floating"
+    -- CR 800.4a's SECOND clause, at three seats: alice resolves a Gather
+    -- Specimens and then concedes. A floating control-on-entry row is an effect
+    -- whose whole content is giving its controller control of objects, so it is
+    -- one of the "effects which give that player control of any objects" that
+    -- end when she leaves -- and carol's creature, entering afterwards, stays
+    -- carol's.
+    --
+    -- Three seats are required twice over: Departure.continuesAfterDeparture is
+    -- `> 2`, so at two seats CR 104.2a ends the game and none of CR 800.4a runs,
+    -- and a creature entering under bob's control is not "an opponent's" from
+    -- bob's own side.
+    Spec.it s "CR 800.4a a control-on-entry row ends when its controller leaves the game" $ do
+      island <- S.printingOf s registry "Island"
+      gatherSpecimens <- S.printingOf s registry "Gather Specimens"
+      narcomoeba <- S.printingOf s registry "Narcomoeba"
+      let (gs, aliceGather, _, moeba) = threeSeatSpecimenBoard island gatherSpecimens narcomoeba
+          armed = S.runPure S.identityAnswer gs (S.cast S.alice aliceGather >> Stack.resolveTop)
+          -- The one difference between the two runs.
+          gone = S.runPure S.identityAnswer armed (Departure.leaveGame Departure.Type.Conceded S.alice)
+          entry = S.cast S.carol moeba >> Stack.resolveTop
+          after = S.runPure S.identityAnswer gone entry
+          stayed = S.runPure S.identityAnswer armed entry
+          moebaName = CardName.MkCardName $ Text.pack "Narcomoeba"
+      -- Both read boards taken BEFORE the departure filter runs, so neither can
+      -- absorb a mutation of it.
+      Spec.assertEqWith s "alice's row was floating before she left" (length (GameState.replacements armed)) 1
+      Spec.assertBool s (List.notElem S.alice (Game.stillPlaying gone)) "alice really has left"
+      case (newestNamed moebaName after, newestNamed moebaName stayed) of
+        (Just departed, Just present) -> do
+          Spec.assertEqWith s "carol's creature stays carol's (CR 800.4a)" (Projection.controllerOf departed after) (Just S.carol)
+          -- The discriminating twin, on the identical board with alice seated:
+          -- the fix ended the row, it did not disable the rewrite.
+          Spec.assertEqWith s "with alice seated the same creature is hers (CR 616.1b)" (Projection.controllerOf present stayed) (Just S.alice)
+          -- CR 110.2a's entry controller, written by the effect that put the
+          -- permanent there and left alone by an entry loop with no candidate:
+          -- carol, and so not the departed player CR 800.4c draws its line at.
+          Spec.assertEqWith s "the recorded entry controller is carol, not alice (CR 110.2a)" (fmap Object.enteredUnder (Game.lookupObject departed after)) (Just (Just S.carol))
+          Spec.assertEqWith s "the row itself is gone" (length (GameState.replacements gone)) 0
+        _ -> Spec.assertFailure s "the creature did not reach the battlefield"
+    -- WHY CR 800.4a ends the row rather than Event's UnderSourceControl arm
+    -- refusing to name a departed player. A guard inside that arm would leave
+    -- alice's row a CR 616.1 candidate, and Replacement.readsApplier answers True
+    -- for that rewrite, so the pair stays distinguishable and carol is asked
+    -- which row takes her creature -- a choice one of whose options does nothing.
+    -- With the row ended there is one candidate, and CR 616.1b's one-candidate
+    -- elision means no prompt at all. This is the board the two fixes disagree on.
+    Spec.it s "CR 616.1b a departed player's row is not a candidate, so carol is not asked" $ do
+      island <- S.printingOf s registry "Island"
+      gatherSpecimens <- S.printingOf s registry "Gather Specimens"
+      narcomoeba <- S.printingOf s registry "Narcomoeba"
+      let (gs, aliceGather, bobGather, moeba) = threeSeatSpecimenBoard island gatherSpecimens narcomoeba
+          resolveFor pid oid g = S.runPure S.identityAnswer g (S.cast pid oid >> Stack.resolveTop)
+          armed = resolveFor S.bob bobGather (resolveFor S.alice aliceGather gs)
+          gone = S.runPure S.identityAnswer armed (Departure.leaveGame Departure.Type.Conceded S.alice)
+          entry = S.cast S.carol moeba >> Stack.resolveTop
+          asked = answersFor S.identityAnswer gone entry
+          after = S.runPure S.identityAnswer gone entry
+          moebaName = CardName.MkCardName $ Text.pack "Narcomoeba"
+      Spec.assertEqWith s "both rows were floating before alice left" (length (GameState.replacements armed)) 2
+      case newestNamed moebaName after of
+        Just moebaObj -> do
+          Spec.assertEqWith s "bob's row is the only one left, so the creature is bob's" (Projection.controllerOf moebaObj after) (Just S.bob)
+          Spec.assertBool s (not (wasAskedToReplace asked)) "no ChooseReplacement was raised"
+          Spec.assertEqWith s "only bob's row survived alice's departure" (length (GameState.replacements gone)) 1
+        Nothing -> Spec.assertFailure s "the creature did not reach the battlefield"
 
 -- Kismet ({3}{W} Enchantment, "Artifacts, creatures, and lands your opponents
 -- control enter tapped") -- CR 614.1d's other-objects form, bucketing to CR

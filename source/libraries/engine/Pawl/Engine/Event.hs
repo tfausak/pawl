@@ -1092,8 +1092,11 @@ apply batch candidate event =
       -- and the choice the rule DOES describe -- which of several
       -- control-modifying effects to apply -- is `choose`'s, one level up.
       --
-      -- Not implemented: `you` is not checked against CR 800.4a, so this can
-      -- hand a permanent to a player who has left the game (#592).
+      -- No roster check on `you`, and none is owed: CR 800.4a's second clause
+      -- ends a floating control-on-entry row the moment its controller leaves
+      -- (Departure.givesControlOnEntryTo), so no row that reaches here can name a
+      -- departed player. Pawl.ReplacementSpec's "CR 800.4a a control-on-entry row
+      -- ends when its controller leaves the game" is what proves it.
       EntryRewrite.UnderSourceControl -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         case ReplacementCandidate.controller candidate of
@@ -3353,9 +3356,11 @@ sacrifice pid oid = do
 -- rule says no token is created, so nothing may be minted and nothing spent
 -- getting there -- resolveTokens consumes CR 614.3 use counts.
 --
--- Not implemented: the guard reads the PARAMETER, so a CR 616.1b control rewrite
--- applied by the entry loop can still hand the finished token to a player who has
--- left (#592).
+-- Reading the PARAMETER rather than the post-entry controller is sufficient, not
+-- merely convenient: the entry loop below can move a token with a CR 616.1b
+-- control rewrite, but CR 800.4a's second clause ends such a row when its
+-- controller leaves (Departure.givesControlOnEntryTo), so no surviving row can
+-- rewrite the token onto a departed player.
 --
 -- Inline rather than delegating to a `createTokensFor` body: the project writes no
 -- export lists, so a second top-level name would be a public door past the check.
