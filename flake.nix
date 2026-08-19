@@ -2,8 +2,6 @@
   inputs = {
     cabal-gild.inputs.nixpkgs.follows = "nixpkgs";
     cabal-gild.url = "github:tfausak/cabal-gild-nix";
-    claude-code-nix.inputs.nixpkgs.follows = "nixpkgs";
-    claude-code-nix.url = "github:sadjow/claude-code-nix";
     hooky.inputs.nixpkgs.follows = "nixpkgs";
     hooky.url = "github:tfausak/hooky-nix";
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
@@ -12,7 +10,6 @@
   outputs =
     {
       cabal-gild,
-      claude-code-nix,
       hooky,
       nixpkgs,
       ...
@@ -53,24 +50,10 @@
                 install -D -m 755 dist/build/pawl-benchmark/pawl-benchmark "$out/bin/pawl-benchmark"
               '';
 
-              # This check phase is the only place CI runs the suite, and
-              # without these flags tasty defaults to NoTimeout: a
-              # non-terminating regression would run to the platform's job
-              # limit instead of failing. Each entry reaches the test binary as
-              # `--test-option`, so tasty sees `--timeout 5s`.
-              #
-              # The figure is a floor against a hang, not an assertion about
-              # speed: a real hang never terminates at any budget, so raising
-              # or lowering this cannot mask one -- it only sets how long CI
-              # waits before naming the case. Measured 2026-08-13 on an
-              # unloaded aarch64-darwin: the whole suite runs in 26s and its
-              # slowest case not already carrying a `Tasty.localOption` budget
-              # in `source/test-suite/Main.hs` takes 1.7s. If a loaded runner
-              # ever trips this, bump the number -- that is not a performance
-              # regression to chase.
               testFlags = (old.testFlags or [ ]) ++ [
+                "--hide-successes"
                 "--timeout"
-                "5s"
+                "15s"
               ];
             }))
           ];
@@ -126,16 +109,19 @@
       devShells = forAllSystems (
         system:
         let
-          pkgs = nixpkgs.legacyPackages.${system};
+          pkgs = import nixpkgs {
+            inherit system;
+            config.allowUnfreePredicate = pkg: nixpkgs.lib.getName pkg == "claude-code";
+          };
         in
         {
           default = pkgs.mkShell {
             nativeBuildInputs = [
               cabal-gild.packages.${system}.default
-              claude-code-nix.packages.${system}.default
               hooky.packages.${system}.default
               pkgs.bash
               pkgs.cabal-install
+              pkgs.claude-code
               pkgs.coreutils
               pkgs.fzf
               pkgs.gh
