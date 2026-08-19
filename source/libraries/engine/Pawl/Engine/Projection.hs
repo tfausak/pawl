@@ -1107,7 +1107,7 @@ setLandSubtypeEffectsGiven functioning gs =
            in fmap (\sa -> (permId, rewriteAffected changes (StaticAbility.affected sa))) $
                 filter (\sa -> any isSet (StaticAbility.modifications sa) && lives sa) (Face.staticAbilities face)
    in concatMap fromStored (GameState.continuousEffects gs)
-        <> concatMap fromPerm (Set.toList (GameState.battlefield gs))
+        <> concatMap fromPerm (abilitySources gs)
 
 -- CR 305.7: a land whose subtype is set to a basic type loses its rules-text
 -- abilities. The GATE half, for readers whose ability lands on objects other than
@@ -1754,6 +1754,32 @@ conditionHolds :: [Gathered] -> GameState -> ObjectId -> Layer -> Condition.Type
 conditionHolds cands gs src lowest =
   Condition.holds (viewUpTo lowest cands gs) ((Filter.contextFor (controllerOf src gs) (Just src)) {Filter.sourceAttachedTo = hostOf src gs}) gs src
 
+-- CR 113.6 / 614.12: the battlefield permanents whose static abilities FUNCTION
+-- right now. Everything on the battlefield, minus the permanents entering beside
+-- the one whose entry loop is running (GameState.enteringBeside), which this
+-- engine has already materialized but the rules have not let in yet: CR 614.12
+-- admits only the entering permanent's own static abilities and "continuous
+-- effects that already exist", and a sibling's are neither.
+--
+-- Empty of exclusions at every priority window, so outside an entry loop this is
+-- the battlefield. Three walks read it -- this module's static-ability gather,
+-- its CR 305.7 set-subtype scan and its layer-2 control grants -- which together
+-- are every place a permanent's own printed static ability becomes a continuous
+-- effect. Only the FIRST has an observer: Pawl.ReplacementSpec's "a Wood Elemental
+-- reanimated beside Ashaya sacrifices nothing" goes red when it is widened back to
+-- the whole battlefield, and neither of the other two moves a case, because
+-- nothing in `data/cards/` puts a control-changer or a Blood Moon-shaped subtype
+-- setter into a batch. Those two are regression fences, kept because a projection
+-- that suppressed a sibling's ability in one walk and not the next would disagree
+-- with itself.
+--
+-- anyConditional deliberately does NOT narrow by it: a superset costs a second
+-- walk where a subset would leave a CR 604.2 clause wired open. Nor does
+-- Pawl.Engine.Replacement.replacementsAffecting, whose siblings Event.loop
+-- already drops by SOURCE (channel 2 of applyReplacementsIn's note).
+abilitySources :: GameState -> [ObjectId]
+abilitySources gs = Set.toList (Set.difference (GameState.battlefield gs) (GameState.enteringBeside gs))
+
 -- gather's body with both ability gates left open. Called twice by gather --
 -- once wired shut to build the list the gates read, once with the real answers.
 gatherGiven :: (ObjectId -> Bool) -> (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> GameState -> [Gathered]
@@ -1773,7 +1799,7 @@ gatherGiven stripped functioning gs =
             gModification = ContinuousEffect.modification eff
           }
       stored = fmap fromStored (GameState.continuousEffects gs)
-      static = concatMap (fmap snd . permanentParts stripped functioning setEffs gs) (Set.toList (GameState.battlefield gs))
+      static = concatMap (fmap snd . permanentParts stripped functioning setEffs gs) (abilitySources gs)
       fromEmblem emblemId = case Game.lookupObject emblemId gs of
         Nothing -> []
         Just emblemObj -> case Game.faceOf emblemId gs of
@@ -3215,7 +3241,7 @@ controlGrants gs =
                       cgTimestamp = Object.timestamp permObj
                     }
              in fmap toGrant (filter isControl (Face.staticAbilities face))
-   in concatMap grantsOf (Set.toList (GameState.battlefield gs))
+   in concatMap grantsOf (abilitySources gs)
 
 -- CR 303.4b: WHICH object this one is attached to -- what an Aura "enchants".
 -- Nothing where it is attached to nothing, and where it is attached to a PLAYER

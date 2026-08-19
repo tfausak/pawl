@@ -1539,6 +1539,7 @@ oneMountainState mountain ph =
           GameState.pendingPreventionRiders = Seq.empty,
           GameState.ambientAmounts = Map.empty,
           GameState.pendingEntryEffects = Seq.empty,
+          GameState.enteringBeside = Set.empty,
           GameState.playerEffects = [],
           GameState.blockRequirements = [],
           GameState.ignoredAbilities = [],

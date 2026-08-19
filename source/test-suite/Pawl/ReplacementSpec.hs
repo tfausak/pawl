@@ -2926,7 +2926,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   --
   -- Power and toughness ride along with the counter count because they are what a
   -- player sees: 1 counter is a 1/1 Worker, 2 is a 2/2, and 0 would be a 0/0 that
-  -- CR 704.5a buries -- three boards no pair of readings can confuse.
+  -- CR 704.5f buries -- three boards no pair of readings can confuse.
   Spec.it s "CR 614.12 a Corpsejack Menace reanimated beside a modular creature doubles nothing (#78)" $ do
     swamp <- S.printingOf s registry "Swamp"
     rise <- S.printingOf s registry "Rise of the Dark Realms"
@@ -2946,6 +2946,56 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         workerFirst = outcome [arcboundWorker, corpsejackMenace]
     Spec.assertEqWith s "modular 1's one counter, undoubled -- a 1/1 Worker" menaceFirst [(1, Just (1, 1))]
     Spec.assertEqWith s "and the batch's processing order changes nothing (CR 608.2f)" workerFirst menaceFirst
+  -- THE PROVING TEST for #78's PROJECTION channel, the other half of the same
+  -- rule. A permanent's static abilities function only while it is on the
+  -- battlefield (CR 113.6), and CR 614.12a puts an as-enters choice BEFORE the
+  -- permanent enters -- so at the moment a batch member makes its choice, a
+  -- sibling arriving in the same batch has no continuous effect yet, which is the
+  -- same thing CR 614.12 says by admitting only "continuous effects that already
+  -- exist". This engine materializes every batch member up front, so the sibling
+  -- IS sitting on the battlefield when the projection reads run, and its static
+  -- has to be suppressed rather than merely not looked at.
+  --
+  -- Ashaya, Soul of the Wild ("nontoken creatures you control are Forest lands in
+  -- addition to their other types") and Wood Elemental ("as this creature enters,
+  -- sacrifice any number of untapped Forests") come back from one graveyard as ONE
+  -- CR 608.2f event. The victim is a THIRD permanent -- a Goblin Piker already on
+  -- the battlefield -- because CR 614.13a already bars the batch's own members from
+  -- the offer, so a sibling of the batch could not tell the two rules apart.
+  --
+  -- The answer is greedy (sacrificesAll), so the offer is not merely observed but
+  -- SPENT: with Ashaya's static visible the Piker projects as an untapped Forest,
+  -- is offered, and dies.
+  --
+  -- Ashaya is buried FIRST so it takes the lower ObjectId and arrives first
+  -- (Resolve.graveyardCardsOf sorts ascending, S.addGraveyardCard mints in call
+  -- order) -- the only order in which a live-board reading has a Forest to offer.
+  -- The mirrored leg pins that the answer does not depend on it, which is CR
+  -- 608.2f's point. The nine lands are Swamps, not Forests, so the only Forest
+  -- anywhere on the board is one Ashaya would have made.
+  --
+  -- Wood Elemental's power and toughness ride along, read after one SBA sweep:
+  -- its CDA reads the count it sacrificed (CR 208.2a), so 0 is a 0/0 that CR
+  -- 704.5f buries and 1 is a 1/1 still standing -- a second reading of the same
+  -- divergence, on the same board, that the Piker count cannot be confused with.
+  Spec.it s "CR 614.12 a Wood Elemental reanimated beside Ashaya sacrifices nothing (#78)" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    rise <- S.printingOf s registry "Rise of the Dark Realms"
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    woodElemental <- S.printingOf s registry "Wood Elemental"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    let pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
+        outcome buried =
+          let (_, withPiker) = S.addCreature pikerPrinting S.alice (S.landsInPlay swamp 9)
+              graves = List.foldl' (\g printing -> snd (S.addGraveyardCard printing S.alice g)) withPiker buried
+              (gs, spellId) = S.handOne rise graves
+              after = S.settleSba (castAndResolve sacrificesAll gs spellId)
+              pikers = length [oid | oid <- Set.toList (GameState.battlefield after), Projection.hasName pikerName oid after]
+           in (pikers, fmap (`S.powerToughnessOf` after) (newestNamed (CardName.MkCardName (Text.pack "Wood Elemental")) after))
+        ashayaFirst = outcome [ashaya, woodElemental]
+        elementalFirst = outcome [woodElemental, ashaya]
+    Spec.assertEqWith s "the Piker was never a Forest, so it was not offered and it lives -- and the Wood Elemental that sacrificed nothing is a 0/0 CR 704.5f buried" ashayaFirst (1, Nothing)
+    Spec.assertEqWith s "and the batch's processing order changes nothing (CR 608.2f)" elementalFirst ashayaFirst
   -- CR 614.1d: "Continuous effects that read '[This permanent] enters . . .' or
   -- '[Objects] enter [the battlefield] . . .' are replacement effects." Zof
   -- Bloodbog prints one sentence of exactly that shape -- "This land enters
