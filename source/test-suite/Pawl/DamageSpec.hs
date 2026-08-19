@@ -2787,3 +2787,91 @@ fightSpec s registry = Spec.describe s "Fight (CR 701.14)" $ do
         after = S.settleSba (S.runPure (aimedAtEither mine theirs) before (S.cast S.alice spell >> Stack.resolveTop))
     Spec.assertEqWith s "CR 701.14d the Piker's 2 still landed on the Giant" (S.damageOf theirs after) (Just 2)
     Spec.assertBool s (not (S.onBattlefield mine after)) "CR 701.14d and the Giant's 3 still killed the Piker"
+
+  -- CR 701.14c: "if a creature fights itself, it deals damage to itself equal to
+  -- twice its power". ONE blow of 2P, not two of P.
+  --
+  -- The producer is Nightfall Predator, the back face of Daybreak Ranger: "{R},
+  -- {T}: This creature fights target creature", whose second participant is a
+  -- target with no control clause and no "another", so CR 115.3 lets the player
+  -- name the Predator itself. Prey Upon cannot reach the rule -- its two slots are
+  -- filtered by controller, disjointly.
+  --
+  -- Every observer that SUMS -- marked damage, excess (CR 120.4a), lifelink, an
+  -- amount-based CR 615.7 shield -- reads the same under both implementations,
+  -- because 4 + 4 and 8 agree. Only an observer that counts EVENTS separates
+  -- them, so this case is written on CR 122.1c's shield counters: one counter is
+  -- spent per prevented event, whatever the amount.
+  Spec.it s "CR 701.14c a self-fight is ONE damage event, so one shield counter answers it" $ do
+    (board, predator) <- predatorBoard s registry
+    Spec.assertEqWith s "Moonmist flipped the Ranger to a 4/4 Nightfall Predator" (fmap Face.name (Game.faceOf predator board), S.powerToughnessOf predator board) (Just (CardName.MkCardName (Text.pack "Nightfall Predator")), Just (4, 4))
+    let shielded = S.addCounter CounterKind.Shield 2 predator board
+        after = selfFight predator shielded
+    -- The gameplay-level assertion, and the only one the two readings disagree
+    -- on: two blows of 4 spend both counters, one blow of 8 spends one.
+    Spec.assertEqWith s "CR 701.14c one event, so one of the two counters is left" (S.counterOf CounterKind.Shield predator after) 1
+    -- Supporting checks: both readings agree here, which is why they come after.
+    Spec.assertEqWith s "CR 122.1c the blow was prevented whole, so nothing is marked" (S.damageOf predator after) (Just 0)
+    Spec.assertBool s (S.onBattlefield predator after) "and the Predator survives"
+
+  -- The AMOUNT, on the same board minus the shield counters: CR 701.14c's "twice
+  -- its power". +0/+5 makes the Predator a 4/9, so 8 is marked rather than
+  -- lethal and the number is readable.
+  --
+  -- Today's two-blow implementation marks 8 here too, so this case does not
+  -- separate the bug; it separates a fix that collapses the two blows into one
+  -- blow of P (which marks 4) from one that doubles.
+  Spec.it s "CR 701.14c the one blow is TWICE its power" $ do
+    (base, predator) <- predatorBoard s registry
+    let board = S.withEffect predator (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 0) (Quantity.Literal 5))) base
+        after = selfFight predator board
+    Spec.assertEqWith s "the Predator is a 4/9 before it fights" (S.powerToughnessOf predator board) (Just (4, 9))
+    Spec.assertEqWith s "CR 701.14c twice its power is marked on it" (S.damageOf predator after) (Just 8)
+    Spec.assertBool s (S.onBattlefield predator after) "CR 704.5g 8 is not lethal to a 4/9"
+
+  -- The same rule read as a DEATH rather than as a counter, on one shield counter
+  -- instead of two: the single blow of 8 is prevented whole and the Predator
+  -- lives, where two blows of 4 spend the counter on the first and let the second
+  -- kill a 4/4. THE PAIR with the case above, differing only in the shield.
+  Spec.it s "CR 701.14c one shield counter answers the whole self-fight" $ do
+    (board, predator) <- predatorBoard s registry
+    let shielded = S.addCounter CounterKind.Shield 1 predator board
+        after = selfFight predator shielded
+    Spec.assertBool s (S.onBattlefield predator after) "CR 701.14c the one event was prevented, so the Predator lives"
+    Spec.assertEqWith s "nothing was marked on it" (S.damageOf predator after) (Just 0)
+    Spec.assertEqWith s "and the counter paid for it" (S.counterOf CounterKind.Shield predator after) 0
+
+-- alice controls a Daybreak Ranger that Moonmist has flipped to its back face,
+-- plus an untapped Mountain for the back face's {R}. The Ranger is the only Human
+-- on the board, so Moonmist's board-wide "transform all Humans" reaches it and
+-- nothing else.
+--
+-- The Mountain arrives AFTER Moonmist resolves: paying {1}{G} off a board holding
+-- one may tap it for the generic, and then the ability has no red mana to pay
+-- with.
+predatorBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId)
+predatorBoard s registry = do
+  ranger <- S.printingOf s registry "Daybreak Ranger"
+  moonmist <- S.printingOf s registry "Moonmist"
+  forest <- S.printingOf s registry "Forest"
+  mountain <- S.printingOf s registry "Mountain"
+  let (rangerId, g1) = S.addCreature ranger S.alice (S.landsInPlay forest 2)
+      (g2, spell) = S.handOne moonmist g1
+      cast = S.runPure S.castAnswer g2 (S.cast S.alice spell)
+      flipped = S.runPure S.castAnswer cast Stack.resolveTop
+  pure (S.landsFor mountain S.alice 1 flipped, rangerId)
+
+-- alice activates the back face's fight ability and answers its one target slot
+-- with the Predator itself (CR 115.3: the same object may be chosen for each
+-- instance of the word "target"), then the ability resolves and SBAs settle.
+--
+-- The ability is read off the object's CURRENT face (CR 709.3b), so a board whose
+-- Ranger never transformed would activate nothing rather than silently activating
+-- the front face's ping.
+selfFight :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+selfFight oid gs = case Game.faceOf oid gs of
+  Just face
+    | ability : _ <- Face.activatedAbilities face ->
+        let activated = S.runPure (aimedAt oid) gs (Activate.activateAbility S.alice oid ability)
+         in S.settleSba (S.runPure (aimedAt oid) activated Stack.resolveTop)
+  _ -> gs
