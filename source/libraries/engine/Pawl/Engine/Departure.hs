@@ -328,6 +328,13 @@ controlEffectsEnd pid gs =
 -- installed by a player still in the game is untouched however many opponents
 -- leave.
 --
+-- Both halves are proved by test rather than asserted here. Pawl.ReplacementSpec
+-- reddens on the CONTROLLER half through "CR 616.1b a departed player's row is
+-- not a candidate, so carol is not asked" (drop the comparison and bob's
+-- surviving row goes with alice's), and on the BUCKET half through "CR 800.4a a
+-- departing player's shield is not a control effect, so it stays" (drop the
+-- bucket check and a Mending Hands shield dies with its caster).
+--
 -- ActiveReplacement.controller is CR 109.5's "you" as of installation, which is
 -- also the only player any current control-on-entry rewrite can name
 -- (EntryRewrite.UnderSourceControl hands the permanent to the candidate's own

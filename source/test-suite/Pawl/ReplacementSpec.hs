@@ -758,6 +758,11 @@ stonehornSpec s registry = Spec.describe s "Stonehorn Dignitary" $ do
 -- for it the shielded side chooses which damage it prevents rather than the
 -- engine.
 --
+-- The group's last case is not about CR 615.7 at all: this card is the pool's
+-- floating replacement that grants nobody CONTROL, which is what makes it the
+-- discriminating twin for CR 800.4a's second clause
+-- (Departure.givesControlOnEntryTo). It says why it is here.
+--
 -- The DAMAGE BATCHES below are hand-built and the SPELL is not: casting Mending
 -- Hands for real is what proves the card, and reaching a real combat-damage batch
 -- of two attackers with different powers would mean driving a whole combat phase
@@ -884,6 +889,34 @@ mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
     Spec.assertEqWith s "both events were prevented whole" (amounts after) []
     Spec.assertEqWith s "bob's life is untouched" (S.lifeOf S.bob after) (Just 20)
     Spec.assertEqWith s "and 3 of the shield's 4 were spent, so 1 remains" (length (GameState.replacements after)) 1
+  -- CR 800.4a from the other side, and the case that proves the BUCKET half of
+  -- Departure.givesControlOnEntryTo: the second clause ends only the effects that
+  -- give the departing player control, and a prevention shield gives nobody
+  -- control. So alice's shield on BOB's creature outlives her concession, exactly
+  -- as her Giant Growth would.
+  --
+  -- It lives here rather than in Pawl.DepartureSpec because Mending Hands is the
+  -- pool's one floating non-control row a test can install by casting a real card
+  -- and then read off the board; three seats because
+  -- Departure.continuesAfterDeparture is `> 2`, and carol deals the damage so
+  -- nothing about the strike depends on the seat that left.
+  Spec.it s "CR 800.4a a departing player's shield is not a control effect, so it stays" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    mendingHands <- S.printingOf s registry "Mending Hands"
+    let base = Setup.emptyGame S.threePlayers
+        (_, g1) = S.addCreature plains S.alice base
+        (victim, g2) = S.addCreature pikerPrinting S.bob g1
+        (attacker, g3) = S.addCreature pikerPrinting S.carol g2
+        (spellId, g4) = S.addHandCard mendingHands S.alice g3
+        shielded = S.runPure (aimCreature victim) g4 (S.cast S.alice spellId >> Stack.resolveTop)
+        -- The one difference between the two runs.
+        gone = S.runPure S.identityAnswer shielded (Departure.leaveGame Departure.Type.Conceded S.alice)
+        strike g = S.runPure S.identityAnswer g (Damage.applyDamage [hit attacker (Recipient.ToCreature victim) 3])
+    Spec.assertEqWith s "setup: alice's shield is floating before she leaves" (length (GameState.replacements shielded)) 1
+    Spec.assertEqWith s "the shield still prevents carol's 3 after alice has left (CR 800.4a)" (S.damageOf victim (strike gone)) (Just 0)
+    Spec.assertEqWith s "the same 3 with alice still seated is prevented too" (S.damageOf victim (strike shielded)) (Just 0)
+    Spec.assertEqWith s "and her departure left the row standing" (length (GameState.replacements gone)) 1
 
 -- CR 615.5's ADDITIONAL EFFECT, whose producer is Test of Faith ({1}{W} Instant:
 -- "Prevent the next 3 damage that would be dealt to target creature this turn.
