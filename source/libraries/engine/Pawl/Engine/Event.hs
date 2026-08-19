@@ -782,7 +782,12 @@ loop asOf batch applied prevented exiledBy event = do
 -- A later rewrite that moves the destination back OUT of exile clears the link:
 -- no card arrives in exile for the rule to speak of. One that leaves an
 -- already-exile destination alone changes nothing, since the earlier row is
--- still what caused the exile.
+-- still what caused the exile. Neither of those two arms is exercised, and not
+-- by a claim about Magic: every ReplacementEffect.ZoneChangeR in data/cards/
+-- names exile as its destination, so no board can stack two of them into a
+-- rewrite chain that leaves it again. A printed row naming any other zone --
+-- Wheel of Sun and Moon's "into its owner's library instead" is the shape --
+-- would refute that and reach both arms. Only the first has a producer.
 --
 -- No case on effect identity: the question is a proposed event's destination
 -- ZONE, and the answer is the row's source object.
@@ -2533,9 +2538,9 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- so a CR 616.1 rewrite that redirects the move decides this too
               -- (CR 614.6: the modified event is what happens). Indistinguishable
               -- from gating on the request today, and not because of a claim
-              -- about Magic: no ReplacementEffect.ZoneChangeR in the pool names
-              -- the battlefield as its destination (Leyline of the Void and Rest
-              -- in Peace, the two that exist, both name exile).
+              -- about Magic: no ReplacementEffect.ZoneChangeR in data/cards/
+              -- names the battlefield as its destination -- every one of them
+              -- names exile (see exiledByAfter, which rests on the same fact).
               --
               -- CR 400.7: Object.newIncarnation is the whole forgetting -- the
               -- entry controller (CR 110.2), the as-enters choices (CR 614.1c),

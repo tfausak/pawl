@@ -494,10 +494,11 @@ data GameState = MkGameState
     -- on at all -- Pawl.Types.Source embeds the ability value, not an index. No
     -- printing in the pool is in that shape (#1535).
     --
-    -- Rule 607.2b's writer is Pawl.Engine.Event's zone change funnel: an exile another object's replacement effect causes inside
-    -- that window links to the replacement's own object, not to whatever ability
-    -- was resolving, so the funnel files it as the arriving incarnation is minted
-    -- and recordExiledWith's insertWith leaves that entry standing.
+    -- Rule 607.2b's writer is Pawl.Engine.Event's zone change funnel: an exile
+    -- another object's replacement effect causes inside that window links to the
+    -- replacement's own object, not to whatever ability was resolving, so the
+    -- funnel files it as the arriving incarnation is minted and
+    -- recordExiledWith's insertWith leaves that entry standing.
     --
     -- Cleaned up by KEY only, never by value, for `haunting`'s reason: an entry
     -- whose value is gone is exactly the entry Hoarding Dragon reads. Three sweeps
