@@ -2128,12 +2128,14 @@ selfTapSpec s registry = Spec.describe s "A self-tap and an other-tap over one c
 -- threshold half stated no claim, so the two were counted against the same Piker
 -- twice and the cost read as payable; see #1744.
 --
--- SYNTHETIC because no printing puts a threshold tap beside another tapping
--- component in one cost. The printed producers of that shape are crew (CR
--- 702.122a; Consulate Dreadnought is the pool's) and Mossbridge Troll, and in
--- each the threshold tap is the whole of its ability's cost, so nothing contends
--- with it. Scryfall `oracle:"total power" oracle:tap`, 2026-08-18: eight cards,
--- none of them a second tapping component away from refuting this.
+-- SYNTHETIC because the shape it needs is one COST carrying a threshold tap
+-- beside another tapping component, and the printed producers of a threshold tap
+-- are crew (CR 702.122a; `data/cards/consulate-dreadnought.json` is the only one
+-- of those in `data/cards/`) and Mossbridge Troll, in each of which it is the
+-- whole of its ability's cost, so nothing contends with it. Scryfall
+-- `oracle:"total power" oracle:tap`, 2026-08-18, eight cards -- a printing whose
+-- one cost taps for a total power AND taps something counted is what would
+-- refute this and let the synthetic go.
 --
 -- The Battery's own {T} is a third claim, on a pool of one -- itself -- that no
 -- other claim meets, so it neither pays nor blocks these two.
