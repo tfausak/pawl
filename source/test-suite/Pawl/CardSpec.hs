@@ -773,12 +773,13 @@ effectCounts effect = case effect of
   -- CR 708.2's listed characteristics are card data, so the listed power and
   -- toughness are walked for the reason Create's minted face is. The listed type
   -- line holds no Quantity.
-  -- CR 701.14a fixes both amounts at the fighters' own powers, so no Quantity.
-  Effect.Fight _ -> []
-  Effect.TurnFaceUp _ -> []
   Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown _ listed) ->
     concatMap (\(Power.MkPower quantity) -> quantityCounts quantity) (Maybe.maybeToList (FaceDownCharacteristics.power listed))
       <> concatMap (\(Toughness.MkToughness quantity) -> quantityCounts quantity) (Maybe.maybeToList (FaceDownCharacteristics.toughness listed))
+  -- CR 708.8 has the permanent regain its own values, so this one lists nothing.
+  Effect.TurnFaceUp _ -> []
+  -- CR 701.14a fixes both amounts at the fighters' own powers, so no Quantity.
+  Effect.Fight _ -> []
   Effect.RemoveFromCombat _ -> []
   Effect.BecomesBlocked _ -> []
   Effect.Counter {} -> []

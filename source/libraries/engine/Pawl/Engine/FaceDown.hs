@@ -197,6 +197,11 @@ turnableFaceUp pid gs =
 -- that correct rather than merely tidy -- the cost is paid BEFORE the permanent
 -- turns over, so a failed payment has turned nothing over to undo.
 --
+-- The UNPAID branch is quiet, and for a reason of its own: CR 702.37e's
+-- reject-not-repair restores the state the attempt began with, log and all, and
+-- CR 708.2a leaves the still-face-down permanent with no ability that could have
+-- seen an event anyway.
+--
 -- Everything from the status write on is performTurnFaceUp below, which the
 -- effect road shares.
 turnFaceUp :: PlayerId -> TurnUpProcedure -> ObjectId -> Game ()
@@ -332,10 +337,6 @@ performTurnFaceUp procedure oid = do
       -- such a permanent has its text back, so an event recorded on a
       -- refused call would fire the ability again. Pawl.FaceDownSpec asks
       -- twice to prove it.
-      -- The unpaid branch is quiet for a different reason: CR 702.37e's
-      -- reject-not-repair restores the state the attempt began with, log
-      -- and all, and CR 708.2a leaves the still-face-down permanent with
-      -- no ability that could have seen the event anyway.
       State.modify' (Event.recordEvent (GameEvent.TurnedFaceUp oid))
 
 -- CR 708 by way of an Effect.TurnFaceUp: Showstopping Surprise's "turn it face

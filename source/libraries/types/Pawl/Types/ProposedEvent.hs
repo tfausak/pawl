@@ -40,9 +40,9 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 --
 -- WouldTurnFaceUp carries the object for WouldEnter's reason: CR 708.11 has the
 -- ability applied WHILE the permanent is turning over, and
--- Pawl.Engine.FaceDown.performTurnFaceUp has already written the face-up status by
--- time it raises this -- so every property a CR 614.1e replacement can modify is
--- read off, and written to, the object.
+-- Pawl.Engine.FaceDown.performTurnFaceUp has already written the face-up status
+-- by the time it raises this -- so every property a CR 614.1e replacement can
+-- modify is read off, and written to, the object.
 --
 -- It carries the PROCEDURE beside it, which no other arm needs, because CR
 -- 702.37b's rewrite is conditional on WHICH COST WAS PAID -- "put a +1/+1 counter
