@@ -17,7 +17,8 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- Pawl.Engine.Mulligan in the module graph, so importing back would close a
 -- cycle. That cycle is a fact about the RULES: an opcode restarts a game, a game
 -- start draws opening hands, and drawing opening hands performs opcodes.
--- Resolve.resolveSpellWith takes its subgame runner the same way.
+-- Resolve.resolveSpellWith and Resolve.resolveModesWith take their subgame
+-- runner the same way.
 --
 -- Deliberately has NO default: "no subgame runner" is a real state of the world
 -- (Resolve.noSubgame), but "no mulligan performer" is not -- it would silently

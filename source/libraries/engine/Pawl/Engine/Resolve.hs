@@ -1198,8 +1198,12 @@ resolveSpell = resolveSpellWith noSubgame
 -- question is asked ONCE off the pre-fold snapshot: re-deriving the fizzle
 -- mid-fold would let a token a Create just minted rescue an ability whose every
 -- target is gone.
-resolveModes :: ObjectId -> ObjectId -> [(ModeInstance, Mode.Mode Card.Type.Card)] -> Game ()
-resolveModes stackId srcId modes = do
+--
+-- `runSubgame` is the injected nested-game runner, the same one resolveSpellWith
+-- takes: CR 729.1a says "the spell or ability that created the subgame", so an
+-- ability's PlaySubgame plays one exactly as a spell's does (see #137).
+resolveModesWith :: Game Result -> ObjectId -> ObjectId -> [(ModeInstance, Mode.Mode Card.Type.Card)] -> Game ()
+resolveModesWith runSubgame stackId srcId modes = do
   gs <- State.get
   case Game.lookupObject stackId gs of
     Nothing -> pure ()
@@ -1241,7 +1245,7 @@ resolveModes stackId srcId modes = do
                   bindingsNow <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject stackId)
                   let chosenNow = Binding.targetsOf bindingsNow
                       legalNow = Map.mapWithKey legalSlot chosenNow
-                  applyEffect stackId srcId effectController (instanceView legalNow) (instanceView chosenNow) eff
+                  applyEffectWith runSubgame stackId srcId effectController (instanceView legalNow) (instanceView chosenNow) eff
              in -- CR 608.2e's clause is what each gate covers. Run only when
                 -- `fizzles` is False.
                 Monad.foldM_
@@ -1389,17 +1393,29 @@ payerOf slot legal gs = case legalOne slot legal of
   Just recipient -> Recipient.objectOf recipient >>= \oid -> Projection.controllerOf oid gs
   _ -> Nothing
 
+-- The no-subgame mode executor: every direct caller, and any path that cannot
+-- reach a PlaySubgame.
+resolveModes :: ObjectId -> ObjectId -> [(ModeInstance, Mode.Mode Card.Type.Card)] -> Game ()
+resolveModes = resolveModesWith noSubgame
+
 -- CR 608: resolve an activated ability. The effect SOURCE is the source permanent
 -- (CR 113.7a), not the ability object, and only the CHOSEN modes are read (CR
 -- 700.2c). The ability then ceases (CR 608.2n) rather than being buried.
-resolveAbility :: ObjectId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card -> Game ()
-resolveAbility abilId srcId ability = do
+--
+-- `runSubgame` rides through to the effects for the reason resolveModesWith
+-- gives (CR 729.1a).
+resolveAbilityWith :: Game Result -> ObjectId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card -> Game ()
+resolveAbilityWith runSubgame abilId srcId ability = do
   gs <- State.get
   case Game.lookupObject abilId gs of
     Nothing -> pure ()
     Just obj ->
       let chosen = Binding.modesOf (Object.bindings obj)
-       in resolveModes abilId srcId (Modal.chosenModes chosen (ActivatedAbility.modal ability))
+       in resolveModesWith runSubgame abilId srcId (Modal.chosenModes chosen (ActivatedAbility.modal ability))
+
+-- The no-subgame activated-ability resolver.
+resolveAbility :: ObjectId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card -> Game ()
+resolveAbility = resolveAbilityWith noSubgame
 
 -- CR 701.27a over ONE object: turn it over, or leave the map as it was. The turn
 -- itself is Game.turnFaceOver, shared with Pawl.Engine.Daytime's CR 702.145c/f
@@ -2438,12 +2454,17 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- drawn case for free. The roster the complement is taken against is
   -- Game.stillPlaying's, the set Setup.subgameStateFrom seated.
   --
-  -- Not implemented: an ability-driven subgame -- this arm runs only on the SPELL
-  -- path (#137).
+  -- The winner is bound onto `resolving` -- the object ON THE STACK -- and not
+  -- onto `source`, because that is what the next effect's re-read looks at: both
+  -- resolveSpellWith and resolveModesWith re-read the stack object's bindings
+  -- before each effect. The two coincide for a spell, which resolveSpellWith
+  -- passes as both, and differ for an ability, whose source is the permanent it
+  -- came from (CR 113.7) -- so binding onto `source` left an ability's follow-on
+  -- reading an unbound slot; see #137.
   Effect.PlaySubgame slot -> do
     result <- runSubgame
     case result of
-      Result.Won winner -> State.modify' (bindPlayerSlot source slot winner)
+      Result.Won winner -> State.modify' (bindPlayerSlot resolving slot winner)
       Result.Drawn -> pure ()
   -- CR 608.2d: "choose an opponent", announced as this effect is applied and
   -- bound so the sentence after it can say "that player". NOT A TARGET (CR
@@ -4223,20 +4244,26 @@ bindObjectsSlot holder slot targets gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toObjects targets) (Object.bindings obj)}
    in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
 
--- The default runner for every resolution that is NOT a subgame-bearing spell: a
--- PlaySubgame effect reports a draw and binds nothing.
+-- The default runner for the resolutions the live loop does not drive: a
+-- PlaySubgame effect reports a draw and binds nothing. Pawl.Engine.Engine's
+-- priority loop passes the real runner to BOTH halves of CR 729.1a's "spell or
+-- ability" (resolveSpellWith, resolveModesWith), which is every object that
+-- resolves off the stack.
 --
--- Not implemented: a subgame played from an ABILITY (#137).
+-- Not implemented: a subgame started by an instruction that never reaches the
+-- stack -- CR 103.5b/103.6's hand actions (performHandAction), CR 615.5's
+-- prevention riders and CR 614.1c's as-enters effects all fold the bare
+-- applyEffect and land here (#1900).
 noSubgame :: Game Result
 noSubgame = pure Result.Drawn
 
 -- Bind a PLAYER a resolution named into `slot` on `holder`, bindSlot's mirror
 -- with a player recipient (ToPlayer) rather than an object.
 --
--- Each caller passes the holder its own READER looks at: CR 729.1b's subgame
--- winner sits on the effect's `source`, read through resolveSpellWith's re-read
--- of the resolving SPELL's bindings; CR 608.2d's chosen opponent sits on
--- `resolving`, whose reader is the next effect's `legalNow`.
+-- Every caller passes `resolving` -- the object on the stack, whose bindings both
+-- resolution loops re-read before each effect: CR 729.1b's subgame winner and CR
+-- 608.2d's chosen opponent are each read by the effect after the one that bound
+-- it, through that re-read (`legalNow`).
 bindPlayerSlot :: ObjectId -> SlotName -> PlayerId -> GameState -> GameState
 bindPlayerSlot holder slot player gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toPlayer player) (Object.bindings obj)}

@@ -29,10 +29,10 @@ import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
 
--- The runner-aware resolve-the-top-of-stack: a resolving SPELL may play a
--- subgame (CR 729), so the spell branch takes the injected runner; abilities do
--- not (an ability-driven subgame is deferred). Engine.priorityLoop supplies
--- playSubgame.
+-- The runner-aware resolve-the-top-of-stack: CR 729.1a's "the spell or ability
+-- that created the subgame" names both kinds of object, so the injected runner
+-- goes to the spell branch and to all three ability branches alike; see #137.
+-- Engine.priorityLoop supplies playSubgame.
 --
 -- CR 608.3: a resolving permanent spell becomes a permanent on the battlefield;
 -- anything else resolves its effects and then goes to its owner's graveyard
@@ -140,7 +140,7 @@ resolveTopWith runSubgame = do
           -- CR 601.3's offer is NOT made here. It belongs to the Search effect
           -- itself (Resolve's Effect.Search arm), so it sees the state the player
           -- is actually searching from and reaches searching SPELLS too (#57).
-          Resolve.resolveAbility oid srcId ability
+          Resolve.resolveAbilityWith runSubgame oid srcId ability
         Source.OfTrigger srcId ability ->
           -- CR 608.2a: an intervening "if" is checked AGAIN as the ability
           -- resolves. Object.owner is the ability's controller, which is "you".
@@ -172,7 +172,7 @@ resolveTopWith runSubgame = do
             _ ->
               let chosen = Binding.modesOf (Object.bindings obj)
                   modal = TriggeredAbility.modal ability
-               in Resolve.resolveModes oid srcId (Modal.chosenModes chosen modal)
+               in Resolve.resolveModesWith runSubgame oid srcId (Modal.chosenModes chosen modal)
         -- CR 114.5: an emblem is never on the stack (created into the command
         -- zone, never cast). Drop it, like a token.
         Source.OfEmblem _ -> State.put gs {GameState.stack = rest}
@@ -213,7 +213,7 @@ resolveTopWith runSubgame = do
             _ ->
               let chosen = Binding.modesOf (Object.bindings obj)
                   modal = TriggeredAbility.modal ability
-               in Resolve.resolveModes oid oid (Modal.chosenModes chosen modal)
+               in Resolve.resolveModesWith runSubgame oid oid (Modal.chosenModes chosen modal)
 
 -- CR 400.7a: effects that change a permanent spell's characteristics or
 -- controller keep applying to the permanent it becomes. CR 400.7 mints a fresh
@@ -249,8 +249,8 @@ reanchor oldId newId eff = case ContinuousEffect.affected eff of
         eff {ContinuousEffect.affected = Affected.TheseObjects (Set.insert newId (Set.delete oldId oids))}
   _ -> eff
 
--- The no-subgame resolve-top (every existing caller and test): a resolving
--- spell with a PlaySubgame effect would draw. Engine's live loop uses
+-- The no-subgame resolve-top (every existing caller and test): a resolving spell
+-- or ability with a PlaySubgame effect would draw. Engine's live loop uses
 -- resolveTopWith.
 resolveTop :: Game ()
 resolveTop = resolveTopWith Resolve.noSubgame
