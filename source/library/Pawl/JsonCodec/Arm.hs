@@ -168,7 +168,7 @@ taggedWith enc arms =
 --
 -- DERIVED 'Show' BECOMES THE WIRE FORMAT: renaming a constructor renames its
 -- tag, and so silently changes every card file that names it. That coupling is
--- not new -- every hand-written arm in @pawl:codec@ already spells the tag as
+-- not new -- every hand-written arm under @Pawl.Codec@ already spells the tag as
 -- the constructor's name, as an unenforced convention -- but this makes it
 -- structural, and a rename is now a data migration.
 --

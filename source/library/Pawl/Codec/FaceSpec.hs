@@ -70,9 +70,9 @@ import qualified Pawl.Types.UntapRestriction as UntapRestriction
 
 -- Fixtures --------------------------------------------------------------------
 --
--- No registry here: the codec sublibrary sits above the test suite in the
--- dependency table, so it cannot reach Pawl.Registry or a real Printing. Every
--- fixture below is a synthetic Face built by hand.
+-- No registry here: Pawl.Codec sits before Pawl.Registry in CLAUDE.md's table,
+-- so it does not reach a real Printing. Every fixture below is a synthetic Face
+-- built by hand.
 
 -- | The face codec at the card knot Pawl.Codec.Card ties, which is the only
 -- instantiation of it that exists: the six card-shaped fields need a card codec
@@ -340,8 +340,8 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
     Spec.it s "costReductions (CR 601.2f) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.costReductions <$> decodeFace v) (Right [])
-    -- The registry-backed pair lives in Pawl.CodecIntegrationSpec, which can
-    -- reach real Printings; this sublibrary cannot.
+    -- The registry-backed pair lives in Pawl.CodecIntegrationSpec, which
+    -- reaches real Printings; Pawl.Codec does not.
     Spec.it s "counterability (CR 113.6g) defaults to Counterable" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.counterability <$> decodeFace v) (Right Counterability.Counterable)

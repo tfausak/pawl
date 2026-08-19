@@ -332,7 +332,7 @@ mechanically forbids a closure from ever entering the card model (§2.7's
 Two steps, **A** then **B**:
 
 - **A — the codec and the honesty round-trip.** A hand-rolled JSON
-  parser/renderer (the `json` sublibrary for the value and its codec;
+  parser/renderer (the `Pawl.Json.*` modules for the value and its codec;
   `Pawl.Json` for the codec-facing helpers) plus a `Card ⇆ Json` codec. The payoff is a structural round-trip
   property over `allPrintings`: `jsonToCard . cardToJson ≡ Right`. This is the
   "keeps us honest" check — it proves the card model is fully first-order data,

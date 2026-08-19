@@ -26,8 +26,9 @@ newtype CardName = MkCardName
 -- words, so "Wax//Wane" and "Wax // Wane" both slugify to "wax-wane" --
 -- Task 5's filename check cannot diverge either way, whichever this writes.
 --
--- Here rather than in Pawl.Engine.Card because `registry` sits BEFORE `engine`
--- in the sublibrary table and cannot reach it, while both sit after `types`.
+-- Here rather than in Pawl.Engine.Card because Pawl.Registry sits BEFORE
+-- Pawl.Engine in CLAUDE.md's table and does not reach it, while both sit after
+-- Pawl.Types.
 -- Two consumers ask for this string for unrelated reasons:
 -- Pawl.Engine.Card.combined, because CR 709.4's combined view shows both names
 -- at once, and Pawl.Registry.filedAs, because that is what a card's FILE is

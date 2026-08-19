@@ -71,9 +71,9 @@ mechanically checkable, so do not propose a script for it.
 When your change lets a capability reach somewhere it previously did not, grep
 the tree before you push for prose asserting the old limit --- the name of what
 you widened, the zone or type it now reaches, and the absolutes such claims use
-(`only`, `never`, `does not`, `no card`). Sweep `source/test-suite/` along with
-the libraries, and the files you edited along with the ones you did not; both
-are where survivors turn up. Re-derive every hit and rewrite it to say what it
+(`only`, `never`, `does not`, `no card`). Sweep the specs along with the code
+they cover, and the files you edited along with the ones you did not; both are
+where survivors turn up. Re-derive every hit and rewrite it to say what it
 actually rests on, worded so a later grep finds it.
 
 Adding a card does the same thing from the other direction. A comment that

@@ -394,7 +394,7 @@ failure c m =
       message = m
     }
 
--- | 'Pawl.JsonCodec.Common.render' is the same function and is not reachable
--- from here: pawl:json-codec depends on this library rather than the reverse.
+-- | 'Pawl.JsonCodec.Common.render' is the same function and is not imported
+-- here: Pawl.JsonCodec sits after Pawl.JsonSchema, not before it.
 render :: Value.Value -> Text.Text
 render = Text.pack . Builder.toString . Value.encode

@@ -8,9 +8,9 @@ import qualified Control.Exception as Exception
 -- Every problem at once rather than the first, so a broken pool is one report
 -- rather than N runs (#167).
 --
--- Rendered `problems` rather than a structured list, because this sublibrary
--- sits above `types` and cannot speak CardName, and because a caller's only
--- move is to show them.
+-- Rendered `problems` rather than a structured list, because Pawl.Exceptions
+-- sits before Pawl.Types and so does not speak CardName, and because a caller's
+-- only move is to show them.
 data InvalidCorpus = MkInvalidCorpus
   { root :: FilePath,
     problems :: [String]

@@ -82,7 +82,7 @@ object properties required =
 
 -- | An object used as a MAP: every value shares one shape and the keys are
 -- unconstrained, e.g. @Pawl.JsonCodec.Common.textMap@ -- named rather than
--- linked, since pawl:json-schema does not depend on pawl:json-codec. Distinct from
+-- linked, since Pawl.JsonSchema sits before Pawl.JsonCodec. Distinct from
 -- 'object', which names its properties and requires some of them; this names
 -- none.
 --

@@ -55,8 +55,8 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- 709.5i's flag is a Bool whose two values are what that rule turns on and a
 -- codec that dropped it would round-trip one of them unchanged. The
 -- Moved/Revealed/SpellCast cases carry a
--- stand-in snapshot: this sublibrary sits above Pawl.Registry and Pawl.Engine,
--- so it cannot build a real one. The registry-backed round-trips over real
+-- stand-in snapshot: Pawl.Codec sits before Pawl.Registry and Pawl.Engine, so
+-- it does not build a real one. The registry-backed round-trips over real
 -- snapshots stay in Pawl.CodecIntegrationSpec.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do

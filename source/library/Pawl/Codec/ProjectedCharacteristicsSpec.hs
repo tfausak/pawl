@@ -23,8 +23,8 @@ import qualified Pawl.Types.Supertype as Supertype
 -- `minimalCharacteristics` below is its counterpart with everything but the two
 -- required keys defaulted.
 --
--- No registry here: like Pawl.Codec.CardSpec, this sublibrary sits above
--- Pawl.Registry and cannot reach a real snapshot. Round trips over an
+-- No registry here: like Pawl.Codec.CardSpec, Pawl.Codec sits before
+-- Pawl.Registry and does not reach a real snapshot. Round trips over an
 -- engine-built snapshot stay in Pawl.CodecIntegrationSpec.
 
 -- | A synthetic snapshot, not any real card's projection: its supertype and

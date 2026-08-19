@@ -27,7 +27,7 @@ spec s = Spec.describe s "Pawl.Codec.Binding" $ do
       " {} "
   -- A codec totality check, not a claim about a reachable game state: no real
   -- slot carries all five fields at once. The stand-in snapshot is needed
-  -- because this sublibrary cannot reach the registry or Projection.project.
+  -- because Pawl.Codec does not reach the registry or Projection.project.
   Spec.it s "MkBinding, every field populated" $
     Common.assertCodec
       s

@@ -41,7 +41,7 @@ import qualified Pawl.Engine.Quantity as Quantity
 
 import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Setup as Setup
--- The json sublibrary's own modules, for the CR 701.3a completeness cross-check
+-- The Pawl.Json modules, for the CR 701.3a completeness cross-check
 -- alone: it counts the atom in a card's ENCODED form, which is a traversal of the
 -- whole card written by somebody else and so an independent witness to the
 -- hand-maintained one below.

@@ -137,7 +137,7 @@ constCodec v =
     { Codec.encode = const v,
       Codec.decode = const (Left (Text.pack "constCodec does not decode")),
       -- Borrowed rather than built: naming a Schema here would make this spec
-      -- depend on pawl:json-schema, which nothing else under Pawl.Codec does.
+      -- import Pawl.JsonSchema, which nothing else under Pawl.Codec does.
       Codec.schema = Codec.schema Common.text
     }
 

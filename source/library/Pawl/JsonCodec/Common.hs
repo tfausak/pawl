@@ -12,11 +12,11 @@
 -- binding, or encoding a default value and decoding it back stops being the
 -- identity.
 --
--- Nothing here names a @Pawl.Types@ type. Since the move to @pawl:json-codec@,
--- that is guaranteed by the build graph rather than by discipline:
--- @pawl:json-codec@ does not depend on @pawl:types@, so a @Pawl.Types@ import
--- would fail to build, which is what keeps this module below the per-type
--- modules rather than in a cycle with them.
+-- Nothing here names a @Pawl.Types@ type. That is what keeps this module below
+-- the per-type modules rather than in a cycle with them. It was once guaranteed
+-- by the build graph, which no longer holds now that one library holds every
+-- module (#1880): the rule is that @Pawl.JsonCodec@ sits before @Pawl.Types@ in
+-- CLAUDE.md's table, and nothing but review enforces it.
 --
 -- 'Value.object' and 'asObject' trade in 'Pair.Pair' lists so fields can be written
 -- in a readable order rather than an alphabetical one. That order is
@@ -382,8 +382,8 @@ multiset c =
 -- 'Object.Object' does not dedupe.
 --
 -- The key's unwrap and wrap are passed rather than a @Codec k@, because a JSON
--- object's key is a string rather than a 'Value.Value'; this module cannot name
--- the key type either, since @pawl:json-codec@ does not depend on @pawl:types@.
+-- object's key is a string rather than a 'Value.Value'; this module does not
+-- name the key type either, since @Pawl.JsonCodec@ sits before @Pawl.Types@.
 --
 -- The wrap is total. Both key types in the corpus are unvalidated @Text@
 -- newtypes, and 'Schema.mapOf' constrains no key, so a fallible wrap would
