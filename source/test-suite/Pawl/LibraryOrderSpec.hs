@@ -2079,12 +2079,19 @@ optionalEffectSpec s registry =
         -- CR 608.2d over CR 608.2e's unit: a "may" covers the CLAUSE it is
         -- printed on, not the whole mode. Two clauses in one mode -- a mandatory
         -- Draw and an optional Draw -- and declining the second must still leave
-        -- the first having happened. The mandatory-then-optional pair itself is
-        -- printed -- Corpse Churn, Into the Wilds, Nissa, Steward of Elements
-        -- and Shed Weakness all write it, and the two cases below prove it
-        -- through a real cast of Corpse Churn -- so resolveModes is driven
-        -- directly here only for the two-DRAW shape, where the library count
-        -- alone separates "declined" from "drew".
+        -- the first having happened.
+        --
+        -- resolveModes is the ABILITY clause loop; a spell's clauses run through
+        -- Resolve.resolveSpellWith's own fold, which the Corpse Churn cases below
+        -- reach through a real cast. The pair is printed on four cards --
+        -- Corpse Churn and Shed Weakness as spells, Into the Wilds and Nissa,
+        -- Steward of Elements as abilities -- but both abilities open with an
+        -- Effect.LookAt, which changes nothing a board can see, so neither can
+        -- tell this rule's reading from a mode-wide one. Not implemented: a
+        -- gameplay-level twin for the ability loop, which wants a card whose
+        -- mandatory clause is observable (#1887). Until one lands, this is a
+        -- unit-level pin, and it is also the only case for the two-DRAW shape,
+        -- where the library count alone separates "declined" from "drew".
         Spec.it s "CR 608.2d a declined clause skips only its own effects" $ do
           forest <- S.printingOf s registry "Forest"
           piker <- S.printingOf s registry "Goblin Piker"
@@ -2111,11 +2118,19 @@ optionalEffectSpec s registry =
               after = S.runPure S.identityAnswer gs (Resolve.resolveModes stackId stackId [(ModeInstance.MkModeInstance (ModeIndex.MkModeIndex 0) 0, mode)])
           Spec.assertEqWith s "the mandatory clause drew, the declined one did not" (S.handSize S.alice after) (before + 1)
         -- The same rule at gameplay level, through a real cast: Corpse Churn
-        -- PRINTS the mandatory-then-optional pair the case above builds by
-        -- hand. Milling three and then DECLINING the return must leave all
-        -- three milled cards in the graveyard -- the decline skips its own
-        -- clause and nothing else. Paired with the taking half below, which
-        -- differs in exactly one thing: the answer to the "may".
+        -- PRINTS the mandatory-then-optional pair the case above builds by hand.
+        -- Milling three and then DECLINING the return must leave all three
+        -- milled cards in the graveyard -- the decline skips its own clause and
+        -- nothing else. Paired with the taking half below, which differs in
+        -- exactly one thing: the answer to the "may".
+        --
+        -- The Shed Weakness case in the Counters group proves the same rule on
+        -- the same spell loop; what this card adds is the other half of CR
+        -- 608.2d, "the player announces these while applying the effect" -- the
+        -- optional clause here CHOOSES its object at resolution rather than
+        -- acting on a target fixed at CR 601.2c -- and a mandatory clause whose
+        -- effect is a zone change, so the decline has to leave cards where an
+        -- earlier clause put them.
         Spec.it s "CR 608.2d whole card: Corpse Churn's declined return leaves the mill done" $ do
           (gs, spellId) <- corpseChurnBoard
           let cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
