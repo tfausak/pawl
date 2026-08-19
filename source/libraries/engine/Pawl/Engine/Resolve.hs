@@ -2574,6 +2574,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- unobservable. `sofar` ACCUMULATES rather than naming every target up
         -- front because a member still in its old zone is not on the battlefield
         -- for a sweep to find anyway; only an arrived one needs excluding.
+        --
+        -- `sofar` is the half a test separates: Pawl.AuraSpec's returned Aura and
+        -- Pawl.CopySpec's reanimated Clone both fail without it. `before` is
+        -- threaded because CR 614.4 asks which effects existed before the BATCH,
+        -- but nothing in data/cards separates it from Nothing -- every
+        -- ReplacementEffect.ZoneChangeR there names a `whenDestination` of
+        -- Graveyard or Stack (rest-in-peace, leyline-of-the-void,
+        -- anafenza-the-foremost, yawgmoths-will, synthetic-stack-interdiction),
+        -- and no member of a batch moving ONTO THE BATTLEFIELD goes to either. A
+        -- card whose ZoneChangeR named the battlefield would separate them.
         moveOne before (sofar, acc) (target, position) = do
           mNew <- Event.changeZoneEnteringIn (Just before) sofar target zone position entry (Just controller)
           -- CR 614.6: the move was cancelled, or the id was already gone (CR
