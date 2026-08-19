@@ -121,7 +121,7 @@ resolveTopWith runSubgame = do
                     -- Aura, and a face-down spell's `face` is
                     -- Card.faceDownFace -- whose subtypes are the ones the
                     -- listing names, and no listing in the pool names Aura.
-                      carryOver oid =<< Event.changeZoneAttaching Nothing oid Zone.Battlefield LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just controller) entering (Object.facing obj) False
+                      carryOver oid =<< Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just controller) entering (Object.facing obj) False
                     else -- CR 303.4a made this spell target, so CR 608.2b applies
                     -- to it. THE INVARIANT: is-it-an-Aura is a SUBTYPE read off
                     -- the type line (CR 205.3h), the same closed-half
@@ -132,7 +132,7 @@ resolveTopWith runSubgame = do
                           -- CR 303.4: an Aura ENTERS attached, so the target is
                           -- seeded into the new incarnation rather than written
                           -- after the move (see Event.changeZoneAttaching).
-                          carryOver oid =<< Event.changeZoneAttaching Nothing oid Zone.Battlefield LibraryPosition.defaultValue (enchantedBy oid gs) TapState.Untapped Map.empty (Just controller) entering Facing.FaceUp False
+                          carryOver oid =<< Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue (enchantedBy oid gs) TapState.Untapped Map.empty (Just controller) entering Facing.FaceUp False
         -- A token is never on the stack (created onto the battlefield, never
         -- cast).
         Source.OfToken _ -> State.put gs {GameState.stack = rest}

@@ -696,6 +696,60 @@ replenishSpec s registry =
               Spec.assertEqWith s "and no Aura reached the battlefield" (copiesOn unholy after) 0
               Spec.assertEqWith s "while the non-Aura enchantment did come back, so the effect really ran" (copiesOn scales after) 1
             _ -> Spec.assertFailure s "the board should hold two graveyard cards"
+        -- THE PROVING TEST for #1738, and the CR 303.4f half of it. CR 608.2f makes
+        -- Replenish's return ONE event, so each Aura's host choice is made against
+        -- the board the batch began on -- where a would-be host returned in the
+        -- same batch is not on the battlefield at all. Master of the Feast is that
+        -- would-be host: an enchantment card, so Replenish returns it, and a
+        -- creature, so Unholy Strength's "enchant creature" would admit it.
+        --
+        -- NO creature on the battlefield, which is what makes the board
+        -- discriminate: one already there would be a legal host under both
+        -- readings, and every assertion below would pass either way.
+        --
+        -- TWO LEGS in the two sweep orders, because visibility of a sibling
+        -- inherently depends on which member moved first: Resolve.graveyardCardsOf
+        -- sorts ascending ObjectId and S.addGraveyardCard mints in call order, so
+        -- the `buried` list pins the order exactly. The per-object reading answers
+        -- differently in the two orders and CR 608.2f says it may not, so the legs
+        -- must AGREE.
+        --
+        -- The prompt count is deliberately not the evidence: Attach.chooseHost
+        -- elides at one candidate, so nobody is asked under either reading. The
+        -- gameplay-level quantity is the host's power and toughness, and the zone
+        -- is read through the Aura's ORIGINAL ObjectId -- "remains in the
+        -- graveyard" (CR 303.4g) and "entered and was buried" (CR 704.5m) are the
+        -- same zone, and only the surviving id separates them (CR 400.7), exactly
+        -- as the case above argues.
+        Spec.it s "CR 608.2f a returned Aura cannot enchant a permanent returned beside it (#1738)" $ do
+          plains <- S.printingOf s registry "Plains"
+          replenish <- S.printingOf s registry "Replenish"
+          unholy <- S.printingOf s registry "Unholy Strength"
+          master <- S.printingOf s registry "Master of the Feast"
+          let outcome buried =
+                let (spell, _, buriedIds, gs) = board plains replenish [] buried
+                    (after, responses) = run S.castAnswer spell gs
+                    -- The Aura's GRAVEYARD id, whichever slot of the batch it took.
+                    auraId = Maybe.listToMaybe [oid | (oid, printing) <- zip buriedIds buried, Printing.card printing == Printing.card unholy]
+                    -- By CARD: CR 400.7 minted a fresh id at the battlefield.
+                    masterNew = List.find (\oid -> Game.cardOf oid after == Just (Printing.card master)) (Set.toList (GameState.battlefield after))
+                 in ( fmap (`S.powerToughnessOf` after) masterNew,
+                      fmap (\oid -> fmap Object.zone (Game.lookupObject oid after)) auraId,
+                      copiesOn unholy after,
+                      hostsChosen responses
+                    )
+              hostFirst = outcome [master, unholy]
+              auraFirst = outcome [unholy, master]
+          Spec.assertEqWith
+            s
+            "the host came back a plain 5/5, the Aura is the same object still in the graveyard, and nobody was asked"
+            hostFirst
+            (Just (Just (5, 5)), Just (Just Zone.Graveyard), 0, 0)
+          Spec.assertEqWith
+            s
+            "and the batch's processing order changes nothing (CR 608.2f)"
+            auraFirst
+            hostFirst
         -- CR 708.2a against CR 303.4f, on Soul Summons rather than Replenish: an
         -- Aura card MANIFESTED off a library (CR 701.40a) enters as a 2/2 with no
         -- subtypes and no enchant ability, so it is not an Aura the rule speaks
