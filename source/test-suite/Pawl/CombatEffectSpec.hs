@@ -1761,8 +1761,7 @@ putOntoBattlefieldAttackingSpec s registry = Spec.describe s "PutOntoBattlefield
     -- The 2/3 Garrison plus two 1/1 tokens, all unblocked, against bob's 20.
     Spec.assertEqWith s "bob takes 2 + 1 + 1" (S.lifeOf S.bob after) (Just 16)
 
--- CR 306.6 / CR 508.1b: attacking a planeswalker, through the one planeswalker in
--- the pool.
+-- CR 306.6 / CR 508.1b: attacking a planeswalker, through Jace Beleren.
 --
 -- Jace Beleren is the whole board on bob's side: {1}{U}{U} Legendary
 -- Planeswalker -- Jace, with printed loyalty 3, which is what makes every

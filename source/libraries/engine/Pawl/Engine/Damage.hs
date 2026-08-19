@@ -1199,9 +1199,9 @@ applyDamage events = do
             -- single event, and CR 702.15e already makes each source's gain its
             -- own entry.
             --
-            -- CR 120.3c's and CR 310.6's counter removals join them, after the damage and for the
-            -- same reason: they are a RESULT of it (CR 120.3h), so the cause reads
-            -- first. `marked` is the board markOne left, which is what makes the
+            -- CR 120.3c's and CR 310.6's counter removals join them, after the
+            -- damage and for the same reason: they are a RESULT of it (CR 120.3c,
+            -- CR 120.3h), so the cause reads first. `marked` is the board markOne left, which is what makes the
             -- pair the removal that actually happened.
             List.foldl'
               (flip Event.recordEvent)

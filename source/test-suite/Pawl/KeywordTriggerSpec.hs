@@ -3991,9 +3991,8 @@ meleeSpec s registry =
         wings <- S.printingOf s registry "Wings of the Guard"
         piker <- S.printingOf s registry "Goblin Piker"
         pure (S.threePlayerCombat (wings : mine) [piker] [piker])
-      -- The same, with bob fielding Jace Beleren at loyalty 3 as well -- the one
-      -- planeswalker in the pool, and the only way to attack something that is
-      -- not an opponent.
+      -- The same, with bob fielding Jace Beleren at loyalty 3 as well, which is
+      -- what lets an attack be declared at something that is not an opponent.
       jaceBoard mine = do
         wings <- S.printingOf s registry "Wings of the Guard"
         piker <- S.printingOf s registry "Goblin Piker"

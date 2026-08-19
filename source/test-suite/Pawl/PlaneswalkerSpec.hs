@@ -1,22 +1,29 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers CR 306, the planeswalker card type, across the six modules it reaches:
+-- Covers CR 306, the planeswalker card type, across the seven modules it reaches:
 -- Pawl.Engine.Projection's intrinsic CR 306.5b enters-with replacement and
 -- Pawl.Engine.Replacement's EntryR arm that carries it out, Pawl.Engine.Cost's
 -- two CR 606.4 loyalty cost components and CR 606.5's combining of them,
 -- Pawl.Engine.Activate's CR 606.3 gate,
 -- Pawl.Engine.Sba's CR 704.5i zero-loyalty state-based action, Pawl.Engine.Target's
 -- CR 115.4 "any target" pool, and Pawl.Engine.Damage's CR 306.8 / CR 120.3c
--- loyalty removal.
+-- loyalty removal -- which Pawl.Engine.Event records as a GameEvent.CountersRemoved
+-- alongside Pawl.Engine.Cost's.
 --
--- CR 306.6 -- "Planeswalkers can be attacked" -- is the one clause of rule 306
--- covered elsewhere: it is combat's, so it lives in CombatSpec's
--- AttackingAPlaneswalker group, on the same card.
+-- CR 306.6 -- "Planeswalkers can be attacked" -- is covered elsewhere: it is
+-- combat's, so it lives in Pawl.CombatEffectSpec's AttackingAPlaneswalker group,
+-- on Jace. The CountersRemoved group below declares an attack at a planeswalker
+-- too, and for a different rule: CR 510.2's simultaneity is what makes one batch
+-- of combat damage one counter-removal record, and combat is the only producer of
+-- a batch with two damage events in it.
 --
--- Two cards carry it. Nissa, Steward of Elements -- {X}{G}{U} Legendary
+-- Three cards carry it. Nissa, Steward of Elements -- {X}{G}{U} Legendary
 -- Planeswalker -- Nissa, whose lower right corner prints CR 107.3's X -- is the
 -- VariableLoyalty group's alone, where CR 107.3m decides what that X is worth.
+-- Chandra, Fire Artisan -- {2}{R}{R} Legendary Planeswalker -- Chandra, printed
+-- loyalty 4 -- is the CountersRemoved group's alone, where CR 606.4's cost and CR
+-- 306.8's damage are read as EVENTS rather than as writes.
 -- Jace Beleren is the rest: {1}{U}{U} Legendary Planeswalker -- Jace, with
 -- printed loyalty 3 and three loyalty abilities (+2, -1, -10). Its -10 is what
 -- makes CR 606.6 observable at 3 loyalty, and three -1s across three of alice's
@@ -35,6 +42,7 @@
 -- printed, so neither can make an activation legal that the real card refuses.
 module Pawl.PlaneswalkerSpec where
 
+import qualified Control.Monad as Monad
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -474,7 +482,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
 -- loyalty 4 -- is the group's card and the pool's only producer of
 -- TriggerCondition.SelfCountersRemoved: "whenever one or more loyalty counters are
 -- removed from Chandra, she deals that much damage to target opponent or
--- planeswalker". Her +1 and -7 exile the top of the library and grant CR 118.1's
+-- planeswalker". Her +1 and -7 exile the top of the library and grant CR 601.1a's
 -- permission to play what was exiled; the -7 is what drives the cost half.
 --
 -- Every board here leaves counters BEHIND, which is what separates this condition
@@ -549,8 +557,12 @@ countersRemovedSpec s registry = Spec.describe s "CountersRemoved" $ do
         gs = S.addCounter CounterKind.Loyalty 6 chandraId board
         atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) attackingChandra gs
         dealt = S.runPure attackingChandra atDamage (do Engine.runTurnBasedActions (Phase.Combat CombatStep.CombatDamage); Engine.settleForPriority)
-        after = S.runPure attackingChandra dealt Stack.resolveTop
-    Spec.assertEqWith s "alice took four: 2 + 2, once" (S.lifeOf S.alice after) (Just 16)
+        -- The WHOLE stack, not its top: with one trigger the second call finds
+        -- nothing, and with two it resolves the other -- which is what lets the
+        -- life total below tell the two readings apart rather than reading the
+        -- top trigger's damage under either.
+        after = S.runPure attackingChandra dealt (Monad.replicateM_ 2 Stack.resolveTop)
+    Spec.assertEqWith s "alice took four: 2 + 2, once and not once per damage event" (S.lifeOf S.alice after) (Just 16)
     Spec.assertEqWith s "one trigger on the stack, not one per damage event" (length (GameState.stack dealt)) 1
     Spec.assertEqWith s "CR 306.8: 6 - 4" (S.counterOf CounterKind.Loyalty chandraId dealt) 2
     Spec.assertEqWith s "CR 510.1b: none of it reached the defending player" (S.lifeOf S.bob after) (Just 20)
