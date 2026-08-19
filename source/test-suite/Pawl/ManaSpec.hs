@@ -2073,6 +2073,39 @@ sharedTapBoard s registry creatures = do
   piker <- S.printingOf s registry "Goblin Piker"
   pure (alicePermanents (drum : drum : replicate creatures piker))
 
+-- CR 118.3's "fully" across a SELF-tap and an OTHER-tap, which is sharedTapSpec's
+-- question with one of the two Drums replaced by the creature's own {T}.
+-- Springleaf Drum beside ONE Llanowar Elves ("{T}: Add {G}") is one mana and not
+-- two: the Drum's payment taps the Elves, or the Elves taps itself, never both.
+-- CR 107.5's {T} stated no claim, so the Elves was counted twice (#1725).
+--
+-- The Drum's own {T} claims too, on a pool of one -- itself -- that no other
+-- claim meets, so it neither pays nor blocks. What separates the halves of each
+-- case is ONE Elves and nothing else. S.addCreature settles what it places, so CR
+-- 302.6 does not gate the Elves' own {T}; the "one Elves makes one" positive is
+-- what would fail if it did.
+selfTapSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+selfTapSpec s registry = Spec.describe s "A self-tap and an other-tap over one creature" $ do
+  Spec.it s "CR 118.3 a Drum and one Elves make one mana, not two" $ do
+    drum <- S.printingOf s registry "Springleaf Drum"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    let one = alicePermanents [drum, elves]
+        two = alicePermanents [drum, elves, elves]
+    -- The POSITIVES first: 1/2 and 2/3 are the two independent readings, and
+    -- collapsing them into one assertion would let a numeric coincidence pass.
+    Spec.assertBool s (paysGeneric 1 one) "the pair makes one mana"
+    Spec.assertBool s (paysGeneric 2 two) "a second Elves makes the second mana"
+    Spec.assertBool s (not (paysGeneric 2 one)) "and one Elves does not make two"
+    Spec.assertBool s (not (paysGeneric 3 two)) "nor two Elves a third"
+
+  -- The OFFER, for sharedTapSpec's reason. Mindcrank is the plain {2} artifact.
+  Spec.it s "CR 601.2g a {2} spell is not offered off one Elves" $ do
+    mindcrank <- S.printingOf s registry "Mindcrank"
+    drum <- S.printingOf s registry "Springleaf Drum"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    Spec.assertBool s (offersCast mindcrank (alicePermanents [drum, elves, elves])) "offered off two"
+    Spec.assertBool s (not (offersCast mindcrank (alicePermanents [drum, elves]))) "not off one"
+
 -- CR 118.3's "fully" across the tapping components of ONE cost, which is
 -- sharedTapSpec's question moved inside a single ability. Synthetic Crewed
 -- Battery ("{T}, Tap an untapped creature you control, Tap any number of
@@ -2628,6 +2661,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   treasonousOgreSpec s registry
   sharedVictimSpec s registry
   sharedTapSpec s registry
+  selfTapSpec s registry
   crewedBatterySpec s registry
   villageRitesSpec s registry
   chromaticSpec s registry

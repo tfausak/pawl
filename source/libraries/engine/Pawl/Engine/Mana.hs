@@ -1108,15 +1108,30 @@ canPayCommittingGiven capacity spending sources pcs pid committed claimed cost g
 -- payableResolutions picks exactly ONE option per source.
 --
 -- How many times is enumerated, 0 up to the ceiling, for an option that SPENDS
--- something a board is measured against -- a claim on objects, or CR 119.4's life
--- -- and fixed at the ceiling for one that spends neither. That asymmetry is the
--- whole of #1126: the clauses payableResolutions asks of a board only ever grow as
--- supplies are added, so a free source is never worth taking fewer times -- but a
--- claiming or a life-paying one is, since the objects and the life it leaves alone
--- are what another source's cost, or the cost being paid, can then have. Ashnod's
--- Altar and Phyrexian Tower beside one creature buy one sacrifice between them,
--- and whose is the player's to choose; a Treasonous Ogre activated fewer times
--- than it could be is the life half of the same thing.
+-- something a board is measured against -- a CONTENDED claim on objects, or CR
+-- 119.4's life -- and fixed at the ceiling for one that spends neither. That
+-- asymmetry is the whole of #1126: the clauses payableResolutions asks of a board
+-- only ever grow as supplies are added, so a free source is never worth taking
+-- fewer times -- but a claiming or a life-paying one is, since the objects and the
+-- life it leaves alone are what another source's cost, or the cost being paid, can
+-- then have. Ashnod's Altar and Phyrexian Tower beside one creature buy one
+-- sacrifice between them, and whose is the player's to choose; a Treasonous Ogre
+-- activated fewer times than it could be is the life half of the same thing.
+--
+-- `contended` is the CALLER's answer to "do this source's claims meet any other
+-- group's?", which is a fact about the whole board and not about this source
+-- (payableResolutionsGiven builds it). Where they meet nothing, declining an
+-- activation frees an object no other claim wants, so the maximum is never worth
+-- undercutting -- and taking the maximum is always satisfiable, `times` being
+-- Claim.repeats' own answer for these claims alone. LIFE is never isolated, one
+-- life total serving every source, so a life-paying source widens whatever its
+-- claims do.
+--
+-- That is what keeps CR 107.5's {T} affordable: every land and every mana
+-- creature claims itself, so without the test a board of n sources would be 2^n
+-- boards below (#1725). It does not bound the case where they genuinely meet --
+-- a Springleaf Drum beside n mana creatures widens all n -- which is the same
+-- unpruned search #595 tracks.
 --
 -- The COLLAPSE is where several yields become one option, and it is exact rather
 -- than a shortcut. Where a yield adds at most one mana, its option is at most one
@@ -1149,8 +1164,8 @@ canPayCommittingGiven capacity spending sources pcs pid committed claimed cost g
 -- The TAGS mix by union, and there too the union is exact: manaOptionsOfGiven
 -- stamps one tag set on every unit of every yield of a source, because CR 106.3
 -- makes them all facts about that one source.
-sourceOptions :: [SpendManaAsThough.SpendManaAsThough] -> [(Activations.Activations, Mana)] -> [([Supply], [Claim], Natural)]
-sourceOptions clauses supplies =
+sourceOptions :: [SpendManaAsThough.SpendManaAsThough] -> Bool -> [(Activations.Activations, Mana)] -> [([Supply], [Claim], Natural)]
+sourceOptions clauses contended supplies =
   let unitLists = [(activations, unitsOf yield) | (activations, yield) <- supplies]
       (narrow, wide) = List.partition (\(_, units) -> length units <= 1) unitLists
       grouped = [(activations, collapsed units) | (activations, units) <- Map.toList (Map.fromListWith (<>) narrow)]
@@ -1160,7 +1175,7 @@ sourceOptions clauses supplies =
     optionsFor (activations, offered) =
       let claims = Activations.claims activations
           life = Activations.life activations
-          counts = if null claims && life == 0 then [Activations.times activations] else [0 .. Activations.times activations]
+          counts = if (null claims || not contended) && life == 0 then [Activations.times activations] else [0 .. Activations.times activations]
        in fmap
             (\k -> (concat (List.genericReplicate k offered), Claim.scale k claims, k * life))
             counts
@@ -1231,9 +1246,10 @@ sourceOptions clauses supplies =
 -- collapse matters. After it, a source offers more than one option only if it has
 -- yields the collapse keeps apart -- one adding more than one mana, which in this
 -- pool takes a multi-mana ability on a permanent some effect has ALSO given a
--- basic land type (Palladium Myr under Ashaya) -- or if its activation CLAIMS
--- something, which costs one option per number of times it could be taken. So the
--- ordinary board -- lands, and a mana creature -- is still one board, and a
+-- basic land type (Palladium Myr under Ashaya) -- or if its activation claims
+-- something ANOTHER group also wants, or pays life, either of which costs one
+-- option per number of times it could be taken. So the ordinary board -- lands,
+-- and a mana creature, each claiming only itself -- is still one board, and a
 -- repeatable source's colour choices cost options in its repeat count and not in
 -- the number of colours.
 -- `any` short-circuits, so a payable cost stops at the first board that pays it;
@@ -1311,7 +1327,14 @@ payableResolutionsGiven capacity spending sources pcs pid committed claimed cost
       -- then cannot pay.
       clauses = PlayerEffect.spendManaAsThough pid gs
       pooled = fmap (rewriteSupply clauses . supplyOf) units
-      options = fmap (\oid -> sourceOptions clauses (manaSuppliesGiven capacity pcs pid oid gs)) sources
+      suppliesPer = fmap (\oid -> manaSuppliesGiven capacity pcs pid oid gs) sources
+      -- WHICH sources are worth taking fewer times: the ones whose claims meet
+      -- another source's, or the cost's own. Asked GROUPWISE, one group per
+      -- source plus `claimed`, so a source's own claims meeting each other is
+      -- not contention -- Cost.repeatsOf has already measured that, and it is
+      -- what `times` is.
+      contested = Claim.contested (claimed : fmap (concatMap (Activations.claims . fst)) suppliesPer)
+      options = fmap (\supplies -> sourceOptions clauses (Claim.contends contested (concatMap (Activations.claims . fst) supplies)) supplies) suppliesPer
       -- One option taken from each source, appended to the pool: `sequenceA` over
       -- the list applicative is that product, and it is [[]] -- one board, the
       -- pool alone -- when the player controls no source at all. Each board

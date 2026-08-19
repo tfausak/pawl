@@ -8,6 +8,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.Claim (Claim)
 import qualified Pawl.Types.Claim as Claim
+import qualified Pawl.Types.ClaimAxis as ClaimAxis
 import Pawl.Types.ObjectId (ObjectId)
 
 -- CR 118.3's "fully", asked of several claims TOGETHER: is there some
@@ -27,10 +28,60 @@ import Pawl.Types.ObjectId (ObjectId)
 -- number of claims' worth. A greedy pass would not do: a claim with the wider
 -- pool can eat the only object a narrower one could have used. A per-claim check
 -- is the singleton subset of this one, and so subsumed rather than replaced.
+--
+-- ISOLATED POOLS ARE TAKEN OUT FIRST, which is exact and not a prune. A pool
+-- that meets no other pool in its axis contributes its whole size to every
+-- subset it joins and its whole count to that subset's demand, so a subset
+-- holds iff the isolated part holds on its own and the rest holds without it.
+-- Asking every subset containing it therefore proves nothing the singleton did
+-- not. What it buys is the enumeration: a board of twenty lands is twenty
+-- singleton self-pools that meet nothing, and that is twenty checks rather than
+-- 2^20 (#1725).
 satisfiable :: [Claim] -> Bool
-satisfiable claims = all (all fits . List.subsequences) (byAxis claims)
+satisfiable claims = all satisfiableAxis (byAxis claims)
+
+-- One axis's entries, isolated ones apart. `contested` is the objects two or
+-- more entries could each take; an entry drawing on none of them is isolated.
+satisfiableAxis :: [(Set.Set ObjectId, Natural)] -> Bool
+satisfiableAxis entries =
+  let shared = objectsWantedTwice (fmap fst entries)
+      (lone, met) = List.partition (\(pool, _) -> Set.disjoint pool shared) entries
+   in all (\entry -> fits [entry]) lone && all fits (List.subsequences met)
   where
     fits subset = Natural.length (Set.unions (fmap fst subset)) >= sum (fmap snd subset)
+
+-- The objects that appear in two or more of these pools -- what makes a pool
+-- meet another one. Counted rather than compared pairwise, so this is linear in
+-- the pools' total size where the pairwise question is quadratic.
+objectsWantedTwice :: [Set.Set ObjectId] -> Set.Set ObjectId
+objectsWantedTwice pools =
+  Map.keysSet
+    . Map.filter (> (1 :: Natural))
+    $ Map.fromListWith (+) [(oid, 1) | pool <- pools, oid <- Set.toList pool]
+
+-- The same question asked of whole CLAIMS rather than of one axis's merged
+-- pools, and asked GROUPWISE: `contested` takes the claim groups -- one per mana
+-- source, plus the claims of the cost being paid -- and answers the objects two
+-- or more DIFFERENT groups could each take. A group's own two claims naming one
+-- object is not contention, since nothing chooses between them.
+--
+-- Pawl.Engine.Mana.payableResolutionsGiven is the reader: a source whose claims
+-- meet no other group's is worth taking as many times as it can be, so it offers
+-- one option instead of one per repeat.
+contested :: [[Claim]] -> Set.Set (ClaimAxis.ClaimAxis, ObjectId)
+contested groups =
+  Map.keysSet
+    . Map.filter (> (1 :: Natural))
+    $ Map.fromListWith
+      (+)
+      [ (key, 1)
+      | group <- groups,
+        key <- Set.toList (Set.fromList [(Claim.axis claim, oid) | claim <- group, oid <- Set.toList (Claim.pool claim)])
+      ]
+
+-- Whether any of these claims draws on an object `contested` above marked.
+contends :: Set.Set (ClaimAxis.ClaimAxis, ObjectId) -> [Claim] -> Bool
+contends marked = any (\claim -> any (\oid -> Set.member (Claim.axis claim, oid) marked) (Claim.pool claim))
 
 -- How many times over could every one of these claims be met, given that each
 -- repetition asks for one more of each? The pools are the same objects every

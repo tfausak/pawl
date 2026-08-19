@@ -876,13 +876,19 @@ claimOf pid oid component gs = case component of
   CostComponent.ExileTopFromGraveyard criterion ->
     claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (Maybe.maybeToList (topExileCandidate pid criterion gs))) 1
   CostComponent.ExileThisFromGraveyard -> claim (ClaimAxis.Removal Zone.Graveyard) (itself (isOwnedIn Zone.Graveyard)) 1
-  -- Not implemented: CR 107.5's {T} spends exactly the untapped-ness the
-  -- TapPermanents arm below claims, and a claim of `ClaimAxis.Tapping (itself
-  -- ...) 1` is the principled arm. The reason it is not written is cost rather
-  -- than rule -- every land and every mana creature carries {T}, and both
-  -- Mana.sourceOptions' enumeration and Claim.satisfiable's subset walk go
-  -- exponential in the number of CLAIMING sources (#1725).
-  CostComponent.TapThis -> Nothing
+  -- CR 107.5: {T} spends exactly the untapped-ness the TapPermanents arm below
+  -- claims, so it is the same axis, on a pool of one.
+  CostComponent.TapThis ->
+    claim
+      ClaimAxis.Tapping
+      -- canPayComponent's own guard for this component, read below; the two
+      -- answers have to agree.
+      ( itself
+          ( Set.member oid (GameState.battlefield gs)
+              && fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Untapped
+          )
+      )
+      1
   -- Nothing, and no printing can observe it: CR 107.6's {Q} spends TAPPED-ness,
   -- a third axis, and names the object the cost is on, so two such claims could
   -- only come from one cost carrying {Q} twice.
