@@ -18,6 +18,7 @@ import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
@@ -36,6 +37,7 @@ import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Asked as Asked
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
@@ -959,6 +961,77 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     Spec.assertEqWith s "and so does carol" (S.lifeOf S.carol after) (Just 4)
     Spec.assertEqWith s "the drawn SUBGAME did not decide the main game (CR 729.1a)" (GameState.result after) Nothing
     Spec.assertEqWith s "Shahrazad resolved and left the stack" (GameState.stack after) []
+
+  -- CR 729.1a #137: "the spell or ability that created the subgame" -- the rule
+  -- names both kinds of object, and Shahrazad and Sindbad (Unknown Event,
+  -- Creature -- Human, type line and Oracle text checked against
+  -- api.scryfall.com) is the one printing whose subgame comes from an ABILITY:
+  -- "whenever this creature deals combat damage to an opponent, ... players play
+  -- a Magic subgame ... Each player who doesn't win the subgame loses half their
+  -- life, rounded up."
+  --
+  -- THREE SEATS, and the subgame's winner is CAROL -- neither the ability's
+  -- controller nor the player the combat damage was dealt to, so "the player
+  -- CR 729.1b excludes" is a different seat from either of the two the trigger
+  -- itself names.
+  --
+  -- THREE DISTINCT LIFE TOTALS and three distinct library sizes: who wins the
+  -- subgame is decided by the libraries (CR 729.3), and the halving is read
+  -- against each payer's own total. 20, 10 (13 less the Sindbad's 3) and 9 halve
+  -- to 10, 5 and 5-rounded-up-from-4.5 -- so a subgame that bound no winner
+  -- charges carol 5 and leaves her on 4, which her printed 9 cannot be confused
+  -- with.
+  --
+  -- Not transcribed on pawl's card, and both are gaps rather than rules
+  -- equivalences: the intervening "if there haven't been any subgames this
+  -- match", which pawl has no match to count over (gap #1898), and the second
+  -- ability, "{T}: Draw a card and reveal it. If it isn't a land card, discard
+  -- it.", whose "it" is the drawn card and which no binding names (gap #1899).
+  -- Both leave pawl's card able to do LESS than printed, never more, except that
+  -- the missing intervening "if" lets the trigger fire more than once a match.
+  --
+  -- "An opponent" is not transcribed either, and that one IS a rules equivalence:
+  -- CR 508.1a lets only the active player's creatures attack, CR 506.2 makes the
+  -- defending player one of the attacking player's opponents, and CR 510.1b
+  -- assigns an unblocked creature's damage to what it is attacking, so combat
+  -- damage a creature deals to a player is always dealt to its controller's
+  -- opponent (Pawl.KeywordTriggerSpec's Questing Beast case makes the same
+  -- reading of the same printed phrase).
+  Spec.it s "CR 729.1a/729.1b #137 gameplay: a TRIGGERED ability plays the subgame, and CR 729.1b's winner is bound" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    sindbad <- S.printingOf s registry "Shahrazad and Sindbad"
+    let (gs0, _, _, _) = S.threePlayerCombat [sindbad] [] []
+        -- Straight onto each library, never through poolToLibraryG: that sweeps
+        -- every object its player owns off the battlefield, which would take the
+        -- attacking Sindbad with it.
+        stocked = addToLibraryG mountain 8 S.carol (addToLibraryG mountain 4 S.bob (addToLibraryG mountain 6 S.alice gs0))
+        atLife pid n gs = gs {GameState.players = Map.adjust (\p -> p {Player.life = n}) pid (GameState.players gs)}
+        before = atLife S.carol 9 (atLife S.bob 13 (atLife S.alice 20 stocked))
+        atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) sindbadAnswer before
+        fought = S.runPure sindbadAnswer atDamage Damage.dealCombatDamage
+        placed = S.runPure sindbadAnswer fought Engine.settleForPriority
+        after = S.runPure sindbadAnswer placed Engine.priorityLoop
+        isRoll r = case r of
+          Response.DeterminedFirstPlayer _ -> True
+          _ -> False
+        rolls = length (filter isRoll (snd (Replay.record sindbadAnswer placed Engine.priorityLoop)))
+    -- The fixture's own preconditions, asserted rather than assumed: neither can
+    -- be reddened by the runner under test.
+    Spec.assertEqWith s "three distinct life totals" (S.lifeOf S.alice before, S.lifeOf S.bob before, S.lifeOf S.carol before) (Just 20, Just 13, Just 9)
+    Spec.assertEqWith s "and three distinct libraries, only carol's able to survive a 7-card opening hand (CR 729.3)" (librarySize S.alice before, librarySize S.bob before, librarySize S.carol before) (6, 4, 8)
+    -- THE proving assertion, at gameplay level: the ability's subgame had a
+    -- winner, and CR 729.1b's "each player who doesn't win" excluded her.
+    Spec.assertEqWith s "CR 729.1b: carol won the ability's subgame, so she pays nothing" (S.lifeOf S.carol after) (Just 9)
+    Spec.assertEqWith s "alice did not win: 20 halves to 10" (S.lifeOf S.alice after) (Just 10)
+    Spec.assertEqWith s "nor did bob, who pays half of the 10 the Sindbad's 3 left him on" (S.lifeOf S.bob after) (Just 5)
+    -- The subgame was really PLAYED, not reported drawn: CR 729.2's roll is asked
+    -- once, from the main game, and only a subgame asks it.
+    Spec.assertEqWith s "CR 729.2: the ability's subgame determined a first player" rolls 1
+    Spec.assertEqWith s "CR 729.5: alice's cards funnelled back into her main-game library" (librarySize S.alice after) 6
+    Spec.assertEqWith s "and bob's" (librarySize S.bob after) 4
+    Spec.assertEqWith s "and carol's" (librarySize S.carol after) 8
+    Spec.assertEqWith s "the trigger resolved and left the stack" (GameState.stack after) []
+    Spec.assertEqWith s "CR 729.1a: the subgame did not decide the main game" (GameState.result after) Nothing
 
   Spec.it s "CR 729.1a #153: a question names the game it came from, so a subgame's is not a main-game one" $ do
     -- The same cast-a-subgame fixture as the two cases around this one, run
@@ -2093,6 +2166,17 @@ subgameAnswer p = case p of
       cast : _ -> cast
       [] -> A.Pass
   _ -> S.identityAnswer p
+
+-- Attack bob with everything and never block, so the Sindbad connects with a
+-- player who is neither its controller nor the subgame's winner. Inside the
+-- subgame the same answerer keeps every opening hand and takes no action, which
+-- is all CR 729.3 needs: two of the three libraries cannot fill a 7-card hand.
+sindbadAnswer :: Prompt.Prompt r -> r
+sindbadAnswer p = case p of
+  Prompt.ChooseDefender {} -> S.bob
+  Prompt.ChooseAttackTarget _ _ _ options -> Maybe.fromMaybe (NonEmpty.head options) (List.find (== AttackTarget.OfPlayer S.bob) (NonEmpty.toList options))
+  Prompt.DeclareBlockers {} -> Map.empty
+  _ -> S.aggressiveAnswer p
 
 -- #153: what one question said about the game that raised it. A depth and two
 -- booleans rather than the GameStates themselves, so a failure prints something
