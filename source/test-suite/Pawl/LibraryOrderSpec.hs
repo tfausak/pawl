@@ -1943,6 +1943,48 @@ optionalEffectSpec s registry =
         let (creature, g0) = S.addCreature piker S.alice (S.landsInPlay mountain 4)
             (g1, worthyId) = S.handOne worthy g0
         pure (g1 {GameState.priority = Just S.alice}, worthyId, creature)
+      -- Corpse Churn {1}{B} Instant, "Mill three cards, then you may return a
+      -- creature card from your graveyard to your hand." (name, cost, type line
+      -- and oracle text checked against Scryfall.) The PRINTED form of the
+      -- two-clause mode the hand-built case below fakes: clause 0 a mandatory
+      -- Mill, clause 1 an optional MoveToZone.
+      --
+      -- alice: two Swamps in play for the cost, Corpse Churn in hand, and a
+      -- THREE-card library of two Goblin Pikers and a Forest. Two creature
+      -- cards, so CR 608.2d's choice among graveyard cards is a real one rather
+      -- than a one-candidate short circuit, and the Forest is the non-creature
+      -- the clause's filter has to exclude. Nothing on this board draws, so
+      -- milling the library empty is not CR 104.3c.
+      corpseChurnBoard = do
+        swamp <- S.printingOf s registry "Swamp"
+        churn <- S.printingOf s registry "Corpse Churn"
+        piker <- S.printingOf s registry "Goblin Piker"
+        forest <- S.printingOf s registry "Forest"
+        let base = S.landsInPlay swamp 2
+            (_, g1) = S.addLibraryCard piker S.alice base
+            (_, g2) = S.addLibraryCard piker S.alice g1
+            (_, g3) = S.addLibraryCard forest S.alice g2
+            (g4, spellId) = S.handOne churn g3
+        pure (g4 {GameState.priority = Just S.alice}, spellId)
+      -- Takes Corpse Churn's SECOND clause, pinned by clause index: the group's
+      -- takeOptional above pins clause 0, which on this card is the mandatory
+      -- mill, so the taking half needs its own answerer. Everything else,
+      -- including the choice of which graveyard card comes back, falls through
+      -- to S.identityAnswer.
+      returnsChurn :: Prompt.Prompt r -> r
+      returnsChurn p = case p of
+        Prompt.ChooseOptional _ _ _ _ cIdx
+          | cIdx == ClauseIndex.MkClauseIndex 1 -> OptionalDecision.Exercises
+        _ -> S.identityAnswer p
+      churnName = CardName.MkCardName (Text.pack "Corpse Churn")
+      forestName = CardName.MkCardName (Text.pack "Forest")
+      pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
+      namesIn zone gs = List.sort (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone S.alice gs))
+      -- The graveyard as a sorted LIST rather than a set -- two Goblin Pikers
+      -- are two cards and a set would collapse them -- with Corpse Churn itself
+      -- dropped, since CR 608.2n puts the finished instant in the very
+      -- graveyard the mill fills.
+      milledNames gs = filter (/= churnName) (namesIn Zone.Graveyard gs)
    in Spec.describe s "OptionalEffect" $ do
         Spec.it s "CR 603.5 declining the may gains nothing, and the ability still resolves" $ do
           (gs, faithId) <- handWithTwoLands "Renewed Faith" "Plains"
@@ -2039,9 +2081,10 @@ optionalEffectSpec s registry =
         -- Draw and an optional Draw -- and declining the second must still leave
         -- the first having happened. The mandatory-then-optional pair itself is
         -- printed -- Corpse Churn, Into the Wilds, Nissa, Steward of Elements
-        -- and Shed Weakness all write it -- and resolveModes is driven directly
-        -- here only for the two-DRAW shape, where the library count alone
-        -- separates "declined" from "drew".
+        -- and Shed Weakness all write it, and the two cases below prove it
+        -- through a real cast of Corpse Churn -- so resolveModes is driven
+        -- directly here only for the two-DRAW shape, where the library count
+        -- alone separates "declined" from "drew".
         Spec.it s "CR 608.2d a declined clause skips only its own effects" $ do
           forest <- S.printingOf s registry "Forest"
           piker <- S.printingOf s registry "Goblin Piker"
@@ -2067,6 +2110,24 @@ optionalEffectSpec s registry =
               -- declining half with no bespoke answerer needed.
               after = S.runPure S.identityAnswer gs (Resolve.resolveModes stackId stackId [(ModeInstance.MkModeInstance (ModeIndex.MkModeIndex 0) 0, mode)])
           Spec.assertEqWith s "the mandatory clause drew, the declined one did not" (S.handSize S.alice after) (before + 1)
+        -- The same rule at gameplay level, through a real cast: Corpse Churn
+        -- PRINTS the mandatory-then-optional pair the case above builds by
+        -- hand. Milling three and then DECLINING the return must leave all
+        -- three milled cards in the graveyard -- the decline skips its own
+        -- clause and nothing else. Paired with the taking half below, which
+        -- differs in exactly one thing: the answer to the "may".
+        Spec.it s "CR 608.2d whole card: Corpse Churn's declined return leaves the mill done" $ do
+          (gs, spellId) <- corpseChurnBoard
+          let cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
+              after = S.runPure S.identityAnswer cast Stack.resolveTop
+          Spec.assertEqWith s "declining the return leaves all three milled cards in the graveyard" (milledNames after) [forestName, pikerName, pikerName]
+          Spec.assertEqWith s "and nothing came back to the hand" (namesIn Zone.Hand after) []
+        Spec.it s "CR 608.2d whole card: taking Corpse Churn's return moves one card and leaves the rest milled" $ do
+          (gs, spellId) <- corpseChurnBoard
+          let cast = S.runPure returnsChurn gs (S.cast S.alice spellId)
+              after = S.runPure returnsChurn cast Stack.resolveTop
+          Spec.assertEqWith s "taking the return leaves the other two milled cards in the graveyard" (milledNames after) [forestName, pikerName]
+          Spec.assertEqWith s "and exactly the creature card is in the hand" (namesIn Zone.Hand after) [pikerName]
 
 -- Takes every printed "may" it is offered. Rank-1 like Pawl.Support.attackTo: the
 -- implicit forall is outermost, so this is the `forall r. Prompt r -> r` that
