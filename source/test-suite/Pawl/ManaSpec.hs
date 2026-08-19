@@ -2073,6 +2073,102 @@ sharedTapBoard s registry creatures = do
   piker <- S.printingOf s registry "Goblin Piker"
   pure (alicePermanents (drum : drum : replicate creatures piker))
 
+-- CR 118.3's "fully" across a SELF-tap and an OTHER-tap, which is sharedTapSpec's
+-- question with one of the two Drums replaced by the creature's own {T}.
+-- Springleaf Drum beside ONE Llanowar Elves ("{T}: Add {G}") is one mana and not
+-- two: the Drum's payment taps the Elves, or the Elves taps itself, never both.
+-- CR 107.5's {T} stated no claim, so the Elves was counted twice; see #1725.
+--
+-- The Drum's own {T} claims too, on a pool of one -- itself -- that no other
+-- claim meets, so it neither pays nor blocks. What separates the halves of each
+-- case is ONE Elves and nothing else. S.addCreature settles what it places, so CR
+-- 302.6 does not gate the Elves' own {T}; the "one Elves makes one" positive is
+-- what would fail if it did.
+selfTapSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+selfTapSpec s registry = Spec.describe s "A self-tap and an other-tap over one creature" $ do
+  Spec.it s "CR 118.3 a Drum and one Elves make one mana, not two" $ do
+    drum <- S.printingOf s registry "Springleaf Drum"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    let one = alicePermanents [drum, elves]
+        two = alicePermanents [drum, elves, elves]
+    -- The POSITIVES first: 1/2 and 2/3 are the two independent readings, and
+    -- collapsing them into one assertion would let a numeric coincidence pass.
+    Spec.assertBool s (paysGeneric 1 one) "the pair makes one mana"
+    Spec.assertBool s (paysGeneric 2 two) "a second Elves makes the second mana"
+    Spec.assertBool s (not (paysGeneric 2 one)) "and one Elves does not make two"
+    Spec.assertBool s (not (paysGeneric 3 two)) "nor two Elves a third"
+
+  -- The pool is the SOURCE ALONE, which the pair above cannot tell from a wider
+  -- one: on a board of one Drum and n Elves a {T} claiming the whole battlefield
+  -- admits exactly the same totals, since declining one Elf relieves the
+  -- overcount and the Drum eats an Elf either way. TWO Drums and one Elves
+  -- separate the readings -- the truth is one mana, whichever of the three is
+  -- activated, and a battlefield-wide {T} reads two.
+  Spec.it s "CR 118.3 two Drums and one Elves still make one mana" $ do
+    drum <- S.printingOf s registry "Springleaf Drum"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    let board = alicePermanents [drum, drum, elves]
+    Spec.assertBool s (paysGeneric 1 board) "one of the three makes one"
+    Spec.assertBool s (not (paysGeneric 2 board)) "and no two of them make two"
+
+  -- The OFFER, for sharedTapSpec's reason. Mindcrank is the plain {2} artifact.
+  Spec.it s "CR 601.2g a {2} spell is not offered off one Elves" $ do
+    mindcrank <- S.printingOf s registry "Mindcrank"
+    drum <- S.printingOf s registry "Springleaf Drum"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    Spec.assertBool s (offersCast mindcrank (alicePermanents [drum, elves, elves])) "offered off two"
+    Spec.assertBool s (not (offersCast mindcrank (alicePermanents [drum, elves]))) "not off one"
+
+-- CR 118.3's "fully" across the tapping components of ONE cost, which is
+-- sharedTapSpec's question moved inside a single ability. Synthetic Crewed
+-- Battery ("{T}, Tap an untapped creature you control, Tap any number of
+-- untapped creatures you control with total power 2 or greater: Add {C}") beside
+-- ONE Goblin Piker makes no mana: the counted tap and CR 702.122a's threshold tap
+-- both want an untapped creature, and one creature pays one of them. The
+-- threshold half stated no claim, so the two were counted against the same Piker
+-- twice and the cost read as payable; see #1744.
+--
+-- SYNTHETIC because the shape it needs is one COST carrying a threshold tap
+-- beside another tapping component, and the printed producers of a threshold tap
+-- are crew (CR 702.122a; `data/cards/consulate-dreadnought.json` is the only one
+-- of those in `data/cards/`) and Mossbridge Troll, in each of which it is the
+-- whole of its ability's cost, so nothing contends with it. Scryfall
+-- `oracle:"total power" oracle:tap`, 2026-08-18, eight cards -- a printing whose
+-- one cost taps for a total power AND taps something counted is what would
+-- refute this and let the synthetic go.
+--
+-- The Battery's own {T} is a third claim, on a pool of one -- itself -- that no
+-- other claim meets, so it neither pays nor blocks these two.
+crewedBatterySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+crewedBatterySpec s registry = Spec.describe s "A threshold tap and a counted tap in one cost" $ do
+  Spec.it s "CR 118.3 one creature cannot pay both tapping components" $ do
+    one <- crewedBatteryBoard s registry 1
+    two <- crewedBatteryBoard s registry 2
+    -- The POSITIVE first, sharedTapSpec's posture: a refusal that came from the
+    -- Battery not being a source at all would fail here.
+    Spec.assertBool s (paysGeneric 1 two) "two creatures buy the Battery's mana"
+    Spec.assertBool s (not (paysGeneric 1 one)) "and one creature does not"
+
+  -- The OFFER, for sharedTapSpec's reason: a payment that follows a bad offer
+  -- just fails at CR 601.2h, so what the bug does is menu an uncastable spell.
+  -- Springleaf Drum is the pool's plain {1} artifact, and it is cast from HAND,
+  -- so it adds nothing to either board.
+  Spec.it s "CR 601.2g a {1} spell is not offered off one creature" $ do
+    drum <- S.printingOf s registry "Springleaf Drum"
+    one <- crewedBatteryBoard s registry 1
+    two <- crewedBatteryBoard s registry 2
+    Spec.assertBool s (offersCast drum two) "offered off two creatures"
+    Spec.assertBool s (not (offersCast drum one)) "not off one"
+
+-- Alice's Synthetic Crewed Battery and `creatures` Goblin Pikers. What separates
+-- the halves of each case above is ONE Piker and nothing else; the Battery is no
+-- creature, so CR 302.6 gates nothing and S.addCreature settles the Pikers.
+crewedBatteryBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m GameState.GameState
+crewedBatteryBoard s registry creatures = do
+  battery <- S.printingOf s registry "Synthetic Crewed Battery"
+  piker <- S.printingOf s registry "Goblin Piker"
+  pure (alicePermanents (battery : replicate creatures piker))
+
 -- CR 118.3's "fully" across a cost's OWN components and its mana SOURCES, which
 -- is the same rule one level up from sharedVictimSpec. Village Rites ("{B}", "As
 -- an additional cost to cast this spell, sacrifice a creature") beside Phyrexian
@@ -2096,7 +2192,8 @@ villageRitesSpec s registry = Spec.describe s "A cost's own sacrifice and its so
   -- The same ONE Piker, with the {B} coming from a Swamp instead: nothing now
   -- contends for it, so the refusal above is about the contention and not about a
   -- creature too few. The Tower stays on the board, so what changes is only that
-  -- a claimless source can pay the mana.
+  -- the mana comes from a source claiming ITSELF (CR 107.5's {T}) rather than the
+  -- Piker -- a different pool, which the Rites' sacrifice never meets.
   Spec.it s "CR 601.2g a Swamp frees the creature for the additional cost" $ do
     rites <- S.printingOf s registry "Village Rites"
     tower <- S.printingOf s registry "Phyrexian Tower"
@@ -2580,6 +2677,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   treasonousOgreSpec s registry
   sharedVictimSpec s registry
   sharedTapSpec s registry
+  selfTapSpec s registry
+  crewedBatterySpec s registry
   villageRitesSpec s registry
   chromaticSpec s registry
   burningTreeSpec s registry

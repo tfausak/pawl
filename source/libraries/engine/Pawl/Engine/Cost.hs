@@ -876,22 +876,37 @@ claimOf pid oid component gs = case component of
   CostComponent.ExileTopFromGraveyard criterion ->
     claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (Maybe.maybeToList (topExileCandidate pid criterion gs))) 1
   CostComponent.ExileThisFromGraveyard -> claim (ClaimAxis.Removal Zone.Graveyard) (itself (isOwnedIn Zone.Graveyard)) 1
-  -- Not implemented: CR 107.5's {T} spends exactly the untapped-ness the
-  -- TapPermanents arm below claims, and a claim of `ClaimAxis.Tapping (itself
-  -- ...) 1` is the principled arm. The reason it is not written is cost rather
-  -- than rule -- every land and every mana creature carries {T}, and both
-  -- Mana.sourceOptions' enumeration and Claim.satisfiable's subset walk go
-  -- exponential in the number of CLAIMING sources (#1725).
-  CostComponent.TapThis -> Nothing
+  -- CR 107.5: {T} spends exactly the untapped-ness the TapPermanents arm below
+  -- claims, so it is the same axis, on a pool of one.
+  CostComponent.TapThis ->
+    claim
+      ClaimAxis.Tapping
+      -- canPayComponent's own guard for this component, read below; the two
+      -- answers have to agree.
+      ( itself
+          ( Set.member oid (GameState.battlefield gs)
+              && fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Untapped
+          )
+      )
+      1
   -- Nothing, and no printing can observe it: CR 107.6's {Q} spends TAPPED-ness,
   -- a third axis, and names the object the cost is on, so two such claims could
   -- only come from one cost carrying {Q} twice.
   CostComponent.UntapThis -> Nothing
-  -- Nothing, this Natural being a THRESHOLD on an aggregate rather than a count
-  -- of objects. Not implemented: CR 702.122a's payment does tap at least one
-  -- untapped permanent whenever the threshold is above 0, so a claim of 1 on
-  -- ClaimAxis.Tapping is a lower bound that could never over-refuse (#1744).
-  CostComponent.TapForTotalPower {} -> Nothing
+  -- ONE, and deliberately not the Natural: that number is a THRESHOLD on an
+  -- aggregate rather than a count of objects, so how many permanents a payment
+  -- taps is not settled until the payer picks them. A threshold above 0 needs
+  -- some permanent of positive power (canPayComponent below), so one is a LOWER
+  -- BOUND on what the payment taps and can never over-refuse; a threshold of 0 is
+  -- paid by the empty set, taps nothing and claims nothing.
+  --
+  -- The pool is tapCandidates', TapPermanents' below: tapped candidates included,
+  -- the same permissive reading and for its reason. CR 702.122a's own criterion
+  -- excludes them (Pawl.Engine.Keyword's crew), so a crew cost's pool is the
+  -- untapped creatures exactly.
+  CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower threshold criterion)
+    | threshold > 0 -> claim ClaimAxis.Tapping (Set.fromList (tapCandidates pid oid criterion gs)) 1
+    | otherwise -> Nothing
   -- CR 601.2f's "tapping permanents", on the TAPPING axis rather than a zone's,
   -- for the header's reason. ManaSpec's "a creature tapped for mana can still be
   -- sacrificed" is the case that proves the axes stay apart.
