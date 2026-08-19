@@ -1951,10 +1951,10 @@ optionalEffectSpec s registry =
       --
       -- alice: two Swamps in play for the cost, Corpse Churn in hand, and a
       -- THREE-card library of two Goblin Pikers and a Forest. Two creature
-      -- cards, so CR 608.2d's choice among graveyard cards is a real one rather
-      -- than a one-candidate short circuit, and the Forest is the non-creature
-      -- the clause's filter has to exclude. Nothing on this board draws, so
-      -- milling the library empty is not CR 104.3c.
+      -- cards, so CR 608.2d's choice among graveyard cards has more candidates
+      -- than it takes and cannot be elided as a forced one, and the Forest is
+      -- the non-creature the clause's filter has to exclude. Nothing on this
+      -- board draws, so milling the library empty is not CR 104.3c.
       corpseChurnBoard = do
         swamp <- S.printingOf s registry "Swamp"
         churn <- S.printingOf s registry "Corpse Churn"
@@ -1979,12 +1979,12 @@ optionalEffectSpec s registry =
       churnName = CardName.MkCardName (Text.pack "Corpse Churn")
       forestName = CardName.MkCardName (Text.pack "Forest")
       pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
-      namesIn zone gs = List.sort (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone S.alice gs))
+      aliceNamesIn zone gs = List.sort (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone S.alice gs))
       -- The graveyard as a sorted LIST rather than a set -- two Goblin Pikers
       -- are two cards and a set would collapse them -- with Corpse Churn itself
       -- dropped, since CR 608.2n puts the finished instant in the very
       -- graveyard the mill fills.
-      milledNames gs = filter (/= churnName) (namesIn Zone.Graveyard gs)
+      milledNames gs = filter (/= churnName) (aliceNamesIn Zone.Graveyard gs)
    in Spec.describe s "OptionalEffect" $ do
         Spec.it s "CR 603.5 declining the may gains nothing, and the ability still resolves" $ do
           (gs, faithId) <- handWithTwoLands "Renewed Faith" "Plains"
@@ -2136,13 +2136,13 @@ optionalEffectSpec s registry =
           let cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
               after = S.runPure S.identityAnswer cast Stack.resolveTop
           Spec.assertEqWith s "declining the return leaves all three milled cards in the graveyard" (milledNames after) [forestName, pikerName, pikerName]
-          Spec.assertEqWith s "and nothing came back to the hand" (namesIn Zone.Hand after) []
+          Spec.assertEqWith s "and nothing came back to the hand" (aliceNamesIn Zone.Hand after) []
         Spec.it s "CR 608.2d whole card: taking Corpse Churn's return moves one card and leaves the rest milled" $ do
           (gs, spellId) <- corpseChurnBoard
           let cast = S.runPure returnsChurn gs (S.cast S.alice spellId)
               after = S.runPure returnsChurn cast Stack.resolveTop
           Spec.assertEqWith s "taking the return leaves the other two milled cards in the graveyard" (milledNames after) [forestName, pikerName]
-          Spec.assertEqWith s "and exactly the creature card is in the hand" (namesIn Zone.Hand after) [pikerName]
+          Spec.assertEqWith s "and exactly the creature card is in the hand" (aliceNamesIn Zone.Hand after) [pikerName]
 
 -- Takes every printed "may" it is offered. Rank-1 like Pawl.Support.attackTo: the
 -- implicit forall is outermost, so this is the `forall r. Prompt r -> r` that
