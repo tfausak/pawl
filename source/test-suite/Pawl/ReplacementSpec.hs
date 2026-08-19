@@ -2809,6 +2809,51 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         let after = castAndResolve (raceAnswer corpsejack piker) gs spellId
          in Spec.assertEqWith s "not doubled -- ControllerRelation is Yours" (countersOn CounterKind.PlusOnePlusOne piker after) 1
       _ -> Spec.assertFailure s "fixture did not build both sides"
+  -- THE PROVING TEST for #78's candidate-collection channel. CR 614.12 settles
+  -- which replacement effects modify how a permanent enters by taking into
+  -- account "continuous effects that already exist and would apply to the
+  -- permanent" -- and a permanent arriving in the SAME batch has none yet, since
+  -- its static abilities begin to apply only once it is on the battlefield, which
+  -- is the moment this one arrives too. Corpsejack Menace's own ruling states the
+  -- effect this rule denies it here: "if a creature you control would enter the
+  -- battlefield with a number of +1/+1 counters on it, it enters with twice that
+  -- many instead."
+  --
+  -- Rise of the Dark Realms returns every creature card from every graveyard as
+  -- ONE CR 608.2f event, so the Menace and the Worker enter simultaneously.
+  -- Arcbound Worker is a printed 0/0 with modular 1 (CR 702.43a), which
+  -- Pawl.Engine.Keyword mints as the CR 614.1c entry replacement "enters with one
+  -- +1/+1 counter" -- so the counter is placed inside the Worker's entry loop,
+  -- exactly where the rule is asked.
+  --
+  -- The Menace is buried FIRST so it takes the lower ObjectId and moves first
+  -- (Resolve.graveyardCardsOf sorts ascending, S.addGraveyardCard mints in call
+  -- order), which is the only order in which a live-board reading has anything to
+  -- double; the mirrored leg pins that the answer does not depend on it, which is
+  -- CR 608.2f's point -- the batch is one event and nobody gets to order it.
+  --
+  -- Power and toughness ride along with the counter count because they are what a
+  -- player sees: 1 counter is a 1/1 Worker, 2 is a 2/2, and 0 would be a 0/0 that
+  -- CR 704.5a buries -- three boards no pair of readings can confuse.
+  Spec.it s "CR 614.12 a Corpsejack Menace reanimated beside a modular creature doubles nothing (#78)" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    rise <- S.printingOf s registry "Rise of the Dark Realms"
+    corpsejackMenace <- S.printingOf s registry "Corpsejack Menace"
+    arcboundWorker <- S.printingOf s registry "Arcbound Worker"
+    let outcome buried =
+          let graves = List.foldl' (\g printing -> snd (S.addGraveyardCard printing S.alice g)) (S.landsInPlay swamp 9) buried
+              (gs, spellId) = S.handOne rise graves
+              after = castAndResolve S.identityAnswer gs spellId
+              workers =
+                [ oid
+                | oid <- Set.toList (GameState.battlefield after),
+                  Projection.namesOf oid after == Set.singleton (CardName.MkCardName (Text.pack "Arcbound Worker"))
+                ]
+           in [(countersOn CounterKind.PlusOnePlusOne oid after, S.powerToughnessOf oid after) | oid <- workers]
+        menaceFirst = outcome [corpsejackMenace, arcboundWorker]
+        workerFirst = outcome [arcboundWorker, corpsejackMenace]
+    Spec.assertEqWith s "modular 1's one counter, undoubled -- a 1/1 Worker" menaceFirst [(1, Just (1, 1))]
+    Spec.assertEqWith s "and the batch's processing order changes nothing (CR 608.2f)" workerFirst menaceFirst
   -- CR 614.1d: "Continuous effects that read '[This permanent] enters . . .' or
   -- '[Objects] enter [the battlefield] . . .' are replacement effects." Zof
   -- Bloodbog prints one sentence of exactly that shape -- "This land enters

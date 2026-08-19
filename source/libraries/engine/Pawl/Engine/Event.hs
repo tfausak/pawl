@@ -634,8 +634,10 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 -- is unexercised.
 --
 -- `batch` is the set of ids entering the battlefield AT THE SAME TIME as this
--- loop's subject, and TWO of `apply`'s entry arms narrow by it, on two different
--- rules:
+-- loop's subject, NOT counting the subject itself -- every door subtracts it
+-- before passing the set. THREE readers narrow by it, on three different rules.
+-- The loop's own candidate filter is the first (CR 614.12; see `loop`), and two
+-- of `apply`'s entry arms are the other two:
 --
 --   * COPY TARGETS. CR 614.12a puts the choice BEFORE the permanent enters, and
 --     an as-enters copy may only copy a permanent already ON the battlefield
@@ -651,14 +653,15 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 --     object entering the battlefield at the same time as that object."
 --
 -- Both arms exclude the loop's own subject themselves -- legalCopyTargets'
--- `self`, and the sacrifice arm's `entering` -- never through this set.
+-- `self`, and the sacrifice arm's `entering` -- rather than leaning on this set
+-- being subject-free.
 --
 -- Every `changeZone` door but changeZoneEnteringIn handles one entering object at
 -- a time and passes `Set.empty`. There are two non-empty cases, and they reach
 -- the same invariant from opposite directions. `createTokens` below materializes
 -- every token of a Create BEFORE running any of their entry loops (CR 614.16's
 -- doubled count is settled once, up front), so it knows the whole set and passes
--- it whole. Effect.MoveToZone's CR 608.2f batch (Pawl.Engine.Resolve) moves its
+-- each token the rest of it. Effect.MoveToZone's CR 608.2f batch (Pawl.Engine.Resolve) moves its
 -- members through the funnel one after another, so it ACCUMULATES the set as
 -- each arrives: a member still in its old zone is not on the battlefield for a
 -- sweep to find, and one that has arrived is. Either way a later member's entry
@@ -672,23 +675,32 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 --      Dark Realms over a graveyard holding a Clone, where the batch is a zone
 --      change (Pawl.CopySpec's "a reanimated Clone may not copy a creature
 --      reanimated beside it"). Both fail without this exclusion.
---   2. Candidate collection -- reachable, and correct where it is reached. Most
---      entry replacements a PERMANENT carries in this pool are CR 614.1c's
---      self-only `IsSource` (Clone, Primal Plasma, CR 306.5b's loyalty), which no
---      sibling can satisfy. Kismet prints CR 614.1d's other-objects form, so a
---      sibling entering beside it would be collected here -- correctly, and by
---      the card's own text. Still no board in the pool puts Kismet itself into a
---      batch, the CR 608.2f zone-change batches below included: Kismet's EntryR
---      names permanents its OPPONENTS control, and the two batches the specs
---      build (Replenish, Rise of the Dark Realms) return cards from ONE
---      graveyard under that player's own control. So nothing observes it yet.
---   3. Projection -- a sibling's STATIC ABILITIES would be visible to a later
---      member's projection, and nothing here excludes them the way `batch`
---      excludes copy targets. CR 614.12 does not sanction this: a
---      simultaneously-entering sibling's static abilities do not already exist
---      relative to it. NOT IMPLEMENTED AT ALL, and unreached today only because
---      every token card in the pool has empty `staticAbilities` (#78). A CR 608.2f
---      MoveToZone batch reaches this channel too now, and is not fixed here.
+--   2. Candidate collection -- excluded by `batch` in `loop`, which drops every
+--      candidate a sibling SOURCES. Most entry replacements a PERMANENT carries
+--      in this pool are CR 614.1c's self-only `IsSource` (Clone, Primal Plasma,
+--      CR 306.5b's loyalty), which no sibling can satisfy, so the exclusion bites
+--      on the other-objects forms: Kismet's CR 614.1d "enter tapped" and
+--      Corpsejack Menace's CR 614.16 counter doubling. Pawl.ReplacementSpec's
+--      "a Corpsejack Menace reanimated beside a modular creature doubles nothing"
+--      is the proof, over a Rise of the Dark Realms batch; without it an Arcbound
+--      Worker returned beside the Menace enters 2/2 instead of 1/1, and which
+--      answer it got depended on the order CR 608.2f gives nobody the right to
+--      decide.
+--   3. Projection -- a sibling's STATIC ABILITIES are visible to a later member's
+--      projection (Projection.controllerOf, copiableCharacteristics and the
+--      characteristics `applies` matches on), and nothing here excludes them the
+--      way `batch` excludes the sibling's replacement candidates. CR 614.12 does
+--      not sanction this: a simultaneously-entering sibling's continuous effects
+--      do not already exist relative to it. Not implemented. Observing it needs
+--      two cards at once -- a sibling whose static ability changes one of those
+--      reads (a Mycosynth Lattice-shaped type-changer, a control-changer) and an
+--      entering permanent whose entry replacement reads what it changed -- and no
+--      pair in `data/cards/` shares a batch: Ashaya, Soul of the Wild is the only
+--      type-changer reanimation can put into one, and the pool's only entry
+--      replacement that asks about land-ness is Kismet's, whose artifact-or-
+--      creature-or-land filter already matches an entering creature without it
+--      and names permanents an OPPONENT controls, where a reanimation batch is one
+--      player's (#78).
 applyReplacementsIn :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent)
 applyReplacementsIn asOf batch event = do
   (outcome, _, _) <- applyReplacementsFully asOf batch event
@@ -721,7 +733,20 @@ loop asOf batch applied prevented exiledBy event = do
   -- CR 608.2f batch, the state the batch began in), minus CR 614.5's
   -- already-applied set. Re-collecting is what makes CR 616.2 work.
   let unused candidate = not (Set.member (ReplacementCandidate.identity candidate) applied)
-      fresh = filter unused (Replacement.applicable asOf gs event)
+      -- CR 614.12: a permanent entering BESIDE this event's subject contributes
+      -- nothing. The rule settles which effects apply from "continuous effects
+      -- that already exist and would apply to the permanent", and a sibling's
+      -- static abilities do not already exist -- they begin to apply once it is on
+      -- the battlefield, which is the moment this event happens too. The subject's
+      -- OWN abilities are untouched, because `batch` never holds it (see
+      -- applyReplacementsIn).
+      --
+      -- Filtered by SOURCE, which reaches only the permanent segment of `collect`:
+      -- a floating row's source is a spell or ability that has already changed
+      -- zones and taken a new id, so no id in a batch of entering permanents can
+      -- name one.
+      notSibling candidate = not (Set.member (ReplacementCandidate.source candidate) batch)
+      fresh = filter (\candidate -> unused candidate && notSibling candidate) (Replacement.applicable asOf gs event)
   case Replacement.highestBucket fresh of
     -- CR 616.1f / 614.6: no candidate remains, so the surviving event happens.
     [] -> pure (Just event, prevented, exiledBy)
@@ -1114,7 +1139,7 @@ apply batch candidate event =
       -- iteration from placing them twice.
       EntryRewrite.WithCounters (WithCounters.MkWithCounters kind n) -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
-        Monad.void (putOwnCounters oid kind n)
+        Monad.void (putOwnCountersIn batch oid kind n)
         pure (Just event)
       -- CR 616.1b / 110.2: Gather Specimens. The entering object's CR 110.2
       -- DEFAULT controller becomes CR 109.5's "you" -- the candidate's
@@ -1243,7 +1268,7 @@ apply batch candidate event =
             State.modify' $ \gs2 ->
               let note obj = obj {Object.bindings = Map.insert Binding.sacrificedCount (Binding.toAmount many) (Object.bindings obj)}
                in gs2 {GameState.objects = Map.adjust note oid (GameState.objects gs2)}
-            Monad.mapM_ (\k -> putOwnCounters oid k many) kind
+            Monad.mapM_ (\k -> putOwnCountersIn batch oid k many) kind
             pure (Just event)
       -- CR 702.136a: riot. "You may have this permanent enter with an additional
       -- +1/+1 counter on it. If you don't, it gains haste."
@@ -1285,7 +1310,7 @@ apply batch candidate event =
             let decider = Decide.deciderFor controller gs
             answer <- Game.choose (Prompt.ChooseRiot decider controller oid)
             case answer of
-              OptionalDecision.Exercises -> Monad.void (putOwnCounters oid CounterKind.PlusOnePlusOne 1)
+              OptionalDecision.Exercises -> Monad.void (putOwnCountersIn batch oid CounterKind.PlusOnePlusOne 1)
               OptionalDecision.Declines ->
                 State.modify' $ \gs2 ->
                   -- CR 611.2a: "gains haste" with no stated end lasts until the
@@ -1333,7 +1358,7 @@ apply batch candidate event =
             let decider = Decide.deciderFor controller gs
             answer <- Game.choose (Prompt.ChooseUnleash decider controller oid)
             case answer of
-              OptionalDecision.Exercises -> Monad.void (putOwnCounters oid CounterKind.PlusOnePlusOne 1)
+              OptionalDecision.Exercises -> Monad.void (putOwnCountersIn batch oid CounterKind.PlusOnePlusOne 1)
               OptionalDecision.Declines -> pure ()
             pure (Just event)
       -- CR 702.54a via CR 614.1c: bloodthirst N on Bloodrage Vampire. The
@@ -1350,7 +1375,7 @@ apply batch candidate event =
       -- No prompt, and none is owed: rule 702.54a states no choice.
       EntryRewrite.Bloodthirst n -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
-        Monad.void (putOwnCounters oid CounterKind.PlusOnePlusOne n)
+        Monad.void (putOwnCountersIn batch oid CounterKind.PlusOnePlusOne n)
         pure (Just event)
       -- CR 614.1d / 110.5b: "This permanent enters tapped" (Zof Bloodbog's land,
       -- Headless Skaab's creature -- the arm gates on no card type). CR 110.5b
@@ -2025,8 +2050,13 @@ resolveDestruction asOf cause regenerability oid = do
 -- it -- CR 702.100b and CR 702.149c, at Pawl.Engine.Resolve's Effect.Evolve and
 -- Effect.Train arms; every other caller places and moves on.
 putCounters :: CounterCause.CounterCause -> ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game Natural
-putCounters cause oid kind n = do
-  resolved <- resolveCounters cause oid kind n
+putCounters = putCountersIn Set.empty
+
+-- putCounters with CR 614.12's same-batch exclusion: `batch` is the permanents
+-- entering beside `oid`, and only an entry path has one to pass.
+putCountersIn :: Set ObjectId -> CounterCause.CounterCause -> ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game Natural
+putCountersIn batch cause oid kind n = do
+  resolved <- resolveCounters batch cause oid kind n
   case resolved of
     Nothing -> pure 0
     Just (target, settledKind, settledCount)
@@ -2072,11 +2102,16 @@ putCounters cause oid kind n = do
 -- putCounters places nothing on such an object anyway -- so answering 0 without
 -- raising the event is the same answer, reached one step earlier.
 putOwnCounters :: ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game Natural
-putOwnCounters oid kind n = do
+putOwnCounters = putOwnCountersIn Set.empty
+
+-- putOwnCounters with CR 614.12's same-batch exclusion; `batch` is
+-- putCountersIn's.
+putOwnCountersIn :: Set ObjectId -> ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game Natural
+putOwnCountersIn batch oid kind n = do
   gs <- State.get
   case Projection.controllerOf oid gs of
     Nothing -> pure 0
-    Just putter -> putCounters (CounterCause.ByEffect putter) oid kind n
+    Just putter -> putCountersIn batch (CounterCause.ByEffect putter) oid kind n
 
 -- CR 122: take counters off an object, recording a CountersRemoved event from
 -- the before/after pair so a trigger can read the crossing. That event's other
@@ -2132,9 +2167,15 @@ removeCounters oid kind n =
 -- placement used to skip the loop at this door, an equivalence that held only while
 -- every representable counter replacement was one of rule 614.16's; Vorinclex is
 -- not one, so the gate moved into the row filter (#847).
-resolveCounters :: CounterCause.CounterCause -> ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game (Maybe (ObjectId, CounterKind.CounterKind Keyword.Type.Keyword, Natural))
-resolveCounters cause oid kind n = do
-  outcome <- applyReplacements (ProposedEvent.WouldPutCounters cause oid kind n)
+--
+-- `batch` is applyReplacementsIn's: the permanents entering the battlefield
+-- BESIDE the object being counted, empty for every placement that is not part of
+-- an entry. A counter a permanent enters with is part of how it enters (CR
+-- 614.1c), so CR 614.12 settles which effects may scale it, and a Corpsejack
+-- Menace arriving in the same batch is not one of them.
+resolveCounters :: Set ObjectId -> CounterCause.CounterCause -> ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game (Maybe (ObjectId, CounterKind.CounterKind Keyword.Type.Keyword, Natural))
+resolveCounters batch cause oid kind n = do
+  outcome <- applyReplacementsIn Nothing batch (ProposedEvent.WouldPutCounters cause oid kind n)
   pure (outcome >>= Replacement.asCounters)
 
 -- CR 122.1 / 122.6: putCounters' player half -- the ONE place a player's counters
@@ -2921,7 +2962,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                 -- Before the loop rather than after it, which no card observes: no
                 -- entry replacement in the pool reads a counter the entering object
                 -- already has, and the two are simultaneous in the rules anyway.
-                Monad.mapM_ (\(kind, n) -> Monad.void (putOwnCounters newId kind n)) (Map.toAscList entering)
+                Monad.mapM_ (\(kind, n) -> Monad.void (putOwnCountersIn batch newId kind n)) (Map.toAscList entering)
                 runEntry batch newId
               -- CR 709.5h: an ability that triggers on a door opening fires "regardless
               -- of whether it was given that designation while entering the
@@ -3510,8 +3551,9 @@ createTokens controller card copy n tapped entering = do
           -- difference -- no entry replacement in the pool reads a counter the
           -- entering object already has -- so this buys the ordering rather than a
           -- passing test.
-          Monad.mapM_ (\oid -> Monad.mapM_ (\(kind, many) -> Monad.void (putOwnCounters oid kind many)) (Map.toAscList entering)) ids
-          Monad.mapM_ (runEntry (Set.fromList ids)) ids
+          let siblingsOf oid = Set.delete oid (Set.fromList ids)
+          Monad.mapM_ (\oid -> Monad.mapM_ (\(kind, many) -> Monad.void (putOwnCountersIn (siblingsOf oid) oid kind many)) (Map.toAscList entering)) ids
+          Monad.mapM_ (\oid -> runEntry (siblingsOf oid) oid) ids
           -- No prior incarnation to snapshot, so a token's last known information
           -- IS what it is now (CR 111.3). Recorded after every entry loop, so the
           -- events describe settled objects.
