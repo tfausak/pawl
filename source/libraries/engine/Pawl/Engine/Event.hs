@@ -589,10 +589,14 @@ createEmblem pid card =
 --
 -- `asOf` is applyReplacementsIn's: Nothing for a lone move, Just the pre-batch
 -- board when this move is one member of a CR 608.2f / 704.3 batch.
-resolveZoneChange :: Maybe GameState -> ZoneChange -> Game (Maybe ZoneChange)
+--
+-- Also reports CR 607.2b's link: the object whose replacement effect is what made
+-- the destination exile, or Nothing when the move was headed there on its own
+-- instruction. The caller files it once the arriving incarnation has an id.
+resolveZoneChange :: Maybe GameState -> ZoneChange -> Game (Maybe ZoneChange, Maybe ObjectId)
 resolveZoneChange asOf zc = do
-  outcome <- applyReplacementsIn asOf Set.empty (ProposedEvent.WouldChangeZone zc)
-  pure (outcome >>= Replacement.asZoneChange)
+  (outcome, _, exiledBy) <- applyReplacementsFully asOf Set.empty (ProposedEvent.WouldChangeZone zc)
+  pure (outcome >>= Replacement.asZoneChange, exiledBy)
 
 -- CR 616.1's loop. `Nothing` means the event DOES NOT HAPPEN (CR 615.6, CR
 -- 701.19a). A rewrite that cancels an event has already performed its own
@@ -686,7 +690,9 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 --      every token card in the pool has empty `staticAbilities` (#78). A CR 608.2f
 --      MoveToZone batch reaches this channel too now, and is not fixed here.
 applyReplacementsIn :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent)
-applyReplacementsIn asOf batch = fmap fst . applyReplacementsReporting asOf batch
+applyReplacementsIn asOf batch event = do
+  (outcome, _, _) <- applyReplacementsFully asOf batch event
+  pure outcome
 
 -- The same loop, answering CR 615.13's second question as well: WHICH prevention
 -- effects applied on the way, and how much each of them prevented.
@@ -696,10 +702,20 @@ applyReplacementsIn asOf batch = fmap fst . applyReplacementsReporting asOf batc
 -- prevention effect a thing that watches a DAMAGE event -- so every other caller
 -- would be threading a value it knows is empty.
 applyReplacementsReporting :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent, [Prevention])
-applyReplacementsReporting asOf batch = loop asOf batch Set.empty []
+applyReplacementsReporting asOf batch event = do
+  (outcome, prevented, _) <- applyReplacementsFully asOf batch event
+  pure (outcome, prevented)
 
-loop :: Maybe GameState -> Set ObjectId -> Set CandidateId -> [Prevention] -> ProposedEvent -> Game (Maybe ProposedEvent, [Prevention])
-loop asOf batch applied prevented event = do
+-- The loop itself, with both of the side answers its two classes of caller want:
+-- CR 615.13's preventions, and CR 607.2b's "which object's replacement effect is
+-- what exiled this". Each is empty or Nothing for every event class but one --
+-- damage for the first, zone changes for the second -- which is why the three
+-- entries above and around it exist rather than one wide return everywhere.
+applyReplacementsFully :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent, [Prevention], Maybe ObjectId)
+applyReplacementsFully asOf batch = loop asOf batch Set.empty [] Nothing
+
+loop :: Maybe GameState -> Set ObjectId -> Set CandidateId -> [Prevention] -> Maybe ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent, [Prevention], Maybe ObjectId)
+loop asOf batch applied prevented exiledBy event = do
   gs <- State.get
   -- From scratch each iteration: collect against the CURRENT state (or, for a
   -- CR 608.2f batch, the state the batch began in), minus CR 614.5's
@@ -708,13 +724,13 @@ loop asOf batch applied prevented event = do
       fresh = filter unused (Replacement.applicable asOf gs event)
   case Replacement.highestBucket fresh of
     -- CR 616.1f / 614.6: no candidate remains, so the surviving event happens.
-    [] -> pure (Just event, prevented)
+    [] -> pure (Just event, prevented, exiledBy)
     bucket -> do
       picked <- Replacement.choose gs event bucket
       case picked of
         -- Unreachable: highestBucket returns [] for an empty input, so `bucket`
         -- is non-empty and `choose` always picks. Total rather than partial.
-        Nothing -> pure (Just event, prevented)
+        Nothing -> pure (Just event, prevented, exiledBy)
         Just candidate -> do
           -- CR 615.12: the chosen effect is a prevention effect and this damage
           -- can't be prevented (Spider-Punk), so it is APPLIED and prevents none
@@ -752,8 +768,36 @@ loop asOf batch applied prevented event = do
           -- SetAmount and Scale shrink an event without preventing a point of it.
           let prevented1 = prevented <> Maybe.maybeToList (Replacement.preventionBy candidate event outcome)
           case outcome of
-            Nothing -> pure (Nothing, prevented1)
-            Just rewritten -> loop asOf batch (Set.insert (ReplacementCandidate.identity candidate) applied) prevented1 rewritten
+            Nothing -> pure (Nothing, prevented1, exiledBy)
+            Just rewritten -> loop asOf batch (Set.insert (ReplacementCandidate.identity candidate) applied) prevented1 (exiledByAfter candidate event rewritten exiledBy) rewritten
+
+-- CR 607.2b's link, read OUTSIDE `apply` from the event before and after --
+-- `preventionBy`'s posture above, for its reason: no arm of that fold has to
+-- report anything, so none can forget to. A rewrite that moved a proposed zone
+-- change's destination INTO exile is the "replacement event caused by" the row's
+-- own object that the rule links to, so the arriving card is that object's and
+-- not the resolving ability's, which CR 607.2a's "as a result of an instruction
+-- to exile them in the first ability" already excludes it from.
+--
+-- A later rewrite that moves the destination back OUT of exile clears the link:
+-- no card arrives in exile for the rule to speak of. One that leaves an
+-- already-exile destination alone changes nothing, since the earlier row is
+-- still what caused the exile. Neither of those two arms is exercised, and not
+-- by a claim about Magic: every ReplacementEffect.ZoneChangeR in data/cards/
+-- names exile as its destination, so no board can stack two of them into a
+-- rewrite chain that leaves it again. A printed row naming any other zone --
+-- Wheel of Sun and Moon's "into its owner's library instead" is the shape --
+-- would refute that and reach both arms. Only the first has a producer.
+--
+-- No case on effect identity: the question is a proposed event's destination
+-- ZONE, and the answer is the row's source object.
+exiledByAfter :: ReplacementCandidate -> ProposedEvent -> ProposedEvent -> Maybe ObjectId -> Maybe ObjectId
+exiledByAfter candidate before after exiledBy =
+  case (fmap ZoneChange.to (Replacement.asZoneChange before), fmap ZoneChange.to (Replacement.asZoneChange after)) of
+    (Just old, Just new)
+      | new == Zone.Exile, old /= Zone.Exile -> Just (ReplacementCandidate.source candidate)
+      | new /= Zone.Exile -> Nothing
+    _ -> exiledBy
 
 -- CR 615.12: apply one chosen PREVENTION effect to damage that can't be
 -- prevented. The event comes back undiminished -- "those effects won't prevent
@@ -2468,7 +2512,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
       -- read would mean re-deriving them after that loop.
       --
       -- Both ids are `oid` in the PROPOSED event: nothing has moved yet.
-      resolved <- resolveZoneChange asOf (ZoneChange.MkZoneChange oid oid fromZone requestedDest)
+      (resolved, exiledBy) <- resolveZoneChange asOf (ZoneChange.MkZoneChange oid oid fromZone requestedDest)
       case resolved of
         -- CR 614.6: nothing survived the loop, so no zone change happens. No
         -- producer today -- no card in the pool cancels a zone change outright --
@@ -2494,9 +2538,9 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- so a CR 616.1 rewrite that redirects the move decides this too
               -- (CR 614.6: the modified event is what happens). Indistinguishable
               -- from gating on the request today, and not because of a claim
-              -- about Magic: no ReplacementEffect.ZoneChangeR in the pool names
-              -- the battlefield as its destination (Leyline of the Void and Rest
-              -- in Peace, the two that exist, both name exile).
+              -- about Magic: no ReplacementEffect.ZoneChangeR in data/cards/
+              -- names the battlefield as its destination -- every one of them
+              -- names exile (see exiledByAfter, which rests on the same fact).
               --
               -- CR 400.7: Object.newIncarnation is the whole forgetting -- the
               -- entry controller (CR 110.2), the as-enters choices (CR 614.1c),
@@ -2936,6 +2980,18 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                       { BecameAttached.attachment = newId,
                         BecameAttached.host = host
                       }
+              -- CR 607.2b: this move ended in exile because somebody's replacement
+              -- effect sent it there, so the arriving card is linked to THAT
+              -- object. Filed here, at the one place the CR 400.7 incarnation
+              -- first has an id, and before the Moved event so nothing can read
+              -- the arrival with the link missing.
+              --
+              -- Resolve.recordExiledWith's diff runs afterwards and would
+              -- otherwise file this same card against whatever effect was
+              -- running; its insertWith keeps the entry already present, which is
+              -- what makes this write the one that stands.
+              Monad.forM_ (if dest == Zone.Exile then exiledBy else Nothing) $ \linked ->
+                State.modify' (\g -> g {GameState.exiledWith = Map.insert newId linked (GameState.exiledWith g)})
               State.modify' (recordEvent (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange oid newId fromZone dest) snapshot)))
               pure (Just newId)
 

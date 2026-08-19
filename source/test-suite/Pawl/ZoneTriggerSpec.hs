@@ -2163,6 +2163,9 @@ promiseOfTomorrowReturnSpec s registry =
       -- Everything in exile by name, whoever owns it -- CR 400.1 makes exile one
       -- shared zone, and the Sentry there is bob's card.
       exiledNames gs = List.sort (Maybe.mapMaybe (`nameOf` gs) (Set.toList (GameState.exile gs)))
+      -- Both graveyards, since CR 400.1 makes the graveyard a per-player zone and
+      -- the Sentry is bob's card.
+      namesInGraveyards gs = List.sort (concatMap (\pid -> Maybe.mapMaybe (`nameOf` gs) (Game.zoneMembers Zone.Graveyard pid gs)) (NonEmpty.toList S.bothPlayers))
       named = CardName.MkCardName . Text.pack
    in Spec.describe s "CR 607.2a Promise of Tomorrow returns the cards it exiled" $ do
         Spec.it s "CR 700.4 whole card: the linked cards come back under alice, the unlinked one stays in exile" $ do
@@ -2202,6 +2205,48 @@ promiseOfTomorrowReturnSpec s registry =
           Spec.assertEqWith s "CR 603.4: nothing was placed on the stack" (length (GameState.stack placed)) 0
           Spec.assertBool s (S.onBattlefield promiseId after) "the enchantment is still there"
           Spec.assertEqWith s "and exile is unchanged" (exiledNames after) (fmap named ["Goblin Piker", "Ogre Sentry", "Wall of Stone"])
+        -- CR 607.2b: the SAME resolution, with Rest in Peace on the battlefield
+        -- so that the sacrifice in Promise's own effect list is replaced by an
+        -- exile. That exile is a "direct result of a replacement event caused
+        -- by" Rest in Peace, so the Promise CARD links to Rest in Peace and not
+        -- to the Promise permanent whose ability is resolving; CR 607.2a's link
+        -- is scoped to cards exiled "as a result of an instruction to exile them
+        -- in the first ability", which this is not. Filed against the resolving
+        -- source, the enchantment would return itself to the battlefield out of
+        -- its own exile.
+        --
+        -- Rest in Peace is placed AFTER both deaths, not on the starting board:
+        -- its replacement would otherwise exile the Piker and the Sentry on the
+        -- way to the graveyard, so neither would die, Promise's first ability
+        -- would never trigger, and the linked set would be empty -- which is
+        -- also the control this leg needs, since an over-narrowed fix that filed
+        -- nothing at all would leave the battlefield just as empty of returns.
+        -- Placed rather than cast, so its own "exile all graveyards" trigger
+        -- does not fire and file a second set of arrivals.
+        Spec.it s "CR 607.2b the card Rest in Peace's replacement exiles is linked to IT, not to the resolving enchantment" $ do
+          (promiseId, pikerId, sentryId, wallId, board0) <- board S.bob
+          rip <- S.printingOf s registry "Rest in Peace"
+          let exiled = killIt sentryId (killIt pikerId board0)
+              (ripId, guarded) = S.addCreature rip S.alice exiled
+              (placed, after) = endStepOf guarded
+          Spec.assertEqWith s "CR 603.4: the ability still triggered" (length (GameState.stack placed)) 1
+          Spec.assertBool s (not (S.onBattlefield promiseId after)) "CR 701.21a: the enchantment sacrificed itself"
+          -- The discriminating pair. Under the ambient diff the Promise card is
+          -- filed against its own permanent, so it comes back on the battlefield
+          -- and leaves exile; under CR 607.2b it is Rest in Peace's, so it stays
+          -- in exile beside the decoy and only the two cards Promise itself
+          -- exiled return.
+          Spec.assertEqWith
+            s
+            "only the cards Promise itself exiled returned, and the replaced sacrifice stayed in exile"
+            (controlledNames S.alice after, exiledNames after)
+            (fmap named ["Goblin Piker", "Ogre Sentry", "Rest in Peace"], fmap named ["Promise of Tomorrow", "Wall of Stone"])
+          -- The falsifier: with Rest in Peace out, nothing can be in a graveyard
+          -- at all, so a green result above cannot be a sacrifice that quietly
+          -- went to the graveyard instead of being replaced.
+          Spec.assertEqWith s "CR 614.6: the sacrifice was replaced, so no graveyard holds anything" (namesInGraveyards after) []
+          Spec.assertBool s (Maybe.isJust (Game.lookupObject wallId after)) "and the decoy, which never moved, keeps its id"
+          Spec.assertBool s (S.onBattlefield ripId after) "Rest in Peace itself never moved"
 
 -- CR 603.4's intervening "if" on a LOOK-BACK trigger, which is the one shape
 -- where the clause has to be read against an object that no longer exists:
