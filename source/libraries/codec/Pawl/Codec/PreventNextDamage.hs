@@ -6,6 +6,8 @@ import qualified Data.Sequence as Seq
 import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.DamageKind as DamageKind
 import qualified Pawl.Codec.Duration as Duration
+import qualified Pawl.Codec.Filter as Filter
+import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -27,6 +29,7 @@ codec effectCodec = Fields.object $ do
   duration <- Fields.required "duration" Duration.codec PreventNextDamage.duration
   kind <- Fields.defaulted "kind" Nothing (Common.maybe DamageKind.codec) PreventNextDamage.kind
   ref <- Fields.required "ref" ObjectRef.codec PreventNextDamage.ref
+  chosenSource <- Fields.defaulted "chosenSource" Nothing (Common.maybe (Filter.codec Keyword.codec)) PreventNextDamage.chosenSource
   quantity <- Fields.required "quantity" Quantity.codec PreventNextDamage.quantity
   riders <- Fields.defaulted "riders" Seq.empty (Common.seq effectCodec) PreventNextDamage.riders
   pure
@@ -34,6 +37,7 @@ codec effectCodec = Fields.object $ do
       { PreventNextDamage.duration = duration,
         PreventNextDamage.kind = kind,
         PreventNextDamage.ref = ref,
+        PreventNextDamage.chosenSource = chosenSource,
         PreventNextDamage.quantity = quantity,
         PreventNextDamage.riders = riders
       }

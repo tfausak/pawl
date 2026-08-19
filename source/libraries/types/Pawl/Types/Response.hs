@@ -119,6 +119,13 @@ data Response
     -- (every creature its chooser controls), so nothing but a distinct
     -- constructor keeps a transcript of one from replaying as the other.
     ChoseBlight ObjectId.ObjectId
+  | -- | CR 609.7a: the damage source a player chose for a prevention effect that
+    -- names one.
+    --
+    -- Its own constructor for ChoseBolster's reason: the candidates are neither
+    -- of the counter-placing pools -- CR 609.7a's set spans the battlefield, the
+    -- stack and the command zone, and is not scoped to the chooser at all.
+    ChoseDamageSource ObjectId.ObjectId
   | -- | CR 608.2d: the graveyard card a player chose for an
     -- Pawl.Types.ObjectRef.ChosenCardInGraveyard. One of these per chooser, so a
     -- transcript of Exhume resolving holds one for each stocked graveyard.
