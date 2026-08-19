@@ -625,14 +625,20 @@ matchesDamageSource gs context filter_ de =
    in Filter.matches context view filter_
 
 -- CR 615.1 / 614.1a: does this damage event have the qualities the pattern
--- names? Four of them: a pattern naming no KIND admits combat and noncombat
+-- names? Five of them: a pattern naming no KIND admits combat and noncombat
 -- alike (CR 510.2's dealing versus CR 608's), one narrowing the SOURCE admits
 -- only the damage a source it describes is dealing (CR 120.1's "an object that
 -- deals damage is the source of that damage" -- CR 609.7b's characteristic, or
 -- CR 614.15's identity), one DESCRIBING the recipient admits only damage
 -- addressed to an object matching it (Stormwild Capridor's "to this creature"),
--- and one NAMING a recipient admits only the damage addressed to the permanent
--- or player the engine baked in (CR 615.7).
+-- one NAMING a recipient admits only the damage addressed to the permanent or
+-- player the engine baked in (CR 615.7), and one NAMING a source admits only the
+-- damage the one object a player chose is dealing (CR 609.7a).
+--
+-- That chosen source is compared by ID and its properties are not re-read here:
+-- CR 615.9 splits the question in two, and the property half is the Filter
+-- conjunct above, so a shield against "a red source of your choice" whose source
+-- has stopped being red matches this conjunct and fails that one.
 --
 -- ONE reading of what a DamagePattern means, shared by the two questions that
 -- ask it: `applies` above, for CR 615.1's shields and CR 614.1a's replacements,
@@ -649,6 +655,7 @@ matchesDamagePattern gs context pat de =
     && matchesDamageSource gs context (DamagePattern.whatSource pat) de
     && maybe True (matchesDamageRecipient gs context de) (DamagePattern.whatRecipient pat)
     && maybe True (== DamageEvent.target de) (DamagePattern.whichRecipient pat)
+    && maybe True (== DamageEvent.source de) (DamagePattern.whichSource pat)
 
 -- CR 615.1: does the damage's RECIPIENT have the qualities the pattern's PRINTED
 -- clause names -- Stormwild Capridor's "if noncombat damage would be dealt to

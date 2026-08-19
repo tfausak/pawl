@@ -13,6 +13,7 @@ module Pawl.ReplacementSpec where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Ord as Ord
@@ -747,9 +748,10 @@ stonehornSpec s registry = Spec.describe s "Stonehorn Dignitary" $ do
     Spec.assertBool s (not (null (combatStepsOf S.alice mid))) "alice's combat phase began"
     Spec.assertEqWith s "bob's skip is still armed, waiting for his own turn" (armed mid) 1
 
--- CR 615.7's prevention shield, whose one producer in the pool is Mending Hands
--- ({W} Instant: "Prevent the next 4 damage that would be dealt to any target this
--- turn").
+-- CR 615.7's prevention shield, whose plainest producer in data/cards/ is Mending
+-- Hands ({W} Instant: "Prevent the next 4 damage that would be dealt to any
+-- target this turn") -- the same countdown shield as Healing Grace below, minus
+-- CR 609.7a's chosen source.
 --
 -- Three properties, and they are the three halves of the rule: the shield is
 -- spent in DAMAGE rather than in events ("such effects count only the amount of
@@ -917,6 +919,93 @@ mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
     Spec.assertEqWith s "the shield still prevents carol's 3 after alice has left (CR 800.4a)" (S.damageOf victim (strike gone)) (Just 0)
     Spec.assertEqWith s "the same 3 with alice still seated is prevented too" (S.damageOf victim (strike shielded)) (Just 0)
     Spec.assertEqWith s "and her departure left the row standing" (length (GameState.replacements gone)) 1
+
+-- Aim every target slot at `victim` and answer CR 609.7a's source choice with
+-- `src`. FILTERED, not built: the id is taken from the offered set, so an answer
+-- the prompt never offered cannot reach the engine -- and the group asserts on
+-- the RECORDED response, so a `src` that was never offered fails the case rather
+-- than quietly falling back.
+aimAndChoose :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAndChoose victim src p = case p of
+  Prompt.ChooseDamageSource _ _ _ candidates ->
+    Maybe.fromMaybe (NonEmpty.head candidates) (List.find (== src) (NonEmpty.toList candidates))
+  _ -> aimCreature victim p
+
+-- Which sources CR 609.7a's prompt was answered with, in order. The proxy half
+-- of the group below: it says a choice was MADE, where the damage assertions say
+-- the shield watches what was chosen.
+chosenSourcesIn :: [Response.Response] -> [ObjectId.ObjectId]
+chosenSourcesIn =
+  let chosen r = case r of
+        Response.ChoseDamageSource oid -> Just oid
+        _ -> Nothing
+   in Maybe.mapMaybe chosen
+
+-- CR 609.7a's player-CHOSEN source, whose producer is Healing Grace ({W}
+-- Instant: "Prevent the next 3 damage that would be dealt to any target this turn
+-- by a source of your choice. You gain 3 life").
+--
+-- Mending Hands above with one clause added, which is exactly the difference the
+-- rule makes: that shield watches every source ("the number of events or sources
+-- dealing it doesn't matter", CR 615.7), this one watches the ONE object its
+-- controller chose when the effect was created. The engine bakes the id into
+-- DamagePattern.whichSource, never choosing it (CR 609.7a: "if an effect requires
+-- a player to choose a source of damage").
+--
+-- The chosen source is deliberately NOT the first candidate the prompt offers:
+-- CR 609.7a's pool here is alice's Plains, the two creatures, the shielded one
+-- and Healing Grace itself on the stack, sorted ascending, so an engine that
+-- ignored the answer and took the head would shield against the Plains and both
+-- damage assertions would read the other way round.
+healingGraceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+healingGraceSpec s registry = Spec.describe s "Healing Grace (CR 609.7a)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+  Spec.it s "CR 609.7a the shield watches the source its controller chose and no other" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    healingGrace <- S.printingOf s registry "Healing Grace"
+    let base = S.landsInPlay plains 1
+        (victim, g1) = S.addCreature pikerPrinting S.alice base
+        (alpha, g2) = S.addCreature pikerPrinting S.bob g1
+        (omega, g3) = S.addCreature pikerPrinting S.bob g2
+        (g4, spellId) = S.handOne healingGrace g3
+        -- Rank-2, so the answerer is applied at each use rather than let-bound
+        -- (castEach's reason above).
+        shielded = castAndResolve (aimAndChoose victim omega) g4 spellId
+        strike src n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit src (Recipient.ToCreature victim) n])
+    -- THE gameplay assertion, and the one the whole unit exists for: the source
+    -- alice did NOT choose is not shielded against, however much the shield has
+    -- left. Before DamagePattern.whichSource this 2 was prevented.
+    Spec.assertEqWith s "the unchosen source's 2 lands in full" (S.damageOf victim (strike alpha 2 shielded)) (Just 2)
+    -- Its twin, on the same board and differing in one thing: the chosen source's
+    -- damage IS prevented, so the case cannot pass by installing no shield.
+    Spec.assertEqWith s "the chosen source's 3 is prevented whole" (S.damageOf victim (strike omega 3 shielded)) (Just 0)
+    -- CR 615.7 from the other side: a shield spends nothing on damage it does not
+    -- cover, so alpha's 2 leaves the 3 intact for omega.
+    Spec.assertEqWith s "and the shield survives the unchosen source untouched" (S.damageOf victim (strike omega 3 (strike alpha 2 shielded))) (Just 2)
+    -- The proxies, after the behaviour: a choice was raised and answered with the
+    -- source the assertions above read, and the card's second sentence ran.
+    Spec.assertEqWith s "setup: the shield is a floating replacement" (length (GameState.replacements shielded)) 1
+    Spec.assertEqWith s "alice was asked which source, and answered omega" (chosenSourcesIn (answersFor (aimAndChoose victim omega) g4 (S.cast S.alice spellId >> Stack.resolveTop))) [omega]
+    Spec.assertEqWith s "and she gained the printed 3 life" (S.lifeOf S.alice shielded) (Just 23)
+  -- The discriminating twin, differing from the case above in the CARD alone:
+  -- Mending Hands prints no "of your choice", so its shield watches every source
+  -- and no choice is raised at all. Without it the case above could pass on a
+  -- board where nothing but the chosen source ever dealt damage.
+  Spec.it s "CR 615.7 a shield naming NO source watches every source, and asks nothing" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    mendingHands <- S.printingOf s registry "Mending Hands"
+    let base = S.landsInPlay plains 1
+        (victim, g1) = S.addCreature pikerPrinting S.alice base
+        (alpha, g2) = S.addCreature pikerPrinting S.bob g1
+        (_, g3) = S.addCreature pikerPrinting S.bob g2
+        (g4, spellId) = S.handOne mendingHands g3
+        shielded = castAndResolve (aimCreature victim) g4 spellId
+        strike src n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit src (Recipient.ToCreature victim) n])
+    Spec.assertEqWith s "the same unchosen source's 2 is prevented here" (S.damageOf victim (strike alpha 2 shielded)) (Just 0)
+    Spec.assertEqWith s "and nobody was asked to choose a source" (chosenSourcesIn (answersFor (aimCreature victim) g4 (S.cast S.alice spellId >> Stack.resolveTop))) []
 
 -- CR 615.5's ADDITIONAL EFFECT, whose producer is Test of Faith ({1}{W} Instant:
 -- "Prevent the next 3 damage that would be dealt to target creature this turn.
@@ -3351,6 +3440,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   stonehornSpec s registry
   galvanicBlastSpec s registry
   mendingHandsSpec s registry
+  healingGraceSpec s registry
   testOfFaithSpec s registry
   decoratedGriffinSpec s registry
   braceForImpactSpec s registry
@@ -4125,7 +4215,7 @@ blastShape :: ObjectId.ObjectId -> Timestamp.Timestamp -> ActiveReplacement.Acti
 blastShape src ts =
   ActiveReplacement.MkActiveReplacement
     { ActiveReplacement.effect =
-        ReplacementEffect.DamageR (DamageR.MkDamageR (DamagePattern.MkDamagePattern Nothing Filter.Type.IsSource Nothing Nothing) (DamageRewrite.SetAmount 4) Seq.empty),
+        ReplacementEffect.DamageR (DamageR.MkDamageR (DamagePattern.MkDamagePattern Nothing Filter.Type.IsSource Nothing Nothing Nothing) (DamageRewrite.SetAmount 4) Seq.empty),
       ActiveReplacement.source = src,
       ActiveReplacement.controller = S.alice,
       ActiveReplacement.timestamp = ts,

@@ -927,6 +927,30 @@ combatReplaySpec s =
             "the head"
             (Replay.defaultAnswer (Prompt.ChooseAmass decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])))
             (ObjectId.MkObjectId 7)
+        -- CR 609.7a: which source a player chose for a prevention effect is a
+        -- decision made when the effect is created, so it has to survive a
+        -- transcript like any other.
+        Spec.it s "ChooseDamageSource round-trips through the transcript" $ do
+          let a = ObjectId.MkObjectId 7
+              b = ObjectId.MkObjectId 9
+              p = Prompt.ChooseDamageSource decider S.alice oid (a NonEmpty.:| [b])
+          Spec.assertEqWith s "choosing the second round trips" (Replay.decode p (Replay.encode p b)) (Just b)
+          Spec.assertEqWith s "choosing the first round trips" (Replay.decode p (Replay.encode p a)) (Just a)
+        Spec.it s "a chosen damage source does not decode as an amass choice" $ do
+          -- Discriminating: fails if ChooseDamageSource reuses another
+          -- ObjectId-shaped response rather than getting its own. CR 609.7a's
+          -- candidates are not even scoped to the chooser, so replaying one as
+          -- the other would shield against an object nobody chose.
+          let p = Prompt.ChooseDamageSource decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseAmass (ObjectId.MkObjectId 7))) Nothing
+        Spec.it s "a short damage-source transcript returns the first candidate offered" $
+          -- CR 609.7a: every offered source already matches the shield's printed
+          -- properties, so the head is legal.
+          Spec.assertEqWith
+            s
+            "the head"
+            (Replay.defaultAnswer (Prompt.ChooseDamageSource decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])))
+            (ObjectId.MkObjectId 7)
         -- CR 701.68a: which creature a blighting player put the counters on is a
         -- decision, so it has to survive a transcript like any other.
         Spec.it s "ChooseBlight round-trips through the transcript" $ do

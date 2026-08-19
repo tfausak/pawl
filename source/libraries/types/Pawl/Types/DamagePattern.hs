@@ -3,14 +3,17 @@ module Pawl.Types.DamagePattern where
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Recipient as Recipient
 
 -- | CR 614.1a / 615.1: which damage events a replacement or prevention
 -- intercepts -- both, since this type is shared. Fog's prevention is
--- (Just Combat, And [], Nothing, Nothing); Furnace of Rath's replacement is
--- (Nothing, And [], Nothing, Nothing); Mending Hands' shield is
--- (Nothing, And [], Nothing, Just the chosen recipient); Stormwild Capridor's is
--- (Just Noncombat, And [], Just IsSource, Nothing). Nothing means any kind.
+-- (Just Combat, And [], Nothing, Nothing, Nothing); Furnace of Rath's replacement
+-- is (Nothing, And [], Nothing, Nothing, Nothing); Mending Hands' shield is
+-- (Nothing, And [], Nothing, Just the chosen recipient, Nothing); Healing Grace's
+-- adds the chosen SOURCE in the last field; Stormwild Capridor's is
+-- (Just Noncombat, And [], Just IsSource, Nothing, Nothing). Nothing means any
+-- kind.
 --
 -- `whatSource` says WHAT the damage's source is (CR 120.1), as a Filter over its
 -- characteristics: Luminesce's "black sources and red sources" is
@@ -50,6 +53,21 @@ import qualified Pawl.Types.Recipient as Recipient
 -- otherwise have to mean "any object OR any player", which is not what any other
 -- Filter position means.
 --
+-- `whichSource` is CR 609.7a's player-CHOSEN source, baked as an id: Healing
+-- Grace's "by a source of your choice" is answered when the shield is created,
+-- and the shield then watches that one object. Nothing means EVERY source, the
+-- way Nothing means every recipient above, rather than an unanswered choice.
+--
+-- It does not replace `whatSource` beside it, and CR 615.9 is why both are
+-- written together: the chosen source's PROPERTIES are rechecked when it would
+-- deal damage (CR 609.7b), so a "red source of your choice" is an id here AND
+-- the colour predicate there. Healing Grace names no property, so its shield
+-- carries the trivial filter and this id.
+--
+-- BAKED by the engine and never authored, `whichRecipient`'s reason exactly:
+-- card data cannot name an ObjectId. Resolve's installDamageRow is the one
+-- producer, and Pawl.CardSpec's engineOnlyOffends keeps the corpus off it.
+--
 -- Not implemented: a printed recipient condition naming a PLAYER, which is what
 -- a static redirection ability needs -- "all damage that would be dealt to you
 -- is dealt to this creature instead" (Palisade Giant, Pariah) (#1054).
@@ -57,6 +75,7 @@ data DamagePattern = MkDamagePattern
   { whichKind :: Maybe DamageKind.DamageKind,
     whatSource :: Filter.Filter Keyword.Keyword,
     whatRecipient :: Maybe (Filter.Filter Keyword.Keyword),
-    whichRecipient :: Maybe Recipient.Recipient
+    whichRecipient :: Maybe Recipient.Recipient,
+    whichSource :: Maybe ObjectId.ObjectId
   }
   deriving (Eq, Ord, Show)

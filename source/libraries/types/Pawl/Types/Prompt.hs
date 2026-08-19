@@ -162,6 +162,20 @@ data Prompt r where
   -- ChooseBolster. ChooseBolster's posture, constructor argument and elision;
   -- not raised for zero, by CR 101.3 or CR 701.68b depending on the caller.
   ChooseBlight :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
+  -- | CR 609.7a: which SOURCE OF DAMAGE a player chooses for a prevention
+  -- effect that names one (Healing Grace's "by a source of your choice"). The
+  -- ObjectId is the spell or ability resolving; the NonEmpty is the sources it
+  -- may choose from, already narrowed to the effect's printed properties, so
+  -- every candidate offered is legal. ChooseBolster's posture, constructor
+  -- argument and elision -- choose, not target (rule 609.7a says "choice", so
+  -- nothing was declared on the stack), filtered rather than trusted, and raised
+  -- only for two or more candidates. Not raised for zero, where no shield is
+  -- installed at all.
+  --
+  -- Its own constructor rather than ChooseBolster reused: the candidate sets are
+  -- different questions, and Pawl.Engine.Replay's transcript must not let one
+  -- prompt's answer satisfy another.
+  ChooseDamageSource :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 608.2d: which card in a graveyard a player chooses for a
   -- Pawl.Types.ObjectRef.ChosenCardInGraveyard. The PlayerId is the CHOOSER,
   -- which the ref's Pawl.Types.Chooser decides and who need not own the

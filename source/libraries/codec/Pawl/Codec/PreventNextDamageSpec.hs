@@ -8,6 +8,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Duration as Duration
+import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.Quantity as Quantity
@@ -32,6 +33,7 @@ spec s = Spec.describe s "Pawl.Codec.PreventNextDamage" $ do
           { PreventNextDamage.duration = Duration.UntilEndOfTurn,
             PreventNextDamage.kind = Nothing,
             PreventNextDamage.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
+            PreventNextDamage.chosenSource = Nothing,
             PreventNextDamage.quantity = Quantity.Literal 4,
             PreventNextDamage.riders = Seq.empty
           }
@@ -47,9 +49,28 @@ spec s = Spec.describe s "Pawl.Codec.PreventNextDamage" $ do
           { PreventNextDamage.duration = Duration.UntilEndOfTurn,
             PreventNextDamage.kind = Just DamageKind.Combat,
             PreventNextDamage.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
+            PreventNextDamage.chosenSource = Nothing,
             PreventNextDamage.quantity = Quantity.Literal 3,
             PreventNextDamage.riders = Seq.singleton (Text.pack "a rider")
           }
       )
       " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"kind\":{\"type\":\"Combat\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"quantity\":{\"type\":\"Literal\",\"value\":3},\"riders\":[\"a rider\"]} "
+  -- CR 609.7a's "by a source of your choice", which is Healing Grace: the key is
+  -- WRITTEN and its Filter is the trivial one, since the card names no property
+  -- the chosen source must have. Elided and present-but-trivial are different
+  -- shields, so the round trip has to keep them apart.
+  Spec.it s "MkPreventNextDamage, CR 609.7a's chosen source" $
+    Common.assertCodec
+      s
+      codec
+      ( PreventNextDamage.MkPreventNextDamage
+          { PreventNextDamage.duration = Duration.UntilEndOfTurn,
+            PreventNextDamage.kind = Nothing,
+            PreventNextDamage.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
+            PreventNextDamage.chosenSource = Just (Filter.And []),
+            PreventNextDamage.quantity = Quantity.Literal 3,
+            PreventNextDamage.riders = Seq.empty
+          }
+      )
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"chosenSource\":{\"type\":\"And\",\"value\":[]},\"quantity\":{\"type\":\"Literal\",\"value\":3}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec
