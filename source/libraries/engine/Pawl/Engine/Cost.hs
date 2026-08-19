@@ -887,11 +887,18 @@ claimOf pid oid component gs = case component of
   -- a third axis, and names the object the cost is on, so two such claims could
   -- only come from one cost carrying {Q} twice.
   CostComponent.UntapThis -> Nothing
-  -- Nothing, this Natural being a THRESHOLD on an aggregate rather than a count
-  -- of objects. Not implemented: CR 702.122a's payment does tap at least one
-  -- untapped permanent whenever the threshold is above 0, so a claim of 1 on
-  -- ClaimAxis.Tapping is a lower bound that could never over-refuse (#1744).
-  CostComponent.TapForTotalPower {} -> Nothing
+  -- ONE, and deliberately not the Natural: that number is a THRESHOLD on an
+  -- aggregate rather than a count of objects, so how many permanents a payment
+  -- taps is not known until the payer picks them. CR 702.122a taps at least one
+  -- untapped permanent for any threshold above 0, which makes 1 a LOWER BOUND
+  -- that can never over-refuse. A threshold of 0 is paid by the empty set
+  -- (canPayComponent below), so it taps nothing and claims nothing.
+  --
+  -- The pool is tapCandidates', TapPermanents' below: same permissive reading,
+  -- and for its reason.
+  CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower threshold criterion)
+    | threshold > 0 -> claim ClaimAxis.Tapping (Set.fromList (tapCandidates pid oid criterion gs)) 1
+    | otherwise -> Nothing
   -- CR 601.2f's "tapping permanents", on the TAPPING axis rather than a zone's,
   -- for the header's reason. ManaSpec's "a creature tapped for mana can still be
   -- sacrificed" is the case that proves the axes stay apart.

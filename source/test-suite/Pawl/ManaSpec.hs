@@ -2073,6 +2073,54 @@ sharedTapBoard s registry creatures = do
   piker <- S.printingOf s registry "Goblin Piker"
   pure (alicePermanents (drum : drum : replicate creatures piker))
 
+-- CR 118.3's "fully" across the tapping components of ONE cost, which is
+-- sharedTapSpec's question moved inside a single ability. Synthetic Crewed
+-- Battery ("{T}, Tap an untapped creature you control, Tap any number of
+-- untapped creatures you control with total power 2 or greater: Add {C}") beside
+-- ONE Goblin Piker makes no mana: the counted tap and CR 702.122a's threshold tap
+-- both want an untapped creature, and one creature pays one of them. The
+-- threshold half stated no claim, so the two were counted against the same Piker
+-- twice and the cost read as payable (#1744).
+--
+-- SYNTHETIC because no printing puts a threshold tap beside another tapping
+-- component in one cost. The printed producers of that shape are crew (CR
+-- 702.122a; Consulate Dreadnought is the pool's) and Mossbridge Troll, and in
+-- each the threshold tap is the whole of its ability's cost, so nothing contends
+-- with it. Scryfall `oracle:"total power" oracle:tap`, 2026-08-18: eight cards,
+-- none of them a second tapping component away from refuting this.
+--
+-- The Battery's own {T} is a third claim, on a pool of one -- itself -- that no
+-- other claim meets, so it neither pays nor blocks these two.
+crewedBatterySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+crewedBatterySpec s registry = Spec.describe s "A threshold tap and a counted tap in one cost" $ do
+  Spec.it s "CR 118.3 one creature cannot pay both tapping components" $ do
+    one <- crewedBatteryBoard s registry 1
+    two <- crewedBatteryBoard s registry 2
+    -- The POSITIVE first, sharedTapSpec's posture: a refusal that came from the
+    -- Battery not being a source at all would fail here.
+    Spec.assertBool s (paysGeneric 1 two) "two creatures buy the Battery's mana"
+    Spec.assertBool s (not (paysGeneric 1 one)) "and one creature does not"
+
+  -- The OFFER, for sharedTapSpec's reason: a payment that follows a bad offer
+  -- just fails at CR 601.2h, so what the bug does is menu an uncastable spell.
+  -- Springleaf Drum is the pool's plain {1} artifact, and it is cast from HAND,
+  -- so it adds nothing to either board.
+  Spec.it s "CR 601.2g a {1} spell is not offered off one creature" $ do
+    drum <- S.printingOf s registry "Springleaf Drum"
+    one <- crewedBatteryBoard s registry 1
+    two <- crewedBatteryBoard s registry 2
+    Spec.assertBool s (offersCast drum two) "offered off two creatures"
+    Spec.assertBool s (not (offersCast drum one)) "not off one"
+
+-- Alice's Synthetic Crewed Battery and `creatures` Goblin Pikers. What separates
+-- the halves of each case above is ONE Piker and nothing else; the Battery is no
+-- creature, so CR 302.6 gates nothing and S.addCreature settles the Pikers.
+crewedBatteryBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m GameState.GameState
+crewedBatteryBoard s registry creatures = do
+  battery <- S.printingOf s registry "Synthetic Crewed Battery"
+  piker <- S.printingOf s registry "Goblin Piker"
+  pure (alicePermanents (battery : replicate creatures piker))
+
 -- CR 118.3's "fully" across a cost's OWN components and its mana SOURCES, which
 -- is the same rule one level up from sharedVictimSpec. Village Rites ("{B}", "As
 -- an additional cost to cast this spell, sacrifice a creature") beside Phyrexian
@@ -2580,6 +2628,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   treasonousOgreSpec s registry
   sharedVictimSpec s registry
   sharedTapSpec s registry
+  crewedBatterySpec s registry
   villageRitesSpec s registry
   chromaticSpec s registry
   burningTreeSpec s registry
