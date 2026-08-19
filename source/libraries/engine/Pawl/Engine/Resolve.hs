@@ -2050,6 +2050,14 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = do
 -- applyEffectWith recurses. Then RESTRICTED to what is still in exile, so the
 -- map cannot grow over a game.
 --
+-- What insertWith ALSO keeps is CR 607.2b's link, which Pawl.Engine.Event files
+-- at the move itself: a card this window saw arrive because somebody else's
+-- replacement effect redirected it there was not put in exile by an instruction
+-- in the resolving ability, so 607.2a does not claim it and this diff must not
+-- overwrite the funnel's entry with `source`. Load-bearing, not incidental --
+-- Pawl.ZoneTriggerSpec's "CR 607.2b the card Rest in Peace's replacement exiles
+-- is linked to IT" is what proves it.
+--
 -- Filed for a SPELL's effects too, where CR 607.2a scopes the link to an
 -- activated or triggered ability -- unreadable rather than wrong, since CR
 -- 608.2n puts the spell into its graveyard as part of its own resolution.
