@@ -8468,8 +8468,9 @@ eventTriggers events gs =
         GameEvent.Exerted _ -> Map.empty
       -- CR 113.6k and CR 113.6m: every card in every graveyard carrying at least
       -- one ability those rules put there. The one source that widens the SCANNED
-      -- ZONE rather than recovering an object an event names, which is why it is
-      -- computed once outside the event loop, as `onBattlefield` is.
+      -- ZONE rather than recovering an object an event names, which is why the
+      -- walk itself happens once outside the event loop; what an individual event
+      -- may see of the answer is `arrivedLater`'s subtraction below.
       --
       -- Narrow by construction, which keeps a large graveyard cheap: membership is
       -- decided by `functionsIn` -- a total case over a closed condition type and a
