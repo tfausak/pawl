@@ -661,7 +661,8 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 -- the same invariant from opposite directions. `createTokens` below materializes
 -- every token of a Create BEFORE running any of their entry loops (CR 614.16's
 -- doubled count is settled once, up front), so it knows the whole set and passes
--- each token the rest of it. Effect.MoveToZone's CR 608.2f batch (Pawl.Engine.Resolve) moves its
+-- each token the rest of it. Effect.MoveToZone's CR 608.2f batch
+-- (Pawl.Engine.Resolve) moves its
 -- members through the funnel one after another, so it ACCUMULATES the set as
 -- each arrives: a member still in its old zone is not on the battlefield for a
 -- sweep to find, and one that has arrived is. Either way a later member's entry
