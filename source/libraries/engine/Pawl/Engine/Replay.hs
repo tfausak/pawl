@@ -127,6 +127,7 @@ encode p answer = case p of
   Prompt.AnnounceHybridPayment {} -> Response.AnnouncedHybridPayment answer
   Prompt.AnnounceHybridHalf {} -> Response.AnnouncedHybridHalf answer
   Prompt.ChooseReductionHalf {} -> Response.ChoseReductionHalf answer
+  Prompt.ChooseReducedCost {} -> Response.ChoseReducedCost answer
 
 -- The inverse of 'encode'. Nothing when the logged response does not match the
 -- prompt the engine is actually asking (a stale or foreign transcript).
@@ -371,6 +372,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseReductionHalf {} -> case response of
     Response.ChoseReductionHalf half -> Just half
+    _ -> Nothing
+  Prompt.ChooseReducedCost {} -> case response of
+    Response.ChoseReducedCost total_ -> Just total_
     _ -> Nothing
   Prompt.ChooseEntwine {} -> case response of
     Response.AnnouncedEntwine decision -> Just decision
@@ -684,6 +688,10 @@ defaultAnswer p = case p of
   -- deterministic a default as any -- and unlike the announcements above it can
   -- never make a cost unpayable, since CR 601.2f floors a reduction at {0}.
   Prompt.ChooseReductionHalf _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 601.2f: every offered order is legal, and the offer is CHEAPEST FIRST, so
+  -- the head is both deterministic and the one that can never strand a payment a
+  -- costlier order would have made unpayable.
+  Prompt.ChooseReducedCost _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: entwine is a "may", so declining is always legal. It also costs
   -- no mana, which keeps a short transcript from diverging into an unpayable
   -- cast.

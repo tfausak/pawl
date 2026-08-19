@@ -17,6 +17,7 @@ import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -334,6 +335,11 @@ data Response
     -- payer chose as CR 601.2f applied it. The symbol the half resolved to, so a
     -- {2/B} reduction taken as {2} replays as that and not as one black mana.
     ChoseReductionHalf ManaSymbol.ManaSymbol
+  | -- | CR 601.2f: the order a payer applied several cost reductions in, written
+    -- as the total that order reached -- which is the whole of what the choice
+    -- does, so a Mishra's Foundry animated for {1} rather than for nothing
+    -- replays as that.
+    ChoseReducedCost ManaCost.ManaCost
   | -- | CR 702.42a / 601.2b: whether a caster used a modal spell's entwine
     -- ability.
     AnnouncedEntwine EntwineDecision.EntwineDecision

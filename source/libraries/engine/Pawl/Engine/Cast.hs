@@ -1395,6 +1395,13 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                       -- choice, and CR 601.2h's failed payment is what `reject`
                       -- below answers with.
                       --
+                      -- CR 601.2f's ORDER of the reductions is asked at the same
+                      -- seam, and asks a SPELL nothing: the order is observable
+                      -- only where two reductions state different floors, and
+                      -- Pawl.Types.PlayerEffect.ReduceSpellCost states none at
+                      -- all. `announcedCost` goes in because the order is chosen
+                      -- against the cost it will be applied to.
+                      --
                       -- CR 601.2f's LOCK: `paidCost` is determined here, once,
                       -- and handed to Cost.pay as a VALUE -- so an effect that
                       -- would change the total after this line, including the
@@ -1402,7 +1409,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                       -- produced it, does nothing. Pawl.CostSpec's Altar's Reap
                       -- group is the proof (Baral pays the sacrifice, and the
                       -- Reap still costs {B}).
-                      adjustments <- Cost.announceReductions pid sid gs (Cost.spellAdjustments pid sid gs)
+                      adjustments <- Cost.announceReductions pid sid gs announcedCost (Cost.spellAdjustments pid sid gs)
                       let paidCost = Cost.totalWith adjustments announcedCost
                       payment <- Cost.pay spending pid sid paidCost
                       case payment of

@@ -19,7 +19,6 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
-import qualified Data.Ord as Ord
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
@@ -335,6 +334,46 @@ adjustmentResolutions adjustments =
         (\reductions -> adjustments {CostAdjustments.reductions = reductions})
         (traverse resolveAll (CostAdjustments.reductions adjustments))
 
+-- CR 601.2f's "if multiple cost reductions apply, the player may apply them in any
+-- order", enumerated: each order the payer could pick paired with the total it
+-- reaches, DEDUPLICATED by that total and CHEAPEST FIRST (CR 202.3's mana value is
+-- the key, through Quantity.symbolValue).
+--
+-- Deduplicated because a fold's only observable IS the total -- applyAdjustments
+-- answers a cost and nothing else -- so two orders reaching one total are one
+-- outcome, and offering both would be a prompt with nothing to ask.
+--
+-- ONE entry, with no permutation enumerated at all, wherever every reduction states
+-- the SAME floor: with one floor F a step is `\g -> if g >= F then max (g - a) F
+-- else g`, and two of those commute -- max (max (g - b) F - a) F = max (g - a - b) F,
+-- symmetric in a and b -- so the fold is order-free. That is every SPELL cost, since
+-- Pawl.Types.PlayerEffect.ReduceSpellCost states no floor at all, and every
+-- activation cost whose reducers agree on one.
+--
+-- The search branches over DISTINCT remaining reductions, so two copies of one
+-- reducer cost nothing, and the equal-floor prune ends every tail; what is left to
+-- enumerate is the interleaving of reductions whose floors genuinely differ.
+reductionOrders :: CostAdjustments.CostAdjustments -> ManaCost.ManaCost -> NonEmpty.NonEmpty (CostAdjustments.CostAdjustments, ManaCost.ManaCost)
+reductionOrders adjustments manaCost =
+  let sameFloor rs = case fmap snd rs of
+        [] -> True
+        floor_ : floors -> all (== floor_) floors
+      orders rs =
+        if sameFloor rs
+          then [rs]
+          else concatMap (\r -> fmap (r :) (orders (List.delete r rs))) (List.nub rs)
+      withTotal order =
+        let reordered = adjustments {CostAdjustments.reductions = order}
+         in (reordered, applyAdjustments reordered manaCost)
+      manaValue (_, ManaCost.MkManaCost symbols) = sum (fmap Quantity.symbolValue symbols)
+      candidates = List.sortOn manaValue (fmap withTotal (orders (CostAdjustments.reductions adjustments)))
+   in case List.nubBy (\x y -> snd x == snd y) candidates of
+        entry : rest -> entry NonEmpty.:| rest
+        -- Unreachable: `orders` answers at least one order for every list, the
+        -- empty one included, so the deduplication has something to keep. Left
+        -- rather than made partial, and the answer is the unreordered fold.
+        [] -> (adjustments, applyAdjustments adjustments manaCost) NonEmpty.:| []
+
 -- The same totalling over adjustments the CALLER already has, which is what CR
 -- 118.7e's prompt needs: `announceReductions`' answers have to reach
 -- applyAdjustments rather than being read out of the game state a second time.
@@ -375,14 +414,14 @@ plusComponents adjustments cost =
 -- CR 601.2f's totalling of the MANA part alone, curried over one mana cost --
 -- what `announce` and `canPaySomeCompletion` need of candidates that never
 -- become a Cost of their own. MANY answers, because CR 118.7e leaves a choice
--- inside the reduction and this runs before anyone has made it: one total per
--- resolution, computed once and shared, and a caller asks `any` of them. Takes
--- the ADJUSTMENTS rather than gathering them, so the two moments CR 601.2f
--- reaches share one totalling.
+-- inside the reduction and CR 601.2f leaves the ORDER of the reductions outside
+-- it, and this runs before either has been made: every total some pair of choices
+-- reaches, and a caller asks `any` of them. Takes the ADJUSTMENTS rather than
+-- gathering them, so the two moments CR 601.2f reaches share one totalling.
 totalManas :: CostAdjustments.CostAdjustments -> ManaCost.ManaCost -> [ManaCost.ManaCost]
 totalManas adjustments =
   let resolutions = adjustmentResolutions adjustments
-   in \manaCost -> fmap (`applyAdjustments` manaCost) resolutions
+   in \manaCost -> concatMap (NonEmpty.toList . fmap snd . (`reductionOrders` manaCost)) resolutions
 
 -- CR 601.2f's ADDITIONAL-COSTS clause alone, bolted onto one candidate -- the
 -- shape CR 702.42a's entwine needs. Applied to whichever candidate the caster
@@ -528,10 +567,25 @@ announce spending pid oid total_ cost = case Cost.mana cost of
 -- The INCREASES and the FLOOR ride through untouched: an increase is generic
 -- mana with no halves, and a floor is a limit rather than an amount of mana.
 --
+-- CR 601.2f's OTHER choice rides here too, after the halves and for the same
+-- reason -- "if multiple cost reductions apply, the player may apply them in any
+-- order" is the payer's, and applying them in an order pawl picked would be the
+-- engine making it. Asked as the TOTAL each order reaches (`reductionOrders`),
+-- which is the whole of what an order does, and asked only where two totals differ:
+-- a floored reduction beside an unfloored one on one cost is what separates them
+-- (Heartstone and Blossoming Tortoise on an animated Mishra's Foundry), and the
+-- cheapest is offered first so it is also the default a short transcript replays.
+--
+-- NOT FILTERED BY PAYABILITY, `chooseOne` above verbatim: the costlier order is a
+-- legal choice CR 601.2f grants outright, and CR 601.2h reverses a payment it
+-- strands.
+--
 -- Takes the ADJUSTMENTS the caller gathered, which is what makes the announced
--- reduction the one that will be applied.
-announceReductions :: PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments -> Game CostAdjustments.CostAdjustments
-announceReductions pid oid gs adjustments =
+-- reduction the one that will be applied, and the ANNOUNCED COST, which must be
+-- the one `totalWith` is about to be handed: the order is chosen against the cost
+-- it will be applied to, and a different cost could rank the orders differently.
+announceReductions :: PlayerId -> ObjectId -> GameState -> Cost Keyword.Type.Keyword -> CostAdjustments.CostAdjustments -> Game CostAdjustments.CostAdjustments
+announceReductions pid oid gs cost adjustments =
   let chooseOne symbol = case reductionHalvesOf symbol of
         -- Not a hybrid symbol, so CR 118.7e has nothing to ask about it.
         Nothing -> pure symbol
@@ -549,9 +603,27 @@ announceReductions pid oid gs adjustments =
           -- not one of the offered halves falls back to the first.
           pure (if elem answer halves then answer else first)
       chooseAll (ManaCost.MkManaCost symbols, floor_) = fmap (\xs -> (ManaCost.MkManaCost xs, floor_)) (traverse chooseOne symbols)
-   in fmap
-        (\reductions -> adjustments {CostAdjustments.reductions = reductions})
-        (traverse chooseAll (CostAdjustments.reductions adjustments))
+   in do
+        halved <-
+          fmap
+            (\reductions -> adjustments {CostAdjustments.reductions = reductions})
+            (traverse chooseAll (CostAdjustments.reductions adjustments))
+        case Cost.mana cost of
+          -- CR 118.6: an object with no mana cost has no generic component for a
+          -- reduction to come off, so no order changes anything.
+          Nothing -> pure halved
+          Just manaCost -> case reductionOrders halved manaCost of
+            -- One total, so every order CR 601.2f allows pays the same mana and
+            -- the prompt would have one outcome. Elided, and the reductions keep
+            -- the order they were gathered in.
+            only NonEmpty.:| [] -> pure (fst only)
+            first NonEmpty.:| others -> do
+              answer <-
+                Game.choose
+                  (Prompt.ChooseReducedCost (Decide.deciderFor pid gs) pid oid (fmap snd (first NonEmpty.:| others)))
+              -- FILTERED, NOT TRUSTED, `chooseOne`'s posture again: an answer that
+              -- is not one of the offered totals falls back to the cheapest.
+              pure (maybe (fst first) fst (List.find ((==) answer . snd) (first : others)))
 
 -- CR 118.7e's "one half of that symbol", written as the reduction each half
 -- would be: a coloured or colourless half is an OfType, a generic half a
@@ -1863,13 +1935,11 @@ payComponent pid oid component = case component of
 --    {1} tells the two readings apart at {0} against {1}. The shortfall is
 --    GENERIC mana, and it NEVER RAISES a cost already below the floor.
 --
--- Reductions are FOLDED one at a time, in DESCENDING order of floor. CR 601.2f
--- lets the player apply them in any order, and once the floors differ the order
--- is observable; descending floor is the CHEAPEST, so pawl takes it and the
--- player's choice of a costlier order is the elision (#88). A FENCE rather than
--- proved behaviour: the one board with mixed floors (Pawl.ActivateSpec's
--- UnflooredActivationCostReduction) has a printed {1} either order empties. What
--- the suite does prove is that each floor binds its own reduction and no other.
+-- Reductions are FOLDED one at a time, in the LIST's own order, which is CR
+-- 601.2f's order as the PAYER chose it: `announceReductions` reorders them to the
+-- answer it got before this ever runs, and nothing here sorts. A caller that
+-- reaches this without that seam is asking a different question -- the GATE does,
+-- through `totalManas`, and enumerates the orders itself rather than picking one.
 --
 -- Every step's result is CANONICAL: one leading Generic symbol carrying the whole
 -- generic component (omitted at zero), then the SURVIVING printed typed symbols
@@ -2006,4 +2076,4 @@ applyAdjustments adjustments cost =
         symbol : rest -> case costManaTypeOf symbol of
           Just manaType | elem manaType unspent -> cancel (List.delete manaType unspent) rest
           _ -> symbol : cancel unspent rest
-   in List.foldl' reduce (raise cost) (List.sortOn (Ord.Down . snd) reductions)
+   in List.foldl' reduce (raise cost) reductions

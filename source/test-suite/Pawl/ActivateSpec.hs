@@ -2556,9 +2556,10 @@ activationCostReductionSpec s registry = Spec.describe s "ActivationCostReductio
     Spec.assertEqWith s "two of bob's three Mountains paid it" (S.tappedCount S.bob after) 2
     Spec.assertEqWith s "and alice tapped nothing" (S.tappedCount S.alice after) 0
 
--- Mutavault's SECOND printed ability, the {1} animation. `theAbility` takes the
--- first, which here is the mana ability CR 605.3b keeps off the stack -- and one
--- with no mana in its cost, so nothing could be measured on it.
+-- The SECOND printed ability of a land that animates itself -- Mutavault's {1} and
+-- Mishra's Foundry's {2}. `theAbility` takes the first, which on both is the mana
+-- ability CR 605.3b keeps off the stack -- and one with no mana in its cost, so
+-- nothing could be measured on it.
 animationAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
 animationAbility p = case drop 1 (Face.activatedAbilities (S.combinedFace p)) of
   ab : _ -> ab
@@ -2582,6 +2583,35 @@ mutavaultBoard mountain lands mutavault heartstone mTortoise =
       g3 = maybe g2 (\tortoise -> snd (S.addCreature tortoise S.alice g2)) mTortoise
    in (srcId, g3 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice})
 
+-- alice's board: Mishra's Foundry, `lands` Mountains, Heartstone and Blossoming
+-- Tortoise. ONE board rather than mutavaultBoard's pair, because what the order
+-- case below varies is the ANSWER to a prompt raised on this board -- a second
+-- board would put a difference beside the one the assertion is about.
+foundryBoard ::
+  Printing.Printing ->
+  Int ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, GameState.GameState)
+foundryBoard mountain lands foundry heartstone tortoise =
+  let base = List.foldl' (\g _ -> snd (S.addCreature mountain S.alice g)) (Setup.emptyGame S.bothPlayers) [1 .. lands]
+      (srcId, g1) = S.addCreature foundry S.alice base
+      g2 = snd (S.addCreature heartstone S.alice g1)
+      g3 = snd (S.addCreature tortoise S.alice g2)
+   in (srcId, g3 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice})
+
+-- Answers CR 601.2f's Prompt.ChooseReducedCost with `total_` whenever it is on
+-- offer, and defers everything else to S.identityAnswer -- Pawl.PlayerEffectSpec's
+-- takesHalf shape, for its reason. Naming the TOTAL rather than an index is what
+-- makes the case below discriminating: an engine that stopped offering the
+-- costlier order would fall through to the default, and the two answers would
+-- stop disagreeing.
+takesTotal :: ManaCost.ManaCost -> Prompt.Prompt r -> r
+takesTotal total_ p = case p of
+  Prompt.ChooseReducedCost _ _ _ offers -> if elem total_ offers then total_ else S.identityAnswer p
+  _ -> S.identityAnswer p
+
 -- CR 601.2f's floor read PER REDUCING EFFECT rather than as a clamp on the pooled
 -- result (#1243). The two readings agree on every board with one reduction, and on
 -- every board whose reductions all state the same floor, so what tells them apart
@@ -2603,7 +2633,7 @@ mutavaultBoard mountain lands mutavault heartstone mTortoise =
 -- nothing back (its own ruling) -- and the assertion is not reading pawl's choice
 -- of order. A pooled clamp answers {1} on the same board, which is a different
 -- number of lands.
-unflooredActivationCostReductionSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+unflooredActivationCostReductionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 unflooredActivationCostReductionSpec s registry = Spec.describe s "UnflooredActivationCostReduction" $ do
   Spec.it s "CR 601.2f an unfloored reduction takes the mana a floored one may not" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -2639,6 +2669,46 @@ unflooredActivationCostReductionSpec s registry = Spec.describe s "UnflooredActi
     -- stack on this board too, so the difference is the mana and nothing else.
     Spec.assertEqWith s "Heartstone's own floor leaves a mana to pay" (S.tappedCount S.alice withoutSecond) 2
     Spec.assertEqWith s "which is paid, not refused" (length (GameState.stack withoutSecond)) 1
+
+  -- CR 601.2f's OTHER sentence, on the same two reducers: "If multiple cost
+  -- reductions apply, the player may apply them in any order." Two ANSWERS on one
+  -- board rather than two boards, since what is varied is the choice itself.
+  --
+  -- Mishra's Foundry {2} rather than Mutavault {1}, because the printed number is
+  -- what makes the orders disagree: Heartstone may not take the last mana of a {2},
+  -- so Heartstone-then-Tortoise reaches {0} while Tortoise-then-Heartstone stops at
+  -- {1}. Mutavault's {1} is emptied by either order -- the case above -- which is
+  -- why that board cannot see this and this one is not asserting through it.
+  --
+  -- "{T}: Add {C}. / {2}: This land becomes a 2/2 Assembly-Worker artifact creature
+  -- until end of turn. It's still a land. / {1}, {T}: Target attacking
+  -- Assembly-Worker gets +2/+2 until end of turn", checked against
+  -- api.scryfall.com.
+  Spec.it s "CR 601.2f the payer picks which reduction applies first" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    foundry <- S.printingOf s registry "Mishra's Foundry"
+    heartstone <- S.printingOf s registry "Heartstone"
+    tortoise <- S.printingOf s registry "Blossoming Tortoise"
+    let animate = animationAbility foundry
+        (srcId, board) = foundryBoard mountain 3 foundry heartstone tortoise
+        activation = Activate.activateAbility S.alice srcId animate
+        -- The FIRST activation, made while the Foundry is a land and no creature:
+        -- only the Tortoise's criterion names it, so one reduction applies, there is
+        -- one order, and the printed {2} costs {1}. Resolved, so the activation the
+        -- case is about is made by a permanent inside both criteria at once.
+        animated = S.runPure S.identityAnswer (S.runPure S.identityAnswer board activation) Stack.resolveTop
+        costlier = ManaCost.MkManaCost [ManaSymbol.Generic 1]
+        chosen = S.runPure (takesTotal costlier) animated activation
+        cheapest = S.runPure S.identityAnswer animated activation
+    Spec.assertEqWith s "Mishra's Foundry prints three abilities, and the animation is the second" (length (Face.activatedAbilities (S.combinedFace foundry))) 3
+    Spec.assertEqWith s "the Tortoise alone pays one of the printed {2}" (S.tappedCount S.alice animated) 1
+    Spec.assertEqWith s "and the animation resolved, so the Foundry is a land creature under the Tortoise" (S.powerToughnessOf srcId animated) (Just (3, 3))
+    -- THE ASSERTION. Tortoise first leaves the {1} Heartstone's own floor then
+    -- forbids it to take, and the payer is the one who says so -- a second Mountain
+    -- pays it. Nothing but the answer differs between these two lines.
+    Spec.assertEqWith s "the order the payer chose costs a second Mountain" (S.tappedCount S.alice chosen) 2
+    Spec.assertEqWith s "where the order pawl offers first taps nothing more" (S.tappedCount S.alice cheapest) 1
+    Spec.assertEqWith s "and both reached the stack, so neither was refused" (fmap (length . GameState.stack) [chosen, cheapest]) [1, 1]
 
 -- alice's board: Saltfield Recluse, `lands` Plains, and a Goblin Piker under bob
 -- to aim the Recluse's ability at -- plus Brutal Suppression under BOB when one
