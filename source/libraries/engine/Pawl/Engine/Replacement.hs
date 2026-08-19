@@ -596,9 +596,28 @@ matchesController gs src rel oid = case rel of
 -- can't be prevented" effect stored by a resolution has no permanent behind it.
 -- Nothing names no object, so IsSource -- the "THIS creature" of a printed clause
 -- -- is vacuously False for it, and no printing writes that pair anyway.
+--
+-- CR 608.2h decides WHICH view: a source no longer in the zone it was expected to
+-- be in is read from its last known information, which is CR 113.7a's own
+-- sentence from the shield's side and CR 702.2e's from the keyword's. Ghitu
+-- Fire-Eater is the case -- it sacrifices itself to pay for the ability that then
+-- deals its damage -- and without the fallback Luminesce's colour disjuncts both
+-- answer False on the blank view a dead id projects, so a red source's damage
+-- goes unprevented. viewWithLastKnownAnywhere rather than viewWithLastKnown: the
+-- id in hand IS the source, so there is no second object for the scoped reader to
+-- protect from the substitution.
+--
+-- Nothing from that reader means the object is gone AND nothing was filed, which
+-- falls back to the live blank view rather than to False -- today's behaviour,
+-- kept because `And []` above must still admit everything when the view is
+-- unavailable. No board separates the two: Pawl.Engine.Event files a record for
+-- every object that leaves a zone, and Pawl.Engine.Departure for every object of
+-- a departing player.
 matchesDamageSource :: GameState -> Filter.Context -> Filter.Type.Filter Keyword.Type.Keyword -> DamageEvent.DamageEvent -> Bool
 matchesDamageSource gs context filter_ de =
-  Filter.matches context (Projection.viewOfObject (DamageEvent.source de) gs) filter_
+  let oid = DamageEvent.source de
+      view = Maybe.fromMaybe (Projection.viewOfObject oid gs) (Projection.viewWithLastKnownAnywhere gs oid)
+   in Filter.matches context view filter_
 
 -- CR 615.1 / 614.1a: does this damage event have the qualities the pattern
 -- names? Four of them: a pattern naming no KIND admits combat and noncombat

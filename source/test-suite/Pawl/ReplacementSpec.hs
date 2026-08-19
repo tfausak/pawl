@@ -1948,6 +1948,59 @@ luminesceSpec s registry = Spec.describe s "Luminesce (CR 615.1, CR 609.7b)" $ d
           asPrinted = S.runPure S.identityAnswer shielded (Damage.applyDamage [hit piker 2])
       Spec.assertEqWith s "while red, the Piker's 2 is prevented whole" (S.lifeOf S.alice asPrinted) (Just 20)
       Spec.assertEqWith s "once green, the same 2 is dealt" (S.lifeOf S.alice after) (Just 18)
+  -- CR 608.2h's DEPARTED source, the half neither case above reaches: both of
+  -- them deal damage from a permanent still on the battlefield, so the recheck
+  -- reads a live projection either way. Ghitu Fire-Eater ({2}{R} Creature --
+  -- Human Nomad 2/2, "{T}, Sacrifice this creature: It deals damage equal to its
+  -- power to any target") pays the source's own departure as a COST, so the id
+  -- the damage event carries names nothing by the time the ability resolves --
+  -- no response and no prompt stands between the departure and the read.
+  --
+  -- THE VACUITY TRAP here is the AMOUNT collapsing to 0: were Quantity.Power to
+  -- read the dead id's blank view, both readings would leave bob on 20 and the
+  -- case would pass whatever the shield did. Pawl.ActivateSpec's "CR 113.7a whole
+  -- card" case pins the amount at 2 with the source already gone, which is what
+  -- keeps 20 and 18 apart below. That trap is not hypothetical: emptying
+  -- GameState.lastKnown outright is NOT a usable mutation here, because the same
+  -- store feeds Quantity.Power, the amount collapses to nothing, and the red board
+  -- below lands on 20 under both readings. Only the green board catches it.
+  --
+  -- TWO boards differing in exactly one thing, because one cannot separate the
+  -- readings on its own. Pairing (red, green) the shield gives (20, 18) reading
+  -- the filed record, (20, 20) reading the printed card -- the print is red --
+  -- (20, 20) admitting any departed source unconditionally, and (18, 18) reading
+  -- the live projection of a dead id, which is what the engine did before #1844.
+  -- The green board rests on the record holding the PROJECTED characteristics
+  -- rather than the printed face; Pawl.ActivateSpec's pumped Fire-Eater is the
+  -- direct proof of that, and this is the same fact read on the colour axis.
+  --
+  -- bob is the recipient because a PLAYER puts no toughness, no state-based
+  -- action and no marked damage between the divergence and the read. Two seats
+  -- and not three: nothing in CR 608.2h, CR 609.7b or Luminesce's text says
+  -- "opponent", "that player" or "defending player" -- the shield is
+  -- source-scoped and the recipient is whatever the ability targeted.
+  let ghituBoard tint act = do
+        plains <- S.printingOf s registry "Plains"
+        ghitu <- S.printingOf s registry "Ghitu Fire-Eater"
+        luminesce <- S.printingOf s registry "Luminesce"
+        let base = S.landsInPlay plains 1
+            (fireEater, g1) = S.addCreature ghitu S.alice base
+            (g2, spellId) = S.handOne luminesce g1
+            shielded = tint fireEater (castAndResolve S.identityAnswer g2 spellId)
+        act fireEater shielded (S.runPure (aimPlayer S.bob) shielded (Activate.activateAbility S.alice fireEater (theAbility ghitu) Monad.>> Stack.resolveTop))
+  Spec.it s "CR 608.2h a sacrificed red source's damage is still prevented: the shield reads last known information"
+    . ghituBoard (\_ gs -> gs)
+    $ \fireEater shielded after -> do
+      Spec.assertEqWith s "bob takes nothing: the departed source is read as the red creature it last was" (S.lifeOf S.bob after) (Just 20)
+      Spec.assertBool s (not (Set.member fireEater (GameState.battlefield after))) "setup: the cost really did remove the source"
+      Spec.assertBool s (Maybe.isNothing (Game.lookupObject fireEater after)) "setup: and the id it left behind names nothing"
+      Spec.assertEqWith s "setup: the shield was a floating replacement before the activation" (length (GameState.replacements shielded)) 1
+      Spec.assertEqWith s "supporting: and it lasts the turn rather than being used up (CR 615.3)" (length (GameState.replacements after)) 1
+  Spec.it s "CR 609.7b the recheck reads the RECORD, not the print: a Fire-Eater made green before it left deals its 2"
+    . ghituBoard (\oid -> S.withEffect oid (Modification.SetColor (Set.singleton Color.Green)))
+    $ \fireEater _ after -> do
+      Spec.assertEqWith s "bob takes 2: neither disjunct matches the green source the record filed" (S.lifeOf S.bob after) (Just 18)
+      Spec.assertBool s (Maybe.isNothing (Game.lookupObject fireEater after)) "setup: the source departed here too, so the two boards differ only in colour"
 
 -- CR 615.1 / 609.7b again, on two axes at once: a shield that names its source by
 -- CHARACTERISTIC and narrows by DAMAGE KIND. Its producer is Moonmist ({1}{G}
