@@ -256,6 +256,11 @@ numberInstances =
 -- and Just the pre-batch board for a CR 608.2f batch (see Event.applyReplacementsIn);
 -- `gs` is always the live state.
 --
+-- NOT the last word on which candidates the CR 616.1 loop offers: Event.loop
+-- drops every candidate a permanent entering BESIDE this event's subject sources
+-- (CR 614.12). That filter needs the batch, which is the loop's parameter rather
+-- than this one's.
+--
 -- `applies` reads the pre-batch board too, not just `collect`: both ask about
 -- the SOURCE's controller for CR 109.5's "you" (matchesController,
 -- matchesZoneOwner, the TokenR arm), and a source the batch has already removed
