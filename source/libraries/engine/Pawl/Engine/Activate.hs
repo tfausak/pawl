@@ -685,7 +685,13 @@ activateAbility pid srcId ability = do
               -- pool reduces by generic mana (Heartstone's {1}), which has no halves
               -- to choose between. The seam is here rather than skipped so that the
               -- one that does cannot arrive at a path that never asks.
-              adjustments <- Cost.announceReductions pid srcId gs gathered
+              --
+              -- CR 601.2f's ORDER is asked at the same seam and does reach a board:
+              -- Heartstone's floor beside Blossoming Tortoise's absence of one on an
+              -- animated Mishra's Foundry is two orders at two prices. The ANNOUNCED
+              -- cost goes in because the order is chosen against the cost it will be
+              -- applied to.
+              adjustments <- Cost.announceReductions pid srcId gs announcedCost gathered
               let paidCost = Cost.totalWith adjustments announcedCost
               -- CR 601.2g/h via Pawl.Engine.Cost.pay: the mana window, then the
               -- components. The gates above prove SOME sequence of choices pays for

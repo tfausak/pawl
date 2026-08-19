@@ -1157,6 +1157,26 @@ combatReplaySpec s =
             "the coloured half round trips"
             (Replay.decode p (Replay.encode p (ManaSymbol.OfType (ManaType.Colored Color.Black))))
             (Just (ManaSymbol.OfType (ManaType.Colored Color.Black)))
+        -- CR 601.2f: which order a payer applied several reductions in decides what
+        -- the spell or ability cost, so the total that order reached has to survive
+        -- a transcript too.
+        Spec.it s "ChooseReducedCost round-trips through the transcript" $ do
+          let p =
+                Prompt.ChooseReducedCost
+                  decider
+                  S.alice
+                  oid
+                  (ManaCost.MkManaCost [] NonEmpty.:| [ManaCost.MkManaCost [ManaSymbol.Generic 1]])
+          Spec.assertEqWith
+            s
+            "the costlier order round trips"
+            (Replay.decode p (Replay.encode p (ManaCost.MkManaCost [ManaSymbol.Generic 1])))
+            (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
+          Spec.assertEqWith
+            s
+            "and so does the cheapest"
+            (Replay.decode p (Replay.encode p (ManaCost.MkManaCost [])))
+            (Just (ManaCost.MkManaCost []))
         -- Discriminating: fails if CR 118.7e's choice rides CR 601.2b's
         -- announcement response rather than getting its own constructor, which
         -- is the nearest miss -- both are a two-way question about a hybrid

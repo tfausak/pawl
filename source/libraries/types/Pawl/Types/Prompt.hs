@@ -26,6 +26,7 @@ import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -799,3 +800,22 @@ data Prompt r where
   -- the half that reduces nothing legal. Elided only for the degenerate
   -- `Hybrid t t`.
   ChooseReductionHalf :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ManaSymbol.ManaSymbol -> NonEmpty.NonEmpty ManaSymbol.ManaSymbol -> Prompt ManaSymbol.ManaSymbol
+  -- | CR 601.2f: "If multiple cost reductions apply, the player may apply them
+  -- in any order." Asked of the payer as CR 601.2f's totalling reaches the
+  -- reductions, once for the whole cost rather than once per reduction.
+  --
+  -- The offer is the distinct TOTALS those orders reach, cheapest first, and the
+  -- answer is the one the payer picked. An order's only observable is the total
+  -- it leaves -- Pawl.Engine.Cost.applyAdjustments answers a cost and nothing
+  -- else -- so naming the total names the order, and two orders that agree on it
+  -- are one button.
+  --
+  -- Raised only where two totals differ, which takes a FLOORED reduction beside
+  -- an UNFLOORED one on one cost (Pawl.Types.CostAdjustments' pairing);
+  -- reductions that state one floor commute, and every spell-cost reduction
+  -- states none.
+  --
+  -- NOT filtered by payability, ChooseReductionHalf's posture and reason: CR
+  -- 601.2f puts no such condition on the order, so the payer may take the
+  -- costlier one and CR 601.2h reverses a payment they cannot make.
+  ChooseReducedCost :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ManaCost.ManaCost -> Prompt ManaCost.ManaCost
