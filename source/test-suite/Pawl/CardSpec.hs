@@ -684,6 +684,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfCountersReached {} -> []
   -- CR 310.12b carries a counter kind alone.
   TriggerCondition.SelfLastCounterRemoved _ -> []
+  -- And so does its any-amount mirror.
+  TriggerCondition.SelfCountersRemoved _ -> []
   -- CR 601.2i's Filter is a predicate over the spell that was cast, and a Filter
   -- holds no Count, exactly as CR 603.6a's does above. Its ordinal is a bare
   -- Natural, as CR 714.2b's is.
@@ -2720,6 +2722,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfCountersReached {} -> []
   -- CR 310.12b carries a counter kind alone.
   TriggerCondition.SelfLastCounterRemoved _ -> []
+  -- And so does its any-amount mirror.
+  TriggerCondition.SelfCountersRemoved _ -> []
   -- CR 601.2i's "whenever you cast a [type] spell" carries one directly, over
   -- the spell rather than over a permanent.
   TriggerCondition.SpellCast (SpellCast.MkSpellCast f _ _ _) -> [f]

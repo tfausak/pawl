@@ -1046,32 +1046,52 @@ applyDamage events = do
       lifeGainedBy ev = case DamageEvent.dealtByLifelink ev of
         Just pid | DamageEvent.amount ev > 0 -> [GameEvent.LifeGained (LifeChange.MkLifeChange pid (DamageEvent.amount ev))]
         _ -> []
-      -- CR 310.6's counter removal, recorded so CR 310.12b's "when the last
-      -- defense counter is removed" has an event to fire off.
+      -- CR 120.3h's and CR 120.3c's counter removals, recorded so a trigger
+      -- watching counters come off has an event to fire off: CR 310.12b's "when
+      -- the last defense counter is removed" for the battle half, and Chandra,
+      -- Fire Artisan's "whenever one or more loyalty counters are removed" for the
+      -- planeswalker half. BOTH kinds, because the two rules differ in nothing but
+      -- the counter kind -- the same reason `removeCounters` above is one function.
       --
-      -- ONE record per BATTLE and not one per damage event, which is CR 510.2's
-      -- simultaneity taken seriously: two unblocked attackers that between them
-      -- take a defense-5 battle to 0 removed its last defense counter ONCE, so the
-      -- Siege ability triggers once. A per-event record would have neither event
-      -- reach 0 and the trigger would never fire at all.
+      -- ONE record per PERMANENT per kind and not one per damage event, which is
+      -- CR 510.2's simultaneity taken seriously: two unblocked attackers that
+      -- between them take a defense-5 battle to 0 removed its last defense counter
+      -- ONCE, so the Siege ability triggers once, and two that take two loyalty
+      -- counters off a planeswalker fire Chandra's trigger once for two rather than
+      -- twice for one. A per-event record would also have neither event reach 0 and
+      -- the Siege trigger would never fire at all.
       --
       -- Read as a BEFORE/AFTER pair off the two boards rather than summed out of
       -- the events, so the record describes what actually came off: the floor in
       -- removeCounters above means 4 damage to a defense-1 battle removes one counter,
-      -- not four.
+      -- not four. That is also why this is a DIFF rather than a call to
+      -- Event.removeCounters, CR 122's funnel: `markOne` is a pure fold and the
+      -- funnel is a Game action, so routing it would emit one event per damage
+      -- event and lose both properties above.
       --
       -- Every PERMANENT a surviving event named, not only the ones tagged
-      -- ToBattle: whether a defense counter actually came off is what the
+      -- ToBattle or ToPlaneswalker: whether a counter actually came off is what the
       -- before/after pair below answers, so this need not classify the recipient a
-      -- second time -- and a permanent that is a battle under some other tag (CR
-      -- 120.3h alongside CR 120.3e) is therefore not missed.
-      battleHit ev = Recipient.objectOf (DamageEvent.target ev)
-      removalOn before after oid =
-        let was = Battle.defenseOn oid before
-            now = Battle.defenseOn oid after
-         in [GameEvent.CountersRemoved (CounterChange.MkCounterChange oid CounterKind.Defense was now) | was > now]
+      -- second time -- and a permanent that is a battle or a planeswalker under
+      -- some other tag (CR 120.3h alongside CR 120.3e) is therefore not missed. A
+      -- permanent that is both yields two records, one per kind, which is what CR
+      -- 120.3's "one or more of the following results" says.
+      permanentHit ev = Recipient.objectOf (DamageEvent.target ev)
+      -- Battle.defenseOn generalized over the kind, which is the whole change: it
+      -- is that function's body with CounterKind.Defense taken as an argument.
+      countersOn kind oid gs = maybe 0 (Map.findWithDefault 0 kind . Object.counters) (Game.lookupObject oid gs)
+      removalOn kind before after oid =
+        let was = countersOn kind oid before
+            now = countersOn kind oid after
+         in [GameEvent.CountersRemoved (CounterChange.MkCounterChange oid kind was now) | was > now]
+      -- The `was > now` guard above already subsumes the card-type classification,
+      -- so this folds both kinds over every hit permanent rather than asking which
+      -- of CR 120.3's results the recipient earned: a creature has neither kind on
+      -- it and yields neither record.
       removalsBetween before after =
-        concatMap (removalOn before after) (List.nub (Maybe.mapMaybe battleHit survivors))
+        concatMap
+          (\oid -> concatMap (\kind -> removalOn kind before after oid) [CounterKind.Loyalty, CounterKind.Defense])
+          (List.nub (Maybe.mapMaybe permanentHit survivors))
       -- CR 120.3b / 702.90b, CR 120.3d / 702.90c / 702.80a and CR 120.3g /
       -- 702.164c: the counters a damage event CAUSES, placed through
       -- Event.putCounters and Event.putPlayerCounters -- CR 122.6's two funnels --
@@ -1179,9 +1199,9 @@ applyDamage events = do
             -- single event, and CR 702.15e already makes each source's gain its
             -- own entry.
             --
-            -- CR 310.6's counter removals join them, after the damage and for the
-            -- same reason: they are a RESULT of it (CR 120.3h), so the cause reads
-            -- first. `marked` is the board markOne left, which is what makes the
+            -- CR 120.3c's and CR 310.6's counter removals join them, after the
+            -- damage and for the same reason: they are a RESULT of it (CR 120.3c,
+            -- CR 120.3h), so the cause reads first. `marked` is the board markOne left, which is what makes the
             -- pair the removal that actually happened.
             List.foldl'
               (flip Event.recordEvent)

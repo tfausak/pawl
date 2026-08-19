@@ -1577,6 +1577,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerLosesLife _ -> condition
   TriggerCondition.SelfCountersReached {} -> condition
   TriggerCondition.SelfLastCounterRemoved _ -> condition
+  TriggerCondition.SelfCountersRemoved _ -> condition
   TriggerCondition.SelfHalfUnlocked _ -> condition
   TriggerCondition.RoomFullyUnlocked _ -> condition
   TriggerCondition.AnyOf conditions -> TriggerCondition.AnyOf (fmap (rewriteTriggerCondition pairs) conditions)

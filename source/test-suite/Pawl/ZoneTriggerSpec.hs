@@ -1641,6 +1641,10 @@ representativeEvents cond =
         -- CR 310.12b: a removal on the BEARER that took the last counter, so the
         -- event really matches the condition Event.matchesTrigger is asked about.
         TriggerCondition.SelfLastCounterRemoved kind -> one (GameEvent.CountersRemoved (CounterChange.MkCounterChange departed kind 1 0))
+        -- Its any-amount mirror, on a pair that does NOT reach zero -- so an
+        -- implementation that had cased on `after` would find no match here and the
+        -- eventBindingSlots pin below would see nothing stamped.
+        TriggerCondition.SelfCountersRemoved kind -> one (GameEvent.CountersRemoved (CounterChange.MkCounterChange departed kind 3 1))
         -- CR 601.2i's own event, and the only one this condition admits. Both
         -- halves are bound whichever ids the event names -- the spell under
         -- `thatSpell`, the caster under `thatPlayer` -- so the two sides agree
@@ -1806,6 +1810,7 @@ everyTriggerCondition =
     TriggerCondition.PlayerLosesLife PlayerRelation.Opponent,
     TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached CounterKind.Lore 1),
     TriggerCondition.SelfLastCounterRemoved CounterKind.Defense,
+    TriggerCondition.SelfCountersRemoved CounterKind.Loyalty,
     -- BOTH scopes, unlike StepBegins' one above: the TurnScope is new on this
     -- condition, and the pin below asserts eventBindingSlots against what
     -- eventBindings stamps for every event -- so an arm that had cased on the

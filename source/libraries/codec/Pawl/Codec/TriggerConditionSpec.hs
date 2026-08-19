@@ -387,6 +387,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.SelfLastCounterRemoved CounterKind.Defense)
       " {\"type\":\"SelfLastCounterRemoved\",\"value\":{\"type\":\"Defense\"}} "
+  -- Its any-amount mirror, sharing the payload and differing only in the tag --
+  -- a DIFFERENT kind here, so a codec that crossed the two arms could not pass
+  -- both cases.
+  Spec.it s "SelfCountersRemoved round-trips its kind" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.SelfCountersRemoved CounterKind.Loyalty)
+      " {\"type\":\"SelfCountersRemoved\",\"value\":{\"type\":\"Loyalty\"}} "
   -- CR 601.2i. A PAIR: a Filter over the SPELL, holding Young Pyromancer's two
   -- printed narrowings -- who cast it and what it was -- plus the TurnScope,
   -- which is the axis the Filter cannot carry. Young Pyromancer prints no turn,
