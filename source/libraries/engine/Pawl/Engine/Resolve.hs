@@ -2160,9 +2160,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- CR 701.14c: "if a creature fights itself, it deals damage to
               -- itself equal to TWICE its power" -- ONE event, not two of its
               -- power. Every observer that sums (marked damage, CR 120.4a's
-              -- excess, lifelink) agrees either way; one that counts events (CR
-              -- 122.1c's shield counters, a damage trigger, CR 615.7's
-              -- prevention) does not, which is why the rule bothers to say it.
+              -- excess, lifelink, CR 615.7's amount-based shield) agrees either
+              -- way; one that counts events (CR 122.1c's shield counters, a
+              -- damage trigger) does not, which is why the rule bothers to say
+              -- it.
               --
               -- Both reads of the same power off the same pre-effect state, so
               -- doubling one is the same number as summing the two; written as

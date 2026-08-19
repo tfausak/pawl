@@ -2797,11 +2797,13 @@ fightSpec s registry = Spec.describe s "Fight (CR 701.14)" $ do
   -- name the Predator itself. Prey Upon cannot reach the rule -- its two slots are
   -- filtered by controller, disjointly.
   --
-  -- Every observer that SUMS -- marked damage, excess (CR 120.4a), lifelink, an
-  -- amount-based CR 615.7 shield -- reads the same under both implementations,
-  -- because 4 + 4 and 8 agree. Only an observer that counts EVENTS separates
-  -- them, so this case is written on CR 122.1c's shield counters: one counter is
-  -- spent per prevented event, whatever the amount.
+  -- Every observer that SUMS reads the same under both implementations, because
+  -- 4 + 4 and 8 agree: marked damage, excess (CR 120.4a), lifelink, and an
+  -- amount-based shield, whose rule says so itself ("such effects count only the
+  -- amount of damage; the number of events or sources dealing it doesn't matter",
+  -- CR 615.7). Only an observer that counts EVENTS separates them, so this case is
+  -- written on CR 122.1c's shield counters: one counter is spent per prevented
+  -- event, whatever the amount.
   Spec.it s "CR 701.14c a self-fight is ONE damage event, so one shield counter answers it" $ do
     (board, predator) <- predatorBoard s registry
     Spec.assertEqWith s "Moonmist flipped the Ranger to a 4/4 Nightfall Predator" (fmap Face.name (Game.faceOf predator board), S.powerToughnessOf predator board) (Just (CardName.MkCardName (Text.pack "Nightfall Predator")), Just (4, 4))
@@ -2818,9 +2820,9 @@ fightSpec s registry = Spec.describe s "Fight (CR 701.14)" $ do
   -- its power". +0/+5 makes the Predator a 4/9, so 8 is marked rather than
   -- lethal and the number is readable.
   --
-  -- Today's two-blow implementation marks 8 here too, so this case does not
-  -- separate the bug; it separates a fix that collapses the two blows into one
-  -- blow of P (which marks 4) from one that doubles.
+  -- The two-blow implementation this replaced marked 8 here too, so this case
+  -- does not separate that bug; it separates a fix that collapses the two blows
+  -- into one blow of P (which marks 4) from one that doubles.
   Spec.it s "CR 701.14c the one blow is TWICE its power" $ do
     (base, predator) <- predatorBoard s registry
     let board = S.withEffect predator (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 0) (Quantity.Literal 5))) base
@@ -2849,6 +2851,10 @@ fightSpec s registry = Spec.describe s "Fight (CR 701.14)" $ do
 -- The Mountain arrives AFTER Moonmist resolves: paying {1}{G} off a board holding
 -- one may tap it for the generic, and then the ability has no red mana to pay
 -- with.
+--
+-- Moonmist rather than the card's own upkeep trigger: neither face's "if no
+-- spells were cast last turn, transform this creature" is transcribed, because no
+-- card can read that count (gap #1883).
 predatorBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId)
 predatorBoard s registry = do
   ranger <- S.printingOf s registry "Daybreak Ranger"
@@ -2865,9 +2871,11 @@ predatorBoard s registry = do
 -- with the Predator itself (CR 115.3: the same object may be chosen for each
 -- instance of the word "target"), then the ability resolves and SBAs settle.
 --
--- The ability is read off the object's CURRENT face (CR 709.3b), so a board whose
--- Ranger never transformed would activate nothing rather than silently activating
--- the front face's ping.
+-- The ability is read off the object's CURRENT face (CR 712.8: each face has its
+-- own characteristics), so a board whose Ranger never transformed would activate
+-- the front face's ping instead and mark no damage on the Ranger at all. The id
+-- survives the flip because CR 712.18 says a transformed permanent is not a new
+-- object.
 selfFight :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 selfFight oid gs = case Game.faceOf oid gs of
   Just face
