@@ -13,6 +13,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Engine as Engine
@@ -456,6 +457,80 @@ manaLeakSpec s registry = Spec.describe s "ManaLeak" $ do
     -- and this interpreter pays whenever it is asked. Offered at either end of
     -- the exchange, this would read 6.
     Spec.assertEqWith s "only Cancel's three Islands are tapped" (S.tappedCount S.bob after) 3
+
+-- Announces `x` for CR 601.2b's variable, and pays whatever a resolving spell
+-- offers bob (paysFor, and its reasons). Rank-1 for paysFor's reason too: the
+-- implicit forall is outermost, so `announcesXBobPays 2` is the `forall r. Prompt
+-- r -> r` that Replay.record wants.
+announcesXBobPays :: Natural -> Prompt.Prompt r -> r
+announcesXBobPays x p = case p of
+  Prompt.ChooseX {} -> x
+  _ -> bobPaysAnswer p
+
+-- The X answers in a transcript, in order. Empty during a resolution is the
+-- point: CR 107.3a's value was announced at the CAST, so nothing asks again.
+xResponses :: [Response.Response] -> [Response.Response]
+xResponses = filter isXResponse
+
+isXResponse :: Response.Response -> Bool
+isXResponse response = case response of
+  Response.ChoseX _ -> True
+  _ -> False
+
+-- manaLeakHand's board with Clash of Wills in alice's hand instead, cast at bob's
+-- Piker with `x` announced at CR 601.2b. alice holds FIVE Islands, enough for
+-- {X}{U} at either X the cases below announce, so the two boards differ in
+-- nothing but that announcement; bob holds THREE, which is what makes {2}
+-- payable and {4} not.
+clashBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Natural -> (ObjectId.ObjectId, GameState.GameState)
+clashBoard island clash piker x =
+  let base = S.landsInPlay island 5
+      withBob = List.foldl' (\g _ -> snd (S.addCreature island S.bob g)) base [1 .. 3 :: Int]
+      (victimId, onStack) = S.spellOnStack piker S.bob withBob
+      (gs, clashId) = S.handOne clash onStack
+   in (victimId, snd (Engine.runGamePure (announcesXBobPays x) gs (S.cast S.alice clashId)))
+
+-- CR 118.4 / CR 107.3a: Clash of Wills, {X}{U} Instant, "Counter target spell
+-- unless its controller pays {X}." The {X} of a cost paid at RESOLUTION (CR
+-- 118.12) is the value the spell's own controller announced as it was cast, so
+-- the payer is charged a number he had no say in and is never asked for one.
+--
+-- The two cases run the same board, the same hand and the same interpreter, and
+-- differ in NOTHING but the X alice announced: bob's three Islands cover {2} and
+-- cannot cover {4}. A gate that left the symbol unsubstituted reads {0} (see
+-- Pawl.Engine.Cost's costGenericOf), which is payable for free -- so both cases
+-- would end with the Piker uncountered and nothing of bob's tapped.
+clashOfWillsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+clashOfWillsSpec s registry = Spec.describe s "ClashOfWills" $ do
+  Spec.it s "CR 107.3a the announced X is what the targeted spell's controller pays" $ do
+    island <- S.printingOf s registry "Island"
+    clash <- S.printingOf s registry "Clash of Wills"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (victimId, cast) = clashBoard island clash piker 2
+        ((_, after), transcript) = Replay.record (announcesXBobPays 2) cast Stack.resolveTop
+    -- The behaviour: {X} was announced as 2, so the offer cost bob exactly two of
+    -- his three Islands. Unsubstituted it is {0} and taps none of them.
+    Spec.assertEqWith s "paying the announced {2} tapped two of bob's three Islands" (S.tappedCount S.bob after) 2
+    Spec.assertBool s (elem victimId (GameState.stack after)) "so the Piker was not countered"
+    Spec.assertEqWith s "bob was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
+    -- CR 107.3a's other half: the value came off the announcement, so the
+    -- resolution asked nobody for an X -- not the payer, whose choice it never is.
+    Spec.assertEqWith s "and nobody was asked to choose an X during resolution" (xResponses transcript) []
+    Spec.assertEqWith s "Clash of Wills finished resolving into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+  -- CR 118.3 against the SAME board with a larger announcement: an unpayable cost
+  -- takes the "can't" branch with no prompt, exactly as Mana Leak's {3} does
+  -- against two Islands.
+  Spec.it s "CR 118.3 a larger announced X the controller cannot pay counters the spell" $ do
+    island <- S.printingOf s registry "Island"
+    clash <- S.printingOf s registry "Clash of Wills"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_victimId, cast) = clashBoard island clash piker 4
+        ((_, after), transcript) = Replay.record (announcesXBobPays 4) cast Stack.resolveTop
+    Spec.assertEqWith s "the Piker was countered into bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+    Spec.assertEqWith s "and never reached the battlefield" (S.creaturesInPlay S.bob after) 0
+    Spec.assertEqWith s "three Islands cannot pay the announced {4}, so bob was never asked" (payResponses transcript) []
+    Spec.assertEqWith s "and nothing of bob's was tapped" (S.tappedCount S.bob after) 0
+    Spec.assertEqWith s "Clash of Wills finished resolving into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
 
 -- Puts every looked-at card where a look-and-split keyword action's FIRST list
 -- goes -- the bottom of the library for scry (CR 701.22a), the graveyard for
@@ -2012,6 +2087,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   indestructibleSpec s registry
   counterSpec s registry
   manaLeakSpec s registry
+  clashOfWillsSpec s registry
   stymiedHopesSpec s registry
   standstillSpec s registry
   dontMakeASoundSpec s registry

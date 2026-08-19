@@ -758,6 +758,10 @@ data Prompt r where
   --
   -- One offer per PAYMENT and not per clause: a clause naming another's offer
   -- (Pawl.Types.PayGate.offeredAt) reuses the recorded answer.
+  --
+  -- The Cost carried is the one the payer will actually be charged, with CR
+  -- 107.3a's X already resolved (Pawl.Engine.Resolve.announcedXOn): Clash of
+  -- Wills offers a number rather than a symbol.
   ChooseToPay :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> ClauseIndex.ClauseIndex -> Cost.Cost Keyword.Keyword -> Prompt PaymentDecision.PaymentDecision
   -- | CR 601.2b: whether 2 life or a coloured mana pays each Phyrexian symbol.
   -- CR 118.13a puts the choice here rather than at payment. The Color is the

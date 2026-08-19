@@ -1360,10 +1360,15 @@ branchTaken branch wasPaid = case branch of
 -- player "started to pay", so a mandatory cost the payer can afford leaves
 -- nothing to choose, and CR 118.3 is asked first so an unpayable one takes the
 -- "can't" branch with no prompt either.
+--
+-- The cost is the PRINTED one with CR 107.3's X resolved (`announcedXOn`), and
+-- that substitution is what every reader below sees -- CR 118.3's affordability
+-- test, the prompt the payer is shown, and the payment itself -- so none of them
+-- can disagree about what {X} is.
 payGatePaid :: ObjectId -> ObjectId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> PayGate.PayGate -> Game Bool
 payGatePaid resolving source idx cIdx legal gate = do
   gs <- State.get
-  let cost = PayGate.cost gate
+  let cost = Cost.substituteX (announcedXOn resolving gs) (PayGate.cost gate)
   case payerOf (PayGate.payer gate) legal gs of
     Nothing -> pure False
     Just payer ->
@@ -1381,6 +1386,32 @@ payGatePaid resolving source idx cIdx legal gate = do
               -- CR 118.12 cost that sacrifices a permanent cannot be read by a
               -- later clause of the same resolution (#1872).
               pure (case outcome of Payment.Paid _ -> True; Payment.Unpaid -> False)
+
+-- CR 118.4 / CR 107.3a: the value of X in a cost paid during resolution. NOT a
+-- choice the payer makes -- CR 107.3a fixes it at the value the object's own
+-- controller announced at CR 601.2b, and CR 107.3i gives every instance of X on
+-- that object that one value -- so Clash of Wills' "unless its controller pays
+-- {X}" charges the X its caster paid for, and nobody is prompted here.
+--
+-- Read off the object CR 601.2b announced ON: the SPELL (Cast.castSpell stamps
+-- the new incarnation) or the ABILITY (Activate.activateAbility stamps the
+-- ability object), which is `resolving` in both cases and never `source` --
+-- Quantity.evaluateFor's InSlot arm says the same about the same binding.
+--
+-- Zero when nothing was announced. A face whose gate prints {X} always declares
+-- an {X} of its own (Pawl.CardSpec's "every printing that reads X declares X"),
+-- so this is a totality guard for a CARD-authored gate. A gate MINTED by a
+-- keyword resolves on a triggered ability that announced nothing, and reads 0
+-- here.
+--
+-- Not implemented: CR 702.21b's ward {X}, whose value is determined as the
+-- ability resolves rather than announced, needs a cost whose amount is a
+-- Quantity and has no spelling at all (#1526).
+announcedXOn :: ObjectId -> GameState -> Natural
+announcedXOn oid gs =
+  Maybe.fromMaybe
+    0
+    (Game.lookupObject oid gs >>= Binding.amountOf Binding.variableX . Object.bindings)
 
 -- Which player a resolution cost is offered to. ONE slot read answering two ways:
 -- a slot bound to a PLAYER names that player, one bound to an OBJECT names
