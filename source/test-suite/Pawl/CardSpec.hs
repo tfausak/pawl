@@ -1189,7 +1189,7 @@ printedBoxQuantity quantity = case quantity of
 -- to 0; over Scope.InHistory and Scope.OverPlayers the seed view is bypassed
 -- altogether (Pawl.Engine.Count.evaluate reads snapshots and players directly),
 -- so the box reads LIVE state and changes under the object. Either answer is a
--- number the card never printed (#156).
+-- number the card never printed; see #156.
 --
 -- Scoped to a card's own faces through `anyFace`, and that scope is load-bearing:
 -- CR 111.3 lets the creating effect define a token's power and toughness by a
@@ -4746,7 +4746,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- CR 208.1 / 208.2: a printed power or toughness box holds a number, or a value
   -- including a star. The type permits any Quantity there, and a computed one
   -- would be evaluated at Projection.baseCharacteristics' seed against a board
-  -- that has not been described yet -- see printedBoxOffends (#156).
+  -- that has not been described yet -- see printedBoxOffends.
   Spec.it s "CR 208.1 / 208.2 every printed power and toughness box is a number or a star" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace printedBoxOffends . Printing.card) ps
