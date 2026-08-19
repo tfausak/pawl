@@ -157,6 +157,7 @@ import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PerAttacker as PerAttacker
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.Phase as Phase
@@ -894,6 +895,16 @@ spellCostsOf :: Face.Face Card.Type.Card -> [Cost.Type.Cost Keyword.Keyword]
 spellCostsOf face =
   Cost.Type.MkCost (Face.manaCost face) (Face.additionalCosts face)
     : fmap AlternativeCost.cost (Face.alternativeCosts face)
+
+-- Every CR 118.12 cost this payload offers at resolution, over every mode and
+-- every clause. A READER of X rather than a declarer: Clash of Wills' "unless its
+-- controller pays {X}" spends the value its own {X}{U} announced (CR 107.3a),
+-- which is what Pawl.Engine.Resolve.announcedXOn substitutes in.
+payGateCostsOf :: Modal.Modal Card.Type.Card -> [Cost.Type.Cost Keyword.Keyword]
+payGateCostsOf =
+  fmap PayGate.cost
+    . concatMap (Maybe.mapMaybe Clause.payGate . Foldable.toList . Mode.clauses)
+    . Modal.modes
 
 -- Every Count reachable from a combat restriction: only CR 508.1c's / CR
 -- 509.1b's "unless some condition is met" carries one, and the subject beside it
@@ -3842,9 +3853,17 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- announcement the spell made. Nissa, Steward of Elements is the pool's
   -- producer, and without this disjunct the lint would call it an offender for
   -- declaring an {X} nothing reads.
+  --
+  -- A CR 118.12 COST reads X the same way and by the same rule, and it is not an
+  -- effect, so Card.allEffects cannot see it: Clash of Wills' only reader of the
+  -- X it announces is the "pays {X}" its clause offers at resolution
+  -- (`payGateCostsOf`, substituted in by Pawl.Engine.Resolve.announcedXOn).
   Spec.it s "every printing that reads X declares X, and vice versa" $ do
     ps <- S.allPrintings s
-    let readsX c = Resolve.readsX (Card.allEffects c) || Face.loyalty c == Just Loyalty.Variable
+    let readsX c =
+          Resolve.readsX (Card.allEffects c)
+            || Face.loyalty c == Just Loyalty.Variable
+            || any declaresVariable (payGateCostsOf (Face.spell c))
         offenders =
           filter
             (anyFace (\f -> readsX f /= any declaresVariable (spellCostsOf f)) . Printing.card)
@@ -3858,6 +3877,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- Sacrifice this creature: It deals X damage to any target" reads an X its
   -- CARD's {3}{R} does not declare, which the sweep above would have called an
   -- offender and this one calls correct (#544).
+  --
+  -- No `payGateCostsOf` disjunct here, unlike the spell half: no ability in the
+  -- pool offers a CR 118.12 cost containing {X} (Martyr of Frost, "{2}, Reveal X
+  -- blue cards from your hand, Sacrifice this creature: Counter target spell
+  -- unless its controller pays {X}", is the printing that would). Adding the
+  -- disjunct unexercised would weaken the sweep silently; without it the first
+  -- such card reddens this lint, which is where its author wants to be.
   Spec.it s "CR 602.2b every activated ability that reads X declares {X} in its own cost" $ do
     ps <- S.allPrintings s
     let abilitiesOf p = fmap ((,) (Face.name (S.combinedFace p))) (Face.activatedAbilities (S.combinedFace p))

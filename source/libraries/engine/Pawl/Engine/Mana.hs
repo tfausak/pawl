@@ -615,7 +615,9 @@ waysOf symbol = case symbol of
   -- type (CR 106.1b) and one tag, so nothing about the mana's identity is asked
   -- and everything about its provenance is.
   ManaSymbol.Snow -> [(Just (MkDemand everyManaType (Set.singleton ProductionTag.Snow)), 0, 0)]
-  -- Unreachable in payment: substituteX removes every Variable before canPay.
+  -- Unreachable in payment: substituteX removes every Variable before canPay --
+  -- at CR 601.2b for a cast or an activation, and at
+  -- Pawl.Engine.Resolve.payGatePaid for CR 118.12's cost paid on resolution.
   -- The match must be total, so a bare {X} demands nothing and counts as 0
   -- generic.
   ManaSymbol.Variable -> [(Nothing, 0, 0)]

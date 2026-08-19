@@ -35,8 +35,7 @@ import qualified Pawl.Types.SlotName as SlotName
 -- The clause is CR 608.2e's span, so a gate governing only some of an ability's
 -- instructions is representable -- Stymied Hopes' "counter target spell unless
 -- its controller pays {1}. Scry 1", where the scry happens either way and is a
--- clause carrying no gate at all. Condescend is the same shape and still wants
--- {X} in a resolution cost (CR 107.3, CR 118.4), which is #1501.
+-- clause carrying no gate at all.
 --
 -- Two clauses hanging off ONE payment are `offeredAt` below: Don't Make a
 -- Sound's "counter target spell unless its controller pays {2}. If they do,
@@ -66,6 +65,11 @@ data PayGate = MkPayGate
     -- NOT routed through CR 601.2f's totalling: that rule totals the cost of a
     -- spell being CAST or an ability being ACTIVATED, and a cost paid during
     -- resolution is neither, so no cost increase or reduction applies to it.
+    --
+    -- An {X} in it IS resolved, which is a different rule: CR 118.4 sends X to
+    -- CR 107.3a, whose value is the one the object's controller announced at
+    -- CR 601.2b. Clash of Wills' is {X}; Pawl.Engine.Resolve.announcedXOn is
+    -- where it is substituted in.
     cost :: Cost.Cost Keyword.Keyword,
     -- | Which of CR 118.12's branches this clause's instructions are. See
     -- Pawl.Types.PayBranch, and Pawl.Engine.Resolve.payGateAdmits for where the
