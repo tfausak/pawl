@@ -1146,6 +1146,68 @@ cardOffendsSharedZoneScope :: Face.Face Card.Type.Card -> Bool
 cardOffendsSharedZoneScope card =
   any (scopeOffends . Count.Type.scope) (cardCounts card)
 
+-- The shapes CR 208.1 and CR 208.2 allow in a printed power or toughness box:
+-- "two numbers separated by a slash", or a value that "includes a star (*)" --
+-- so a Literal, a bare Star, and the Plus that composes them into Tarmogoyf's
+-- 1+*. Exhaustive rather than a fallthrough: a new Quantity constructor must
+-- say whether a card can print it, and -Werror is what asks.
+printedBoxQuantity :: Quantity.Type.Quantity -> Bool
+printedBoxQuantity quantity = case quantity of
+  Quantity.Type.Literal _ -> True
+  Quantity.Type.Star -> True
+  -- CR 208.2's composite box. Recursive on both sides, so 1+* is accepted and
+  -- 1 + "the number of creatures you control" is not.
+  Quantity.Type.Plus (Plus.MkPlus left right) -> printedBoxQuantity left && printedBoxQuantity right
+  Quantity.Type.ManaValue -> False
+  Quantity.Type.Power -> False
+  Quantity.Type.Toughness -> False
+  Quantity.Type.InSlot _ -> False
+  Quantity.Type.Halved {} -> False
+  Quantity.Type.Negate {} -> False
+  Quantity.Type.Count {} -> False
+  Quantity.Type.ManaCount {} -> False
+  Quantity.Type.LifeTotal {} -> False
+  Quantity.Type.Speed {} -> False
+  Quantity.Type.IsMonarch {} -> False
+  Quantity.Type.PlayerCounters {} -> False
+  Quantity.Type.ObjectCounters {} -> False
+  Quantity.Type.HasDesignation {} -> False
+  Quantity.Type.WasKicked -> False
+  Quantity.Type.OpponentsAttacked {} -> False
+  Quantity.Type.CardsDiscardedThisTurn {} -> False
+  Quantity.Type.PlayersDealtDamageThisTurn {} -> False
+  Quantity.Type.EnteredThisTurn -> False
+  Quantity.Type.BlockersBeyondFirst -> False
+  Quantity.Type.AgainstSlot {} -> False
+
+-- Does this face print a power or toughness box CR 208.1/208.2 could not print?
+--
+-- Projection.baseCharacteristics is why it matters: it evaluates the printed box
+-- at the projection's SEED, before any layer has run. A Count there reads a board
+-- nobody has described yet -- over Scope.InZone every candidate's view is
+-- Nothing, so nothing is kept and Aggregation.Members aggregates the empty list
+-- to 0; over Scope.InHistory and Scope.OverPlayers the seed view is bypassed
+-- altogether (Pawl.Engine.Count.evaluate reads snapshots and players directly),
+-- so the box reads LIVE state and changes under the object. Either answer is a
+-- number the card never printed; see #156.
+--
+-- Scoped to a card's own faces through `anyFace`, and that scope is load-bearing:
+-- CR 111.3 lets the creating effect define a token's power and toughness by a
+-- computed value -- Rootha, Mastering the Moment's "create an X/X ... token,
+-- where X is the greatest mana value among instant and sorcery spells you've cast
+-- this turn" -- which Resolve.bakeTokenCharacteristics settles into a Literal as
+-- the token is created. So the wire format has to keep permitting the shape, and
+-- this is a claim about what a CARD prints rather than one the codec could make.
+printedBoxOffends :: Face.Face Card.Type.Card -> Bool
+printedBoxOffends card =
+  not
+    ( all
+        printedBoxQuantity
+        ( fmap Power.unwrap (Maybe.maybeToList (Face.power card))
+            <> fmap Toughness.unwrap (Maybe.maybeToList (Face.toughness card))
+        )
+    )
+
 -- The shared shape of the D4 dataflow lint, over EVERY carrier a card can hang
 -- modes off: its spell, and its activated, triggered and delayed abilities. The
 -- claim is an EQUALITY -- what ONE MODE reads, less what that mode mints and less
@@ -4681,6 +4743,35 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "a cost to attack's counted share is in the sweep"
       (fmap Count.Type.scope (cardCounts (S.combinedFace sphere)))
       [Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)]
+  -- CR 208.1 / 208.2: a printed power or toughness box holds a number, or a value
+  -- including a star. The type permits any Quantity there, and a computed one
+  -- would be evaluated at Projection.baseCharacteristics' seed against a board
+  -- that has not been described yet -- see printedBoxOffends.
+  Spec.it s "CR 208.1 / 208.2 every printed power and toughness box is a number or a star" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace printedBoxOffends . Printing.card) ps
+    Spec.assertEqWith s "no printed box holds a computed quantity" (fmap (S.nameOf . Printing.card) offenders) []
+    -- The sweep is vacuous on a predicate that accepts everything, so both
+    -- directions are asserted on real card data. Rootha, Mastering the Moment is
+    -- the pool's one computed box, and it sits on a MINTED face (CR 111.3), which
+    -- is exactly the shape the sweep above must not reach and the predicate must
+    -- still reject.
+    rootha <- S.printingOf s registry "Rootha, Mastering the Moment"
+    let elemental = mintedFaces (S.combinedFace rootha)
+    Spec.assertBool
+      s
+      (any printedBoxOffends elemental)
+      "CR 111.3 Rootha's minted Elemental token prints a computed box the predicate rejects"
+    Spec.assertBool
+      s
+      (not (printedBoxOffends (S.combinedFace rootha)))
+      "and Rootha's own 3/4 box is accepted"
+    -- CR 208.2's star, in both the bare and the composite spelling, accepted.
+    goyf <- S.printingOf s registry "Tarmogoyf"
+    Spec.assertBool
+      s
+      (not (printedBoxOffends (S.combinedFace goyf)))
+      "CR 208.2 Tarmogoyf's */1+* is accepted"
   Spec.it s "a card with no enchant ability declares no enchant slot" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let card = S.combinedFace piker

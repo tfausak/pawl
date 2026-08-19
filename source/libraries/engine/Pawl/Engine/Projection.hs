@@ -850,8 +850,16 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
         PC.subtypeWordChanges = []
       }
   Just face ->
-    -- The seed predates every layer, so a Count reached from here determines
-    -- nothing; such a Count aggregates to Just 0 rather than Nothing (#156).
+    -- The seed predates every layer, so it can describe no object: every view is
+    -- Nothing. That silences the printed box's board-reading shapes only where
+    -- they go through this view at all -- Pawl.Engine.Count.evaluate reads a
+    -- Scope.InHistory snapshot and a Scope.OverPlayers player directly, so a Count
+    -- over either would read LIVE state here. What keeps both out is CR 208.1 /
+    -- 208.2: a printed box is a number or a star, and Pawl.CardSpec's "every
+    -- printed power and toughness box is a number or a star" lint holds every
+    -- card's own faces to it. A MINTED face may print a computed box (CR 111.3),
+    -- which Resolve.bakeTokenCharacteristics stamps into a Literal as the token is
+    -- created -- except when it could not determine one (gap #1908).
     let seedViewOf = const Nothing
         seedContext = Filter.contextFor (controllerOf oid gs) (Just oid)
      in PC.MkProjectedCharacteristics
