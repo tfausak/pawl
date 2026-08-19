@@ -2634,7 +2634,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
       (fmap (namesOf gs) shuffles)
       [Set.fromList (fmap Text.pack ["Mountain", "Hill Giant", "Goblin Piker"])]
 
-  -- The gameplay-level proof of Projection.characteristicPowerIn. CR 604.3 and
+  -- The gameplay-level proof of CR 208.2a off the battlefield. CR 604.3 and
   -- CR 208.2a make a characteristic-defining power function in every zone, so
   -- Imperial Recruiter's "creature card with power 2 or less" has to weigh a
   -- Tarmogoyf in alice's library against the card types among all graveyards.
@@ -2656,9 +2656,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "the Tarmogoyf and the Piker" candidates [Set.fromList (fmap Text.pack ["Tarmogoyf", "Goblin Piker"])]
 
   -- CR 604.3's "in all zones" as an equality: one Tarmogoyf on the battlefield
-  -- and one in the library over the same graveyards, read through the two
-  -- different paths -- applyCharacteristicPT and characteristicPowerIn -- must
-  -- agree. Catches a substituteStar the wrong way round in either.
+  -- and one in the library over the same graveyards must read the same power.
+  -- One path now serves both -- layer 7a of each object's own CR 613 fold
+  -- (#1911) -- so this is the fence that says the fold does not quietly skip an
+  -- object off the battlefield, rather than a comparison of two implementations.
   Spec.it s "CR 604.3 the battlefield and off-battlefield readings of a CDA power agree" $ do
     mountain <- S.printingOf s registry "Mountain"
     bolt <- S.printingOf s registry "Lightning Bolt"
@@ -2667,7 +2668,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         (_, gs1) = S.addGraveyardCard bolt S.alice gs0
         (onBattlefield, gs2) = S.addCreature goyf S.alice gs1
         (inLibrary, gs3) = S.addLibraryCard goyf S.alice gs2
-        libraryPower = Game.faceOf inLibrary gs3 >>= Filter.power . Projection.viewOfCardIn gs3 inLibrary
+        libraryPower = Filter.power (Projection.viewOfObject inLibrary gs3)
     Spec.assertEqWith s "on the battlefield" (Projection.powerOf onBattlefield gs3) (Just 2)
     Spec.assertEqWith s "in the library" libraryPower (Just 2)
 

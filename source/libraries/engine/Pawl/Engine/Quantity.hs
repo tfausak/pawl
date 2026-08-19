@@ -101,11 +101,9 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   --
   -- Nothing when the view cannot say: no object at all, or an object with no
   -- card behind it. WHICH view arrives is the caller's choice rather than the
-  -- zone's, and every one of them answers CR 202.3 off the battlefield: the
-  -- printed-card view for the one reader that still takes it
-  -- (Projection.viewOfCardIn -- a mill tally), and the CR 613 projection for the
-  -- rest (Projection.fullView, Projection.viewUpTo), which project an object in
-  -- any zone.
+  -- zone's, and every view a reader holding an OBJECT now supplies is the CR 613
+  -- projection (Projection.fullView, Projection.viewUpTo), which projects an
+  -- object in any zone and so answers CR 202.3 off the battlefield too (#1911).
   Quantity.ManaValue -> mView >>= Filter.manaValue
   -- CR 208.1 read through the injected view, so this arm never learns whether
   -- it is looking at a live projection or a CR 608.2h snapshot -- the caller
@@ -159,10 +157,10 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
      in fmap toInteger ((mOid >>= boundOn) <|> boundOn announcedOn <|> Map.lookup slot (GameState.ambientAmounts gs))
   -- CR 208.2: a bare star has no value of its own. Both readers of a
   -- characteristic-defining P/T substitute the object's quantity for it first,
-  -- through Projection.seedCharacteristicPT -- the projection at its seed
-  -- (Projection.baseCharacteristics), and Projection.characteristicPowerIn off
-  -- the battlefield -- so reaching this arm means the star was never resolved,
-  -- honestly Nothing rather than a hole.
+  -- through Projection.seedCharacteristicPT at the projection's seed
+  -- (Projection.baseCharacteristics), in every zone as CR 604.3 asks -- so
+  -- reaching this arm means the star was never resolved, honestly Nothing rather
+  -- than a hole.
   Quantity.Star -> Nothing
   -- CR 608.2b: an effect may require information about a TARGET, which is not
   -- the ability's source (CR 113.7). Re-aim the fold at the object the slot
@@ -491,11 +489,11 @@ halve rounding n = case rounding of
 -- either way; and no printed characteristic-defining P/T contains a Negate at
 -- all. Both of those arms are consistency rather than a card's behaviour.
 --
--- SCOPED TO THE CHARACTERISTIC-DEFINING ABILITY, as CR 208.2a is: the callers
--- are Projection.applyCharacteristicPT on the battlefield and
--- Projection.characteristicPowerIn off it (CR 604.3 makes the ability function
--- in all zones), and every other reader of a quantity must keep evaluate's
--- honest Nothing, since no rule tells those to invent a number.
+-- SCOPED TO THE CHARACTERISTIC-DEFINING ABILITY, as CR 208.2a is: the caller is
+-- Projection.applyCharacteristicPT, which layer 7a runs for an object in any
+-- zone (CR 604.3 makes the ability function in all zones), and every other reader
+-- of a quantity must keep evaluate's honest Nothing, since no rule tells those to
+-- invent a number.
 --
 -- It does NOT descend into a Count, and does not need to: an undeterminable
 -- count IS the number CR 208.2a is talking about, so the 0 goes in whole here

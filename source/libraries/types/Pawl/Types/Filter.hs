@@ -70,10 +70,10 @@ data Filter keyword
     -- family with HasKeywordFamily below; Pawl.FilterSpec pins the pair apart.
     --
     -- Read through the PROJECTION, so a creature that gains flying at CR 613.1f
-    -- layer 6 matches and a Humility'd one stops matching. The one reader that
-    -- takes Projection.viewOfCardIn instead -- a mill tally -- sees the printed
-    -- keywords of a card off the battlefield (#160); a library search, a cost
-    -- criterion and an explore's land test no longer do.
+    -- layer 6 matches and a Humility'd one stops matching -- in every zone, since
+    -- CR 613.1 names none: a library search, a cost criterion, an explore's land
+    -- test and a mill tally all read a card's projected keywords rather than its
+    -- printed ones (#1911).
     HasKeyword keyword
   | -- | The object has SOME keyword ability of this family (CR 702.1), whatever
     -- its payload -- Flensing Raptor's "another target creature you control with
@@ -103,15 +103,12 @@ data Filter keyword
     -- of them. Both arms answer False for an absent power, so neither is
     -- reachable from the other, and Pawl.FilterSpec pins that pair apart.
     --
-    -- Answered off the PROJECTION wherever the reader supplies one, which is
-    -- every zone: Imperial Recruiter's "creature card with power 2 or less" reads
-    -- a library card's full CR 613 projection, Tarmogoyf's CR 208.2a power
-    -- included, and so does a graveyard-exile cost criterion. The one reader
-    -- that still takes the printed card (Projection.viewOfCardIn -- a mill tally)
-    -- reads the printed power box, except that CR 208.2a's
-    -- characteristic-defining power is evaluated for it too
-    -- (Projection.characteristicPowerIn), since CR 604.3 makes it function in
-    -- every zone.
+    -- Answered off the PROJECTION, in every zone: Imperial Recruiter's "creature
+    -- card with power 2 or less" reads a library card's full CR 613 projection,
+    -- Tarmogoyf's CR 208.2a power included, and so do a graveyard-exile cost
+    -- criterion and a mill tally (#1911). CR 208.2a's characteristic-defining
+    -- power arrives at layer 7a of that same fold, which CR 604.3 runs off the
+    -- battlefield as well as on it.
     PowerAtMost Integer
   | -- | CR 208.1 compared against the SOURCE rather than a literal: the object's
     -- power is less than the power of the object the evaluation comes from. CR

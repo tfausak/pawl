@@ -534,15 +534,19 @@ viewUpTo bound cands gs oid =
 
 -- The characteristics view of a printed card, from the FACE alone. The axes that
 -- only an OBJECT can have are Nothing or empty, and each says so at its field.
--- viewOfCardIn below is this with CR 208.2a's characteristic-defining power
--- filled in.
+--
+-- Every reader that holds an OBJECT takes viewOfObject instead, wherever the
+-- object sits (#1911), so what is left here answers about a printed face alone:
+-- Pawl.ProjectionSpec's changeling and basic-land cases, which read a printing
+-- with no game around it.
 viewOfCard :: Face.Face Card.Type.Card -> Filter.View
 viewOfCard face =
   let typeLine = Face.typeLine face
    in Filter.MkView
         { -- CR 201.1 off the printed FACE. A multi-faced card's combined view
-          -- carries the halves joined for rendering (Engine.Card.merge2), which
-          -- viewOfCardIn overwrites with Game.namesOf's CR 709.4a set.
+          -- carries the halves joined for rendering (Engine.Card.merge2); CR
+          -- 709.4a's set is viewOfCharacteristics', which has an id to ask
+          -- Game.namesOf about.
           Filter.names = Set.singleton (Face.name face),
           Filter.cardTypes = TypeLine.types typeLine,
           Filter.supertypes = TypeLine.supertypes typeLine,
@@ -584,7 +588,7 @@ viewOfCard face =
           Filter.blocked = False,
           Filter.attackedThisTurn = False,
           -- CR 701.17a mills an OBJECT; this builder describes a printed FACE.
-          -- viewOfCardIn below is the caller that holds an id and answers.
+          -- viewOfCharacteristics is the view that holds an id and answers.
           Filter.milledThisTurn = False,
           Filter.attachedToView = Nothing,
           Filter.attachedTo = Nothing,
@@ -616,68 +620,14 @@ viewOfCard face =
               )
         }
 
--- viewOfCard for a card that IS an object in some zone, so a
--- characteristic-defining power can be evaluated (CR 604.3 / 208.2a): Tarmogoyf
--- in a library has the power its count says. Having an id is also what lets CR
--- 701.17a's mills be looked up (CR 608.2i).
---
--- Not implemented: this view's one remaining reader, Resolve's CR 728.1 mill
--- tally, holds an object but reads it as printed, where the object has a CR 613
--- projection of its own (#160).
-viewOfCardIn :: GameState -> ObjectId -> Face.Face Card.Type.Card -> Filter.View
-viewOfCardIn gs oid face =
-  (viewOfCard face)
-    { -- CR 709.4a's set, which the face-only view above cannot give.
-      Filter.names = Game.namesOf oid gs,
-      Filter.power = characteristicPowerIn gs oid face,
-      Filter.toughness = characteristicToughnessIn gs oid face,
-      Filter.milledThisTurn = any (milledIt oid . snd) (GameState.events gs)
-    }
-
--- CR 208.2a's power for a face whose CDA sets it, and printedPower's answer for
--- every other face.
---
--- Quantity.determine rather than Quantity.evaluate, so CR 208.2a's "use 0" for a
--- number that can't be determined applies here as it does on the battlefield. The
--- context is the CDA's OWN and never the reading effect's (CR 604.3a(3), CR
--- 109.5). The injected ViewOf is candidateView below.
-characteristicPowerIn :: GameState -> ObjectId -> Face.Face Card.Type.Card -> Maybe Integer
-characteristicPowerIn gs oid face = case seedCharacteristicPT face of
-  Nothing -> printedPower face
-  Just (CharacteristicPT.MkCharacteristicPT power _) ->
-    let context = Filter.contextFor (controllerOf oid gs) (Just oid)
-     in Just (Quantity.determine (candidateView gs) context gs oid power)
-
--- characteristicPowerIn's mirror, reading CR 208.2a's other half.
-characteristicToughnessIn :: GameState -> ObjectId -> Face.Face Card.Type.Card -> Maybe Integer
-characteristicToughnessIn gs oid face = case seedCharacteristicPT face of
-  Nothing -> printedToughness face
-  Just (CharacteristicPT.MkCharacteristicPT _ toughness) ->
-    let context = Filter.contextFor (controllerOf oid gs) (Just oid)
-     in Just (Quantity.determine (candidateView gs) context gs oid toughness)
-
--- What a CDA evaluated OFF the battlefield sees of the candidates its count
--- sweeps: CR 613.1's projection on the battlefield, the printed card elsewhere.
---
--- The battlefield half carries the termination argument: fullView descends into
--- the CR 613 fold, whose counts read viewUpTo on a strictly decreasing layer
--- bound, and the only door in is viewOfCardIn, whose callers sit outside the
--- fold. Injecting viewOfCardIn instead would not terminate -- Tarmogoyf's sweep
--- of every graveyard makes a Tarmogoyf in a graveyard one of its own candidates.
--- The off-battlefield half stays printed for its readers' sake (gap #160).
-candidateView :: GameState -> Count.ViewOf
-candidateView gs candidate =
-  if Set.member candidate (GameState.battlefield gs)
-    then fullView gs candidate
-    else fmap viewOfCard (Game.faceOf candidate gs)
-
 -- CR 208.1's PRINTED power box, for a card off the battlefield. Nothing for a
 -- face with no power box, since CR 208.1 gives power only to creature cards.
 --
 -- CR 208.2b's zero is the STAR's answer here, and only here. Deliberately NOT
 -- Quantity.evaluate's Star arm, which stays Nothing: there a star that survived
 -- baseCharacteristics is a hole rather than a zero. A face with a characteristicPT
--- answers Nothing here, since CR 208.2a's number is characteristicPowerIn's.
+-- answers Nothing here, since CR 208.2a's number is applyCharacteristicPT's, in
+-- every zone (CR 604.3).
 printedPower :: Face.Face Card.Type.Card -> Maybe Integer
 printedPower face = case Face.characteristicPT face of
   Just _ -> Nothing
