@@ -70,10 +70,10 @@ data Filter keyword
     -- family with HasKeywordFamily below; Pawl.FilterSpec pins the pair apart.
     --
     -- Read through the PROJECTION, so a creature that gains flying at CR 613.1f
-    -- layer 6 matches and a Humility'd one stops matching. The readers that take
-    -- Projection.viewOfCardIn instead -- a mill tally, an explore's land test --
-    -- see the printed keywords of a card off the battlefield (#160); a library
-    -- search and a cost criterion no longer do.
+    -- layer 6 matches and a Humility'd one stops matching. The one reader that
+    -- takes Projection.viewOfCardIn instead -- a mill tally -- sees the printed
+    -- keywords of a card off the battlefield (#160); a library search, a cost
+    -- criterion and an explore's land test no longer do.
     HasKeyword keyword
   | -- | The object has SOME keyword ability of this family (CR 702.1), whatever
     -- its payload -- Flensing Raptor's "another target creature you control with
@@ -106,10 +106,10 @@ data Filter keyword
     -- Answered off the PROJECTION wherever the reader supplies one, which is
     -- every zone: Imperial Recruiter's "creature card with power 2 or less" reads
     -- a library card's full CR 613 projection, Tarmogoyf's CR 208.2a power
-    -- included, and so does a graveyard-exile cost criterion. The two readers
-    -- that still take the printed card (Projection.viewOfCardIn -- a mill tally,
-    -- an explore's land test) read the printed power box, except that CR 208.2a's
-    -- characteristic-defining power is evaluated for them too
+    -- included, and so does a graveyard-exile cost criterion. The one reader
+    -- that still takes the printed card (Projection.viewOfCardIn -- a mill tally)
+    -- reads the printed power box, except that CR 208.2a's
+    -- characteristic-defining power is evaluated for it too
     -- (Projection.characteristicPowerIn), since CR 604.3 makes it function in
     -- every zone.
     PowerAtMost Integer

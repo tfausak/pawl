@@ -1525,6 +1525,27 @@ lookAtSpec s registry = Spec.describe s "LookAt" $ do
     let after = runWildsUpkeep (wildsAnswer OptionalDecision.Declines) board
     Spec.assertEqWith s "the library is untouched" (zoneNames Zone.Library after) ["Forest", "Bird Maiden"]
     Spec.assertEqWith s "and nothing entered the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Forest")) S.alice after) 0
+  -- The SIBLING reader of the land test this unit changed, and the reason the
+  -- change did not have to touch it: Into the Wilds asks "if it's a land card"
+  -- as a Filter.HasCardType inside the effect DSL, and that path has read the CR
+  -- 613 projection of a library card since #1552. With Synthetic Fossil Warren
+  -- out, the Goblin Piker it looks at IS a land card and the clause fires --
+  -- the same answer Resolve.exploreOne's own land test now gives. Green before
+  -- this unit's change as well as after: a fence holding the two readers
+  -- together rather than a proof of the change.
+  Spec.it s "CR 613.1d a looked-at card a continuous effect made a land reaches the battlefield" $ do
+    warren <- S.printingOf s registry "Synthetic Fossil Warren"
+    board <- wildsBoard s registry ["Goblin Piker", "Bird Maiden"]
+    let after = runWildsUpkeep (wildsAnswer OptionalDecision.Exercises) (snd (S.addCreature warren S.alice board))
+    Spec.assertEqWith s "the Piker the Warren made a land left the library" (zoneNames Zone.Library after) ["Bird Maiden"]
+    Spec.assertEqWith s "and is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 1
+  -- The negative half, differing in exactly one thing: whether the Warren is on
+  -- the battlefield. Same library, same answer.
+  Spec.it s "CR 701.20e without the Warren the same Piker is no land card" $ do
+    board <- wildsBoard s registry ["Goblin Piker", "Bird Maiden"]
+    let after = runWildsUpkeep (wildsAnswer OptionalDecision.Exercises) board
+    Spec.assertEqWith s "the library is untouched" (zoneNames Zone.Library after) ["Goblin Piker", "Bird Maiden"]
+    Spec.assertEqWith s "and nothing entered the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 0
   -- CR 609.3: an empty library has no top card, so the look names nothing, the
   -- slot goes unbound and the clause after it finds no land.
   Spec.it s "CR 609.3 an empty library looks at nothing and does nothing" $ do
