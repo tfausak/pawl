@@ -106,6 +106,7 @@ manaProduced :: Effect Card.Type.Card -> Maybe ManaProduction
 manaProduced effect = case effect of
   Effect.AddMana addition -> Just (ManaAddition.production addition)
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> Nothing
+  Effect.Fight {} -> Nothing
   Effect.ModifyTarget {} -> Nothing
   Effect.ChangeText {} -> Nothing
   Effect.Search {} -> Nothing
@@ -123,6 +124,7 @@ manaProduced effect = case effect of
   Effect.Destroy {} -> Nothing
   Effect.Sacrifice _ -> Nothing
   Effect.TurnFaceDown _ -> Nothing
+  Effect.TurnFaceUp _ -> Nothing
   Effect.RemoveFromCombat _ -> Nothing
   Effect.BecomesBlocked _ -> Nothing
   Effect.MoveToZone {} -> Nothing
@@ -256,6 +258,7 @@ movesLibraryCard effect = case effect of
       ObjectRef.RandomCardInHand _ -> False
   Effect.AddMana _ -> False
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> False
+  Effect.Fight {} -> False
   Effect.ModifyTarget {} -> False
   Effect.ChangeText {} -> False
   Effect.ExileAllGraveyards -> False
@@ -270,6 +273,7 @@ movesLibraryCard effect = case effect of
   Effect.Destroy {} -> False
   Effect.Sacrifice _ -> False
   Effect.TurnFaceDown _ -> False
+  Effect.TurnFaceUp _ -> False
   Effect.RemoveFromCombat _ -> False
   Effect.BecomesBlocked _ -> False
   -- CR 701.22 and CR 701.29 rearrange a library's own cards; nothing enters or

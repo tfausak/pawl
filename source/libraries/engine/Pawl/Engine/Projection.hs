@@ -1274,6 +1274,8 @@ rewriteEffect pairs effect = case effect of
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     Effect.ModifyTarget (ModifyTarget.MkModifyTarget (rewriteDuration pairs duration) (rewriteModificationWith (const Void.absurd) pairs modification) (rewriteObjectRef pairs ref))
   Effect.DealDamage (DealDamage.MkDealDamage ref quantity dealer excess) -> Effect.DealDamage (DealDamage.MkDealDamage (rewriteObjectRef pairs ref) quantity dealer excess)
+  -- Two SlotNames and nothing else: no word a swap could reach.
+  Effect.Fight _ -> effect
   -- CR 612.1: a text-changer's own restriction clause is text like any other.
   Effect.ChangeText (ChangeText.MkChangeText family forbidden slot) ->
     Effect.ChangeText (ChangeText.MkChangeText family (Set.map (swapWordIn family pairs) forbidden) slot)
@@ -1296,6 +1298,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Destroy (Destroy.MkDestroy ref regenerability mSlot) -> Effect.Destroy (Destroy.MkDestroy (rewriteObjectRef pairs ref) regenerability mSlot)
   Effect.Sacrifice _ -> effect
   Effect.TurnFaceDown _ -> effect
+  Effect.TurnFaceUp _ -> effect
   Effect.RemoveFromCombat _ -> effect
   Effect.BecomesBlocked _ -> effect
   -- Not implemented: a CR 122.1b keyword counter named in the riders keeps its

@@ -72,6 +72,7 @@ zoneFunctionedFrom effect = case effect of
     ObjectRef.ChosenCardInHand {} -> Nothing
     ObjectRef.RandomCardInHand _ -> Nothing
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> Nothing
+  Effect.Fight {} -> Nothing
   Effect.ModifyTarget {} -> Nothing
   Effect.ChangeText {} -> Nothing
   Effect.AddMana _ -> Nothing
@@ -90,6 +91,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.Destroy {} -> Nothing
   Effect.Sacrifice _ -> Nothing
   Effect.TurnFaceDown _ -> Nothing
+  Effect.TurnFaceUp _ -> Nothing
   Effect.RemoveFromCombat _ -> Nothing
   Effect.BecomesBlocked _ -> Nothing
   Effect.Draw {} -> Nothing

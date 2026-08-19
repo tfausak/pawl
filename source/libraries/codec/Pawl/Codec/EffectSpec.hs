@@ -52,6 +52,7 @@ import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
+import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
@@ -1029,6 +1030,23 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown (SlotName.MkSlotName (Text.pack "target")) FaceDownCharacteristics.defaultValue))
       " {\"type\":\"TurnFaceDown\",\"value\":{\"slot\":\"target\"}} "
+  -- CR 708, and no payload beyond the slot: the permanent regains its own
+  -- copiable values (CR 708.8), so there is nothing to list.
+  Spec.it s "TurnFaceUp" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.TurnFaceUp (SlotName.MkSlotName (Text.pack "target")))
+      " {\"type\":\"TurnFaceUp\",\"value\":\"target\"} "
+  -- CR 701.14a's pair, Prey Upon's two slots.
+  Spec.it s "Fight" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Fight (Fight.MkFight (SlotName.MkSlotName (Text.pack "mine")) (SlotName.MkSlotName (Text.pack "theirs"))))
+      " {\"type\":\"Fight\",\"value\":{\"first\":\"mine\",\"second\":\"theirs\"}} "
   Spec.it s "RemoveFromCombat" $
     Common.assertJsonCodec
       s

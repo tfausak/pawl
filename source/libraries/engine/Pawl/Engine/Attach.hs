@@ -149,7 +149,7 @@ hostsFor controller source subject filter_ gs =
 -- The whole rule is in the two conjuncts and in when this is called. "The Aura's
 -- controller considers the characteristics of that Aura AS IT WOULD EXIST IF IT
 -- WERE FACE UP to determine what it may be attached to": there is no
--- counterfactual here because Pawl.Engine.FaceDown.turnFaceUp writes the
+-- counterfactual here because Pawl.Engine.FaceDown.performTurnFaceUp writes the
 -- face-up status BEFORE it raises the event this answers, so every read below --
 -- the subtypes, the enchant ability, Filter.CanHostSubject -- already sees the
 -- face-up object. Raise the event first and CR 708.2a answers instead: a 2/2

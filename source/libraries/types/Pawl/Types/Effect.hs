@@ -18,6 +18,7 @@ import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
+import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.LookAt as LookAt
@@ -75,6 +76,18 @@ data Effect card
     -- payload's `dealer` (CR 120.2b), absent where CR 113.7's resolving source is
     -- it and present for Rabid Bite.
     DealDamage DealDamage.DealDamage
+  | -- | CR 701.14: the two slots' creatures fight -- "each of those creatures
+    -- deals damage equal to its power to the other creature" (CR 701.14a), and
+    -- that damage is not combat damage (CR 701.14d).
+    --
+    -- A separate opcode rather than a pair of DealDamage instructions because CR
+    -- 701.14b is a condition on the PAIR: if either creature is gone or is no
+    -- longer a creature, NEITHER deals damage. Two DealDamage instructions would
+    -- each answer for themselves and let the survivor hit alone.
+    --
+    -- No Quantity field: CR 701.14a fixes the amount at each creature's own
+    -- power, so nothing about it is the card's to say.
+    Fight Fight.Fight
   | -- | CR 611: create a continuous effect on the objects the ObjectRef names,
     -- for a duration. Resolve stores the Modification without ever casing on it
     -- -- or, when a quantity inside it has no answer at resolution (CR 608.2h),
@@ -594,6 +607,20 @@ data Effect card
     -- Not implemented: turning a SET face down, which Ixidron's "turn all other
     -- nontoken creatures face down" would want.
     TurnFaceDown TurnFaceDown.TurnFaceDown
+  | -- | CR 708: turn the slot's target permanent face up. The mirror of
+    -- TurnFaceDown and NOT of CR 116.2b's special action: no procedure is taken
+    -- and no cost is paid, so Showstopping Surprise's "turn it face up if it's
+    -- face down" needs neither a morph ability nor a mana cost on the card
+    -- underneath.
+    --
+    -- A bare SlotName because the turning-over takes no arguments: CR 708.8 has
+    -- the permanent simply regain its own copiable values, so there is nothing
+    -- for the effect to list the way TurnFaceDown lists CR 708.2's.
+    --
+    -- The "if it's face down" of the card's own text is not a condition to
+    -- author: turning a face-up permanent face up is a no-op, so the opcode's own
+    -- guard is the clause.
+    TurnFaceUp SlotName.SlotName
   | -- | CR 506.4: an effect that specifically removes a permanent from combat --
     -- the rule's one clause a card ASKS for rather than a condition the engine
     -- has to notice, which is why it is an opcode and not a sampler like

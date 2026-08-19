@@ -776,6 +776,10 @@ effectCounts effect = case effect of
   Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown _ listed) ->
     concatMap (\(Power.MkPower quantity) -> quantityCounts quantity) (Maybe.maybeToList (FaceDownCharacteristics.power listed))
       <> concatMap (\(Toughness.MkToughness quantity) -> quantityCounts quantity) (Maybe.maybeToList (FaceDownCharacteristics.toughness listed))
+  -- CR 708.8 has the permanent regain its own values, so this one lists nothing.
+  Effect.TurnFaceUp _ -> []
+  -- CR 701.14a fixes both amounts at the fighters' own powers, so no Quantity.
+  Effect.Fight _ -> []
   Effect.RemoveFromCombat _ -> []
   Effect.BecomesBlocked _ -> []
   Effect.Counter {} -> []
@@ -1001,6 +1005,8 @@ effectNestedEffects effect = case effect of
   Effect.SkipNextPhase {} -> []
   Effect.RedirectDamage {} -> []
   Effect.TurnFaceDown {} -> []
+  Effect.TurnFaceUp {} -> []
+  Effect.Fight {} -> []
   Effect.RemoveFromCombat {} -> []
   Effect.BecomesBlocked {} -> []
   Effect.Counter {} -> []
@@ -1327,6 +1333,8 @@ effectReplacements effect = case effect of
   Effect.RedirectDamage {} -> []
   -- CR 708.2's listed characteristics hold no replacement effect (gap #1667).
   Effect.TurnFaceDown _ -> []
+  Effect.TurnFaceUp _ -> []
+  Effect.Fight _ -> []
   Effect.RemoveFromCombat _ -> []
   Effect.BecomesBlocked _ -> []
   Effect.Counter {} -> []
@@ -1935,6 +1943,8 @@ effectMintedFaces effect = case effect of
   -- existing object's, and Pawl.Engine.Card.faceDownFace supplies every field
   -- they do not name.
   Effect.TurnFaceDown _ -> []
+  Effect.TurnFaceUp _ -> []
+  Effect.Fight _ -> []
   Effect.RemoveFromCombat _ -> []
   Effect.BecomesBlocked _ -> []
   Effect.Counter {} -> []
@@ -3215,6 +3225,8 @@ effectFilters effect = case effect of
     unframed (durationFilters duration) <> sourceHosted (objectRefFilters srcRef <> objectRefFilters destRef)
   -- CR 708.2's listed characteristics hold no Filter.
   Effect.TurnFaceDown _ -> []
+  Effect.TurnFaceUp _ -> []
+  Effect.Fight _ -> []
   Effect.RemoveFromCombat _ -> []
   Effect.BecomesBlocked _ -> []
   -- Swift Silence's "all other spells" is an ObjectRef Filter like Destroy's,

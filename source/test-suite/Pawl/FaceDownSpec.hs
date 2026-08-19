@@ -137,6 +137,7 @@ spec s registry = Spec.describe s "FaceDown" $ do
   turnFaceDownSpec s registry
   listedSpec s registry
   manifestSpec s registry
+  faceUpEffectSpec s registry
 
 -- CR 303.4k: an Aura turned face up, choosing what it becomes attached to.
 --
@@ -1531,3 +1532,127 @@ faceDownWith land morph n =
   let (gs, oid) = morphBoard land morph n
       (after, entered) = castAndResolve morph (Facing.faceDown FaceDownReason.Morphed) gs oid
    in fmap (\permanent -> (after, permanent)) entered
+
+-- Aim every target slot at `oid`. The boards below offer TWO creatures alice
+-- controls, so the aim is a real choice and not a short-circuit.
+aimedAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimedAt oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring ((==) (Just oid) . Recipient.objectOf) sets
+  _ -> S.identityAnswer p
+
+-- manifestedBoard with Showstopping Surprise in hand and a bystander creature
+-- beside the manifest, returned as (the board, the spell, the manifested
+-- permanent, the bystander).
+--
+-- Five Mountains, which is what {3}{R}{R} needs after Soul Summons has taken the
+-- two Plains -- manifestedWith's own accounting.
+--
+-- Armored Galleon is the bystander because it is a 5/4: it survives BOTH the 2 a
+-- face-down permanent deals (CR 708.2a) and the 3 a face-up Hill Giant does, so
+-- the damage marked on it is a number this case reads rather than a death it
+-- infers. A bystander that died to one and not the other would make the pair
+-- below a survival test instead of an arithmetic one.
+surpriseBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Printing.Printing -> m (GameState.GameState, ObjectId.ObjectId, Maybe ObjectId.ObjectId, ObjectId.ObjectId)
+surpriseBoard s registry top = do
+  surprise <- S.printingOf s registry "Showstopping Surprise"
+  galleon <- S.printingOf s registry "Armored Galleon"
+  (manifested, entered) <- manifestedBoard s registry top 5
+  let (g1, spell) = S.handOne surprise manifested
+      (bystander, g2) = S.addCreature galleon S.alice g1
+  pure (g2, spell, entered, bystander)
+
+-- CR 701.40g: "if a manifested permanent that's represented by an instant or
+-- sorcery card would turn face up, its controller reveals it and leaves it face
+-- down. Abilities that trigger whenever a permanent is turned face up won't
+-- trigger."
+--
+-- The rule is only reachable through an EFFECT. CR 701.40b refuses a noncreature
+-- card outright and CR 702.37e refuses a card with no morph ability, so neither
+-- of CR 708.7's procedures can propose the turning this rule replaces -- which is
+-- what makes a test routed through FaceDown.turnableFaceUp worthless here: it
+-- passes with the guard deleted.
+--
+-- Showstopping Surprise is the producer: "choose target creature you control.
+-- Turn it face up if it's face down. Then it deals damage equal to its power to
+-- each other creature." Its second clause is what turns the rule into a NUMBER --
+-- a face-down permanent is a 2/2 (CR 708.2a) and deals 2, where a face-up Prey
+-- Upon would be a sorcery permanent with no power at all and deal nothing.
+faceUpEffectSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+faceUpEffectSpec s registry = Spec.describe s "TurnFaceUp (CR 701.40g)" $ do
+  Spec.it s "CR 701.40g a manifested SORCERY stays face down, and still deals a 2/2's damage" $ do
+    prey <- S.printingOf s registry "Prey Upon"
+    (before, spell, entered, bystander) <- surpriseBoard s registry prey
+    case entered of
+      Nothing -> Spec.assertFailure s "the manifest did not reach the battlefield"
+      Just permanent -> do
+        -- The fixture's positives, and the trap they close: the library's top
+        -- card really is the sorcery, so the case below cannot pass because a
+        -- creature was manifested by accident.
+        Spec.assertEqWith s "CR 701.40a it is face down, manifested" (fmap Object.facing (Game.lookupObject permanent before)) (Just (Facing.faceDown FaceDownReason.Manifested))
+        Spec.assertEqWith s "and the card under it is Prey Upon" (fmap Face.name (Game.faceUpFaceOf permanent before)) (Just (S.printingName prey))
+        Spec.assertEqWith s "CR 708.2a a 2/2 while it is face down" (S.powerToughnessOf permanent before) (Just (2, 2))
+        let after = S.settleSba (S.runPure (aimedAt permanent) before (S.cast S.alice spell >> Stack.resolveTop))
+        -- THE GAMEPLAY ASSERTION. Under CR 701.40g the permanent is still a
+        -- face-down 2/2 when the damage clause reads its power; had it turned
+        -- over it would be a Prey Upon sorcery permanent with no power, and the
+        -- Galleon would take nothing.
+        Spec.assertEqWith s "CR 701.40g/708.2a the Galleon took the face-down 2/2's 2" (S.damageOf bystander after) (Just 2)
+        -- The rule's own words, and the reason for that number.
+        Spec.assertEqWith s "CR 701.40g it is still face down" (fmap Object.facing (Game.lookupObject permanent after)) (Just (Facing.faceDown FaceDownReason.Manifested))
+        Spec.assertEqWith s "CR 708.2a and still a creature, not a sorcery" (Projection.cardTypesOf permanent after) (Set.singleton CardType.Creature)
+
+  -- DO NOT OVER-REJECT, and THE PAIR: the same board, the same spell, the same
+  -- bystander, differing only in the card the manifest turned over. Hill Giant is
+  -- a CREATURE card, so CR 701.40g says nothing about it and the effect turns it
+  -- face up -- and its printed 3 is a different number from the face-down 2/2's
+  -- 2, so "the Galleon took damage" alone cannot pass both legs.
+  Spec.it s "CR 708 a manifested CREATURE turns face up, and deals its printed damage" $ do
+    giant <- S.printingOf s registry "Hill Giant"
+    (before, spell, entered, bystander) <- surpriseBoard s registry giant
+    case entered of
+      Nothing -> Spec.assertFailure s "the manifest did not reach the battlefield"
+      Just permanent -> do
+        Spec.assertEqWith s "CR 701.40a it is face down, manifested" (fmap Object.facing (Game.lookupObject permanent before)) (Just (Facing.faceDown FaceDownReason.Manifested))
+        Spec.assertEqWith s "CR 708.2a a 2/2 while it is face down" (S.powerToughnessOf permanent before) (Just (2, 2))
+        let after = S.settleSba (S.runPure (aimedAt permanent) before (S.cast S.alice spell >> Stack.resolveTop))
+        Spec.assertEqWith s "CR 708.8 the Galleon took the face-up 3/3's 3" (S.damageOf bystander after) (Just 3)
+        Spec.assertEqWith s "CR 110.5 it is face up" (fmap Object.facing (Game.lookupObject permanent after)) (Just Facing.FaceUp)
+        Spec.assertEqWith s "CR 708.8 and answers to its printed name" (Projection.namesOf permanent after) (Set.singleton (S.printingName giant))
+
+  -- CR 701.40g's SECOND SENTENCE: "abilities that trigger whenever a permanent is
+  -- turned face up won't trigger". Nothing above can see it -- a permanent that
+  -- did not turn over and one that turned over unobserved look identical from the
+  -- damage clause.
+  --
+  -- Aven Farseer is the witness: "whenever a permanent is turned face up, put a
+  -- +1/+1 counter on this creature", with CR 701.40g's own scope -- ANY permanent,
+  -- whoever controls it -- so the leg cannot pass because the trigger was too
+  -- narrow to fire.
+  --
+  -- Driven through FaceDown.turnFaceUpByEffect rather than through Showstopping
+  -- Surprise, which is the narrowest path: the Surprise's damage clause would
+  -- kill a 1/1 Farseer at the state-based pass before the counter could be read,
+  -- and the sentence under test is about the funnel and not about the card.
+  --
+  -- THE PAIR again, and the control is what stops the 0 below passing because the
+  -- trigger was never wired: the same board with a creature card underneath fires
+  -- it.
+  Spec.it s "CR 701.40g a turn-face-up trigger does not fire for a manifested sorcery" $ do
+    prey <- S.printingOf s registry "Prey Upon"
+    giant <- S.printingOf s registry "Hill Giant"
+    farseer <- S.printingOf s registry "Aven Farseer"
+    (sorceryBoard, sorceryEntered) <- manifestedBoard s registry prey 0
+    (creatureBoard, creatureEntered) <- manifestedBoard s registry giant 0
+    let flip_ gs entered = case entered of
+          Nothing -> Nothing
+          Just permanent ->
+            let (watcher, g1) = S.addCreature farseer S.alice gs
+             in Just (watcher, S.runPure S.identityAnswer g1 (FaceDown.turnFaceUpByEffect permanent >> Engine.priorityLoop), permanent)
+    case (flip_ sorceryBoard sorceryEntered, flip_ creatureBoard creatureEntered) of
+      (Just (sorceryWatcher, sorceryAfter, sorceryPermanent), Just (creatureWatcher, creatureAfter, creaturePermanent)) -> do
+        Spec.assertEqWith s "CR 701.40g no counter, so the trigger never fired" (S.counterOf CounterKind.PlusOnePlusOne sorceryWatcher sorceryAfter) 0
+        Spec.assertEqWith s "CR 701.40g and the sorcery is still face down" (fmap Object.facing (Game.lookupObject sorceryPermanent sorceryAfter)) (Just (Facing.faceDown FaceDownReason.Manifested))
+        -- THE CONTROL: the same funnel, the same watcher, a creature card.
+        Spec.assertEqWith s "CR 708.7 the counter down the creature road" (S.counterOf CounterKind.PlusOnePlusOne creatureWatcher creatureAfter) 1
+        Spec.assertEqWith s "CR 110.5 and that one is face up" (fmap Object.facing (Game.lookupObject creaturePermanent creatureAfter)) (Just Facing.FaceUp)
+      _ -> Spec.assertFailure s "the manifest did not reach the battlefield"
