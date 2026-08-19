@@ -204,18 +204,20 @@ growthBound = 8
 -- every object costs without changing the shape of the loop keeps the ratio at
 -- 4x, and only an absolute figure catches it.
 --
--- Measured at 11,059 bytes per permanent on GHC 9.10.3, so this carries ~1.3x
+-- Measured at 13,483 bytes per permanent on GHC 9.10.3, so this carries ~1.3x
 -- headroom: enough to absorb a compiler bump, a change of architecture (this
 -- was measured on aarch64 and CI runs the suite on x86_64), or a feature
 -- landing in the enumeration -- and still tight enough to fail on a doubling.
--- It read 7,515 before CR 605.3a's priority window (#1123) added an action per
--- source to the list this walk builds, and 9,188 on GHC 9.14.1 before the drop
--- to the compiler nixpkgs ships by default.
+-- It read 11,371 before CR 107.5's {T} started claiming the permanent it taps
+-- (see #1725), which gives every Elf on this board a Pawl.Types.Claim for
+-- Cost.jointlyPayable to build and group; 7,515 before CR 605.3a's priority
+-- window (#1123) added an action per source to the list this walk builds; and
+-- 9,188 on GHC 9.14.1 before the drop to the compiler nixpkgs ships by default.
 -- To REGENERATE it, run this test and read the observed figure out of the
 -- failure message; if the increase is understood and wanted, raise this
 -- constant in the commit that causes it.
 ceilingBytesPerPermanent :: Integer
-ceilingBytesPerPermanent = 14500
+ceilingBytesPerPermanent = 17500
 
 -- The same committed ceiling for the OTHER fixture -- the one whose ability is
 -- not a mana ability, so the enumeration runs the two conjuncts that ask about
@@ -242,9 +244,9 @@ ceilingBytesPerPermanent = 14500
 --   * 813,080 with the mana-source sweep taken away too, which is the pre-#1073
 --     tree.
 --
--- The same fixture reads 180,313 on GHC 9.10.3, the compiler nixpkgs ships by
--- default; only the first figure was re-measured there, since the other two
--- mean reverting the hoists.
+-- The same fixture reads 183,281 on GHC 9.10.3, the compiler nixpkgs ships by
+-- default -- 180,889 before #1725; only the first figure was re-measured there,
+-- since the other two mean reverting the hoists.
 --
 -- So this carries ~1.3x headroom over the reading -- enough for a compiler bump
 -- or the x86_64 CI runner -- and catches the pool regression 5.7x over. It does

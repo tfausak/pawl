@@ -2077,7 +2077,7 @@ sharedTapBoard s registry creatures = do
 -- question with one of the two Drums replaced by the creature's own {T}.
 -- Springleaf Drum beside ONE Llanowar Elves ("{T}: Add {G}") is one mana and not
 -- two: the Drum's payment taps the Elves, or the Elves taps itself, never both.
--- CR 107.5's {T} stated no claim, so the Elves was counted twice (#1725).
+-- CR 107.5's {T} stated no claim, so the Elves was counted twice; see #1725.
 --
 -- The Drum's own {T} claims too, on a pool of one -- itself -- that no other
 -- claim meets, so it neither pays nor blocks. What separates the halves of each
@@ -2098,6 +2098,19 @@ selfTapSpec s registry = Spec.describe s "A self-tap and an other-tap over one c
     Spec.assertBool s (not (paysGeneric 2 one)) "and one Elves does not make two"
     Spec.assertBool s (not (paysGeneric 3 two)) "nor two Elves a third"
 
+  -- The pool is the SOURCE ALONE, which the pair above cannot tell from a wider
+  -- one: on a board of one Drum and n Elves a {T} claiming the whole battlefield
+  -- admits exactly the same totals, since declining one Elf relieves the
+  -- overcount and the Drum eats an Elf either way. TWO Drums and one Elves
+  -- separate the readings -- the truth is one mana, whichever of the three is
+  -- activated, and a battlefield-wide {T} reads two.
+  Spec.it s "CR 118.3 two Drums and one Elves still make one mana" $ do
+    drum <- S.printingOf s registry "Springleaf Drum"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    let board = alicePermanents [drum, drum, elves]
+    Spec.assertBool s (paysGeneric 1 board) "one of the three makes one"
+    Spec.assertBool s (not (paysGeneric 2 board)) "and no two of them make two"
+
   -- The OFFER, for sharedTapSpec's reason. Mindcrank is the plain {2} artifact.
   Spec.it s "CR 601.2g a {2} spell is not offered off one Elves" $ do
     mindcrank <- S.printingOf s registry "Mindcrank"
@@ -2113,7 +2126,7 @@ selfTapSpec s registry = Spec.describe s "A self-tap and an other-tap over one c
 -- ONE Goblin Piker makes no mana: the counted tap and CR 702.122a's threshold tap
 -- both want an untapped creature, and one creature pays one of them. The
 -- threshold half stated no claim, so the two were counted against the same Piker
--- twice and the cost read as payable (#1744).
+-- twice and the cost read as payable; see #1744.
 --
 -- SYNTHETIC because no printing puts a threshold tap beside another tapping
 -- component in one cost. The printed producers of that shape are crew (CR
@@ -2177,7 +2190,8 @@ villageRitesSpec s registry = Spec.describe s "A cost's own sacrifice and its so
   -- The same ONE Piker, with the {B} coming from a Swamp instead: nothing now
   -- contends for it, so the refusal above is about the contention and not about a
   -- creature too few. The Tower stays on the board, so what changes is only that
-  -- a claimless source can pay the mana.
+  -- the mana comes from a source claiming ITSELF (CR 107.5's {T}) rather than the
+  -- Piker -- a different pool, which the Rites' sacrifice never meets.
   Spec.it s "CR 601.2g a Swamp frees the creature for the additional cost" $ do
     rites <- S.printingOf s registry "Village Rites"
     tower <- S.printingOf s registry "Phyrexian Tower"

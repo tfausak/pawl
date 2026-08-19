@@ -895,13 +895,15 @@ claimOf pid oid component gs = case component of
   CostComponent.UntapThis -> Nothing
   -- ONE, and deliberately not the Natural: that number is a THRESHOLD on an
   -- aggregate rather than a count of objects, so how many permanents a payment
-  -- taps is not known until the payer picks them. CR 702.122a taps at least one
-  -- untapped permanent for any threshold above 0, which makes 1 a LOWER BOUND
-  -- that can never over-refuse. A threshold of 0 is paid by the empty set
-  -- (canPayComponent below), so it taps nothing and claims nothing.
+  -- taps is not settled until the payer picks them. A threshold above 0 needs
+  -- some permanent of positive power (canPayComponent below), so one is a LOWER
+  -- BOUND on what the payment taps and can never over-refuse; a threshold of 0 is
+  -- paid by the empty set, taps nothing and claims nothing.
   --
-  -- The pool is tapCandidates', TapPermanents' below: same permissive reading,
-  -- and for its reason.
+  -- The pool is tapCandidates', TapPermanents' below: tapped candidates included,
+  -- the same permissive reading and for its reason. CR 702.122a's own criterion
+  -- excludes them (Pawl.Engine.Keyword's crew), so a crew cost's pool is the
+  -- untapped creatures exactly.
   CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower threshold criterion)
     | threshold > 0 -> claim ClaimAxis.Tapping (Set.fromList (tapCandidates pid oid criterion gs)) 1
     | otherwise -> Nothing

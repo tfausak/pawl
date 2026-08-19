@@ -1129,7 +1129,7 @@ canPayCommittingGiven capacity spending sources pcs pid committed claimed cost g
 --
 -- That is what keeps CR 107.5's {T} affordable: every land and every mana
 -- creature claims itself, so without the test a board of n sources would be 2^n
--- boards below (#1725). It does not bound the case where they genuinely meet --
+-- boards below; see #1725. It does not bound the case where they genuinely meet --
 -- a Springleaf Drum beside n mana creatures widens all n -- which is the same
 -- unpruned search #595 tracks.
 --

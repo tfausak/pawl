@@ -36,12 +36,13 @@ import Pawl.Types.ObjectId (ObjectId)
 -- Asking every subset containing it therefore proves nothing the singleton did
 -- not. What it buys is the enumeration: a board of twenty lands is twenty
 -- singleton self-pools that meet nothing, and that is twenty checks rather than
--- 2^20 (#1725).
+-- 2^20; see #1725.
 satisfiable :: [Claim] -> Bool
 satisfiable claims = all satisfiableAxis (byAxis claims)
 
--- One axis's entries, isolated ones apart. `contested` is the objects two or
--- more entries could each take; an entry drawing on none of them is isolated.
+-- One axis's entries, the isolated ones taken apart: `shared` is the objects two
+-- or more entries could each take, and an entry drawing on none of them meets
+-- nothing, so its own singleton check is the whole of what it owes.
 satisfiableAxis :: [(Set.Set ObjectId, Natural)] -> Bool
 satisfiableAxis entries =
   let shared = objectsWantedTwice (fmap fst entries)
@@ -60,10 +61,11 @@ objectsWantedTwice pools =
     $ Map.fromListWith (+) [(oid, 1) | pool <- pools, oid <- Set.toList pool]
 
 -- The same question asked of whole CLAIMS rather than of one axis's merged
--- pools, and asked GROUPWISE: `contested` takes the claim groups -- one per mana
--- source, plus the claims of the cost being paid -- and answers the objects two
--- or more DIFFERENT groups could each take. A group's own two claims naming one
--- object is not contention, since nothing chooses between them.
+-- pools, and asked GROUPWISE: the groups are one per mana source plus the claims
+-- of the cost being paid, and the answer is the objects two or more DIFFERENT
+-- groups could each take, keyed by the axis they take them on. A group's own two
+-- claims naming one object is not contention, since nothing chooses between
+-- them.
 --
 -- Pawl.Engine.Mana.payableResolutionsGiven is the reader: a source whose claims
 -- meet no other group's is worth taking as many times as it can be, so it offers
