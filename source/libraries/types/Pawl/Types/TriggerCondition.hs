@@ -461,6 +461,27 @@ data TriggerCondition
     -- Takes no threshold, rule 310.12b stating none. Not restricted to battles
     -- or to defense counters; Pawl.Engine.Battle reads rule 310.
     SelfLastCounterRemoved (CounterKind.CounterKind Keyword.Keyword)
+  | -- | "Whenever one or more [kind] counters are removed from this permanent"
+    -- (Chandra, Fire Artisan). SelfLastCounterRemoved's any-amount mirror: same
+    -- CounterKind payload, same bearer scope, and matched against the same
+    -- GameEvent.CountersRemoved -- but with no reading of the AFTER count, so a
+    -- removal that leaves counters behind matches and a removal that empties the
+    -- object matches too.
+    --
+    -- The two do not collapse into each other in either direction. Rule 310.12b
+    -- needs the last-counter reading, and Chandra needs the any-amount one; a
+    -- board where three of four loyalty counters come off separates them.
+    --
+    -- No "one or more" conjunct, for SelfLastCounterRemoved's reason: the record
+    -- exists only where something actually came off, an invariant stated on
+    -- GameEvent.CountersRemoved itself.
+    --
+    -- The amount removed is bound under Pawl.Engine.Binding.eventAmount, which
+    -- neither sibling stamps -- CR 603.2's "that much", read off the event's
+    -- before/after pair rather than off the board, so CR 510.2's simultaneity
+    -- carries into it: one batch of combat damage removing three counters is one
+    -- trigger for three, not three for one.
+    SelfCountersRemoved (CounterKind.CounterKind Keyword.Keyword)
   | -- | CR 601.2i: "whenever you cast a [type] spell" (Young Pyromancer). That
     -- rule's second sentence is the trigger event in as many words. Matched
     -- against GameEvent.SpellCast.

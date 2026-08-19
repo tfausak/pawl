@@ -71,6 +71,7 @@ codec =
       Arm.payload "PlayerLosesLife" PlayerRelation.codec TriggerCondition.PlayerLosesLife (\x -> case x of TriggerCondition.PlayerLosesLife y -> Just y; _ -> Nothing),
       Arm.payload "SelfCountersReached" SelfCountersReached.codec TriggerCondition.SelfCountersReached (\x -> case x of TriggerCondition.SelfCountersReached y -> Just y; _ -> Nothing),
       Arm.payload "SelfLastCounterRemoved" counterKindCodec TriggerCondition.SelfLastCounterRemoved (\x -> case x of TriggerCondition.SelfLastCounterRemoved y -> Just y; _ -> Nothing),
+      Arm.payload "SelfCountersRemoved" counterKindCodec TriggerCondition.SelfCountersRemoved (\x -> case x of TriggerCondition.SelfCountersRemoved y -> Just y; _ -> Nothing),
       Arm.payload "SpellCast" SpellCast.codec TriggerCondition.SpellCast (\x -> case x of TriggerCondition.SpellCast y -> Just y; _ -> Nothing),
       Arm.nullary "SelfCast" TriggerCondition.SelfCast,
       Arm.payload "SelfBecomesTargeted" PlayerRelation.codec TriggerCondition.SelfBecomesTargeted (\x -> case x of TriggerCondition.SelfBecomesTargeted y -> Just y; _ -> Nothing),

@@ -757,11 +757,6 @@ loyaltyCountersOn oid gs =
 addLoyalty :: Natural -> Object.Object -> Object.Object
 addLoyalty n obj = obj {Object.counters = Map.insertWith (+) CounterKind.Loyalty n (Object.counters obj)}
 
-removeLoyalty :: Natural -> Object.Object -> Object.Object
-removeLoyalty n obj =
-  let have = Map.findWithDefault 0 CounterKind.Loyalty (Object.counters obj)
-   in obj {Object.counters = Map.insert CounterKind.Loyalty (Natural.minusSaturating have n) (Object.counters obj)}
-
 -- The cards this player may discard to pay a cost on `oid`: their hand, in its
 -- own order, narrowed by the criterion and minus `oid` itself -- see
 -- canPayComponent's DiscardCards arm for why that exclusion is CR 601.2a.
@@ -1767,9 +1762,24 @@ payComponent pid oid component = case component of
   CostComponent.AddLoyaltyToThis n -> do
     State.modify' (\gs -> gs {GameState.objects = Map.adjust (addLoyalty n) oid (GameState.objects gs)})
     pure bindsNothing
-  -- CR 606.4's other half, guarded as PayEnergy's is above.
+  -- CR 606.4's other half, and NOT the direct edit its sibling above is: it goes
+  -- through Event.removeCounters, CR 122's removal funnel, so the removal is
+  -- recorded as a GameEvent.CountersRemoved a trigger can see (Chandra, Fire
+  -- Artisan's "whenever one or more loyalty counters are removed from Chandra",
+  -- which her own -7 fires).
+  --
+  -- That asymmetry with AddLoyaltyToThis is not a hole in the argument above.
+  -- CR 614.16 is about REPLACING a placement, and Event.removeCounters runs no
+  -- replacement loop at all -- its own Haddock gives the reason, that no
+  -- ReplacementEffect class in Pawl.Types.ReplacementEffect pairs with a removal.
+  -- So routing this half changes nothing about which counters Doubling Season
+  -- doubles; what it adds is the record.
+  --
+  -- The funnel saturates, which is the floor the direct write here used to apply
+  -- itself: CR 606.6 has already refused an activation the permanent cannot pay
+  -- for, so a saturating removal is unreachable through this door anyway.
   CostComponent.RemoveLoyaltyFromThis n -> do
-    State.modify' (\gs -> gs {GameState.objects = Map.adjust (removeLoyalty n) oid (GameState.objects gs)})
+    Event.removeCounters oid CounterKind.Loyalty n
     pure bindsNothing
   -- CR 122.6's placement, through the Event.putCounters funnel as
   -- CounterCause.ByEffect -- the opposite call from AddLoyaltyToThis above, and

@@ -2036,8 +2036,9 @@ putOwnCounters oid kind n = do
 
 -- CR 122: take counters off an object, recording a CountersRemoved event from
 -- the before/after pair so a trigger can read the crossing. That event's other
--- producer is CR 120.3h's damage to a battle; it belongs to neither rule in
--- particular.
+-- producer is CR 120.3h's and CR 120.3c's damage to a battle or a planeswalker;
+-- it belongs to no one rule in particular. CR 606.4's loyalty cost comes through
+-- this door (Pawl.Engine.Cost's RemoveLoyaltyFromThis arm).
 --
 -- NO CR 614.16 loop, unlike putCounters above, and that asymmetry is the rule's
 -- rather than a shortcut: 614.16 replaces a PLACEMENT -- "if an effect would put
@@ -3647,6 +3648,60 @@ turnScopeAdmits scope active own = case scope of
   TurnScope.EachTurn -> True
   TurnScope.ControllersTurn -> active == own
   TurnScope.OpponentsTurn -> active /= own
+
+-- CR 122's removal as the two bearer-scoped counter-removal conditions read it:
+-- the before/after pair of a GameEvent.CountersRemoved that took counters of
+-- `wanted` off `bearer`, and Nothing for every other event.
+--
+-- ONE exhaustive case shared by TriggerCondition.SelfLastCounterRemoved and
+-- TriggerCondition.SelfCountersRemoved rather than a copy each, because the two
+-- ask the identical question of the identical constructor and differ only in what
+-- they then do with the pair. A new GameEvent constructor still breaks the build
+-- here, which is what the exhaustive list is for.
+countersRemovedFrom :: ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> GameEvent -> Maybe (Natural, Natural)
+countersRemovedFrom bearer wanted event = case event of
+  GameEvent.CountersRemoved (CounterChange.MkCounterChange oid kind before after)
+    | oid == bearer && kind == wanted ->
+        Just (before, after)
+  GameEvent.CountersRemoved {} -> Nothing
+  GameEvent.CountersPut {} -> Nothing
+  GameEvent.ControlChanged {} -> Nothing
+  GameEvent.VentureMarkerEntered {} -> Nothing
+  GameEvent.BecameTarget {} -> Nothing
+  GameEvent.BecameAttached {} -> Nothing
+  GameEvent.LeftTheGame _ -> Nothing
+  GameEvent.Milled {} -> Nothing
+  GameEvent.Scried _ -> Nothing
+  GameEvent.Surveiled _ -> Nothing
+  GameEvent.Plotted _ -> Nothing
+  GameEvent.Explored _ -> Nothing
+  GameEvent.Exerted _ -> Nothing
+  GameEvent.Moved {} -> Nothing
+  GameEvent.DamageDealt _ -> Nothing
+  GameEvent.DamagePrevented {} -> Nothing
+  GameEvent.StepBegan {} -> Nothing
+  GameEvent.SpellCast {} -> Nothing
+  GameEvent.BecameMonarch _ -> Nothing
+  GameEvent.Discarded {} -> Nothing
+  GameEvent.Drew {} -> Nothing
+  GameEvent.Revealed {} -> Nothing
+  GameEvent.AttackerDeclared {} -> Nothing
+  GameEvent.BlockerDeclared {} -> Nothing
+  GameEvent.BlocksDeclared {} -> Nothing
+  GameEvent.AttackerBlocked {} -> Nothing
+  GameEvent.AttackerUnblocked _ -> Nothing
+  GameEvent.SpellCountered _ -> Nothing
+  GameEvent.HalfUnlocked {} -> Nothing
+  GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.BecameDesignated {} -> Nothing
+  GameEvent.Evolved _ -> Nothing
+  GameEvent.Mentored {} -> Nothing
+  GameEvent.Trained _ -> Nothing
+  GameEvent.PermanentSacrificed {} -> Nothing
+  GameEvent.AbilityTriggered {} -> Nothing
+  GameEvent.LoyaltyAbilityActivated _ -> Nothing
+  GameEvent.LifeLost {} -> Nothing
+  GameEvent.LifeGained {} -> Nothing
 
 -- CR 603.2: does this condition fire on this event, for the permanent that bears
 -- it? `bearer` is the object whose ability this is and `you` its controller (CR
@@ -5738,46 +5793,15 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- recorded only where something actually came off, so an event that removed
   -- nothing is not in the log to match. That invariant is the record's, stated on
   -- the constructor, exactly as CountersPut's "before < after" is.
-  TriggerCondition.SelfLastCounterRemoved wanted -> case event of
-    GameEvent.CountersRemoved (CounterChange.MkCounterChange oid kind _ after) -> oid == bearer && kind == wanted && after == 0
-    GameEvent.CountersPut {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerBlocked {} -> False
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
+  TriggerCondition.SelfLastCounterRemoved wanted -> maybe False ((==) 0 . snd) (countersRemovedFrom bearer wanted event)
+  -- "Whenever one or more [kind] counters are removed from this permanent"
+  -- (Chandra, Fire Artisan): the arm above's any-amount mirror, dropping every
+  -- read of the AFTER count. Three of four loyalty counters coming off matches
+  -- here and not there, which is what keeps the two from collapsing.
+  --
+  -- No "one or more" conjunct either, and for the arm above's reason: the record
+  -- exists only where something came off.
+  TriggerCondition.SelfCountersRemoved wanted -> Maybe.isJust (countersRemovedFrom bearer wanted event)
   -- CR 601.2i's "any abilities that trigger when a spell is cast": a spell the
   -- Filter admits became cast. The bearer frames the match rather than being it,
   -- as for PermanentEnters -- it is the Filter.Context's source, and its
@@ -7093,6 +7117,7 @@ reactsToAbilityTriggering cond = case cond of
   -- this whole classification exists to separate.
   TriggerCondition.SelfCountersReached {} -> False
   TriggerCondition.SelfLastCounterRemoved _ -> False
+  TriggerCondition.SelfCountersRemoved _ -> False
   TriggerCondition.SpellCast {} -> False
   TriggerCondition.SelfCast -> False
   TriggerCondition.SelfBecomesTargeted _ -> False
@@ -7162,6 +7187,21 @@ eventBindings cond event = case (cond, event) of
       Recipient.ToPlaneswalker _ -> Map.empty
       Recipient.ToBattle _ -> Map.empty
       Recipient.ToObject _ -> Map.empty
+  -- CR 603.2's "that much": how many counters actually came off, read off the
+  -- event's own before/after pair. Chandra, Fire Artisan's "she deals that much
+  -- damage" counts THAT and not the damage that caused it -- CR 306.8's removal
+  -- saturates, so five damage to a four-loyalty planeswalker removes four -- and
+  -- one CR 510.2 batch is one record, so two attackers taking two counters off
+  -- between them stamp 2 once rather than 1 twice.
+  --
+  -- Unconditional given a match, which is what eventBindingSlots' per-condition
+  -- promise needs: every GameEvent.CountersRemoved carries both counts, and the
+  -- record exists only where `before` exceeds `after`.
+  --
+  -- Saturating, and the guard is nominal for that reason; a Natural difference
+  -- has no other honest floor.
+  (TriggerCondition.SelfCountersRemoved _, GameEvent.CountersRemoved change) ->
+    Binding.setEventAmount (Natural.minusSaturating (CounterChange.before change) (CounterChange.after change)) Map.empty
   -- CR 510.2's "it": the permanent that dealt the combat damage, which Aragorn,
   -- Hornburg Hero's payload doubles the counters on. Read off the event's source,
   -- the same field matchesTrigger applied the Filter to, so the slot names exactly
@@ -7787,6 +7827,10 @@ eventBindingSlots cond = case cond of
   -- print says "that many", and eventBindings has no arm for this condition.
   TriggerCondition.SelfCountersReached {} -> Set.empty
   TriggerCondition.SelfLastCounterRemoved _ -> Set.empty
+  -- CR 603.2's "that much", the one thing this condition binds that neither
+  -- sibling does: Chandra, Fire Artisan reads the number of counters that came
+  -- off. The bearer needs no slot, CR 113.7a's source slot already naming it.
+  TriggerCondition.SelfCountersRemoved _ -> Set.singleton Binding.eventAmount
   -- CR 709.5h names the permanent and the half, and CR 113.7a's source slot
   -- already names the permanent. The HALF is not bound: no printing says "that
   -- door", so there is nothing for a payload to read it as.
@@ -8053,6 +8097,7 @@ looksBack condition = case condition of
   TriggerCondition.PlayerLosesLife _ -> False
   TriggerCondition.SelfCountersReached {} -> False
   TriggerCondition.SelfLastCounterRemoved _ -> False
+  TriggerCondition.SelfCountersRemoved _ -> False
   TriggerCondition.SpellCast {} -> False
   TriggerCondition.SelfCast -> False
   TriggerCondition.SelfBecomesTargeted _ -> False
@@ -9086,6 +9131,7 @@ zonesTriggeredFrom cond = case cond of
   -- chapter ability functions from the battlefield alone.
   TriggerCondition.SelfCountersReached {} -> battlefield
   TriggerCondition.SelfLastCounterRemoved _ -> battlefield
+  TriggerCondition.SelfCountersRemoved _ -> battlefield
   -- CR 113.6's default: Young Pyromancer watches the stack from the battlefield,
   -- and a card in a graveyard sees nothing cast.
   TriggerCondition.SpellCast {} -> battlefield
@@ -9262,6 +9308,7 @@ controllerTurnScoped cond = case cond of
   -- action's restriction rather than this condition's.
   TriggerCondition.SelfCountersReached {} -> False
   TriggerCondition.SelfLastCounterRemoved _ -> False
+  TriggerCondition.SelfCountersRemoved _ -> False
   -- CR 601.2i says nothing about whose turn it is and CR 117.1a lets an instant
   -- be cast on anybody's, so the answer is the condition's own TurnScope --
   -- StepBegins' arms one more time, and for its reason (CR 603.3a, CR 109.5).
@@ -9466,6 +9513,7 @@ stateTriggers gs
               -- not re-run its final chapter for as long as it sits there.
               TriggerCondition.SelfCountersReached {} -> False
               TriggerCondition.SelfLastCounterRemoved _ -> False
+              TriggerCondition.SelfCountersRemoved _ -> False
               TriggerCondition.SpellCast {} -> False
               TriggerCondition.SelfCast -> False
               TriggerCondition.SelfBecomesTargeted _ -> False

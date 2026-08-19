@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- Covers CR 306, the planeswalker card type, across the six modules it reaches:
 -- Pawl.Engine.Projection's intrinsic CR 306.5b enters-with replacement and
@@ -35,6 +36,7 @@
 module Pawl.PlaneswalkerSpec where
 
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
@@ -53,9 +55,11 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
@@ -63,6 +67,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
@@ -239,6 +244,76 @@ useNissaAbility i p oid gs = case abilityAt i p of
   ability : _ -> S.runPure (announcingX 0) gs (do Activate.activateAbility S.alice oid ability; Stack.resolveTop)
   [] -> gs
 
+-- Chandra, Fire Artisan's abilities in printed order: +1, -7. Indexed for the
+-- reason Jace's are.
+plusOne, minusSeven :: Int
+plusOne = 0
+minusSeven = 1
+
+-- The planeswalker on the battlefield, found by name for theJace's reason.
+theChandra :: GameState.GameState -> ObjectId.ObjectId
+theChandra gs =
+  let named oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName $ Text.pack "Chandra, Fire Artisan")
+   in case filter named (Set.toList (GameState.battlefield gs)) of
+        oid : _ -> oid
+        [] -> S.noSource
+
+-- alice with `spare` Mountains left over after casting Chandra, Fire Artisan for
+-- {2}{R}{R} through the ordinary path -- so her four loyalty counters come from
+-- CR 306.5b's replacement rather than from a fixture.
+--
+-- Eight cards in alice's library, which the -7 needs: it exiles seven, and CR
+-- 104.3c would end the game on an empty one before an assertion about the trigger
+-- could run.
+chandraOnBattlefield :: Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
+chandraOnBattlefield mountain chandra spare =
+  let lands = S.landsInPlay mountain (4 + spare)
+      stocked = List.foldl' (\g _ -> snd (S.addLibraryCard mountain S.alice g)) lands [1 :: Int .. 8]
+      (gs, handId) = S.handOne chandra stocked
+      after = S.runPure S.identityAnswer gs (do S.cast S.alice handId; Stack.resolveTop)
+   in (theChandra after, after)
+
+-- Fill every target slot with the candidate that names this PLAYER, filtering the
+-- set the engine offered rather than building a Recipient by hand -- aimedAt's
+-- posture one recipient shape over.
+--
+-- Chandra's trigger says "target opponent or planeswalker", and SHE is a legal
+-- planeswalker for it: an answerer that took the head of the offered set could put
+-- the damage back on her and leave the life assertion reading 20 for a reason that
+-- has nothing to do with the counters.
+aimedAtPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+aimedAtPlayer pid p = case p of
+  Prompt.ChooseTargets _ _ _ sets ->
+    let naming (n, candidates) =
+          Set.fromList
+            . take (Natural.toIntSaturating n)
+            $ filter (== Recipient.ToPlayer pid) (Set.toList candidates) <> Set.toList candidates
+     in fmap naming sets
+  _ -> S.identityAnswer p
+
+-- Gather the triggers the log has earned and resolve the top of the stack, with
+-- the trigger's own target answered. Two steps and not one: CR 603.3b puts the
+-- ability on the stack at the next CR 117.5 boundary, and CR 608.1 resolves it
+-- only once a player would receive priority with it there.
+firedTrigger :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+firedTrigger answer gs = S.runPure answer gs (do Engine.settleForPriority; Stack.resolveTop)
+
+isPlaneswalkerTarget :: AttackTarget.AttackTarget -> Bool
+isPlaneswalkerTarget target = case target of
+  AttackTarget.OfPlaneswalker _ -> True
+  AttackTarget.OfPlayer _ -> False
+  AttackTarget.OfBattle _ -> False
+
+-- Announce every attack at the planeswalker, answer Chandra's own trigger at
+-- alice, and everything else aggressively.
+attackingChandra :: Prompt.Prompt r -> r
+attackingChandra p = case p of
+  Prompt.ChooseAttackTarget _ _ _ options -> case filter isPlaneswalkerTarget (NonEmpty.toList options) of
+    target : _ -> target
+    [] -> NonEmpty.head options
+  Prompt.ChooseTargets {} -> aimedAtPlayer S.alice p
+  _ -> S.aggressiveAnswer p
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
   Spec.it s "CR 306.5b Jace Beleren enters with three loyalty counters" $ do
@@ -388,6 +463,97 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
     Spec.assertEqWith s "loyalty 1 after two" (S.counterOf CounterKind.Loyalty jaceId afterTwo) 1
     Spec.assertBool s (not (Set.member jaceId (GameState.battlefield afterThree))) "off the battlefield after three"
     Spec.assertEqWith s "in its owner's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice afterThree)) 1
+
+-- CR 122's counter REMOVAL as an event a trigger can see, through the two
+-- removals a planeswalker performs: CR 606.4's loyalty cost (Pawl.Engine.Cost,
+-- routed through Pawl.Engine.Event.removeCounters) and CR 120.3c / 306.8's damage
+-- (Pawl.Engine.Damage, which diffs the boards instead, for the reason its own
+-- comment gives).
+--
+-- Chandra, Fire Artisan -- {2}{R}{R} Legendary Planeswalker -- Chandra, printed
+-- loyalty 4 -- is the group's card and the pool's only producer of
+-- TriggerCondition.SelfCountersRemoved: "whenever one or more loyalty counters are
+-- removed from Chandra, she deals that much damage to target opponent or
+-- planeswalker". Her +1 and -7 exile the top of the library and grant CR 118.1's
+-- permission to play what was exiled; the -7 is what drives the cost half.
+--
+-- Every board here leaves counters BEHIND, which is what separates this condition
+-- from TriggerCondition.SelfLastCounterRemoved: an implementation that read the
+-- after-count would match none of them.
+countersRemovedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+countersRemovedSpec s registry = Spec.describe s "CountersRemoved" $ do
+  -- The DAMAGE half. Lightning Bolt's 3 against printed loyalty 4: three counters
+  -- come off, one stays, and bob takes three. Every number here is distinct from
+  -- every other reading of the rule this board admits -- the loyalty is 4, the
+  -- damage 3, the remainder 1 -- so a trigger stamped with the wrong one cannot
+  -- land on 17.
+  Spec.it s "CR 306.8 / 603.2 the three loyalty counters Lightning Bolt takes off Chandra deal three to bob" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    chandra <- S.printingOf s registry "Chandra, Fire Artisan"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    let (chandraId, board) = chandraOnBattlefield mountain chandra 1
+        (boltId, withBolt) = S.addHandCard lightningBolt S.alice board
+        resolved = S.runPure (aimedAt chandraId) withBolt (do S.cast S.alice boltId; Stack.resolveTop)
+        after = firedTrigger (aimedAtPlayer S.bob) resolved
+    Spec.assertEqWith s "bob took three, the number of counters that came off" (S.lifeOf S.bob after) (Just 17)
+    Spec.assertEqWith s "CR 306.8: 4 - 3, so this was NOT the last counter" (S.counterOf CounterKind.Loyalty chandraId after) 1
+    Spec.assertBool s (Set.member chandraId (GameState.battlefield after)) "and Chandra is still on the battlefield"
+
+  -- The COST half, on the same card and a different removal path entirely. Ten
+  -- loyalty and not seven: CR 606.6 admits the -7 at either, but seven would take
+  -- her to zero and CR 704.5i would bury her mid-trigger, which is a case about
+  -- last known information rather than about the funnel.
+  Spec.it s "CR 606.4 / 603.2 paying Chandra's -7 removes seven loyalty counters and deals seven to bob" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    chandra <- S.printingOf s registry "Chandra, Fire Artisan"
+    let (chandraId, board) = chandraOnBattlefield mountain chandra 0
+        atTen = S.addCounter CounterKind.Loyalty 6 chandraId board
+        spent = useAbility minusSeven chandra chandraId atTen
+        after = firedTrigger (aimedAtPlayer S.bob) spent
+    Spec.assertEqWith s "bob took seven" (S.lifeOf S.bob after) (Just 13)
+    Spec.assertEqWith s "CR 606.4: 10 - 7" (S.counterOf CounterKind.Loyalty chandraId after) 3
+    Spec.assertEqWith s "and the -7 did resolve: seven cards left alice's library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
+
+  -- The control for the pair above: the +1 ADDS counters, so no removal happens
+  -- and the trigger does not fire. One board, one card, and the only difference
+  -- from the case above is which loyalty ability was activated -- which is what
+  -- makes the seven damage there the removal's and not the activation's.
+  Spec.it s "CR 606.4 Chandra's +1 removes nothing, so the trigger does not fire" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    chandra <- S.printingOf s registry "Chandra, Fire Artisan"
+    let (chandraId, board) = chandraOnBattlefield mountain chandra 0
+        atTen = S.addCounter CounterKind.Loyalty 6 chandraId board
+        after = firedTrigger (aimedAtPlayer S.bob) (useAbility plusOne chandra chandraId atTen)
+    Spec.assertEqWith s "bob is untouched" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "CR 606.4: 10 + 1" (S.counterOf CounterKind.Loyalty chandraId after) 11
+    Spec.assertEqWith s "and the +1 did resolve: one card left alice's library" (length (Game.zoneMembers Zone.Library S.alice after)) 7
+
+  -- CR 510.2's simultaneity, which is the property the board diff in
+  -- Pawl.Engine.Damage exists to keep and the reason that site is not routed
+  -- through Pawl.Engine.Event.removeCounters. Two 2/1 Goblin Pikers attacking one
+  -- six-loyalty Chandra remove four counters BETWEEN them, in one batch: one
+  -- record of four, so one trigger for four.
+  --
+  -- The life total cannot see the difference on its own -- two triggers of two
+  -- also total four -- so the trigger COUNT is asserted off the stack, before it
+  -- resolves. The life total is asserted first all the same, because it is what
+  -- catches the other wrong reading: a single trigger stamped with one damage
+  -- event's two rather than the pair's four.
+  Spec.it s "CR 510.2 two attackers taking four loyalty counters off Chandra together fire her trigger once, for four" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    chandra <- S.printingOf s registry "Chandra, Fire Artisan"
+    let (board, _, theirs) = S.combatBoardOf [piker, piker] [chandra]
+        chandraId = case theirs of
+          oid : _ -> oid
+          [] -> S.noSource
+        gs = S.addCounter CounterKind.Loyalty 6 chandraId board
+        atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) attackingChandra gs
+        dealt = S.runPure attackingChandra atDamage (do Engine.runTurnBasedActions (Phase.Combat CombatStep.CombatDamage); Engine.settleForPriority)
+        after = S.runPure attackingChandra dealt Stack.resolveTop
+    Spec.assertEqWith s "alice took four: 2 + 2, once" (S.lifeOf S.alice after) (Just 16)
+    Spec.assertEqWith s "one trigger on the stack, not one per damage event" (length (GameState.stack dealt)) 1
+    Spec.assertEqWith s "CR 306.8: 6 - 4" (S.counterOf CounterKind.Loyalty chandraId dealt) 2
+    Spec.assertEqWith s "CR 510.1b: none of it reached the defending player" (S.lifeOf S.bob after) (Just 20)
 
 -- CR 606.5: "If the total cost to activate a loyalty ability contains multiple
 -- costs to add or remove loyalty counters, those costs are combined into a single
