@@ -8129,7 +8129,11 @@ looksBack condition = case condition of
 -- The GRAVEYARD half has a hole of the same shape, and last known information
 -- fills it the same way: a card the batch put into a graveyard and took back out
 -- again is not in the graveyard the boundary scan walks, so `arrivedInGraveyard`
--- offers it to its own arrival event from CR 608.2h.
+-- offers it to its own arrival event from CR 608.2h. The other direction of that
+-- half is narrowed rather than widened: the graveyard the boundary scan walks
+-- holds cards the batch put there, and `arrivedLater` withholds each of them from
+-- every event of a strictly earlier group, which is the same per-event reading
+-- `laterGroups` gives the battlefield.
 --
 -- Not reconstructed: a permanent that ENTERED later in the batch and left before
 -- the boundary is still offered to the batch's earlier events (#441). Nor is a
@@ -8342,6 +8346,32 @@ eventTriggers events gs =
       -- above, that being the reading that wins. The filter is kept identical here
       -- so the two cannot disagree on the fallback path.
       laterGroups = drop 1 (List.scanr (Map.union . departuresIn) Map.empty groups)
+      -- The ids a graveyard arrival in this block minted, keyed by the ARRIVING
+      -- incarnation -- ZoneChange.object, the key `inGraveyards` would hold them
+      -- under, `arrivedInGraveyard` below arguing that the two ids coincide.
+      arrivalsIn block = Set.fromList (Maybe.mapMaybe (arrivedInGraveyardAt . snd) block)
+      arrivedInGraveyardAt event = case movedOf event of
+        Just zc | ZoneChange.to zc == Zone.Graveyard -> Just (ZoneChange.object zc)
+        _ -> Nothing
+      -- CR 603.10's first sentence on the ARRIVAL side, and `laterGroups`' mirror:
+      -- a card that reached a graveyard at a STRICTLY LATER group did not exist
+      -- immediately after this group's events, so it is no witness to them and is
+      -- subtracted from `inGraveyards` below. Strictly later for `laterGroups`'
+      -- reason -- two events of one group happened at the same time, so a card
+      -- buried by an event of the SAME group did exist immediately after it, and
+      -- keeping the two boundaries aligned is what stops the arrival and departure
+      -- narrowings from disagreeing about simultaneity.
+      --
+      -- Subtracting from the live read rather than reconstructing each group's
+      -- graveyard: a card that was in a graveyard BEFORE the batch has no arrival
+      -- event in the log this scan reads, so it is in no entry here and survives
+      -- every subtraction, which is the answer the rule wants. A Set and a right
+      -- scan for `laterGroups`' reasons, `drop 1` being the same alignment.
+      --
+      -- `arrivedInGraveyard` is NOT narrowed by this: it is already per event and
+      -- already scoped by the arrival it answers for, so subtracting the arrival
+      -- from its own event would delete the case that source exists for.
+      arrivedLater = drop 1 (List.scanr (Set.union . arrivalsIn) Set.empty groups)
       -- CR 603.10a, the other half of that rule: for a LOOK-BACK condition the
       -- board that matters is "the appearance of objects immediately prior to the
       -- event", on which every permanent this same event removed was still
@@ -8438,8 +8468,9 @@ eventTriggers events gs =
         GameEvent.Exerted _ -> Map.empty
       -- CR 113.6k and CR 113.6m: every card in every graveyard carrying at least
       -- one ability those rules put there. The one source that widens the SCANNED
-      -- ZONE rather than recovering an object an event names, which is why it is
-      -- computed once outside the event loop, as `onBattlefield` is.
+      -- ZONE rather than recovering an object an event names, which is why the
+      -- walk itself happens once outside the event loop; what an individual event
+      -- may see of the answer is `arrivedLater`'s subtraction below.
       --
       -- Narrow by construction, which keeps a large graveyard cheap: membership is
       -- decided by `functionsIn` -- a total case over a closed condition type and a
@@ -8451,9 +8482,12 @@ eventTriggers events gs =
       --
       -- CR 603.10a does not apply to what this serves -- a card ENTERING a
       -- graveyard is on none of its look-back list -- so CR 603.10's normal first
-      -- sentence governs and this live read is the game as it stands. The card
-      -- that arrived in a graveyard and is gone again by the boundary is the one
-      -- this read cannot reach; `arrivedInGraveyard` below is its source.
+      -- sentence governs: an event is checked against the objects that existed
+      -- immediately after IT, not against the board at the end of the batch. This
+      -- read is the whole graveyard as it stands, so `arrivedLater` below narrows
+      -- it per event group. The card that arrived in a graveyard and is gone again
+      -- by the boundary is the one this read cannot reach; `arrivedInGraveyard`
+      -- below is its source.
       --
       -- Its `_ -> Nothing` arm is what keeps the two disjoint: `Game.lookupObject`
       -- fails for an id that has ceased, and a ceased id is exactly the one the
@@ -8775,15 +8809,15 @@ eventTriggers events gs =
       -- `inExile`: CR 400.1 makes exile a zone of its own, and an id in it is in
       -- no other. Nor does `revealedInHand`: CR 701.20b leaves the revealed card
       -- in the hand, which no other source reads.
-      candidates onBattlefield event later same = Map.toAscList (Map.unions [onBattlefield, leftBattlefield event, later, same, cycledCard event, spellCast event, revealedInHand event, inGraveyards, arrivedInGraveyard event, inCommand, inExile])
-      scanOne onBattlefield later same event = concatMap (forOne event) (candidates onBattlefield event later same)
+      candidates onBattlefield event later same arrivedAfter = Map.toAscList (Map.unions [onBattlefield, leftBattlefield event, later, same, cycledCard event, spellCast event, revealedInHand event, Map.withoutKeys inGraveyards arrivedAfter, arrivedInGraveyard event, inCommand, inExile])
+      scanOne onBattlefield later same arrivedAfter event = concatMap (forOne event) (candidates onBattlefield event later same arrivedAfter)
       -- The battlefield reading is per GROUP and so is hoisted out of the block:
       -- every event in one group happened at the same time, so they share it. A
       -- group with no events cannot occur -- List.groupBy yields no empty block.
-      scanBlock block later same = case block of
+      scanBlock block later same arrivedAfter = case block of
         [] -> []
-        (group, _) : _ -> concatMap (scanOne (onBattlefieldAt group) later same . snd) block
-   in concat (List.zipWith3 scanBlock groups laterGroups sameGroup)
+        (group, _) : _ -> concatMap (scanOne (onBattlefieldAt group) later same arrivedAfter . snd) block
+   in concat (List.zipWith4 scanBlock groups laterGroups sameGroup arrivedLater)
 
 -- CR 113.6m, read off a TRIGGERED ability: "an ability whose cost or effect
 -- specifies that it moves the object it's on out of a particular zone functions

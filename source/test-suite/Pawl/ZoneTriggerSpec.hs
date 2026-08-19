@@ -3503,6 +3503,13 @@ bystanderSpec s registry =
 bystanderZoneSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 bystanderZoneSpec s registry =
   let upkeep = Phase.Beginning BeginningStep.Upkeep
+      squeeName = CardName.MkCardName (Text.pack "Squee, Goblin Nabob")
+      faerieToken = CardName.MkCardName (Text.pack "Faerie Rogue Token")
+      -- Takes every "you may", so a trigger that fires is observable as the card
+      -- it moved rather than as a prompt count.
+      exercising p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        _ -> S.identityAnswer p
       -- alice's upkeep begins with Squee and Bitterblossom on her battlefield;
       -- `remove` then takes both off inside the same batch. Answers with the two
       -- battlefield ids and the sources the gather produced.
@@ -3535,14 +3542,52 @@ bystanderZoneSpec s registry =
         -- The same board with the ordinary destination. The battlefield
         -- incarnation still gets nothing, which is what this change is; the
         -- graveyard incarnation CR 400.7 mints is a different object under a
-        -- different id, and whether IT should be offered to an event that
-        -- predates its arrival is a separate question this says nothing about
-        -- (#824).
+        -- different id, and CR 603.10's first sentence is what withholds THAT one
+        -- from an event that predates its arrival -- the leg below is where that
+        -- is proved, so this one still reads only the battlefield id.
         Spec.it s "CR 113.6m the same holds when the bystander dies to a graveyard" $ do
           (squeeId, blossomId, after, sources) <- board (Event.destroy Regenerability.Regenerable)
           Spec.assertEqWith s "Squee really left the battlefield" (Game.lookupObject squeeId after) Nothing
           Spec.assertBool s (TriggerSource.OfObject squeeId `notElem` sources) "the battlefield incarnation triggered nothing"
           Spec.assertBool s (TriggerSource.OfObject blossomId `elem` sources) "and the control still did"
+        -- The ARRIVAL side of the same rule, driven through the turn machinery
+        -- rather than through a hand-built log. CR 603.2b's step event is
+        -- recorded as alice's upkeep begins, and only then does CR 704.3's check
+        -- bury a Squee that CR 122.1a's -1/-1 counter had already taken to zero
+        -- toughness (CR 704.5f) -- a strictly later event group of the same
+        -- CR 117.5 batch. So the graveyard incarnation CR 400.7 minted did not
+        -- exist immediately after the step began, and CR 603.10's first sentence
+        -- checks an event against the objects that did: its CR 113.6m upkeep
+        -- ability is no witness to an upkeep that had already begun.
+        Spec.it s "CR 603.10 a card that reaches a graveyard mid-batch is no witness to an earlier event" $ do
+          squee <- S.printingOf s registry "Squee, Goblin Nabob"
+          bitterblossom <- S.printingOf s registry "Bitterblossom"
+          let (squeeId, g1) = S.addCreature squee S.alice (Setup.emptyGame S.bothPlayers)
+              (_, g2) = S.addCreature bitterblossom S.alice g1
+              doomed = S.addCounter CounterKind.MinusOneMinusOne 1 squeeId g2
+              atUpkeep =
+                doomed
+                  { GameState.phase = upkeep,
+                    GameState.activePlayer = S.alice,
+                    GameState.priority = Just S.alice,
+                    GameState.remaining = Seq.drop 1 (GameState.remaining doomed)
+                  }
+              after = S.runPure exercising atUpkeep Engine.runStep
+              squeesIn zone = filter (\oid -> fmap Face.name (Game.faceOf oid after) == Just squeeName) (Game.zoneMembers zone S.alice after)
+          -- The discriminating assertion, and gameplay-level: the trigger that
+          -- must not fire is the only thing that could move this card, and where
+          -- the card ends up is what a player would see. `exercising` takes the
+          -- "you may", so a fired trigger is a Squee in the hand.
+          Spec.assertEqWith s "no Squee reached alice's hand" (length (squeesIn Zone.Hand)) 0
+          -- The board really is the one the claim is about: a Squee IS in the
+          -- graveyard at the boundary, under the fresh id CR 400.7 minted, so a
+          -- live read of that zone would have offered it.
+          Spec.assertEqWith s "and one Squee is in the graveyard" (length (squeesIn Zone.Graveyard)) 1
+          Spec.assertBool s (squeeId `notElem` squeesIn Zone.Graveyard) "under a fresh id, not the battlefield one"
+          -- The control, and the falsifier for over-narrowing: Bitterblossom's
+          -- own upkeep trigger saw the same step event and fired, so "no Squee
+          -- trigger" is not what a silenced batch looks like.
+          Spec.assertEqWith s "the Bitterblossom's upkeep trigger still fired" (S.countOnBattlefieldByName faerieToken S.alice after) 1
 
 -- CR 400.7e's slot read from the OTHER direction of a zone change: an entry.
 -- "Abilities that trigger when an object moves from one zone to another ... can
