@@ -2147,7 +2147,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- CR 701.14d: "the damage dealt when a creature fights ISN'T COMBAT
         -- DAMAGE", so DamageKind.Noncombat and never the combat damage path.
         -- Each creature is its own blow's source (CR 120.2b), which is what makes
-        -- a fight two dealers where an Effect.DealDamage has one.
+        -- an ordinary fight two dealers where an Effect.DealDamage has one -- and
+        -- a self-fight one dealer again.
         --
         -- Zero is dropped rather than dealt (CR 120.8), the same guard the
         -- DealDamage arm above writes.
@@ -2155,14 +2156,23 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               [ Damage.damageEvent gs DamageKind.Noncombat dealer (Recipient.ToCreature victim) (Integer.toNaturalSaturating amount)
               | amount > 0
               ]
-            events = blow oneId twoId onePower <> blow twoId oneId twoPower
+            events
+              -- CR 701.14c: "if a creature fights itself, it deals damage to
+              -- itself equal to TWICE its power" -- ONE event, not two of its
+              -- power. Every observer that sums (marked damage, CR 120.4a's
+              -- excess, lifelink, CR 615.7's amount-based shield) agrees either
+              -- way; one that counts events (CR 122.1c's shield counters, a
+              -- damage trigger) does not, which is why the rule bothers to say
+              -- it.
+              --
+              -- Both reads of the same power off the same pre-effect state, so
+              -- doubling one is the same number as summing the two; written as
+              -- the rule words it.
+              | oneId == twoId = blow oneId oneId (2 * onePower)
+              | otherwise = blow oneId twoId onePower <> blow twoId oneId twoPower
         -- ONE batch: CR 701.14a's "each of those creatures deals damage" is one
         -- action, so the two blows land simultaneously and a creature that dies
         -- to the first still dealt the second.
-        --
-        -- Not implemented: CR 701.14c's self-fight, where both slots name one
-        -- permanent and the rule wants ONE blow of twice its power rather than
-        -- the two of its power this builds (#1875).
         Monad.unless (null events) (Damage.applyDamage events)
       _ -> pure ()
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
