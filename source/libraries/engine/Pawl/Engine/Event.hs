@@ -1650,14 +1650,14 @@ apply batch candidate event =
     (ReplacementEffect.PhaseR _, _) -> pure (Just event)
     -- CR 614.1e / 702.37b: megamorph's "as this permanent is turned face up, put
     -- a +1/+1 counter on it", applied WHILE the permanent turns over (CR 708.11)
-    -- because FaceDown.turnFaceUp raises this event there and nowhere else.
+    -- because FaceDown.performTurnFaceUp raises this event there and nowhere else.
     --
     -- The counters go through putCounters, the CR 122.6 funnel, exactly as the
     -- EntryR WithCounters arm's do -- so CR 614.16 applies and Hardened Scales
     -- sees a megamorph counter the way it sees a riot one.
     --
     -- The event survives: turning face up is not replaced by the counter, only
-    -- accompanied by it, so Just is returned and FaceDown.turnFaceUp goes on to
+    -- accompanied by it, so Just is returned and FaceDown.performTurnFaceUp goes on to
     -- record CR 708.7's event.
     (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ rewrite), ProposedEvent.WouldTurnFaceUp oid _) -> case rewrite of
       TurnUpRewrite.WithCounters (WithCounters.MkWithCounters kind n) -> do
@@ -1666,7 +1666,7 @@ apply batch candidate event =
         pure (Just event)
       -- CR 303.4k with CR 614.1e: Gift of Doom's "as this Aura is turned face
       -- up, you may attach it to a creature", applied WHILE the permanent turns
-      -- over (CR 708.11) because FaceDown.turnFaceUp raises this event there and
+      -- over (CR 708.11) because FaceDown.performTurnFaceUp raises this event there and
       -- nowhere else -- and, decisively for this rule, AFTER it has written the
       -- face-up status. Every characteristic Attach.turnUpHosts reads is
       -- therefore the Aura's "as it would exist if it were face up"; see there.
@@ -1684,7 +1684,7 @@ apply batch candidate event =
       --
       -- The event survives either way: turning face up is not replaced by the
       -- attachment, only accompanied by it, so Just is returned and
-      -- FaceDown.turnFaceUp goes on to record CR 708.7's event.
+      -- FaceDown.performTurnFaceUp goes on to record CR 708.7's event.
       TurnUpRewrite.MayAttachTo filter_ -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         gs <- State.get
@@ -6037,7 +6037,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   --
   -- Nothing here asks whether the permanent had ALREADY entered the battlefield.
   -- CR 708.7 leaves turning face up something only a permanent can be doing, and
-  -- FaceDown.turnFaceUp is the sole writer of this event -- CR 708.3's
+  -- FaceDown.performTurnFaceUp is the sole writer of this event -- CR 708.3's
   -- face-down ENTRY writes a Moved event and never this one, which is what makes
   -- CR 708.8's last sentence fall out rather than needing a clause.
   TriggerCondition.SelfTurnedFaceUp -> case event of

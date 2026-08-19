@@ -40,7 +40,7 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 --
 -- WouldTurnFaceUp carries the object for WouldEnter's reason: CR 708.11 has the
 -- ability applied WHILE the permanent is turning over, and
--- Pawl.Engine.FaceDown.turnFaceUp has already written the face-up status by the
+-- Pawl.Engine.FaceDown.performTurnFaceUp has already written the face-up status by
 -- time it raises this -- so every property a CR 614.1e replacement can modify is
 -- read off, and written to, the object.
 --
@@ -101,8 +101,8 @@ data ProposedEvent
     -- first step of such a phase -- once for the phase, once for the step.
     WouldBeginPhase PhaseSelector.PhaseSelector PlayerId.PlayerId
   | -- | CR 614.1e / 708.11: a face-down permanent is being turned face up.
-    -- Raised by Pawl.Engine.FaceDown.turnFaceUp, the only place in the engine
-    -- that turns anything face up, and the one funnel CR 116.2b's special action
-    -- goes through.
+    -- Raised by Pawl.Engine.FaceDown.performTurnFaceUp, the only place in the
+    -- engine that turns anything face up -- the one funnel CR 116.2b's special
+    -- action and Effect.TurnFaceUp both go through.
     WouldTurnFaceUp ObjectId.ObjectId (Maybe TurnUpProcedure.TurnUpProcedure)
   deriving (Eq, Ord, Show)

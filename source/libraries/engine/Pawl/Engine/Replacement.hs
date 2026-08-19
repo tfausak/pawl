@@ -406,7 +406,7 @@ applies gs event candidate =
         -- THIS permanent is turned face up".
         --
         -- Matched against the LIVE projection, which for this event is the
-        -- permanent as it is turning over: FaceDown.turnFaceUp has already
+        -- permanent as it is turning over: FaceDown.performTurnFaceUp has already
         -- written Facing.FaceUp when it raises the event, so CR 708.11's "would
         -- have ... after it's turned face up" is answered by asking about the
         -- board rather than by a counterfactual.

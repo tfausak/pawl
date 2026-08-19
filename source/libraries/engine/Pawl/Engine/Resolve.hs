@@ -2480,7 +2480,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- it closes CR 701.40b's turn-face-up procedure and leaves CR 702.37e's
           -- open. No CR 400.7 incarnation is minted, so the object id, marked
           -- damage, counters, attachments, statuses and the CR 613.7d timestamp
-          -- all ride through -- the mirror of FaceDown.turnFaceUp.
+          -- all ride through -- the mirror of FaceDown.performTurnFaceUp.
           --
           -- CR 708.2b is the guard below: an effect that LISTS its own values
           -- would otherwise overwrite the list already there. No event is

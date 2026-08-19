@@ -2734,12 +2734,17 @@ fightSpec s registry = Spec.describe s "Fight (CR 701.14)" $ do
   -- fights or deals damage."
   --
   -- THE PAIR with the case above, differing in one thing: bob takes control of
-  -- the Piker (CR 108.4) after Prey Upon is on the stack. That makes the "mine"
-  -- slot's target illegal -- it is no longer a creature alice controls -- while
-  -- leaving the Piker on the battlefield, still a creature, still a legal
-  -- RECIPIENT. So the board can tell "neither fights" from "the survivor swings
-  -- alone", which a Piker that had simply been destroyed could not: a destroyed
-  -- Piker is no recipient either way and both readings deal nothing.
+  -- the Piker (CR 108.4) after Prey Upon is on the stack, so the "mine" slot's
+  -- target is illegal -- no longer a creature alice controls -- while the Piker
+  -- itself is still on the battlefield and still a creature.
+  --
+  -- What this leg can and cannot separate. Prey Upon TARGETS both fighters, so CR
+  -- 608.2b removes the Piker from the slot map in BOTH roles, and 701.14b's first
+  -- sentence (gone from the battlefield, no longer a creature) is not
+  -- independently observable off this card -- an implementation that dropped
+  -- those two conjuncts would answer the same here. What it does separate is the
+  -- PAIR shape: an implementation that fell back to the remaining fighter leaves
+  -- the Giant fighting itself and marks 3 on it.
   --
   -- Prey Upon still has its other target, so CR 608.2b lets it resolve rather
   -- than countering it -- the graveyard assertion is what pins that, and without
@@ -2749,10 +2754,10 @@ fightSpec s registry = Spec.describe s "Fight (CR 701.14)" $ do
     let cast = S.runPure (aimedAtEither mine theirs) before (S.cast S.alice spell)
         stolen = S.giveControl mine S.bob cast
         after = S.settleSba (S.runPure S.identityAnswer stolen Stack.resolveTop)
-    -- The discriminator: under a per-fighter reading the Giant is still a legal
-    -- target and would deal its 3 to the Piker, killing it.
     Spec.assertEqWith s "CR 701.14b the Giant dealt nothing to the Piker" (S.damageOf mine after) (Just 0)
     Spec.assertBool s (S.onBattlefield mine after) "CR 701.14b so the Piker lived"
+    -- The discriminator: an implementation that let the remaining fighter swing
+    -- anyway marks the Giant's own 3 on the Giant.
     Spec.assertEqWith s "CR 701.14b and the Piker dealt nothing to the Giant" (S.damageOf theirs after) (Just 0)
     -- CR 608.2b: it RESOLVED, and was not countered for want of targets.
     Spec.assertEqWith s "the spell resolved into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1

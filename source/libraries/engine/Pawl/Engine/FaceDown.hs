@@ -304,10 +304,10 @@ performTurnFaceUp procedure oid = do
       -- ability and a CR 708.7 trigger on one card would otherwise be
       -- ordered the wrong way round, and CR 708.11's "not afterward" is
       -- exactly the sentence that decides it. Pawl.FaceDownSpec's second
-      -- turnFaceUp call is what proves the loop is inside the PAID branch
-      -- rather than run on every ask: a permanent that is already face up
-      -- has its megamorph row too, so a loop outside this branch would put
-      -- a second counter on.
+      -- turnFaceUp call is what proves this body is reached only from
+      -- turnFaceUp's PAID branch rather than on every ask: a permanent that
+      -- is already face up has its megamorph row too, so a loop run on the
+      -- refused call would put a second counter on.
       --
       -- Monad.void discards the Nothing that would mean the turning does
       -- not happen. No arm reachable from this event returns one -- CR
@@ -324,11 +324,12 @@ performTurnFaceUp procedure oid = do
       -- Engine.settleForPriority and reads the log later, never between
       -- these two lines, so no reader can see the permanent mid-turnover.
       --
-      -- Inside the PAID branch, which IS observable: turnFaceUp is a
-      -- no-op for a permanent that is already face up (canTurnFaceUp's
-      -- first conjunct), and such a permanent has its text back -- so an
-      -- event recorded unconditionally would fire the ability again on a
-      -- second, refused call. Pawl.FaceDownSpec asks twice to prove it.
+      -- Reached only from a caller that has already refused an
+      -- already-face-up permanent -- turnFaceUp's canTurnFaceUp, and
+      -- turnFaceUpByEffect's own face-down guard -- and THAT is observable:
+      -- such a permanent has its text back, so an event recorded on a
+      -- refused call would fire the ability again. Pawl.FaceDownSpec asks
+      -- twice to prove it.
       -- The unpaid branch is quiet for a different reason: CR 702.37e's
       -- reject-not-repair restores the state the attempt began with, log
       -- and all, and CR 708.2a leaves the still-face-down permanent with
