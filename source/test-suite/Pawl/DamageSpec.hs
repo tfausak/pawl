@@ -843,7 +843,11 @@ lastKnownRiderSpec s registry =
                     LastKnown.counters = Map.empty,
                     -- Nothing here copies anything; the field is filled to
                     -- build the record.
-                    LastKnown.copiable = Projection.copiableCharacteristics srcId equipped
+                    LastKnown.copiable = Projection.copiableCharacteristics srcId equipped,
+                    -- The Sorcerer wears the Collar rather than the other way
+                    -- round, so the object this record is about is attached to
+                    -- nothing.
+                    LastKnown.attachedTo = Nothing
                   }
               humbled = S.withHumility humility equipped
               planted =

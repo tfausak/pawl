@@ -2900,7 +2900,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                         -- `snapshot` is, and the copy binding and face it reads live
                         -- on `obj`, which is about to cease. No third board walk --
                         -- it reads that binding or the printed face and stops.
-                        GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs)) (GameState.lastKnown g1)
+                        GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Object.attachedTo obj)) (GameState.lastKnown g1)
                       }
               newId <- placeObject pid (mkObj entrySeed) dest position
               -- CR 614.1c-d: entry replacements apply to BATTLEFIELD entries and
@@ -5431,6 +5431,72 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
+  -- CR 700.4's "dies" once more, asked of the permanent the bearer is attached
+  -- to: PermanentDies' battlefield-to-graveyard pair, matched on
+  -- ZoneChange.departed for that arm's reason (CR 603.10a), against the host id
+  -- Object.attachedTo records.
+  --
+  -- The host is read through Recipient.objectOf, AttachedCreatureMentors' route
+  -- for CR 303.4's other destination: an Aura enchanting a PLAYER has no host id
+  -- to compare and answers False, as does one attached to nothing.
+  --
+  -- No characteristic of the deceased is read, unlike PermanentDies -- the
+  -- attachment link already says which permanent this is about, so there is
+  -- nothing for last known information to answer.
+  --
+  -- LAST KNOWN INFORMATION where the bearer is gone (CR 608.2h), which is
+  -- AttachedCreatureMentors' one point of departure and is load-bearing rather
+  -- than defensive: CR 704.5m takes the Aura off the battlefield in the very SBA
+  -- batch that buried its host, and CR 117.5 places triggers only after that
+  -- batch settles, so by the time this is asked the live link is ALWAYS gone.
+  -- The live read is kept ahead of it for the Equipment-shaped case, where
+  -- CR 704.5n leaves the bearer standing.
+  TriggerCondition.AttachedCreatureDies -> case event of
+    GameEvent.Moved (Moved.MkMoved zc _)
+      | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard ->
+          let hostOfBearer = case Game.lookupObject bearer gs of
+                Just obj -> Object.attachedTo obj
+                Nothing -> LastKnown.attachedTo =<< Map.lookup bearer (GameState.lastKnown gs)
+           in (Recipient.objectOf =<< hostOfBearer) == Just (ZoneChange.departed zc)
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Exerted _ -> False
   -- CR 603.6c taken whole. The `from` half matches SelfDies'; the `to` half is
   -- where they part company, this one asking only that the destination be ANOTHER
   -- zone.
@@ -7193,6 +7259,9 @@ reactsToAbilityTriggering cond = case cond of
   -- Rule 702.149c watches a training ability RESOLVING, which is the same
   -- first-pass event the arm above argues rule 702.134c's is.
   TriggerCondition.SelfTrains -> False
+  -- CR 700.4's zone change is a first-pass event too, and not an ability
+  -- triggering.
+  TriggerCondition.AttachedCreatureDies -> False
   TriggerCondition.PermanentSacrificed -> False
 
 -- CR 603.2: the bindings the EVENT contributes to a trigger it has just fired --
@@ -7942,6 +8011,12 @@ eventBindingSlots cond = case cond of
   -- Legion's "that creature" has no other name to be read under. Guaranteed given a
   -- match, as this classification has to be: every Mentored event carries both ids.
   TriggerCondition.AttachedCreatureMentors -> Set.singleton Binding.mentoredCreature
+  -- Empty, unlike AttachedCreatureMentors above: CR 303.4b's "enchanted
+  -- creature" is the one permanent the event names beyond the bearer, and
+  -- Screams from Within's payload acts on the bearer alone. A card that did name
+  -- it -- Reins of the Vinesteed's "that creature" -- would need a slot here
+  -- (gap #1893).
+  TriggerCondition.AttachedCreatureDies -> Set.empty
   -- Empty for SelfEvolves' reason and not for AttachedCreatureMentors' -- rule
   -- 702.149a's counter goes on the bearer, so Savior of Ollenbock's "this creature"
   -- is Binding.triggerSource and the event names nobody else.
@@ -8077,6 +8152,10 @@ looksBack condition = case condition of
   TriggerCondition.SelfDies -> True
   TriggerCondition.PermanentDies _ -> True
   TriggerCondition.SelfLeavesTheBattlefield -> True
+  -- CR 603.10a's first family read off the HOST rather than the bearer: this
+  -- triggers when a permanent leaves the battlefield, so the rule reaches the
+  -- ability however the bearer is found.
+  TriggerCondition.AttachedCreatureDies -> True
   -- CR 603.10a's first family again, read off the event rather than off the
   -- bearer: this triggers when a permanent leaves the battlefield. Inert today --
   -- the bearer is a card in exile, which no look-back source can offer -- but a
@@ -8281,9 +8360,10 @@ eventTriggers events gs =
       -- permanent THIS event removed. That is the same shape asking a different
       -- question, and CR 113.6m answers it differently: the rule's own "unless
       -- its trigger condition ... specifies that the object is put into that
-      -- zone" exempts the dies triggers that arm serves, and that clause is not
-      -- implemented (#819), so filtering there would read the rule's first half
-      -- without its second.
+      -- zone" exempts the dies triggers that arm serves, and THAT half of the
+      -- clause is not implemented (#819) -- `enchantedObjectLeaves` below reads
+      -- only its Aura half -- so filtering there would read the rule's first
+      -- sentence without the exception that governs this arm.
       battlefieldAbilitiesOf pc = filter (functionsIn Zone.Battlefield) (abilitiesOf pc)
       -- CR 603.10's first sentence, per EVENT GROUP: the permanents that existed
       -- immediately after the event, with the abilities and the CR 603.3a
@@ -8938,12 +9018,50 @@ eventTriggers events gs =
 -- Not a case on an effect's identity: Pawl.Engine.EffectZone answers the one
 -- question, and this folds its answer.
 --
--- Not implemented: CR 113.6m's "unless" clause, its Aura half, and its
--- delayed-triggered-ability sentence (#819).
+-- CR 113.6m's "unless" clause is read here in the one half a trigger condition
+-- can satisfy -- the Aura half, `enchantedObjectLeaves` below. Screams from
+-- Within's "when enchanted creature dies, return this card from your graveyard
+-- to the battlefield" is the printing it decides: without the clause the effect
+-- pins the ability to the graveyard, where the condition can never be checked,
+-- and the card does nothing.
+--
+-- Not implemented: the clause's OTHER half, "a previous part of its cost or
+-- effect specifies that the object is put into that zone", and the
+-- delayed-triggered-ability sentence (#819). Neither needs a trigger condition,
+-- so both belong to the fold below rather than here.
 zoneFunctionedFrom :: TriggeredAbility.TriggeredAbility Card -> Maybe Zone
 zoneFunctionedFrom ability =
-  Maybe.listToMaybe
-    (Maybe.mapMaybe EffectZone.zoneFunctionedFrom (Modal.allEffects (TriggeredAbility.modal ability)))
+  if enchantedObjectLeaves (TriggeredAbility.condition ability)
+    then Nothing
+    else
+      Maybe.listToMaybe
+        (Maybe.mapMaybe EffectZone.zoneFunctionedFrom (Modal.allEffects (TriggeredAbility.modal ability)))
+
+-- CR 113.6m's Aura clause, asked of a trigger condition: does it specify "that
+-- the object it enchants leaves the battlefield"? CR 700.4 makes a death one, so
+-- the "dies" wording every printing uses is inside the clause.
+--
+-- CR 603.1b: one ability may have several conditions, and the rule's "its
+-- trigger condition" is satisfied by any of them -- the exception is about what
+-- the ability can be made to watch, and one watching condition is enough.
+--
+-- The rule's "if the object is an Aura" is NOT checked, for want of the object:
+-- this reads an ability, and the card's type line is not in hand. Inert rather
+-- than wrong today -- Scryfall `o:"enchanted creature dies" o:"from your
+-- graveyard to the battlefield"` (2026-08-19) returns Journey to Eternity, Reins
+-- of the Vinesteed and Screams from Within, all three Auras -- and an Equipment
+-- printed with this condition and a graveyard-recursion effect is the card that
+-- would refute it (gap #1894).
+--
+-- The `_` is a decision, not an omission: CR 113.6m's exception names exactly one
+-- family of conditions, so a condition that says nothing about the enchanted
+-- object's departure gets the rule's main sentence, which is what False means
+-- here.
+enchantedObjectLeaves :: TriggerCondition -> Bool
+enchantedObjectLeaves condition = case condition of
+  TriggerCondition.AttachedCreatureDies -> True
+  TriggerCondition.AnyOf conditions -> any enchantedObjectLeaves conditions
+  _ -> False
 
 -- CR 113.6, asked of one zone and one triggered ability: does it function from
 -- there? Three sentences of that rule in precedence order.
@@ -9069,6 +9187,13 @@ zonesTriggeredFrom cond = case cond of
   -- battlefield, and Aegis of the Legion watches from there -- CR 113.6k's exception
   -- is for a condition that cannot trigger from the battlefield at all.
   TriggerCondition.AttachedCreatureMentors -> battlefield
+  -- CR 113.6's default from the Aura's side: CR 303.4 attaches an Aura to a
+  -- permanent on the battlefield, so its bearer watches from there, and CR
+  -- 113.6k's exception -- for a condition that cannot trigger from the
+  -- battlefield at all -- does not apply. What DOES apply is CR 113.6m's Aura
+  -- clause, read by zoneFunctionedFrom above, which is why this arm is reached
+  -- for Screams from Within at all.
+  TriggerCondition.AttachedCreatureDies -> battlefield
   -- The same default from the training creature's own side: rule 702.149a's ability
   -- fires on an attack, so its bearer is on the battlefield and CR 113.6k's
   -- exception -- for a condition that cannot trigger from there at all -- does not
@@ -9300,6 +9425,8 @@ controllerTurnScoped cond = case cond of
   -- watches rather than a narrowing this condition states, and the Equipment's
   -- controller need not be that player.
   TriggerCondition.AttachedCreatureMentors -> False
+  -- CR 303.4 names no turn either: an enchanted creature can die on anyone's.
+  TriggerCondition.AttachedCreatureDies -> False
   -- Rule 702.149c names no turn either, and the SelfAttacks arm below settles the
   -- consequence: CR 508.1a makes the training happen on the ACTIVE player's turn,
   -- which is not CR 109.5's "you" -- a stolen creature trains on its thief's turn.
@@ -9555,6 +9682,9 @@ stateTriggers gs
               -- counter like any other, so the board afterwards says nothing about
               -- which creature mentored which.
               TriggerCondition.AttachedCreatureMentors -> False
+              -- CR 700.4's death is an EVENT, and the board afterwards cannot
+              -- say which permanent an Aura in a graveyard used to enchant.
+              TriggerCondition.AttachedCreatureDies -> False
               -- CR 702.149c the same: it fires on a resolution, and the counter
               -- that resolution put is a counter like any other, so the board
               -- afterwards says nothing about which creature trained.

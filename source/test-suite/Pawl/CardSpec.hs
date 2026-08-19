@@ -602,6 +602,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfEvolves -> []
   -- CR 702.134c's is nullary too, so it holds no Quantity.
   TriggerCondition.AttachedCreatureMentors -> []
+  -- CR 700.4's is nullary as well, for the same reason.
+  TriggerCondition.AttachedCreatureDies -> []
   -- Nor does CR 702.149c's, for the same reason.
   TriggerCondition.SelfTrains -> []
   -- CR 701.21a's is nullary too, so it holds no Quantity either.
@@ -2633,6 +2635,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 702.134c's carries none either: "equipped creature" is CR 301.5f's one
   -- permanent rather than a class of them, and "a creature" narrows by nothing.
   TriggerCondition.AttachedCreatureMentors -> []
+  -- CR 303.4b's "enchanted creature" is one permanent rather than a class of
+  -- them too, so this condition carries no Filter either.
+  TriggerCondition.AttachedCreatureDies -> []
   -- CR 702.149c's carries none either: it names "this creature" and nothing about
   -- it to narrow by.
   TriggerCondition.SelfTrains -> []

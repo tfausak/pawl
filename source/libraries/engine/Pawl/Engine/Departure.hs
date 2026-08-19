@@ -213,6 +213,7 @@ objectsLeaveWith pid gs =
                 (Object.source obj)
                 (Object.counters obj)
                 (Event.copiedSnapshot oid gs)
+                (Object.attachedTo obj)
             )
       -- CR 603.6c's second trigger event: "when a phased-in permanent leaves the
       -- game because its owner leaves the game". Only those, which is CR 702.26k

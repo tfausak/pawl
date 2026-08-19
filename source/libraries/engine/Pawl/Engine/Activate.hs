@@ -203,8 +203,11 @@ zoneAbilitiesOf zone oid gs = case (Game.faceOf oid gs, Game.lookupObject oid gs
 -- Pawl.Engine.Event.zoneFunctionedFrom is the triggered one, and has only the
 -- effect half to fold, CR 603.1 giving a triggered ability no cost.
 --
--- Not implemented: CR 113.6m's "unless" clause, its Aura half, and its
--- delayed-triggered-ability sentence (#819).
+-- Not implemented: CR 113.6m's "a previous part of its cost or effect specifies
+-- that the object is put into that zone" clause, which would need this fold to
+-- be ORDER-sensitive across the cost and the effects, and its
+-- delayed-triggered-ability sentence (#819). The clause's Aura half needs a
+-- trigger condition and so belongs to the triggered reading alone.
 zoneFunctionedFrom :: ActivatedAbility.ActivatedAbility Card.Card -> Maybe Zone.Zone
 zoneFunctionedFrom ability =
   case Cost.zoneFunctionedFrom (ActivatedAbility.cost ability) of

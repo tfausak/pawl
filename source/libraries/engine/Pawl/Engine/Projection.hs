@@ -1586,6 +1586,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated d f) -> TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated d (Filter.rewrite pairs f))
   TriggerCondition.SelfEvolves -> condition
   TriggerCondition.AttachedCreatureMentors -> condition
+  TriggerCondition.AttachedCreatureDies -> condition
   TriggerCondition.SelfTrains -> condition
   TriggerCondition.PermanentSacrificed -> condition
   TriggerCondition.SagaFinalChapterTriggers _ -> condition
