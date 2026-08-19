@@ -1960,7 +1960,10 @@ luminesceSpec s registry = Spec.describe s "Luminesce (CR 615.1, CR 609.7b)" $ d
   -- read the dead id's blank view, both readings would leave bob on 20 and the
   -- case would pass whatever the shield did. Pawl.ActivateSpec's "CR 113.7a whole
   -- card" case pins the amount at 2 with the source already gone, which is what
-  -- keeps 20 and 18 apart below.
+  -- keeps 20 and 18 apart below. That trap is not hypothetical: emptying
+  -- GameState.lastKnown outright is NOT a usable mutation here, because the same
+  -- store feeds Quantity.Power, the amount collapses to nothing, and the red board
+  -- below lands on 20 under both readings. Only the green board catches it.
   --
   -- TWO boards differing in exactly one thing, because one cannot separate the
   -- readings on its own. Pairing (red, green) the shield gives (20, 18) reading
