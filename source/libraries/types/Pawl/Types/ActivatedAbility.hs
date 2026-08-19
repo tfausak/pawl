@@ -45,8 +45,8 @@ data ActivatedAbility card = MkActivatedAbility
     -- (Pawl.Engine.Projection.abilitiesGiven) and so takes the ability away and
     -- gives it back as the board moves, with no resolution in between.
     --
-    -- Read AFTER the layer fold rather than at the projection seed: the seed's
-    -- view determines nothing (#156), and CR 604.2's own gate -- the object being
+    -- Read AFTER the layer fold rather than at the projection seed: the seed can
+    -- describe no object, so its view determines nothing, and CR 604.2's own gate -- the object being
     -- on the battlefield with the ability -- is the fold's job, which this only
     -- narrows.
     --
