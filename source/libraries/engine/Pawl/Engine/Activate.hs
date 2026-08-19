@@ -698,7 +698,15 @@ activateAbility pid srcId ability = do
                 -- (see loyaltyOk above). Every path that rejects the activation
                 -- restores `before`, and the log lives in that state, so no rejected
                 -- activation can leave a record behind.
-                Payment.Paid -> do
+                Payment.Paid bound -> do
+                  -- CR 608.2h: the slots the PAYMENT bound -- the permanent a
+                  -- Sacrifice component put in a graveyard -- folded onto the
+                  -- ability object, so "the sacrificed creature's power" has a
+                  -- name to read at resolution (Jarad, Golgari Lich Lord). After
+                  -- the payment because that is when the payment knows them, and
+                  -- onto the ABILITY for the reason CR 113.7a gives above: the
+                  -- source may itself be what was sacrificed.
+                  State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setPaid bound (Object.bindings o)}) abilId (GameState.objects g)})
                   Monad.when
                     (Cost.isLoyaltyCost (ActivatedAbility.cost ability))
                     (State.modify' (Event.recordEvent (GameEvent.LoyaltyAbilityActivated srcId)))

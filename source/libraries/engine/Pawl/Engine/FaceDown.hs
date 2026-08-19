@@ -210,7 +210,9 @@ turnFaceUp pid procedure oid = do
         payment <- Cost.pay ManaSpending.AsProduced pid oid cost
         case payment of
           Payment.Unpaid -> State.put before
-          Payment.Paid -> performTurnFaceUp (Just procedure) oid
+          -- The payment's bound slots are dropped, Pawl.Engine.Ignore's reason:
+          -- turning a permanent face up resolves nothing.
+          Payment.Paid _ -> performTurnFaceUp (Just procedure) oid
 
 -- CR 701.40g: "if a manifested permanent that's represented by an instant or
 -- sorcery card would turn face up, its controller reveals it and leaves it face

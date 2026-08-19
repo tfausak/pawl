@@ -130,7 +130,9 @@ plot pid oid = do
       payment <- Cost.pay ManaSpending.AsProduced pid oid (Maybe.fromMaybe Cost.unpayable (plotCostOf oid before))
       case payment of
         Payment.Unpaid -> State.put before
-        Payment.Paid -> do
+        -- Dropped, Pawl.Engine.Foretell's reason exactly: the card is exiled and
+        -- the later cast pays its own cost.
+        Payment.Paid _ -> do
           exiled <- Event.changeZoneReturning oid Zone.Exile
           case exiled of
             Nothing -> pure ()

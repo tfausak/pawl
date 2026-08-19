@@ -1420,7 +1420,11 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                         -- candidate carried it -- and is stamped on the object,
                         -- because "if this spell was kicked" is read at
                         -- resolution.
-                        Payment.Paid -> do
+                        -- Not implemented: the slots the payment bound are
+                        -- dropped, so a spell whose additional cost sacrifices a
+                        -- permanent cannot read it (#1872). Activation is the
+                        -- half that folds them on (Pawl.Engine.Activate).
+                        Payment.Paid _ -> do
                           -- CR 601.2i: the spell has been cast. Emitted AFTER the
                           -- last step that can fail, so a rejected announcement
                           -- records nothing.

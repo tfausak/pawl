@@ -1373,7 +1373,10 @@ payGatePaid resolving source idx cIdx legal gate = do
             PaymentDecision.Declines -> pure False
             PaymentDecision.Pays -> do
               outcome <- Cost.pay ManaSpending.AsProduced payer source cost
-              pure (outcome == Payment.Paid)
+              -- Not implemented: the slots this payment bound are dropped, so a
+              -- CR 118.12 cost that sacrifices a permanent cannot be read by a
+              -- later clause of the same resolution (#1872).
+              pure (case outcome of Payment.Paid _ -> True; Payment.Unpaid -> False)
 
 -- Which player a resolution cost is offered to. ONE slot read answering two ways:
 -- a slot bound to a PLAYER names that player, one bound to an OBJECT names
@@ -1606,7 +1609,7 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- fallback 5 leaves the suite green.
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player count) ->
     let named = playerRefPlayers legal controller gs player
-        viewOf = Projection.viewWithLastKnown source gs
+        viewOf = effectViewOf source legal gs
         context = effectContext controller source legal
         depth = maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf context gs resolving source count)
      in concatMap
@@ -1970,9 +1973,33 @@ installDamageRow players controller source duration kind rewrite rider g recipie
 -- unanswered rather than answered off the source.
 effectContext :: PlayerId -> ObjectId -> Map.Map SlotName (Set Recipient) -> Filter.Context
 effectContext controller source legal =
-  Filter.contextWithSlots (Just controller) (Just source)
-    . Map.mapMaybe Recipient.objectOf
-    $ Map.mapMaybe Binding.onlyOne legal
+  Filter.contextWithSlots (Just controller) (Just source) (effectSlotObjects legal)
+
+-- The ONE object each of a resolution's slots names, shared by effectContext
+-- above and effectViewOf below so the two cannot disagree about which object a
+-- slot is.
+effectSlotObjects :: Map.Map SlotName (Set Recipient) -> Map.Map SlotName ObjectId
+effectSlotObjects = Map.mapMaybe Recipient.objectOf . Map.mapMaybe Binding.onlyOne
+
+-- CR 608.2h's reader for one resolution: Projection.viewWithLastKnown, which
+-- answers the SOURCE off its last known information, widened to the permanent a
+-- COST payment sacrificed (Binding.sacrificedPermanent).
+--
+-- That slot's object is gone by construction -- CR 601.2h paid the cost before
+-- the ability was on the stack at all, and CR 701.21a put the permanent in a
+-- graveyard as a new object (CR 400.7) -- so viewWithLastKnown's blank answer for
+-- a non-source object would leave Jarad, Golgari Lich Lord's "the sacrificed
+-- creature's power" permanently unanswerable.
+--
+-- The blank is still right for every OTHER non-source id, and that is why this
+-- names one slot rather than lifting the scope: those ids are TARGETS, and CR
+-- 608.2b wants a target that has left to answer with nothing. A slot the payment
+-- defined was never a target (CR 115.10a).
+effectViewOf :: ObjectId -> Map.Map SlotName (Set Recipient) -> GameState -> ObjectId -> Maybe Filter.View
+effectViewOf source legal gs oid =
+  if Map.lookup Binding.sacrificedPermanent (effectSlotObjects legal) == Just oid
+    then Projection.viewWithLastKnownAnywhere gs oid
+    else Projection.viewWithLastKnown source gs oid
 
 -- The amount ONE RECIPIENT of a per-player instruction reads, which need not be
 -- the amount the rest of the table reads (Stronghold Discipline). Every opcode
@@ -2038,7 +2065,7 @@ recordExiledWith source before gs =
 -- `controller` is the controller of the resolving spell or ability, never the
 -- effect `source`, which for an ability may already have been sacrificed as a
 -- cost. Every arm evaluating a Quantity views through
--- `Projection.viewWithLastKnown source gs` (CR 608.2h).
+-- `effectViewOf source legal gs` (CR 608.2h).
 --
 -- `resolving` is the object ON THE STACK -- the spell, or the ABILITY object --
 -- where every slot this fold defines is bound, where CR 603.7c's captured
@@ -2049,7 +2076,7 @@ applyOneEffect :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map Slo
 applyOneEffect runSubgame resolving source controller legal chosen effect = case effect of
   Effect.DealDamage (DealDamage.MkDealDamage ref quantity dealer excess) -> do
     gs <- State.get
-    let viewOf = Projection.viewWithLastKnown source gs
+    let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal
         -- CR 120.1a: damage only to a battle, creature, or planeswalker, so both
         -- arms of the ObjectRef go through Damage.damageRecipient and neither is
@@ -2302,7 +2329,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- How many cards this search may find (CR 701.23a), evaluated ONCE
               -- before the loop: one instruction names one count. An unevaluable
               -- or non-positive quantity comes out as 0.
-              cap = case Quantity.evaluateFor (Projection.viewWithLastKnown source gs0) (effectContext controller source legal) gs0 resolving source quantity of
+              cap = case Quantity.evaluateFor (effectViewOf source legal gs0) (effectContext controller source legal) gs0 resolving source quantity of
                 Just n | n > 0 -> Integer.toNaturalSaturating n
                 _ -> 0
           Monad.forM_ searchers $ \searcher -> Monad.forM_ (ownersFor searcher) $ \owner -> do
@@ -2783,7 +2810,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     State.modify' rescope
   Effect.Draw (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
-    let viewOf = Projection.viewWithLastKnown source gs
+    let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal
         named = playerRefPlayers legal controller gs ref
         -- CR 121.2c: the active player draws first, then each other player in turn
@@ -2806,7 +2833,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         _ -> pure ()
   Effect.Mill (Mill.MkMill ref quantity mTally) -> do
     gs <- State.get
-    let viewOf = Projection.viewWithLastKnown source gs
+    let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal
         -- An illegal slot (CR 608.2b) or a reference naming nobody mills nothing.
         millers = playerRefPlayers legal controller gs ref
@@ -2908,7 +2935,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       several -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList several))
   Effect.Scry (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
-    let viewOf = Projection.viewWithLastKnown source gs
+    let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal
         -- An illegal slot (CR 608.2b) or a reference naming nobody scries nothing.
         named = playerRefPlayers legal controller gs ref
@@ -2923,7 +2950,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         _ -> pure ()
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
-    let viewOf = Projection.viewWithLastKnown source gs
+    let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal
         -- Scry's arm in every respect, APNAP included (CR 101.4, rule 701.25
         -- stating no order of its own).
@@ -2936,7 +2963,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         _ -> pure ()
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
-    let viewOf = Projection.viewWithLastKnown source gs
+    let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal
         -- The players who FATESEAL, not the ones fatesealed (CR 701.29a); whose
         -- library is looked at is fatesealOne's separate choice.
@@ -2956,7 +2983,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     Monad.mapM_ exploreOne (objectRefObjects legal resolving controller source gs ref)
   Effect.Discard (Discard.MkDiscard slot quantity) -> do
     gs <- State.get
-    let viewOf = Projection.viewWithLastKnown source gs
+    let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal
     case legalOne slot legal of
       Just (Recipient.ToPlayer target) ->
@@ -2995,7 +3022,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       _ -> pure ()
   Effect.LoseLife (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
-    let viewOf = Projection.viewWithLastKnown source gs
+    let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal
         -- Whoever the PlayerRef names loses the life. Unordered: there is no CR
         -- 121.2c for life, and CR 704.3 checks state-based actions only as a player
@@ -3017,7 +3044,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- is CR 119.9: a gain of 0 is no life gain event to trigger on.
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
-    let viewOf = Projection.viewWithLastKnown source gs
+    let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal
         gainers = playerRefPlayers legal controller gs ref
     Monad.forM_ gainers $ \pid ->
@@ -3061,7 +3088,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- state before any life moves (CR 608.2f).
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
-    let viewOf = Projection.viewWithLastKnown source gs
+    let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal
         recipients = playerRefPlayers legal controller gs ref
     Monad.forM_ recipients $ \pid ->
@@ -3107,7 +3134,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- (#809).
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
-    let viewOf = Projection.viewWithLastKnown source gs
+    let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal
         revving = playerRefPlayers legal controller gs ref
     Monad.forM_ revving $ \pid ->
@@ -3134,7 +3161,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- once the object moved (#1441).
   Effect.DecreaseSpeed d -> do
     gs <- State.get
-    let viewOf = Projection.viewWithLastKnown source gs
+    let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal
         slowing = playerRefPlayers chosen controller gs (SpeedDecrease.player d)
         atLeast = toInteger (SpeedDecrease.floor d)
@@ -3150,7 +3177,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- between this and Sacrifice above. CR 609.3: only a genuine surplus prompts.
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot filter_ quantity) -> do
     gs <- State.get
-    let viewOf = Projection.viewWithLastKnown source gs
+    let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal
     case legalOne slot legal of
       Just (Recipient.ToPlayer victim) ->
@@ -3186,7 +3213,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       _ -> pure ()
   Effect.Create (Create.MkCreate quantity card entry mSlot) -> do
     gs <- State.get
-    let viewOf = Projection.viewWithLastKnown source gs
+    let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
@@ -3237,7 +3264,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- where the characteristics come FROM, the snapshot being layer 1 (CR
     -- 613.1a). CR 608.2h: both reads take the last known branch for a permanent
     -- already gone, and the pair has to move together.
-    let viewOf = Projection.viewWithLastKnown source gs
+    let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal
         sources = objectRefObjects legal resolving controller source gs ref
     -- The count is Create's, read the same way and off the same `gs` (CR 707.1).
@@ -3355,7 +3382,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- recipient is in the same vocabulary a DamageEvent's target arrives in (CR
     -- 120.1a).
     gs <- State.get
-    let viewOf = Projection.viewWithLastKnown source gs
+    let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal
         recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legal resolving controller source gs ref)
         -- CR 615.5: the additional effect, BAKED onto the row with this
@@ -3698,7 +3725,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       State.modify' (bindAmountSlot source slot (Natural.length countered))
   Effect.PutCounters (PutCounters.MkPutCounters kind quantity ref) -> do
     gs <- State.get
-    let viewOf = Projection.viewWithLastKnown source gs
+    let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal
         -- CR 608.2c: the set is swept as this instruction is reached, and an
         -- illegal slot (CR 608.2b) or a player recipient answers with nobody.
@@ -3714,7 +3741,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- nothing in CR 614 replaces a removal.
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind quantity slot) -> do
     gs <- State.get
-    let viewOf = Projection.viewWithLastKnown source gs
+    let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal
     case legalOne slot legal of
       Just recipient -> case Recipient.objectOf recipient of
@@ -3768,7 +3795,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- pool is swept before the counters land (CR 608.2h).
   Effect.Bolster quantity -> do
     gs <- State.get
-    let viewOf = Projection.viewWithLastKnown source gs
+    let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal
         -- Ascending, so the single-candidate shortcut and a transcript are
         -- deterministic.
@@ -3805,7 +3832,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- Targetless: no CR 608.2b legality to re-check.
   Effect.Amass (Amass.Type.MkAmass quantity subtype) -> do
     gs <- State.get
-    let viewOf = Projection.viewWithLastKnown source gs
+    let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
@@ -3824,7 +3851,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- "blighted creature" and CR 701.68d's trigger have nothing to read (#1492).
   Effect.Blight (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
-    let viewOf = Projection.viewWithLastKnown source gs
+    let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal
         named = playerRefPlayers legal controller gs ref
         blighters = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
@@ -3839,7 +3866,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.Venture -> Dungeon.venture controller
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters ref kind quantity) -> do
     gs <- State.get
-    let viewOf = Projection.viewWithLastKnown source gs
+    let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal
         recipients = playerRefPlayers legal controller gs ref
     -- CR 122 / 107.14: the amount is read per recipient off the one pre-effect
@@ -3852,7 +3879,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         _ -> pure ()
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters ref kind quantity) -> do
     gs <- State.get
-    let viewOf = Projection.viewWithLastKnown source gs
+    let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal
         recipients = playerRefPlayers legal controller gs ref
     Monad.forM_ recipients $ \pid ->

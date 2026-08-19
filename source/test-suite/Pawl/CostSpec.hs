@@ -1304,10 +1304,10 @@ longtuskCubSpec s registry =
 -- graveyard, one untapped Bayou, and whatever `extras` adds beside it, with
 -- priority in her own precombat main phase.
 --
--- Not implemented: Jarad's other activated ability, "{1}{B}{G}, Sacrifice
--- another creature: Each opponent loses life equal to the sacrificed creature's
--- power" -- no quantity can read the power of a permanent sacrificed to pay a
--- COST, so the card file omits the ability (#1061).
+-- Jarad's OTHER activated ability, "{1}{B}{G}, Sacrifice another creature: Each
+-- opponent loses life equal to the sacrificed creature's power", is the card's
+-- first and is proved by jaradDrainSpec below; this group's helper reaches the
+-- second through `swampAndForest`.
 --
 -- THE card for CR 118.3 across two components, and a Bayou is why: `Land --
 -- Forest Swamp` is one permanent that answers BOTH halves of the cost, so a gate
@@ -1353,6 +1353,14 @@ namesIn :: Zone.Zone -> GameState.GameState -> [CardName.CardName]
 namesIn zone gs =
   List.sort (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone S.alice gs))
 
+-- Jarad's SECOND activated ability, "Sacrifice a Swamp and a Forest". The file-local
+-- `theAbility` names the FIRST, which on this card is the drain the group below
+-- proves. Total: the fallback is unreachable on this printing.
+swampAndForest :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
+swampAndForest p = case Face.activatedAbilities (S.combinedFace p) of
+  _ : ability : _ -> ability
+  _ -> theAbility p
+
 jaradSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 jaradSpec s registry =
   Spec.describe s "Jarad, Golgari Lich Lord" $ do
@@ -1364,7 +1372,7 @@ jaradSpec s registry =
       jarad <- S.printingOf s registry "Jarad, Golgari Lich Lord"
       bayou <- S.printingOf s registry "Bayou"
       forest <- S.printingOf s registry "Forest"
-      let cost = ActivatedAbility.cost (theAbility jarad)
+      let cost = ActivatedAbility.cost (swampAndForest jarad)
           (_, loneId, lone) = jaradBoard jarad bayou []
           (_, pairId, pair) = jaradBoard jarad bayou [forest]
       -- Guards the two below against passing vacuously off a card file that
@@ -1398,7 +1406,7 @@ jaradSpec s registry =
       forest <- S.printingOf s registry "Forest"
       swamp <- S.printingOf s registry "Swamp"
       let (_, jaradId, gs) = jaradBoard jarad bayou [swamp, forest]
-          activating = Activate.activateAbility S.alice jaradId (theAbility jarad)
+          activating = Activate.activateAbility S.alice jaradId (swampAndForest jarad)
           asked = answersFor S.identityAnswer gs activating
           after = S.runPure S.identityAnswer gs activating
       Spec.assertEqWith s "asked to sacrifice exactly once" (sacrificePromptCount asked) 1
@@ -1430,8 +1438,8 @@ jaradSpec s registry =
       bayou <- S.printingOf s registry "Bayou"
       swamp <- S.printingOf s registry "Swamp"
       let (bayouId, jaradId, gs) = jaradBoard jarad bayou [swamp]
-          cost = ActivatedAbility.cost (theAbility jarad)
-          activating = Activate.activateAbility S.alice jaradId (theAbility jarad)
+          cost = ActivatedAbility.cost (swampAndForest jarad)
+          activating = Activate.activateAbility S.alice jaradId (swampAndForest jarad)
           run order = S.runPure (payingInOrder order bayouId) gs activating
           forestFirst = run [1, 0]
           printedOrder = run [0, 1]
@@ -1463,6 +1471,69 @@ jaradSpec s registry =
         "and Jarad is still in the graveyard"
         (namesIn Zone.Graveyard printedOrder)
         (names ["Jarad, Golgari Lich Lord"])
+
+-- alice controls Jarad, one other creature (`victim`), exactly {1}{B}{G} of
+-- lands, and whatever `extras` name. Two seats: "each opponent" needs one
+-- opponent and bob's life total is the read.
+--
+-- EXACTLY ONE other creature, so Cost.payComponent's Sacrifice arm elides its
+-- prompt (candidates == count) and S.identityAnswer scripts no sacrifice -- the
+-- test asserts the rule rather than an answerer's pick. EXACTLY three lands, one
+-- Swamp and two Forests, which is the minimum that pays {1}{B}{G} and leaves the
+-- mana window nothing to decide.
+jaradDrainBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+jaradDrainBoard jarad swamp forest victim extras =
+  let lands = S.landsFor forest S.alice 2 (S.landsFor swamp S.alice 1 (Setup.emptyGame S.bothPlayers))
+      (jaradId, withJarad) = S.addCreature jarad S.alice lands
+      (preyId, withPrey) = S.addCreature victim S.alice withJarad
+   in (jaradId, preyId, foldl (\g printing -> snd (S.addCreature printing S.alice g)) withPrey extras)
+
+-- CR 602.2b pays an activation cost at CR 601.2h, so by the time Jarad's drain
+-- resolves the creature it sacrificed is a card in a graveyard and CR 608.2h's
+-- last known information is the only reading of its power there is.
+jaradDrainSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+jaradDrainSpec s registry =
+  Spec.describe s "Jarad, Golgari Lich Lord's drain" $ do
+    -- The base case: nothing modifies the prey's power, so this separates "the
+    -- cost payment binds the permanent at all" from "the slot is empty and the
+    -- quantity silently answers nothing".
+    Spec.it s "CR 601.2h a creature sacrificed to pay the cost is still readable when the ability resolves" $ do
+      jarad <- S.printingOf s registry "Jarad, Golgari Lich Lord"
+      swamp <- S.printingOf s registry "Swamp"
+      forest <- S.printingOf s registry "Forest"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (jaradId, preyId, gs) = jaradDrainBoard jarad swamp forest piker []
+          activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice jaradId (theAbility jarad))
+          resolved = S.runPure S.identityAnswer activated Stack.resolveTop
+      Spec.assertEqWith s "bob lost the Piker's 2 power" (S.lifeOf S.bob resolved) (Just 18)
+      -- CR 109.5: "each opponent" must not reach the controller. Without this a
+      -- fix that spelled the recipient EachPlayer would pass the assertion above.
+      Spec.assertEqWith s "alice, who is not an opponent of herself, lost nothing" (S.lifeOf S.alice resolved) (Just 20)
+      Spec.assertEqWith s "the Piker really was sacrificed, and as a COST" (Game.lookupObject preyId activated) Nothing
+      Spec.assertEqWith s "so the ability was on the stack with the Piker already gone" (length (GameState.stack activated)) 1
+    -- The discriminating leg. Night of Souls' Betrayal ("All creatures get
+    -- -1/-1") makes the Sentry's LAST KNOWN power 2 where its PRINTED power is
+    -- 3, so the two readings of CR 608.2h give bob 18 and 17 -- and an unbound
+    -- slot gives 20. Three implementations, three life totals.
+    --
+    -- Ogre Sentry rather than the Goblin Piker above: the Piker is 1/0 under the
+    -- Betrayal and dies to CR 704.5f before the activation, which would make this
+    -- leg unreachable rather than discriminating. Its defender is inert here,
+    -- nothing attacking.
+    Spec.it s "CR 608.2h the power read is the one it last had, not the one it printed" $ do
+      jarad <- S.printingOf s registry "Jarad, Golgari Lich Lord"
+      swamp <- S.printingOf s registry "Swamp"
+      forest <- S.printingOf s registry "Forest"
+      sentry <- S.printingOf s registry "Ogre Sentry"
+      betrayal <- S.printingOf s registry "Night of Souls' Betrayal"
+      let (jaradId, preyId, gs) = jaradDrainBoard jarad swamp forest sentry [betrayal]
+          activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice jaradId (theAbility jarad))
+          resolved = S.runPure S.identityAnswer activated Stack.resolveTop
+      -- Guards the leg against passing off a board where the anthem is not
+      -- applying: 3 printed less 1 is what makes 18 differ from 17.
+      Spec.assertEqWith s "the Sentry is 2/2 under the Betrayal, not 3/3" (S.powerToughnessOf preyId gs) (Just (2, 2))
+      Spec.assertEqWith s "bob lost 2 -- the Sentry's 3 printed power less the anthem's -1" (S.lifeOf S.bob resolved) (Just 18)
+      Spec.assertEqWith s "alice lost nothing" (S.lifeOf S.alice resolved) (Just 20)
 
 -- Chooses this value of X; every other prompt takes the identity fallback, which
 -- aims Hatred's one target slot at the only creature on the board. The liar
@@ -1607,6 +1678,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   doorSpec s registry
   jaradSpec s registry
+  jaradDrainSpec s registry
   greedSpec s registry
   hatredSpec s registry
   villageRitesSpec s registry
