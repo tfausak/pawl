@@ -3679,9 +3679,9 @@ discard cause pid oid = do
 -- The snapshot is Projection.project -- the object's CR 613 characteristics and
 -- deliberately not its printed card, since a reveal has to show what a player at
 -- the table would see, on every axis a continuous effect reaches off the
--- battlefield. Every reader that judges a card off the battlefield now takes that
--- same projection (#1911) -- the explore that follows this very reveal, and rule
--- 728.1's mill tally -- so what is shown and what is judged cannot part
+-- battlefield. The readers that judge a card off the battlefield take that same
+-- projection -- the explore that follows this very reveal, and rule 728.1's mill
+-- tally (see #1911) -- so what is shown and what is judged cannot part
 -- company.
 --
 -- The `cause` is CR 702.94a's "this way" (see RevealCause): every caller but the

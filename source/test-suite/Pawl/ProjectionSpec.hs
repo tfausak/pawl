@@ -2657,9 +2657,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
 
   -- CR 604.3's "in all zones" as an equality: one Tarmogoyf on the battlefield
   -- and one in the library over the same graveyards must read the same power.
-  -- One path now serves both -- layer 7a of each object's own CR 613 fold
-  -- (#1911) -- so this is the fence that says the fold does not quietly skip an
-  -- object off the battlefield, rather than a comparison of two implementations.
+  -- One path serves both -- layer 7a of each object's own CR 613 fold, since
+  -- #1911 retired the printed-card reading -- so this is the fence that says the
+  -- fold does not quietly skip an object off the battlefield, rather than a
+  -- comparison of two implementations.
   Spec.it s "CR 604.3 the battlefield and off-battlefield readings of a CDA power agree" $ do
     mountain <- S.printingOf s registry "Mountain"
     bolt <- S.printingOf s registry "Lightning Bolt"

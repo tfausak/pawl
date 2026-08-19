@@ -101,9 +101,9 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   --
   -- Nothing when the view cannot say: no object at all, or an object with no
   -- card behind it. WHICH view arrives is the caller's choice rather than the
-  -- zone's, and every view a reader holding an OBJECT now supplies is the CR 613
+  -- zone's, and the view a reader holding an OBJECT supplies is the CR 613
   -- projection (Projection.fullView, Projection.viewUpTo), which projects an
-  -- object in any zone and so answers CR 202.3 off the battlefield too (#1911).
+  -- object in any zone and so answers CR 202.3 off the battlefield too.
   Quantity.ManaValue -> mView >>= Filter.manaValue
   -- CR 208.1 read through the injected view, so this arm never learns whether
   -- it is looking at a live projection or a CR 608.2h snapshot -- the caller

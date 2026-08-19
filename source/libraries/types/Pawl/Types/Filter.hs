@@ -73,7 +73,7 @@ data Filter keyword
     -- layer 6 matches and a Humility'd one stops matching -- in every zone, since
     -- CR 613.1 names none: a library search, a cost criterion, an explore's land
     -- test and a mill tally all read a card's projected keywords rather than its
-    -- printed ones (#1911).
+    -- printed ones (see #1911).
     HasKeyword keyword
   | -- | The object has SOME keyword ability of this family (CR 702.1), whatever
     -- its payload -- Flensing Raptor's "another target creature you control with
@@ -106,7 +106,7 @@ data Filter keyword
     -- Answered off the PROJECTION, in every zone: Imperial Recruiter's "creature
     -- card with power 2 or less" reads a library card's full CR 613 projection,
     -- Tarmogoyf's CR 208.2a power included, and so do a graveyard-exile cost
-    -- criterion and a mill tally (#1911). CR 208.2a's characteristic-defining
+    -- criterion and a mill tally (see #1911). CR 208.2a's characteristic-defining
     -- power arrives at layer 7a of that same fold, which CR 604.3 runs off the
     -- battlefield as well as on it.
     PowerAtMost Integer

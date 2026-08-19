@@ -535,10 +535,9 @@ viewUpTo bound cands gs oid =
 -- The characteristics view of a printed card, from the FACE alone. The axes that
 -- only an OBJECT can have are Nothing or empty, and each says so at its field.
 --
--- Every reader that holds an OBJECT takes viewOfObject instead, wherever the
--- object sits (#1911), so what is left here answers about a printed face alone:
--- Pawl.ProjectionSpec's changeling and basic-land cases, which read a printing
--- with no game around it.
+-- Its readers are Pawl.ProjectionSpec's, which ask about a printed face with no
+-- game around it. A reader that holds an OBJECT takes viewOfObject instead, in
+-- whatever zone the object sits -- see #1911, which moved the last of them.
 viewOfCard :: Face.Face Card.Type.Card -> Filter.View
 viewOfCard face =
   let typeLine = Face.typeLine face
