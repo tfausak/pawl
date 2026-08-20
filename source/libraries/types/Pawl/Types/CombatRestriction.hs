@@ -105,11 +105,14 @@ import qualified Pawl.Types.LimitUnless as LimitUnless
 --
 -- The LAST field of each arm is that gate: the condition the creature can't
 -- attack (or block) UNLESS -- Blind-Spot Giant's "unless you control another
--- Giant". On the two bound arms it gates the whole sentence rather than a
--- creature, which is the same clause CR 508.1c describes and the same posture
--- CantAttackAlone's gate is in: nothing in the pool prints a gated one, and the
--- field is there because whether a restriction is gated is independent of its
--- shape rather than because a card asks. Nothing is the unconditional
+-- Giant". On CantBeBlockedBy and on CantAttackMoreThan it gates the whole
+-- sentence rather than a creature, which is the same clause CR 508.1c describes
+-- and the same posture CantAttackAlone's gate is in. Relic Runner prints the
+-- first ("can't be blocked if you've cast a historic spell this turn", carried
+-- here as the unless of that condition's negation); the bound's gate and
+-- CantAttackAlone's are unprinted in data/cards, and the field is there because
+-- whether a restriction is gated is independent of its shape rather than because
+-- a card asks. Nothing is the unconditional
 -- restriction (Pacifism), which is not the same as a condition that never
 -- holds: the two would answer alike today, but
 -- only one of them is what the card says. A Condition states the gate because
@@ -136,10 +139,12 @@ data CombatRestriction
     CantBlock AffectedUnless.AffectedUnless
   | -- | CR 509.1b's second paragraph: these ATTACKING creatures can't be blocked
     -- by creatures matching the Filter, unless the gate holds. Questing Beast's
-    -- "can't be blocked by creatures with power 2 or less" is the pool's printed
-    -- statement of it, and CR 701.54c's "your Ring-bearer ... can't be blocked by
-    -- creatures with greater power" the rulebook's
-    -- (Pawl.Engine.Ring.theRingCantBeBlockedByGreaterPower).
+    -- "can't be blocked by creatures with power 2 or less" and Relic Runner's
+    -- "can't be blocked if you've cast a historic spell this turn" are the pool's
+    -- printed statements of it -- the second describing no blocker at all, since
+    -- CR 509.1a lets only creatures be declared -- and CR 701.54c's "your
+    -- Ring-bearer ... can't be blocked by creatures with greater power" the
+    -- rulebook's (Pawl.Engine.Ring.theRingCantBeBlockedByGreaterPower).
     --
     -- The one arm carrying an OBJECT as well as a subject, because a pair is the
     -- smallest thing the sentence is about: the Filter describes a blocker
