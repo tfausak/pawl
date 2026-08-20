@@ -75,9 +75,9 @@ data StaticAbility card = MkStaticAbility
     --
     -- CR 113.6c's clause -- which zones an ability does NOT function in -- needs
     -- no second field and no inversion flag: rule 400.1's list is finite, so
-    -- Grist, the Hunger Tide's "as long as this card isn't on the battlefield"
-    -- is this field holding every zone but the battlefield. What that card still
-    -- waits on is a walk to gather it from a hand or a library (gap #1912).
+    -- Grist, the Hunger Tide's "as long as Grist isn't on the battlefield" is
+    -- this field holding every zone but the battlefield, and
+    -- Projection.gatherGiven walks the two hidden zones to find it there.
     functionsFrom :: Set.Set Zone.Zone,
     -- | Titania's Song's second sentence: "If this enchantment leaves the
     -- battlefield, this effect continues until end of turn." Nothing -- almost

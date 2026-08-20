@@ -1,0 +1,109 @@
+{
+  "faces": [
+    {
+      "loyalty": {
+        "type": "Literal",
+        "value": 3
+      },
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Grist, the Hunger Tide",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "MatchingAnywhere",
+            "value": {
+              "type": "IsSource"
+            }
+          },
+          "functionsFrom": [
+            {
+              "type": "Library"
+            },
+            {
+              "type": "Hand"
+            },
+            {
+              "type": "Graveyard"
+            },
+            {
+              "type": "Stack"
+            },
+            {
+              "type": "Exile"
+            },
+            {
+              "type": "Command"
+            }
+          ],
+          "modifications": [
+            {
+              "type": "AddCardType",
+              "value": {
+                "type": "Creature"
+              }
+            },
+            {
+              "type": "AddCreatureSubtype",
+              "value": {
+                "type": "Insect"
+              }
+            },
+            {
+              "type": "SetBasePowerToughness",
+              "value": {
+                "power": {
+                  "type": "Literal",
+                  "value": 1
+                },
+                "toughness": {
+                  "type": "Literal",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Grist"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Planeswalker"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -41,6 +41,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
@@ -1396,10 +1397,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "and the Forest is a plain Forest again" (Projection.subtypesOf forestId gs) (Set.singleton Subtype.Type.Forest)
 
   -- Not implemented, so the card file omits it: Celestial Dawn's colour clause
-  -- for spells you control and nonland cards you own off the battlefield (#160).
-  -- Nothing below looks at a card outside the battlefield. Its other clauses are
-  -- printed in full, the mana sentence included -- CR 609.4b's two halves are a
-  -- pair of PlayerEffect.SpendManaAsThough entries, proved in Pawl.ManaSpec.
+  -- for spells you control and nonland cards you own off the battlefield
+  -- (#1934). Nothing below looks at a card outside the battlefield. Its other
+  -- clauses are printed in full, the mana sentence included -- CR 609.4b's two
+  -- halves are a pair of PlayerEffect.SpendManaAsThough entries, proved in
+  -- Pawl.ManaSpec.
   --
   -- CR 305.7's gate reached by an affected set that asks who CONTROLS the
   -- candidate, which is the shape that used to make Projection.controllerOf
@@ -2867,6 +2869,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   attachedHostSpec s registry
   hostOfSourceSpec s registry
   conditionalAbilitySpec s registry
+  hiddenZoneStaticSpec s registry
   keywordCounterSpec s registry
   levelerSpec s registry
   supertypeSpec s registry
@@ -3333,6 +3336,107 @@ conditionalAbilitySpec s registry = Spec.describe s "ConditionalActivatedAbility
       (onto Layer.Type, onto Layer.Color)
       (Just False, Just True)
 
+-- CR 113.6b/c: the static abilities Projection.gatherGiven collects from a zone
+-- CR 113.6's own defaults never reach.
+--
+-- Grist, the Hunger Tide ({1}{B}{G} Legendary Planeswalker -- Grist, "As long as
+-- Grist isn't on the battlefield, it's a 1/1 Insect creature in addition to its
+-- other types", Oracle text fetched from Scryfall 2026-08-20) is the pool's
+-- statement of CR 113.6c, and pawl's card carries that ability alone.
+--
+-- Not implemented: Grist's three loyalty abilities (#1932). That leaves the card
+-- STRICTER than printed, and it never touches these boards, where Grist is only
+-- ever a card in a hidden zone or a spell on the stack.
+hiddenZoneStaticSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hiddenZoneStaticSpec s registry = Spec.describe s "HiddenZoneStatics" $ do
+  -- CR 113.6b/c: gatherGiven walks the two HIDDEN zones (CR 400.2), which no
+  -- default in CR 113.6 reaches. Grist, the Hunger Tide's "as long as Grist
+  -- isn't on the battlefield, it's a 1/1 Insect creature in addition to its
+  -- other types" is CR 113.6c's negative form, and rule 400.1's zone list being
+  -- finite makes it a stated set holding every zone but the battlefield -- so a
+  -- Grist CARD is a creature card in a library and in a hand, and a Grist SPELL
+  -- is a creature spell.
+  --
+  -- Jace Beleren is the control on all three boards, and each pair differs in
+  -- exactly one thing: which legendary planeswalker card is in the zone. It is
+  -- cast and searched for on the same mana and out of the same fixture, so a
+  -- board that admits it admits Grist for a reason other than the ability.
+  Spec.it s "CR 113.6c a Grist card in a library is a creature card a search offers" $ do
+    withGrist <- hiddenZoneSearchCandidates s registry "Grist, the Hunger Tide"
+    withJace <- hiddenZoneSearchCandidates s registry "Jace Beleren"
+    Spec.assertEqWith
+      s
+      "the Grist is a search candidate beside the Piker"
+      withGrist
+      [Set.fromList (fmap Text.pack ["Grist, the Hunger Tide", "Goblin Piker"])]
+    Spec.assertEqWith
+      s
+      "an ordinary planeswalker card in the same slot is not"
+      withJace
+      [Set.singleton (Text.pack "Goblin Piker")]
+
+  -- The HAND walk, through Selhoff Entomber's "{T}, Discard a creature card:
+  -- Draw a card". Cost.discardCandidates projects each card in the hand, so the
+  -- cost is payable only if the projection reaches a card sitting in a hand.
+  -- The Mountain is in hand on both boards so that the hand is never a
+  -- one-candidate set the cost could take by construction.
+  Spec.it s "CR 113.6c a Grist card in a hand is a creature card a discard cost can name" $ do
+    entomber <- S.printingOf s registry "Selhoff Entomber"
+    mountain <- S.printingOf s registry "Mountain"
+    grist <- S.printingOf s registry "Grist, the Hunger Tide"
+    jace <- S.printingOf s registry "Jace Beleren"
+    let board subject =
+          let (entomberId, b1) = S.addCreature entomber S.alice (Setup.emptyGame S.bothPlayers)
+              (_, b2) = S.addLibraryCard mountain S.alice b1
+              (_, b3) = S.addLibraryCard mountain S.alice b2
+              (_, b4) = S.addHandCard mountain S.alice b3
+              (_, b5) = S.addHandCard subject S.alice b4
+           in (entomberId, b5 {GameState.priority = Just S.alice})
+        (gristEntomber, gristBoard) = board grist
+        (jaceEntomber, jaceBoard) = board jace
+        ability = soleActivatedAbility entomber
+        resolved = S.runPure S.identityAnswer gristBoard (do Activate.activateAbility S.alice gristEntomber ability; Stack.resolveTop)
+    -- Named rather than identified: the discarded card takes a FRESH object id
+    -- as it changes zones (CR 400.7), so `gristId` names nothing in `resolved`.
+    Spec.assertEqWith
+      s
+      "the Grist card is what paid the discard cost"
+      (namesOf resolved (Game.zoneMembers Zone.Graveyard S.alice resolved))
+      (Set.singleton (Text.pack "Grist, the Hunger Tide"))
+    Spec.assertEqWith
+      s
+      "the Mountain stayed in hand, beside the drawn card"
+      (length (Game.zoneMembers Zone.Hand S.alice resolved), namesOf resolved (Game.zoneMembers Zone.Hand S.alice resolved))
+      (2, Set.singleton (Text.pack "Mountain"))
+    Spec.assertEqWith
+      s
+      "payable with the Grist in hand, not with an ordinary planeswalker card"
+      (Activate.activatable S.alice gristEntomber ability gristBoard, Activate.activatable S.alice jaceEntomber ability jaceBoard)
+      (True, False)
+
+  -- The STACK, where CR 113.6b's stated set overrides CR 113.6's own first
+  -- sentence rather than a hidden zone's absence of one: a planeswalker spell's
+  -- static abilities do not function on the stack by default, and this one says
+  -- it does. Essence Scatter's "counter target creature spell" is the reader.
+  Spec.it s "CR 113.6c a Grist spell on the stack is a creature spell Essence Scatter counters" $ do
+    grist <- S.printingOf s registry "Grist, the Hunger Tide"
+    jace <- S.printingOf s registry "Jace Beleren"
+    (gristScatter, gristBoard) <- spellAndScatter s registry grist
+    (jaceScatter, jaceBoard) <- spellAndScatter s registry jace
+    let afterScatter = S.runPure S.identityAnswer gristBoard (do S.cast S.bob gristScatter; Stack.resolveTop)
+    -- Named for the hand case's reason: CR 400.7 gives the countered spell a new
+    -- id as CR 701.6a puts it into its owner's graveyard.
+    Spec.assertEqWith
+      s
+      "the Grist spell was countered and put into its owner's graveyard"
+      (namesOf afterScatter (Game.zoneMembers Zone.Graveyard S.alice afterScatter))
+      (Set.singleton (Text.pack "Grist, the Hunger Tide"))
+    Spec.assertEqWith
+      s
+      "targetable as a creature spell, where an ordinary planeswalker spell is not"
+      (S.castable S.bob gristScatter gristBoard, S.castable S.bob jaceScatter jaceBoard)
+      (True, False)
+
 -- Is this action an activation of the Ogre? Pinned to the object, since the board
 -- also holds lands whose mana abilities are actions of their own.
 isActivateOfOgre :: ObjectId.ObjectId -> Action.Type.Action -> Bool
@@ -3348,3 +3452,54 @@ isActivateOfOgre oid action = case action of
   Action.Type.Foretell _ -> False
   Action.Type.Ignore _ -> False
   Action.Type.ActivateManaAbility _ -> False
+
+-- The single activated ability of a printing. Total: every caller below names a
+-- printing with exactly one, and a fallback that answered some other ability
+-- would make the case pass for the wrong reason.
+soleActivatedAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Card
+soleActivatedAbility printing = case Face.activatedAbilities (S.combinedFace printing) of
+  [ability] -> ability
+  _ -> error "Pawl.ProjectionSpec: expected exactly one activated ability"
+
+-- Imperial Recruiter's search candidates, by card name, over a library holding
+-- `subject` beside a fixed cast. Alice's library is a Goblin Piker (printed 2,
+-- a candidate on both boards, so the prompt is never short-circuited down to the
+-- one card it had to offer), a Hill Giant (printed 3, out on both) and a
+-- Mountain (out on the creature clause). The Piker is what the answerer takes,
+-- so neither search fails for want of a legal pick and the candidate SET is the
+-- only thing that moves.
+hiddenZoneSearchCandidates :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m [Set.Set Text.Text]
+hiddenZoneSearchCandidates s registry subject = do
+  mountain <- S.printingOf s registry "Mountain"
+  recruiter <- S.printingOf s registry "Imperial Recruiter"
+  piker <- S.printingOf s registry "Goblin Piker"
+  giant <- S.printingOf s registry "Hill Giant"
+  card <- S.printingOf s registry subject
+  let base0 = S.landsInPlay mountain 3
+      (_, base1) = S.addLibraryCard mountain S.alice base0
+      (_, base2) = S.addLibraryCard giant S.alice base1
+      (_, base3) = S.addLibraryCard card S.alice base2
+      (pikerId, base4) = S.addLibraryCard piker S.alice base3
+      (gs, spellId) = S.handOne recruiter base4
+      (_, (searches, _)) =
+        State.runState
+          (Engine.runGame (searchRecordingAnswer pikerId) gs (do S.cast S.alice spellId; Engine.priorityLoop))
+          ([], [])
+  pure (fmap (namesOf gs) searches)
+
+-- Alice casts `printing`, leaving it on the stack, with an Essence Scatter in
+-- bob's hand and the mana for it under him. Alice's lands cover {1}{B}{G} and
+-- {1}{U}{U} both, so the two boards this builds differ in the spell alone.
+spellAndScatter :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Printing.Printing -> m (ObjectId.ObjectId, GameState.GameState)
+spellAndScatter s registry printing = do
+  swamp <- S.printingOf s registry "Swamp"
+  forest <- S.printingOf s registry "Forest"
+  island <- S.printingOf s registry "Island"
+  scatter <- S.printingOf s registry "Essence Scatter"
+  let base0 = S.landsFor swamp S.alice 2 (Setup.emptyGame S.bothPlayers)
+      base1 = S.landsFor forest S.alice 1 base0
+      base2 = S.landsFor island S.alice 2 base1
+      base3 = S.landsFor island S.bob 2 base2
+      (scatterId, base4) = S.addHandCard scatter S.bob base3
+      (base5, spellId) = S.handOne printing base4
+   in pure (scatterId, S.runPure S.identityAnswer base5 (S.cast S.alice spellId))

@@ -450,7 +450,7 @@ castsThisTurn pid gs =
 -- BOTH the object and the name, because CR 601.3a's qualities come in two kinds
 -- and neither argument answers the other's. A name is compared AS A NAME, and the
 -- caller takes it off the chosen face -- the only place it could come from, since
--- the card is still in the zone it is cast from (#160) and a face-down proposal
+-- the card is still in the zone it is cast from and a face-down proposal
 -- carries CR 708.2a's empty name rather than the card's. Any other quality is a
 -- Filter over the spell's characteristics, which is a question about the OBJECT
 -- and is asked of the proposal's projection through matchesObject, the same
