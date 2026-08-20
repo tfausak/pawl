@@ -155,6 +155,14 @@ data Response
     -- constructor's reason: the two prompts offer cards out of different zones,
     -- and a transcript of one must not satisfy the other.
     ChoseCardInHand ObjectId.ObjectId
+  | -- | CR 608.2d: the card a player chose out of a bound group for an
+    -- Pawl.Types.ObjectRef.ChosenCardFromAmong.
+    --
+    -- Its own constructor rather than ChoseCardInGraveyard or ChoseCardInHand
+    -- reused, for those constructors' reason: the candidates come from a slot
+    -- rather than from either zone, and a transcript of one must not satisfy
+    -- another.
+    ChoseCardFromAmong ObjectId.ObjectId
   | -- | CR 309.5a: the room a venturing player chose to move their marker into.
     ChoseRoom RoomIndex.RoomIndex
   | -- | CR 704.5j: the legendary permanent its controller kept.

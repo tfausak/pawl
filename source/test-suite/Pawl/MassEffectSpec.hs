@@ -793,6 +793,124 @@ midnightTillingSpec s registry =
           Spec.assertEqWith s "nothing reached alice's hand" (namesIn Zone.Hand S.alice after) []
           Spec.assertEqWith s "and the mill still happened" (List.sort (namesIn Zone.Graveyard S.alice after)) allBuried
 
+-- CR 701.20e's "from among them" over a group that never left the LIBRARY, which
+-- is the read no zone-keyed ObjectRef can do: ObjectRef.ChosenCardFromAmong.
+--
+-- Commune with the Gods {1}{G} Sorcery, "Reveal the top five cards of your
+-- library. You may put a creature or enchantment card from among them into your
+-- hand. Put the rest into your graveyard." (name, cost, type line and Oracle text
+-- checked against api.scryfall.com, 2026-08-20). The whole card is transcribed.
+--
+-- Three clauses, and the middle one is this unit: the reveal binds the five as a
+-- group and leaves them where they are (CR 701.20b), the choice picks one of them
+-- by the card's own filter, and "the rest" is the SAME slot read by
+-- ObjectRef.InSlot -- which finds the chosen card gone, CR 400.7 having minted a
+-- new object for it on the way to the hand.
+--
+-- The library is stocked so that the offer and the group differ: an Island and a
+-- Murder sit among the five and match neither card type, so a reading that
+-- ignored the filter would offer five cards where this one offers three. The
+-- answers below are pinned by INDEX into the offer, so the two readings hand back
+-- different cards rather than the same one. A Swamp sits SIXTH, below the five, so
+-- a reveal of the wrong depth is visible in the library as well as in the
+-- graveyard.
+communeWithTheGodsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+communeWithTheGodsSpec s registry =
+  let -- alice: two Forests for the {1}{G}, `stock` into her library BOTTOM FIRST
+      -- (S.addLibraryCard puts each new card on top), Commune with the Gods in
+      -- hand. Returns the spell's id.
+      board forest commune stock =
+        let mana = S.landsFor forest S.alice 2 S.threePlayerGame
+            withStock = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.alice g)) mana stock
+            (withSpell, spellId) = S.handOne commune withStock
+         in (spellId, withSpell {GameState.priority = Just S.alice})
+      named = Just . CardName.MkCardName . Text.pack
+      -- The candidates in the order the prompt offers them: the group's own mint
+      -- order, which for a reveal of the top five is the library's, top first (CR
+      -- 401.2). Pinned by index, since an answerer that went looking for a legal
+      -- card would find one again under either reading.
+      nth n offered = Maybe.fromMaybe (NonEmpty.head offered) (Maybe.listToMaybe (drop n (NonEmpty.toList offered)))
+      -- Takes the printed "may" -- clause 1, the move to hand; clause 0 is the
+      -- reveal and clause 2 the rest -- and answers the group choice with the nth
+      -- card offered.
+      taking :: Int -> Prompt.Prompt r -> r
+      taking n p = case p of
+        Prompt.ChooseOptional _ _ _ _ clause
+          | clause == ClauseIndex.MkClauseIndex 1 -> OptionalDecision.Exercises
+        Prompt.ChooseCardFromAmong _ _ _ offered -> nth n offered
+        _ -> S.identityAnswer p
+      cast :: (forall r. Prompt.Prompt r -> r) -> (ObjectId.ObjectId, GameState.GameState) -> GameState.GameState
+      cast answer (spellId, gs) =
+        let announced = S.runPure answer gs (S.cast S.alice spellId)
+         in S.runPure answer announced Stack.resolveTop
+      setup = do
+        forest <- S.printingOf s registry "Forest"
+        commune <- S.printingOf s registry "Commune with the Gods"
+        island <- S.printingOf s registry "Island"
+        swamp <- S.printingOf s registry "Swamp"
+        maiden <- S.printingOf s registry "Bird Maiden"
+        moon <- S.printingOf s registry "Bad Moon"
+        murder <- S.printingOf s registry "Murder"
+        piker <- S.printingOf s registry "Goblin Piker"
+        -- Bottom to top: the Swamp is never revealed, and the five above it are
+        -- Island, Goblin Piker, Murder, Bad Moon, Bird Maiden -- so the offer is
+        -- Goblin Piker, Bad Moon, Bird Maiden.
+        pure (board forest commune [swamp, maiden, moon, murder, piker, island])
+      -- What the graveyard holds when nothing is taken: all five revealed cards
+      -- and the spell itself (CR 608.2n).
+      allBuried = List.sort [named "Bad Moon", named "Bird Maiden", named "Commune with the Gods", named "Goblin Piker", named "Island", named "Murder"]
+   in Spec.describe s "CommuneWithTheGods" $ do
+        -- The headline: the SECOND card the offer names is the second revealed
+        -- card matching the filter, not the second revealed card.
+        Spec.it s "CR 701.20e the choice ranges over the matching revealed cards, not over all five" $ do
+          gs <- setup
+          let after = cast (taking 1) gs
+          Spec.assertEqWith s "the second matching revealed card is the one in alice's hand" (namesIn Zone.Hand S.alice after) [named "Bad Moon"]
+          Spec.assertEqWith
+            s
+            "and the rest -- the two unmatched cards included -- are in the graveyard"
+            (List.sort (namesIn Zone.Graveyard S.alice after))
+            (List.delete (named "Bad Moon") allBuried)
+          Spec.assertEqWith s "the sixth card was never revealed" (namesIn Zone.Library S.alice after) [named "Swamp"]
+        -- The paired control: the same board and the same offer, answered at
+        -- index 0 instead. If the engine were picking, both legs would name one
+        -- card.
+        Spec.it s "CR 608.2d the engine does not pick: another answer takes another revealed card" $ do
+          gs <- setup
+          let after = cast (taking 0) gs
+          Spec.assertEqWith s "the first matching revealed card comes to hand instead" (namesIn Zone.Hand S.alice after) [named "Goblin Piker"]
+          Spec.assertEqWith
+            s
+            "and the Bad Moon is among the rest"
+            (List.sort (namesIn Zone.Graveyard S.alice after))
+            (List.delete (named "Goblin Piker") allBuried)
+        -- CR 603.5: the printed "may" is a real choice, and declining sends the
+        -- whole group to the graveyard. The reveal still ran, so this cannot pass
+        -- because the spell never resolved.
+        Spec.it s "CR 603.5 declining the may buries all five revealed cards" $ do
+          gs <- setup
+          let after = cast S.identityAnswer gs
+          Spec.assertEqWith s "nothing reached alice's hand" (namesIn Zone.Hand S.alice after) []
+          Spec.assertEqWith s "and every revealed card is in the graveyard" (List.sort (namesIn Zone.Graveyard S.alice after)) allBuried
+          Spec.assertEqWith s "the sixth card is still the library" (namesIn Zone.Library S.alice after) [named "Swamp"]
+        -- CR 609.3 and CR 101.3: a group holding no matching card offers nothing,
+        -- so the taken half is skipped and the rest is all of it. The pair with
+        -- the case above differs in exactly one thing -- which cards are stocked.
+        Spec.it s "CR 609.3 a group with no matching card takes nothing and buries all five" $ do
+          forest <- S.printingOf s registry "Forest"
+          commune <- S.printingOf s registry "Commune with the Gods"
+          island <- S.printingOf s registry "Island"
+          swamp <- S.printingOf s registry "Swamp"
+          murder <- S.printingOf s registry "Murder"
+          let gs = board forest commune [swamp, murder, island, murder, island, murder]
+              after = cast (taking 0) gs
+          Spec.assertEqWith s "nothing reached alice's hand" (namesIn Zone.Hand S.alice after) []
+          Spec.assertEqWith
+            s
+            "and all five revealed cards are in the graveyard"
+            (List.sort (namesIn Zone.Graveyard S.alice after))
+            (List.sort [named "Commune with the Gods", named "Island", named "Island", named "Murder", named "Murder", named "Murder"])
+
 -- The same arm reached from a TRIGGER rather than an activated ability, and over
 -- LAND cards rather than creature cards -- the two axes portOfKarfellSpec above
 -- holds fixed.
@@ -2694,6 +2812,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   angelOfFinalitySpec s registry
   portOfKarfellSpec s registry
   midnightTillingSpec s registry
+  communeWithTheGodsSpec s registry
   blossomingTortoiseSpec s registry
   exhumeSpec s registry
   bloodForBonesSpec s registry

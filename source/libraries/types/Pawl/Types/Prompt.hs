@@ -207,6 +207,17 @@ data Prompt r where
   -- the seat asked the only seat the candidates are shown to, which is why
   -- there is no second PlayerId as ChooseFateseal has.
   ChooseCardInHand :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
+  -- | CR 608.2d: which card of a bound GROUP a player chooses for a
+  -- Pawl.Types.ObjectRef.ChosenCardFromAmong -- Commune with the Gods' "a
+  -- creature or enchantment card from among them". ChooseCardInGraveyard's
+  -- payload, posture and elision, with the candidates coming from the slot an
+  -- earlier clause of this resolution bound rather than from a zone, which is why
+  -- neither of those prompts can stand in for it: the group's cards are still in
+  -- the library the reveal showed them from (CR 701.20b).
+  --
+  -- The PlayerId is the resolving controller, the only seat that chooses today
+  -- (#1957). Raised only for two or more candidates.
+  ChooseCardFromAmong :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 309.5a \/ 701.49b: which arrow a venturing player follows. The
   -- ObjectId is the dungeon card their marker is on; the NonEmpty is the rooms
   -- the arrows out of their current room lead to. Choose, not target. Raised

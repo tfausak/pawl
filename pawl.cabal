@@ -150,6 +150,8 @@ library codec
     Pawl.Codec.ChooseBetweenSpec
     Pawl.Codec.Chooser
     Pawl.Codec.ChooserSpec
+    Pawl.Codec.ChosenCardFromAmong
+    Pawl.Codec.ChosenCardFromAmongSpec
     Pawl.Codec.ChosenCardInGraveyard
     Pawl.Codec.ChosenCardInGraveyardSpec
     Pawl.Codec.ChosenCardInHand
@@ -950,6 +952,7 @@ library types
     Pawl.Types.CharacteristicPT
     Pawl.Types.ChooseBetween
     Pawl.Types.Chooser
+    Pawl.Types.ChosenCardFromAmong
     Pawl.Types.ChosenCardInGraveyard
     Pawl.Types.ChosenCardInHand
     Pawl.Types.Claim

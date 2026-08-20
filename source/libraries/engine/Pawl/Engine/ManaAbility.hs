@@ -259,6 +259,13 @@ movesLibraryCard effect = case effect of
       ObjectRef.ChosenPlayer -> False
       ObjectRef.ChosenCardInGraveyard {} -> False
       ObjectRef.ChosenCardInHand {} -> False
+      -- TRUE, and the second arm that answers so: a group a look or a reveal
+      -- bound is still in the LIBRARY it was shown from (CR 701.20b), so
+      -- Commune with the Gods' move takes a card out of one while naming
+      -- neither the zone nor a position in it. CR 605.1a asks what the effect
+      -- MAY do rather than where one board's group happens to sit, and a group
+      -- bound by a mill -- already in a graveyard -- cannot make the answer No.
+      ObjectRef.ChosenCardFromAmong {} -> True
       ObjectRef.RandomCardInHand _ -> False
   Effect.AddMana _ -> False
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> False

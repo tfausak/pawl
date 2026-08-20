@@ -9,6 +9,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Chooser as Chooser
+import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
@@ -202,6 +203,22 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       s
       (Either.isLeft (Common.parse (Text.pack " {\"type\":\"ChosenCardInHand\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} ") >>= Codec.decode ObjectRef.codec))
       "expected a decode failure"
+  -- Commune with the Gods' "a creature or enchantment card from among them": the
+  -- slot names the group an earlier clause bound, where the two arms above name a
+  -- zone.
+  Spec.it s "ChosenCardFromAmong" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong (SlotName.MkSlotName (Text.pack "revealed")) (Filter.HasCardType CardType.Creature)))
+      " {\"type\":\"ChosenCardFromAmong\",\"value\":{\"slot\":\"revealed\",\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+  -- The bare slot name an InSlot takes is not a whole payload here: dropping the
+  -- filter would make the two arms tell one story on the wire.
+  Spec.it s "ChosenCardFromAmong rejects a bare slot name" $
+    Spec.assertBool
+      s
+      (Either.isLeft (Common.parse (Text.pack " {\"type\":\"ChosenCardFromAmong\",\"value\":\"revealed\"} ") >>= Codec.decode ObjectRef.codec))
+      "a bare slot name is rejected"
   -- Merfolk Spy's "that player reveals a card at random from their hand": the
   -- chosen arm's PlayerRef with no filter beside it (gap #1742), and the slot is the
   -- one the trigger bound to the damaged player.
@@ -224,7 +241,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
   Spec.it s "every arm carries a distinct tag" $
     Spec.assertEqWith
       s
-      "a slot, a battlefield sweep, a graveyard sweep, the hand sweep, the linked exile sweep, the stack sweep, the player sweep, the chosen player, a library's top card, a chosen graveyard card, a chosen card in hand and a random card in hand all encode differently"
+      "a slot, a battlefield sweep, a graveyard sweep, the hand sweep, the linked exile sweep, the stack sweep, the player sweep, the chosen player, a library's top card, a chosen graveyard card, a chosen card in hand, a chosen card from among a group and a random card in hand all encode differently"
       ( length
           ( List.nub
               [ Codec.encode ObjectRef.codec (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
@@ -238,11 +255,12 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 3))),
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature))),
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (PlayerRef.Relative PlayerRelation.You) (Filter.HasCardType CardType.Creature))),
+                Codec.encode ObjectRef.codec (ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong (SlotName.MkSlotName (Text.pack "revealed")) (Filter.HasCardType CardType.Creature))),
                 Codec.encode ObjectRef.codec (ObjectRef.RandomCardInHand (PlayerRef.Relative PlayerRelation.You))
               ]
           )
       )
-      12
+      13
   -- A tag the decoder does not know is an error rather than a silent slot.
   Spec.it s "an unknown tag is rejected" $
     Spec.assertBool
