@@ -2652,7 +2652,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     --     of this slot says "card" -- "if a creature CARD is put into a graveyard
     --     this way", "return each CARD put into a graveyard this way". The filter
     --     also keeps CR 111.8 (a token that has left the battlefield can't come
-    --     back) out of reach of the one shape that would ask for it (#1953).
+    --     back) out of reach of the one shape that would ask for it (gap #1950).
     --
     -- Nothing is bound when nothing qualifies, MoveToZone's rule: no slot names
     -- an empty set, so the later clause finds an unbound slot and does nothing --

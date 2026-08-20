@@ -2462,13 +2462,13 @@ comeBackWrongSpec s registry =
               after = resolveAll (settle (beginEndStep armed))
           Spec.assertEqWith s "one creature was on the battlefield to sacrifice" (length (creaturesOnBattlefield armed)) 1
           Spec.assertEqWith s "and none is left" (creaturesOnBattlefield after) []
-          Spec.assertEqWith s "CR 701.21 a sacrifice puts it in its OWNER's graveyard, not the caster's" (namesIn Zone.Graveyard S.bob after) [Just (S.nameOf (Printing.card piker))]
+          Spec.assertEqWith s "CR 701.21a a sacrifice puts it in its OWNER's graveyard, not the caster's" (namesIn Zone.Graveyard S.bob after) [Just (S.nameOf (Printing.card piker))]
           Spec.assertEqWith s "the delayed store is spent" (length (GameState.delayedTriggers after)) 0
         -- The first discriminating twin: the SAME board plus Rest in Peace ("If a
         -- card would be put into a graveyard from anywhere, exile it instead").
-        -- The destruction still happens -- CR 701.8a's "put that permanent into
-        -- its owner's graveyard" is what CR 614 replaces -- but nothing is put
-        -- into a graveyard this way, so the second sentence names nothing and the
+        -- The destruction still happens -- CR 701.8a's move to its owner's
+        -- graveyard is the event CR 614 replaces -- but nothing is put into a
+        -- graveyard this way, so the second sentence names nothing and the
         -- creature stays gone.
         Spec.it s "CR 614.1 a destruction the replacement sends to exile buries nothing, so nothing returns" $ do
           comeBackWrong <- S.printingOf s registry "Come Back Wrong"
@@ -2486,7 +2486,7 @@ comeBackWrongSpec s registry =
         -- card. CR 111.6 says a token is not a card, so "if a CREATURE CARD is
         -- put into a graveyard this way" is false and nothing returns. That is
         -- also what keeps CR 111.8 ("a token that has left the battlefield can't
-        -- come back onto the battlefield") out of reach here (#1953).
+        -- come back onto the battlefield") out of reach here (gap #1950).
         Spec.it s "CR 111.6 a destroyed token is not a card put into a graveyard, so nothing returns" $ do
           comeBackWrong <- S.printingOf s registry "Come Back Wrong"
           swamp <- S.printingOf s registry "Swamp"
