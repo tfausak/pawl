@@ -16,7 +16,11 @@ import qualified Pawl.Types.TurnWindow as TurnWindow
 --
 -- `controller` is the player who controlled the SPELL OR ABILITY that created it,
 -- as that spell or ability RESOLVED (CR 603.7d-f) -- baked in at arming, never
--- re-derived. `bindings` is the environment captured at that moment, which is how
+-- re-derived. CR 603.7g is the other producer and needs no second field: a static
+-- ability that lets a player take an action arms one WITHOUT a resolution
+-- (Chancellor of the Forge's CR 103.6 reveal), and that rule's controller is the
+-- controller of the object at the time the action was taken -- the player acting
+-- from their own hand. `bindings` is the environment captured at that moment, which is how
 -- "it" and "that card" (CR 603.7c) survive the resolution that armed the ability.
 --
 -- `expiry` is CR 603.7b's stated duration, as the game remembers it. Nothing is

@@ -672,11 +672,13 @@ data Prompt r where
   -- only to a player who has not yet kept. Performing the action is not taking
   -- a mulligan, so it feeds neither the bottom count nor CR 103.5c.
   MulliganAction :: Decider.Decider -> PlayerId.PlayerId -> [(ObjectId.ObjectId, HandActionIndex.HandActionIndex)] -> Prompt (Maybe (ObjectId.ObjectId, HandActionIndex.HandActionIndex))
-  -- | CR 103.6 / 103.6a: an action an opening-hand card lets a player take once
-  -- the mulligan process is complete. MulliganAction's entries, offered in turn
-  -- order and repeatedly to the same player until they decline. A separate
-  -- channel because that window sits at a mulligan declaration and this one
-  -- opens after the process.
+  -- | CR 103.6 / 103.6a / 103.6b: an action an opening-hand card lets a player
+  -- take once the mulligan process is complete. MulliganAction's entries,
+  -- offered in turn order and again to the same player until they decline or
+  -- nothing is left -- and a card acted on is not offered again, CR 103.6b
+  -- capping this window where CR 103.5b caps nothing
+  -- (Pawl.Types.HandWindowCap). A separate channel because that window sits at a
+  -- mulligan declaration and this one opens after the process.
   OpeningHandAction :: Decider.Decider -> PlayerId.PlayerId -> [(ObjectId.ObjectId, HandActionIndex.HandActionIndex)] -> Prompt (Maybe (ObjectId.ObjectId, HandActionIndex.HandActionIndex))
   -- | CR 603.5 / 608.2d: whether the controller of a resolving spell or ability
   -- exercises a printed "may". The ObjectId is the object RESOLVING, not its

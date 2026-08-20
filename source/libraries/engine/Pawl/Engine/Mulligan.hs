@@ -5,6 +5,7 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
 import qualified Numeric.Natural
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
@@ -18,6 +19,7 @@ import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import Pawl.Types.HandActionPerformer (HandActionPerformer)
+import qualified Pawl.Types.HandWindowCap as HandWindowCap
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.MulliganOffer as MulliganOffer
 import Pawl.Types.ObjectId (ObjectId)
@@ -88,13 +90,16 @@ actionsFor field pid gs =
 -- let a player act more than once, which is why this recurses rather than asking
 -- once.
 --
--- TERMINATION IS THE PLAYER'S. An action need not move its card out of the
+-- TERMINATION IS THE PLAYER'S WHERE THE RULE LEAVES IT SO -- the CR 103.5b
+-- window, whose `cap` is Repeatable. An action need not move its card out of the
 -- hand: No-Regrets Egret's only reveals, so the same entry is offered again and
--- again, and CR 103.5b caps nothing. Bounding the offers here -- one per entry,
+-- again, and CR 103.5b caps nothing. Bounding the offers there -- one per entry,
 -- say -- would be the engine making a choice the rule leaves to the player, so
--- this loop ends when they decline and not before. An interpreter that never
+-- that loop ends when they decline and not before. An interpreter that never
 -- declines never leaves the window, which is CR 104.4b's optional loop: those
--- are not draws and the rules give nothing to break one with.
+-- are not draws and the rules give nothing to break one with. The CR 103.6
+-- window terminates either way, its cap taking each acted-on card out of the
+-- offers.
 --
 -- Proved by MulliganSpec's "an action that leaves its card in hand is offered
 -- again", which takes the Egret twice and then declines. Card DATA that makes
@@ -102,18 +107,43 @@ actionsFor field pid gs =
 -- loop with a keen interpreter, and CardSpec's CR 103.5b / CR 103.6 dataflow
 -- lint from #184 is what rejects it; that belongs at load, not here.
 --
--- Not implemented: CR 103.6b caps a reveal from the OPENING hand at once per
--- card, which this loop does not enforce. Unreachable today -- every CR 103.6
--- action in the pool is rule 103.6a's, and putting the card onto the
--- battlefield takes it out of the hand (#185).
+-- CR 103.6b's cap is the `cap` parameter, and the reason this loop takes one:
+-- the CR 103.6 window may not re-offer a card that has already been acted on,
+-- and the CR 103.5b window must (Serum Powder, No-Regrets Egret). See
+-- Pawl.Types.HandWindowCap for why the cap is per card and why it is applied to
+-- every CR 103.6 action rather than to reveals alone.
+--
+-- Not implemented: CR 103.6b's second sentence, "the card remains revealed until
+-- the first turn begins". pawl's reveal is momentary and there is no per-object
+-- revealed flag for it to set (#1408); with no hidden-information filter every
+-- interpreter already sees every hand, so a lasting reveal and a momentary one
+-- reach the same board.
 handWindow ::
+  HandWindowCap.HandWindowCap ->
   (Face.Face Card.Card -> [[Effect Card.Card]]) ->
   (Decider.Decider -> PlayerId -> [(ObjectId, HandActionIndex.HandActionIndex)] -> Prompt.Prompt (Maybe (ObjectId, HandActionIndex.HandActionIndex))) ->
   HandActionPerformer ->
   PlayerId ->
   Game ()
-handWindow field question perform pid = do
-  candidates <- State.gets (actionsFor field pid)
+handWindow cap = handWindowExcept cap Set.empty
+
+-- handWindow's body, carrying the cards this window has already been acted on
+-- with. The set is a LOOP-LOCAL fact about one player's one visit to one window,
+-- so it never enters GameState -- the mulligan counts' argument, one rule over.
+--
+-- A set of cards and not of (card, action) keys: CR 103.6b caps the CARD.
+handWindowExcept ::
+  HandWindowCap.HandWindowCap ->
+  Set.Set ObjectId ->
+  (Face.Face Card.Card -> [[Effect Card.Card]]) ->
+  (Decider.Decider -> PlayerId -> [(ObjectId, HandActionIndex.HandActionIndex)] -> Prompt.Prompt (Maybe (ObjectId, HandActionIndex.HandActionIndex))) ->
+  HandActionPerformer ->
+  PlayerId ->
+  Game ()
+handWindowExcept cap acted field question perform pid = do
+  -- Filtered before the offer, not after the answer: an action the rule no longer
+  -- allows is not a choice the player is asked to make.
+  candidates <- State.gets (filter (\((oid, _), _) -> Set.notMember oid acted) . actionsFor field pid)
   case candidates of
     -- Where the rules leave nothing to ask, don't prompt.
     [] -> pure ()
@@ -132,7 +162,10 @@ handWindow field question perform pid = do
           Nothing -> pure ()
           Just effects -> do
             perform (fst key) pid effects
-            handWindow field question perform pid
+            let acted' = case cap of
+                  HandWindowCap.Repeatable -> acted
+                  HandWindowCap.OncePerCard -> Set.insert (fst key) acted
+            handWindowExcept cap acted' field question perform pid
 
 -- CR 103.6: the starting player acts first, then each other player in turn
 -- order, which is exactly the order `owners` arrives in. A player who has left
@@ -140,7 +173,7 @@ handWindow field question perform pid = do
 -- Game.stillPlayingInOrder, so they get no window and no opening hand.
 openingHandActions :: HandActionPerformer -> [PlayerId] -> Game ()
 openingHandActions perform owners =
-  Monad.forM_ owners (handWindow Face.openingHandActions Prompt.OpeningHandAction perform)
+  Monad.forM_ owners (handWindow HandWindowCap.OncePerCard Face.openingHandActions Prompt.OpeningHandAction perform)
 
 -- CR 103.5: repeat the declare-all-then-take-all round until no still-deciding
 -- player mulligans. `deciding` is the players who have NOT yet kept -- keeping
@@ -158,7 +191,7 @@ mulliganRounds perform counts deciding = do
     -- would declare", and the declaration follows it. Reading the hand size
     -- after it is load-bearing: an action that empties the hand makes this a
     -- forced keep under CR 103.5's final sentence.
-    handWindow Face.mulliganActions Prompt.MulliganAction perform pid
+    handWindow HandWindowCap.Repeatable Face.mulliganActions Prompt.MulliganAction perform pid
     handSize <- State.gets (length . Game.zoneMembers Zone.Hand pid)
     if handSize <= 0
       then pure (pid, MulliganDecision.Keep)

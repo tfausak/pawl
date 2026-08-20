@@ -231,6 +231,45 @@ egretGame egret mountain n =
       withAlice = addMany mountain S.alice n (addMany egret S.alice 1 g0)
    in poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain S.bob n withAlice))
 
+-- alice's library: a Chancellor of the Forge on top, then `n` Mountains; bob's
+-- is uniform. The Chancellor is drawn into her opening hand, which is where CR
+-- 103.6 reads from -- and like the Egret's, its action leaves it there.
+chancellorGame :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
+chancellorGame chancellor mountain n =
+  let g0 = Setup.emptyGame S.bothPlayers
+      addMany p pid k g = List.foldl' (\h _ -> snd (S.addCreature p pid h)) g (replicate k ())
+      withAlice = addMany mountain S.alice n (addMany chancellor S.alice 1 g0)
+   in poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain S.bob n withAlice))
+
+-- Takes the first offered CR 103.6 action for the first `k` offers, declines the
+-- next, and keeps; every offer's candidate list is recorded.
+--
+-- takeThenDecline's shape on the other channel, and bounded by the ANSWERER for
+-- that helper's reason. `k` greater than one is how the CR 103.6b cap becomes
+-- observable: an interpreter that WOULD take the action twice can only do so if
+-- the window offers it twice.
+takeOpeningThenDecline :: Int -> Prompt.Prompt r -> State.State [[(ObjectId.ObjectId, HandActionIndex.HandActionIndex)]] r
+takeOpeningThenDecline k p = case p of
+  Prompt.OpeningHandAction _ _ candidates -> do
+    seen <- State.get
+    State.put (candidates : seen)
+    pure (if length seen < k then Maybe.listToMaybe candidates else Nothing)
+  Prompt.DeclareMulligan {} -> pure MulliganDecision.Keep
+  _ -> pure (S.identityAnswer p)
+
+-- CR 103.8 / CR 502 / CR 503: the first turn's untap step and then its upkeep
+-- step, run whole through the engine so the upkeep's triggers are placed and
+-- resolved by the priority loop rather than by hand. Setup.emptyGame starts at
+-- Turn.firstPhase, so the game a CR 103.6 window leaves behind is one that has
+-- not begun its first turn.
+throughFirstUpkeep :: GameState.GameState -> GameState.GameState
+throughFirstUpkeep gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs Engine.runStep) Engine.runStep
+
+-- How many Phyrexian Goblin tokens alice has -- the observable CR 103.6b's
+-- reveal buys, and the one a second reveal would double.
+goblins :: GameState.GameState -> Int
+goblins = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Phyrexian Goblin Token")) S.alice
+
 -- Takes the first offered CR 103.5b action for the first `k` offers, declines
 -- the next, and keeps; every offer's candidate list is recorded.
 --
@@ -583,6 +622,43 @@ spec s registry =
       -- nothing anywhere, so two takings leave the library exactly as the draw
       -- left it.
       Spec.assertEqWith s "and the look moved no card" (libSize S.alice after) 14
+    Spec.it s "CR 103.6: a reveal from the opening hand arms the first upkeep" $ do
+      -- Chancellor of the Forge, end to end: alice is offered the CR 103.6
+      -- action, takes it, and the delayed ability it arms fires at the beginning
+      -- of the first upkeep. One Goblin token on the battlefield is the whole
+      -- payoff, so it is the whole assertion.
+      chancellor <- S.printingOf s registry "Chancellor of the Forge"
+      mountain <- S.printingOf s registry "Mountain"
+      let gs0 = chancellorGame chancellor mountain 20
+          ((_, afterWindow), _offers) = State.runState (Engine.runGame (takeOpeningThenDecline 1) gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])) []
+          after = throughFirstUpkeep afterWindow
+      Spec.assertEqWith s "CR 603.7g: one Goblin token at the first upkeep" (goblins after) 1
+      Spec.assertEqWith s "CR 701.20a: the card was revealed once" (revealedNames afterWindow) ["Chancellor of the Forge"]
+      Spec.assertEqWith s "CR 103.6b: and it never left her hand" (S.handSize S.alice afterWindow) 7
+    Spec.it s "CR 103.6: declining the reveal arms nothing" $ do
+      -- The control, differing from the case above in the ANSWER alone: the same
+      -- board, the same steps, nobody reveals. A token here would mean the
+      -- payoff came from the card sitting in hand rather than from the action.
+      chancellor <- S.printingOf s registry "Chancellor of the Forge"
+      mountain <- S.printingOf s registry "Mountain"
+      let gs0 = chancellorGame chancellor mountain 20
+          ((_, afterWindow), _offers) = State.runState (Engine.runGame (takeOpeningThenDecline 0) gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])) []
+          after = throughFirstUpkeep afterWindow
+      Spec.assertEqWith s "no token at the first upkeep" (goblins after) 0
+      Spec.assertEqWith s "and nothing was revealed" (revealedNames afterWindow) []
+    Spec.it s "CR 103.6b: each card may be revealed this way only once" $ do
+      -- The discriminating case. This interpreter would take the action TWICE,
+      -- and the CR 103.5b window would let it (the Egret case above takes its
+      -- action twice on exactly this shape). CR 103.6b caps it, so the second
+      -- taking never happens and the first upkeep creates ONE Goblin and not two.
+      chancellor <- S.printingOf s registry "Chancellor of the Forge"
+      mountain <- S.printingOf s registry "Mountain"
+      let gs0 = chancellorGame chancellor mountain 20
+          ((_, afterWindow), offers) = State.runState (Engine.runGame (takeOpeningThenDecline 2) gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])) []
+          after = throughFirstUpkeep afterWindow
+      Spec.assertEqWith s "CR 103.6b: one Goblin token, not one per taking" (goblins after) 1
+      Spec.assertEqWith s "the capped card is not offered a second time" (length offers) 1
+      Spec.assertEqWith s "CR 701.20a: and it was revealed once" (revealedNames afterWindow) ["Chancellor of the Forge"]
     Spec.it s "CR 103.5b: one card granting two actions offers both" $ do
       -- Nothing in CR 103 caps how many such actions a card grants, so the two
       -- are two offers with the same granting card and different indices. A

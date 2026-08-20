@@ -342,8 +342,10 @@ data Face card = MkFace
     -- An empty OUTER list means the face grants no such action at all, which is
     -- how a card that says nothing about this window is never offered one.
     mulliganActions :: [[Effect.Effect card]],
-    -- | CR 103.6 / 103.6a: this face's opening-hand actions, shaped exactly like
-    -- mulliganActions above and read the same way (CR 113.6, #1859).
+    -- | CR 103.6 / 103.6a / 103.6b: this face's opening-hand actions, shaped
+    -- exactly like mulliganActions above and read the same way (CR 113.6,
+    -- #1859) -- Leyline of Sanctity's rule 103.6a battlefield action, and
+    -- Chancellor of the Forge's rule 103.6b reveal.
     --
     -- The SIBLING of mulliganActions, not a reuse: the two windows are at different
     -- times (CR 103.5b sits AT a declaration, CR 103.6 opens once the whole
@@ -351,7 +353,9 @@ data Face card = MkFace
     -- offered at the other.
     --
     -- No card grants two of these, so the two-action offer is proved on the CR
-    -- 103.5b window only (#803).
+    -- 103.5b window only (#803). Unlike that window, this one offers each card
+    -- at most once -- CR 103.6b, and Pawl.Types.HandWindowCap for why the cap
+    -- covers a rule 103.6a action too.
     openingHandActions :: [[Effect.Effect card]],
     -- | CR 116.2: the special actions this face's printed text grants -- CR
     -- 116.2e's "you may discard this card any time you could cast an instant"
