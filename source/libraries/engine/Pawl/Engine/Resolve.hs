@@ -1437,10 +1437,16 @@ exercises resolving controller idx cIdx clause = case Clause.optionality clause 
 -- sacrifices a permanent of their choice unless they pay {1}" is one offer per
 -- opponent gating that opponent's own edict. The seats the branch SELECTS are
 -- bound under Binding.gatePlayers, which is how the clause's own instructions
--- say "they", and the clause happens when the branch selected anybody. A gate
--- whose reference names nobody selects nobody, and its clause is skipped rather
--- than run against an empty slot -- the same no-op, since every such clause's
--- instructions read the reference's own slot.
+-- say "they", and the clause happens when the branch selected anybody.
+--
+-- A gate whose reference names NOBODY therefore selects nobody and its clause is
+-- skipped, where a single-payer gate used to take the IfNotPaid branch and run
+-- its instructions against an unfilled slot. Unobservable across the pool as it
+-- stands: only an IfNotPaid clause diverges (an IfPaid one was skipped either
+-- way), only the slot-reading references can name nobody, and every IfNotPaid
+-- clause in the pool whose payer is one of those aims its own instructions at
+-- that same slot -- Mana Leak's Counter, Amulet of Safekeeping's. The rest read
+-- `you`, which is stamped for every carrier (Binding.you).
 --
 -- FOUR ways one player's answer comes out, of which exactly one is "paid": the
 -- reference names them but they CANNOT pay (CR 118.3), asked on neither limb;
