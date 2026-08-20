@@ -733,7 +733,7 @@ bakeBound players =
 --     total among your opponents" read the recipient's life in every member.
 --
 -- Control is the question this reference cannot ask: the battlefield is shared
--- (CR 400.1) and Game.zoneMembers slices it by OWNER (#161), so "each creature
+-- (CR 400.1) and Game.zoneMembers slices it by OWNER (see #161), so "each creature
 -- THEY CONTROL" is Filter.ControlledByRecipient off Filter.Context's recipient
 -- instead. Pawl.Engine.Resolve.evaluateForRecipient supplies both.
 forCandidate :: PlayerId.PlayerId -> Quantity -> Quantity

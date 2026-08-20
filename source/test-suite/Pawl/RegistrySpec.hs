@@ -189,6 +189,34 @@ spec s = Spec.describe s "Pawl.Registry" $ do
       Spec.assertBool s (any (List.isInfixOf "wax is claimed by") problems) ("names the repeated name: " <> show problems)
       Spec.assertBool s (any (List.isInfixOf "its own faces") problems) ("says it is a self-repeat, not a collision: " <> show problems)
 
+  -- CR 400.1: "each player has their own library, hand, and graveyard. The
+  -- other zones are shared by all players." A count scoped to one player's
+  -- share of a shared zone therefore asks a question the rules do not have,
+  -- and it is refused where card data enters the engine rather than only by
+  -- Pawl.CardSpec's sweep of the committed pool.
+  --
+  -- The two corpora below differ in exactly one thing: Nightmare's own scope,
+  -- with EachPlayer swapped for a relative reference. The unmodified file
+  -- loading is what makes the rejection attributable to that swap rather than
+  -- to anything else about the card, and the assertion that the two texts
+  -- differ is what keeps the case from passing vacuously if the file's
+  -- formatting changes under it.
+  Spec.it s "CR 400.1 a corpus dividing a shared zone between players is rejected when the registry is built" $ do
+    nightmare <- S.nightmareJson
+    let divided =
+          Text.replace
+            (Text.pack "\"type\": \"EachPlayer\"")
+            (Text.pack "\"type\": \"Relative\", \"value\": {\"type\": \"You\"}")
+            nightmare
+    Spec.assertBool s (divided /= nightmare) "the fixture's scope was actually divided"
+    withCorpus "shared-zone-whole" [("nightmare.json", nightmare)] $ \_ registry -> do
+      whole <- Registry.named registry "Nightmare"
+      Spec.assertBool s (Maybe.isJust whole) "the undivided card loads"
+    S.withCorpusDir "shared-zone-divided" [("nightmare.json", divided)] $ \root -> do
+      problems <- problemsOf s "shared-zone-divided" (Registry.fileRegistry root)
+      Spec.assertBool s (any (List.isInfixOf (root <> "/nightmare.json")) problems) ("names the file: " <> show problems)
+      Spec.assertBool s (any (List.isInfixOf "Battlefield") problems) ("names the shared zone: " <> show problems)
+
   -- The filename is a filing convention with no standing in the rules (#649),
   -- so it decides where a file LIVES and never what a lookup may ask for.
   Spec.it s "a card is found by its own name, and never by its file name" $ do

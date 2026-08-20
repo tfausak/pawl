@@ -87,10 +87,14 @@ spec s = Spec.describe s "Pawl.Codec.Condition" $ do
         Condition.Compares (Compares.MkCompares Quantity.Power Comparison.AtLeast (Quantity.Literal 3))
       ]
 
--- A count with every axis non-default, so a codec that drops one is caught.
+-- A count with every axis non-default, so a codec that drops one is caught. The
+-- zone is a GRAVEYARD rather than the battlefield because CR 400.1 gives each
+-- player their own, which is what lets the reference beside it be a non-default
+-- one: Pawl.Codec.InZone rejects a shared zone scoped to anything but the whole
+-- table.
 zeroSwamps :: Count.Count Quantity.Quantity
 zeroSwamps =
   Count.MkCount
-    (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.Opponent)))
+    (Scope.InZone (InZone.MkInZone Zone.Graveyard (PlayerRef.Relative PlayerRelation.Opponent)))
     (Filter.HasSubtype Subtype.Swamp)
     Aggregation.Members

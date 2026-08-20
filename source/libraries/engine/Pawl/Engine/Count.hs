@@ -182,7 +182,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   -- Pawl.Engine.Filter holds no game state to size one with.
   --
   -- OWNER-SLICED, which is right here where it is wrong for the battlefield
-  -- (#161): rule 400.1 gives each player their own graveyard and CR 404.1 puts
+  -- (see #161): rule 400.1 gives each player their own graveyard and CR 404.1 puts
   -- an object on top of its OWNER's, so Game.zoneMembers asks exactly the rule's
   -- question rather than approximating it, and the projected control
   -- controlledMatching below reads has nothing to say about a card in a
@@ -250,7 +250,7 @@ truth b = if b then Filter.Type.And [] else Filter.Type.Not (Filter.Type.And [])
 -- CR 110.2: how many permanents that player CONTROLS match the filter.
 --
 -- Control is read off the projected view rather than off Game.zoneMembers, which
--- slices the shared battlefield by OWNER (#161): rule 110.2 makes the two come
+-- slices the shared battlefield by OWNER (see #161): rule 110.2 makes the two come
 -- apart, and control is what the card asks about. The view is the injected one
 -- every other candidate is seen through, so a land animated or taken at CR 613's
 -- layers counts as the layers leave it, and an object the caller's projection

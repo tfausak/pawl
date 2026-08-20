@@ -1132,7 +1132,10 @@ isSharedZone zone = case zone of
 
 -- A Count over a shared zone paired with anything but EachPlayer names a
 -- per-player fold over a zone no player individually owns -- permitted by the
--- type, not by the rules (#161).
+-- type, not by the rules. Pawl.Codec.InZone.undividedShared is what ENFORCES
+-- this, at the decoder, so a card file carrying the pairing never reaches a
+-- registry; this restates the rule over the loaded pool rather than calling
+-- that predicate, so the two have to agree independently, see #161.
 scopeOffends :: Scope.Scope -> Bool
 scopeOffends scope = case scope of
   Scope.InZone (InZone.MkInZone zone ref) -> isSharedZone zone && ref /= PlayerRef.EachPlayer
@@ -4725,7 +4728,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- CR 400.1: every InZone Count over a shared zone (battlefield, stack,
   -- exile, command) must pair with PlayerRef.EachPlayer -- the type
   -- permits any PlayerRef there, but only EachPlayer is meaningful for a
-  -- zone no player owns individually (#161).
+  -- zone no player owns individually, see #161. A REGRESSION FENCE rather than
+  -- the guard: the decoder refuses such a file, so an offender would abort the
+  -- whole corpus load before this sweep ran. Pawl.RegistrySpec's "CR 400.1 a
+  -- corpus dividing a shared zone between players" is where that is proved.
   Spec.it s "every InZone Count over a shared zone pairs with EachPlayer" $ do
     ps <- S.allPrintings s
     let offenders =
