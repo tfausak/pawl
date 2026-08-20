@@ -1857,8 +1857,13 @@ gatherGiven stripped functioning gs =
       -- shares the card's own timestamp. Never stripped, for the emblem
       -- branch's reason.
       --
-      -- No index stands in front of these two walks, so every card in every
-      -- library has its face read on every projection (#1935).
+      -- Walked on EVERY projection, once per card in every hand and every
+      -- library, so what the walk costs per card is the whole of what it costs:
+      -- mayStateZone below settles the common card without building a face, and
+      -- Game.faceOfObject takes one lookup where the chain through Game.faceOf
+      -- took three. Pawl.PerformanceSpec's per-library-card ceiling is what
+      -- holds both -- see #1935, which measured the walk at 26% of the suite
+      -- before them.
       --
       -- Not implemented: exile gets no arm of its own, so a stated set naming it
       -- is ignored -- Grist's does (gap #1933).
@@ -1917,27 +1922,28 @@ statesZone zone = Set.member zone . StaticAbility.functionsFrom
 -- carries a static ability that no printed face carries. A True answer decides
 -- nothing; a False answer means the exact test below cannot keep anything.
 --
--- Here because it is CHEAP where the exact test is not: three field reads and no
--- face to build, against a card lookup, a layout case and a fold. The two hidden
--- walks read it once per card in every hand and every library on every
--- projection, so that difference is the walk (#1935).
+-- Here because it is CHEAP where the exact test is not: a field read and a fold
+-- over the printed faces, against BUILDING the face the object shows --
+-- Game.resolveFaceFor's layout case, a NonEmpty, and Card.foldSplit's merge.
+-- gatherGiven's hidden walks read it once per card in every hand and every
+-- library on every projection, so that difference is the walk; see #1935.
 --
 -- A FACE-DOWN object is the one case it cannot narrow, and it does not try: CR
 -- 708.2's substituted face comes from the ability that turned the object down
 -- rather than from its card, so this answers True and leaves the work to the
--- exact test.
+-- exact test in gatherGiven.
 mayStateZone :: Zone.Zone -> Object.Object -> Bool
 mayStateZone zone obj = case Object.facing obj of
   Facing.FaceDown _ _ -> True
-  _ -> case Game.cardOfSource (Just (Object.source obj)) of
+  Facing.FaceUp -> case Game.cardOfSource (Just (Object.source obj)) of
     Nothing -> False
     Just card -> any (any (statesZone zone) . Face.staticAbilities) (Card.Type.faces card)
 
 -- Fold over every card in one per-player zone, across every player, WITHOUT
--- materializing the ids: the two hidden zones below are walked on every
+-- materializing the ids: gatherGiven walks the two hidden zones on every
 -- projection, and a list of every card in every library allocated and thrown
--- away each time is the other half of what #1935 measured. `any`'s companion is
--- anyZoneCard beside it, which short-circuits.
+-- away each time is the other half of what #1935 measured. anyZoneCard below is
+-- the `any` companion, which short-circuits and so cannot go through a Monoid.
 foldZoneCards :: (Monoid m) => (GameState -> Map PlayerId.PlayerId (Seq.Seq ObjectId)) -> (ObjectId -> m) -> GameState -> m
 foldZoneCards field f = foldMap (foldMap f) . field
 

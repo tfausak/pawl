@@ -146,7 +146,7 @@ enumerationOver printing n = length (Action.legalActions S.alice (boardOf printi
 -- narrowed to one seat for the wrong reason.
 --
 -- The library card must have NO static ability of its own, which is the case
--- #1935 is about: the walk reads the printed face of an ordinary card to find
+-- #1935 was about: the walk reads the printed face of an ordinary card to find
 -- out that it states no zone, and pays that read on every projection. A library
 -- card that DID state a hidden zone would be gathered, and then the cost would
 -- be the rule rather than the lookup.
@@ -170,7 +170,7 @@ boardWithLibrary permanent libraryCard n =
 -- object for itself, and a whole game does that at every priority window and
 -- every state-based-action sweep. So this measures a projection's OWN marginal
 -- cost per library card, multiplied up by a path that really does take one per
--- object, which is the cost #1935 is about.
+-- object, which is the cost #1935 measured.
 referenceOverLibrary :: Printing.Printing -> Printing.Printing -> Int -> Int
 referenceOverLibrary permanent libraryCard n = length (referenceActivations S.alice (boardWithLibrary permanent libraryCard n))
 {-# NOINLINE referenceOverLibrary #-}
