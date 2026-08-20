@@ -18,33 +18,37 @@ import qualified Pawl.Types.Supertype as Supertype
 -- Pawl.CardSpec's lints also case on it, legitimately: a test-suite lint that
 -- walks the card pool is not rules core. GainKeyword carries a Keyword, a
 -- closed-half CITATION, so casing on it is not an invariant violation; and
--- GainActivatedAbility carries a whole open-half ability that nothing cases on
--- -- the projection appends it to a list, and every reader downstream treats it
--- as any other ability. The P/T arms carry records of signed Quantity. The
--- layer-4 arms below reach card types, subtypes and supertypes, which CR 205.4b
--- keeps independent of one another.
+-- GainAbility carries a whole open-half ability that nothing cases on beyond CR
+-- 113.3's ability KIND -- the projection appends it to one of two lists, and
+-- every reader downstream treats it as any other ability. The P/T arms carry
+-- records of signed Quantity. The layer-4 arms below reach card types, subtypes
+-- and supertypes, which CR 205.4b keeps independent of one another.
 --
--- Parametric in `ability` for GainActivatedAbility's sake alone, and parametric
--- rather than concrete because this module cannot NAME an ability: an
--- ActivatedAbility carries Effects and Pawl.Types.Effect carries a
--- Pawl.Types.ModifyTarget, which carries one of these. Pawl.Types.StaticAbility
--- and Pawl.Types.ContinuousEffect instantiate the variable at
--- `ActivatedAbility card`, which is every position a card's grant reaches;
--- ModifyTarget instantiates it at Void, and says there why.
+-- Parametric in `ability` for GainAbility's sake alone, and parametric rather
+-- than concrete because this module cannot NAME an ability: an ActivatedAbility
+-- carries Effects and Pawl.Types.Effect carries a Pawl.Types.ModifyTarget, which
+-- carries one of these. Pawl.Types.StaticAbility and Pawl.Types.ContinuousEffect
+-- instantiate the variable at `GrantedAbility card`, which is every position a
+-- card's grant reaches; ModifyTarget instantiates it at Void, and says there
+-- why.
 data Modification ability
   = GainKeyword Keyword.Keyword -- layer 6 (Serpent's Gift)
-  | -- | layer 6, CR 613.1f: this object gains a whole quoted ACTIVATED ability,
-    -- authored on the granting card (Presence of Gond's "Enchanted creature has
-    -- '{T}: Create a 1/1 green Elf Warrior creature token.'").
+  | -- | layer 6, CR 613.1f: this object gains a whole quoted ability, authored on
+    -- the granting card (Presence of Gond's "Enchanted creature has '{T}: Create
+    -- a 1/1 green Elf Warrior creature token.'", Sixth Sense's "Enchanted
+    -- creature has 'Whenever this creature deals combat damage to a player, you
+    -- may draw a card.'").
     --
-    -- Folded into ProjectedCharacteristics.activatedAbilities, which is what
-    -- decides everything about the granted ability's identity: it becomes an
-    -- ability OF THE RECEIVING OBJECT, so CR 113.7 makes that object the
-    -- ability's source, CR 602.2 lets only that object's controller activate it,
-    -- CR 113.8 makes them the controller of the ability on the stack, and every
-    -- binding it names -- the tap cost, IsSource, the counter it puts on "this
-    -- creature" -- resolves against the receiver. The granting permanent supplies
-    -- only the text and, via CR 613.7a, the timestamp.
+    -- Folded into the ProjectedCharacteristics list CR 113.3 puts its kind in,
+    -- which is what decides everything about the granted ability's identity: it
+    -- becomes an ability OF THE RECEIVING OBJECT, so CR 113.7 makes that object
+    -- the ability's source, CR 602.2 lets only that object's controller activate
+    -- an activated one, CR 603.3a makes that same player the controller of a
+    -- triggered one, CR 113.8 makes them the controller of the ability on the
+    -- stack, and every binding it names -- the tap cost, IsSource, the counter it
+    -- puts on "this creature", the "you" that draws -- resolves against the
+    -- receiver. The granting permanent supplies only the text and, via CR 613.7a,
+    -- the timestamp.
     --
     -- CR 303.4e says as much outright for the Aura case: "if the Aura grants an
     -- ability to the enchanted object (with 'gains' or 'has'), the enchanted
@@ -53,10 +57,16 @@ data Modification ability
     -- Rejected: keeping the ability anchored to the GRANTER and activating it
     -- there. Presence of Gond on an opponent's creature is the board that refutes
     -- that -- the opponent taps their own creature and gets the token, both of
-    -- which a granter-anchored ability gets backwards.
+    -- which a granter-anchored ability gets backwards. Sixth Sense refutes it in
+    -- the other half: the card that draws is the enchanted creature's
+    -- controller's.
     --
-    -- Not implemented: a granted TRIGGERED or STATIC ability (#1641).
-    GainActivatedAbility ability
+    -- Rejected: an arm per ability kind. The ability variable is the one this
+    -- module cannot name, so two arms would need two variables, and every
+    -- position instantiating them -- StaticAbility, ContinuousEffect,
+    -- ModifyTarget's Void -- would carry both. The sum lives one module out
+    -- instead, in Pawl.Types.GrantedAbility.
+    GainAbility ability
   | LoseAllAbilities -- layer 6 (Humility)
   | SetBasePowerToughness SetBasePowerToughness.SetBasePowerToughness -- layer 7b (Humility 1/1; Opalescence mana value)
   | ModifyPowerToughness ModifyPowerToughness.ModifyPowerToughness -- layer 7c (Giant Growth +3/+3)

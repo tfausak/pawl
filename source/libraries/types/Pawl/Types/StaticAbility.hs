@@ -2,10 +2,10 @@ module Pawl.Types.StaticAbility where
 
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Set as Set
-import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Duration as Duration
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Zone as Zone
 
@@ -95,6 +95,6 @@ data StaticAbility card = MkStaticAbility
     -- Duration.UntilEndOfTurn, the same value a spell would print. A card
     -- naming a different one needs no new field.
     lingers :: Maybe Duration.Duration,
-    modifications :: NonEmpty.NonEmpty (Modification.Modification (ActivatedAbility.ActivatedAbility card))
+    modifications :: NonEmpty.NonEmpty (Modification.Modification (GrantedAbility.GrantedAbility card))
   }
   deriving (Eq, Ord, Show)

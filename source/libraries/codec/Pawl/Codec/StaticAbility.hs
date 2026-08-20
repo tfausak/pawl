@@ -4,10 +4,10 @@ module Pawl.Codec.StaticAbility where
 
 import qualified Data.Set as Set
 import qualified Data.Typeable as Typeable
-import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Codec.Affected as Affected
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Duration as Duration
+import qualified Pawl.Codec.GrantedAbility as GrantedAbility
 import qualified Pawl.Codec.Modification as Modification
 import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -37,7 +37,7 @@ codec cardCodec = Fields.object $ do
   condition <- Fields.defaulted "condition" Nothing (Common.maybe Condition.codec) StaticAbility.condition
   functionsFrom <- Fields.defaulted "functionsFrom" Set.empty (Common.set Zone.codec) StaticAbility.functionsFrom
   lingers <- Fields.defaulted "lingers" Nothing (Common.maybe Duration.codec) StaticAbility.lingers
-  modifications <- Fields.required "modifications" (Common.nonEmpty (Modification.codec (ActivatedAbility.codec cardCodec))) StaticAbility.modifications
+  modifications <- Fields.required "modifications" (Common.nonEmpty (Modification.codec (GrantedAbility.codec cardCodec))) StaticAbility.modifications
   pure
     StaticAbility.MkStaticAbility
       { StaticAbility.affected = affected,

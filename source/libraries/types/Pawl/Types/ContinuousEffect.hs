@@ -1,8 +1,8 @@
 module Pawl.Types.ContinuousEffect where
 
-import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -29,7 +29,7 @@ data ContinuousEffect card = MkContinuousEffect
   { source :: ObjectId.ObjectId,
     timestamp :: Timestamp.Timestamp,
     expiry :: Expiry.Expiry,
-    modification :: Modification.Modification (ActivatedAbility.ActivatedAbility card),
+    modification :: Modification.Modification (GrantedAbility.GrantedAbility card),
     affected :: Affected.Affected
   }
   deriving (Eq, Ord, Show)

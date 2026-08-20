@@ -73,6 +73,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.Hybrid as Hybrid
 import Pawl.Types.Keyword (Keyword)
@@ -133,15 +134,15 @@ import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 
--- CR 613.1f's grant carries a whole activated ability, and a card's abilities are
+-- CR 613.1f's grant carries a whole quoted ability, and a card's abilities are
 -- written against a whole Card (CR 707.8a).
-type Modification = Modification.Modification (ActivatedAbility.ActivatedAbility Card.Type.Card)
+type Modification = Modification.Modification (GrantedAbility.GrantedAbility Card.Type.Card)
 
 -- CR 611.2: a modification a RESOLUTION created, widened. Exhaustive rather than
 -- a catch-all, so a later arm carrying an ability has to be widened deliberately.
 widenModification :: Modification.Modification Void.Void -> Modification
 widenModification m = case m of
-  Modification.GainActivatedAbility a -> Void.absurd a
+  Modification.GainAbility a -> Void.absurd a
   Modification.GainKeyword k -> Modification.GainKeyword k
   Modification.LoseAllAbilities -> Modification.LoseAllAbilities
   Modification.SetBasePowerToughness x -> Modification.SetBasePowerToughness x
@@ -169,7 +170,7 @@ widenModification m = case m of
 layer :: Modification -> Layer
 layer m = case m of
   Modification.GainKeyword _ -> Layer.Ability
-  Modification.GainActivatedAbility _ -> Layer.Ability
+  Modification.GainAbility _ -> Layer.Ability
   Modification.LoseAllAbilities -> Layer.Ability
   Modification.SetBasePowerToughness {} -> Layer.SetPT
   Modification.ModifyPowerToughness {} -> Layer.ModifyPT
@@ -207,9 +208,15 @@ applyModification viewOf src gs oid m pc =
           pc {PC.keywords = Map.insertWith (+) k 1 (PC.keywords pc)}
         -- CR 613.1f layer 6: one whole quoted ability. Appended to the card's own
         -- printed abilities, which is what makes it the RECEIVER's (CR 113.7, CR
-        -- 602.2, CR 303.4e) and lets two grants stack in CR 613.7 timestamp order.
-        Modification.GainActivatedAbility a ->
-          pc {PC.activatedAbilities = PC.activatedAbilities pc <> [a]}
+        -- 602.2, CR 603.3a, CR 303.4e) and lets two grants stack in CR 613.7
+        -- timestamp order. The case is on CR 113.3's ability KIND, which decides
+        -- only which of the two lists the ability joins -- nothing here reads what
+        -- the ability does.
+        Modification.GainAbility g -> case g of
+          GrantedAbility.Activated a ->
+            pc {PC.activatedAbilities = PC.activatedAbilities pc <> [a]}
+          GrantedAbility.Triggered t ->
+            pc {PC.triggeredAbilities = PC.triggeredAbilities pc <> [t]}
         -- CR 604.3: a CDA is a static ability, so this loses it too.
         Modification.LoseAllAbilities ->
           pc
@@ -962,7 +969,7 @@ freezeQuantities gs announcedOn source you m =
         Modification.GainKeyword _ -> Just m
         -- The granted ability's own quantities are NOT frozen: CR 611.2d fixes a
         -- variable in this effect, not in a quoted ability's own future one.
-        Modification.GainActivatedAbility _ -> Just m
+        Modification.GainAbility _ -> Just m
         Modification.LoseAllAbilities -> Just m
         Modification.SetLandSubtype _ -> Just m
         Modification.SetLandSubtypeToChosen -> Just m
@@ -990,7 +997,7 @@ quantitiesOf m = case m of
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> [p, t]
   Modification.GainKeyword _ -> []
   -- The layer fold evaluates nothing inside a quoted ability.
-  Modification.GainActivatedAbility _ -> []
+  Modification.GainAbility _ -> []
   Modification.LoseAllAbilities -> []
   Modification.SetLandSubtype _ -> []
   Modification.SetLandSubtypeToChosen -> []
@@ -1036,7 +1043,7 @@ setLandSubtypeEffectsGiven functioning gs =
         -- source entered (CR 614.1c) strips rules text as a printed one does.
         Modification.SetLandSubtypeToChosen -> True
         -- An ability grant is layer 6 and sets no subtype at all.
-        Modification.GainActivatedAbility _ -> False
+        Modification.GainAbility _ -> False
         -- A control op, not a type change.
         Modification.SetController _ -> False
         Modification.SetControllerToSource -> False
@@ -1154,7 +1161,7 @@ textChangesAffecting oid gs =
 -- Polymorphic in the granted ability, and takes ITS rewriter, since a card's grant
 -- descends into the quoted ability while ModifyTarget's Void one cannot occur.
 rewriteModification :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Modification -> Modification
-rewriteModification = rewriteModificationWith rewriteActivatedAbility
+rewriteModification = rewriteModificationWith rewriteGrantedAbility
 
 rewriteModificationWith :: ([(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ability -> ability) -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Modification.Modification ability -> Modification.Modification ability
 rewriteModificationWith rewriteAbility pairs m =
@@ -1175,7 +1182,7 @@ rewriteModificationWith rewriteAbility pairs m =
         Modification.GainKeyword k -> Modification.GainKeyword (Filter.rewriteKeyword [(from, to)] k)
         -- CR 612.1 over the whole quoted ability: the words are printed on the
         -- GRANTER, so a text change affecting it rewrites them before the grant.
-        Modification.GainActivatedAbility a -> Modification.GainActivatedAbility (rewriteAbility [(from, to)] a)
+        Modification.GainAbility a -> Modification.GainAbility (rewriteAbility [(from, to)] a)
         -- Carries no word: the type is read off the source at projection time.
         Modification.SetLandSubtypeToChosen -> acc
         -- A control op carries no subtype word either.
@@ -1452,6 +1459,14 @@ rewriteActivatedAbility pairs ability =
       ActivatedAbility.condition = fmap (rewriteCondition pairs) (ActivatedAbility.condition ability),
       ActivatedAbility.cost = Filter.rewriteCost pairs (ActivatedAbility.cost ability)
     }
+
+-- CR 612.1 over a GRANTED ability (CR 613.1f), whichever of CR 113.3's two kinds
+-- it is. The words are printed on the GRANTER, so a text change affecting that
+-- permanent rewrites them before layer 6 hands them over.
+rewriteGrantedAbility :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> GrantedAbility.GrantedAbility Card.Type.Card -> GrantedAbility.GrantedAbility Card.Type.Card
+rewriteGrantedAbility pairs granted = case granted of
+  GrantedAbility.Activated a -> GrantedAbility.Activated (rewriteActivatedAbility pairs a)
+  GrantedAbility.Triggered t -> GrantedAbility.Triggered (rewriteTriggeredAbility pairs t)
 
 -- CR 612.1 over a TRIGGERED ability printed on a permanent. Three parts, not
 -- just the payload: the CR 603.8 condition is where the word usually is, and CR
@@ -2122,7 +2137,7 @@ removesAbilities m = case m of
   -- through the FOLD by Pawl.ActivateSpec's "Presence of Gond" pair; this arm's
   -- own answer is a regression fence -- flipping it to True leaves the suite
   -- green.
-  Modification.GainActivatedAbility _ -> False
+  Modification.GainAbility _ -> False
   -- CR 305.7 strips a land's rules text, but as a layer-4 type change performed
   -- by setLandSubtypeTo and liveGiven, never a layer-6 removal.
   Modification.SetLandSubtype _ -> False
@@ -2466,9 +2481,10 @@ filterReads f = case f of
 modificationWrites :: Modification -> Set Aspect
 modificationWrites m = case m of
   Modification.GainKeyword _ -> Set.singleton Keywords
-  -- Writes ProjectedCharacteristics.activatedAbilities, which no Filter atom
-  -- reads. LoseAllAbilities declares Keywords because it also empties the map.
-  Modification.GainActivatedAbility _ -> Set.empty
+  -- Writes ProjectedCharacteristics.activatedAbilities or .triggeredAbilities,
+  -- neither of which any Filter atom reads. LoseAllAbilities declares Keywords
+  -- because it also empties the map.
+  Modification.GainAbility _ -> Set.empty
   Modification.LoseAllAbilities -> Set.singleton Keywords
   Modification.SetBasePowerToughness {} -> Set.singleton PowerA
   Modification.ModifyPowerToughness {} -> Set.singleton PowerA
@@ -2503,7 +2519,7 @@ modificationReads m = case m of
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityReads p <> quantityReads t
   Modification.GainKeyword _ -> Set.empty
   -- A quoted ability's quantities are read at ITS resolution.
-  Modification.GainActivatedAbility _ -> Set.empty
+  Modification.GainAbility _ -> Set.empty
   Modification.LoseAllAbilities -> Set.empty
   Modification.SwitchPowerToughness -> Set.empty
   Modification.SetLandSubtype _ -> Set.empty
@@ -3187,7 +3203,7 @@ grantsKeywordWhere :: (Keyword -> Bool) -> Modification -> Bool
 grantsKeywordWhere p m = case m of
   Modification.GainKeyword k -> p k
   -- Hands out an ability but never a KEYWORD, which is all the callers ask about.
-  Modification.GainActivatedAbility _ -> False
+  Modification.GainAbility _ -> False
   Modification.LoseAllAbilities -> False
   Modification.SetBasePowerToughness {} -> False
   Modification.ModifyPowerToughness {} -> False

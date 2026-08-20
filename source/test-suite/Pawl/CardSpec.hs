@@ -129,6 +129,7 @@ import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.HandAction as HandAction
 import qualified Pawl.Types.InZone as InZone
@@ -552,8 +553,10 @@ modificationCounts :: Projection.Modification -> [Count.Type.Count Quantity.Type
 modificationCounts modification = case modification of
   Modification.GainKeyword _ -> []
   -- CR 613.1f's other grant carries a whole ability, so the sweep descends into
-  -- it exactly as it does into a printed one.
-  Modification.GainActivatedAbility ability -> activatedAbilityCounts ability
+  -- it exactly as it does into a printed one, whichever of CR 113.3's kinds it is.
+  Modification.GainAbility granted -> case granted of
+    GrantedAbility.Activated ability -> activatedAbilityCounts ability
+    GrantedAbility.Triggered ability -> triggeredAbilityCounts ability
   Modification.LoseAllAbilities -> []
   Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> quantityCounts p <> quantityCounts t
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityCounts p <> quantityCounts t
@@ -1075,6 +1078,11 @@ cardCarrierEffects card =
     <> concatMap (Modal.allEffects . ActivatedAbility.modal) (Face.activatedAbilities card)
     <> concatMap (Modal.allEffects . TriggeredAbility.modal) (Face.triggeredAbilities card)
     <> concatMap (Modal.allEffects . TriggeredAbility.modal) (Map.elems (Face.delayedAbilities card))
+    -- CR 613.1f's quoted abilities, the seventh and eighth carriers: the text is
+    -- printed on THIS card even though the ability ends up on another object, so
+    -- every lint below has to read it here or nowhere.
+    <> concatMap (Modal.allEffects . ActivatedAbility.modal) (grantedActivatedAbilities card)
+    <> concatMap (Modal.allEffects . TriggeredAbility.modal) (grantedTriggeredAbilities card)
     -- CR 309.4c: a room ability's effects, which no other limb above reaches --
     -- Pawl.Types.Face.rooms is the fifth carrier.
     <> concatMap (Modal.allEffects . DungeonRoom.ability) (Face.rooms card)
@@ -2689,10 +2697,11 @@ modificationFilters :: Projection.Modification -> [Filter.Type.Filter Keyword.Ke
 modificationFilters modification = case modification of
   Modification.GainKeyword keyword -> keywordFilters keyword
   -- Nothing HERE, and that is not a hole: a granted ability's Filters are swept
-  -- by grantedAbilities below, at the outer level, so they keep the Framing that
-  -- a printed activated ability's do. Answering here would flatten them to
-  -- unframed and lose CR 701.3a's attach-destination distinction.
-  Modification.GainActivatedAbility _ -> []
+  -- by grantedActivatedAbilities and grantedTriggeredAbilities below, at the
+  -- outer level, so they keep the Framing that a printed ability's do. Answering
+  -- here would flatten them to unframed and lose CR 701.3a's attach-destination
+  -- distinction.
+  Modification.GainAbility _ -> []
   Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> quantityFilters p <> quantityFilters t
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityFilters p <> quantityFilters t
   Modification.LoseAllAbilities -> []
@@ -3432,16 +3441,32 @@ modalFilters modal =
     )
     (Modal.modes modal)
 
--- Every ability this face's static abilities GRANT to another object (CR
--- 613.1f). Swept alongside the printed ones: the quoted text is this card's, so
--- every corpus lint that reads a printed activated ability has to read these
+-- Every ACTIVATED ability this face's static abilities GRANT to another object
+-- (CR 613.1f). Swept alongside the printed ones: the quoted text is this card's,
+-- so every corpus lint that reads a printed activated ability has to read these
 -- too.
-grantedAbilities :: Face.Face Card.Type.Card -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
-grantedAbilities card =
+grantedActivatedAbilities :: Face.Face Card.Type.Card -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
+grantedActivatedAbilities card =
   [ ability
+  | Modification.GainAbility (GrantedAbility.Activated ability) <- grantedModifications card
+  ]
+
+-- The TRIGGERED half of the same grant, swept for the same reason: Sixth Sense's
+-- quoted "whenever this creature deals combat damage to a player" is text
+-- printed on the Aura.
+grantedTriggeredAbilities :: Face.Face Card.Type.Card -> [TriggeredAbility.TriggeredAbility Card.Type.Card]
+grantedTriggeredAbilities card =
+  [ ability
+  | Modification.GainAbility (GrantedAbility.Triggered ability) <- grantedModifications card
+  ]
+
+-- Every modification this face's static abilities carry, the shared walk both
+-- grant sweeps above index into.
+grantedModifications :: Face.Face Card.Type.Card -> [Projection.Modification]
+grantedModifications card =
+  [ modification
   | static <- Face.staticAbilities card,
-    modification <- Foldable.toList (StaticAbility.modifications static),
-    Modification.GainActivatedAbility ability <- [modification]
+    modification <- Foldable.toList (StaticAbility.modifications static)
   ]
 
 triggeredAbilityFilters :: TriggeredAbility.TriggeredAbility Card.Type.Card -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
@@ -3535,7 +3560,8 @@ cardFilters card =
     <> concatMap staticAbilityFilters (Face.staticAbilities card)
     <> modalFilters (Face.spell card)
     <> concatMap activatedAbilityFilters (Face.activatedAbilities card)
-    <> concatMap activatedAbilityFilters (grantedAbilities card)
+    <> concatMap activatedAbilityFilters (grantedActivatedAbilities card)
+    <> concatMap triggeredAbilityFilters (grantedTriggeredAbilities card)
     <> concatMap triggeredAbilityFilters (Face.triggeredAbilities card)
     <> concatMap triggeredAbilityFilters (Map.elems (Face.delayedAbilities card))
     <> concatMap (modalFilters . DungeonRoom.ability) (Face.rooms card)
