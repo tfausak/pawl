@@ -3425,7 +3425,7 @@ hiddenZoneStaticSpec s registry = Spec.describe s "HiddenZoneStatics" $ do
     (jaceScatter, jaceBoard) <- spellAndScatter s registry jace
     let afterScatter = S.runPure S.identityAnswer gristBoard (do S.cast S.bob gristScatter; Stack.resolveTop)
     -- Named for the hand case's reason: CR 400.7 gives the countered spell a new
-    -- id as CR 701.5a puts it into its owner's graveyard.
+    -- id as CR 701.6a puts it into its owner's graveyard.
     Spec.assertEqWith
       s
       "the Grist spell was countered and put into its owner's graveyard"
