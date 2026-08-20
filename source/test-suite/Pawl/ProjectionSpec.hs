@@ -2567,6 +2567,26 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertBool s (elem goblin (Projection.controls S.alice gs)) "so the Goblin is in alice's battlefield permanents"
     Spec.assertBool s (notElem goblin (Projection.controls S.bob gs)) "and not in bob's"
 
+  -- The layer-1 half of the same read. CR 613.2c makes an object's COPIABLE
+  -- values what layer 1 leaves behind, and CR 613.8a confines dependency to one
+  -- layer, so layer 2 tests those and never a layer-4 type change -- which is
+  -- exactly what lets this set be resolved without projecting. A permanent
+  -- stamped as a copy of a Goblin is therefore in the set although nothing
+  -- printed on it is a Goblin. One board, one axis: whether the copy binding is
+  -- stamped.
+  Spec.it s "CR 613.2c a copy of a Goblin is in the static ability's set" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    dominion <- S.printingOf s registry "Synthetic Goblin Dominion"
+    let (original, g1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+        (clone, g2) = S.addCreature giant S.bob g1
+        (_, unstamped) = S.addCreature dominion S.alice g2
+        snapshot = Projection.copiableCharacteristics original unstamped
+        gs = unstamped {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setCopy snapshot (Object.bindings o)}) clone (GameState.objects unstamped)}
+    Spec.assertEqWith s "stamped as a copy of a Goblin, alice controls it (CR 613.2c)" (Projection.controllerOf clone gs) (Just S.alice)
+    Spec.assertEqWith s "unstamped, the Hill Giant is bob's" (Projection.controllerOf clone unstamped) (Just S.bob)
+    Spec.assertEqWith s "and the copy is a Goblin, which is what puts it in the set" (Projection.subtypesOf clone gs) (Set.fromList [Subtype.Type.Goblin, Subtype.Type.Warrior])
+
   Spec.it s "a copy binding seeds the fold with the copied object's copiable P/T" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers

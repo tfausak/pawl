@@ -3183,8 +3183,9 @@ data ControlGrant = MkControlGrant
 -- once. NOT `gather`, and PROJECTION-FREE throughout: affects reads controllerOf
 -- to supply CR 109.5's "you", so a controlGrants that consulted the layers would
 -- be mutually recursive with it. That is why controlNames below reads copiable
--- values rather than the projection, and why no CR 305.7 gate is applied here. Hoisted for the same reason setLandSubtypeEffects is: `controls`
--- calls controllerOf once per battlefield object.
+-- values rather than the projection, and why no CR 305.7 gate is applied here.
+-- Hoisted for the same reason setLandSubtypeEffects is: `controls` calls
+-- controllerOf once per battlefield object.
 --
 -- Not implemented: CR 604.2's "as long as" gate, which setLandSubtypeEffects
 -- does ask -- the same mutual recursion rules it out here (#1529).
@@ -3291,6 +3292,15 @@ controlNames grants visited gs source a = case a of
 -- rather than re-entering the fold that is asking (#946). Termination is
 -- structural here, not a matter of Filter.View's laziness -- which is what
 -- separates this path from the liveness gate #197 describes.
+--
+-- Both of those controller reads are REGRESSION FENCES rather than proved
+-- behaviour: a filter only forces either one by asking about control, and
+-- `data/cards/`'s one predicate control grant is Synthetic Goblin Dominion's
+-- "You control all Goblins", whose filter does not. Blanking the perspective
+-- leaves the suite green. The card that would prove them is #197's shape, a
+-- control-dependent conjunct under a control grant, and it would also be the
+-- first board on which this recursion is more than linear: each candidate whose
+-- controller is forced re-enters the fold, which walks the battlefield again.
 matchesLeanly :: [ControlGrant] -> Set ObjectId -> GameState -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
 matchesLeanly grants visited gs source f oid =
   Filter.matches
