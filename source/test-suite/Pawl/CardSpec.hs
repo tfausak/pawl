@@ -2631,8 +2631,8 @@ objectRefFilters ref = case ref of
   -- Day of Judgment's "all creatures", Boil's "all Islands".
   ObjectRef.EachMatching f -> [f]
   -- Rise of the Dark Realms' "all creature cards from all graveyards"; its
-  -- PlayerScope names players rather than characteristics, so the Filter is the
-  -- whole of what there is to lint.
+  -- GraveyardScope names players rather than characteristics, so the Filter is
+  -- the whole of what there is to lint.
   ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard _ f) -> [f]
   -- Ignorant Bliss' "all cards from your hand" holds none either: CR 400.2
   -- makes a hand hidden, so the arm carries no Filter to lint.

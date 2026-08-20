@@ -622,12 +622,13 @@ abilityRecipients gs = Set.fromList (fmap Recipient.ToObject (filter (\oid -> Ga
 -- the scope answerable at all -- CR 108.4 gives a card in a graveyard no
 -- controller to ask about.
 --
--- Whose graveyard is the GraveyardScope's answer, in two readings:
+-- Whose graveyard is the GraveyardScope's answer, read by graveyardScopePlayers
+-- below, in two readings:
 --
 --   * Scoped is PlayerEffect.playersInScope's, rather than a second reading of
 --     CR 109.5 written here: that function folds the one membership test, which
---     is where PlayerScope.Opponents' CR 806.1 argument lives. Nothing -> empty
---     is its report of an absent perspective -- the vacuous posture every
+--     is where PlayerScope.Opponents' CR 806.1 argument lives. Nothing -> no
+--     players is its report of an absent perspective -- the vacuous posture every
 --     player-referencing Filter atom takes. PlayerScope.EachPlayer never reaches
 --     it: "a graveyard" names the whole table with no perspective to lack.
 --
@@ -651,13 +652,25 @@ abilityRecipients gs = Set.fromList (fmap Recipient.ToObject (filter (\oid -> Ga
 --     `bindings` from a pass that gave it no bindings of its own, so it holds
 --     nothing and this is empty -- which terminates rather than recurring.
 graveyardRecipients :: Filter.Context -> Map SlotName (Set Recipient) -> GraveyardScope.GraveyardScope -> GameState -> Set Recipient
-graveyardRecipients context bindings scope gs = case scope of
-  GraveyardScope.Scoped playerScope ->
-    case PlayerEffect.playersInScope (Filter.perspective context) gs playerScope of
-      Nothing -> Set.empty
-      Just pids -> graveyardsOf pids gs
+graveyardRecipients context bindings scope gs =
+  graveyardsOf (graveyardScopePlayers (Filter.perspective context) bindings scope gs) gs
+
+-- The players a GraveyardScope names, and the WHOLE of what either reading of
+-- that type means: the two arms are exactly the two paragraphs above, and this is
+-- the one place they are read.
+--
+-- Shared with Pawl.Engine.Resolve, whose ObjectRef.EachCardInGraveyard sweep asks
+-- the same question at CR 608.2c; see #1310. The two callers differ only in what
+-- they do with the answer -- a target pool wants CR 404.1's cards as recipients,
+-- a sweep wants them filtered and in CR 608.2f's APNAP order -- so splitting here
+-- rather than at the recipients keeps one reading of the scope for both.
+--
+-- Unordered: the caller imposes whatever order its own rule asks for.
+graveyardScopePlayers :: Maybe PlayerId -> Map SlotName (Set Recipient) -> GraveyardScope.GraveyardScope -> GameState -> [PlayerId]
+graveyardScopePlayers perspective bindings scope gs = case scope of
+  GraveyardScope.Scoped playerScope -> Maybe.fromMaybe [] (PlayerEffect.playersInScope perspective gs playerScope)
   GraveyardScope.InSlot slot ->
-    graveyardsOf (Maybe.mapMaybe playerOf (Set.toList (Map.findWithDefault Set.empty slot bindings))) gs
+    Maybe.mapMaybe playerOf (Set.toList (Map.findWithDefault Set.empty slot bindings))
 
 -- CR 404.1 over a list of players, deduplicated by the Set the caller gets back.
 graveyardsOf :: [PlayerId] -> GameState -> Set Recipient

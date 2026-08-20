@@ -253,13 +253,30 @@ chooserSlots chooser = case chooser of
   Chooser.EachInScope -> Map.empty
   Chooser.BoundInSlot slot -> Map.singleton slot SlotArity.One
 
--- The slots an ObjectRef reads. Only InSlot names one directly; the sweeping arms
--- name nothing at cast, so CR 608.2b has nothing to fizzle (CR 115.10a).
+-- The slots a GraveyardScope reads. Only InSlot names one, and at arity Many: the
+-- reader takes the whole recipient set, so "each of up to two target players'
+-- graveyards" would be seen whole.
+graveyardScopeSlots :: GraveyardScope.GraveyardScope -> Map.Map SlotName SlotArity
+graveyardScopeSlots scope = case scope of
+  GraveyardScope.Scoped _ -> Map.empty
+  GraveyardScope.InSlot slot -> Map.singleton slot SlotArity.Many
+
+-- The slots an ObjectRef reads. InSlot names one directly and
+-- EachCardInGraveyard names one through its scope; the other sweeping arms name
+-- none. Reporting a scope's slot does not make the SWEPT CARDS targets -- CR
+-- 115.10a needs the word "target" against them, and a graveyard scope says it
+-- against the PLAYER -- so what CR 608.2b judges is still the card's own target
+-- slot, holding that player, and not this read.
 objectRefSlots :: ObjectRef -> Map.Map SlotName SlotArity
 objectRefSlots ref = case ref of
   ObjectRef.InSlot slot -> Map.singleton slot SlotArity.Many
   ObjectRef.EachMatching _ -> Map.empty
-  ObjectRef.EachCardInGraveyard {} -> Map.empty
+  -- The one sweeping arm that DOES name a slot: CR 400.1's per-player graveyards
+  -- leave "whose" to be said, and Angel of Finality says it by pointing at the
+  -- player another slot of the same announcement targets. Reported, not dropped,
+  -- because the D4 dataflow lint reads this: a card whose ONLY use of that slot
+  -- is the scope would otherwise declare a target nothing reads.
+  ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard scope _) -> graveyardScopeSlots scope
   ObjectRef.EachCardInYourHand -> Map.empty
   ObjectRef.EachCardExiledWithSource {} -> Map.empty
   ObjectRef.EachSpell _ -> Map.empty
@@ -1633,8 +1650,11 @@ objectRefObjects legal resolving controller source gs ref = case ref of
      in List.sortOn (\oid -> (seat oid, oid)) matching
   -- EachMatching's sweep with CR 109.2's battlefield default switched off by the
   -- card's own words (CR 109.2a), over CR 400.1's per-player zone. Whose
-  -- graveyards, what matches and in what order are all graveyardCards below.
-  ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard scope filter_) -> graveyardCards controller source gs scope filter_
+  -- graveyards is graveyardScopePlayers below -- either the perspective's own
+  -- reading of CR 109.5 or the players another slot of this announcement targets
+  -- -- and what matches within each is graveyardCardsOf.
+  ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard scope filter_) ->
+    concatMap (\pid -> graveyardCardsOf controller source gs pid filter_) (graveyardScopePlayers legal controller gs scope)
   -- CR 400.1's per-player zone again, but only the RESOLVING CONTROLLER's, so no
   -- scope to fold over and no APNAP order to impose. In the zone's own order,
   -- which no rule reads: CR 400.5 leaves a hand's arrangement to its owner.
@@ -1694,12 +1714,27 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- Answered for real by the REVEAL arm, over the seats handChoosers names.
   ObjectRef.RandomCardInHand _ -> []
 
--- The players a graveyard scope names, in APNAP order: the seat half of
+-- The players a PlayerScope names, in APNAP order: the seat half of
 -- graveyardCards, needed by ObjectRef.ChosenCardInGraveyard's EachInScope
 -- chooser, which asks each seat separately. An absent perspective is empty.
+--
+-- No bindings, and none to pass: a PlayerScope has no arm that names a slot,
+-- which is exactly why ObjectRef.EachCardInGraveyard stopped carrying one.
 graveyardPlayers :: PlayerId -> GameState -> PlayerScope.PlayerScope -> [PlayerId]
-graveyardPlayers controller gs scope =
-  let named = Maybe.fromMaybe [] (PlayerEffect.playersInScope (Just controller) gs scope)
+graveyardPlayers controller gs = graveyardScopePlayers Map.empty controller gs . GraveyardScope.Scoped
+
+-- graveyardPlayers over the WIDER scope an ObjectRef.EachCardInGraveyard carries,
+-- and the function that actually reads it: whose graveyards is
+-- Target.graveyardScopePlayers, the same answer a target pool over CR 400.1's
+-- per-player zone gets, and the order imposed on it here is APNAP (CR 608.2f, CR
+-- 101.4) restricted to the players still in the game.
+--
+-- The bindings are the ones the CALLER holds, which is CR 608.2b's re-checked set
+-- at resolution: an InSlot scope naming a slot whose target went illegal names
+-- nobody, and CR 101.3 ignores that share of the effect.
+graveyardScopePlayers :: Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> GraveyardScope.GraveyardScope -> [PlayerId]
+graveyardScopePlayers bindings controller gs scope =
+  let named = Target.graveyardScopePlayers (Just controller) bindings scope gs
    in filter (`elem` named) (Game.apnapOrder gs)
 
 -- The cards in ONE player's graveyard matching the filter, in ascending
@@ -1714,11 +1749,12 @@ graveyardCardsOf controller source gs pid filter_ =
             (Game.zoneMembers Zone.Graveyard pid gs)
         )
 
--- The cards in the named graveyards matching the filter: shared by
--- ObjectRef.EachCardInGraveyard and ChosenCardInGraveyard's TheController
--- chooser. A card in a graveyard has no controller, so Filter.ControlledBy is
--- vacuously False. APNAP (CR 101.4) then ascending ObjectId, not the graveyard's
--- own pile order (CR 404.2), which no rule makes a batch's processing order.
+-- The cards in the named graveyards matching the filter, for
+-- ChosenCardInGraveyard's TheController chooser -- ObjectRef.EachCardInGraveyard
+-- is this fold over the wider scope, spelled out at its own arm. A card in a
+-- graveyard has no controller, so Filter.ControlledBy is vacuously False. APNAP
+-- (CR 101.4) then ascending ObjectId, not the graveyard's own pile order (CR
+-- 404.2), which no rule makes a batch's processing order.
 graveyardCards :: PlayerId -> ObjectId -> GameState -> PlayerScope.PlayerScope -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
 graveyardCards controller source gs scope filter_ =
   concatMap (\pid -> graveyardCardsOf controller source gs pid filter_) (graveyardPlayers controller gs scope)

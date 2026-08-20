@@ -3,8 +3,8 @@
 module Pawl.Codec.EachCardInGraveyard where
 
 import qualified Pawl.Codec.Filter as Filter
+import qualified Pawl.Codec.GraveyardScope as GraveyardScope
 import qualified Pawl.Codec.Keyword as Keyword
-import qualified Pawl.Codec.PlayerScope as PlayerScope
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
@@ -13,10 +13,10 @@ import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 -- array this payload used to be (#1464).
 codec :: Codec.Codec EachCardInGraveyard.EachCardInGraveyard
 codec = Fields.object $ do
-  players <- Fields.required "players" PlayerScope.codec EachCardInGraveyard.players
+  graveyards <- Fields.required "graveyards" GraveyardScope.codec EachCardInGraveyard.graveyards
   filter_ <- Fields.required "filter" (Filter.codec Keyword.codec) EachCardInGraveyard.filter
   pure
     EachCardInGraveyard.MkEachCardInGraveyard
-      { EachCardInGraveyard.players = players,
+      { EachCardInGraveyard.graveyards = graveyards,
         EachCardInGraveyard.filter = filter_
       }
