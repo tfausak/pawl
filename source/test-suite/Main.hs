@@ -79,6 +79,7 @@ import qualified Pawl.Codec.CounteringSpec
 import qualified Pawl.Codec.CreateCopySpec
 import qualified Pawl.Codec.CreateSpec
 import qualified Pawl.Codec.CyclingSpec
+import qualified Pawl.Codec.DamageDirectionSpec
 import qualified Pawl.Codec.DamageEventSpec
 import qualified Pawl.Codec.DamageKindSpec
 import qualified Pawl.Codec.DamagePatternSpec
@@ -498,6 +499,7 @@ spec s registry = do
   Pawl.Codec.CreateSpec.spec s
   Pawl.Codec.CyclingSpec.spec s
   Pawl.Codec.DamageEventSpec.spec s
+  Pawl.Codec.DamageDirectionSpec.spec s
   Pawl.Codec.DamageKindSpec.spec s
   Pawl.Codec.DamagePatternSpec.spec s
   Pawl.Codec.DamagePreventedSpec.spec s

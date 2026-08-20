@@ -1,6 +1,7 @@
 module Pawl.Types.PreventAllDamage where
 
 import qualified Data.Sequence as Seq
+import qualified Pawl.Types.DamageDirection as DamageDirection
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -24,6 +25,12 @@ data PreventAllDamage effect = MkPreventAllDamage
     -- taking combat and noncombat alike, and is elided rather than written null.
     kind :: Maybe DamageKind.DamageKind,
     ref :: ObjectRef.ObjectRef,
+    -- | Which SIDE of the damage event the objects @ref@ names sit on -- the
+    -- recipients (Inkshield, Selfless Squire) or the SOURCE (Dovin, Hand of
+    -- Control's "and dealt by target permanent"). DealtTo for every shield that
+    -- names only a recipient, so the key is elided rather than written on all
+    -- but the by-direction.
+    direction :: DamageDirection.DamageDirection,
     -- | CR 615.5's additional effect -- Brace for Impact's "for each 1 damage
     -- prevented this way, put a +1/+1 counter on that creature". Unlike CR
     -- 615.7's countdown shield this one has no amount to spend, so "the damage

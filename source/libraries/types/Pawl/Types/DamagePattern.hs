@@ -11,7 +11,8 @@ import qualified Pawl.Types.Recipient as Recipient
 -- (Just Combat, And [], Nothing, Nothing, Nothing); Furnace of Rath's replacement
 -- is (Nothing, And [], Nothing, Nothing, Nothing); Mending Hands' shield is
 -- (Nothing, And [], Nothing, Just the chosen recipient, Nothing); Healing Grace's
--- adds the chosen SOURCE in the last field; Stormwild Capridor's is
+-- adds the chosen SOURCE in the last field, and Dovin, Hand of Control's
+-- by-direction names that field and no recipient; Stormwild Capridor's is
 -- (Just Noncombat, And [], Just IsSource, Nothing, Nothing). Nothing means any
 -- kind.
 --
@@ -53,16 +54,19 @@ import qualified Pawl.Types.Recipient as Recipient
 -- otherwise have to mean "any object OR any player", which is not what any other
 -- Filter position means.
 --
--- `whichSource` is CR 609.7a's player-CHOSEN source, baked as an id: Healing
--- Grace's "by a source of your choice" is answered when the shield is created,
--- and the shield then watches that one object. Nothing means EVERY source, the
+-- `whichSource` is the ONE object a shield watches, baked as an id, and two
+-- unlike questions land in it: CR 609.7a's player-CHOSEN source (Healing Grace's
+-- "by a source of your choice", answered when the shield is created) and CR
+-- 601.2c's TARGETED one (Dovin, Hand of Control's "prevent all damage ... dealt
+-- by target permanent", declared on the stack). Nothing means EVERY source, the
 -- way Nothing means every recipient above, rather than an unanswered choice.
 --
 -- It does not replace `whatSource` beside it, and CR 615.9 is why both are
--- written together: the chosen source's PROPERTIES are rechecked when it would
+-- written together: a CHOSEN source's PROPERTIES are rechecked when it would
 -- deal damage (CR 609.7b), so a "red source of your choice" is an id here AND
 -- the colour predicate there. Healing Grace names no property, so its shield
--- carries the trivial filter and this id.
+-- carries the trivial filter and this id -- and so does a targeted source, which
+-- has no printed properties for CR 615.9 to recheck.
 --
 -- BAKED by the engine and never authored, `whichRecipient`'s reason exactly:
 -- card data cannot name an ObjectId. Resolve's installDamageRow is the one
