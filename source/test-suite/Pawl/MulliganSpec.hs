@@ -632,7 +632,7 @@ spec s registry =
       let gs0 = chancellorGame chancellor mountain 20
           ((_, afterWindow), _offers) = State.runState (Engine.runGame (takeOpeningThenDecline 1) gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])) []
           after = throughFirstUpkeep afterWindow
-      Spec.assertEqWith s "CR 603.7: one Goblin token at the first upkeep" (goblins after) 1
+      Spec.assertEqWith s "CR 603.7g: one Goblin token at the first upkeep" (goblins after) 1
       Spec.assertEqWith s "CR 701.20a: the card was revealed once" (revealedNames afterWindow) ["Chancellor of the Forge"]
       Spec.assertEqWith s "CR 103.6b: and it never left her hand" (S.handSize S.alice afterWindow) 7
     Spec.it s "CR 103.6: declining the reveal arms nothing" $ do

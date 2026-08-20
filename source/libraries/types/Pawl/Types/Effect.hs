@@ -671,10 +671,11 @@ data Effect card
     -- total field rather than a second Maybe, and why the gate cannot live in the
     -- ability's own trigger condition.
     --
-    -- A resolution is not the only arming: Chancellor of the Forge arms this from
-    -- a CR 103.6 opening-hand action, before the game's first turn, where
-    -- Pawl.Engine.Resolve.performHandAction passes the acting CARD as the
-    -- resolving object.
+    -- A resolution is not the only arming -- CR 603.7a's third clause, "a static
+    -- ability that allows a player to take an action". Chancellor of the Forge
+    -- arms this from a CR 103.6 opening-hand action, before the game's first
+    -- turn, where Pawl.Engine.Resolve.performHandAction passes the acting CARD as
+    -- the resolving object; CR 603.7g fixes that card as the source.
     ArmDelayedTrigger ArmDelayedTrigger.ArmDelayedTrigger
   | -- | CR 611.1 / 613.11: install a stored PLAYER or RULES-modifying continuous
     -- effect on some players for a duration (Silence, Cease-Fire).
