@@ -330,7 +330,8 @@ whileReplacement src you gs =
             ActiveReplacement.expiry = Expiry.Type.While (While.MkWhile you S.youControlSource),
             ActiveReplacement.uses = Uses.Unlimited,
             ActiveReplacement.origin = ReplacementOrigin.Other,
-            ActiveReplacement.rider = Nothing
+            ActiveReplacement.rider = Nothing,
+            ActiveReplacement.slots = Map.empty
           }
    in S.addReplacement active gs1
 

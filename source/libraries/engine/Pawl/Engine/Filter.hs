@@ -456,11 +456,14 @@ data Context = MkContext
     -- directly. An EMPTY set never appears -- a slot naming nothing is an absent
     -- key -- so `Map.member` and "names something" are the same question.
     --
-    -- EMPTY everywhere but a resolution and CR 603.4's intervening-"if" checks,
-    -- which is the honest answer rather than a forgotten filler: elsewhere there
-    -- are no slots. Pawl.Engine.Resolve's effectContext,
-    -- Pawl.Engine.Event.interveningHolds and Pawl.Engine.Stack are the non-empty
-    -- producers, and all three go through contextWithSlots below.
+    -- EMPTY everywhere but a resolution, CR 603.4's intervening-"if" checks and a
+    -- floating replacement row's own patterns, which is the honest answer rather
+    -- than a forgotten filler: elsewhere there are no slots. Pawl.Engine.Resolve's
+    -- effectContext, Pawl.Engine.Event.interveningHolds, Pawl.Engine.Stack and
+    -- Pawl.Engine.Replacement.candidateContext are the non-empty producers -- the
+    -- last of them off the snapshot ActiveReplacement.slots holds, the resolution
+    -- that installed the row being over -- and all four go through
+    -- contextWithSlots below.
     slotObjects :: Map.Map SlotName.SlotName (Set.Set ObjectId.ObjectId),
     -- CR 201.1 / 709.4a: the NAMES of the objects the surrounding announcement's
     -- slots hold, for the one atom that compares a candidate's against them

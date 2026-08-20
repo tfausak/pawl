@@ -1,5 +1,7 @@
 module Pawl.Types.ActiveReplacement where
 
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Expiry as Expiry
@@ -8,6 +10,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PreventionRider as PreventionRider
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Uses as Uses
 
@@ -79,6 +82,23 @@ data ActiveReplacement = MkActiveReplacement
     -- snapshot: the spell that installed the row is gone, so its chosen targets
     -- and its CR 109.5 "you" cannot be re-derived. A permanent's static ability
     -- keeps both live and needs no such field.
-    rider :: Maybe PreventionRider.PreventionRider
+    rider :: Maybe PreventionRider.PreventionRider,
+    -- | The objects the INSTALLING resolution's slots named, captured as the row
+    -- is installed -- the same snapshot Pawl.Types.DelayedTrigger takes for CR
+    -- 603.7c's "it", and taken for the same reason: the resolution ends, and with
+    -- it the object whose bindings these were. It is what lets a pattern's
+    -- Filter.IsBound name one object rather than a class (Dire Fleet Daredevil's
+    -- "that spell"), which a printed Filter cannot do.
+    --
+    -- EMPTY for a row installed outside a resolution, and for one whose pattern
+    -- names no slot; the projection's side of Pawl.Engine.Replacement.collect
+    -- carries none at all, a permanent's static ability having no resolution
+    -- behind it.
+    --
+    -- REWRITTEN by CR 400.7h: a card cast under a permission this row's source
+    -- granted becomes a new object (CR 400.7), and Pawl.Engine.Cast.followIntoSpell
+    -- moves the name onto it, which is what makes "that spell" a claim about the
+    -- spell rather than about the card that is no longer there.
+    slots :: Map.Map SlotName.SlotName (Set.Set ObjectId.ObjectId)
   }
   deriving (Eq, Ord, Show)

@@ -321,7 +321,8 @@ damageSpec s registry =
                 ActiveReplacement.expiry = Expiry.Type.AtCleanup,
                 ActiveReplacement.uses = Uses.Unlimited,
                 ActiveReplacement.origin = ReplacementOrigin.Other,
-                ActiveReplacement.rider = Nothing
+                ActiveReplacement.rider = Nothing,
+                ActiveReplacement.slots = Map.empty
               }
           withShield = S.addReplacement shield gs0
           combat = S.runPure S.identityAnswer withShield (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False False 0 Nothing DamageKind.Combat])
@@ -341,7 +342,8 @@ damageSpec s registry =
                 ActiveReplacement.expiry = Expiry.Type.AtCleanup,
                 ActiveReplacement.uses = Uses.Unlimited,
                 ActiveReplacement.origin = ReplacementOrigin.Other,
-                ActiveReplacement.rider = Nothing
+                ActiveReplacement.rider = Nothing,
+                ActiveReplacement.slots = Map.empty
               }
           dropped = Expiry.dropAtCleanup (S.addReplacement shield base)
        in Spec.assertEqWith s "no replacements remain" (GameState.replacements dropped) []
@@ -575,7 +577,8 @@ toxicSpec s registry =
                 ActiveReplacement.expiry = Expiry.Type.AtCleanup,
                 ActiveReplacement.uses = Uses.Unlimited,
                 ActiveReplacement.origin = ReplacementOrigin.Other,
-                ActiveReplacement.rider = Nothing
+                ActiveReplacement.rider = Nothing,
+                ActiveReplacement.slots = Map.empty
               }
           ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False False False 2 Nothing DamageKind.Combat
           after = S.runPure S.identityAnswer (S.addReplacement shield gs0) (Damage.applyDamage [ev])
@@ -703,7 +706,8 @@ lifelinkSpec s registry =
                 ActiveReplacement.expiry = Expiry.Type.AtCleanup,
                 ActiveReplacement.uses = Uses.Unlimited,
                 ActiveReplacement.origin = ReplacementOrigin.Other,
-                ActiveReplacement.rider = Nothing
+                ActiveReplacement.rider = Nothing,
+                ActiveReplacement.slots = Map.empty
               }
           ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 2 False False False 0 (Just S.alice) DamageKind.Combat
           after = S.runPure S.identityAnswer (S.addReplacement shield gs0) (Damage.applyDamage [ev])
@@ -2784,7 +2788,8 @@ fightSpec s registry = Spec.describe s "Fight (CR 701.14)" $ do
               ActiveReplacement.expiry = Expiry.Type.AtCleanup,
               ActiveReplacement.uses = Uses.Unlimited,
               ActiveReplacement.origin = ReplacementOrigin.Other,
-              ActiveReplacement.rider = Nothing
+              ActiveReplacement.rider = Nothing,
+              ActiveReplacement.slots = Map.empty
             }
         before = S.addReplacement shield base
         after = S.settleSba (S.runPure (aimedAtEither mine theirs) before (S.cast S.alice spell >> Stack.resolveTop))

@@ -266,7 +266,8 @@ leylineShape src ts =
       ActiveReplacement.expiry = Expiry.Never,
       ActiveReplacement.uses = Uses.Unlimited,
       ActiveReplacement.origin = ReplacementOrigin.Other,
-      ActiveReplacement.rider = Nothing
+      ActiveReplacement.rider = Nothing,
+      ActiveReplacement.slots = Map.empty
     }
 
 -- Eon Hub {5} Artifact: "Players skip their upkeep steps."
@@ -3418,7 +3419,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
               ActiveReplacement.expiry = Expiry.AtCleanup,
               ActiveReplacement.uses = Uses.Once,
               ActiveReplacement.origin = ReplacementOrigin.Other,
-              ActiveReplacement.rider = Nothing
+              ActiveReplacement.rider = Nothing,
+              ActiveReplacement.slots = Map.empty
             }
         g3 = S.addReplacement active g2
         asked = answersFor S.identityAnswer g3 (Event.runEntry Set.empty piker)
@@ -4275,7 +4277,8 @@ blastShape src ts =
       ActiveReplacement.expiry = Expiry.Never,
       ActiveReplacement.uses = Uses.Unlimited,
       ActiveReplacement.origin = ReplacementOrigin.SelfReplacement,
-      ActiveReplacement.rider = Nothing
+      ActiveReplacement.rider = Nothing,
+      ActiveReplacement.slots = Map.empty
     }
 
 -- alice controls `n` Mountains and `extra` further permanents, and holds a

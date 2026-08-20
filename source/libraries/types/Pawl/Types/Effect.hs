@@ -456,9 +456,12 @@ data Effect card
   | -- | CR 614.3 / 615.3: install a floating replacement effect for a duration,
     -- with a use count, an origin and an optional condition. Fog and Drudge
     -- Skeletons' regeneration are both this opcode, differing only in the
-    -- payload's event class. Targetless -- a floating replacement watches a CLASS
-    -- of events. Resolve stores it into GameState.replacements with this effect's
-    -- SOURCE (CR 113.7).
+    -- payload's event class. Targetless -- a floating replacement watches a class
+    -- of events, and where the printed sentence is about ONE object it says so
+    -- with a Filter.IsBound over a slot an earlier effect of the same resolution
+    -- defined (CR 400.7j / 400.7h; Dire Fleet Daredevil's "that spell"), which
+    -- ActiveReplacement.slots is what answers. Resolve stores the row into
+    -- GameState.replacements with this effect's SOURCE (CR 113.7).
     --
     -- The ReplacementOrigin is CR 614.15's self-replacement bit. Resolve checks
     -- the Condition on resolution and installs nothing when it fails, which is
@@ -490,8 +493,11 @@ data Effect card
     -- One shield per recipient, CR 615.11's shape for free.
     --
     -- NOT a Replace carrying a DamageR: the pattern must name the shielded
-    -- permanent or player, known only at resolution, so Resolve bakes the
-    -- Recipient into DamagePattern.whichRecipient. A Duration, CR 615.3 giving a
+    -- permanent OR PLAYER, known only at resolution, so Resolve bakes the
+    -- Recipient into DamagePattern.whichRecipient. A Filter.IsBound over a slot
+    -- would reach the permanent half (that is how Replace's own ZoneChangeR names
+    -- one object), and no Filter names a player, so the two halves would need two
+    -- spellings where the baked Recipient is one. A Duration, CR 615.3 giving a
     -- prevention effect two terminators; no Uses field, the shield being spent in
     -- damage rather than applications.
     --

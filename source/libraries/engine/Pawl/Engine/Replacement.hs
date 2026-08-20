@@ -167,7 +167,11 @@ collect sources floating =
             -- CR 615.5, built rather than copied: the additional effect is
             -- printed on the ability (DamageR.riders) and the environment it
             -- runs in is read off the live board (see `printedRider`).
-            ReplacementCandidate.rider = printedRider src (Projection.controllerOf src sources) re
+            ReplacementCandidate.rider = printedRider src (Projection.controllerOf src sources) re,
+            -- No resolution installed this segment, so there is nothing it could
+            -- have bound: a permanent's static ability is re-derived from the
+            -- battlefield, and Filter.IsBound is vacuously False in it.
+            ReplacementCandidate.slots = Map.empty
           }
       fromFloating active =
         ReplacementCandidate.MkReplacementCandidate
@@ -191,7 +195,10 @@ collect sources floating =
             -- CR 615.5, copied off the row rather than looked up later: the row
             -- may be dropped by the very application that fires the rider
             -- (`setShield` drops a shield reduced to 0).
-            ReplacementCandidate.rider = ActiveReplacement.rider active
+            ReplacementCandidate.rider = ActiveReplacement.rider active,
+            -- The installing resolution's bindings, carried through so a row's
+            -- own pattern can name one object (see Pawl.Types.ActiveReplacement).
+            ReplacementCandidate.slots = ActiveReplacement.slots active
           }
    in fmap fromPermanent (numberInstances (Projection.replacementsAffecting sources))
         <> fmap fromFloating floating
@@ -808,9 +815,17 @@ matchesFiltered gs candidate filter_ oid =
 -- Shared by matchesFiltered above and by the damage arm of `applies`, so a
 -- shield naming its source by characteristic (Luminesce) and an entry
 -- replacement naming its own permanent (Clone) read one context.
+--
+-- The row's own captured slot bindings ride along, which is what lets a floating
+-- pattern's Filter.IsBound name the object the INSTALLING resolution bound
+-- (Dire Fleet Daredevil's "that spell"); empty for a permanent's static ability,
+-- where the atom is vacuously False.
 candidateContext :: ReplacementCandidate -> Filter.Context
 candidateContext candidate =
-  Filter.contextFor (ReplacementCandidate.controller candidate) (Just (ReplacementCandidate.source candidate))
+  Filter.contextWithSlots
+    (ReplacementCandidate.controller candidate)
+    (Just (ReplacementCandidate.source candidate))
+    (ReplacementCandidate.slots candidate)
 
 -- CR 614.1a: apply a scaling to a number. "Plus one" and "twice that many" are
 -- the same operation with different data, and so is Furnace of Rath's doubling
@@ -1868,7 +1883,8 @@ installTurnSkips entry gs =
                   ActiveReplacement.expiry = Expiry.AtCleanup,
                   ActiveReplacement.uses = Uses.Once,
                   ActiveReplacement.origin = ReplacementOrigin.Other,
-                  ActiveReplacement.rider = Nothing
+                  ActiveReplacement.rider = Nothing,
+                  ActiveReplacement.slots = Map.empty
                 }
          in g1 {GameState.replacements = active : GameState.replacements g1}
    in List.foldl' install gs (Set.toAscList (ExtraTurn.skipped entry))
