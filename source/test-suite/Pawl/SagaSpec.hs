@@ -10,11 +10,14 @@
 -- where a card reaches them: CounterKind.Lore, GameEvent.CountersPut (the CR
 -- 122.6 record) and TriggerCondition.SelfCountersReached.
 --
--- History of Benalia is the whole card pool for this file, and is the only Saga
--- in `data/cards`. Chapters I and II create a 2/2 white Knight token with
--- vigilance -- CR 714.2c's "I, II --" shorthand, written as the two abilities
--- that rule says it means -- and chapter III gives Knights its controller
--- controls +2/+1 until end of turn.
+-- History of Benalia is the whole card pool for this file. Chapters I and II
+-- create a 2/2 white Knight token with vigilance -- CR 714.2c's "I, II --"
+-- shorthand, written as the two abilities that rule says it means -- and
+-- chapter III gives Knights its controller controls +2/+1 until end of turn.
+--
+-- `data/cards` holds a second Saga, Old Fat Spider Can't See Me, whose four
+-- chapters run under Pawl.ExpirySpec's OldFatSpiderCantSeeMe group: rule 714 is
+-- read here, and that group reads what its chapters' CR 611.2b durations do.
 module Pawl.SagaSpec where
 
 import qualified Data.Map.Strict as Map
