@@ -985,6 +985,95 @@ communeWithTheGodsSpec s registry =
             (List.sort (namesIn Zone.Graveyard S.alice after))
             (List.sort [named "Commune with the Gods", named "Island", named "Island", named "Murder", named "Murder", named "Murder"])
 
+-- ObjectRef.TopOfLibraryUntil: a prefix of a library whose LENGTH is what a
+-- Filter decides, where ObjectRef.TopOfLibrary's is what a Quantity counts.
+--
+-- Treasure Hunt {1}{U} Sorcery, "Reveal cards from the top of your library until
+-- you reveal a nonland card, then put all cards revealed this way into your
+-- hand." Two clauses, both of whose opcodes already existed: CR 701.20a's reveal
+-- binding the walked cards as a group, and a move of that group (CR 701.20b left
+-- every one of them in the library, so the move is what takes them out).
+--
+-- Nothing in the CR governs the word "until" -- the stopping condition is the
+-- card's own text. What the walk owes the rulebook is CR 401.2's ordered pile
+-- read from its head (CR 121.1) and CR 609.3's shortfall where no card matches.
+--
+-- The board deliberately puts SEVERAL non-matching cards above the match, which
+-- is what separates "revealed until the match" from "revealed the top card" and
+-- from "revealed the whole library"; the two legs below it pin the ends of the
+-- walk.
+treasureHuntSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+treasureHuntSpec s registry =
+  let -- alice: two Islands for the {1}{U}, `stock` into her library BOTTOM FIRST
+      -- (S.addLibraryCard puts each new card on top), Treasure Hunt in hand.
+      -- `decoy` goes into BOB's library, which alice's "your library" must not
+      -- reach -- a three-seat game, so "you" and "an opponent" cannot collapse.
+      board island treasureHunt stock decoy =
+        let mana = S.landsFor island S.alice 2 S.threePlayerGame
+            withStock = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.alice g)) mana stock
+            withDecoy = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.bob g)) withStock decoy
+            (withSpell, spellId) = S.handOne treasureHunt withDecoy
+         in (spellId, withSpell {GameState.priority = Just S.alice})
+      named = Just . CardName.MkCardName . Text.pack
+      cast (spellId, gs) =
+        let announced = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
+         in S.runPure S.identityAnswer announced Stack.resolveTop
+   in Spec.describe s "TreasureHunt" $ do
+        -- The headline. Top to bottom alice's library is Island, Swamp, Forest,
+        -- Murder, Bird Maiden, Mountain: THREE lands sit above the first nonland
+        -- card, so the four cards that reach her hand are neither the one an
+        -- unwalked read would take nor the six a walk that never stopped would.
+        Spec.it s "CR 401.2 the walk takes the top cards down to and including the first match" $ do
+          island <- S.printingOf s registry "Island"
+          treasureHunt <- S.printingOf s registry "Treasure Hunt"
+          swamp <- S.printingOf s registry "Swamp"
+          forest <- S.printingOf s registry "Forest"
+          murder <- S.printingOf s registry "Murder"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          mountain <- S.printingOf s registry "Mountain"
+          let after = cast (board island treasureHunt [mountain, maiden, murder, forest, swamp, island] [murder, murder])
+          Spec.assertEqWith
+            s
+            "the three lands and the nonland card that ended the walk are alice's hand"
+            (List.sort (namesIn Zone.Hand S.alice after))
+            (List.sort [named "Forest", named "Island", named "Murder", named "Swamp"])
+          Spec.assertEqWith
+            s
+            "the two cards under the match are still her library, in that order"
+            (namesIn Zone.Library S.alice after)
+            [named "Bird Maiden", named "Mountain"]
+          Spec.assertEqWith s "and only the spell is in her graveyard (CR 608.2n)" (namesIn Zone.Graveyard S.alice after) [named "Treasure Hunt"]
+          -- CR 400.1: "your library" is one player's. bob's holds two cards that
+          -- would both have matched, and the walk never looked at them.
+          Spec.assertEqWith s "bob's library is untouched" (namesIn Zone.Library S.bob after) [named "Murder", named "Murder"]
+          Spec.assertEqWith s "and nothing reached bob's hand" (namesIn Zone.Hand S.bob after) []
+        -- The near end of the walk: the top card already matches, so it is the
+        -- whole set. Pairs with the case above on one changed thing -- where the
+        -- Murder sits in the stock.
+        Spec.it s "CR 401.2 a matching top card ends the walk at one card" $ do
+          island <- S.printingOf s registry "Island"
+          treasureHunt <- S.printingOf s registry "Treasure Hunt"
+          swamp <- S.printingOf s registry "Swamp"
+          murder <- S.printingOf s registry "Murder"
+          let after = cast (board island treasureHunt [swamp, island, murder] [])
+          Spec.assertEqWith s "one card came to hand" (namesIn Zone.Hand S.alice after) [named "Murder"]
+          Spec.assertEqWith s "and the two under it stayed put" (namesIn Zone.Library S.alice after) [named "Island", named "Swamp"]
+        -- The far end: CR 609.3's shortfall. A library with no matching card is
+        -- walked to the bottom and given up whole, which is as much as the
+        -- instruction can do.
+        Spec.it s "CR 609.3 a library with no matching card is walked to the bottom" $ do
+          island <- S.printingOf s registry "Island"
+          treasureHunt <- S.printingOf s registry "Treasure Hunt"
+          swamp <- S.printingOf s registry "Swamp"
+          forest <- S.printingOf s registry "Forest"
+          let after = cast (board island treasureHunt [forest, swamp, island] [])
+          Spec.assertEqWith
+            s
+            "every card in the library came to hand"
+            (List.sort (namesIn Zone.Hand S.alice after))
+            (List.sort [named "Forest", named "Island", named "Swamp"])
+          Spec.assertEqWith s "and the library is empty" (namesIn Zone.Library S.alice after) []
+
 -- CR 701.20e's look, CR 701.20a's reveal of ONE card chosen from among what it
 -- showed, and CR 401.4's arrangement handed to randomness -- the three halves
 -- communeWithTheGodsSpec and enduranceSpec above each carry one of, on the
@@ -3036,6 +3125,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   portOfKarfellSpec s registry
   midnightTillingSpec s registry
   communeWithTheGodsSpec s registry
+  treasureHuntSpec s registry
   carthTheLionSpec s registry
   blossomingTortoiseSpec s registry
   exhumeSpec s registry

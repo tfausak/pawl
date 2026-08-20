@@ -9,6 +9,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
+import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
 
 -- | WHICH OBJECTS an object-affecting effect names -- the object-side counterpart
 -- of Pawl.Types.PlayerRef.
@@ -38,7 +39,9 @@ data ObjectRef
     -- EachCardExiledWithSource -- and a FILTERED sweep of a zone is written on
     -- the arm for that zone: the battlefield's is here, and a graveyard's, the
     -- stack's and the linked exile set's are on their own arms. A hand and a
-    -- library still have none (#1309).
+    -- library still have none (#1309) -- TopOfLibraryUntil below is not one, since
+    -- it names a PREFIX of a library that a match ends rather than the cards in it
+    -- that match.
     --
     -- Not a target and never one (CR 115.10a), so CR 608.2b has nothing to
     -- fizzle. The set is swept when the effect executes (CR 608.2c) and is then
@@ -239,6 +242,39 @@ data ObjectRef
     -- executes (CR 608.2c), which is what makes an empty library a no-op rather
     -- than an error: there is no top card, so the arm names nothing.
     TopOfLibrary TopOfLibrary.TopOfLibrary
+  | -- | The cards on top of a library down to and INCLUDING the first one the
+    -- Filter matches -- Treasure Hunt's "reveal cards from the top of your
+    -- library until you reveal a nonland card". TopOfLibrary's sibling, and a
+    -- second way to say HOW DEEP rather than a second way to reveal: both name a
+    -- prefix of CR 401.2's ordered pile taken from its head (CR 121.1), and they
+    -- differ only in what ends it -- a Quantity there, a match here.
+    --
+    -- NOT the filtered sweep of a library the arms above still lack (#1309), and
+    -- the difference is the one that issue turns on. A sweep would have to read
+    -- every card in a hidden zone (CR 400.2) and report which ones matched; this
+    -- walks the pile from the top and stops, so which cards it names is a
+    -- POSITION question that a Filter only terminates. Every card the walk names
+    -- is then shown by the effect reading it (CR 701.20a), where the cards a
+    -- sweep passed over would not be.
+    --
+    -- The MATCHING card is in the set, which is what "until you reveal a nonland
+    -- card" says: the walk stops having revealed it, not before it. A library
+    -- holding no match at all gives up the whole of itself and stops at the
+    -- bottom (CR 609.3), and the rest of the instruction is then performed on all
+    -- of it.
+    --
+    -- No rule of the CR governs "until": the stopping condition is the card's own
+    -- text, and what the walk owes the rulebook is CR 401.2's order, CR 121.1's
+    -- head and CR 609.3's shortfall.
+    --
+    -- The PlayerRef is WHOSE library, TopOfLibrary's field for its reason, and
+    -- the walk runs once per library it names rather than once across all of
+    -- them.
+    --
+    -- Not a target and never one (CR 115.10a) -- the player may be targeted, the
+    -- cards are not -- and read when the effect executes (CR 608.2c), the two
+    -- properties TopOfLibrary above has. An empty library names nothing.
+    TopOfLibraryUntil TopOfLibraryUntil.TopOfLibraryUntil
   | -- | A card in a graveyard, matching the Filter, CHOSEN as the effect runs
     -- rather than swept -- Port of Karfell's "return a creature card from your
     -- graveyard to the battlefield tapped".
@@ -346,9 +382,11 @@ data ObjectRef
     -- by CR 701.20a's reveal, CR 701.20e's look, CR 701.17c's mill or a move, and
     -- it sits wherever that effect left it -- which for a look or a reveal is the
     -- LIBRARY, since neither moves anything (CR 701.20b). No zone-keyed arm can
-    -- offer a choice there: there is no filtered sweep of a library at all
-    -- (#1309). Where the batch DID move to a graveyard, Midnight Tilling writes
-    -- the same sentence as ChosenCardInGraveyard narrowed by Filter.IsBound; this
+    -- offer a choice there: a library still has no filtered sweep (#1309), and
+    -- TopOfLibraryUntil's walk is not one either -- it names a prefix and cannot
+    -- reach past the first match. Where the batch DID move to a graveyard,
+    -- Midnight Tilling writes the same sentence as ChosenCardInGraveyard narrowed
+    -- by Filter.IsBound; this
     -- arm reads the slot directly instead, so it needs no such sweep.
     --
     -- Reads the slot's GROUP first and its single binding second, the two shapes

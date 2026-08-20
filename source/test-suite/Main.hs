@@ -256,6 +256,7 @@ import qualified Pawl.Codec.TargetSlotSpec
 import qualified Pawl.Codec.TokenPatternSpec
 import qualified Pawl.Codec.TokenRSpec
 import qualified Pawl.Codec.TopOfLibrarySpec
+import qualified Pawl.Codec.TopOfLibraryUntilSpec
 import qualified Pawl.Codec.ToughnessSpec
 import qualified Pawl.Codec.TriggerConditionSpec
 import qualified Pawl.Codec.TriggerFrequencySpec
@@ -680,6 +681,7 @@ spec s registry = do
   Pawl.Codec.TokenPatternSpec.spec s
   Pawl.Codec.TokenRSpec.spec s
   Pawl.Codec.TopOfLibrarySpec.spec s
+  Pawl.Codec.TopOfLibraryUntilSpec.spec s
   Pawl.Codec.ToughnessSpec.spec s
   Pawl.Codec.TriggerConditionSpec.spec s
   Pawl.Codec.TriggerFrequencySpec.spec s

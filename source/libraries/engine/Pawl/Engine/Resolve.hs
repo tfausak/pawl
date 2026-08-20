@@ -206,6 +206,7 @@ import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
+import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 import qualified Pawl.Types.TurnUpR as TurnUpR
@@ -291,6 +292,11 @@ objectRefSlots ref = case ref of
   -- The seat comes from the source's own entry choice (CR 614.12a), not a slot.
   ObjectRef.ChosenPlayer -> Map.empty
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player count) -> joinTwo (playerRefSlots player) (quantitySlots count)
+  -- The seat half of the arm above, and no more: what ends the walk is a Filter,
+  -- and no arm here reports the slots a Filter reads -- EachMatching's and the
+  -- two chosen arms' each answer for their PLAYER side alone, for the reason the
+  -- header states.
+  ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil player _) -> playerRefSlots player
   -- CR 109.5: whose graveyards names no slot; who CHOOSES may.
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser _ _) -> chooserSlots chooser
   -- CR 402.3: the choosers own the hands, so the PlayerRef is the whole read.
@@ -320,6 +326,8 @@ objectRefQuantities ref = case ref of
   ObjectRef.EachPlayer -> []
   ObjectRef.ChosenPlayer -> []
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary _ count) -> [count]
+  -- A Filter ends this walk, so there is no depth to carry.
+  ObjectRef.TopOfLibraryUntil {} -> []
   ObjectRef.ChosenCardInGraveyard {} -> []
   ObjectRef.ChosenCardInHand {} -> []
   ObjectRef.ChosenCardFromAmong {} -> []
@@ -1811,6 +1819,29 @@ objectRefObjects legal resolving controller source gs ref = case ref of
      in concatMap
           (\pid -> List.genericTake depth (Game.zoneMembers Zone.Library pid gs))
           (filter (`elem` named) (Game.apnapOrder gs))
+  -- The arm above's walk with a MATCH where its Quantity is: the same prefix of
+  -- CR 401.2's ordered pile taken from its head (CR 121.1), ended by the first
+  -- card the Filter matches instead of by a counted depth. The matching card is
+  -- IN the prefix, which is what Treasure Hunt's "until you reveal a nonland
+  -- card" says -- the walk stops having reached it, not before it.
+  --
+  -- A library holding no match is given up whole (CR 609.3), which `break` does
+  -- by leaving the second list empty; the rest of the instruction is then
+  -- performed on all of it (CR 101.3). An empty library names nothing, for the
+  -- same reason.
+  --
+  -- Per named library and in APNAP order, the arm above's fold, so "each
+  -- player's" walks each pile separately rather than one across the table. The
+  -- Filter is matched against each card's own projection as the walk reaches it
+  -- (CR 608.2c) -- the context is this resolution's, so a filter reading a slot
+  -- this resolution bound sees it.
+  ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil player filter_) ->
+    let named = playerRefPlayers legal controller gs player
+        context = effectContext controller source legal (slotGroups resolving gs)
+        walk pid =
+          let (before, after) = List.break (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_) (Game.zoneMembers Zone.Library pid gs)
+           in before <> take 1 after
+     in concatMap walk (filter (`elem` named) (Game.apnapOrder gs))
   -- A card somebody CHOOSES is a QUESTION, and this function cannot ask one; the
   -- MoveToZone arm's own gather does. Under any other opcode this empty answer is
   -- an inert card-data error.
@@ -1962,6 +1993,7 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.EachCardInYourHand -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachCardExiledWithSource {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.TopOfLibrary {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
+  ObjectRef.TopOfLibraryUntil {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachSpell _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   -- CR 120.3a: a player is a damage recipient. APNAP (CR 608.2f) via
   -- Game.apnapOrder.
@@ -2367,8 +2399,8 @@ slotBoundObjects resolving chosen slot = do
 -- members of a GROUP an earlier clause of this resolution bound rather than a
 -- zone's contents, which is the whole difference from the zone-keyed choices --
 -- and the reason a batch CR 701.20a's reveal or CR 701.20e's look left in the
--- LIBRARY is reachable at all (CR 701.20b), there being no filtered sweep of a
--- library (#1309).
+-- LIBRARY is reachable at all (CR 701.20b), a library still having no filtered
+-- sweep (#1309).
 --
 -- ONE function rather than one per opcode, because it is ONE choice: Carth the
 -- Lion's "you may reveal a planeswalker card from among them and put it into
@@ -3106,6 +3138,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- Read from the pre-move state like the sweeps above: the whole batch
             -- comes off one look at each library (CR 608.2c, CR 608.2f).
             ObjectRef.TopOfLibrary {} -> do
+              gs <- State.get
+              pure (objectRefObjects legal resolving controller source gs ref)
+            -- The walked prefix, read from the PRE-MOVE state for the arm above's
+            -- reason: the whole batch comes off one walk of each library (CR
+            -- 608.2c, CR 608.2f).
+            ObjectRef.TopOfLibraryUntil {} -> do
               gs <- State.get
               pure (objectRefObjects legal resolving controller source gs ref)
             -- One card per chooser, and the only ref whose gather asks a question

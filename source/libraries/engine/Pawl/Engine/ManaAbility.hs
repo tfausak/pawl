@@ -256,6 +256,9 @@ movesLibraryCard effect = case effect of
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref zone _ _ origin _) ->
     zone == Zone.Library || origin == Just Zone.Library || case ref of
       ObjectRef.TopOfLibrary {} -> True
+      -- TRUE for the arm above's reason: the cards are named by their POSITION in
+      -- a library, whatever ends the walk that finds them.
+      ObjectRef.TopOfLibraryUntil {} -> True
       ObjectRef.InSlot _ -> False
       ObjectRef.EachMatching _ -> False
       ObjectRef.EachCardInGraveyard {} -> False

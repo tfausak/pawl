@@ -561,6 +561,8 @@ library codec
     Pawl.Codec.TokenRSpec
     Pawl.Codec.TopOfLibrary
     Pawl.Codec.TopOfLibrarySpec
+    Pawl.Codec.TopOfLibraryUntil
+    Pawl.Codec.TopOfLibraryUntilSpec
     Pawl.Codec.Toughness
     Pawl.Codec.ToughnessSpec
     Pawl.Codec.TriggerCondition
@@ -1223,6 +1225,7 @@ library types
     Pawl.Types.TokenPattern
     Pawl.Types.TokenR
     Pawl.Types.TopOfLibrary
+    Pawl.Types.TopOfLibraryUntil
     Pawl.Types.Toughness
     Pawl.Types.TriggerCondition
     Pawl.Types.TriggeredAbility

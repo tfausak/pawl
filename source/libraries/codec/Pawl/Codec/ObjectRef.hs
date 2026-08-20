@@ -9,6 +9,7 @@ import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.TopOfLibrary as TopOfLibrary
+import qualified Pawl.Codec.TopOfLibraryUntil as TopOfLibraryUntil
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -24,7 +25,7 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- was waiting on. The wire format is unchanged by that conversion -- the same
 -- tags, emitted identically -- and what it adds is the schema.
 --
--- 'EachCardInGraveyard', 'TopOfLibrary', 'ChosenCardInGraveyard',
+-- 'EachCardInGraveyard', 'TopOfLibrary', 'TopOfLibraryUntil', 'ChosenCardInGraveyard',
 -- 'ChosenCardInHand' and 'ChosenCardFromAmong' each carry a payload record of
 -- their own (#1464), so no arm here writes a positional array.
 -- 'RandomCardInHand' carries a bare PlayerRef instead, since it holds only the
@@ -46,6 +47,7 @@ codec =
       Arm.nullary "EachPlayer" ObjectRef.EachPlayer,
       Arm.nullary "ChosenPlayer" ObjectRef.ChosenPlayer,
       Arm.payload "TopOfLibrary" TopOfLibrary.codec ObjectRef.TopOfLibrary (\x -> case x of ObjectRef.TopOfLibrary y -> Just y; _ -> Nothing),
+      Arm.payload "TopOfLibraryUntil" TopOfLibraryUntil.codec ObjectRef.TopOfLibraryUntil (\x -> case x of ObjectRef.TopOfLibraryUntil y -> Just y; _ -> Nothing),
       Arm.payload "ChosenCardInGraveyard" ChosenCardInGraveyard.codec ObjectRef.ChosenCardInGraveyard (\x -> case x of ObjectRef.ChosenCardInGraveyard y -> Just y; _ -> Nothing),
       Arm.payload "ChosenCardInHand" ChosenCardInHand.codec ObjectRef.ChosenCardInHand (\x -> case x of ObjectRef.ChosenCardInHand y -> Just y; _ -> Nothing),
       Arm.payload "ChosenCardFromAmong" ChosenCardFromAmong.codec ObjectRef.ChosenCardFromAmong (\x -> case x of ObjectRef.ChosenCardFromAmong y -> Just y; _ -> Nothing),
