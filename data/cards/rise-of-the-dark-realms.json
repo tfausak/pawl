@@ -44,8 +44,11 @@
                               "type": "Creature"
                             }
                           },
-                          "players": {
-                            "type": "EachPlayer"
+                          "graveyards": {
+                            "type": "Scoped",
+                            "value": {
+                              "type": "EachPlayer"
+                            }
                           }
                         }
                       },

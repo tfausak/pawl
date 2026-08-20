@@ -399,6 +399,87 @@ riseOfTheDarkRealmsSpec s registry = Spec.describe s "RiseOfTheDarkRealms" $ do
       )
     Spec.assertBool s (S.onBattlefield heroId after) "bob's creature was never moved, so nothing swept the battlefield"
 
+-- The same CR 109.2a sweep with its scope taken from another SLOT of the same
+-- announcement rather than from CR 109.5's perspective: riseOfTheDarkRealmsSpec
+-- above names the whole table, this names the one player the trigger targeted
+-- (#1310).
+--
+-- Angel of Finality {3}{W} Creature -- Angel 3/4 -- "Flying / When this creature
+-- enters, exile target player's graveyard." (name, cost, type line, power,
+-- toughness and Oracle text checked against api.scryfall.com, 2026-08-20). The
+-- whole card is transcribed, and the only clause with a resolution-time effect is
+-- the trigger, so nothing else on it can be what these assertions read.
+--
+-- THREE SEATS, and a graveyard per seat, because the board has to tell four
+-- readings of "target player's graveyard" apart:
+--
+--   * THE TARGETED SEAT versus YOUR OWN. alice controls the Angel and targets
+--     bob, so a scope that had stayed CR 109.5's "you" would empty the wrong
+--     graveyard.
+--   * THE TARGETED SEAT versus EACH PLAYER'S. carol's graveyard is stocked too
+--     and must survive -- the reading Rise of the Dark Realms takes.
+--   * THE TARGETED SEAT versus OPPONENTS'. carol is alice's opponent as much as
+--     bob is (CR 806.1), so her surviving separates those two readings as well;
+--     a two-seat board could not.
+--   * A GRAVEYARD versus the battlefield. bob controls a Benalish Hero, which
+--     stays put: the sweep reads CR 400.1's per-player graveyard, not the seat's
+--     permanents.
+--
+-- Every buried card is of a printing nobody else has, so the graveyard assertion
+-- names which seat lost what rather than counting.
+angelOfFinalitySpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+angelOfFinalitySpec s registry = Spec.describe s "AngelOfFinality" $ do
+  Spec.it s "CR 109.2a only the targeted player's graveyard is exiled" $ do
+    angel <- S.printingOf s registry "Angel of Finality"
+    piker <- S.printingOf s registry "Goblin Piker"
+    maiden <- S.printingOf s registry "Bird Maiden"
+    sentry <- S.printingOf s registry "Ogre Sentry"
+    hero <- S.printingOf s registry "Benalish Hero"
+    murder <- S.printingOf s registry "Murder"
+    judgment <- S.printingOf s registry "Day of Judgment"
+    forest <- S.printingOf s registry "Forest"
+    let (heroId, withHero) = S.addCreature hero S.bob S.threePlayerGame
+        buried =
+          List.foldl'
+            (\g (printing, pid) -> snd (S.addGraveyardCard printing pid g))
+            withHero
+            [ (piker, S.alice),
+              (murder, S.alice),
+              (maiden, S.bob),
+              (judgment, S.bob),
+              (sentry, S.carol),
+              (forest, S.carol)
+            ]
+        (_, entered) = S.entersWithTrigger angel S.alice buried
+        -- The offered set is FILTERED rather than rebuilt, so the answer is a
+        -- recipient the engine itself minted; three seats are offered where one
+        -- is wanted, so the prompt is a real choice rather than an elision.
+        atBob :: Prompt.Prompt r -> r
+        atBob p = case p of
+          Prompt.ChooseTargets _ _ _ slots -> fmap (Set.filter (== Recipient.ToPlayer S.bob) . snd) slots
+          _ -> S.identityAnswer p
+        placed = S.runPure atBob entered Engine.placePendingTriggers
+        after = S.runPure atBob placed Stack.resolveTop
+        named = Just . CardName.MkCardName . Text.pack
+        exiled gs = List.sort [fmap S.nameOf (Game.cardOf oid gs) | oid <- Set.toList (GameState.exile gs)]
+    Spec.assertEqWith
+      s
+      "bob's graveyard is empty and the other two keep every card"
+      ( namesIn Zone.Graveyard S.alice after,
+        namesIn Zone.Graveyard S.bob after,
+        namesIn Zone.Graveyard S.carol after
+      )
+      ( [named "Goblin Piker", named "Murder"],
+        [],
+        [named "Ogre Sentry", named "Forest"]
+      )
+    Spec.assertEqWith
+      s
+      "the two cards that left bob's graveyard are the two now in exile"
+      (exiled after)
+      (List.sort [named "Bird Maiden", named "Day of Judgment"])
+    Spec.assertBool s (S.onBattlefield heroId after) "bob's creature was never moved, so nothing swept the battlefield"
+
 -- CR 608.2d's choice made WHILE APPLYING an effect, over a graveyard:
 -- ObjectRef.ChosenCardInGraveyard, where riseOfTheDarkRealmsSpec above is the
 -- same zone swept as a set.
@@ -2504,6 +2585,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   destroyAllSpec s registry
   returnAllSpec s registry
   riseOfTheDarkRealmsSpec s registry
+  angelOfFinalitySpec s registry
   portOfKarfellSpec s registry
   blossomingTortoiseSpec s registry
   exhumeSpec s registry

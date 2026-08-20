@@ -62,13 +62,13 @@ data ObjectRef
     -- EachCardExiledWithSource takes the exile one -- and the hidden zones (CR
     -- 400.2) would owe a visibility question a graveyard does not (#1309).
     --
-    -- The PlayerScope is WHOSE, which CR 400.1 forces this arm to say and
-    -- EachMatching's shared battlefield never has to. Not the
-    -- Pawl.Types.GraveyardScope a target pool carries: that type's other arm
-    -- reads the players another TARGET SLOT names, a reading no mass effect in
-    -- the pool asks for (#1310). Enumerated by
-    -- Pawl.Engine.PlayerEffect.playersInScope, the same fold over the one
-    -- membership test that pool uses, so the two cannot drift.
+    -- The Pawl.Types.GraveyardScope is WHOSE, which CR 400.1 forces this arm to
+    -- say and EachMatching's shared battlefield never has to. The SAME type a
+    -- target pool carries, so both readings are stated once: the perspective's
+    -- own (Rise of the Dark Realms' "all graveyards") and the players another
+    -- slot of the announcement targets (Angel of Finality's "target player's
+    -- graveyard"). Read by Pawl.Engine.Target.graveyardScopePlayers for both, so
+    -- the sweep and the pool cannot drift.
     --
     -- Not a target and never one (CR 115.10a), and swept when the effect executes
     -- (CR 608.2c) -- the two properties EachMatching above has, for its reasons.
@@ -262,6 +262,12 @@ data ObjectRef
     -- names -- Skullwinder's "choose an opponent. That player returns a card
     -- from their graveyard to their hand", where Effect.ChooseOpponent filled the
     -- slot a sentence earlier.
+    --
+    -- Still a PlayerScope where EachCardInGraveyard now takes a
+    -- Pawl.Types.GraveyardScope: no card in data/cards/ draws these candidates
+    -- from the graveyards another slot names, and Skullwinder -- whose CHOOSER is
+    -- slot-bound -- draws from "a graveyard" rather than that opponent's. Not
+    -- implemented: a slot-named scope here (#1952).
     --
     -- The PlayerScope is WHOSE GRAVEYARDS the candidates are drawn from, which
     -- CR 400.1 forces this arm to say for EachCardInGraveyard's reason. Under

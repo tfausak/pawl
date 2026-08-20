@@ -35,8 +35,11 @@
                               "type": "Enchantment"
                             }
                           },
-                          "players": {
-                            "type": "You"
+                          "graveyards": {
+                            "type": "Scoped",
+                            "value": {
+                              "type": "You"
+                            }
                           }
                         }
                       },

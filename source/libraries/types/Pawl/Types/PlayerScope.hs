@@ -5,16 +5,20 @@ module Pawl.Types.PlayerScope where
 -- Membership is Pawl.Engine.PlayerEffect.inScope and the set is the fold over it,
 -- Pawl.Engine.PlayerEffect.playersInScope -- one reading, two shapes.
 --
--- THREE carriers. They differ only in where the perspective comes from, and the
+-- The carriers below differ only in where the perspective comes from, and the
 -- first two take CR 109.5's "you":
 --
 --   * Pawl.Types.PlayerStaticAbility / ActivePlayerEffect -- which players a
 --     Pawl.Types.PlayerEffect applies to, against the effect's CONTROLLER.
---   * Pawl.Types.GraveyardScope.Scoped -- whose graveyards a target slot draws
---     from (CR 400.1), for the readings CR 109.5 answers. That type's OTHER arm
---     names a slot, which is why this is not Pawl.Types.PlayerRef and why the
---     pool carries a GraveyardScope rather than this type: the two PlayerEffect
---     carriers above have no slots for an InSlot arm to be resolved against.
+--   * Pawl.Types.GraveyardScope.Scoped -- whose graveyards a target slot or a
+--     resolution-time sweep draws from (CR 400.1), for the readings CR 109.5
+--     answers. That type's OTHER arm names a slot, which is why this is not
+--     Pawl.Types.PlayerRef and why both of those carry a GraveyardScope rather
+--     than this type: the two PlayerEffect carriers above have no slots for an
+--     InSlot arm to be resolved against.
+--   * Pawl.Types.ChosenCardInGraveyard.players -- whose graveyards a
+--     resolution-time CHOICE draws candidates from. The one graveyard carrier
+--     still on this type; see #1952, filed where that arm states the elision.
 --   * Pawl.Types.PlayerEffect.CantBeTargetedBy -- whose spells and abilities
 --     cannot target the player the effect applies to (CR 702.18a's shroud, CR
 --     702.11c's hexproof). Its perspective is that PROTECTED player, which is

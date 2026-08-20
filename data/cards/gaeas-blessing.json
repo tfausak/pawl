@@ -108,8 +108,11 @@
                                 "type": "And",
                                 "value": []
                               },
-                              "players": {
-                                "type": "You"
+                              "graveyards": {
+                                "type": "Scoped",
+                                "value": {
+                                  "type": "You"
+                                }
                               }
                             }
                           }

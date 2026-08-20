@@ -13,6 +13,7 @@ import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.GraveyardScope as GraveyardScope
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -42,8 +43,8 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
     Common.assertCodec
       s
       ObjectRef.codec
-      (ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature)))
-      " {\"type\":\"EachCardInGraveyard\",\"value\":{\"players\":{\"type\":\"EachPlayer\"},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+      (ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard (GraveyardScope.Scoped PlayerScope.EachPlayer) (Filter.HasCardType CardType.Creature)))
+      " {\"type\":\"EachCardInGraveyard\",\"value\":{\"graveyards\":{\"type\":\"Scoped\",\"value\":{\"type\":\"EachPlayer\"}},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   -- The record codec rejects an ARRAY of any length, which is what keeps the
   -- old positional wire format from decoding silently. Both lengths are asserted
   -- rather than one: a decoder that had kept a tuple fallback would reject the
@@ -140,9 +141,11 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       (Either.isLeft (Common.parse (Text.pack " {\"type\":\"TopOfLibrary\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"count\":3}} ") >>= Codec.decode ObjectRef.codec))
       "expected a decode failure"
   -- The graveyard's OTHER arm: a card somebody chooses rather than the whole
-  -- matching set. Its scope and filter are EachCardInGraveyard's exactly, so
-  -- only the tag and the leading chooser tell them apart -- which is what the
-  -- distinctness case below is for.
+  -- matching set. Its filter is EachCardInGraveyard's exactly and its scope is
+  -- the PlayerScope that arm used to carry, so the tag, the leading chooser and
+  -- the scope's own shape tell them apart -- which is what the distinctness case
+  -- below is for; see #1310 for why the sweep's scope widened and this one
+  -- did not.
   Spec.it s "ChosenCardInGraveyard" $
     Common.assertCodec
       s
@@ -226,7 +229,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
           ( List.nub
               [ Codec.encode ObjectRef.codec (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
                 Codec.encode ObjectRef.codec (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)),
-                Codec.encode ObjectRef.codec (ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature))),
+                Codec.encode ObjectRef.codec (ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard (GraveyardScope.Scoped PlayerScope.EachPlayer) (Filter.HasCardType CardType.Creature))),
                 Codec.encode ObjectRef.codec ObjectRef.EachCardInYourHand,
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardExiledWithSource Nothing),
                 Codec.encode ObjectRef.codec (ObjectRef.EachSpell (Filter.Not Filter.IsSource)),
