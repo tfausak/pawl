@@ -32,6 +32,7 @@ import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.DungeonRoom as DungeonRoom
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.HandAction as HandAction
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -331,7 +332,8 @@ data Face card = MkFace
     -- CombatRestriction takes its subject off.
     attackCosts :: [AttackCost.AttackCost],
     -- | CR 103.5b: this face's "any time you could mulligan" actions, in printed
-    -- order, each one its own list of effects in written order (Serum Powder).
+    -- order, each one a Pawl.Types.HandAction -- its effects in written order,
+    -- and the clause gating whether it may be taken (Serum Powder writes none).
     -- Read directly from the card, the castingPermissions precedent: the ability
     -- functions in the HAND (CR 113.6), where this reader takes the printed card
     -- (#1859).
@@ -339,9 +341,9 @@ data Face card = MkFace
     -- A LIST OF ACTIONS and not one action's effects: nothing in CR 103 caps how
     -- many such actions a face may grant, and two are two separate offers a
     -- player picks between, which is why Pawl.Types.HandActionIndex exists.
-    -- An empty OUTER list means the face grants no such action at all, which is
+    -- An empty list means the face grants no such action at all, which is
     -- how a card that says nothing about this window is never offered one.
-    mulliganActions :: [[Effect.Effect card]],
+    mulliganActions :: [HandAction.HandAction card],
     -- | CR 103.6 / 103.6a / 103.6b: this face's opening-hand actions, shaped
     -- exactly like mulliganActions above and read the same way (CR 113.6,
     -- #1859) -- Leyline of Sanctity's rule 103.6a battlefield action, and
@@ -356,7 +358,11 @@ data Face card = MkFace
     -- 103.5b window only (#803). Unlike that window, this one offers each card
     -- at most once -- CR 103.6b, and Pawl.Types.HandWindowCap for why the cap
     -- covers a rule 103.6a action too.
-    openingHandActions :: [[Effect.Effect card]],
+    --
+    -- Gemstone Caverns is the printing that writes a HandAction's gate: "you're
+    -- not the starting player" allows the action to some players and not others,
+    -- which no CR 103.5b card says.
+    openingHandActions :: [HandAction.HandAction card],
     -- | CR 116.2: the special actions this face's printed text grants -- CR
     -- 116.2e's "you may discard this card any time you could cast an instant"
     -- (Circling Vultures). Read directly from the card, the castingPermissions

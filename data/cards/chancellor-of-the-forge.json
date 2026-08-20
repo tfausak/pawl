@@ -115,23 +115,25 @@
       ],
       "name": "Chancellor of the Forge",
       "openingHandActions": [
-        [
-          {
-            "type": "Reveal",
-            "value": {
-              "ref": {
-                "type": "InSlot",
-                "value": "self"
+        {
+          "effects": [
+            {
+              "type": "Reveal",
+              "value": {
+                "ref": {
+                  "type": "InSlot",
+                  "value": "self"
+                }
+              }
+            },
+            {
+              "type": "ArmDelayedTrigger",
+              "value": {
+                "name": "create a goblin"
               }
             }
-          },
-          {
-            "type": "ArmDelayedTrigger",
-            "value": {
-              "name": "create a goblin"
-            }
-          }
-        ]
+          ]
+        }
       ],
       "power": {
         "type": "Literal",

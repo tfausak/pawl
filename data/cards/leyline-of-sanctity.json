@@ -27,20 +27,22 @@
       ],
       "name": "Leyline of Sanctity",
       "openingHandActions": [
-        [
-          {
-            "type": "MoveToZone",
-            "value": {
-              "ref": {
-                "type": "InSlot",
-                "value": "self"
-              },
-              "zone": {
-                "type": "Battlefield"
+        {
+          "effects": [
+            {
+              "type": "MoveToZone",
+              "value": {
+                "ref": {
+                  "type": "InSlot",
+                  "value": "self"
+                },
+                "zone": {
+                  "type": "Battlefield"
+                }
               }
             }
-          }
-        ]
+          ]
+        }
       ],
       "playerAbilities": [
         {

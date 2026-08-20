@@ -22,38 +22,40 @@
         }
       ],
       "mulliganActions": [
-        [
-          {
-            "type": "Reveal",
-            "value": {
-              "ref": {
-                "type": "InSlot",
-                "value": "self"
+        {
+          "effects": [
+            {
+              "type": "Reveal",
+              "value": {
+                "ref": {
+                  "type": "InSlot",
+                  "value": "self"
+                }
               }
-            }
-          },
-          {
-            "type": "LookAt",
-            "value": {
-              "ref": {
-                "type": "TopOfLibrary",
-                "value": {
-                  "count": {
-                    "type": "Literal",
-                    "value": 2
-                  },
-                  "player": {
-                    "type": "Relative",
-                    "value": {
-                      "type": "You"
+            },
+            {
+              "type": "LookAt",
+              "value": {
+                "ref": {
+                  "type": "TopOfLibrary",
+                  "value": {
+                    "count": {
+                      "type": "Literal",
+                      "value": 2
+                    },
+                    "player": {
+                      "type": "Relative",
+                      "value": {
+                        "type": "You"
+                      }
                     }
                   }
-                }
-              },
-              "slot": "looked"
+                },
+                "slot": "looked"
+              }
             }
-          }
-        ]
+          ]
+        }
       ],
       "name": "No-Regrets Egret",
       "power": {

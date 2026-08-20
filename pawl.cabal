@@ -302,6 +302,8 @@ library codec
     Pawl.Codec.HalfUnlockedSpec
     Pawl.Codec.Halved
     Pawl.Codec.HalvedSpec
+    Pawl.Codec.HandAction
+    Pawl.Codec.HandActionSpec
     Pawl.Codec.Hybrid
     Pawl.Codec.HybridSpec
     Pawl.Codec.IncreaseSpellCost
@@ -1038,6 +1040,7 @@ library types
     Pawl.Types.GraveyardScope
     Pawl.Types.HalfUnlocked
     Pawl.Types.Halved
+    Pawl.Types.HandAction
     Pawl.Types.HandActionIndex
     Pawl.Types.HandActionPerformer
     Pawl.Types.HandWindowCap

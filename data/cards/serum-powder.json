@@ -43,11 +43,13 @@
         }
       ],
       "mulliganActions": [
-        [
-          {
-            "type": "ExileHandThenDraw"
-          }
-        ]
+        {
+          "effects": [
+            {
+              "type": "ExileHandThenDraw"
+            }
+          ]
+        }
       ],
       "name": "Serum Powder",
       "typeLine": {

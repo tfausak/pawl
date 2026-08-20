@@ -32,6 +32,7 @@ import qualified Pawl.Codec.Counterability as Counterability
 import qualified Pawl.Codec.Defense as Defense
 import qualified Pawl.Codec.DungeonRoom as DungeonRoom
 import qualified Pawl.Codec.Effect as Effect
+import qualified Pawl.Codec.HandAction as HandAction
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Loyalty as Loyalty
 import qualified Pawl.Codec.ManaCost as ManaCost
@@ -105,8 +106,8 @@ codec cardCodec = Fields.object $ do
   costReductions <- Fields.defaulted "costReductions" [] (Common.list CostReduction.codec) Face.costReductions
   -- CR 103.5b / CR 103.6: an array of ACTIONS, each an array of effects, so a
   -- face granting two of them is writable (Pawl.Types.Face).
-  mulliganActions <- Fields.defaulted "mulliganActions" [] (Common.list (Common.list (Effect.codec cardCodec))) Face.mulliganActions
-  openingHandActions <- Fields.defaulted "openingHandActions" [] (Common.list (Common.list (Effect.codec cardCodec))) Face.openingHandActions
+  mulliganActions <- Fields.defaulted "mulliganActions" [] (Common.list (HandAction.codec cardCodec)) Face.mulliganActions
+  openingHandActions <- Fields.defaulted "openingHandActions" [] (Common.list (HandAction.codec cardCodec)) Face.openingHandActions
   -- CR 116.2: the special actions this face grants (Pawl.Types.Face).
   specialActions <- Fields.defaulted "specialActions" [] (Common.list SpecialAction.codec) Face.specialActions
   -- CR 113.6g: Counterable is the absence of a card stating it can't be

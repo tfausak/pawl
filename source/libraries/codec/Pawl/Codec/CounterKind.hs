@@ -22,5 +22,6 @@ codec keywordCodec =
       Arm.nullary "Time" CounterKind.Time,
       Arm.nullary "Fade" CounterKind.Fade,
       Arm.nullary "Shield" CounterKind.Shield,
-      Arm.nullary "Level" CounterKind.Level
+      Arm.nullary "Level" CounterKind.Level,
+      Arm.nullary "Luck" CounterKind.Luck
     ]

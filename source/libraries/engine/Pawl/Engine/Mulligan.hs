@@ -7,16 +7,19 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Numeric.Natural
+import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Decider as Decider
-import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.HandAction as HandAction
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import Pawl.Types.HandActionPerformer (HandActionPerformer)
 import qualified Pawl.Types.HandWindowCap as HandWindowCap
@@ -77,12 +80,28 @@ openingHands perform owners = do
 -- Read straight off the face (Game.faceOf) and never through the projection --
 -- the Face.castingPermissions precedent: these abilities function in the HAND
 -- (CR 113.6), where this reader takes the printed card (#1859).
-actionsFor :: (Face.Face Card.Card -> [[Effect Card.Card]]) -> PlayerId -> GameState.GameState -> [((ObjectId, HandActionIndex.HandActionIndex), [Effect Card.Card])]
+actionsFor :: (Face.Face Card.Card -> [HandAction.HandAction Card.Card]) -> PlayerId -> GameState.GameState -> [((ObjectId, HandActionIndex.HandActionIndex), HandAction.HandAction Card.Card)]
 actionsFor field pid gs =
   let withActions oid = case Game.faceOf oid gs of
         Nothing -> []
-        Just face -> zipWith (\i effects -> ((oid, HandActionIndex.MkHandActionIndex i), effects)) [0 ..] (field face)
+        Just face -> zipWith (\i action -> ((oid, HandActionIndex.MkHandActionIndex i), action)) [0 ..] (field face)
    in concatMap withActions (Game.zoneMembers Zone.Hand pid gs)
+
+-- CR 103.6: does this action's own clause allow the player to take it? Gemstone
+-- Caverns' "you're not the starting player" is the pool's one gate, and an action
+-- that writes none is allowed to everyone.
+--
+-- Evaluated against the CARD IN HAND, with the acting player as CR 109.5's "you"
+-- -- which is what makes PlayerRef.Relative You resolve to the player being
+-- offered the action rather than to whoever a projection would call the card's
+-- controller.
+--
+-- A CLASSIFICATION, not an identity test, exactly as actionsFor above is: this
+-- asks whether the card's own gate holds, never which card it is.
+allows :: PlayerId -> ObjectId -> HandAction.HandAction Card.Card -> GameState.GameState -> Bool
+allows pid oid action gs = case HandAction.condition action of
+  Nothing -> True
+  Just condition -> Condition.holds (Projection.fullView gs) (Filter.contextFor (Just pid) (Just oid)) gs oid condition
 
 -- The shared CR 103.5b / CR 103.6 loop: offer this player every action their
 -- hand grants through `field`, on the `question` channel, until they decline or
@@ -120,7 +139,7 @@ actionsFor field pid gs =
 -- reach the same board.
 handWindow ::
   HandWindowCap.HandWindowCap ->
-  (Face.Face Card.Card -> [[Effect Card.Card]]) ->
+  (Face.Face Card.Card -> [HandAction.HandAction Card.Card]) ->
   (Decider.Decider -> PlayerId -> [(ObjectId, HandActionIndex.HandActionIndex)] -> Prompt.Prompt (Maybe (ObjectId, HandActionIndex.HandActionIndex))) ->
   HandActionPerformer ->
   PlayerId ->
@@ -135,15 +154,19 @@ handWindow cap = handWindowExcept cap Set.empty
 handWindowExcept ::
   HandWindowCap.HandWindowCap ->
   Set.Set ObjectId ->
-  (Face.Face Card.Card -> [[Effect Card.Card]]) ->
+  (Face.Face Card.Card -> [HandAction.HandAction Card.Card]) ->
   (Decider.Decider -> PlayerId -> [(ObjectId, HandActionIndex.HandActionIndex)] -> Prompt.Prompt (Maybe (ObjectId, HandActionIndex.HandActionIndex))) ->
   HandActionPerformer ->
   PlayerId ->
   Game ()
 handWindowExcept cap acted field question perform pid = do
   -- Filtered before the offer, not after the answer: an action the rule no longer
-  -- allows is not a choice the player is asked to make.
-  candidates <- State.gets (filter (\((oid, _), _) -> Set.notMember oid acted) . actionsFor field pid)
+  -- allows is not a choice the player is asked to make. Two filters, and the
+  -- SAME line is where both live -- CR 103.6b's cap, and the action's own printed
+  -- clause (`allows`). Re-read on every pass of the loop rather than once, so an
+  -- action taken earlier in this window that changed the board is seen by the
+  -- next read.
+  candidates <- State.gets (\gs -> filter (\((oid, _), action) -> Set.notMember oid acted && allows pid oid action gs) (actionsFor field pid gs))
   case candidates of
     -- Where the rules leave nothing to ask, don't prompt.
     [] -> pure ()
@@ -160,8 +183,8 @@ handWindowExcept cap acted field question perform pid = do
           -- Action.Activate posture, which keeps this total with no partial
           -- lookup and no way for an interpreter to conjure an action.
           Nothing -> pure ()
-          Just effects -> do
-            perform (fst key) pid effects
+          Just action -> do
+            perform (fst key) pid (HandAction.effects action)
             let acted' = case cap of
                   HandWindowCap.Repeatable -> acted
                   HandWindowCap.OncePerCard -> Set.insert (fst key) acted

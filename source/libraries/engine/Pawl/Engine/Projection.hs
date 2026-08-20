@@ -1613,6 +1613,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.LifeTotal _ -> quantity
   Quantity.Type.Speed _ -> quantity
   Quantity.Type.IsMonarch _ -> quantity
+  Quantity.Type.IsStartingPlayer _ -> quantity
   Quantity.Type.HasDesignation _ -> quantity
   Quantity.Type.WasKicked -> quantity
   Quantity.Type.PlayerCounters {} -> quantity
@@ -2176,6 +2177,9 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               -- Nor a level counter: CR 711.2a states a leveler's grants as
               -- static abilities of the card, which gatherStatic applies.
               CounterKind.Level -> []
+              -- Nor a luck counter: Gemstone Caverns reads its own count through
+              -- an ActivatedAbility condition, which is card data.
+              CounterKind.Luck -> []
          in pt <> concatMap grantOf (Map.toList cs)
 
 -- CR 701.60c / 613.1f: a SUSPECTED permanent has menace, emitted as a layer-6
@@ -2401,6 +2405,7 @@ quantityReads q = case q of
   Quantity.Type.LifeTotal _ -> Set.empty
   Quantity.Type.Speed _ -> Set.empty
   Quantity.Type.IsMonarch _ -> Set.empty
+  Quantity.Type.IsStartingPlayer _ -> Set.empty
   Quantity.Type.PlayerCounters {} -> Set.empty
   Quantity.Type.ObjectCounters _ -> Set.empty
   Quantity.Type.HasDesignation _ -> Set.empty

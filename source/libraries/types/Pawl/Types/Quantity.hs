@@ -229,6 +229,25 @@ data Quantity
     --
     -- A LEAF, like LifeTotal, Speed and ManaCount: it holds no Quantity.
     IsMonarch PlayerRef.PlayerRef
+  | -- | CR 103.1: is that player the starting player? 1 if so and 0 if not --
+    -- Gemstone Caverns' "you're not the starting player", which is that card's
+    -- opening-hand action's own gate. IsMonarch's shape exactly, and for the same
+    -- reason: this type's vocabulary is numeric, so a yes/no is a comparison
+    -- against a 0/1 on the measured side.
+    --
+    -- CR 103.1's last sentence is what makes the answer readable at all -- "the
+    -- game's default turn order begins with the starting player" -- so the
+    -- starting player is the head of GameState.turnOrder, which is that seating
+    -- order rotated. A restarted game (CR 727.1a) and a subgame (CR 729.2) seat
+    -- their own starting player, so each answers for itself.
+    --
+    -- Not implemented: CR 103.1c's Power Play, which makes its controller the
+    -- starting player after the determination. That card is not in
+    -- @data\/cards\/@ and there is no effect that reseats a turn order, so the
+    -- head of the roster is the whole answer today (#1927).
+    --
+    -- A LEAF, like LifeTotal, Speed and IsMonarch: it holds no Quantity.
+    IsStartingPlayer PlayerRef.PlayerRef
   | -- | CR 122.1: how many counters of a kind a PLAYER has -- CR 728.1's "a
     -- number of cards equal to the number of rad counters they have", and the
     -- shape Ezuri, Claw of Progress' "where X is the number of experience

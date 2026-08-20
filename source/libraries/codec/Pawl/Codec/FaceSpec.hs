@@ -38,6 +38,7 @@ import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.HandAction as HandAction
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -236,8 +237,8 @@ populatedFace =
       Face.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing (Cost.MkCost (Just (ManaCost.MkManaCost [])) [])],
       Face.costReductions = [CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 3]) (Quantity.Literal 1)],
       Face.counterability = Counterability.CantBeCountered,
-      Face.mulliganActions = [[Effect.ExileHandThenDraw]],
-      Face.openingHandActions = [[Effect.ExileHandThenDraw]],
+      Face.mulliganActions = [HandAction.MkHandAction Nothing [Effect.ExileHandThenDraw]],
+      Face.openingHandActions = [HandAction.MkHandAction Nothing [Effect.ExileHandThenDraw]],
       Face.specialActions = [SpecialAction.DiscardThisAnyTime],
       Face.enchant = [TargetSlot.required Pool.Creatures Nothing],
       Face.castingRestrictions = [CastingRestriction.AttackedThisStep]
@@ -271,8 +272,8 @@ populatedFaceJson =
     <> "\"alternativeCosts\":[{\"cost\":{\"mana\":[]}}],"
     <> "\"costReductions\":[{\"amount\":[{\"type\":\"Generic\",\"value\":3}],\"perEach\":{\"type\":\"Literal\",\"value\":1}}],"
     <> "\"counterability\":{\"type\":\"CantBeCountered\"},"
-    <> "\"mulliganActions\":[[{\"type\":\"ExileHandThenDraw\"}]],"
-    <> "\"openingHandActions\":[[{\"type\":\"ExileHandThenDraw\"}]],"
+    <> "\"mulliganActions\":[{\"effects\":[{\"type\":\"ExileHandThenDraw\"}]}],"
+    <> "\"openingHandActions\":[{\"effects\":[{\"type\":\"ExileHandThenDraw\"}]}],"
     <> "\"specialActions\":[{\"type\":\"DiscardThisAnyTime\"}],"
     <> "\"enchant\":[{\"pool\":{\"type\":\"Creatures\"}}],"
     <> "\"castingRestrictions\":[{\"type\":\"AttackedThisStep\"}]}"
@@ -484,8 +485,8 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         s
         encodeFace
         decodeFace
-        baseFace {Face.mulliganActions = [[Effect.ExileHandThenDraw]]}
-        (init baseFaceJson <> ",\"mulliganActions\":[[{\"type\":\"ExileHandThenDraw\"}]]}")
+        baseFace {Face.mulliganActions = [HandAction.MkHandAction Nothing [Effect.ExileHandThenDraw]]}
+        (init baseFaceJson <> ",\"mulliganActions\":[{\"effects\":[{\"type\":\"ExileHandThenDraw\"}]}]}")
     -- CR 103.5b caps nothing, so two actions must survive the round trip AS TWO.
     -- The arms differ in length on purpose: a codec that flattened them would
     -- read back one action of three effects, which is a different face.
@@ -494,18 +495,18 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         s
         encodeFace
         decodeFace
-        baseFace {Face.mulliganActions = [[Effect.ExileHandThenDraw], [Effect.ExileHandThenDraw, Effect.ExileHandThenDraw]]}
+        baseFace {Face.mulliganActions = [HandAction.MkHandAction Nothing [Effect.ExileHandThenDraw], HandAction.MkHandAction Nothing [Effect.ExileHandThenDraw, Effect.ExileHandThenDraw]]}
         ( init baseFaceJson
-            <> ",\"mulliganActions\":[[{\"type\":\"ExileHandThenDraw\"}],"
-            <> "[{\"type\":\"ExileHandThenDraw\"},{\"type\":\"ExileHandThenDraw\"}]]}"
+            <> ",\"mulliganActions\":[{\"effects\":[{\"type\":\"ExileHandThenDraw\"}]},"
+            <> "{\"effects\":[{\"type\":\"ExileHandThenDraw\"},{\"type\":\"ExileHandThenDraw\"}]}]}"
         )
     Spec.it s "openingHandActions" $
       Common.assertJsonCodec
         s
         encodeFace
         decodeFace
-        baseFace {Face.openingHandActions = [[Effect.ExileHandThenDraw]]}
-        (init baseFaceJson <> ",\"openingHandActions\":[[{\"type\":\"ExileHandThenDraw\"}]]}")
+        baseFace {Face.openingHandActions = [HandAction.MkHandAction Nothing [Effect.ExileHandThenDraw]]}
+        (init baseFaceJson <> ",\"openingHandActions\":[{\"effects\":[{\"type\":\"ExileHandThenDraw\"}]}]}")
     Spec.it s "specialActions" $
       Common.assertJsonCodec
         s

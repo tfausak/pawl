@@ -8,25 +8,29 @@
         }
       ],
       "mulliganActions": [
-        [
-          {
-            "type": "ExileHandThenDraw"
-          }
-        ],
-        [
-          {
-            "type": "MoveToZone",
-            "value": {
-              "ref": {
-                "type": "InSlot",
-                "value": "self"
-              },
-              "zone": {
-                "type": "Battlefield"
+        {
+          "effects": [
+            {
+              "type": "ExileHandThenDraw"
+            }
+          ]
+        },
+        {
+          "effects": [
+            {
+              "type": "MoveToZone",
+              "value": {
+                "ref": {
+                  "type": "InSlot",
+                  "value": "self"
+                },
+                "zone": {
+                  "type": "Battlefield"
+                }
               }
             }
-          }
-        ]
+          ]
+        }
       ],
       "name": "Synthetic Twofold Powder",
       "typeLine": {
