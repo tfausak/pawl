@@ -619,7 +619,7 @@ inCastableZone pid oid name gs =
 -- card lacks a projection in the hand or graveyard it is asked from -- CR 613.1
 -- names no zone and Projection.viewOfObject reaches every one of them. The two
 -- can differ only for an effect granting or removing a supertype there (CR
--- 205.4b) -- the off-battlefield printed read (gap #160), which no card in the
+-- 205.4b) -- the off-battlefield printed read (gap #1859), which no card in the
 -- pool reaches.
 legendaryRestrictionOk :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
 legendaryRestrictionOk pid oid name gs = case proposedFace oid name gs of

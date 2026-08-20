@@ -518,8 +518,11 @@ powerWithLastKnownGiven pcs oid gs = case lastKnownOf oid gs of
 -- The ViewOf a count gets when it is evaluated while `bound` is being applied:
 -- candidates projected through the layers BEFORE that one. EVERY object in the
 -- game, in whatever zone -- CR 613.1 names no zone. WHICH effects reach it is the
--- affected set's question; only Affected.MatchingAnywhere and TheseObjects reach
--- off the battlefield.
+-- affected set's question, and four of the six arms reach off the battlefield:
+-- Affected.TheseObjects (a fixed id set, CR 611.2c), MatchingAnywhere,
+-- MatchingOffBattlefield, and Attached, which reads the SOURCE's host and so
+-- carries no gate of its own. Only Matching and AttachedPlayerControls spell out
+-- a battlefield conjunct.
 --
 -- Nothing for an id that names no object: CR 400.7 makes a departed object a new
 -- one, and a caller handed a dead id wants the no-op an unevaluable quantity
@@ -1684,14 +1687,18 @@ alwaysFunctioning _ _ _ = True
 
 -- Does any static ability in play carry a CR 604.2 "as long as" clause at all?
 -- gather's cheap structural precondition, a pure read of the printed faces with
--- no projection behind it. Emblems, the stack and graveyards are all walked,
--- because gatherGiven gathers abilities from each (CR 114.4 / 113.6 / 113.6f)
--- and skipping one would leave its clause wired open by alwaysFunctioning.
+-- no projection behind it. Emblems, the stack, graveyards, hands and libraries
+-- are all walked, because gatherGiven gathers abilities from each (CR 114.4 /
+-- 113.6 / 113.6b / 113.6f) and skipping one would leave its clause wired open by
+-- alwaysFunctioning.
 anyConditional :: GameState -> Bool
 anyConditional gs =
   let conditional oid = case Game.faceOf oid gs of
         Nothing -> False
         Just face -> any (Maybe.isJust . StaticAbility.condition) (Face.staticAbilities face)
+      conditionalStating zone oid = case Game.faceOf oid gs of
+        Nothing -> False
+        Just face -> any (\sa -> Maybe.isJust (StaticAbility.condition sa) && statesZone zone sa) (Face.staticAbilities face)
    in any conditional (Set.toList (GameState.battlefield gs))
         || any conditional (Set.toList (GameState.command gs))
         || any conditional (GameState.stack gs)
@@ -1699,6 +1706,14 @@ anyConditional gs =
         -- gatherGiven will keep: a superset costs a second walk, where a subset
         -- ungates a clause.
         || any conditional (graveyardCards gs)
+        -- The two hidden zones narrow instead, and cost nothing for it: CR
+        -- 113.6b's stated set is a printed field, so asking it here is the same
+        -- read this function was already doing, and an ability that does not
+        -- state the zone is one gatherGiven's hidden walks cannot keep however
+        -- the clause answers. Without the narrowing an ordinary Kird Ape in hand
+        -- would buy a second whole-board walk on every projection.
+        || any (conditionalStating Zone.Hand) (zoneCards GameState.hand gs)
+        || any (conditionalStating Zone.Library) (zoneCards GameState.library gs)
 
 -- CR 604.2: is this static ability's "as long as" clause true right now?
 --
@@ -1780,14 +1795,22 @@ gatherGiven stripped functioning gs =
           Just face ->
             -- CR 604.2's second limb and CR 113.6: an instant's or sorcery's
             -- abilities function while it is on the stack. Read off the CARD
-            -- TYPES, a classification rather than an identity. A permanent
-            -- spell's statics are NOT gathered here; the exceptions that do
+            -- TYPES, a classification rather than an identity. That read is the
+            -- DEFAULT, which CR 113.6b's stated set overrides in both
+            -- directions: a permanent spell's statics are not gathered here
+            -- unless the ability names the stack -- Grist, the Hunger Tide's CR
+            -- 113.6c clause names every zone but the battlefield, so a Grist
+            -- SPELL is a creature spell -- and an instant's are dropped where it
+            -- names some other zone (Viral Spawning). The other exceptions that
             -- reach the stack (CR 113.6d/e/g) are asked elsewhere, off the
             -- printed face. CR 613.7a: the effect shares the stack object's
             -- timestamp. Never stripped, for the emblem branch's reason.
-            if Set.null (Set.intersection spellStaticTypes (TypeLine.types (Face.typeLine face)))
-              then []
-              else concat [gatherStatic (functioning spellId) spellId (Object.timestamp spellObj) [] False n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), functionsFromZone Zone.Stack sa]
+            let isSpellStatic = not (Set.null (Set.intersection spellStaticTypes (TypeLine.types (Face.typeLine face))))
+                keeps sa =
+                  if Set.null (StaticAbility.functionsFrom sa)
+                    then isSpellStatic
+                    else statesZone Zone.Stack sa
+             in concat [gatherStatic (functioning spellId) spellId (Object.timestamp spellObj) [] False n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), keeps sa]
       spells = concatMap fromSpell (GameState.stack gs)
       fromGraveyardCard cardId = case Game.lookupObject cardId gs of
         Nothing -> []
@@ -1810,25 +1833,44 @@ gatherGiven stripped functioning gs =
             -- names the graveyard, so it is kept here and dropped by `fromSpell`
             -- above rather than gathered twice.
             --
-            -- Not implemented: an ability that states NO zone and grants no
-            -- cast permission is still dropped here -- Grist, the Hunger Tide's
-            -- CR 113.6c clause is that shape -- and a hand or a library gets no
-            -- walk of its own at all (gap #1912).
+            -- CR 113.6c's negative form arrives here as a stated set holding
+            -- the graveyard, so Grist, the Hunger Tide is kept by the second
+            -- limb rather than by CR 113.6f's classification.
             let qualifies sa = any (grantsKeywordWhere (castZoneKeyword face)) (StaticAbility.modifications sa)
                 keeps sa =
                   if Set.null (StaticAbility.functionsFrom sa)
                     then qualifies sa
-                    else functionsFromZone Zone.Graveyard sa
+                    else statesZone Zone.Graveyard sa
                 indexed = zip [0 :: Natural ..] (Face.staticAbilities face)
              in concat [gatherStatic (functioning cardId) cardId (Object.timestamp cardObj) [] False n sa | (n, sa) <- indexed, keeps sa]
       graveyards = concatMap fromGraveyardCard (graveyardCards gs)
+      -- CR 113.6b/c: the two HIDDEN zones (CR 400.2), which no default in CR
+      -- 113.6 ever reaches -- a card in a hand or a library has its abilities
+      -- function only where CR 113.6b's stated set says so. So this arm asks
+      -- `statesZone` rather than `functionsFromZone`: an ability that states no
+      -- zone must NOT be gathered here, or every creature card in a library
+      -- would start pumping the board from inside it. CR 613.7a: the effect
+      -- shares the card's own timestamp. Never stripped, for the emblem
+      -- branch's reason.
+      fromHiddenCard zone cardId = case Game.lookupObject cardId gs of
+        Nothing -> []
+        Just cardObj -> case Game.faceOf cardId gs of
+          Nothing -> []
+          Just face ->
+            concat [gatherStatic (functioning cardId) cardId (Object.timestamp cardObj) [] False n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), statesZone zone sa]
+      --
+      -- Not implemented: exile gets no arm, so a stated set naming it is
+      -- ignored -- Grist's does (gap #1933).
+      hands = concatMap (fromHiddenCard Zone.Hand) (zoneCards GameState.hand gs)
+      libraries = concatMap (fromHiddenCard Zone.Library) (zoneCards GameState.library gs)
       counters = counterGathered gs
       designations = designationGathered gs
-   in stored <> static <> emblems <> spells <> graveyards <> counters <> designations
+   in stored <> static <> emblems <> spells <> graveyards <> hands <> libraries <> counters <> designations
 
 -- CR 113.6b: does this static ability function from `zone`? THE zone
--- classification -- one question, asked by each of gatherGiven's four
--- static-ability walks and by the two battlefield walks beside them
+-- classification -- one question, asked by each of gatherGiven's static-ability
+-- walks that HAS a CR 113.6 default to fall back on and by the two battlefield
+-- walks beside them
 -- (setLandSubtypeEffectsGiven and controlGrants), so a permanent's printed
 -- ability cannot become a continuous effect through one of those three and not
 -- the others.
@@ -1839,7 +1881,8 @@ gatherGiven stripped functioning gs =
 -- "only", so it replaces those defaults rather than adding to them;
 -- `fromGraveyardCard` above is the one caller that has to tell the two cases
 -- apart, because the default it would otherwise override is CR 113.6f's
--- classification rather than a bare zone.
+-- classification rather than a bare zone. The hand and library walks ask
+-- `statesZone` below instead, having no default at all to fall back on.
 --
 -- Structural, and deliberately not a Condition: CR 604.2's clause is asked of an
 -- ability some walk has already kept, so it could narrow a gather but never
@@ -1849,9 +1892,20 @@ functionsFromZone zone sa =
   let zones = StaticAbility.functionsFrom sa
    in Set.null zones || Set.member zone zones
 
+-- CR 113.6b's stated set, without the empty-set default that
+-- functionsFromZone folds in: does this ability SAY it functions from `zone`?
+-- The question the two hidden zones take, where "states no zone" has to mean
+-- "not here" rather than "wherever the caller is looking".
+statesZone :: Zone.Zone -> StaticAbility.StaticAbility card -> Bool
+statesZone zone = Set.member zone . StaticAbility.functionsFrom
+
+-- Every card in one per-player zone, across every player.
+zoneCards :: (GameState -> Map PlayerId.PlayerId (Seq.Seq ObjectId)) -> GameState -> [ObjectId]
+zoneCards field = foldMap (foldr (:) []) . Map.elems . field
+
 -- Every card in every graveyard.
 graveyardCards :: GameState -> [ObjectId]
-graveyardCards = foldMap (foldr (:) []) . Map.elems . GameState.graveyard
+graveyardCards = zoneCards GameState.graveyard
 
 -- CR 113.6f's classification, one keyword at a time: does rule 702 turn this
 -- keyword into a permission to cast the object it is on from somewhere? The face
