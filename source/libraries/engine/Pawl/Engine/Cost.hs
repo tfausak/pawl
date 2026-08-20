@@ -203,7 +203,7 @@ candidateCostsFor name oid gs = case Game.lookupObject oid gs of
                   -- and its cost are one sentence, so the cost is what
                   -- distinguishes one instance from another.
                   flashback cost = CandidateCost.MkCandidateCost (Just (Keyword.Type.Flashback cost)) (withAdditional cost)
-               in fmap flashback (Maybe.maybeToList (Keyword.flashbackCost keywords))
+               in fmap flashback (Keyword.flashbackCosts keywords)
                     <> [CandidateCost.MkCandidateCost (Just Keyword.Type.Aftermath) printed | Keyword.hasAftermath keywords]
                     <> [ CandidateCost.MkCandidateCost
                            (Just Keyword.Type.JumpStart)

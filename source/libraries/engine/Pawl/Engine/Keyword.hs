@@ -827,28 +827,33 @@ hasFlash = Set.member Keyword.Flash
 -- keywords add one to a cast from a graveyard. Read by Cost.costsFor only while
 -- the object is in a graveyard, the zone half of the same sentence.
 --
--- A Bool rather than flashbackCost's Maybe Cost: rule 702.133a states the cost
+-- A Bool rather than morphCost's Maybe Cost: rule 702.133a states the cost
 -- itself, so there is nothing to read off the card. Membership rather than a
 -- count, the rule taking no parameter.
 hasJumpStart :: Set Keyword -> Bool
 hasJumpStart = Set.member Keyword.JumpStart
 
--- CR 702.34a: the cost this card may be cast from the graveyard for, or Nothing
--- when it has no flashback. Read by Pawl.Engine.Cost.costsFor, which offers it
--- ONLY while the object is in a graveyard -- the zone half of the same sentence.
+-- CR 702.34a: every cost this card may be cast from the graveyard for, in
+-- ascending Set order, and empty when it has no flashback. Read by
+-- Pawl.Engine.Cost.costsFor, which offers them ONLY while the object is in a
+-- graveyard -- the zone half of the same sentence.
+--
+-- A LIST where every other keyword-cost reader in this module answers a Maybe,
+-- and rule 702.34a is why: it states no limit on how many flashback abilities an
+-- object has, and CR 601.2b's "a player can't apply two alternative methods of
+-- casting or two alternative costs to a single spell" makes two of them a CHOICE
+-- between the two rather than a sum. The Fugitive Doctor grants one on top of a
+-- printed one, so a card holding two is a board rather than a hypothesis; the
+-- test that proves it is Pawl.CastSpec's FugitiveDoctor group.
 --
 -- A wildcard rather than an exhaustive case: this asks about ONE named
 -- constructor rather than classifying every keyword.
---
--- Nothing beyond the FIRST flashback cost is reachable, where rule 702.34a states
--- no limit and CR 601.2b would give a choice between them; only the lesser (Set
--- order) is offered (gap #294).
-flashbackCost :: Set Keyword -> Maybe (Cost Keyword)
-flashbackCost keywords =
+flashbackCosts :: Set Keyword -> [Cost Keyword]
+flashbackCosts keywords =
   let costOf keyword = case keyword of
         Keyword.Flashback cost -> Just cost
         _ -> Nothing
-   in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
+   in Maybe.mapMaybe costOf (Set.toAscList keywords)
 
 -- CR 702.37a / 702.37e: the MORPH cost -- what a face-down permanent's controller
 -- pays to turn it face up as CR 116.2b's special action -- or Nothing when the
@@ -875,7 +880,7 @@ morphCost keywords =
 
 -- CR 702.33a: the ADDITIONAL cost this card's controller may pay as they cast it,
 -- or Nothing when it has no kicker. Offered at CR 601.2b and added to whichever
--- candidate cost was announced (CR 601.2f). A wildcard, flashbackCost's shape.
+-- candidate cost was announced (CR 601.2f). A wildcard, morphCost's shape.
 --
 -- Nothing beyond the FIRST kicker cost is reachable, so CR 702.33b's "kicker
 -- [cost 1] and/or [cost 2]" is unrepresented (gap #1235).
@@ -888,7 +893,7 @@ kickerCost keywords =
 
 -- CR 702.42a: the ADDITIONAL cost this card's controller may pay to choose all of
 -- its modes, or Nothing when it has no entwine. Offered at CR 601.2b and added to
--- whichever candidate cost was announced (CR 601.2f). A wildcard, flashbackCost's
+-- whichever candidate cost was announced (CR 601.2f). A wildcard, morphCost's
 -- shape.
 --
 -- Nothing beyond the FIRST entwine cost is reachable: a card printing two
@@ -944,10 +949,11 @@ castFromGraveyardReplacementsOf keywords castFor =
   let paidFor keyword = castFor == Just keyword
    in -- The cost the cast PAID FOR, and not merely a flashback the card has:
       -- paying the printed cost under a CR 601.3 permission leaves rule 702.34a's
-      -- clause unsatisfied. Compared against the cost-bearing keyword itself,
-      -- which is how a card with two flashback abilities (#294) answers for the
-      -- one it was cast for rather than for both.
-      [castFromGraveyardExile | any paidFor (Maybe.maybeToList (fmap Keyword.Flashback (flashbackCost keywords)))]
+      -- clause unsatisfied. Compared against the cost-bearing keyword itself, and
+      -- against EVERY flashback the card has, which is how one with two flashback
+      -- abilities answers for the cost it was cast for rather than for the least
+      -- of them.
+      [castFromGraveyardExile | any (paidFor . Keyword.Flashback) (flashbackCosts keywords)]
         -- CR 702.127a's THIRD static ability, word for word CR 702.34a's second
         -- ability, so it is the same effect and not a sibling. The one of the
         -- three that does NOT read `castFor`: rule 702.127a conditions its exile
@@ -2453,8 +2459,9 @@ miracle cost =
 -- card would cost if its controller took the reveal. Nothing when the card has no
 -- miracle ability at all, which is also "no window to open".
 --
--- flashbackCost's shape exactly, and asked of the card's PRINTED keywords for that
--- function's reason: rule 702.94a's abilities function in the hand (CR 113.6b).
+-- morphCost's shape exactly, and asked of the card's PRINTED keywords for
+-- flashbackCosts' reason: rule 702.94a's abilities function in the hand
+-- (CR 113.6b).
 -- ONE cost per card (the ascending-least), morphCost's shape.
 --
 -- Not implemented: a card in a hand whose MIRACLE an effect granted or removed
