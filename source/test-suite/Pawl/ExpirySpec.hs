@@ -1615,10 +1615,11 @@ isWhile expiry = case expiry of
 -- that phase is what puts the second lore counter on and fires chapter II.
 --
 -- bob's War Mammoth earns its place twice, Dovin's board's reasons: it is the
--- SECOND candidate the CR 601.2c choice picks between, so the target prompt is a
--- real choice rather than one elided for offering exactly what it needs, and it
--- is the unshielded dealer every batch below runs alongside the shielded one --
--- the control leg, on the same board, differing in nothing but the shield.
+-- SECOND candidate chapter II's target choice picks between (CR 603.3d puts a
+-- triggered ability's targets through CR 601.2c), so the prompt is a real choice
+-- rather than one elided for offering exactly what it needs, and it is the
+-- unshielded dealer every batch below runs alongside the shielded one -- the
+-- control leg, on the same board, differing in nothing but the shield.
 --
 -- The Saga is PLACED with its first lore counter rather than cast, so chapter I
 -- never fires and the hexproof grant is not also standing; the last case casts it
@@ -1672,7 +1673,7 @@ oldFatSpiderSpec s registry = Spec.describe s "OldFatSpiderCantSeeMe" $ do
       Spec.assertEqWith s "the whole 7 lands now" (S.lifeOf S.alice after) (Just 13)
       Spec.assertEqWith s "and both events happened" (amounts after) [4, 3]
       Spec.assertEqWith s "the row is gone, not masked" (GameState.replacements told) []
-  Spec.it s "CR 611.2b the shield is armed to a condition, which no other sweep reaches"
+  Spec.it s "CR 611.2b / 514.2 the shield is armed to a condition, which the cleanup sweep does not reach"
     . withBoard
     $ \(_, _, _, gs) -> do
       Spec.assertEqWith s "one floating replacement" (length (GameState.replacements gs)) 1
