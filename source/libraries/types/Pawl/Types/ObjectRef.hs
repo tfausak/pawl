@@ -370,7 +370,7 @@ data ObjectRef
     -- ChosenCardInGraveyard's note above describes what a card writing it under
     -- any other opcode gets, and why that inert answer earns no lint. Carth the
     -- Lion's "you may REVEAL a planeswalker card from among them" is the printing
-    -- that would want the Reveal arm to answer it too (#1954).
+    -- that would want the Reveal arm to answer it too (#1699).
     ChosenCardFromAmong ChosenCardFromAmong.ChosenCardFromAmong
   | -- | A card RANDOMNESS names out of a hand -- Merfolk Spy's "that player
     -- reveals a card at random from their hand". ChosenCardInHand's PlayerRef,

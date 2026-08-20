@@ -26,8 +26,9 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 --
 -- 'EachCardInGraveyard', 'TopOfLibrary', 'ChosenCardInGraveyard',
 -- 'ChosenCardInHand' and 'ChosenCardFromAmong' each carry a payload record of
--- their own (#1464), so no arm here writes a positional array. 'RandomCardInHand' carries a bare PlayerRef
--- instead, since it holds only the one field.
+-- their own (#1464), so no arm here writes a positional array.
+-- 'RandomCardInHand' carries a bare PlayerRef instead, since it holds only the
+-- one field.
 --
 -- 'EachCardExiledWithSource' takes an OPTIONAL payload: the bare tag is the whole
 -- linked set (CR 607.3), and a value narrows it to the cards a printing's own

@@ -289,13 +289,12 @@ objectRefSlots ref = case ref of
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser _ _) -> chooserSlots chooser
   -- CR 402.3: the choosers own the hands, so the PlayerRef is the whole read.
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player _) -> playerRefSlots player
-  -- The one CHOOSING arm that names a slot, and it names the slot its candidates
-  -- come from. Reported for EachCardInGraveyard's reason -- the D4 dataflow lint
-  -- reads this, and a group an earlier clause bound and this one reads is exactly
-  -- the dataflow that lint is checking. Many, not One: the ref reads every member
-  -- of the group to offer them, which is the arity InSlot reports of the same
-  -- binding, and reporting One would let a card bind a group under a name a
-  -- singular reader elsewhere could not see.
+  -- The one arm whose CANDIDATES come from a slot; the two chosen arms above name
+  -- a slot only where their chooser does. Reported for EachCardInGraveyard's
+  -- reason -- the D4 dataflow lint reads this, and a group one clause binds and a
+  -- later one reads is exactly the dataflow that lint checks. Many, not One,
+  -- which is the arity InSlot reports of the same binding: the ref reads every
+  -- member of the group to offer them.
   ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong slot _) -> Map.singleton slot SlotArity.Many
   -- The seats whose hands randomness reads: the arm above's read.
   ObjectRef.RandomCardInHand player -> playerRefSlots player
@@ -3007,12 +3006,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
               fmap concat . Monad.mapM (\pid -> ask pid (handCardsOf (chooseContext gs) gs pid filter_)) $
                 handChoosers legal controller gs player
-            -- CR 701.20e's "from among them": the candidates are the members of a
-            -- GROUP an earlier clause of this resolution bound rather than a
-            -- zone's contents, which is the whole difference from the two arms
-            -- above -- and the reason a batch a look or a reveal left in the
-            -- LIBRARY is reachable at all (CR 701.20b), there being no filtered
-            -- sweep of a library (#1309).
+            -- The printed "from among them", a CR 608.2d choice: the candidates
+            -- are the members of a GROUP an earlier clause of this resolution
+            -- bound rather than a zone's contents, which is the whole difference
+            -- from the two arms above -- and the reason a batch CR 701.20a's
+            -- reveal or CR 701.20e's look left in the LIBRARY is reachable at all
+            -- (CR 701.20b), there being no filtered sweep of a library (#1309).
             --
             -- The candidates are read from the pre-move state (CR 608.2c) through
             -- the same boundObjects the InSlot gather reads, so the choice and
