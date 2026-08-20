@@ -820,6 +820,7 @@ effectCounts effect = case effect of
   Effect.ExileHaunting {} -> []
   Effect.Attach _ -> []
   Effect.AttachTarget {} -> []
+  Effect.AttachTargetToEach {} -> []
   Effect.PlaySubgame _ -> []
   Effect.ChooseOpponent _ -> []
   Effect.TakeExtraTurn {} -> []
@@ -1052,6 +1053,7 @@ effectNestedEffects effect = case effect of
   Effect.ExileHaunting {} -> []
   Effect.Attach {} -> []
   Effect.AttachTarget {} -> []
+  Effect.AttachTargetToEach {} -> []
   Effect.PlaySubgame {} -> []
   Effect.ChooseOpponent {} -> []
   Effect.ArmDelayedTrigger {} -> []
@@ -1465,6 +1467,7 @@ effectReplacements effect = case effect of
   Effect.ExileHaunting {} -> []
   Effect.Attach _ -> []
   Effect.AttachTarget {} -> []
+  Effect.AttachTargetToEach {} -> []
   Effect.PlaySubgame _ -> []
   Effect.ChooseOpponent _ -> []
   Effect.TakeExtraTurn {} -> []
@@ -2078,6 +2081,7 @@ effectMintedFaces effect = case effect of
   Effect.ExileHaunting {} -> []
   Effect.Attach _ -> []
   Effect.AttachTarget {} -> []
+  Effect.AttachTargetToEach {} -> []
   Effect.PlaySubgame _ -> []
   Effect.ChooseOpponent _ -> []
   Effect.TakeExtraTurn {} -> []
@@ -3210,10 +3214,10 @@ blockPermissionFilters permission =
 -- soundness question. Two of the three name ONE position; CR 303.4b's names three,
 -- which is why this is a tag on the position rather than a Bool.
 --
---   * AttachDestination -- Effect.AttachTarget's destination, the one position
---     evaluated against a view whose `canHostSubject` is filled in
---     (Pawl.Engine.Attach.hostsFor). CR 701.3a's atom belongs here and nowhere
---     else.
+--   * AttachDestination -- the destination of Effect.AttachTarget or
+--     Effect.AttachTargetToEach, the positions evaluated against a view whose
+--     `canHostSubject` is filled in (Pawl.Engine.Attach.hostsFor). CR 701.3a's
+--     atom belongs here and nowhere else.
 --   * InTargetSlot -- a MODE's target slot filter, the one position matched by
 --     Pawl.Engine.Target.admittedGiven, which is the one site that fills
 --     Filter.Context.slotNames. CR 709.4a's Filter.SameNameAsBound belongs here
@@ -3253,11 +3257,11 @@ unframed = fmap ((,) Unframed)
 sourceHosted :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 sourceHosted = fmap ((,) SourceHostFramed)
 
--- Every Filter one effect carries, paired with its Framing. Exactly one arm
--- answers AttachDestination: Effect.AttachTarget's destination, which is the
--- only CARD-AUTHORED Filter position evaluated against a view whose
--- `canHostSubject` is filled in (Pawl.Engine.Attach.hostsFor, from
--- attachmentFor). TurnUpRewrite.MayAttachTo reaches the same evaluator and is
+-- Every Filter one effect carries, paired with its Framing. Two arms answer
+-- AttachDestination -- Effect.AttachTarget's destination and
+-- Effect.AttachTargetToEach's, which are the only CARD-AUTHORED Filter positions
+-- evaluated against a view whose `canHostSubject` is filled in
+-- (Pawl.Engine.Attach.hostsFor, from attachmentFor). TurnUpRewrite.MayAttachTo reaches the same evaluator and is
 -- still unframed, deliberately: CR 303.4k's enchant-ability conjunct is added by
 -- Attach.turnUpHosts because the rule mandates it, so the atom appearing in that
 -- card's data would be a card restating a rule. Everywhere else the field is
@@ -3274,6 +3278,9 @@ effectFilters effect = case effect of
   -- equip, or fortify, respectively." Aura Graft's "another permanent it can
   -- enchant".
   Effect.AttachTarget (AttachTarget.MkAttachTarget _ f) -> [(AttachDestination, f)]
+  -- Rule 701.3a frames this opcode's destination filter exactly as it frames
+  -- AttachTarget's; CR 303.4d only moves whose choice it is.
+  Effect.AttachTargetToEach (AttachTarget.MkAttachTarget _ f) -> [(AttachDestination, f)]
   -- The dealer is a SlotName and carries no Filter.
   Effect.DealDamage (DealDamage.MkDealDamage ref quantity _ _) -> sourceHosted (objectRefFilters ref) <> unframed (quantityFilters quantity)
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
@@ -3534,9 +3541,10 @@ cardFilters card =
     <> concatMap handActionFilters (Face.mulliganActions card)
     <> concatMap handActionFilters (Face.openingHandActions card)
 
--- How many CR 701.3a atoms this card carries in an Effect.AttachTarget's
--- destination filter, and how many anywhere else. The second number is the
--- offence; the first is what Aura Graft legitimately has one of.
+-- How many CR 701.3a atoms this card carries in an attach opcode's destination
+-- filter -- Effect.AttachTarget's or Effect.AttachTargetToEach's -- and how many
+-- anywhere else. The second number is the offence; the first is what Aura Graft
+-- and Synthetic Aura Diffusion legitimately have one of each.
 canHostSubjectCounts :: Face.Face Card.Type.Card -> (Int, Int)
 canHostSubjectCounts card =
   let total wanted = sum [canHostSubjects f | (framing, f) <- cardFilters card, (framing == AttachDestination) == wanted]
@@ -5529,22 +5537,31 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "CR 701.3a no card asks CanHostSubject outside an attach's destination" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace canHostSubjectOffends . Printing.card) ps
-    Spec.assertEqWith s "the atom sits only in an AttachTarget destination" (fmap (S.nameOf . Printing.card) offenders) []
-    -- NOT vacuous: the pool authors the atom, and the one card that does is
-    -- ACCEPTED here rather than skipped. Aura Graft's "another permanent it can
-    -- enchant" is the whole legal use, so a lint that swept past it would be
-    -- indistinguishable from one that swept past everything.
+    Spec.assertEqWith s "the atom sits only in an attach opcode's destination" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous: the pool authors the atom, and the cards that do are ACCEPTED
+    -- here rather than skipped. Aura Graft's "another permanent it can enchant"
+    -- is the legal use, so a lint that swept past it would be indistinguishable
+    -- from one that swept past everything.
     graft <- S.printingOf s registry "Aura Graft"
     Spec.assertEqWith
       s
       "Aura Graft's one atom is framed by its own attach"
       (canHostSubjectCounts (S.combinedFace graft))
       (1, 0)
+    -- The same accepting read for the OTHER opcode that frames one, so a
+    -- cardFilters arm that forgot AttachTargetToEach would fail here rather than
+    -- silently counting its atom as zero.
+    diffusion <- S.printingOf s registry "Synthetic Aura Diffusion"
     Spec.assertEqWith
       s
-      "and it is the pool's only one"
+      "Synthetic Aura Diffusion's atom is framed by its CR 303.4d attach"
+      (canHostSubjectCounts (S.combinedFace diffusion))
+      (1, 0)
+    Spec.assertEqWith
+      s
+      "and those two cards are the whole of data/cards' authorship of it"
       (sum (fmap (uncurry (+) . canHostSubjectCounts . S.combinedFace) ps))
-      1
+      2
     -- The traversal reaches a Filter position no effect, target slot or affected
     -- set would have led it to: CR 702.29e's typecycling predicate, on a real
     -- card. Its absence would not show up in the sweep above, because Ash Barrens

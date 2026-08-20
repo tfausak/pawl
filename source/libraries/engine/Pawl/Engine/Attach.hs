@@ -1,6 +1,6 @@
 -- Rule 701.3's LEGALITY READING, in one place because callers a library apart need
 -- the same answer: Pawl.Engine.Event.attach, which every CR 701.3 move goes
--- through, Pawl.Engine.Resolve's AttachTarget opcode, and two arms of
+-- through, Pawl.Engine.Resolve's two attach-the-target opcodes, and two arms of
 -- Pawl.Engine.Event -- the CR 303.4k rewrite for an Aura being turned face up, and
 -- changeZoneAttaching's CR 303.4f host choice for an Aura entering the battlefield
 -- by any means other than resolving as an Aura spell. Event sits BELOW Resolve, so
@@ -177,6 +177,10 @@ turnUpHosts controller aura filter_ =
 -- Which of the offered destinations the player picks, or Nothing when the text
 -- admits none (CR 609.3: the effect does as much as it can, and that is nothing).
 --
+-- `controller` is WHO IS ASKED and is the caller's to decide: the resolving
+-- controller for an effect naming one destination (CR 608.2d), and the subject's
+-- own controller where CR 303.4d or CR 301.5c reassigns it -- see arbitrate.
+--
 -- ELIDED AT ONE CANDIDATE, the Prompt.ChooseAttachment posture: with a single
 -- destination there is nothing to decide. The current host is never among the
 -- candidates (CR 701.3b), so it is not being withheld.
@@ -194,3 +198,31 @@ chooseHost controller subject candidates = case candidates of
       let offered = first NonEmpty.:| (second : more)
       answer <- Game.choose (Prompt.ChooseAttachment (Decide.deciderFor controller gs) controller subject offered)
       pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
+
+-- CR 303.4d and CR 301.5c, whose closing sentences are the same rule twice: "an
+-- Aura can't enchant more than one object or player. If a spell or ability would
+-- cause an Aura to become attached to more than one object or player, the Aura's
+-- controller chooses which object or player it becomes attached to", and the
+-- Equipment wording with "equip" for "enchant". An effect that NAMES several
+-- destinations hands them here and gets back the one destination the subject
+-- keeps.
+--
+-- The whole content over chooseHost is WHOSE choice it is. CR 608.2d gives every
+-- other resolution-time choice to the resolving controller, which is what
+-- chooseHost's own callers pass; these two rules take this one away from them and
+-- give it to the controller of the thing being attached. So the SUBJECT's
+-- controller is read here and nowhere else, and the caller keeps passing its own
+-- controller to hostsFor -- CR 109.5's "you" on the destination filter is still
+-- the asking ability's card text.
+--
+-- Subtype-blind on purpose: the two rules agree, so nothing here asks whether the
+-- subject is an Aura or an Equipment. A permanent that is neither cannot be
+-- attached at all (CR 701.3b), and attachmentFor refuses it downstream.
+--
+-- A subject with no controller has nobody to make CR 303.4d's choice, so nothing
+-- moves. Unreachable: the subject is a battlefield permanent, and
+-- Projection.controllerOf answers Nothing only for an object that is not there.
+arbitrate :: ObjectId -> [ObjectId] -> Game (Maybe ObjectId)
+arbitrate subject candidates = do
+  gs <- State.get
+  Maybe.maybe (pure Nothing) (\chooser -> chooseHost chooser subject candidates) (Projection.controllerOf subject gs)

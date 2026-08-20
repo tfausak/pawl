@@ -581,7 +581,13 @@ Card-driven unless noted.
    "no card wants it yet".
 5. **CR 303.4d's chooser** — "if a spell or ability would cause an Aura to become
    attached to more than one object or player, the Aura's controller chooses".
-   No effect attaches, so there is nothing to choose between.
+   No effect attaches, so there is nothing to choose between. *Landed since:*
+   `Effect.AttachTargetToEach` names a whole destination set and
+   `Pawl.Engine.Attach.arbitrate` reduces it, asking the SUBJECT’s controller
+   rather than the resolving controller — CR 301.5c’s Equipment sentence at the
+   same time. Synthetic Aura Diffusion is the producer, synthetic because the
+   Scryfall sweep `Pawl.AuraSpec`’s Arbitration group records found no printing
+   that names more than one destination; see #191.
 6. **CR 303.4k** — face-down permanents do not exist.
 7. **CR 704.5n / 704.5p** — Equipment, Fortification, and attached
    creatures/battles becoming unattached. Out of scope by this unit's scope

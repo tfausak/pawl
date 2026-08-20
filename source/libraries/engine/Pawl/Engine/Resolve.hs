@@ -429,6 +429,7 @@ slotsOf effect = case effect of
   Effect.ExileHaunting (ExileHaunting.MkExileHaunting card slot) -> joinSlots [oneSlot card, oneSlot slot]
   Effect.Attach slot -> oneSlot slot
   Effect.AttachTarget (AttachTarget.MkAttachTarget slot _) -> oneSlot slot
+  Effect.AttachTargetToEach (AttachTarget.MkAttachTarget slot _) -> oneSlot slot
   -- CR 729.1/729.1b: the slot is a DEFINITION (the subgame's winner), not a read.
   Effect.PlaySubgame _ -> Map.empty
   -- A DEFINITION too: chosen as this effect is applied (CR 608.2d), never read.
@@ -615,6 +616,7 @@ slotsAreExhaustive effect = case effect of
   Effect.ExileHaunting (ExileHaunting.MkExileHaunting _ _) -> True
   Effect.Attach _ -> True
   Effect.AttachTarget (AttachTarget.MkAttachTarget _ _) -> True
+  Effect.AttachTargetToEach (AttachTarget.MkAttachTarget _ _) -> True
   -- CR 729.1b: a DEFINITION, and the subgame reads no binding of the outer game.
   Effect.PlaySubgame _ -> True
   -- PlaySubgame's answer: a definition reads no slot.
@@ -740,6 +742,7 @@ readsX = any effectReadsX
       Effect.ExileHaunting {} -> False
       Effect.Attach _ -> False
       Effect.AttachTarget {} -> False
+      Effect.AttachTargetToEach {} -> False
       Effect.PlaySubgame _ -> False
       Effect.ChooseOpponent _ -> False
       Effect.TakeExtraTurn {} -> False
@@ -834,6 +837,7 @@ searchesLibrary effect = case effect of
   Effect.ExileHaunting {} -> False
   Effect.Attach _ -> False
   Effect.AttachTarget {} -> False
+  Effect.AttachTargetToEach {} -> False
   Effect.PlaySubgame _ -> False
   Effect.ChooseOpponent _ -> False
   -- CR 701.24 shuffles a library but never LOOKS at one (CR 701.23a).
@@ -970,6 +974,7 @@ boundSlots effect = case effect of
   Effect.ExileHaunting {} -> Set.empty
   Effect.Attach _ -> Set.empty
   Effect.AttachTarget {} -> Set.empty
+  Effect.AttachTargetToEach {} -> Set.empty
   Effect.TakeExtraTurn {} -> Set.empty
   Effect.ShuffleIntoLibrary {} -> Set.empty
   Effect.OfferCast {} -> Set.empty
@@ -3844,6 +3849,23 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- subject's own enchant slot references it, and applies CR 303.4j's
           -- refusal. Always a different object than the current host, so CR
           -- 701.3c's restamp is always earned.
+          Monad.mapM_ (Event.attach subject . Recipient.ToObject) destination
+      _ -> pure ()
+  -- CR 303.4d / CR 301.5c: the same move, with the destination filter read as
+  -- "each" rather than "one of". The candidate list is built exactly as
+  -- AttachTarget builds it -- same filter, same Context, so CR 109.5's "you" on
+  -- the card's own text stays the ASKING ability's -- and only the arbitration
+  -- differs: Attach.arbitrate asks the SUBJECT's controller instead of the
+  -- resolving controller. Everything downstream is shared, so CR 303.4j's
+  -- refusal, CR 701.3b's no-op and CR 701.3c's restamp cannot diverge between
+  -- the two opcodes.
+  Effect.AttachTargetToEach (AttachTarget.MkAttachTarget slot filter_) ->
+    case legalOne slot legal of
+      Just recipient -> case Recipient.objectOf recipient of
+        Nothing -> pure ()
+        Just subject -> do
+          gs <- State.get
+          destination <- Attach.arbitrate subject (Attach.hostsFor controller source subject filter_ gs)
           Monad.mapM_ (Event.attach subject . Recipient.ToObject) destination
       _ -> pure ()
   Effect.ExileUntilMonarch slot ->

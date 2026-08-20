@@ -185,6 +185,7 @@ manaProduced effect = case effect of
   Effect.ExileHaunting {} -> Nothing
   Effect.Attach _ -> Nothing
   Effect.AttachTarget {} -> Nothing
+  Effect.AttachTargetToEach {} -> Nothing
   Effect.PlaySubgame _ -> Nothing
   Effect.ChooseOpponent _ -> Nothing
   Effect.TakeExtraTurn {} -> Nothing
@@ -344,6 +345,7 @@ movesLibraryCard effect = case effect of
   Effect.ExileHaunting {} -> False
   Effect.Attach _ -> False
   Effect.AttachTarget {} -> False
+  Effect.AttachTargetToEach {} -> False
   Effect.ChooseOpponent _ -> False
   -- The card is wherever the slot bound it, which the opcode itself never
   -- states. Its one producer is CR 310.12b's exiled Siege, so no library is in
