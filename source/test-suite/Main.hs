@@ -124,6 +124,7 @@ import qualified Pawl.Codec.FilterSpec
 import qualified Pawl.Codec.ForEachSpec
 import qualified Pawl.Codec.GameEventSpec
 import qualified Pawl.Codec.GrantPlayFromExileSpec
+import qualified Pawl.Codec.GrantedAbilitySpec
 import qualified Pawl.Codec.GraveyardScopeSpec
 import qualified Pawl.Codec.HalfUnlockedSpec
 import qualified Pawl.Codec.HalvedSpec
@@ -543,6 +544,7 @@ spec s registry = do
   Pawl.Codec.ForEachSpec.spec s
   Pawl.Codec.GameEventSpec.spec s
   Pawl.Codec.GrantPlayFromExileSpec.spec s
+  Pawl.Codec.GrantedAbilitySpec.spec s
   Pawl.Codec.GraveyardScopeSpec.spec s
   Pawl.Codec.HalfUnlockedSpec.spec s
   Pawl.Codec.HalvedSpec.spec s

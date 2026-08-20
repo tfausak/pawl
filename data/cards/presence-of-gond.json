@@ -31,71 +31,74 @@
           },
           "modifications": [
             {
-              "type": "GainActivatedAbility",
+              "type": "GainAbility",
               "value": {
-                "cost": {
-                  "components": [
-                    {
-                      "type": "TapThis"
-                    }
-                  ],
-                  "mana": []
-                },
-                "modal": {
-                  "modes": [
-                    {
-                      "clauses": [
-                        {
-                          "effects": [
-                            {
-                              "type": "Create",
-                              "value": {
-                                "card": {
-                                  "faces": [
-                                    {
-                                      "colorIndicator": [
-                                        {
-                                          "type": "Green"
-                                        }
-                                      ],
-                                      "name": "Elf Warrior Token",
-                                      "power": {
-                                        "type": "Literal",
-                                        "value": 1
-                                      },
-                                      "toughness": {
-                                        "type": "Literal",
-                                        "value": 1
-                                      },
-                                      "typeLine": {
-                                        "subtypes": [
+                "type": "Activated",
+                "value": {
+                  "cost": {
+                    "components": [
+                      {
+                        "type": "TapThis"
+                      }
+                    ],
+                    "mana": []
+                  },
+                  "modal": {
+                    "modes": [
+                      {
+                        "clauses": [
+                          {
+                            "effects": [
+                              {
+                                "type": "Create",
+                                "value": {
+                                  "card": {
+                                    "faces": [
+                                      {
+                                        "colorIndicator": [
                                           {
-                                            "type": "Elf"
-                                          },
-                                          {
-                                            "type": "Warrior"
+                                            "type": "Green"
                                           }
                                         ],
-                                        "types": [
-                                          {
-                                            "type": "Creature"
-                                          }
-                                        ]
+                                        "name": "Elf Warrior Token",
+                                        "power": {
+                                          "type": "Literal",
+                                          "value": 1
+                                        },
+                                        "toughness": {
+                                          "type": "Literal",
+                                          "value": 1
+                                        },
+                                        "typeLine": {
+                                          "subtypes": [
+                                            {
+                                              "type": "Elf"
+                                            },
+                                            {
+                                              "type": "Warrior"
+                                            }
+                                          ],
+                                          "types": [
+                                            {
+                                              "type": "Creature"
+                                            }
+                                          ]
+                                        }
                                       }
-                                    }
-                                  ]
-                                },
-                                "quantity": {
-                                  "type": "Literal",
-                                  "value": 1
+                                    ]
+                                  },
+                                  "quantity": {
+                                    "type": "Literal",
+                                    "value": 1
+                                  }
                                 }
                               }
-                            }
-                          ]
-                        }
-                      ]
-                    }
-                  ]
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
                 }
               }
             }

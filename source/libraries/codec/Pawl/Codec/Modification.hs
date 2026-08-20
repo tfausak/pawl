@@ -21,13 +21,13 @@ import qualified Pawl.Types.Modification as Modification
 --
 -- Takes the codec for the GRANTED ABILITY rather than for a card, since that is
 -- what Pawl.Types.Modification is parametric in -- and because naming
--- Pawl.Codec.ActivatedAbility here would close the same module cycle the type's
+-- Pawl.Codec.GrantedAbility here would close the same module cycle the type's
 -- own parameter opens. 'grantless' below is this codec at the one position that
 -- cannot hold a grant.
 codec :: (Typeable.Typeable ability, Eq ability) => Codec.Codec ability -> Codec.Codec (Modification.Modification ability)
 codec abilityCodec =
   Arm.tagged
-    ( Arm.payload "GainActivatedAbility" abilityCodec Modification.GainActivatedAbility (\x -> case x of Modification.GainActivatedAbility y -> Just y; _ -> Nothing)
+    ( Arm.payload "GainAbility" abilityCodec Modification.GainAbility (\x -> case x of Modification.GainAbility y -> Just y; _ -> Nothing)
         : arms
     )
 

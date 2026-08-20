@@ -3833,6 +3833,98 @@ brambleElementalSpec s registry =
           Spec.assertEqWith s "though the Equipment really did become attached" (attachmentsOn brambleId equipped) [bladeId]
           Spec.assertEqWith s "which CR 301.5f's +2/+0 confirms" (S.powerToughnessOf brambleId equipped) (Just (6, 4))
 
+-- CR 613.1f layer 6, the TRIGGERED half of the grant: Sixth Sense ({G}
+-- Enchantment -- Aura, "Enchant creature / Enchanted creature has 'Whenever this
+-- creature deals combat damage to a player, you may draw a card.'", checked
+-- against Scryfall on 2026-08-20) is the cheapest printing whose whole text box
+-- is one quoted triggered ability, so nothing but the grant is under test.
+--
+-- Presence of Gond (Pawl.ActivateSpec) is the activated half of the same
+-- Modification arm. What this group adds is the other side of the fold: a
+-- granted ability has to be found by the CR 603.2 scan, not only by the
+-- projection, and Pawl.Engine.Event.eventTriggers reads
+-- ProjectedCharacteristics.triggeredAbilities to do it.
+--
+-- Three seats, and the two that matter are DIFFERENT players: alice controls the
+-- enchanted attacker, carol controls the Aura, bob is the defending player. CR
+-- 113.7 makes the enchanted creature the granted ability's source and CR 603.3a
+-- makes its controller the trigger's controller, so the "you" that draws is
+-- alice. A granter-anchored reading would draw for carol, and the two hands are
+-- what tell those readings apart -- one seat could not.
+sixthSenseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+sixthSenseSpec s registry = Spec.describe s "CR 613.1f a granted triggered ability" $ do
+  -- The gameplay-level proof, and the pair's positive half.
+  Spec.it s "CR 603.3a whole card: the enchanted creature connects and ITS controller draws" $ do
+    ps <- traverse (S.printingOf s registry) ["Goblin Piker", "Sixth Sense", "Mountain", "Island"]
+    case ps of
+      [piker, sense, mountain, island] -> case sixthSenseBoard piker sense mountain island True of
+        ([attackerId], _, gs) -> do
+          let after = S.runCombat sixthSenseAnswer gs
+          Spec.assertEqWith s "alice drew the one card her library held" (handNames S.alice after) ["Mountain"]
+          Spec.assertEqWith s "and the Aura's controller drew nothing" (handNames S.carol after) []
+          Spec.assertEqWith s "CR 510.1b the Piker's 2 damage reached bob" (S.lifeOf S.bob after) (Just 18)
+          Spec.assertBool s (S.onBattlefield attackerId after) "the unblocked attacker survived combat"
+        _ -> Spec.assertFailure s "fixture should give alice exactly one attacker"
+      _ -> Spec.assertFailure s "four printings"
+  -- The pair's other half: the same board, the same combat, the Aura sitting on
+  -- carol's battlefield unattached. Nothing else differs, so a draw here would
+  -- mean the trigger came from somewhere other than the grant.
+  Spec.it s "CR 303.4m an unattached Sixth Sense grants nothing and nobody draws" $ do
+    ps <- traverse (S.printingOf s registry) ["Goblin Piker", "Sixth Sense", "Mountain", "Island"]
+    case ps of
+      [piker, sense, mountain, island] -> case sixthSenseBoard piker sense mountain island False of
+        ([_], _, gs) -> do
+          let after = S.runCombat sixthSenseAnswer gs
+          Spec.assertEqWith s "alice's hand is still empty" (handNames S.alice after) []
+          Spec.assertEqWith s "and so is carol's" (handNames S.carol after) []
+          Spec.assertEqWith s "the same combat still happened" (S.lifeOf S.bob after) (Just 18)
+        _ -> Spec.assertFailure s "fixture should give alice exactly one attacker"
+      _ -> Spec.assertFailure s "four printings"
+  -- Where the ability ends up, CR 113.7: on the RECEIVER, and not on the Aura
+  -- that prints the words.
+  Spec.it s "CR 113.7 the enchanted creature has the trigger and the Aura does not" $ do
+    ps <- traverse (S.printingOf s registry) ["Goblin Piker", "Sixth Sense", "Mountain", "Island"]
+    case ps of
+      [piker, sense, mountain, island] -> case (sixthSenseBoard piker sense mountain island True, sixthSenseBoard piker sense mountain island False) of
+        (([attackerId], senseId, enchanted), ([bareId], _, unenchanted)) -> do
+          Spec.assertEqWith s "one triggered ability on the enchanted creature" (length (Projection.triggeredAbilitiesOf attackerId enchanted)) 1
+          Spec.assertEqWith s "the Piker prints none of its own" (length (Projection.triggeredAbilitiesOf bareId unenchanted)) 0
+          Spec.assertEqWith s "and the granter does not have what it grants" (length (Projection.triggeredAbilitiesOf senseId enchanted)) 0
+        _ -> Spec.assertFailure s "fixture should give alice exactly one attacker"
+      _ -> Spec.assertFailure s "four printings"
+
+-- alice attacks with one settled Goblin Piker, carol holds the Aura, bob defends
+-- with nothing. Both libraries hold exactly one card, and DIFFERENT cards, so
+-- "who drew" is answerable by name; stocking carol's as well keeps CR 104.3c out
+-- of the negative reading, where a wrongly-controlled trigger would otherwise
+-- deck her instead of drawing.
+sixthSenseBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> ([ObjectId.ObjectId], ObjectId.ObjectId, GameState.GameState)
+sixthSenseBoard piker sense mountain island attached =
+  let (base, mine, _, _) = S.threePlayerCombat [piker] [] []
+      stocked = snd (S.addLibraryCard island S.carol (snd (S.addLibraryCard mountain S.alice base)))
+      (senseId, withAura) = S.addCreature sense S.carol stocked
+      board = case mine of
+        [attackerId] | attached -> S.attach senseId attackerId withAura
+        _ -> withAura
+   in (mine, senseId, board)
+
+-- Attacks bob with everything and takes every "may". CR 507.1 leaves the
+-- defending player to the active player's choice on a three-seat board, so it
+-- has to be pinned.
+sixthSenseAnswer :: Prompt.Prompt r -> r
+sixthSenseAnswer p = case p of
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  _ -> S.attackTo S.bob p
+
+-- The names in a player's hand, sorted. Names rather than a count, because the
+-- two libraries hold different cards and which one moved is the question.
+handNames :: PlayerId.PlayerId -> GameState.GameState -> [String]
+handNames pid gs =
+  List.sort
+    [ Text.unpack (CardName.unwrap (S.soleFaceName oid gs))
+    | oid <- Game.zoneMembers Zone.Hand pid gs
+    ]
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   discardTriggerSpec s registry
@@ -3868,3 +3960,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   wildgrowthWalkerSpec s registry
   rayOfCommandSpec s registry
   brambleElementalSpec s registry
+  sixthSenseSpec s registry

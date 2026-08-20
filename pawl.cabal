@@ -296,6 +296,8 @@ library codec
     Pawl.Codec.ForEachSpec
     Pawl.Codec.GameEvent
     Pawl.Codec.GameEventSpec
+    Pawl.Codec.GrantedAbility
+    Pawl.Codec.GrantedAbilitySpec
     Pawl.Codec.GrantPlayFromExile
     Pawl.Codec.GrantPlayFromExileSpec
     Pawl.Codec.GraveyardScope
@@ -1039,6 +1041,7 @@ library types
     Pawl.Types.Game
     Pawl.Types.GameEvent
     Pawl.Types.GameState
+    Pawl.Types.GrantedAbility
     Pawl.Types.GrantPlayFromExile
     Pawl.Types.GraveyardScope
     Pawl.Types.HalfUnlocked

@@ -120,14 +120,18 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     cardTypes :: Set.Set CardType.CardType,
     subtypes :: Set.Set Subtype.Subtype,
     -- | CR 602 / 613 layer 6: the object's activated abilities after the layer
-    -- system. Seeded from the card; emptied by LoseAllAbilities (Humility) and by
-    -- CR 305.7's strip at layer 4 (Blood Moon), as are the two fields below.
+    -- system. Seeded from the card and added to by CR 613.1f's grant (Presence of
+    -- Gond); emptied by LoseAllAbilities (Humility) and by CR 305.7's strip at
+    -- layer 4 (Blood Moon), as are the two fields below.
     activatedAbilities :: [ActivatedAbility.ActivatedAbility Card.Card],
     -- | CR 614 layer 6: the object's replacement effects after the layer system,
     -- the same projection posture as activatedAbilities, emptied by the same two.
     replacementEffects :: [PrintedReplacement.PrintedReplacement (Effect.Effect Card.Card)],
     -- | CR 603 layer 6: the object's triggered abilities after the layer system,
-    -- the same projection posture as activatedAbilities, emptied by the same two.
+    -- the same projection posture as activatedAbilities: seeded from the card,
+    -- added to by CR 613.1f's grant (Sixth Sense), emptied by the same two. CR
+    -- 603.2's scan reads this field, so a granted trigger fires without
+    -- Pawl.Engine.Event learning that it was granted.
     triggeredAbilities :: [TriggeredAbility.TriggeredAbility Card.Card],
     -- | CR 612.1 layer 3: the subtype word swaps applied to this object, in the
     -- order they were applied. A RECORD of what layer 3 did, where every field

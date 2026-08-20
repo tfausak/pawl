@@ -4,7 +4,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Codec.GrantedAbility as GrantedAbility
 import qualified Pawl.Codec.Modification as Modification
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -15,6 +15,7 @@ import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -27,11 +28,11 @@ import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 
--- | The `ability` parameter is instantiated at @ActivatedAbility Text@, which is
+-- | The `ability` parameter is instantiated at @GrantedAbility Text@, which is
 -- what every card position holds with `card` in turn instantiated at 'Text.Text'
 -- -- the posture 'Pawl.Codec.ActivatedAbilitySpec' takes for the same reason.
-codec :: Codec.Codec (Modification.Modification (ActivatedAbility.ActivatedAbility Text.Text))
-codec = Modification.codec (ActivatedAbility.codec Common.text)
+codec :: Codec.Codec (Modification.Modification (GrantedAbility.GrantedAbility Text.Text))
+codec = Modification.codec (GrantedAbility.codec Common.text)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Modification" $ do
@@ -190,19 +191,21 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       " {\"type\":\"SwitchPowerToughness\"} "
   -- layer 6, CR 613.1f: a whole quoted activated ability, Presence of Gond's
   -- "{T}: Create a 1/1 green Elf Warrior creature token" reduced to its cost.
-  Spec.it s "GainActivatedAbility" $
+  Spec.it s "GainAbility" $
     Common.assertCodec
       s
       codec
-      ( Modification.GainActivatedAbility
-          ( ActivatedAbility.MkActivatedAbility
-              (Cost.MkCost Nothing [CostComponent.TapThis])
-              (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
-              []
-              Nothing
+      ( Modification.GainAbility
+          ( GrantedAbility.Activated
+              ( ActivatedAbility.MkActivatedAbility
+                  (Cost.MkCost Nothing [CostComponent.TapThis])
+                  (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
+                  []
+                  Nothing
+              )
           )
       )
-      " {\"type\":\"GainActivatedAbility\",\"value\":{\"cost\":{\"mana\":null,\"components\":[{\"type\":\"TapThis\"}]},\"modal\":{\"modes\":[{}]}}} "
+      " {\"type\":\"GainAbility\",\"value\":{\"type\":\"Activated\",\"value\":{\"cost\":{\"mana\":null,\"components\":[{\"type\":\"TapThis\"}]},\"modal\":{\"modes\":[{}]}}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec
   -- The Void instantiation Pawl.Types.ModifyTarget takes: one arm short, and the
   -- schema says so.

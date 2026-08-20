@@ -2935,7 +2935,9 @@ droughtActivationSpec s registry = Spec.describe s "DroughtActivation" $ do
 -- CR 613.1f layer 6, the ability-GRANTING half: Presence of Gond ({2}{G}
 -- Enchantment -- Aura, "Enchant creature. Enchanted creature has '{T}: Create a
 -- 1/1 green Elf Warrior creature token.'", checked against Scryfall) is the
--- smallest card that hands another object a whole quoted ability.
+-- cheapest card in data/cards that hands another object a whole quoted ACTIVATED
+-- ability. Sixth Sense is the triggered half of the same arm, and cheaper --
+-- Pawl.EventTriggerSpec's "CR 613.1f a granted triggered ability" is its group.
 --
 -- Three seats, and the two that matter are DIFFERENT players: alice controls the
 -- Aura, bob controls the enchanted Prodigal Sorcerer, carol is the third. So
