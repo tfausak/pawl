@@ -750,7 +750,7 @@ effectCounts effect = case effect of
   -- also where the four opcodes that route their ref are named.
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> refCounts ref
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
-  Effect.Mill (Mill.MkMill _ quantity _) -> quantityCounts quantity
+  Effect.Mill (Mill.MkMill _ quantity _ _) -> quantityCounts quantity
   Effect.Reveal (Reveal.MkReveal ref _) -> refCounts ref
   Effect.LookAt (LookAt.MkLookAt ref _) -> refCounts ref
   Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
@@ -3334,7 +3334,7 @@ effectFilters effect = case effect of
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   -- The tally's Filter is a position a card author writes, so the lint reaches
   -- it: rule 728.1's "nonland card" is one of these.
-  Effect.Mill (Mill.MkMill _ quantity mTally) -> unframed (quantityFilters quantity <> fmap MillTally.filter (Maybe.maybeToList mTally))
+  Effect.Mill (Mill.MkMill _ quantity mTally _) -> unframed (quantityFilters quantity <> fmap MillTally.filter (Maybe.maybeToList mTally))
   -- The ObjectRef's Filter is a position a card author writes, so the lint
   -- reaches it, as Explore's does. Both halves of CR 701.20 answer alike.
   Effect.Reveal (Reveal.MkReveal ref _) -> sourceHosted (objectRefFilters ref)
@@ -5058,7 +5058,18 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ mSlot _ _) | not (movesAtMostOne ref) -> Maybe.maybeToList mSlot
           Effect.LookAt (LookAt.MkLookAt ref slot) | not (movesAtMostOne ref) -> [slot]
           Effect.Reveal (Reveal.MkReveal ref mSlot) | not (movesAtMostOne ref) -> Maybe.maybeToList mSlot
+          -- CR 701.17c's slot, whose plurality is the mill's DEPTH rather than an
+          -- ObjectRef's: a mill of one card binds the singular shape and any
+          -- deeper mill may bind a group, so only a literal 1 is singular here.
+          -- The depth is per miller, so a ref naming several seats is plural at
+          -- any depth -- movesAtMostOne's own reading of a TopOfLibrary.
+          Effect.Mill (Mill.MkMill player quantity _ mSlot)
+            | not (millsAtMostOne player quantity) ->
+                Maybe.maybeToList mSlot
           _ -> []
+        millsAtMostOne player quantity = case quantity of
+          Quantity.Type.Literal n -> n <= 1 && namesOneSeat player
+          _ -> False
         readSingly effect = case effect of
           Effect.OfferCast (OfferCast.MkOfferCast slot _ _ _) -> [slot]
           _ -> []

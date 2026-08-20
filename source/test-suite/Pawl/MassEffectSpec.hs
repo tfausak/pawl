@@ -36,6 +36,7 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
@@ -686,6 +687,111 @@ portOfKarfellSpec s registry =
               Spec.assertEqWith s "nothing arrived, and carol keeps the creature she controls" (arrivals after) untouched
               Spec.assertEqWith s "only the land that paid for the ability is in the graveyard" (namesIn Zone.Graveyard S.alice after) [named "Port of Karfell"]
             Nothing -> Spec.assertBool s False "expected exactly one returning ability"
+
+-- CR 701.17c's "from among them", which is the group read Filter.IsBound could
+-- not do: a slot bound to the WHOLE batch a mill put in the graveyard, named by a
+-- later clause's filter over candidates that batch does not exhaust.
+--
+-- Midnight Tilling {1}{G} Instant, "Mill four cards, then you may return a
+-- permanent card from among them to your hand." (name, cost, type line and
+-- Oracle text checked against api.scryfall.com, 2026-08-20). The whole card is
+-- transcribed; "a permanent card" is CR 110.4a's six card types written out as an
+-- Or, there being no atom that says it in one word.
+--
+-- Corpse Churn is the printing the pool already had that separates the two
+-- readings -- "Mill three cards, then you may return a creature card FROM YOUR
+-- GRAVEYARD to your hand", the same sentence with the batch swapped for the
+-- zone. So the board buries a permanent card BEFORE the mill: every other clause
+-- of Midnight Tilling's sentence admits it, and only "from among them" keeps it
+-- out. A reading that ignored the slot would offer four candidates where this one
+-- offers three, and the answers below are pinned by INDEX into the offer, so the
+-- two readings hand back different cards rather than the same one.
+--
+-- The milled Murder is the type half of the same filter, kept honest by a batch
+-- that is not all permanent cards; bob's buried Ogre Sentry is CR 400.1's other
+-- graveyard, which "your" excludes.
+midnightTillingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+midnightTillingSpec s registry =
+  let -- alice: four Forests for the {1}{G}, one permanent card already in her
+      -- graveyard, `stock` into her library BOTTOM FIRST (S.addLibraryCard puts
+      -- each new card on top), Midnight Tilling in hand. bob buries one card of
+      -- his own. Returns the spell's id.
+      board forest tilling decoy sentry stock =
+        let mana = S.landsFor forest S.alice 4 S.threePlayerGame
+            (_, withDecoy) = S.addGraveyardCard decoy S.alice mana
+            (_, withTheirs) = S.addGraveyardCard sentry S.bob withDecoy
+            withStock = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.alice g)) withTheirs stock
+            (withSpell, spellId) = S.handOne tilling withStock
+         in (spellId, withSpell {GameState.priority = Just S.alice})
+      named = Just . CardName.MkCardName . Text.pack
+      -- The candidates in the order the prompt offers them, which is
+      -- Resolve.graveyardCardsOf's ascending ObjectId -- and, the mill having
+      -- minted fresh ids in milling order (CR 400.7), the order the cards were
+      -- milled in. Pinned by index: an answerer that went looking for a legal
+      -- card would find one again under either reading.
+      nth n offered = Maybe.fromMaybe (NonEmpty.head offered) (Maybe.listToMaybe (drop n (NonEmpty.toList offered)))
+      -- Takes the printed "may" -- clause 1, the return; clause 0 is the mandatory
+      -- mill -- and answers the graveyard choice with the nth card offered.
+      taking :: Int -> Prompt.Prompt r -> r
+      taking n p = case p of
+        Prompt.ChooseOptional _ _ _ _ clause
+          | clause == ClauseIndex.MkClauseIndex 1 -> OptionalDecision.Exercises
+        Prompt.ChooseCardInGraveyard _ _ _ offered -> nth n offered
+        _ -> S.identityAnswer p
+      cast :: (forall r. Prompt.Prompt r -> r) -> (ObjectId.ObjectId, GameState.GameState) -> GameState.GameState
+      cast answer (spellId, gs) =
+        let announced = S.runPure answer gs (S.cast S.alice spellId)
+         in S.runPure answer announced Stack.resolveTop
+      setup = do
+        forest <- S.printingOf s registry "Forest"
+        tilling <- S.printingOf s registry "Midnight Tilling"
+        hero <- S.printingOf s registry "Benalish Hero"
+        sentry <- S.printingOf s registry "Ogre Sentry"
+        island <- S.printingOf s registry "Island"
+        swamp <- S.printingOf s registry "Swamp"
+        maiden <- S.printingOf s registry "Bird Maiden"
+        murder <- S.printingOf s registry "Murder"
+        piker <- S.printingOf s registry "Goblin Piker"
+        -- Bottom to top: the Island is never reached, and the top four are milled
+        -- in the order Goblin Piker, Murder, Bird Maiden, Swamp.
+        pure (board forest tilling hero sentry [island, swamp, maiden, murder, piker])
+      -- What stays behind when nothing is returned: the card buried before the
+      -- mill, all four milled cards, and the spell itself (CR 608.2m).
+      allBuried = List.sort ([named "Benalish Hero", named "Bird Maiden", named "Goblin Piker", named "Midnight Tilling", named "Murder"] <> [named "Swamp"])
+   in Spec.describe s "MidnightTilling" $ do
+        -- The headline, and the case the whole unit exists for: the SECOND card
+        -- the offer names is the second MILLED permanent card, not the second
+        -- permanent card in the graveyard.
+        Spec.it s "CR 701.17c the return chooses among the milled cards, not among the graveyard" $ do
+          gs <- setup
+          let after = cast (taking 1) gs
+          Spec.assertEqWith s "the second milled permanent card is the one in alice's hand" (namesIn Zone.Hand S.alice after) [named "Bird Maiden"]
+          Spec.assertEqWith
+            s
+            "the permanent card buried before the mill was never a candidate, and neither was the milled Murder"
+            (List.sort (namesIn Zone.Graveyard S.alice after))
+            (List.delete (named "Bird Maiden") allBuried)
+          Spec.assertEqWith s "and the other graveyard was not looked in" (namesIn Zone.Graveyard S.bob after) [named "Ogre Sentry"]
+        -- The paired control: the same board and the same offer, answered at
+        -- index 0 instead. If the engine were picking, both legs would name one
+        -- card.
+        Spec.it s "CR 608.2d the engine does not pick: another answer returns another milled card" $ do
+          gs <- setup
+          let after = cast (taking 0) gs
+          Spec.assertEqWith s "the first milled permanent card comes back instead" (namesIn Zone.Hand S.alice after) [named "Goblin Piker"]
+          Spec.assertEqWith
+            s
+            "and the Bird Maiden stays milled"
+            (List.sort (namesIn Zone.Graveyard S.alice after))
+            (List.delete (named "Goblin Piker") allBuried)
+        -- CR 603.5: the printed "may" is a real choice, and declining leaves the
+        -- whole batch where the mill put it. The mill still ran, so this cannot
+        -- pass because the spell never resolved.
+        Spec.it s "CR 603.5 declining the may leaves every milled card in the graveyard" $ do
+          gs <- setup
+          let after = cast S.identityAnswer gs
+          Spec.assertEqWith s "nothing reached alice's hand" (namesIn Zone.Hand S.alice after) []
+          Spec.assertEqWith s "and the mill still happened" (List.sort (namesIn Zone.Graveyard S.alice after)) allBuried
 
 -- The same arm reached from a TRIGGER rather than an activated ability, and over
 -- LAND cards rather than creature cards -- the two axes portOfKarfellSpec above
@@ -2587,6 +2693,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   riseOfTheDarkRealmsSpec s registry
   angelOfFinalitySpec s registry
   portOfKarfellSpec s registry
+  midnightTillingSpec s registry
   blossomingTortoiseSpec s registry
   exhumeSpec s registry
   bloodForBonesSpec s registry

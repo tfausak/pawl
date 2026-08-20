@@ -516,7 +516,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Mill (Mill.MkMill (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 2) Nothing))
+      (Effect.Mill (Mill.MkMill (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 2) Nothing Nothing))
       " {\"type\":\"Mill\",\"value\":{\"player\":{\"type\":\"InSlot\",\"value\":\"target\"},\"quantity\":{\"type\":\"Literal\",\"value\":2}}} "
   -- CR 728.1's mill, which counts the nonland cards it put in the graveyard.
   Spec.it s "Mill, with a tally" $
@@ -534,6 +534,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
                       MillTally.filter = Filter.Not (Filter.HasCardType CardType.Land)
                     }
               )
+              Nothing
           )
       )
       " {\"type\":\"Mill\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"quantity\":{\"type\":\"Literal\",\"value\":2},\"tally\":{\"slot\":\"milled\",\"filter\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}}} "

@@ -367,8 +367,9 @@ slotsOf effect = case effect of
   Effect.BecomesBlocked slot -> oneSlot slot
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> objectRefSlots ref
   Effect.Draw (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
-  -- The tally's slot is a DEFINITION, not a read: see boundSlots below.
-  Effect.Mill (Mill.MkMill ref quantity _) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  -- The tally's slot and CR 701.17c's are DEFINITIONS, not reads: see boundSlots
+  -- below.
+  Effect.Mill (Mill.MkMill ref quantity _ _) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   -- The bound slot is a DEFINITION, not a read.
   Effect.Reveal (Reveal.MkReveal ref _) -> objectRefSlots ref
   -- The bound slot is a DEFINITION, not a read.
@@ -569,7 +570,7 @@ slotsAreExhaustive effect = case effect of
   -- Three of the four whose ref may nest a Quantity; ForEach is the fourth.
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> all Quantity.slotsAreExhaustive (objectRefQuantities ref)
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
-  Effect.Mill (Mill.MkMill _ quantity _) -> Quantity.slotsAreExhaustive quantity
+  Effect.Mill (Mill.MkMill _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.Reveal (Reveal.MkReveal ref _) -> all Quantity.slotsAreExhaustive (objectRefQuantities ref)
   Effect.LookAt (LookAt.MkLookAt ref _) -> all Quantity.slotsAreExhaustive (objectRefQuantities ref)
   Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
@@ -709,7 +710,7 @@ readsX = any effectReadsX
       -- these three -- and ForEach below -- go through objectRefQuantities.
       Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> any Quantity.readsX (objectRefQuantities ref)
       Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
-      Effect.Mill (Mill.MkMill _ quantity _) -> Quantity.readsX quantity
+      Effect.Mill (Mill.MkMill _ quantity _ _) -> Quantity.readsX quantity
       Effect.Reveal (Reveal.MkReveal ref _) -> any Quantity.readsX (objectRefQuantities ref)
       Effect.LookAt (LookAt.MkLookAt ref _) -> any Quantity.readsX (objectRefQuantities ref)
       Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
@@ -917,8 +918,10 @@ boundSlots effect = case effect of
   -- each ... destroyed this way", and the cards it put into a graveyard, for a
   -- later clause that NAMES them (CR 400.7's incarnations).
   Effect.Destroy (Destroy.MkDestroy _ _ mSlot mBuried) -> foldMap Set.singleton mSlot <> foldMap Set.singleton mBuried
-  -- How many milled cards matched the tally's filter (CR 728.1).
-  Effect.Mill (Mill.MkMill _ _ mTally) -> foldMap (Set.singleton . MillTally.slot) mTally
+  -- How many milled cards matched the tally's filter (CR 728.1), and WHICH cards
+  -- the mill put in the graveyard, for a later clause that names them (CR
+  -- 701.17c). Two slots and not one: a card may write either without the other.
+  Effect.Mill (Mill.MkMill _ _ mTally mSlot) -> foldMap (Set.singleton . MillTally.slot) mTally <> foldMap Set.singleton mSlot
   -- The cards CR 701.20a's reveal showed, where the card named a slot. Optional,
   -- where LookAt's is not: the GameEvent.Revealed in the log is a record already.
   Effect.Reveal (Reveal.MkReveal _ mSlot) -> foldMap Set.singleton mSlot
@@ -1161,7 +1164,7 @@ resolveSpellWith runSubgame oid = do
                         -- re-read adds only defined slots. A REGRESSION FENCE --
                         -- mutating this half back leaves the suite green.
                         gateBindings <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject oid)
-                        gated <- gateHolds effectController oid (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Binding.targetsOf gateBindings)) clause
+                        gated <- gateHolds effectController oid (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Binding.targetsOf gateBindings)) (Binding.groupsOf gateBindings) clause
                         -- CR 603.5 / 608.2d: then the printed "may".
                         taken <- if gated then exercises oid effectController idx cIdx clause else pure False
                         -- CR 118.12: then the cost paid on resolution, against the
@@ -1297,7 +1300,7 @@ resolveModesWith runSubgame stackId srcId modes = do
                       -- the STACK object (CR 608.2c), where this resolution's
                       -- slots are bound (see bindSlot).
                       gateBindings <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject stackId)
-                      gated <- gateHolds effectController srcId (instanceView (Binding.targetsOf gateBindings)) clause
+                      gated <- gateHolds effectController srcId (instanceView (Binding.targetsOf gateBindings)) (Binding.groupsOf gateBindings) clause
                       -- CR 603.5 / 608.2d: then the printed "may".
                       taken <- if gated then exercises stackId effectController idx cIdx clause else pure False
                       -- CR 118.12: then the cost paid on resolution, against the
@@ -1325,12 +1328,18 @@ resolveModesWith runSubgame stackId srcId modes = do
 -- object an earlier clause already moved. The CHOSEN slots rather than CR
 -- 608.2b's surviving ones -- a target THIS resolution moved is not one that
 -- became illegal before it.
-gateHolds :: PlayerId -> ObjectId -> Map.Map SlotName (Set Recipient) -> Clause.Clause Card.Type.Card -> Game Bool
-gateHolds controller source chosen clause = case Clause.condition clause of
+--
+-- The GROUP bindings come in beside them, from the same live read the caller
+-- takes the chosen slots off, so a gate can ask after a batch an earlier clause
+-- named (CR 115.10a). Under the printed slot names, which is how every other
+-- group read is written (slotGroups) and unlike the chosen map, which the caller
+-- has projected into CR 700.2d's mode instance.
+gateHolds :: PlayerId -> ObjectId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Seq.Seq ObjectId) -> Clause.Clause Card.Type.Card -> Game Bool
+gateHolds controller source chosen groups clause = case Clause.condition clause of
   Nothing -> pure True
   Just condition -> do
     gs <- State.get
-    pure (Condition.holds (Projection.viewWithLastKnownAnywhere gs) (effectContext controller source chosen) gs source condition)
+    pure (Condition.holds (Projection.viewWithLastKnownAnywhere gs) (effectContext controller source chosen groups) gs source condition)
 
 -- CR 603.5 / 608.2d: does this clause's instruction list happen at all? A
 -- mandatory clause always does; an optional one is its controller's call, made
@@ -1637,7 +1646,7 @@ objectRefObjects legal resolving controller source gs ref = case ref of
     -- "each OTHER creature" is `Not (IsBound "target")`. Filter.IsBound answers
     -- False for every candidate against an empty slot map, so a bare contextFor
     -- here would leave such a card silently sweeping in its own target.
-    let context = (effectContext controller source legal) {Filter.sourceAttachedTo = Projection.hostOf source gs}
+    let context = (effectContext controller source legal (slotGroups resolving gs)) {Filter.sourceAttachedTo = Projection.hostOf source gs}
         matching =
           filter
             (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_)
@@ -1654,7 +1663,7 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- reading of CR 109.5 or the players another slot of this announcement targets
   -- -- and what matches within each is graveyardCardsOf.
   ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard scope filter_) ->
-    concatMap (\pid -> graveyardCardsOf controller source gs pid filter_) (graveyardScopePlayers legal controller gs scope)
+    concatMap (\pid -> graveyardCardsOf (effectContext controller source legal (slotGroups resolving gs)) gs pid filter_) (graveyardScopePlayers legal controller gs scope)
   -- CR 400.1's per-player zone again, but only the RESOLVING CONTROLLER's, so no
   -- scope to fold over and no APNAP order to impose. In the zone's own order,
   -- which no rule reads: CR 400.5 leaves a hand's arrangement to its owner.
@@ -1667,7 +1676,7 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- off GameState.exile directly because CR 400.1 makes exile one SHARED zone --
   -- no player to ask, and no APNAP sort, so ascending id and thus arrival order.
   ObjectRef.EachCardExiledWithSource mFilter ->
-    let context = Filter.contextFor (Just controller) (Just source)
+    let context = effectContext controller source legal (slotGroups resolving gs)
         stated oid = case mFilter of
           Nothing -> True
           Just filter_ -> Filter.matches context (Projection.viewOfObject oid gs) filter_
@@ -1680,7 +1689,7 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- the STACK's own order, top first (CR 405.2), not APNAP: one shared zone has an
   -- order the rules already read. Read LIVE (CR 608.2c).
   ObjectRef.EachSpell filter_ ->
-    let context = Filter.contextFor (Just controller) (Just source)
+    let context = effectContext controller source legal (slotGroups resolving gs)
      in filter
           (\oid -> Game.isSpell oid gs && Filter.matches context (Projection.viewOfObject oid gs) filter_)
           (GameState.stack gs)
@@ -1701,7 +1710,7 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player count) ->
     let named = playerRefPlayers legal controller gs player
         viewOf = effectViewOf source legal gs
-        context = effectContext controller source legal
+        context = effectContext controller source legal (slotGroups resolving gs)
         depth = maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf context gs resolving source count)
      in concatMap
           (\pid -> List.genericTake depth (Game.zoneMembers Zone.Library pid gs))
@@ -1738,16 +1747,18 @@ graveyardScopePlayers bindings controller gs scope =
    in filter (`elem` named) (Game.apnapOrder gs)
 
 -- The cards in ONE player's graveyard matching the filter, in ascending
--- ObjectId. The filter is matched in this effect's context, so `controller` is
--- CR 109.5's "you" rather than whoever is choosing.
-graveyardCardsOf :: PlayerId -> ObjectId -> GameState -> PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
-graveyardCardsOf controller source gs pid filter_ =
-  let context = Filter.contextFor (Just controller) (Just source)
-   in List.sort
-        ( filter
-            (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_)
-            (Game.zoneMembers Zone.Graveyard pid gs)
-        )
+-- ObjectId. The filter is matched in THIS EFFECT's context -- the caller's, so
+-- CR 109.5's "you" is the resolving controller rather than whoever is choosing,
+-- and the resolution's own slots ride along: Midnight Tilling's "from among
+-- them" is `IsBound` over the slot its own mill defined, which a bare contextFor
+-- would answer False for on every candidate.
+graveyardCardsOf :: Filter.Context -> GameState -> PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
+graveyardCardsOf context gs pid filter_ =
+  List.sort
+    ( filter
+        (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_)
+        (Game.zoneMembers Zone.Graveyard pid gs)
+    )
 
 -- The cards in the named graveyards matching the filter, for
 -- ChosenCardInGraveyard's TheController chooser -- ObjectRef.EachCardInGraveyard
@@ -1755,9 +1766,9 @@ graveyardCardsOf controller source gs pid filter_ =
 -- graveyard has no controller, so Filter.ControlledBy is vacuously False. APNAP
 -- (CR 101.4) then ascending ObjectId, not the graveyard's own pile order (CR
 -- 404.2), which no rule makes a batch's processing order.
-graveyardCards :: PlayerId -> ObjectId -> GameState -> PlayerScope.PlayerScope -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
-graveyardCards controller source gs scope filter_ =
-  concatMap (\pid -> graveyardCardsOf controller source gs pid filter_) (graveyardPlayers controller gs scope)
+graveyardCards :: Filter.Context -> PlayerId -> GameState -> PlayerScope.PlayerScope -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
+graveyardCards context controller gs scope filter_ =
+  concatMap (\pid -> graveyardCardsOf context gs pid filter_) (graveyardPlayers controller gs scope)
 
 -- The seats an ObjectRef.ChosenCardInHand asks -- and an
 -- ObjectRef.RandomCardInHand reads -- in APNAP order. One list, not a chooser
@@ -1775,12 +1786,11 @@ handChoosers legal controller gs player =
 --
 -- NOT sorted, where the graveyard sibling sorts: the candidates keep the zone's
 -- own order, which no rule reads (CR 400.5). Narrowing must not reorder.
-handCardsOf :: PlayerId -> ObjectId -> GameState -> PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
-handCardsOf controller source gs pid filter_ =
-  let context = Filter.contextFor (Just controller) (Just source)
-   in filter
-        (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_)
-        (Game.zoneMembers Zone.Hand pid gs)
+handCardsOf :: Filter.Context -> GameState -> PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
+handCardsOf context gs pid filter_ =
+  filter
+    (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_)
+    (Game.zoneMembers Zone.Hand pid gs)
 
 -- CR 401.2 and CR 401.4: turn the effect's LibraryPlacement into the END each
 -- moving object arrives at, and hand back the batch in the order the moves must
@@ -2143,15 +2153,25 @@ damageSourceCandidates context gs filter_ =
 -- Only LEGAL recipients, only OBJECT ones, and only where the slot names exactly
 -- one (CR 608.2b); all three drop out as an absent key, so the quantity is
 -- unanswered rather than answered off the source.
-effectContext :: PlayerId -> ObjectId -> Map.Map SlotName (Set Recipient) -> Filter.Context
-effectContext controller source legal =
-  Filter.contextWithSlots (Just controller) (Just source) (effectSlotObjects legal)
+effectContext :: PlayerId -> ObjectId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Seq.Seq ObjectId) -> Filter.Context
+-- The GROUPS come in beside `legal` rather than through it: CR 115.10a makes a
+-- group a definition and never a target, so it owes CR 608.2b nothing and is
+-- read live off the resolving object (slotGroups) instead.
+effectContext controller source legal groups =
+  Filter.contextWithSlots (Just controller) (Just source) (Binding.withGroups (effectSlotObjects legal) groups)
 
--- The ONE object each of a resolution's slots names, shared by effectContext
--- above and effectViewOf below so the two cannot disagree about which object a
--- slot is.
+-- The ONE object each of a resolution's TARGET slots names, shared by
+-- effectContext above and effectViewOf below so the two cannot disagree about
+-- which object a slot is.
 effectSlotObjects :: Map.Map SlotName (Set Recipient) -> Map.Map SlotName ObjectId
 effectSlotObjects = Map.mapMaybe Recipient.objectOf . Map.mapMaybe Binding.onlyOne
+
+-- The GROUP bindings a resolution has made so far, read LIVE off the resolving
+-- object (CR 608.2c): a slot an earlier clause of this same resolution defined is
+-- part of the state a later one is read against, which is exactly what "from
+-- among them" needs. By the name the effect wrote, as slotGroup above reads it.
+slotGroups :: ObjectId -> GameState -> Map.Map SlotName (Seq.Seq ObjectId)
+slotGroups resolving gs = Binding.groupsOf (maybe Map.empty Object.bindings (Game.lookupObject resolving gs))
 
 -- CR 608.2h's reader for one resolution: Projection.viewWithLastKnown, which
 -- answers the SOURCE off its last known information, widened to the permanent a
@@ -2257,7 +2277,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.DealDamage (DealDamage.MkDealDamage ref quantity dealer excess) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
-        context = effectContext controller source legal
+        context = effectContext controller source legal (slotGroups resolving gs)
         -- CR 120.1a: damage only to a battle, creature, or planeswalker, so both
         -- arms of the ObjectRef go through Damage.damageRecipient and neither is
         -- trusted. A player recipient survives untouched (CR 115.4, CR 120.3a).
@@ -2519,7 +2539,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- How many cards this search may find (CR 701.23a), evaluated ONCE
               -- before the loop: one instruction names one count. An unevaluable
               -- or non-positive quantity comes out as 0.
-              cap = case Quantity.evaluateFor (effectViewOf source legal gs0) (effectContext controller source legal) gs0 resolving source quantity of
+              cap = case Quantity.evaluateFor (effectViewOf source legal gs0) (effectContext controller source legal (slotGroups resolving gs0)) gs0 resolving source quantity of
                 Just n | n > 0 -> Integer.toNaturalSaturating n
                 _ -> 0
           Monad.forM_ searchers $ \searcher -> Monad.forM_ (ownersFor searcher) $ \owner -> do
@@ -2820,6 +2840,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- player, which the funnel above has already settled.
             Monad.when (EntryRiders.attacking entry) (Combat.putOntoBattlefieldAttacking newId)
           pure (maybe sofar (`Set.insert` sofar) mNew, mNew : acc)
+        -- The context a CHOICE's candidates are filtered in, off the board the
+        -- choice is being made on: the resolution's own slots ride along, so a
+        -- card offering "a permanent card from among them" (Midnight Tilling)
+        -- offers only what an earlier clause of this resolution named.
+        chooseContext g = effectContext controller source legal (slotGroups resolving g)
         -- CR 400.7j: bind what arrived into the resolving object's live bindings,
         -- where a later effect of this resolution or a delayed ability it arms
         -- (CR 603.7c) can name it. The shape follows how many arrived: one takes
@@ -2914,9 +2939,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       answer <- Game.choose (Prompt.ChooseCardInGraveyard (Decide.deciderFor asked gs) asked source offered)
                       pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
               case chooser of
-                Chooser.TheController -> ask controller (graveyardCards controller source gs scope filter_)
+                Chooser.TheController -> ask controller (graveyardCards (chooseContext gs) controller gs scope filter_)
                 Chooser.EachInScope ->
-                  fmap concat . Monad.mapM (\pid -> ask pid (graveyardCardsOf controller source gs pid filter_)) $
+                  fmap concat . Monad.mapM (\pid -> ask pid (graveyardCardsOf (chooseContext gs) gs pid filter_)) $
                     graveyardPlayers controller gs scope
                 -- ONE chooser, read out of the slot a ChooseOpponent bound,
                 -- choosing out of their own graveyard. Through playerRefPlayers so
@@ -2926,7 +2951,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- a chooser the scope does not name is offered nothing.
                 Chooser.BoundInSlot slot ->
                   case playerRefPlayers legal controller gs (PlayerRef.InSlot slot) of
-                    [pid] | List.elem pid (graveyardPlayers controller gs scope) -> ask pid (graveyardCardsOf controller source gs pid filter_)
+                    [pid] | List.elem pid (graveyardPlayers controller gs scope) -> ask pid (graveyardCardsOf (chooseContext gs) gs pid filter_)
                     _ -> pure []
             -- The arm above over the hidden zone CR 400.2 makes a hand: what it
             -- says about when the candidates are read (CR 608.2c), about the asks
@@ -2947,7 +2972,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       let offered = first NonEmpty.:| (second : more)
                       answer <- Game.choose (Prompt.ChooseCardInHand (Decide.deciderFor asked gs) asked source offered)
                       pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
-              fmap concat . Monad.mapM (\pid -> ask pid (handCardsOf controller source gs pid filter_)) $
+              fmap concat . Monad.mapM (\pid -> ask pid (handCardsOf (chooseContext gs) gs pid filter_)) $
                 handChoosers legal controller gs player
             -- Not implemented: a card moved at random out of a hand, CR 701.9b's
             -- random discard. Nothing moves it here, so a card writing the ref
@@ -3062,7 +3087,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.Draw (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
-        context = effectContext controller source legal
+        context = effectContext controller source legal (slotGroups resolving gs)
         named = playerRefPlayers legal controller gs ref
         -- CR 121.2c: the active player draws first, then each other player in turn
         -- order. Observable rather than cosmetic: each draw records a zone change
@@ -3082,10 +3107,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- top and the CR 104.3c empty-library loss is preserved.
               Monad.replicateM_ (Integer.toIntSaturating n) (Event.drawCard pid)
         _ -> pure ()
-  Effect.Mill (Mill.MkMill ref quantity mTally) -> do
+  Effect.Mill (Mill.MkMill ref quantity mTally mSlot) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
-        context = effectContext controller source legal
+        context = effectContext controller source legal (slotGroups resolving gs)
         -- An illegal slot (CR 608.2b) or a reference naming nobody mills nothing.
         millers = playerRefPlayers legal controller gs ref
         -- CR 701.17/701.17b: top min(n, library) of each miller's library, which is
@@ -3105,9 +3130,26 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- milled. ONE entry per miller, holding that player's whole batch, since rule
     -- 701.17a mills them at once -- and recorded even for a card a replacement
     -- diverted elsewhere, since it was milled wherever it ended up.
-    Monad.forM_ milledBy $ \(pid, cards) -> do
+    arrivals <- fmap concat . Monad.forM milledBy $ \(pid, cards) -> do
       arrived <- Maybe.catMaybes <$> Monad.mapM (\c -> Event.changeZoneReturning c Zone.Graveyard) cards
       Monad.unless (null arrived) (State.modify' (Event.recordEvent (GameEvent.Milled (Milled.MkMilled pid (Seq.fromList arrived)))))
+      pure arrived
+    -- CR 701.17c: a later clause naming the milled cards -- Midnight Tilling's
+    -- "from among them" -- finds them in the graveyard they moved to, so the
+    -- binding holds the ids the funnel ANSWERED rather than the library ids the
+    -- tally counts (CR 400.7). A card a replacement diverted elsewhere is bound
+    -- too, and rule 701.17c is then what decides whether a reader can find it:
+    -- an exile is public and a hand is not, which is a question about the READER
+    -- rather than about this binding.
+    --
+    -- ACROSS millers, since the slot is one name and no reader is per-player --
+    -- the tally's own posture. The one/many split is every other group binder's:
+    -- one milled card takes the SINGLE binding, which slotOne and every singular
+    -- reader can see, and several take the group.
+    Monad.forM_ mSlot $ \slot -> case arrivals of
+      [] -> pure ()
+      [only] -> State.modify' (bindSlot resolving slot only)
+      several -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList several))
     -- The tally, read from the pre-move state because CR 400.7 has since minted
     -- new ids. Each milled card is judged by its own CR 613 projection: rule
     -- 613.1 starts from the actual object and names no zone, so a library card is
@@ -3186,7 +3228,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.Scry (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
-        context = effectContext controller source legal
+        context = effectContext controller source legal (slotGroups resolving gs)
         -- An illegal slot (CR 608.2b) or a reference naming nobody scries nothing.
         named = playerRefPlayers legal controller gs ref
         -- CR 701.22c: players scrying at once decide in APNAP order -- apnapOrder
@@ -3201,7 +3243,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
-        context = effectContext controller source legal
+        context = effectContext controller source legal (slotGroups resolving gs)
         -- Scry's arm in every respect, APNAP included (CR 101.4, rule 701.25
         -- stating no order of its own).
         named = playerRefPlayers legal controller gs ref
@@ -3214,7 +3256,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
-        context = effectContext controller source legal
+        context = effectContext controller source legal (slotGroups resolving gs)
         -- The players who FATESEAL, not the ones fatesealed (CR 701.29a); whose
         -- library is looked at is fatesealOne's separate choice.
         named = playerRefPlayers legal controller gs ref
@@ -3234,7 +3276,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.Discard (Discard.MkDiscard slot quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
-        context = effectContext controller source legal
+        context = effectContext controller source legal (slotGroups resolving gs)
     case legalOne slot legal of
       Just (Recipient.ToPlayer target) ->
         -- One recipient, so the loop above is the identity -- but the READING is
@@ -3273,7 +3315,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.LoseLife (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
-        context = effectContext controller source legal
+        context = effectContext controller source legal (slotGroups resolving gs)
         -- Whoever the PlayerRef names loses the life. Unordered: there is no CR
         -- 121.2c for life, and CR 704.3 checks state-based actions only as a player
         -- would get priority, so no total is observable in between.
@@ -3295,7 +3337,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
-        context = effectContext controller source legal
+        context = effectContext controller source legal (slotGroups resolving gs)
         gainers = playerRefPlayers legal controller gs ref
     Monad.forM_ gainers $ \pid ->
       case evaluateForRecipient viewOf context gs resolving source pid quantity of
@@ -3339,7 +3381,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
-        context = effectContext controller source legal
+        context = effectContext controller source legal (slotGroups resolving gs)
         recipients = playerRefPlayers legal controller gs ref
     Monad.forM_ recipients $ \pid ->
       -- A player with no row is nobody to move.
@@ -3385,7 +3427,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
-        context = effectContext controller source legal
+        context = effectContext controller source legal (slotGroups resolving gs)
         revving = playerRefPlayers legal controller gs ref
     Monad.forM_ revving $ \pid ->
       case evaluateForRecipient viewOf context gs resolving source pid quantity of
@@ -3412,7 +3454,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.DecreaseSpeed d -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
-        context = effectContext controller source legal
+        context = effectContext controller source legal (slotGroups resolving gs)
         slowing = playerRefPlayers chosen controller gs (SpeedDecrease.player d)
         atLeast = toInteger (SpeedDecrease.floor d)
     Monad.forM_ slowing $ \pid ->
@@ -3428,7 +3470,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot filter_ quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
-        context = effectContext controller source legal
+        context = effectContext controller source legal (slotGroups resolving gs)
     case legalOne slot legal of
       Just (Recipient.ToPlayer victim) ->
         -- Read against the VICTIM: "half the permanents they control" is a number
@@ -3464,7 +3506,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.Create (Create.MkCreate quantity card entry mSlot) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
-        context = effectContext controller source legal
+        context = effectContext controller source legal (slotGroups resolving gs)
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 -> do
@@ -3515,7 +3557,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- 613.1a). CR 608.2h: both reads take the last known branch for a permanent
     -- already gone, and the pair has to move together.
     let viewOf = effectViewOf source legal gs
-        context = effectContext controller source legal
+        context = effectContext controller source legal (slotGroups resolving gs)
         sources = objectRefObjects legal resolving controller source gs ref
     -- The count is Create's, read the same way and off the same `gs` (CR 707.1).
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
@@ -3599,7 +3641,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- The clause's own "if", read with the resolution's controller as CR
       -- 109.5's "you". The full view, not viewWithLastKnown: a spell creating a
       -- self-replacement is on the stack and the board is live.
-      let met = maybe True (Condition.holds (Projection.fullView gs) (effectContext controller source legal) gs source) condition
+      let met = maybe True (Condition.holds (Projection.fullView gs) (effectContext controller source legal (slotGroups resolving gs)) gs source) condition
        in case (met, Expiry.arm (Binding.playersIn legal) controller source duration gs) of
             -- The stated condition is false, so the clause creates nothing.
             (False, _) -> gs
@@ -3633,7 +3675,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- 120.1a).
     gs <- State.get
     let viewOf = effectViewOf source legal gs
-        context = effectContext controller source legal
+        context = effectContext controller source legal (slotGroups resolving gs)
         recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legal resolving controller source gs ref)
         -- CR 615.5: the additional effect, BAKED onto the row with this
         -- resolution's chosen targets and CR 109.5's "you".
@@ -4051,7 +4093,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.PutCounters (PutCounters.MkPutCounters kind quantity ref) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
-        context = effectContext controller source legal
+        context = effectContext controller source legal (slotGroups resolving gs)
         -- CR 608.2c: the set is swept as this instruction is reached, and an
         -- illegal slot (CR 608.2b) or a player recipient answers with nobody.
         targets = objectRefObjects legal resolving controller source gs ref
@@ -4067,7 +4109,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind quantity slot) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
-        context = effectContext controller source legal
+        context = effectContext controller source legal (slotGroups resolving gs)
     case legalOne slot legal of
       Just recipient -> case Recipient.objectOf recipient of
         Nothing -> pure () -- a player recipient has no object counters
@@ -4121,7 +4163,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.Bolster quantity -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
-        context = effectContext controller source legal
+        context = effectContext controller source legal (slotGroups resolving gs)
         -- Ascending, so the single-candidate shortcut and a transcript are
         -- deterministic.
         creatures = List.sort (filter (\oid -> Projection.isCreatureOf oid gs) (Projection.controls controller gs))
@@ -4158,7 +4200,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.Amass (Amass.Type.MkAmass quantity subtype) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
-        context = effectContext controller source legal
+        context = effectContext controller source legal (slotGroups resolving gs)
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
       Just n -> Amass.amass controller source resolving subtype (Integer.toNaturalSaturating n)
@@ -4177,7 +4219,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.Blight (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
-        context = effectContext controller source legal
+        context = effectContext controller source legal (slotGroups resolving gs)
         named = playerRefPlayers legal controller gs ref
         blighters = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
     Monad.forM_ blighters $ \pid ->
@@ -4192,7 +4234,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters ref kind quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
-        context = effectContext controller source legal
+        context = effectContext controller source legal (slotGroups resolving gs)
         recipients = playerRefPlayers legal controller gs ref
     -- CR 122 / 107.14: the amount is read per recipient off the one pre-effect
     -- `gs`, then CR 122.6's funnel per recipient, so a counter-scaling
@@ -4205,7 +4247,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters ref kind quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
-        context = effectContext controller source legal
+        context = effectContext controller source legal (slotGroups resolving gs)
         recipients = playerRefPlayers legal controller gs ref
     Monad.forM_ recipients $ \pid ->
       case evaluateForRecipient viewOf context gs resolving source pid quantity of

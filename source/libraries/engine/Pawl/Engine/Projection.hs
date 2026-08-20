@@ -1284,8 +1284,8 @@ rewriteEffect pairs effect = case effect of
   -- printed keyword through the swap (#1190).
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref zone riders mSlot mOrigin position) -> Effect.MoveToZone (MoveToZone.MkMoveToZone (rewriteObjectRef pairs ref) zone riders mSlot mOrigin position)
   Effect.Draw {} -> effect
-  Effect.Mill (Mill.MkMill ref quantity mTally) ->
-    Effect.Mill (Mill.MkMill ref quantity (fmap (\t -> t {MillTally.filter = Filter.rewrite pairs (MillTally.filter t)}) mTally))
+  Effect.Mill (Mill.MkMill ref quantity mTally mSlot) ->
+    Effect.Mill (Mill.MkMill ref quantity (fmap (\t -> t {MillTally.filter = Filter.rewrite pairs (MillTally.filter t)}) mTally) mSlot)
   Effect.Reveal (Reveal.MkReveal ref slot) -> Effect.Reveal (Reveal.MkReveal (rewriteObjectRef pairs ref) slot)
   Effect.LookAt (LookAt.MkLookAt ref slot) -> Effect.LookAt (LookAt.MkLookAt (rewriteObjectRef pairs ref) slot)
   Effect.Scry {} -> effect

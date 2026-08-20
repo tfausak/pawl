@@ -152,6 +152,9 @@ ability =
                               (PlayerRef.Relative PlayerRelation.You)
                               (Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad))
                               (Just (MillTally.MkMillTally {MillTally.slot = milledSlot, MillTally.filter = nonland}))
+                              -- CR 701.17c's slot: rule 728.1 looks back at how MANY
+                              -- cards were milled, never at which.
+                              Nothing
                           ),
                         -- "for each nonland card milled this way, that player
                         -- loses 1 life" -- one life per card, which is the count
