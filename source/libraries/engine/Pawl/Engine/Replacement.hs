@@ -815,6 +815,7 @@ matchesFiltered gs candidate filter_ oid =
 -- Shared by matchesFiltered above and by the damage arm of `applies`, so a
 -- shield naming its source by characteristic (Luminesce) and an entry
 -- replacement naming its own permanent (Clone) read one context.
+--
 -- The row's own captured slot bindings ride along, which is what lets a floating
 -- pattern's Filter.IsBound name the object the INSTALLING resolution bound
 -- (Dire Fleet Daredevil's "that spell"); empty for a permanent's static ability,
