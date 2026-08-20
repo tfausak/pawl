@@ -16,7 +16,9 @@ import qualified Pawl.Types.ManaType as ManaType
 --
 -- Not yet a predicate over a unit's Pawl.Types.ProductionTag -- {S}'s "mana
 -- produced by a snow source" (CR 107.4h) is that shape, and no card in the pool
--- names it here (#252 is the neighbouring spending-restriction gap).
+-- names it here. Nor over CR 106.6's spending restriction, which lands on
+-- Pawl.Types.ManaUnit and is a Pawl.Types.Filter over the SPELL rather than
+-- anything this type could ask about a unit.
 data ManaFilter
   = -- | Every unit in the pool, whatever its type. Upwelling.
     Any

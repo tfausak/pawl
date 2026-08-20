@@ -1084,7 +1084,7 @@ declareAttackers pid = do
         paid <-
           if null (ManaCost.unwrap owed)
             then pure True
-            else Cost.payMana ManaSpending.AsProduced pid owed
+            else Cost.payMana Nothing ManaSpending.AsProduced pid owed
         if not paid
           then
             -- CR 508.1's preamble: the declaration is illegal and the game returns

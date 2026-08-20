@@ -357,7 +357,7 @@ slotsOf effect = case effect of
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     joinSlots [objectRefSlots ref, joinSlots (fmap quantitySlots (Projection.quantitiesOf modification)), durationSlots duration]
   Effect.ChangeText (ChangeText.MkChangeText _ _ slot) -> oneSlot slot
-  Effect.AddMana (ManaAddition.MkManaAddition ref _ _) -> playerRefSlots ref
+  Effect.AddMana (ManaAddition.MkManaAddition ref _ _ _) -> playerRefSlots ref
   -- BOTH refs: a slot read only by the owner ref would otherwise look dangling.
   Effect.Search (Search.MkSearch searcher owner quantity _ _ _) ->
     joinSlots [playerRefSlots searcher, playerRefSlots owner, quantitySlots quantity]
@@ -1529,7 +1529,7 @@ payGatePaidBy resolving source idx cIdx payer gate = do
       case decision of
         PaymentDecision.Declines -> pure False
         PaymentDecision.Pays -> do
-          outcome <- Cost.pay ManaSpending.AsProduced payer source cost
+          outcome <- Cost.pay Nothing ManaSpending.AsProduced payer source cost
           -- Not implemented: the slots this payment bound are dropped, so a
           -- CR 118.12 cost that sacrifices a permanent cannot be read by a
           -- later clause of the same resolution (#1872).
@@ -2643,7 +2643,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- playerRefPlayers like every other slot read (CR 608.2b). The type and the CR
   -- 106.3 tags come from the ability's SOURCE, the payment path's own readers.
   -- The RETENTION is the one thing read off the instruction (CR 106.4).
-  Effect.AddMana (ManaAddition.MkManaAddition ref production retention) -> do
+  Effect.AddMana (ManaAddition.MkManaAddition ref production retention restriction) -> do
     gs0 <- State.get
     case Mana.producedTypes source gs0 production of
       -- One settled type is one mana; a clause adding two writes two effects,
@@ -2653,7 +2653,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               ManaUnit.MkManaUnit
                 { ManaUnit.manaType = manaType,
                   ManaUnit.tags = Mana.productionTagsGiven Map.empty source gs0,
-                  ManaUnit.retention = retention
+                  ManaUnit.retention = retention,
+                  ManaUnit.restriction = restriction
                 }
          in State.modify' (\gs -> foldr (\pid -> Mana.addMana pid [unit]) gs (playerRefPlayers legal controller gs0 ref))
       -- No type at all is CR 607.2d's "the chosen color" with nothing chosen:
@@ -2681,7 +2682,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                     ManaUnit.MkManaUnit
                       { ManaUnit.manaType = manaType,
                         ManaUnit.tags = Mana.productionTagsGiven Map.empty source gs0,
-                        ManaUnit.retention = retention
+                        ManaUnit.retention = retention,
+                        ManaUnit.restriction = restriction
                       }
               State.modify' (Mana.addMana pid [unit])
   Effect.Search (Search.MkSearch searcherRef ownerRef quantity filter_ upTo destination) ->

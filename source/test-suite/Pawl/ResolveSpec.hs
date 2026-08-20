@@ -560,15 +560,15 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   -- behaviour the pool exercises.
   Spec.it s "CR 106.4 slotsOf finds the slot an AddMana recipient names" $ do
     let slot = SlotName.MkSlotName (Text.pack "thatPlayer")
-    Spec.assertEqWith s "a named recipient is a read" (Resolve.slotsOf (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.InSlot slot) ManaProduction.AnyColor ManaRetention.Ordinary))) (Map.singleton slot SlotArity.One)
-    Spec.assertEqWith s "and CR 109.5's unwritten one names no slot" (Resolve.slotsOf (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) ManaProduction.AnyColor ManaRetention.Ordinary))) Map.empty
+    Spec.assertEqWith s "a named recipient is a read" (Resolve.slotsOf (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.InSlot slot) ManaProduction.AnyColor ManaRetention.Ordinary Nothing))) (Map.singleton slot SlotArity.One)
+    Spec.assertEqWith s "and CR 109.5's unwritten one names no slot" (Resolve.slotsOf (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) ManaProduction.AnyColor ManaRetention.Ordinary Nothing))) Map.empty
   Spec.it s "CR 605 manaProduced reads AddMana, nothing else" $ do
-    Spec.assertEqWith s "add mana" (ManaAbility.manaProduced (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary))) (Just (ManaProduction.OfType (ManaType.Colored Color.Green)))
-    Spec.assertEqWith s "add mana of any color" (ManaAbility.manaProduced (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) ManaProduction.AnyColor ManaRetention.Ordinary))) (Just ManaProduction.AnyColor)
+    Spec.assertEqWith s "add mana" (ManaAbility.manaProduced (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary Nothing))) (Just (ManaProduction.OfType (ManaType.Colored Color.Green)))
+    Spec.assertEqWith s "add mana of any color" (ManaAbility.manaProduced (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) ManaProduction.AnyColor ManaRetention.Ordinary Nothing))) (Just ManaProduction.AnyColor)
     -- CR 605.1a asks whether the ability could add mana to "a player's" pool, so a
     -- recipient the card names is dropped rather than disqualifying: an ability
     -- that adds to somebody else is still a mana ability.
-    Spec.assertEqWith s "a named recipient is dropped" (ManaAbility.manaProduced (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) ManaProduction.AnyColor ManaRetention.Ordinary))) (Just ManaProduction.AnyColor)
+    Spec.assertEqWith s "a named recipient is dropped" (ManaAbility.manaProduced (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) ManaProduction.AnyColor ManaRetention.Ordinary Nothing))) (Just ManaProduction.AnyColor)
     Spec.assertEqWith s "damage produces no mana" (ManaAbility.manaProduced (Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x"))) (Quantity.Literal 1) Nothing Nothing))) Nothing
   Spec.it s "CR 612.1 a text change reaches a Filter carried by an effect" $ do
     -- Boil ("Destroy all Islands") is the first card whose effect selects by

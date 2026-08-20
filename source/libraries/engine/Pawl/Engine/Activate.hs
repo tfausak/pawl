@@ -376,14 +376,14 @@ payableCostGiven sources pcs = payableCostAtGiven sources pcs 0
 payableCostAt :: Natural -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAt x pid srcId gs cost =
   let adjustments = Cost.activationAdjustments pid srcId gs
-   in Cost.canPaySomeCompletion ManaSpending.AsProduced pid srcId (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs
+   in Cost.canPaySomeCompletion Nothing ManaSpending.AsProduced pid srcId (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs
 
 -- The same predicate on a board the caller already walked -- see
 -- Cost.canPaySomeCompletionGiven.
 payableCostAtGiven :: [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Natural -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAtGiven sources pcs x pid srcId gs cost =
   let adjustments = Cost.activationAdjustments pid srcId gs
-   in Cost.canPaySomeCompletionGiven ManaSpending.AsProduced sources pcs pid srcId (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs
+   in Cost.canPaySomeCompletionGiven Nothing ManaSpending.AsProduced sources pcs pid srcId (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs
 
 -- CR 601.2b via 602.2b: the greatest X this player could actually pay for, which
 -- is what Prompt.ChooseX carries. The climb itself is Cost.greatestPayableX,
@@ -647,7 +647,7 @@ activateAbility pid srcId ability = do
           -- so a Phyrexian symbol offered without the added "Sacrifice a land"
           -- in view would be offered against a board that has one land too many.
           let gathered = Cost.activationAdjustments pid srcId gs
-          announcedCost <- Cost.announce ManaSpending.AsProduced pid srcId (Cost.totalManas gathered) (Cost.plusComponents gathered announcedAtX)
+          announcedCost <- Cost.announce Nothing ManaSpending.AsProduced pid srcId (Cost.totalManas gathered) (Cost.plusComponents gathered announcedAtX)
           let slots = Modal.modesTargetSlots chosenModes (ActivatedAbility.modal ability)
               sets = Target.legalSets (Just pid) Map.empty srcId slots gs
           chosen <- Target.chooseTargets decider pid abilId slots sets
@@ -701,7 +701,7 @@ activateAbility pid srcId ability = do
               -- mis-tapped colour is a choice the engine must honour (Cost.payMana).
               -- Reject-not-repair restores the whole activation, including the
               -- ability object this function put on the stack.
-              payment <- Cost.pay ManaSpending.AsProduced pid srcId paidCost
+              payment <- Cost.pay Nothing ManaSpending.AsProduced pid srcId paidCost
               case payment of
                 -- CR 606.3: record that a loyalty ability of THIS PERMANENT was
                 -- activated, which is the whole of the once-per-turn limit's storage

@@ -56,6 +56,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
+import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Hybrid as Hybrid
@@ -172,7 +173,7 @@ waxingMoonBoard waxingMoon reliquaryTower forest hasForest =
 -- One mana unit of `mt`, untagged -- what tapping a land for its one mana ability
 -- floats.
 oneUnit :: ManaType.ManaType -> Mana.Type.Mana
-oneUnit mt = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = mt, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}]
+oneUnit mt = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = mt, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}]
 
 pikerCost :: ManaCost.ManaCost
 pikerCost = ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Red)]
@@ -243,7 +244,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
           s
           "pool"
           (Game.poolOf S.alice after)
-          (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}])
+          (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}])
 
   Spec.it s "two Mountains can pay {1}{R}" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -263,7 +264,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
   -- count.
   Spec.it s "paying {1}{R} taps exactly two of three Mountains and leaves no float" $ do
     mountain <- S.printingOf s registry "Mountain"
-    let (paid, after) = S.runPureWith S.identityAnswer (S.landsInPlay mountain 3) (Cost.payMana ManaSpending.AsProduced S.alice pikerCost)
+    let (paid, after) = S.runPureWith S.identityAnswer (S.landsInPlay mountain 3) (Cost.payMana Nothing ManaSpending.AsProduced S.alice pikerCost)
     Spec.assertBool s paid "three Mountains should pay {1}{R}"
     Spec.assertEqWith s "tapped" (S.tappedCount S.alice after) 2
     Spec.assertEqWith s "no float" (poolSize S.alice after) 0
@@ -434,7 +435,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     let ab =
           ActivatedAbility.MkActivatedAbility
             { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
-              ActivatedAbility.modal = singleModeAbility [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary)] Map.empty,
+              ActivatedAbility.modal = singleModeAbility [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary Nothing)] Map.empty,
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing
             }
@@ -446,7 +447,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
             { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
               ActivatedAbility.modal =
                 singleModeAbility
-                  [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary)]
+                  [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary Nothing)]
                   (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSlot.required Pool.AnyTarget Nothing)),
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing
@@ -530,8 +531,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
         green = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]
         cost = Cost.Type.MkCost (Just green) []
         tappedElf g = fmap Object.tapped (Game.lookupObject elfId g)
-    Spec.assertEqWith s "asked to tap the Elf, it is tapped" (tappedElf (S.runPure (prefersSource elfId) gs (Cost.pay ManaSpending.AsProduced S.alice elfId cost))) (Just TapState.Tapped)
-    Spec.assertEqWith s "asked to spare the Elf, it is untapped" (tappedElf (S.runPure (avoidsSource elfId) gs (Cost.pay ManaSpending.AsProduced S.alice elfId cost))) (Just TapState.Untapped)
+    Spec.assertEqWith s "asked to tap the Elf, it is tapped" (tappedElf (S.runPure (prefersSource elfId) gs (Cost.pay Nothing ManaSpending.AsProduced S.alice elfId cost))) (Just TapState.Tapped)
+    Spec.assertEqWith s "asked to spare the Elf, it is untapped" (tappedElf (S.runPure (avoidsSource elfId) gs (Cost.pay Nothing ManaSpending.AsProduced S.alice elfId cost))) (Just TapState.Untapped)
 
   -- The other half of the invariant: WHEN the window asks, counted directly --
   -- without which an implementation that never asks would still pass the test
@@ -553,7 +554,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
             State.modify' (\(short, extra) -> (short, extra + 1))
             pure Nothing
           _ -> pure (S.identityAnswer p)
-        promptsFor g = State.execState (Engine.runGame countingAnswer g (Cost.payMana ManaSpending.AsProduced S.alice green)) (0, 0)
+        promptsFor g = State.execState (Engine.runGame countingAnswer g (Cost.payMana Nothing ManaSpending.AsProduced S.alice green)) (0, 0)
     Spec.assertEqWith s "a lone Forest: asked once, and nothing left to float" (promptsFor (S.landsInPlay forest 1)) (1, 0)
     Spec.assertEqWith s "three Forests: asked once short, then offered the float" (promptsFor (S.landsInPlay forest 3)) (1, 1)
 
@@ -569,7 +570,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
           Prompt.ChooseManaSource {} -> Just bogus
           _ -> S.identityAnswer p
         gs = S.landsInPlay forest 3
-        (paid, after) = S.runPureWith liar gs (Cost.payMana ManaSpending.AsProduced S.alice green)
+        (paid, after) = S.runPureWith liar gs (Cost.payMana Nothing ManaSpending.AsProduced S.alice green)
     Spec.assertBool s (not paid) "the cost goes unpaid"
     Spec.assertEqWith s "and no Forest was tapped in its name" (S.tappedCount S.alice after) 0
 
@@ -616,14 +617,14 @@ manaSpec s registry = Spec.describe s "Mana" $ do
         naming p = case p of
           Prompt.ChooseManaSource _ _ candidates -> List.find (`elem` NonEmpty.toList candidates) [theForest, theIsland]
           _ -> S.identityAnswer p
-        (paid, chosen) = S.runPureWith naming gs (Cost.payMana ManaSpending.AsProduced S.alice cost)
+        (paid, chosen) = S.runPureWith naming gs (Cost.payMana Nothing ManaSpending.AsProduced S.alice cost)
         heading :: Prompt.Prompt r -> State.State (Set.Set ObjectId.ObjectId) r
         heading p = case p of
           Prompt.ChooseManaSource _ _ candidates -> do
             State.modify' (Set.insert (NonEmpty.head candidates))
             pure (Just (NonEmpty.head candidates))
           _ -> pure (S.identityAnswer p)
-        ((headPaid, headed), asked) = State.runState (Engine.runGame heading gs (Cost.payMana ManaSpending.AsProduced S.alice cost)) Set.empty
+        ((headPaid, headed), asked) = State.runState (Engine.runGame heading gs (Cost.payMana Nothing ManaSpending.AsProduced S.alice cost)) Set.empty
     Spec.assertBool s paid "two lands pay the cost"
     Spec.assertEqWith s "and they are the two that were named" (tappedLands chosen) (Set.fromList [theIsland, theForest])
     Spec.assertBool s headPaid "the head-taking answer pays too"
@@ -651,7 +652,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
 prefersColor :: Color.Color -> Prompt.Prompt r -> r
 prefersColor wanted p = case p of
   Prompt.ChooseManaYield _ _ _ candidates ->
-    S.optionYielding (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored wanted, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}]) candidates
+    S.optionYielding (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored wanted, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}]) candidates
   _ -> S.identityAnswer p
 
 -- Alice controls `permanents` and holds `spell`; she casts it and resolves it,
@@ -1238,8 +1239,8 @@ palladiumMyrSpec s registry = Spec.describe s "Palladium Myr" $ do
     palladiumMyr <- S.printingOf s registry "Palladium Myr"
     let (_, g1) = S.addCreature ashaya S.alice (Setup.emptyGame S.bothPlayers)
         (myrId, gs) = S.addCreature palladiumMyr S.alice g1
-        green = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}
-        colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}
+        green = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
+        colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
     Spec.assertEqWith
       s
       "the Forest's {G} and the artifact's {C}{C}"
@@ -1559,7 +1560,7 @@ manaConfluenceSpec s registry = Spec.describe s "Mana Confluence" $ do
     urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
     let (confluenceId, g1) = S.addCreature manaConfluence S.alice (Setup.emptyGame S.bothPlayers)
         (_, gs) = S.addCreature urborg S.alice g1
-        black = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Black, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}]
+        black = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Black, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}]
         -- The offered black option that is CR 305.6's free one, or the printed
         -- one that charges the life -- `printed` picks which.
         buysBlack :: Bool -> Prompt.Prompt r -> r
@@ -1585,7 +1586,7 @@ manaConfluenceSpec s registry = Spec.describe s "Mana Confluence" $ do
 prefersDoubleBlack :: Prompt.Prompt r -> r
 prefersDoubleBlack p = case p of
   Prompt.ChooseManaYield _ _ _ candidates ->
-    let unit = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Black, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}
+    let unit = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Black, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
      in S.optionYielding (Mana.Type.MkMana [unit, unit]) candidates
   _ -> S.identityAnswer p
 
@@ -1883,7 +1884,7 @@ nextColor p = case p of
       Nothing -> S.identityAnswer p
       Just color ->
         S.optionYielding
-          (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}])
+          (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}])
           candidates
   _ -> pure (S.identityAnswer p)
 
@@ -2028,7 +2029,7 @@ sharedVictimSpec s registry = Spec.describe s "Two mana sources over one creatur
   Spec.it s "CR 601.2g the window offers both sources, then neither" $ do
     board <- sharedVictimBoard s registry 1
     let cost = ManaCost.MkManaCost [ManaSymbol.Generic 4]
-        offers = State.execState (Engine.runGame recordingManaSources board (Cost.payMana ManaSpending.AsProduced S.alice cost)) []
+        offers = State.execState (Engine.runGame recordingManaSources board (Cost.payMana Nothing ManaSpending.AsProduced S.alice cost)) []
     Spec.assertEqWith s "two candidates, then the one the sacrifice did not spend" (fmap length offers) [2, 1]
 
 -- Alice's Ashnod's Altar, her Phyrexian Tower and `victims` Goblin Pikers.
@@ -2403,7 +2404,7 @@ burningTreeArranged bte pid =
 -- One green mana with no production tags, plainRed's twin: what the Emissary's
 -- trigger adds alongside it.
 plainGreen :: ManaUnit.ManaUnit
-plainGreen = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}
+plainGreen = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
 
 -- plainGreen's twin, differing in EXACTLY one field: what Shizuko, Caller of
 -- Autumn's trigger adds. The pair is what makes the group below discriminating
@@ -2562,6 +2563,72 @@ poolOf :: PlayerId.PlayerId -> GameState.GameState -> [ManaUnit.ManaUnit]
 poolOf pid gs = case Game.poolOf pid gs of
   Mana.Type.MkMana units -> units
 
+-- CR 106.6: mana that carries a restriction on what it may be spent on. Geosurge
+-- ({R}{R}{R}{R} Sorcery, "Add {R}{R}{R}{R}{R}{R}{R}. Spend this mana only to cast
+-- artifact or creature spells") is the printing, and the whole card is that one
+-- sentence. Its mana comes off the STACK -- a sorcery resolving through
+-- Pawl.Engine.Resolve's Effect.AddMana arm -- which is the path that reads the
+-- whole ManaAddition; a mana ability paid inline drops the restriction (#1976).
+--
+-- Nothing is omitted from the card, so pawl's Geosurge is neither stricter nor
+-- weaker than printed.
+geosurgeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+geosurgeSpec s registry = Spec.describe s "Geosurge" $ do
+  -- The discriminating pair, and it is a pair of SPELLS rather than of boards:
+  -- one pool of seven red pays for the artifact spell and not for the instant,
+  -- which is the only difference between the two casts. The BEFORE board is the
+  -- control that keeps the refusal from passing for an unrelated reason -- with
+  -- four untapped Mountains instead of the restricted seven, the very same
+  -- Lightning Bolt in the very same hand, at the same phase and with the same
+  -- targets available, is castable.
+  Spec.it s "CR 106.6 the seven red pay for an artifact spell and not for an instant" $ do
+    geosurge <- S.printingOf s registry "Geosurge"
+    mountain <- S.printingOf s registry "Mountain"
+    solRing <- S.printingOf s registry "Sol Ring"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (before, after) = geosurgeBoards geosurge mountain
+        castables gs =
+          let (ringId, withRing) = S.addHandCard solRing S.alice gs
+              (boltId, withBolt) = S.addHandCard bolt S.alice gs
+           in (S.castable S.alice ringId withRing, S.castable S.alice boltId withBolt)
+    Spec.assertEqWith s "before Geosurge, four untapped Mountains cast either one" (castables before) (True, True)
+    Spec.assertEqWith s "after it, the same seven mana cast the artifact spell and refuse the instant" (castables after) (True, False)
+    Spec.assertEqWith s "and the pool is seven red, every one of them restricted" (poolOf S.alice after) (replicate 7 restrictedRed)
+
+  -- The other half: the mana the restriction ADMITS is spent like any other, so
+  -- the cast it allows really is paid out of these units and not out of some
+  -- other supply. Six restricted red are left, not seven and not zero.
+  Spec.it s "CR 106.4 the artifact cast spends one of the seven and leaves six" $ do
+    geosurge <- S.printingOf s registry "Geosurge"
+    mountain <- S.printingOf s registry "Mountain"
+    solRing <- S.printingOf s registry "Sol Ring"
+    let after = snd (geosurgeBoards geosurge mountain)
+        (ringId, withRing) = S.addHandCard solRing S.alice after
+        paid = S.runPure S.identityAnswer withRing (S.cast S.alice ringId)
+    Spec.assertEqWith s "Sol Ring is on the stack" (length (GameState.stack paid)) 1
+    Spec.assertEqWith s "six restricted red are left" (poolOf S.alice paid) (replicate 6 restrictedRed)
+
+-- alice with four untapped Mountains and Geosurge in hand, before and after she
+-- casts it and the sorcery resolves. The pair differs in nothing a test set up:
+-- the second board is the first one played forward.
+geosurgeBoards :: Printing.Printing -> Printing.Printing -> (GameState.GameState, GameState.GameState)
+geosurgeBoards geosurge mountain =
+  let (before, geoId) = S.handOne geosurge (S.landsInPlay mountain 4)
+      cast_ = S.runPure S.identityAnswer before (S.cast S.alice geoId)
+   in (before, S.runPure S.identityAnswer cast_ Stack.resolveTop)
+
+-- One of Geosurge's seven: red, from a source that is not snow, lost as the
+-- phase ends, and spendable only on an artifact or creature spell.
+restrictedRed :: ManaUnit.ManaUnit
+restrictedRed =
+  ManaUnit.MkManaUnit
+    { ManaUnit.manaType = ManaType.Colored Color.Red,
+      ManaUnit.tags = Set.empty,
+      ManaUnit.retention = ManaRetention.Ordinary,
+      ManaUnit.restriction =
+        Just (Filter.Or [Filter.HasCardType CardType.Artifact, Filter.HasCardType CardType.Creature])
+    }
+
 -- CR 105.4's half of the same arm: an ability that adds mana whose TYPE is not
 -- settled. Quirion Sentinel ({1}{G} 2/1 Creature -- Elf Druid, "When this
 -- creature enters, add one mana of any color") is the printing, and CR 605.1b
@@ -2649,7 +2716,7 @@ recordingManaTypes manaType p = case p of
 -- One mana of `color` carrying no production tag, plainRed's and plainGreen's
 -- generalisation: CR 107.4h reads the SOURCE, and Quirion Sentinel is not snow.
 plainColor :: Color.Color -> ManaUnit.ManaUnit
-plainColor color = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}
+plainColor color = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
 
 -- These printings on the battlefield under alice's control, untapped and settled.
 alicePermanents :: [Printing.Printing] -> GameState.GameState
@@ -2783,7 +2850,7 @@ elfBoard printing n =
 greenWindow :: GameState.GameState -> ([[ObjectId.ObjectId]], Bool, GameState.GameState)
 greenWindow board =
   let cost = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]
-      ((paid, after), offers) = State.runState (Engine.runGame recordingManaSources board (Cost.payMana ManaSpending.AsProduced S.alice cost)) []
+      ((paid, after), offers) = State.runState (Engine.runGame recordingManaSources board (Cost.payMana Nothing ManaSpending.AsProduced S.alice cost)) []
    in (offers, paid, after)
 
 -- How many of these permanents are tapped.
@@ -2832,6 +2899,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   chromaticSpec s registry
   burningTreeSpec s registry
   shizukoSpec s registry
+  geosurgeSpec s registry
   quirionSpec s registry
   celestialDawnSpec s registry
   spendChoiceSpec s registry
@@ -2840,7 +2908,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
 -- One mana of one type carrying no production tag: what a basic land really puts
 -- in a pool, and the unit the Celestial Dawn cases below seat directly.
 plainOf :: ManaType.ManaType -> ManaUnit.ManaUnit
-plainOf manaType = ManaUnit.MkManaUnit {ManaUnit.manaType = manaType, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}
+plainOf manaType = ManaUnit.MkManaUnit {ManaUnit.manaType = manaType, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
 
 -- A cost of exactly one symbol, so a payability answer is about that symbol and
 -- nothing else.
@@ -2890,7 +2958,7 @@ celestialDawnSpec s registry = Spec.describe s "Celestial Dawn" $ do
         blue = oneSymbol (ManaSymbol.OfType (ManaType.Colored Color.Blue))
     Spec.assertBool s (payable S.alice blue with) "under Celestial Dawn the {U} cost is payable"
     Spec.assertBool s (not (payable S.alice blue without)) "and without it the same white mana cannot"
-    let (paid, after) = S.runPureWith S.identityAnswer with (Cost.payMana ManaSpending.AsProduced S.alice blue)
+    let (paid, after) = S.runPureWith S.identityAnswer with (Cost.payMana Nothing ManaSpending.AsProduced S.alice blue)
     Spec.assertBool s paid "the payment goes through, not merely the gate"
     Spec.assertEqWith s "and it spent the white unit" (poolUnits after) []
 
@@ -2910,7 +2978,7 @@ celestialDawnSpec s registry = Spec.describe s "Celestial Dawn" $ do
     Spec.assertBool s (payable S.alice redCost without) "and without it the same mana pays it"
     Spec.assertBool s (payable S.alice colorless with) "the same red mana pays {C}, which is what it may be spent as"
     Spec.assertBool s (payable S.alice (oneSymbol (ManaSymbol.Generic 1)) with) "and {1}, which CR 107.4b lets any mana pay"
-    let (paid, _) = S.runPureWith S.identityAnswer with (Cost.payMana ManaSpending.AsProduced S.alice redCost)
+    let (paid, _) = S.runPureWith S.identityAnswer with (Cost.payMana Nothing ManaSpending.AsProduced S.alice redCost)
     Spec.assertBool s (not paid) "the payment fails too, not only the gate"
 
   -- CR 609.4b's wording is "mana of any COLOR", which is CR 106.1a's five and not
@@ -2929,7 +2997,7 @@ celestialDawnSpec s registry = Spec.describe s "Celestial Dawn" $ do
   -- spent AS without making a nonsnow mana snow.
   Spec.it s "CR 107.4h the clause does not make a nonsnow white mana pay {S}" $ do
     dawn <- S.printingOf s registry "Celestial Dawn"
-    let snowWhite = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.White, ManaUnit.tags = Set.singleton ProductionTag.Snow, ManaUnit.retention = ManaRetention.Ordinary}
+    let snowWhite = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.White, ManaUnit.tags = Set.singleton ProductionTag.Snow, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
         (plainBoard, _) = dawnBoards dawn [plainOf (ManaType.Colored Color.White)]
         (snowBoard, _) = dawnBoards dawn [snowWhite]
     Spec.assertBool s (not (payable S.alice snowCost plainBoard)) "the nonsnow white mana does not pay {S}"
@@ -2981,7 +3049,7 @@ celestialDawnSpec s registry = Spec.describe s "Celestial Dawn" $ do
         blue = oneSymbol (ManaSymbol.OfType (ManaType.Colored Color.Blue))
     Spec.assertBool s (payable S.alice blue with) "the Forest-turned-Plains pays {U}"
     Spec.assertBool s (not (payable S.alice blue land)) "and without the enchantment it pays neither {U} nor, being a Forest, white"
-    let (paid, after) = S.runPureWith S.identityAnswer with (Cost.payMana ManaSpending.AsProduced S.alice blue)
+    let (paid, after) = S.runPureWith S.identityAnswer with (Cost.payMana Nothing ManaSpending.AsProduced S.alice blue)
     Spec.assertBool s paid "and the payment really taps it"
     Spec.assertEqWith s "with nothing left floating" (poolSize S.alice after) 0
 
@@ -3006,11 +3074,12 @@ snowRed =
   ManaUnit.MkManaUnit
     { ManaUnit.manaType = ManaType.Colored Color.Red,
       ManaUnit.tags = Set.singleton ProductionTag.Snow,
-      ManaUnit.retention = ManaRetention.Ordinary
+      ManaUnit.retention = ManaRetention.Ordinary,
+      ManaUnit.restriction = Nothing
     }
 
 plainRed :: ManaUnit.ManaUnit
-plainRed = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}
+plainRed = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
 
 -- CR 107.4h: "When used in a cost, the snow mana symbol {S} represents a cost
 -- that can be paid with one mana of any type produced by a snow source (see rule
@@ -3109,7 +3178,7 @@ snowSpec s registry = Spec.describe s "Snow" $ do
 -- {S}" into when the source is not snow, and the unit every assertion below
 -- compares against.
 plainColorless :: ManaUnit.ManaUnit
-plainColorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}
+plainColorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
 
 -- CR 106.11: "If an effect would add mana represented by one or more snow mana
 -- symbols to a player's mana pool, that much colorless mana is added to that
@@ -3221,7 +3290,7 @@ hybridSpec s registry = Spec.describe s "Hybrid" $ do
     let cost = ManaCost.MkManaCost [redGreen, redSymbol]
         gs = mixedLands mountain forest 1 1
     Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice cost gs) "canPay says yes"
-    let (paid, after) = S.runPureWith S.identityAnswer gs (Cost.payMana ManaSpending.AsProduced S.alice cost)
+    let (paid, after) = S.runPureWith S.identityAnswer gs (Cost.payMana Nothing ManaSpending.AsProduced S.alice cost)
     Spec.assertBool s paid "and it really is paid"
     Spec.assertEqWith s "both lands tapped" (S.tappedCount S.alice after) 2
     Spec.assertEqWith s "nothing left floating" (poolSize S.alice after) 0
@@ -3234,7 +3303,7 @@ hybridSpec s registry = Spec.describe s "Hybrid" $ do
     let cost = ManaCost.MkManaCost [redGreen, redSymbol]
         gs = mixedLands mountain forest 0 2
     Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice cost gs)) "canPay says no"
-    Spec.assertBool s (not (fst (S.runPureWith S.identityAnswer gs (Cost.payMana ManaSpending.AsProduced S.alice cost)))) "and paying fails"
+    Spec.assertBool s (not (fst (S.runPureWith S.identityAnswer gs (Cost.payMana Nothing ManaSpending.AsProduced S.alice cost)))) "and paying fails"
     Spec.assertEqWith s "two {R/G} alone WOULD be payable from them" (Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [redGreen, redGreen]) gs) True
 
   Spec.it s "CR 107.4e whole card: Burning-Tree Emissary casts off RR, GG, or RG" $ do
@@ -3367,7 +3436,7 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
     let gs = S.landsInPlay mountain 3
     Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice javelinCost gs) "canPay says yes"
     Spec.assertEqWith s "and it casts" (castsOff flameJavelin gs) 1
-    let (paid, after) = S.runPureWith S.identityAnswer (S.landsInPlay mountain 6) (Cost.payMana ManaSpending.AsProduced S.alice javelinCost)
+    let (paid, after) = S.runPureWith S.identityAnswer (S.landsInPlay mountain 6) (Cost.payMana Nothing ManaSpending.AsProduced S.alice javelinCost)
     Spec.assertBool s paid "six Mountains pay it too"
     Spec.assertEqWith s "and only three of them are tapped" (S.tappedCount S.alice after) 3
     Spec.assertEqWith s "with nothing left floating" (poolSize S.alice after) 0
@@ -3431,8 +3500,8 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
   -- paid during a resolution or for a special action (#373), which is why
   -- this calls `spend` directly.
   Spec.it s "CR 118.13b with nothing announced, spend takes a {2/R}'s one-mana half (#373)" $
-    let red = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}
-        colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary}
+    let red = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
+        colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
      in Spec.assertEqWith
           s
           "the {R} is spent and both {C} remain -- the other half would spend both {C} and leave the {R}"
@@ -3677,7 +3746,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     forest <- S.printingOf s registry "Forest"
     let gs = S.landsInPlay forest 1
     Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice phyrexianCost gs) "canPay says yes"
-    let (paid, after) = S.runPureWith S.identityAnswer gs (Cost.payMana ManaSpending.AsProduced S.alice phyrexianCost)
+    let (paid, after) = S.runPureWith S.identityAnswer gs (Cost.payMana Nothing ManaSpending.AsProduced S.alice phyrexianCost)
     Spec.assertBool s paid "and it really is paid"
     Spec.assertEqWith s "the Forest is tapped" (S.tappedCount S.alice after) 1
     Spec.assertEqWith s "nothing left floating" (poolSize S.alice after) 0
@@ -3690,7 +3759,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     mountain <- S.printingOf s registry "Mountain"
     let gs = S.landsInPlay mountain 1
     Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice phyrexianCost gs) "canPay says yes"
-    let (paid, after) = S.runPureWith S.identityAnswer gs (Cost.payMana ManaSpending.AsProduced S.alice phyrexianCost)
+    let (paid, after) = S.runPureWith S.identityAnswer gs (Cost.payMana Nothing ManaSpending.AsProduced S.alice phyrexianCost)
     Spec.assertBool s paid "and it really is paid"
     Spec.assertEqWith s "exactly 2 life" (S.lifeOf S.alice after) (Just 18)
     Spec.assertEqWith s "the Mountain is untouched" (S.tappedCount S.alice after) 0
@@ -3704,10 +3773,10 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice phyrexianCost (aliceAt 2)) "2 life is enough"
     Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice phyrexianCost (aliceAt 1))) "1 life is not"
     Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice phyrexianCost (aliceAt 0))) "0 life is not"
-    let (paid, after) = S.runPureWith S.identityAnswer (aliceAt 2) (Cost.payMana ManaSpending.AsProduced S.alice phyrexianCost)
+    let (paid, after) = S.runPureWith S.identityAnswer (aliceAt 2) (Cost.payMana Nothing ManaSpending.AsProduced S.alice phyrexianCost)
     Spec.assertBool s paid "paying at 2 really works"
     Spec.assertEqWith s "and takes her to 0" (S.lifeOf S.alice after) (Just 0)
-    let (failed, unchanged) = S.runPureWith S.identityAnswer (aliceAt 1) (Cost.payMana ManaSpending.AsProduced S.alice phyrexianCost)
+    let (failed, unchanged) = S.runPureWith S.identityAnswer (aliceAt 1) (Cost.payMana Nothing ManaSpending.AsProduced S.alice phyrexianCost)
     Spec.assertBool s (not failed) "at 1 the payment fails"
     Spec.assertEqWith s "and CR 601.2h leaves the life total alone" (S.lifeOf S.alice unchanged) (Just 1)
 
@@ -3804,7 +3873,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     Spec.assertEqWith
       s
       "the {G} plus {2} route, costing no life"
-      (Mana.lifeNeeded Cost.manaActivations ManaSpending.AsProduced S.alice cost (mixedLands island birds 2 1))
+      (Mana.lifeNeeded Nothing Cost.manaActivations ManaSpending.AsProduced S.alice cost (mixedLands island birds 2 1))
       (Just 0)
     Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice cost (mixedLands island birds 2 1)) "and it is payable"
     -- The discriminator: the same cost and the same three permanents, but a
@@ -3813,17 +3882,17 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     Spec.assertEqWith
       s
       "with a Mountain instead, 2 life is the cheapest there is"
-      (Mana.lifeNeeded Cost.manaActivations ManaSpending.AsProduced S.alice cost (mixedLands island mountain 2 1))
+      (Mana.lifeNeeded Nothing Cost.manaActivations ManaSpending.AsProduced S.alice cost (mixedLands island mountain 2 1))
       (Just 2)
     Spec.assertEqWith
       s
       "and a lone {G/P} off nothing at all is 2 as well"
-      (Mana.lifeNeeded Cost.manaActivations ManaSpending.AsProduced S.alice phyrexianCost (Setup.emptyGame S.bothPlayers))
+      (Mana.lifeNeeded Nothing Cost.manaActivations ManaSpending.AsProduced S.alice phyrexianCost (Setup.emptyGame S.bothPlayers))
       (Just 2)
     Spec.assertEqWith
       s
       "while a lone {G/P} with a Forest is 0"
-      (Mana.lifeNeeded Cost.manaActivations ManaSpending.AsProduced S.alice phyrexianCost (S.landsInPlay forest 1))
+      (Mana.lifeNeeded Nothing Cost.manaActivations ManaSpending.AsProduced S.alice phyrexianCost (S.landsInPlay forest 1))
       (Just 0)
 
   -- The budget is recomputed as sources are tapped, not fixed when the
@@ -3837,13 +3906,13 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   Spec.it s "CR 107.4f a Birds tapped for blue still pays a {G/P}, out of life" $ do
     birds <- S.printingOf s registry "Birds of Paradise"
     let (_, gs) = S.addCreature birds S.alice (Setup.emptyGame S.bothPlayers)
-        (paidBlue, afterBlue) = S.runPureWith (prefersColor Color.Blue) gs (Cost.payMana ManaSpending.AsProduced S.alice phyrexianCost)
+        (paidBlue, afterBlue) = S.runPureWith (prefersColor Color.Blue) gs (Cost.payMana Nothing ManaSpending.AsProduced S.alice phyrexianCost)
     Spec.assertBool s paidBlue "the cost is still paid"
     Spec.assertEqWith s "by 2 life" (S.lifeOf S.alice afterBlue) (Just 18)
     Spec.assertEqWith s "the Birds was tapped on the way" (S.tappedCount S.alice afterBlue) 1
     Spec.assertEqWith s "and its blue mana is still floating" (poolSize S.alice afterBlue) 1
     -- The control: the same board and the same card, one different answer.
-    let (paidGreen, afterGreen) = S.runPureWith (prefersColor Color.Green) gs (Cost.payMana ManaSpending.AsProduced S.alice phyrexianCost)
+    let (paidGreen, afterGreen) = S.runPureWith (prefersColor Color.Green) gs (Cost.payMana Nothing ManaSpending.AsProduced S.alice phyrexianCost)
     Spec.assertBool s paidGreen "green pays it too"
     Spec.assertEqWith s "and costs no life at all" (S.lifeOf S.alice afterGreen) (Just 20)
     Spec.assertEqWith s "with nothing left floating" (poolSize S.alice afterGreen) 0
@@ -4349,8 +4418,8 @@ spendChoiceSpec s registry = Spec.describe s "Choosing which mana to spend" $ do
         spends unit p = case p of
           Prompt.ChooseManaToSpend {} -> unit
           _ -> S.identityAnswer p
-        payRed unit = S.runPureWith (spends unit) floated (Cost.payMana ManaSpending.AsProduced S.alice redOnly)
-        thenSnow gs = fst (S.runPureWith S.identityAnswer gs (Cost.payMana ManaSpending.AsProduced S.alice snowCost))
+        payRed unit = S.runPureWith (spends unit) floated (Cost.payMana Nothing ManaSpending.AsProduced S.alice redOnly)
+        thenSnow gs = fst (S.runPureWith S.identityAnswer gs (Cost.payMana Nothing ManaSpending.AsProduced S.alice snowCost))
         (sparedPaid, spared) = payRed plainRed
         (spentPaid, spent) = payRed snowRed
     Spec.assertBool s (thenSnow spared) "sparing the snow mana, {S} is still paid out of what is left"
@@ -4366,8 +4435,8 @@ spendChoiceSpec s registry = Spec.describe s "Choosing which mana to spend" $ do
         spends unit p = case p of
           Prompt.ChooseManaToSpend {} -> unit
           _ -> S.identityAnswer p
-        payGreen unit = S.runPureWith (spends unit) floated (Cost.payMana ManaSpending.AsProduced S.alice greenOnly)
-        thenGreen gs = fst (S.runPureWith S.identityAnswer (Mana.emptyManaPools gs) (Cost.payMana ManaSpending.AsProduced S.alice greenOnly))
+        payGreen unit = S.runPureWith (spends unit) floated (Cost.payMana Nothing ManaSpending.AsProduced S.alice greenOnly)
+        thenGreen gs = fst (S.runPureWith S.identityAnswer (Mana.emptyManaPools gs) (Cost.payMana Nothing ManaSpending.AsProduced S.alice greenOnly))
         (sparedPaid, spared) = payGreen plainGreen
         (spentPaid, spent) = payGreen retainedGreen
     Spec.assertBool s (thenGreen spared) "sparing the retained green, a second {G} is paid after the pool empties"
@@ -4402,7 +4471,7 @@ spendChoiceSpec s registry = Spec.describe s "Choosing which mana to spend" $ do
     let liar p = case p of
           Prompt.ChooseManaToSpend {} -> plainGreen
           _ -> S.identityAnswer p
-        (paid, after) = S.runPureWith liar (seededPool [snowRed, plainRed]) (Cost.payMana ManaSpending.AsProduced S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
+        (paid, after) = S.runPureWith liar (seededPool [snowRed, plainRed]) (Cost.payMana Nothing ManaSpending.AsProduced S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
     Spec.assertBool s paid "the {1} is paid"
     Spec.assertEqWith s "out of an offered unit, and the green was never in the pool" (poolOf S.alice after) [snowRed]
 
@@ -4429,7 +4498,7 @@ payCounting units cost =
           State.modify' (+ 1)
           pure (NonEmpty.head candidates)
         _ -> pure (S.identityAnswer p)
-   in case State.runState (Engine.runGame answerer (seededPool units) (Cost.payMana ManaSpending.AsProduced S.alice cost)) 0 of
+   in case State.runState (Engine.runGame answerer (seededPool units) (Cost.payMana Nothing ManaSpending.AsProduced S.alice cost)) 0 of
         ((paid, _), asked) -> (paid, asked)
 
 -- {R} and {G} on their own, the one-symbol costs the pairs above pay.

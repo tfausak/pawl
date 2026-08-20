@@ -103,6 +103,13 @@ isManaAbility ab =
 -- long the mana lasts, so a retained AddMana is a mana ability like any other.
 -- Not implemented: the payment path acting on it -- Mana.manaOptionsOfGiven
 -- stamps Ordinary, so a mana ability that retained its mana would not (#1808).
+--
+-- The payload's spending RESTRICTION (CR 106.6) is dropped for the third time
+-- and just as rightly, CR 605.1a saying nothing about what the mana may pay for.
+-- Not implemented: the payment path acting on it -- Mana.manaOptionsOfGiven
+-- stamps Nothing, so a mana ability's restricted mana would be spendable on
+-- anything. Mishra's Workshop and Cavern of Souls are the printings; neither is
+-- in `data/cards/` (#1976).
 manaProduced :: Effect Card.Type.Card -> Maybe ManaProduction
 manaProduced effect = case effect of
   Effect.AddMana addition -> Just (ManaAddition.production addition)
