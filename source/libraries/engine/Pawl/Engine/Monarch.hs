@@ -204,54 +204,73 @@ placeInherent pending = do
           }
   State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}
 
--- CR 725 (Palace Jailer): return every object exiled "until an opponent becomes
--- the monarch" once an opponent of the entry's controller HAS BECOME the
--- monarch. Runs in the settle loop; CR 704.3 fixes "whenever a player would get
--- priority" as the coarsest moment anything can observe a condition.
+-- CR 725.1 / CR 725.3: crown a player. The ONE writer of GameState.monarch once
+-- a game is under way (Pawl.Engine.Setup only ever initialises it to Nothing, and
+-- CR 725.4's third sentence below un-crowns rather than crowns), so everything
+-- that must happen AS a player becomes the monarch happens here: the crown moves,
+-- CR 603.2 gets its event, and every CR 725 exile watch an opponent's crowning
+-- discharges is marked.
 --
--- "An opponent" is every player other than the controller. Not a two-player
--- shortcut: in a free-for-all every other player is an opponent by construction
--- (CR 806.1), so the opponent half of the test is just "the monarch is not the
--- controller". Only CR 102.3's teammates would break that, and pawl has no
--- teams (#175).
---
--- When the controller has LEFT the game, CR 800.4i freezes their opponent set
--- at departure, and the same comparison computes it: CR 725.4 guarantees the
--- monarch is always still in the game, so a departed controller is never the
--- monarch. Nothing needs to be stored. Departure.objectsLeaveWith drops an
--- entry whose KEY (the exiled object) belongs to a departing player, never one
--- whose VALUE does, so the effect survives its controller's departure.
+-- A player who is ALREADY the monarch does not become the monarch: Custodi Lich's
+-- ruling (Gatherer, 2016-08-23) is explicit -- "abilities that trigger whenever
+-- you become the monarch trigger only if you aren't already the monarch" -- and
+-- CR 725.3's "as a player becomes the monarch, the current monarch ceases to be
+-- the monarch" describes a handoff between two players. So the instruction is
+-- carried out (the crown is where the effect says it is) while nothing is
+-- recorded and no watch is marked. Both readers of "becomes the monarch" -- the
+-- exile watch and TriggerCondition.PlayerBecomesMonarch -- therefore agree by
+-- construction, which is the reason this is one function rather than a write at
+-- each call site.
+crown :: PlayerId -> GameState -> GameState
+crown pid gs =
+  if GameState.monarch gs == Just pid
+    then gs
+    else
+      let -- "An opponent" is every player other than the effect's controller. Not
+          -- a two-player shortcut: in a free-for-all every other player is an
+          -- opponent by construction (CR 806.1), so the opponent half of the test
+          -- is just "the crowned player is not the controller". Only CR 102.3's
+          -- teammates would break that, and pawl has no teams (#175).
+          --
+          -- When the controller has LEFT the game, CR 800.4i freezes their
+          -- opponent set at departure, and the same comparison computes it: CR
+          -- 725.4 guarantees the crowned player is still in the game, so a
+          -- departed controller is never crowned. Nothing needs to be stored.
+          mark watch =
+            if MonarchWatch.controller watch == pid
+              then watch
+              else watch {MonarchWatch.due = True}
+       in Event.recordEvent
+            (GameEvent.BecameMonarch pid)
+            gs
+              { GameState.monarch = Just pid,
+                GameState.exiledUntilMonarch = fmap mark (GameState.exiledUntilMonarch gs)
+              }
+
+-- CR 725 (Palace Jailer): return every object whose watch `crown` has marked --
+-- an opponent of the entry's controller HAS BECOME the monarch. Runs in the
+-- settle loop; CR 704.3 fixes "whenever a player would get priority" as the
+-- coarsest moment anything can observe a condition, so deciding at the crowning
+-- and moving the card at the next settle is indistinguishable from moving it at
+-- the crowning.
 --
 -- The test is for an EVENT, not a state: a new monarch being CROWNED who is an
 -- opponent, not merely an opponent currently holding the crown. Palace Jailer's
--- rulings draw that line explicitly.
+-- rulings draw that line explicitly. Which is why the decision is `crown`'s and
+-- not this function's: a comparison against the monarch seen at the previous
+-- settle cannot tell a crown that never moved from one that moved away and came
+-- back, and no comparison against the CURRENT monarch can see a reign that began
+-- and ended between two settles at all. Pawl.LibraryOrderSpec's "a crown that goes
+-- to an opponent and back inside one resolution still frees the prisoner" is the
+-- proof (see #208).
 --
--- No monarch-change event is hooked, for the same reason the CR 302.6
--- continuity check samples: GameState.events is cleared at turn handoff, and
--- this watch outlives any number of turns. So each entry carries the monarch it
--- last saw. A crown passing to the controller THEMSELVES discharges nothing but
--- does move the baseline, so the same opponent retaking it later still reads as
--- a new crowning. Nothing is a legitimate baseline rather than a missing value:
--- CR 725.1 starts the game with no monarch.
---
--- Two crownings with no settle between them, landing back on the starting
--- holder, hide the middle reign from this comparison (#208).
+-- Departure.objectsLeaveWith drops an entry whose KEY (the exiled object) belongs
+-- to a departing player, never one whose VALUE does, so the effect survives its
+-- controller's departure.
 returnExiledForMonarch :: Game Bool
 returnExiledForMonarch = do
   gs <- State.get
-  let m = GameState.monarch gs
-      -- Unchanged crown: nothing to decide, and the baseline is already right.
-      changed watch = MonarchWatch.lastMonarch watch /= m
-      -- Someone must actually HOLD the crown: "an opponent becomes the monarch"
-      -- is never satisfied by there being no monarch. Per CR 725.1 the only way
-      -- back to Nothing is CR 725.4 exhausting the players, which must rebase
-      -- the baseline without discharging anything.
-      opponentHolds watch = case m of
-        Nothing -> False
-        Just holder -> holder /= MonarchWatch.controller watch
-      due = Map.keys (Map.filter (\w -> changed w && opponentHolds w) (GameState.exiledUntilMonarch gs))
-      rebase watch = if changed watch then watch {MonarchWatch.lastMonarch = m} else watch
-  State.modify' (\g -> g {GameState.exiledUntilMonarch = fmap rebase (GameState.exiledUntilMonarch g)})
+  let due = Map.keys (Map.filter MonarchWatch.due (GameState.exiledUntilMonarch gs))
   if null due
     then pure False
     else do
@@ -293,13 +312,17 @@ returnExiledForMonarch = do
 -- sentence 1, fails sentence 2's departure condition and leaves the crown
 -- unmoved -- which makes sentence 3 unreachable.
 --
--- The write and the CR 725.1 event record are ONE step, for the reason
--- Departure.depart gives for keeping this call inside itself: a crowning that
--- records nothing is a crowning CR 603.2 cannot see, and separating the two
--- lets a later caller move the crown silently. A rule rather than an effect
--- moves it here, which changes nothing -- CR 725.2's stolen crown is a rule too
--- and records the same event. Nothing is recorded for CR 725.4's third
--- sentence: no player became the monarch.
+-- The write, the CR 725.1 event record and the exile watches are ONE step,
+-- because this crowns through `crown` -- for the reason Departure.depart gives
+-- for keeping this call inside itself: a crowning that records nothing is a
+-- crowning CR 603.2 cannot see, and separating them lets a later caller move the
+-- crown silently. A rule rather than an effect moves it here, which changes
+-- nothing -- CR 725.2's stolen crown is a rule too and goes the same way.
+--
+-- CR 725.4's third sentence is the ONE arm that writes GameState.monarch
+-- directly, and rightly: it crowns nobody, so it records no event and marks no
+-- watch. "An opponent becomes the monarch" is never satisfied by there being no
+-- monarch.
 reassignOnDeparture :: PlayerId -> [PlayerId] -> GameState -> GameState
 reassignOnDeparture leaving playing gs =
   if GameState.monarch gs /= Just leaving
@@ -315,7 +338,6 @@ reassignOnDeparture leaving playing gs =
             if eligible active
               then Just active
               else next
-          moved = gs {GameState.monarch = crowned}
        in case crowned of
-            Nothing -> moved
-            Just pid -> Event.recordEvent (GameEvent.BecameMonarch pid) moved
+            Nothing -> gs {GameState.monarch = Nothing}
+            Just pid -> crown pid gs

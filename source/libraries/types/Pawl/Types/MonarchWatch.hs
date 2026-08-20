@@ -13,13 +13,17 @@ data MonarchWatch = MkMonarchWatch
     -- when the exile resolves, and it outlives both its source permanent and the
     -- controller's own departure from the game.
     controller :: PlayerId.PlayerId,
-    -- | The monarch as of the last time this watch was examined. `Nothing` is the
-    -- game's opening state (CR 725.1) and an ordinary thing to watch from.
+    -- | Has an opponent of `controller` become the monarch since the exile
+    -- resolved? Written by Pawl.Engine.Monarch.crown at the crowning itself and
+    -- read by Pawl.Engine.Monarch.returnExiledForMonarch at the next settle, so
+    -- no number of crownings between two settles can hide one of them from the
+    -- watch.
     --
-    -- Comparing against this turns a state check into an event one, and is why
-    -- the field is updated rather than merely read: a crown passing to the
-    -- controller themselves discharges nothing but does move the baseline, so the
-    -- SAME opponent retaking it later still counts as a new monarch.
-    lastMonarch :: Maybe PlayerId.PlayerId
+    -- A recorded EVENT rather than a remembered holder: comparing the current
+    -- monarch against the one seen at the last look cannot tell an unmoved crown
+    -- from one that moved away and came back, which is what Pawl.LibraryOrderSpec's
+    -- "a crown that goes to an opponent and back inside one resolution still frees
+    -- the prisoner" proves (see #208).
+    due :: Bool
   }
   deriving (Eq, Ord, Show)

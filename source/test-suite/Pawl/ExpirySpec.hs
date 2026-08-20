@@ -22,6 +22,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -644,8 +645,10 @@ monarchSpec s registry = Spec.describe s "Monarch" $ do
         afterEtb = monarchResolveAll (monarchSettle gs3)
         -- caster stays monarch across a turn boundary: exile holds.
         heldExiled = monarchSettle afterEtb
-        -- an opponent (bob) takes the crown: the creature returns.
-        afterSteal = monarchResolveAll (monarchSettle (S.withMonarch S.bob heldExiled))
+        -- an opponent (bob) takes the crown: the creature returns. Monarch.crown
+        -- and not S.withMonarch, which seeds the designation without a crowning
+        -- -- and it is the CROWNING that marks the watch.
+        afterSteal = monarchResolveAll (monarchSettle (Monarch.crown S.bob heldExiled))
     Spec.assertEqWith s "alice is monarch on ETB" (GameState.monarch afterEtb) (Just S.alice)
     Spec.assertEqWith s "victim is exiled" (length (filter (== victim) (Set.toList (GameState.battlefield afterEtb)))) 0
     Spec.assertBool s (not (Map.null (GameState.exiledUntilMonarch afterEtb))) "victim registered for return"
@@ -681,11 +684,13 @@ monarchSpec s registry = Spec.describe s "Monarch" $ do
         gone = S.departs Departure.Type.Conceded S.alice afterEtb
         settled = monarchSettle gone
     Spec.assertEqWith s "alice is the monarch on ETB" (GameState.monarch afterEtb) (Just S.alice)
-    Spec.assertEqWith s "bob's creature is exiled under the watch, keyed to alice, baselined on her crown" (Map.elems (GameState.exiledUntilMonarch afterEtb)) [MonarchWatch.MkMonarchWatch {MonarchWatch.controller = S.alice, MonarchWatch.lastMonarch = Just S.alice}]
+    Spec.assertEqWith s "bob's creature is exiled under the watch, keyed to alice and undischarged" (Map.elems (GameState.exiledUntilMonarch afterEtb)) [MonarchWatch.MkMonarchWatch {MonarchWatch.controller = S.alice, MonarchWatch.due = False}]
     Spec.assertEqWith s "the original is off the battlefield" (length (filter (== victim) (Set.toList (GameState.battlefield afterEtb)))) 0
     -- CR 800.4a: alice's own object leaves; bob's exiled card does not.
     Spec.assertEqWith s "Palace Jailer left the game with alice" (Game.lookupObject jailer gone) Nothing
-    Spec.assertEqWith s "but the watch survived her departure, still keyed to her and still baselined on her crown" (Map.elems (GameState.exiledUntilMonarch gone)) [MonarchWatch.MkMonarchWatch {MonarchWatch.controller = S.alice, MonarchWatch.lastMonarch = Just S.alice}]
+    -- CR 725.4's crowning goes through Monarch.crown like any other, so the
+    -- watch is marked as carol takes the crown, before this settle returns it.
+    Spec.assertEqWith s "but the watch survived her departure, still keyed to her and now marked by carol's crowning" (Map.elems (GameState.exiledUntilMonarch gone)) [MonarchWatch.MkMonarchWatch {MonarchWatch.controller = S.alice, MonarchWatch.due = True}]
     -- CR 725.4, first sentence.
     Spec.assertEqWith s "carol, the active player, is the monarch" (GameState.monarch gone) (Just S.carol)
     -- CR 800.4i: carol is in departed alice's frozen opponent set, so the
