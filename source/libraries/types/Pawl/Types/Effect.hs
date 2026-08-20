@@ -948,12 +948,17 @@ data Effect card
     -- Not implemented: CR 701.49d's "venture into [quality]", the variant naming
     -- a particular dungeon, which would be the one payload (#1334).
     Venture
-  | -- | CR 701.21a: the slot's target PLAYER sacrifices this many permanents
-    -- matching the Filter, chosen by that player (Diabolic Edict).
+  | -- | CR 701.21a: the PLAYERS the slot names each sacrifice this many
+    -- permanents matching the Filter, each chosen by that player (Diabolic
+    -- Edict names one; Rishadan Cutpurse's gate binds several).
     --
     -- Distinct from Sacrifice, which names a PERMANENT: there the effect picks
     -- the victim, here the sacrificing player does, which is why this one
     -- prompts.
+    --
+    -- CR 101.4: with several, every seat's pick is made first -- in APNAP order,
+    -- each seat knowing the ones before it (CR 101.4b) -- and only then does
+    -- anything leave the battlefield.
     --
     -- CR 609.3: a player with fewer matching permanents sacrifices all of them
     -- and one with none sacrifices nothing -- forced, so neither is prompted.

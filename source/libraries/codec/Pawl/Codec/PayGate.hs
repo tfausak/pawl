@@ -7,7 +7,7 @@ import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.PayBranch as PayBranch
 import qualified Pawl.Codec.PayObligation as PayObligation
-import qualified Pawl.Codec.SlotName as SlotName
+import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -26,7 +26,7 @@ import qualified Pawl.Types.PayObligation as PayObligation
 -- offer.
 codec :: Codec.Codec PayGate.PayGate
 codec = Fields.object $ do
-  payer <- Fields.required "payer" SlotName.codec PayGate.payer
+  payer <- Fields.required "payer" PlayerRef.codec PayGate.payer
   cost <- Fields.required "cost" (Cost.codec Keyword.codec) PayGate.cost
   branch <- Fields.required "branch" PayBranch.codec PayGate.branch
   obligation <- Fields.defaulted "obligation" PayObligation.Optional PayObligation.codec PayGate.obligation

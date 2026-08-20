@@ -28,8 +28,12 @@ data PayBranch
   = -- | The instructions run when the cost WAS paid -- CR 118.12's "if [a
     -- player] does".
     IfPaid
-  | -- | The instructions run when the cost was NOT paid, which covers all three
-    -- of the rule's other cases at once: declined, unpayable (CR 118.3), and
-    -- nobody to offer it to.
+  | -- | The instructions run when the cost was NOT paid, which covers both of
+    -- the rule's other answers at once: declined, and unpayable (CR 118.3).
+    --
+    -- A player the gate's reference never NAMED is not one of them and gets no
+    -- answer at all: CR 118.12a's rewriting is per player, so a gate naming
+    -- nobody selects nobody and its clause is skipped -- see
+    -- Pawl.Engine.Resolve.payGateAdmits.
     IfNotPaid
   deriving (Bounded, Enum, Eq, Ord, Show)

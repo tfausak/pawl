@@ -91,7 +91,10 @@
                         ],
                         "mana": []
                       },
-                      "payer": "you"
+                      "payer": {
+                        "type": "InSlot",
+                        "value": "you"
+                      }
                     }
                   }
                 ]

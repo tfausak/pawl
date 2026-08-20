@@ -3002,6 +3002,82 @@ wardSpec s registry =
           Spec.assertEqWith s "ward {2} held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Ward (cost 2)) 2)) [Keyword.ward (cost 2), Keyword.ward (cost 2)]
           Spec.assertBool s (Keyword.ward (cost 2) /= Keyword.ward (cost 3)) "and the cost reaches the minted ability"
 
+-- CR 118.12a over MORE THAN ONE PAYER: "[Do something] unless [a player does
+-- something else]" means "[A player may do something else]. If [that player
+-- doesn't], [do something]", and a card that says "each opponent" makes that
+-- offer once per opponent -- in CR 101.4's APNAP order, each answer gating that
+-- opponent's own instruction and nobody else's.
+--
+-- Rishadan Cutpurse, {2}{U} Creature -- Human Pirate 1/1, whose entire text box
+-- is "When this creature enters, each opponent sacrifices a permanent of their
+-- choice unless they pay {1}." The gate's payer is PlayerRef.Relative Opponent
+-- and its IfNotPaid branch binds the seats that declined under
+-- Binding.gatePlayers, which the Effect.PlayerSacrifices reads as "they".
+--
+-- THREE SEATS, and the point of them: with two, "each opponent" and "the one
+-- opponent" are the same sentence, so an engine that offered the cost once and
+-- applied one answer to everybody would be green. Here bob PAYS and carol does
+-- not, so the two opponents must end the resolution on different boards.
+--
+-- The observable is HOW MANY PERMANENTS EACH SEAT CONTROLS, never a prompt
+-- count: bob keeps his (paying taps a Forest, it does not lose him one) and
+-- carol loses one. The three seats are stocked to three DIFFERENT sizes so no
+-- two readings of the rule produce the same triple.
+cutpurseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+cutpurseSpec s registry =
+  let controls pid gs = length (Projection.controls pid gs)
+      board island forest swamp piker cutpurse =
+        let withLands = S.landsFor swamp S.carol 3 (S.landsFor forest S.bob 2 (S.landsFor island S.alice 3 S.threePlayerGame))
+            withPikers = List.foldl' (\acc pid -> snd (S.addCreature piker pid acc)) withLands [S.bob, S.carol, S.carol]
+            (gs, cutpurseId) = S.handOne cutpurse withPikers
+         in (cutpurseId, gs)
+      -- The Cutpurse cast off alice's three Islands and resolved, with its CR
+      -- 603.6a enters trigger settled onto the stack but NOT resolved.
+      entersOnStack cutpurseId gs =
+        let cast = S.runPure S.identityAnswer gs (S.cast S.alice cutpurseId)
+         in S.runPure S.identityAnswer cast (Stack.resolveTop >> Engine.settleForPriority)
+      boardOf = do
+        island <- S.printingOf s registry "Island"
+        forest <- S.printingOf s registry "Forest"
+        swamp <- S.printingOf s registry "Swamp"
+        piker <- S.printingOf s registry "Goblin Piker"
+        cutpurse <- S.printingOf s registry "Rishadan Cutpurse"
+        let (cutpurseId, gs) = board island forest swamp piker cutpurse
+        pure (entersOnStack cutpurseId gs)
+   in Spec.describe s "CR 118.12 a gate offered to each opponent" $ do
+        Spec.it s "CR 118.12a bob pays and carol does not, so only carol sacrifices" $ do
+          onStack <- boardOf
+          let ((_, after), transcript) = Replay.record (paysFor S.bob) onStack Stack.resolveTop
+          -- The controls: the Cutpurse really entered and its trigger really
+          -- reached the stack, and the three seats really start apart.
+          Spec.assertEqWith s "CR 603.6a: its enters trigger is on the stack" (length (GameState.stack onStack)) 1
+          Spec.assertEqWith s "alice, bob and carol start with 4, 3 and 5 permanents" (controls S.alice onStack, controls S.bob onStack, controls S.carol onStack) (4, 3, 5)
+          -- THE BEHAVIOUR: carol alone lost a permanent. bob's answer bought him
+          -- out of an edict carol's answer did not buy her out of, and alice --
+          -- not an opponent of herself -- was never in it.
+          Spec.assertEqWith s "CR 118.12a: carol alone sacrificed" (controls S.alice after, controls S.bob after, controls S.carol after) (4, 3, 4)
+          -- The supporting check: two offers, in CR 101.4's APNAP order, with
+          -- alice never asked.
+          Spec.assertEqWith s "CR 101.4: bob was asked first and paid, then carol declined" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays, Response.ChoseToPay PaymentDecision.Declines]
+        -- The same board and the same trigger as the case above, differing in
+        -- NOTHING but who is paid for: bob now declines too, so both edicts land
+        -- and the pair tells "carol was asked" apart from "carol was swept up in
+        -- bob's answer".
+        Spec.it s "CR 118.12a nobody pays, so both opponents sacrifice" $ do
+          onStack <- boardOf
+          let ((_, after), transcript) = Replay.record S.identityAnswer onStack Stack.resolveTop
+          Spec.assertEqWith s "CR 118.12a: both opponents sacrificed and alice did not" (controls S.alice after, controls S.bob after, controls S.carol after) (4, 2, 4)
+          Spec.assertEqWith s "both were asked, and both declined" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Declines, Response.ChoseToPay PaymentDecision.Declines]
+        -- The other limb, moved on its own: both opponents pay, so the IfNotPaid
+        -- branch selects nobody and the clause does nothing at all.
+        Spec.it s "CR 118.12a both opponents pay, so nobody sacrifices" $ do
+          onStack <- boardOf
+          let paysForEither p = case p of
+                Prompt.ChooseToPay {} -> PaymentDecision.Pays
+                _ -> S.identityAnswer p
+              after = S.runPure paysForEither onStack Stack.resolveTop
+          Spec.assertEqWith s "CR 118.12a: the paid branch sacrificed nothing" (controls S.alice after, controls S.bob after, controls S.carol after) (4, 3, 5)
+
 -- CR 601.2c read from the TARGETED PLAYER's side: "the chosen objects and/or
 -- players each become a target of that spell". Dormant Gomazoa, {1}{U}{U}
 -- Creature -- Jellyfish 5/5: "Flying / This creature enters tapped. / This
@@ -4103,6 +4179,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   afterlifeSpec s registry
   fabricateSpec s registry
   wardSpec s registry
+  cutpurseSpec s registry
   gomazoaSpec s registry
   amuletSpec s registry
   soulshiftSpec s registry

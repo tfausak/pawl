@@ -4,42 +4,31 @@
       "manaCost": [
         {
           "type": "Generic",
-          "value": 1
+          "value": 2
         },
         {
           "type": "OfType",
           "value": {
             "type": "Colored",
             "value": {
-              "type": "Black"
+              "type": "Blue"
             }
           }
         }
       ],
-      "name": "Whipstitched Zombie",
+      "name": "Rishadan Cutpurse",
       "power": {
         "type": "Literal",
-        "value": 2
+        "value": 1
       },
       "toughness": {
         "type": "Literal",
-        "value": 2
+        "value": 1
       },
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "StepBegins",
-            "value": {
-              "phase": {
-                "type": "Beginning",
-                "value": {
-                  "type": "Upkeep"
-                }
-              },
-              "scope": {
-                "type": "ControllersTurn"
-              }
-            }
+            "type": "SelfEnters"
           },
           "modal": {
             "modes": [
@@ -48,8 +37,18 @@
                   {
                     "effects": [
                       {
-                        "type": "Sacrifice",
-                        "value": "self"
+                        "type": "PlayerSacrifices",
+                        "value": {
+                          "filter": {
+                            "type": "And",
+                            "value": []
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          "slot": "thosePlayers"
+                        }
                       }
                     ],
                     "payGate": {
@@ -59,19 +58,16 @@
                       "cost": {
                         "mana": [
                           {
-                            "type": "OfType",
-                            "value": {
-                              "type": "Colored",
-                              "value": {
-                                "type": "Black"
-                              }
-                            }
+                            "type": "Generic",
+                            "value": 1
                           }
                         ]
                       },
                       "payer": {
-                        "type": "InSlot",
-                        "value": "you"
+                        "type": "Relative",
+                        "value": {
+                          "type": "Opponent"
+                        }
                       }
                     }
                   }
@@ -84,7 +80,10 @@
       "typeLine": {
         "subtypes": [
           {
-            "type": "Zombie"
+            "type": "Human"
+          },
+          {
+            "type": "Pirate"
           }
         ],
         "types": [

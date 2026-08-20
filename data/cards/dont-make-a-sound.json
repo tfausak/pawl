@@ -45,7 +45,10 @@
                       }
                     ]
                   },
-                  "payer": "spell"
+                  "payer": {
+                    "type": "ControllerOfBound",
+                    "value": "spell"
+                  }
                 }
               },
               {
@@ -79,7 +82,10 @@
                     ]
                   },
                   "offeredAt": 0,
-                  "payer": "spell"
+                  "payer": {
+                    "type": "ControllerOfBound",
+                    "value": "spell"
+                  }
                 }
               }
             ],

@@ -1885,7 +1885,7 @@ ward cost =
     -- player pays" is CR 118.12a's "may", and one clause makes its own offer.
     gate =
       PayGate.MkPayGate
-        { PayGate.payer = Binding.targetingObject,
+        { PayGate.payer = PlayerRef.ControllerOfBound Binding.targetingObject,
           PayGate.cost = cost,
           PayGate.branch = PayBranch.IfNotPaid,
           PayGate.obligation = PayObligation.Optional,
@@ -2244,7 +2244,7 @@ fabricate n =
     clause = Clause.MkClause Nothing Optionality.Mandatory (Just gate) (Seq.singleton spawn)
     gate =
       PayGate.MkPayGate
-        { PayGate.payer = Binding.you,
+        { PayGate.payer = PlayerRef.InSlot Binding.you,
           PayGate.cost =
             Cost.MkCost
               { -- CR 118.5, crew's note above: no mana part is `Just` an empty

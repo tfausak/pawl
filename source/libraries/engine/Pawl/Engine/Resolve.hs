@@ -369,7 +369,9 @@ slotsOf effect = case effect of
   Effect.TemptWithTheRing -> Map.empty
   Effect.Venture -> Map.empty
   Effect.ExileHandThenDraw -> Map.empty
-  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot _ quantity) -> insertOne slot (quantitySlots quantity)
+  -- CR 101.4's "each player sacrifices": the arm takes every player recipient
+  -- the slot holds, so the read is Many.
+  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot _ quantity) -> joinTwo (Map.singleton slot SlotArity.Many) (quantitySlots quantity)
   -- CR 727.5's exemption is an ObjectRef like any other.
   Effect.RestartGame exempt -> foldMap objectRefSlots exempt
   Effect.ControlPlayerNextTurn slot -> oneSlot slot
@@ -515,7 +517,7 @@ modeSlots mode =
       maybe Map.empty (Map.fromSet (const SlotArity.One) . Filter.boundSlots)
         . TargetSlot.filter
     -- Every clause's payer: CR 118.12 scopes a resolution cost to its clause.
-    payerSlot = maybe Map.empty (oneSlot . PayGate.payer) . Clause.payGate
+    payerSlot = maybe Map.empty (playerRefSlots . PayGate.payer) . Clause.payGate
 
 -- The slot a target pool draws its candidates from, if it draws them from one
 -- (CR 400.1's per-player graveyard), read singly.
@@ -947,6 +949,15 @@ onsetGatedAbilities effects =
 definedSlots :: [Effect Card.Type.Card] -> Set SlotName
 definedSlots = foldMap boundSlots
 
+-- definedSlots' other half, one MODE at a time: the slot a CR 118.12 gate binds
+-- as it is answered (Binding.gatePlayers, stamped by payGateAdmits). A mode
+-- stating no gate binds nothing, so a card reading that name without offering a
+-- resolution cost is still caught by the dataflow lint.
+gateDefinedSlots :: Mode.Mode card -> Set SlotName
+gateDefinedSlots mode
+  | any (Maybe.isJust . Clause.payGate) (Mode.clauses mode) = Set.singleton Binding.gatePlayers
+  | otherwise = Set.empty
+
 -- slotsOf's mirror for ONE effect: the slots it BINDS rather than reads, which
 -- is also the set Pawl.CardSpec's reserved-name sweep ranges over. Exhaustive
 -- deliberately: a wildcard would file a new bind position under "binds nothing"
@@ -1229,6 +1240,7 @@ resolveSpellWith runSubgame oid = do
                                in payGateAdmits
                                     oid
                                     oid
+                                    effectController
                                     idx
                                     cIdx
                                     (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Map.mapWithKey legalSlot chosenAtStart))
@@ -1355,7 +1367,7 @@ resolveModesWith runSubgame stackId srcId modes = do
                       taken <- if gated then exercises stackId effectController idx cIdx clause else pure False
                       -- CR 118.12: then the cost paid on resolution, against the
                       -- START-of-resolution slots.
-                      (admitted, answers') <- if taken then payGateAdmits stackId srcId idx cIdx (instanceView legal) answers clause else pure (False, answers)
+                      (admitted, answers') <- if taken then payGateAdmits stackId srcId effectController idx cIdx (instanceView legal) answers clause else pure (False, answers)
                       Monad.when admitted (Monad.mapM_ applyOne (Clause.effects clause))
                       pure answers'
                   )
@@ -1412,41 +1424,62 @@ exercises resolving controller idx cIdx clause = case Clause.optionality clause 
 
 -- CR 118.12: does this clause's instruction list happen, given the cost paid on
 -- resolution it may state? A clause stating none always does; one that states one
--- offers it to the player its `payer` slot names, and the instructions are
--- whichever branch PayGate.branch says. A refusal is not a failure.
+-- offers it to the players its `payer` reference names, and the instructions are
+-- whichever branch PayGate.branch says.
 --
 -- The branch is keyed on the ANSWER and never on the board afterwards, which is
 -- CR 118.12 in as many words: it checks whether the player chose to pay
 -- "regardless of what events actually occurred".
 --
--- FOUR ways the answer comes out, of which exactly one is "paid": no payer (the
--- slot is unfilled, illegal under CR 608.2b, or names a gone object); the payer
--- CANNOT pay (CR 118.3), asked on neither limb; the payer declines, which only an
--- OPTIONAL cost reaches; or the payer chose to pay -- the one place the answer is
--- not the raw choice, since Pawl.Engine.Cost.pay restores the entry state and an
--- Unpaid result is a complete no-op.
+-- PER PLAYER, because CR 118.12a's rewriting is: "[Do something] unless [a
+-- player does something else]" means "[A player may do something else]. If
+-- [that player doesn't], [do something]", so Rishadan Cutpurse's "each opponent
+-- sacrifices a permanent of their choice unless they pay {1}" is one offer per
+-- opponent gating that opponent's own edict. The seats the branch SELECTS are
+-- bound under Binding.gatePlayers, which is how the clause's own instructions
+-- say "they", and the clause happens when the branch selected anybody.
+--
+-- A gate whose reference names NOBODY therefore selects nobody and its clause is
+-- skipped, where a single-payer gate used to take the IfNotPaid branch and run
+-- its instructions against an unfilled slot. Unobservable across the pool as it
+-- stands: only an IfNotPaid clause diverges (an IfPaid one was skipped either
+-- way), only the slot-reading references can name nobody, and every IfNotPaid
+-- clause in the pool whose payer is one of those aims its own instructions at
+-- that same slot -- Mana Leak's Counter, Amulet of Safekeeping's. The rest read
+-- `you`, which is stamped for every carrier (Binding.you).
+--
+-- FOUR ways one player's answer comes out, of which exactly one is "paid": the
+-- reference names them but they CANNOT pay (CR 118.3), asked on neither limb;
+-- they decline, which only an OPTIONAL cost reaches; they chose to pay -- the
+-- one place the answer is not the raw choice, since Pawl.Engine.Cost.pay
+-- restores the entry state and an Unpaid result is a complete no-op; or the
+-- reference never named them at all, which is not an answer and leaves them out
+-- of both branches.
 --
 -- The cost is paid AGAINST `source` rather than the resolving stack object (CR
 -- 113.7a); the two are the same object for a spell.
 --
 -- ONE offer per payment (CR 118.12): a second clause hanging off the same cost
--- names the first (PayGate.offeredAt) and reuses the recorded answer, `answers`
+-- names the first (PayGate.offeredAt) and reuses the recorded answers, `answers`
 -- being keyed on the offering clause's ordinal. A clause naming an offer never
 -- made falls through and makes it, the named clause having failed its own CR
 -- 701.46a "if" or CR 603.5 "may".
 --
 -- Not implemented: CR 118.13b's announcement -- how a symbol payable in
 -- multiple ways is being paid, chosen immediately before this payment (#373).
-payGateAdmits :: ObjectId -> ObjectId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Map.Map ClauseIndex Bool -> Clause.Clause Card.Type.Card -> Game (Bool, Map.Map ClauseIndex Bool)
-payGateAdmits resolving source idx cIdx legal answers clause = case Clause.payGate clause of
+payGateAdmits :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Map.Map ClauseIndex (Map.Map PlayerId Bool) -> Clause.Clause Card.Type.Card -> Game (Bool, Map.Map ClauseIndex (Map.Map PlayerId Bool))
+payGateAdmits resolving source controller idx cIdx legal answers clause = case Clause.payGate clause of
   Nothing -> pure (True, answers)
-  Just gate ->
+  Just gate -> do
     let offerAt = Maybe.fromMaybe cIdx (PayGate.offeredAt gate)
-     in case Map.lookup offerAt answers of
-          Just wasPaid -> pure (branchTaken (PayGate.branch gate) wasPaid, answers)
-          Nothing -> do
-            wasPaid <- payGatePaid resolving source idx cIdx legal gate
-            pure (branchTaken (PayGate.branch gate) wasPaid, Map.insert offerAt wasPaid answers)
+    (asked, answers') <- case Map.lookup offerAt answers of
+      Just recorded -> pure (recorded, answers)
+      Nothing -> do
+        recorded <- payGatePaid resolving source controller idx cIdx legal gate
+        pure (recorded, Map.insert offerAt recorded answers)
+    let selected = Map.keysSet (Map.filter (branchTaken (PayGate.branch gate)) asked)
+    State.modify' (bindPlayersSlot resolving Binding.gatePlayers selected)
+    pure (not (Set.null selected), answers')
 
 -- Which branch of CR 118.12 a payment outcome selects, off the classification a
 -- card states -- never off what the payment DID.
@@ -1455,37 +1488,52 @@ branchTaken branch wasPaid = case branch of
   PayBranch.IfPaid -> wasPaid
   PayBranch.IfNotPaid -> not wasPaid
 
--- The offer itself: was this gate's cost paid? CR 118.12's MANDATORY limb is not
--- offered, and that is the rule rather than an elision -- it asks whether the
--- player "started to pay", so a mandatory cost the payer can afford leaves
--- nothing to choose, and CR 118.3 is asked first so an unpayable one takes the
--- "can't" branch with no prompt either.
+-- The offer itself: who was offered this gate's cost, and which of them paid?
+-- CR 118.12's MANDATORY limb is not offered, and that is the rule rather than an
+-- elision -- it asks whether the player "started to pay", so a mandatory cost the
+-- payer can afford leaves nothing to choose, and CR 118.3 is asked first so an
+-- unpayable one takes the "can't" branch with no prompt either.
 --
--- The cost is the PRINTED one with CR 107.3's X resolved (`announcedXOn`), and
--- that substitution is what every reader below sees -- CR 118.3's affordability
--- test, the prompt the payer is shown, and the payment itself -- so none of them
--- can disagree about what {X} is.
-payGatePaid :: ObjectId -> ObjectId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> PayGate.PayGate -> Game Bool
-payGatePaid resolving source idx cIdx legal gate = do
+-- CR 101.4's APNAP order over the players the reference names, which is what
+-- `payersOf` imposes: rule 101.4b lets a later payer answer knowing what an
+-- earlier one did. The board is re-read for each of them (payGatePaidBy's own
+-- State.get) rather than measured once, so a cost that changes the board -- CR
+-- 118.12's own "sacrifice this enchantment" -- is affordable to the next payer
+-- against the board it left. Each payer spends only their own resources, so the
+-- sequencing is not observable as an ordering of the ACTIONS.
+payGatePaid :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> PayGate.PayGate -> Game (Map.Map PlayerId Bool)
+payGatePaid resolving source controller idx cIdx legal gate = do
+  gs <- State.get
+  Monad.foldM
+    ( \acc payer -> do
+        paid <- payGatePaidBy resolving source idx cIdx payer gate
+        pure (Map.insert payer paid acc)
+    )
+    Map.empty
+    (payersOf (PayGate.payer gate) legal controller gs)
+
+-- One player's answer to one gate. The cost is the PRINTED one with CR 107.3's X
+-- resolved (`announcedXOn`), and that substitution is what every reader below
+-- sees -- CR 118.3's affordability test, the prompt the payer is shown, and the
+-- payment itself -- so none of them can disagree about what {X} is.
+payGatePaidBy :: ObjectId -> ObjectId -> ModeIndex -> ClauseIndex -> PlayerId -> PayGate.PayGate -> Game Bool
+payGatePaidBy resolving source idx cIdx payer gate = do
   gs <- State.get
   let cost = Cost.substituteX (announcedXOn resolving gs) (PayGate.cost gate)
-  case payerOf (PayGate.payer gate) legal gs of
-    Nothing -> pure False
-    Just payer ->
-      if not (Cost.canPay payer source cost gs)
-        then pure False
-        else do
-          decision <- case PayGate.obligation gate of
-            PayObligation.Mandatory -> pure PaymentDecision.Pays
-            PayObligation.Optional -> Game.choose (Prompt.ChooseToPay (Decide.deciderFor payer gs) payer resolving idx cIdx cost)
-          case decision of
-            PaymentDecision.Declines -> pure False
-            PaymentDecision.Pays -> do
-              outcome <- Cost.pay ManaSpending.AsProduced payer source cost
-              -- Not implemented: the slots this payment bound are dropped, so a
-              -- CR 118.12 cost that sacrifices a permanent cannot be read by a
-              -- later clause of the same resolution (#1872).
-              pure (case outcome of Payment.Paid _ -> True; Payment.Unpaid -> False)
+  if not (Cost.canPay payer source cost gs)
+    then pure False
+    else do
+      decision <- case PayGate.obligation gate of
+        PayObligation.Mandatory -> pure PaymentDecision.Pays
+        PayObligation.Optional -> Game.choose (Prompt.ChooseToPay (Decide.deciderFor payer gs) payer resolving idx cIdx cost)
+      case decision of
+        PaymentDecision.Declines -> pure False
+        PaymentDecision.Pays -> do
+          outcome <- Cost.pay ManaSpending.AsProduced payer source cost
+          -- Not implemented: the slots this payment bound are dropped, so a
+          -- CR 118.12 cost that sacrifices a permanent cannot be read by a
+          -- later clause of the same resolution (#1872).
+          pure (case outcome of Payment.Paid _ -> True; Payment.Unpaid -> False)
 
 -- CR 118.4 / CR 107.3a: the value of X in a cost paid during resolution. NOT a
 -- choice the payer makes -- CR 107.3a fixes it at the value the object's own
@@ -1513,16 +1561,14 @@ announcedXOn oid gs =
     0
     (Game.lookupObject oid gs >>= Binding.amountOf Binding.variableX . Object.bindings)
 
--- Which player a resolution cost is offered to. ONE slot read answering two ways:
--- a slot bound to a PLAYER names that player, one bound to an OBJECT names
--- whoever controls it (CR 109.4, CR 405.4 for a spell). Not CR 109.5, the rule
--- for "you". A slot naming SEVERAL pays nothing -- an "unless [a player] pays"
--- names one payer (`legalOne`).
-payerOf :: SlotName -> Map.Map SlotName (Set Recipient) -> GameState -> Maybe PlayerId
-payerOf slot legal gs = case legalOne slot legal of
-  Just (Recipient.ToPlayer pid) -> Just pid
-  Just recipient -> Recipient.objectOf recipient >>= \oid -> Projection.controllerOf oid gs
-  _ -> Nothing
+-- Which players a resolution cost is offered to, in CR 101.4's APNAP order --
+-- playerRefPlayers answers in PlayerId order and says so, leaving the ordering
+-- rule to its caller. Mana Leak's reference names one seat and Rishadan
+-- Cutpurse's names every opponent; the order is only observable for the second.
+payersOf :: PlayerRef -> Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> [PlayerId]
+payersOf ref legal controller gs =
+  let named = playerRefPlayers legal controller gs ref
+   in filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
 
 -- The no-subgame mode executor: every direct caller, and any path that cannot
 -- reach a PlaySubgame.
@@ -3631,45 +3677,55 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               let slower p = p {Player.speed = fmap (\was -> Integer.toNaturalSaturating (max atLeast (toInteger was - n))) (Player.speed p)}
                in State.modify' (\g -> g {GameState.players = Map.adjust slower pid (GameState.players g)})
         _ -> pure ()
-  -- CR 701.21a: the slot's target player sacrifices `quantity` permanents
-  -- matching the filter, and THAT PLAYER chooses which -- the whole difference
+  -- CR 701.21a: the players the slot names each sacrifice `quantity` permanents
+  -- matching the filter, and EACH OF THEM chooses which -- the whole difference
   -- between this and Sacrifice above. CR 609.3: only a genuine surplus prompts.
+  --
+  -- CR 101.4's example is this instruction verbatim -- "Each player sacrifices a
+  -- creature. First, the active player chooses a creature they control. Then each
+  -- of the nonactive players, in turn order, chooses ... Then all creatures
+  -- chosen this way are sacrificed simultaneously" -- so every pick is taken
+  -- first, in APNAP order, and only then does anything leave the battlefield.
+  -- The candidate lists are read off ONE `gs` for the same reason.
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot filter_ quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal (slotGroups resolving gs)
-    case legalOne slot legal of
-      Just (Recipient.ToPlayer victim) ->
-        -- Read against the VICTIM: "half the permanents they control" is a number
-        -- of the sacrificing player's own.
-        case evaluateForRecipient viewOf context gs resolving source victim quantity of
-          Just n
-            | n > 0 -> do
-                -- Candidates are what the VICTIM controls, ascending, so both the
-                -- elision and a short transcript are deterministic. Through
-                -- Replacement.sacrificeCandidates, which is what puts CR 101.2's
-                -- "can't be sacrificed" on this path: a prohibited permanent is
-                -- never the pick that satisfies the edict.
-                let candidates = Replacement.sacrificeCandidates victim Nothing filter_ gs
-                    decider = Decide.deciderFor victim gs
-                    -- `n > 0` above, so the clamp never decides anything here.
-                    count = Integer.toNaturalSaturating n
-                picked <-
-                  if Natural.length candidates <= count
-                    then pure (Set.fromList candidates)
-                    else Game.choose (Prompt.ChooseSacrifices decider victim source candidates count)
-                -- FILTERED AND COMPLETED, not merely filtered: an edict is not
-                -- "may", so an answer naming too few would cheat it, and CR 609.3
-                -- caps it at "as much as possible". Valid picks are honoured
-                -- first, the rest made up from the remaining candidates in the
-                -- order offered.
-                let wanted = min count (Natural.length candidates)
-                    valid = filter (\oid -> Set.member oid picked) candidates
-                    filler = filter (\oid -> List.notElem oid valid) candidates
-                Monad.mapM_ (Event.sacrifice victim) (List.genericTake wanted (valid <> filler))
-          _ -> pure ()
-      -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
-      _ -> pure ()
+        -- Every player recipient the slot holds, in APNAP order. A slot that is
+        -- unfilled, illegal (CR 608.2b) or names an object contributes nobody.
+        named = Maybe.mapMaybe Recipient.playerOf (legalMany slot legal)
+        victims = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
+        pickFor victim =
+          -- Read against the VICTIM: "half the permanents they control" is a
+          -- number of the sacrificing player's own.
+          case evaluateForRecipient viewOf context gs resolving source victim quantity of
+            Just n
+              | n > 0 -> do
+                  -- Candidates are what the VICTIM controls, ascending, so both the
+                  -- elision and a short transcript are deterministic. Through
+                  -- Replacement.sacrificeCandidates, which is what puts CR 101.2's
+                  -- "can't be sacrificed" on this path: a prohibited permanent is
+                  -- never the pick that satisfies the edict.
+                  let candidates = Replacement.sacrificeCandidates victim Nothing filter_ gs
+                      decider = Decide.deciderFor victim gs
+                      -- `n > 0` above, so the clamp never decides anything here.
+                      count = Integer.toNaturalSaturating n
+                  picked <-
+                    if Natural.length candidates <= count
+                      then pure (Set.fromList candidates)
+                      else Game.choose (Prompt.ChooseSacrifices decider victim source candidates count)
+                  -- FILTERED AND COMPLETED, not merely filtered: an edict is not
+                  -- "may", so an answer naming too few would cheat it, and CR 609.3
+                  -- caps it at "as much as possible". Valid picks are honoured
+                  -- first, the rest made up from the remaining candidates in the
+                  -- order offered.
+                  let wanted = min count (Natural.length candidates)
+                      valid = filter (\oid -> Set.member oid picked) candidates
+                      filler = filter (\oid -> List.notElem oid valid) candidates
+                  pure (victim, List.genericTake wanted (valid <> filler))
+            _ -> pure (victim, [])
+    doomed <- traverse pickFor victims
+    Monad.forM_ doomed (\(victim, oids) -> Monad.mapM_ (Event.sacrifice victim) oids)
   Effect.Create (Create.MkCreate quantity card entry mSlot) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
@@ -4781,6 +4837,16 @@ noSubgame = pure Result.Drawn
 bindPlayerSlot :: ObjectId -> SlotName -> PlayerId -> GameState -> GameState
 bindPlayerSlot holder slot player gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toPlayer player) (Object.bindings obj)}
+   in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
+
+-- bindPlayerSlot's plural: bind SEVERAL players a resolution named into `slot` on
+-- `holder`. CR 118.12a's per-player gate is the one caller, and the set is
+-- written even when it is EMPTY -- Binding.toRecipients turns that into an
+-- unbound slot, so a branch nobody took leaves the previous clause's answer
+-- unreadable rather than standing.
+bindPlayersSlot :: ObjectId -> SlotName -> Set PlayerId -> GameState -> GameState
+bindPlayersSlot holder slot players gs =
+  let put obj = obj {Object.bindings = Map.insert slot (Binding.toPlayers players) (Object.bindings obj)}
    in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
 
 -- CR 701.8b: bind how many permanents a destruction actually destroyed into

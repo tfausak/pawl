@@ -5,7 +5,7 @@ import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayObligation as PayObligation
-import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.PlayerRef as PlayerRef
 
 -- | CR 118.12's cost, offered to a player as the spell or ability RESOLVES, plus
 -- which of that rule's two branches the clause's instructions are.
@@ -41,21 +41,23 @@ import qualified Pawl.Types.SlotName as SlotName
 -- Sound's "counter target spell unless its controller pays {2}. If they do,
 -- surveil 2" is an IfNotPaid clause and an IfPaid clause over one offer.
 data PayGate = MkPayGate
-  { -- | Which player is offered the cost. A SLOT rather than a
-    -- Pawl.Types.PlayerRef, because the answer Mana Leak needs is "the
-    -- controller of the object bound here" and PlayerRef.InSlot reads a slot
-    -- bound to a PLAYER. Pawl.Engine.Resolve.payerOf takes both readings off one
-    -- slot -- a slot bound to a player IS that player, and a slot bound to an
-    -- object names whoever controls it (CR 109.4, and CR 405.4 for a spell) --
-    -- so "unless that player pays" needs no second field.
+  { -- | Which players are offered the cost. A Pawl.Types.PlayerRef and not a
+    -- slot, because CR 118.12a's rewriting is per player and a card may name
+    -- several at once: Rishadan Cutpurse's "each opponent sacrifices a permanent
+    -- of their choice unless they pay {1}" is one offer to each opponent, and
+    -- CR 101.4 puts them in APNAP order. Every single-payer card in the pool
+    -- writes one of the two slot-reading arms -- Whipstitched Zombie's own
+    -- controller is InSlot "you", Mana Leak's targeted spell's controller is
+    -- ControllerOfBound "spell" (CR 109.4, CR 405.4 for a spell).
     --
-    -- A slot and not the resolving controller, which is the question this card
-    -- family forces: Mana Leak's payer is the TARGETED spell's controller, who
-    -- controls nothing about the resolution. Pawl.Types.MonarchTarget's InSlot
-    -- arm is the same call made at a different opcode: pawl has no general
-    -- "which player" spec for effects, and a slot name is what a spell's own
-    -- target namespace already offers.
-    payer :: SlotName.SlotName,
+    -- Not the resolving controller, which is the question this card family
+    -- forces: Mana Leak's payer is the TARGETED spell's controller, who controls
+    -- nothing about the resolution.
+    --
+    -- Whichever players the gate's answer selects are bound under
+    -- Pawl.Engine.Binding.gatePlayers, so the clause's own instructions can say
+    -- "they" -- see Pawl.Engine.Resolve.payGateAdmits.
+    payer :: PlayerRef.PlayerRef,
     -- | What that player is offered the chance to pay. A whole Cost and not a
     -- bare ManaCost, so Pawl.Engine.Cost.canPay and .pay are the one payment
     -- path, and so a non-mana cost of this family (CR 118.12's own "sacrifice
