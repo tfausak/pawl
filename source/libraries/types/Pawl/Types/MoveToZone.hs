@@ -23,10 +23,12 @@ import qualified Pawl.Types.Zone as Zone
 -- The LibraryPlacement is the END a LIBRARY destination arrives at (CR 401.2's
 -- order), either stated -- Griptide's "on top of its owner's library", against
 -- Unsummon's silence -- or left to each moved object's OWNER, which is
--- Aetherspouts. Inert for every other destination, so a card that states one on
--- a non-library move states something nothing reads; a CardSpec lint
--- additionally forbids OwnerChooses there, since that one would ask a player a
--- question with no board behind it.
+-- Aetherspouts. Its third reading states the end and takes CR 401.4's
+-- arrangement away from the owner, making the batch random: Endurance's "on the
+-- bottom of their library in a random order". Inert for every other destination,
+-- so a card that states one on a non-library move states something nothing
+-- reads; a CardSpec lint additionally forbids OwnerChooses there, since that one
+-- would ask a player a question with no board behind it.
 data MoveToZone = MkMoveToZone
   { ref :: ObjectRef.ObjectRef,
     zone :: Zone.Zone,

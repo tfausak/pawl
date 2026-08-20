@@ -31,6 +31,14 @@ spec s = Spec.describe s "Pawl.Codec.LibraryPlacement" $ do
       LibraryPlacement.codec
       LibraryPlacement.OwnerChooses
       " {\"type\":\"OwnerChooses\"} "
+  -- A random order states its end the same way Stated does: the arm says who
+  -- orders the batch, and the position it carries says where the batch lands.
+  Spec.it s "RandomOrder Bottom" $
+    Common.assertCodec
+      s
+      LibraryPlacement.codec
+      (LibraryPlacement.RandomOrder LibraryPosition.Bottom)
+      " {\"type\":\"RandomOrder\",\"value\":{\"type\":\"Bottom\"}} "
   -- A bare position is no longer a placement, which is what keeps the schema's
   -- oneOf honest. It no longer has to tell a placement from a zone --- moveTail
   -- is gone (#1305) and the placement is a named key.

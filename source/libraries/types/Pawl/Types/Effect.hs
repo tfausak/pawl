@@ -231,8 +231,10 @@ data Effect card
     --
     -- The LibraryPlacement is the END a LIBRARY destination arrives at (CR
     -- 401.2), either stated (Griptide) or left to each moved object's OWNER
-    -- (Aetherspouts). Inert elsewhere; a CardSpec lint forbids OwnerChooses
-    -- there, that one asking a question with no board behind it.
+    -- (Aetherspouts); it also says whether CR 401.4's arrangement of two or more
+    -- simultaneous arrivals is the owner's or a random one (Endurance). Inert
+    -- elsewhere; a CardSpec lint forbids OwnerChooses there, that one asking a
+    -- question with no board behind it.
     MoveToZone MoveToZone.MoveToZone
   | -- | CR 121.1: the players the PlayerRef names each draw this many cards, one
     -- at a time (CR 121.2). Empty-library draw is a loss (CR 104.3c), unlike

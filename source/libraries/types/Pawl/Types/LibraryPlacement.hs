@@ -2,10 +2,11 @@ module Pawl.Types.LibraryPlacement where
 
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 
--- | How a move settles CR 401.2's end: the card states it, or the object's OWNER
--- picks. Griptide's "on top of its owner's library" is 'Stated'; Aetherspouts'
--- "its owner puts it on their choice of the top or bottom of their library" is
--- 'OwnerChooses'.
+-- | How a move settles CR 401.2's end, and who settles CR 401.4's order: the
+-- card states the end, or the object's OWNER picks it. Griptide's "on top of its
+-- owner's library" is 'Stated'; Aetherspouts' "its owner puts it on their choice
+-- of the top or bottom of their library" is 'OwnerChooses'; Endurance's "on the
+-- bottom of their library in a random order" is 'RandomOrder'.
 --
 -- A SIBLING of LibraryPosition rather than a third inhabitant of it, because
 -- Pawl.Engine.Game.insertIntoZone turns an end into an index and sits below the
@@ -22,6 +23,16 @@ import qualified Pawl.Types.LibraryPosition as LibraryPosition
 data LibraryPlacement
   = Stated LibraryPosition.LibraryPosition
   | OwnerChooses
+  | -- | The end is stated and the ORDER is the effect's rather than the owner's.
+    -- CR 401.4 lets the owner arrange two or more cards an effect puts in one
+    -- position at once; text that states a random order takes that back, so
+    -- nobody arranges and the batch is randomised instead, to CR 701.24a's
+    -- standard of no player knowing the order.
+    --
+    -- NOT a shuffle (CR 701.24a randomises a whole library or pile): only the
+    -- arriving cards are randomised, the library they join keeps its order, and
+    -- nothing that triggers on a library being shuffled sees this.
+    RandomOrder LibraryPosition.LibraryPosition
   deriving (Eq, Ord, Show)
 
 -- | What a move that says nothing about an end uses, which is

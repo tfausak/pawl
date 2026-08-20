@@ -481,6 +481,78 @@ angelOfFinalitySpec s registry = Spec.describe s "AngelOfFinality" $ do
       (List.sort [named "Bird Maiden", named "Day of Judgment"])
     Spec.assertBool s (S.onBattlefield heroId after) "bob's creature was never moved, so nothing swept the battlefield"
 
+-- CR 401.4's arrangement of two or more simultaneous library arrivals, taken back
+-- from the owner by text that states a RANDOM order -- the placement angel above
+-- has no reason to state, its destination being exile.
+--
+-- Endurance {1}{G}{G} Creature -- Elemental Incarnation 3/4, "Flash / Reach /
+-- When this creature enters, up to one target player puts all the cards from
+-- their graveyard on the bottom of their library in a random order. / Evoke--
+-- Exile a green card from your hand." (name, cost, type line, power, toughness
+-- and Oracle text checked against api.scryfall.com, 2026-08-20).
+--
+-- EVOKE IS NOT TRANSCRIBED: pawl has no such keyword, so the card loses an
+-- alternative cost and pawl's Endurance is STRICTER than printed -- one fewer way
+-- to cast it, never a cast the printing would refuse. CR 702.74's row is in #877.
+--
+-- THE RANDOMNESS IS THE ANSWERER'S, which is what makes this observable at all:
+-- the engine rolls nothing, it asks Prompt.Shuffle, so a fixture that names a
+-- permutation names the resulting library. The answer below is built from the
+-- object ids rather than from the batch's own order, so it is neither the batch
+-- nor its reverse under any sweep order -- an engine that ignored the answer, and
+-- one that asked CR 401.4's owner instead, each leave a DIFFERENT library.
+--
+-- THREE SEATS: alice controls the Endurance and targets bob, and carol's
+-- graveyard is stocked too, so "the targeted player's graveyard" is told apart
+-- from "yours", "each player's" and "your opponents'" (CR 102.3 read through CR
+-- 806.1's free-for-all makes carol an opponent as much as bob). bob's library is
+-- stocked with one card the trigger never touches, so the three arrivals are read
+-- as the BOTTOM of a library rather than as the whole of one.
+enduranceSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+enduranceSpec s registry = Spec.describe s "Endurance" $ do
+  Spec.it s "CR 401.4 a stated random order puts the batch on the bottom in the order the randomness named" $ do
+    endurance <- S.printingOf s registry "Endurance"
+    sentry <- S.printingOf s registry "Ogre Sentry"
+    maiden <- S.printingOf s registry "Bird Maiden"
+    judgment <- S.printingOf s registry "Day of Judgment"
+    murder <- S.printingOf s registry "Murder"
+    piker <- S.printingOf s registry "Goblin Piker"
+    forest <- S.printingOf s registry "Forest"
+    let stocked = snd (S.addLibraryCard sentry S.bob S.threePlayerGame)
+        (maidenId, g1) = S.addGraveyardCard maiden S.bob stocked
+        (judgmentId, g2) = S.addGraveyardCard judgment S.bob g1
+        (murderId, g3) = S.addGraveyardCard murder S.bob g2
+        elsewhere =
+          List.foldl'
+            (\g (printing, pid) -> snd (S.addGraveyardCard printing pid g))
+            g3
+            [(piker, S.alice), (forest, S.carol)]
+        (_, entered) = S.entersWithTrigger endurance S.alice elsewhere
+        -- The arrangement, from the chosen end INWARD: the Day of Judgment ends
+        -- up deepest and the Bird Maiden nearest the top of the three.
+        ordering :: Prompt.Prompt r -> r
+        ordering p = case p of
+          Prompt.ChooseTargets _ _ _ slots -> fmap (Set.filter (== Recipient.ToPlayer S.bob) . snd) slots
+          Prompt.Shuffle _ -> [judgmentId, murderId, maidenId]
+          _ -> S.identityAnswer p
+        placed = S.runPure ordering entered Engine.placePendingTriggers
+        after = S.runPure ordering placed Stack.resolveTop
+        named = Just . CardName.MkCardName . Text.pack
+    Spec.assertEqWith
+      s
+      "bob's library, top first, is the card that was already there and then the three arrivals in the named order"
+      (namesIn Zone.Library S.bob after)
+      [named "Ogre Sentry", named "Bird Maiden", named "Murder", named "Day of Judgment"]
+    Spec.assertEqWith
+      s
+      "bob's graveyard is empty and the other two seats keep theirs"
+      ( namesIn Zone.Graveyard S.bob after,
+        namesIn Zone.Graveyard S.alice after,
+        namesIn Zone.Graveyard S.carol after
+      )
+      ([], [named "Goblin Piker"], [named "Forest"])
+    Spec.assertEqWith s "and nothing arrived in alice's or carol's library" (namesIn Zone.Library S.alice after, namesIn Zone.Library S.carol after) ([], [])
+
 -- CR 608.2d's choice made WHILE APPLYING an effect, over a graveyard:
 -- ObjectRef.ChosenCardInGraveyard, where riseOfTheDarkRealmsSpec above is the
 -- same zone swept as a set.
@@ -2810,6 +2882,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   returnAllSpec s registry
   riseOfTheDarkRealmsSpec s registry
   angelOfFinalitySpec s registry
+  enduranceSpec s registry
   portOfKarfellSpec s registry
   midnightTillingSpec s registry
   communeWithTheGodsSpec s registry
