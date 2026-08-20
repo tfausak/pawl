@@ -2090,6 +2090,7 @@ subgameSpellOn borrowed name effects gs0 =
             Face.openingHandActions = [],
             Face.specialActions = [],
             Face.additionalCosts = [],
+            Face.maximumX = Nothing,
             Face.alternativeCosts = [],
             Face.costReductions = [],
             Face.enchant = [],

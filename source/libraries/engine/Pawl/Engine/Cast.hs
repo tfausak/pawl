@@ -321,12 +321,23 @@ payableCostAt x spending pid oid gs cost =
 --     cannot move either, so the same argument runs a second time. Hatred is the
 --     card whose X reaches a cost only this way.
 --
+--   * as a BLIGHT (Cost.substituteXInComponent again, a CostComponent.BlightX
+--     becoming a Blight). Monotone VACUOUSLY, CR 701.68b refusing a blight only
+--     where the player controls no creature and naming no number of counters
+--     that is too many -- so this route never fails and the climb needs the
+--     `ceiling` below to stop. Soul Immolation is the card whose X reaches a
+--     cost only this way.
+--
+-- The CEILING is CR 101.1's, evaluated off the face being cast
+-- (Cost.maximumX) and passed straight through: it bounds the search as well as
+-- the announcement, which is what makes the blight route terminate.
+--
 -- The two degenerate costs -- one with no X in it, which would climb forever,
 -- and one unpayable even at X=0 -- both answer 0, and Cost.greatestPayableX says
 -- why. Neither is reachable from castSpell, which asks only about a candidate
 -- that already passed payableCost and only when Cost.hasVariable holds.
-affordableX :: ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
-affordableX spending pid oid gs cost = Cost.greatestPayableX (\x -> payableCostAt x spending pid oid gs cost) cost
+affordableX :: Maybe Natural -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
+affordableX mCeiling spending pid oid gs cost = Cost.greatestPayableX mCeiling (\x -> payableCostAt x spending pid oid gs cost) cost
 
 -- CR 702.42a: the ADDITIONAL cost this player may pay right now to choose all of
 -- this modal spell's modes, or Nothing when entwining is not on offer at all.
@@ -1372,14 +1383,39 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                   -- and its exile is conditioned on the ZONE rather than on
                   -- this tag, so the tie changes no answer.
                   castFor = CandidateCost.keyword =<< List.find ((== chosenCost) . CandidateCost.cost) payableCandidates
-              -- CR 601.2b's announcement is free -- any Natural -- but the player
-              -- making it is told what the board can pay. The bound rides the
+                  -- CR 101.1: the ceiling this card's own words put on the value
+                  -- about to be announced -- "X can't be greater than the
+                  -- greatest toughness among creatures you control". Read HERE
+                  -- and once, which is the timing CR 601.2b fixes: the value is
+                  -- named at this step and no later rule revisits it, so a
+                  -- creature that leaves in response cannot shrink it.
+                  --
+                  -- Off the FACE being cast, never through the projection, which
+                  -- is printedRestrictionsOk's reading and carries its caveat --
+                  -- an effect granting or removing the sentence is missed
+                  -- (CR 113.6e, #1859).
+                  mCeiling = Cost.maximumX pid sid face gs
+              -- CR 601.2b's announcement is free of the board -- any Natural --
+              -- but the player making it is told what the board can pay, and
+              -- narrowed to what the card permits. The affordable half rides the
               -- CHOSEN cost, and nothing filters the answer against it: an
               -- unaffordable announcement still reverses the whole cast (#417).
               mAmount <-
                 if Cost.hasVariable chosenCost
-                  then fmap Just (Game.choose (Prompt.ChooseX decider pid sid (affordableX spending pid sid gs chosenCost)))
+                  then fmap Just (Game.choose (Prompt.ChooseX decider pid sid (affordableX mCeiling spending pid sid gs chosenCost)))
                   else pure Nothing
+              -- CR 101.1, and CR 101.2 for its direction: the card's sentence
+              -- overrides the rule that would otherwise leave X free, and a
+              -- "can't" beats the permission. REJECT rather than clamp, which is
+              -- this whole step's posture -- CR 601.2 returns the game to before
+              -- the casting was proposed rather than choosing a legal value on
+              -- the player's behalf.
+              --
+              -- Asked against the ceiling read BEFORE the prompt, so the answer
+              -- is judged against the same board the player was shown.
+              let overCeiling = case (mCeiling, mAmount) of
+                    (Just c, Just x) -> x > c
+                    _ -> False
               -- CR 601.2: a step the player cannot comply with makes the casting
               -- illegal and returns the game to before it was proposed. The X just
               -- named is where that can first become true, since every candidate
@@ -1404,7 +1440,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
               -- one predicate over one cost instead of two spellings of when the
               -- gate applies.
               let announcedAtX = maybe chosenCost (\x -> Cost.substituteX x chosenCost) mAmount
-              if not (payableCost spending pid sid gs announcedAtX)
+              if overCeiling || not (payableCost spending pid sid gs announcedAtX)
                 then reject
                 else do
                   -- CR 601.2b's own order puts the hybrid and Phyrexian

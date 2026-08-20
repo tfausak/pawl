@@ -390,8 +390,16 @@ payableCostAtGiven sources pcs x pid srcId gs cost =
 -- shared with Cast.affordableX; only the predicate differs, and only by WHICH
 -- adjustments CR 601.2f's totalling reads. Advisory, never a clamp -- see
 -- Prompt.ChooseX.
+--
+-- NO CEILING is handed to the climb, and that is CR 101.1 having nothing to say
+-- here rather than an oversight: Pawl.Types.Face.maximumX bounds the X a SPELL's
+-- controller announces, and no activated ability in `data/cards/` states a
+-- ceiling of its own. Not implemented: an ability that does (Blighted
+-- Nightmare) (#1985). What that leaves is Cost.greatestPayableX's other ground
+-- for terminating -- a demand that grows -- which every {X} in an activation
+-- cost in the pool has.
 affordableX :: PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
-affordableX pid srcId gs cost = Cost.greatestPayableX (\x -> payableCostAt x pid srcId gs cost) cost
+affordableX pid srcId gs cost = Cost.greatestPayableX Nothing (\x -> payableCostAt x pid srcId gs cost) cost
 
 -- CR 602.2/602.5: the ability is a member of the source's abilities
 -- (abilitiesFor), it is not a mana ability, the whole activation cost is payable

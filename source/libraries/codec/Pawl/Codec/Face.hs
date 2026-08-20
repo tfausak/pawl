@@ -100,6 +100,9 @@ codec cardCodec = Fields.object $ do
   untapRestrictions <- Fields.defaulted "untapRestrictions" [] (Common.list UntapRestriction.codec) Face.untapRestrictions
   attackCosts <- Fields.defaulted "attackCosts" [] (Common.list AttackCost.codec) Face.attackCosts
   additionalCosts <- Fields.defaulted "additionalCosts" [] (Common.list (CostComponent.codec Keyword.codec)) Face.additionalCosts
+  -- CR 101.1: the ceiling this face's own words put on CR 601.2b's announced X
+  -- (Pawl.Types.Face).
+  maximumX <- Fields.defaulted "maximumX" Nothing (Common.maybe Quantity.codec) Face.maximumX
   alternativeCosts <- Fields.defaulted "alternativeCosts" [] (Common.list AlternativeCost.codec) Face.alternativeCosts
   -- CR 601.2f: the reductions this face applies to its own cost to cast
   -- (Pawl.Types.CostReduction).
@@ -144,6 +147,7 @@ codec cardCodec = Fields.object $ do
         Face.untapRestrictions = untapRestrictions,
         Face.attackCosts = attackCosts,
         Face.additionalCosts = additionalCosts,
+        Face.maximumX = maximumX,
         Face.alternativeCosts = alternativeCosts,
         Face.costReductions = costReductions,
         Face.mulliganActions = mulliganActions,

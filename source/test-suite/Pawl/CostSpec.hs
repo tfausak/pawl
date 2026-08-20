@@ -1673,6 +1673,24 @@ hatredSpec s registry =
       Spec.assertBool s (notElem ManaSymbol.Variable (foldMap ManaCost.unwrap (Face.manaCost (S.combinedFace hatred)))) "the mana part really has none"
       Spec.assertBool s (not (Cost.canPayComponent S.alice S.noSource CostComponent.PayLifeX gs)) "and it is unpayable until announced"
       Spec.assertBool s (Cost.canPayComponent S.alice S.noSource (CostComponent.PayLife 20) gs) "while the announced 20 it substitutes to is payable"
+    -- The same fence one keyword action over, and the same board serves: alice
+    -- controls a Goblin Piker, so CR 701.68b's only refusal does not apply and
+    -- an announced blight IS payable -- which is what leaves the unannounced one
+    -- unpayable for CR 601.2b's reason alone rather than for want of a creature.
+    --
+    -- The pair also states the fact Cost.greatestPayableX rests on: blight's
+    -- payability does not move with the number, so a big enough announcement is
+    -- refused by CR 101.1's ceiling and by nothing else.
+    Spec.it s "CR 601.2b an unannounced blight X is unpayable, though every announced one is payable" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      piker <- S.printingOf s registry "Goblin Piker"
+      hatred <- S.printingOf s registry "Hatred"
+      let (_, _, gs) = hatredBoard swamp piker hatred 20
+      Spec.assertBool s (not (Cost.canPayComponent S.alice S.noSource CostComponent.BlightX gs)) "unpayable until announced"
+      Spec.assertBool s (Cost.canPayComponent S.alice S.noSource (CostComponent.Blight 1) gs) "an announced 1 is payable"
+      Spec.assertBool s (Cost.canPayComponent S.alice S.noSource (CostComponent.Blight 99) gs) "and so is an announced 99, CR 701.68b naming no number that is too many"
+      Spec.assertBool s (Cost.hasVariable (Cost.Type.MkCost Nothing [CostComponent.BlightX])) "it is a CR 107.3 variable"
+      Spec.assertBool s (not (Cost.demandGrowsWithX (Cost.Type.MkCost Nothing [CostComponent.BlightX]))) "whose demand never grows, so only CR 101.1 can refuse a value"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do

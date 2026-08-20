@@ -289,6 +289,7 @@ objectRefSlots ref = case ref of
   ObjectRef.EachCardExiledWithSource {} -> Map.empty
   ObjectRef.EachSpell _ -> Map.empty
   ObjectRef.EachPlayer -> Map.empty
+  ObjectRef.EachOpponent -> Map.empty
   -- The seat comes from the source's own entry choice (CR 614.12a), not a slot.
   ObjectRef.ChosenPlayer -> Map.empty
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player count) -> joinTwo (playerRefSlots player) (quantitySlots count)
@@ -324,6 +325,7 @@ objectRefQuantities ref = case ref of
   ObjectRef.EachCardExiledWithSource {} -> []
   ObjectRef.EachSpell _ -> []
   ObjectRef.EachPlayer -> []
+  ObjectRef.EachOpponent -> []
   ObjectRef.ChosenPlayer -> []
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary _ count) -> [count]
   -- A Filter ends this walk, so there is no depth to carry.
@@ -1799,6 +1801,7 @@ objectRefObjects legal resolving controller source gs ref = case ref of
           (GameState.stack gs)
   -- Names players and so no objects at all.
   ObjectRef.EachPlayer -> []
+  ObjectRef.EachOpponent -> []
   ObjectRef.ChosenPlayer -> []
   -- CR 401.2's ordered pile, whose head is the top (CR 121.1). The depth is taken
   -- from EACH named library, top first, and a shorter library gives what it has
@@ -1998,6 +2001,10 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   -- CR 120.3a: a player is a damage recipient. APNAP (CR 608.2f) via
   -- Game.apnapOrder.
   ObjectRef.EachPlayer -> fmap Recipient.ToPlayer (Game.apnapOrder gs)
+  -- CR 120.3a again, over CR 102.1's opponents alone -- the arm above filtered
+  -- by PlayerRelation.holds against CR 109.5's "you", which is the resolving
+  -- controller. APNAP order survives the filter (CR 608.2f).
+  ObjectRef.EachOpponent -> fmap Recipient.ToPlayer (filter (PlayerRelation.holds PlayerRelation.Opponent controller) (Game.apnapOrder gs))
   -- CR 120.3a, one seat wide: the player the SOURCE chose as it entered (CR
   -- 614.12a). Read off `source` (CR 113.7a), not `resolving`, which for a
   -- triggered ability is the ability object and never carries the choice.
@@ -3141,6 +3148,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               gs <- State.get
               pure (objectRefObjects legal resolving controller source gs ref)
             ObjectRef.EachPlayer -> pure []
+            ObjectRef.EachOpponent -> pure []
             ObjectRef.ChosenPlayer -> pure []
             -- Read from the pre-move state like the sweeps above: the whole batch
             -- comes off one look at each library (CR 608.2c, CR 608.2f).

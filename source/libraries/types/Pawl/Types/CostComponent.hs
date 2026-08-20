@@ -249,10 +249,27 @@ data CostComponent keyword
     -- and CR 118.12's resolution offer is never raised (CR 118.3).
     --
     -- A Natural and not a Quantity, for PayLife's reason -- nothing here is
-    -- evaluated against a binding environment. Not implemented: Soul Immolation's
-    -- "blight X", whose X is announced at CR 601.2b under a bound rule 701.68a
-    -- does not state, so it is neither this nor PayLifeX's shape (#1646).
+    -- evaluated against a binding environment. CR 601.2b's announced X is
+    -- BlightX below, PayLifeX's shape one keyword action over.
     Blight Natural.Natural
+  | -- | CR 107.3a's X as a BLIGHT amount: "blight X", where the value is announced
+    -- by the caster at CR 601.2b (Soul Immolation). PayLifeX's exact sibling --
+    -- rule 118.4 sends a cost with an X in it to CR 107.3, and rule 601.2b names
+    -- the mana cost as an EXAMPLE, so an additional cost carrying X is announced
+    -- by the same rule -- and Pawl.Engine.Cost.substituteX rewrites it to a
+    -- @Blight n@ carrying the announced value exactly as it rewrites PayLifeX.
+    --
+    -- The MAXIMUM rule 701.68a does not state is not here either. Soul Immolation
+    -- prints "X can't be greater than the greatest toughness among creatures you
+    -- control", which CR 101.1 makes binding on the ANNOUNCEMENT rather than on
+    -- this component -- an X in a mana cost takes the same ceiling (Open the Way),
+    -- so it lives on Pawl.Types.Face.maximumX where both halves of a cost can see
+    -- it.
+    --
+    -- UNPAYABLE as it stands, PayLifeX's posture and for its reason: a value the
+    -- caster has not announced is not one this cost can charge, and CR 601.2
+    -- reverses the casting rather than guessing.
+    BlightX
   | -- | CR 406.2 as a cost: exile the card the cost is on, from the graveyard it
     -- is in. Loxodon Surveyor's "{3}, Exile this card from your graveyard: Draw a
     -- card" is the printing. CR 601.2f's list of what a cost may include ends in

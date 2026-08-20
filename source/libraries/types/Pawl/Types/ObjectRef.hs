@@ -187,6 +187,31 @@ data ObjectRef
     -- flying and each player") has to be written as two DealDamage
     -- instructions, so its one CR 608.2f batch becomes two (#1285).
     EachPlayer
+  | -- | Every OPPONENT of the resolving controller -- Soul Immolation's "each
+    -- opponent". EachPlayer's set narrowed by CR 102.1's relation, and here for
+    -- that arm's reason: it names no object at all, and it is an ObjectRef
+    -- because Effect.DealDamage's ref is one (CR 120.3a makes a player a damage
+    -- recipient).
+    --
+    -- Payload-free, EachPlayer's call: "each opponent" is what the card says,
+    -- and a Pawl.Types.PlayerRef would make InSlot sayable twice over. The
+    -- perspective is CR 109.5's "you", the resolving controller, and
+    -- Pawl.Types.PlayerRelation.holds is the single definition of whom that
+    -- leaves -- so this arm and a Filter's ControlledBy Opponent cannot drift
+    -- apart about who an opponent is.
+    --
+    -- NOT EachPlayer with the controller dropped at the reader: rule 102.1's
+    -- roster is what EachPlayer names, and a card saying "each opponent" says
+    -- something narrower that no reader may infer from the wider arm.
+    --
+    -- Not a target (CR 115.10a) and swept when the effect executes, the two
+    -- properties EachMatching above has.
+    --
+    -- Not implemented, recorded here because the card's JSON cannot carry a
+    -- comment: a sentence naming opponents AND their permanents ("each opponent
+    -- and each creature they control", Soul Immolation) has to be written as two
+    -- DealDamage instructions, so its one CR 608.2f batch becomes two (#1285).
+    EachOpponent
   | -- | The player this effect's SOURCE chose as it entered the battlefield --
     -- Stuffy Doll's "it deals that much damage to the chosen player". EachPlayer's
     -- sibling one seat wide, and here for that arm's reason: the arm names no

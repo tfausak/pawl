@@ -3448,6 +3448,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   direFleetDaredevilSpec s registry
   upToOneTargetSpec s registry
   multiTargetCastSpec s registry
+  soulImmolationSpec s registry
 
 -- CR 115.6's "up to one target", read at cast time. Rat Out {B} Instant is "Up
 -- to one target creature gets -1/-1 until end of turn. You create a 1/1 black
@@ -3601,3 +3602,117 @@ aftermathSpec s registry = Spec.describe s "Aftermath" $ do
     -- Onward has no permission of its own, so the graveyard is closed to it --
     -- CR 702.127a grants the half that PRINTS aftermath, not the card.
     Spec.assertEqWith s "Onward is not" (Cast.castable S.alice oid onwardName Facing.FaceUp gs) False
+
+-- Soul Immolation {3}{R}{R} Sorcery (data/cards/soul-immolation.json): "As an
+-- additional cost to cast this spell, blight X. X can't be greater than the
+-- greatest toughness among creatures you control. Soul Immolation deals X damage
+-- to each opponent and each creature they control." Name, cost, type line and
+-- oracle text checked against Scryfall 2026-08-20.
+--
+-- The pool's card for CR 101.1 read against CR 601.2b: the card's own sentence
+-- overrides the rule that would otherwise leave the announced X free, and CR
+-- 101.2 fixes the direction, the sentence being a "can't". CR 107.3a is only
+-- where the announcement happens.
+--
+-- THREE SEATS, because "each opponent" and "each player" name the same set on a
+-- two-seat board once alice is excluded from neither -- carol is what makes the
+-- difference between reaching every opponent and reaching one observable.
+--
+-- The board: alice has five Mountains (exactly {3}{R}{R}, so nothing below turns
+-- on mana), a Goblin Piker (2/1) and a Palace Guard (1/4); bob has Russet Wolves
+-- (3/3); carol has nothing but a life total. The ceiling is therefore 4, and the
+-- Piker is deliberately the LOWER-numbered object: a "least toughness" reading
+-- and a "first creature" reading both answer 1, so both refuse an X of 4 that
+-- CR 101.1 permits.
+--
+-- Nothing here turns on affordability, and that is the point: {3}{R}{R} carries
+-- no {X}, so every X is equally payable and the ceiling is the only thing that
+-- can refuse one.
+soulImmolationBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+soulImmolationBoard mountain piker guard wolves immolation =
+  let withLands = S.landsFor mountain S.alice 5 S.threePlayerGame
+      (pikerId, withPiker) = S.addCreature piker S.alice withLands
+      (guardId, withGuard) = S.addCreature guard S.alice withPiker
+      (wolvesId, withWolves) = S.addCreature wolves S.bob withGuard
+      (spellId, withSpell) = S.addHandCard immolation S.alice withWolves
+   in ( spellId,
+        pikerId,
+        guardId,
+        wolvesId,
+        withSpell
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Announces this X, and pays the blight onto the Palace Guard -- alice controls
+-- two creatures, so CR 701.68a's choice is a real prompt and pinning it keeps
+-- the counters off the creature the ceiling is read from being an accident.
+answerSoulImmolation :: ObjectId.ObjectId -> Natural -> Prompt.Prompt r -> r
+answerSoulImmolation guardId n p = case p of
+  Prompt.ChooseX {} -> n
+  Prompt.ChooseBlight {} -> guardId
+  _ -> S.identityAnswer p
+
+soulImmolationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+soulImmolationSpec s registry = Spec.describe s "Soul Immolation" $ do
+  -- The PROVING case. Five is one more than the greatest toughness among
+  -- alice's creatures, so CR 101.1 refuses the announcement and CR 601.2
+  -- returns the game to before the casting was proposed. An engine that
+  -- honoured the answer would deal five to each opponent.
+  Spec.it s "CR 101.1 an X above the card's stated maximum reverses the cast" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    guard <- S.printingOf s registry "Palace Guard"
+    wolves <- S.printingOf s registry "Russet Wolves"
+    immolation <- S.printingOf s registry "Soul Immolation"
+    let (spellId, _, guardId, wolvesId, board) = soulImmolationBoard mountain piker guard wolves immolation
+        after = S.runPure (answerSoulImmolation guardId 5) board (do S.cast S.alice spellId; Stack.resolveTop)
+    Spec.assertEqWith s "bob took nothing" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "carol took nothing" (S.lifeOf S.carol after) (Just 20)
+    Spec.assertEqWith s "and bob's Wolves took nothing" (S.damageOf wolvesId after) (Just 0)
+    -- CR 601.2e's rewind reaches the additional cost as well as the damage.
+    Spec.assertEqWith s "no blight counters were paid" (S.counterOf CounterKind.MinusOneMinusOne guardId after) 0
+    Spec.assertEqWith s "and the card is still in alice's hand" (S.handSize S.alice after) 1
+  -- The CONTROL, and the same board with one thing changed: the answer. Four IS
+  -- the greatest toughness among alice's creatures, so CR 101.1 permits it and
+  -- everything the case above found missing happens.
+  Spec.it s "CR 101.1 an X equal to the stated maximum is announced and paid" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    guard <- S.printingOf s registry "Palace Guard"
+    wolves <- S.printingOf s registry "Russet Wolves"
+    immolation <- S.printingOf s registry "Soul Immolation"
+    let (spellId, _, guardId, wolvesId, board) = soulImmolationBoard mountain piker guard wolves immolation
+        after = S.runPure (answerSoulImmolation guardId 4) board (do S.cast S.alice spellId; Stack.resolveTop)
+    Spec.assertEqWith s "bob took four" (S.lifeOf S.bob after) (Just 16)
+    Spec.assertEqWith s "carol took four" (S.lifeOf S.carol after) (Just 16)
+    Spec.assertEqWith s "and bob's Wolves took four" (S.damageOf wolvesId after) (Just 4)
+    Spec.assertEqWith s "the blight put four counters on the Palace Guard" (S.counterOf CounterKind.MinusOneMinusOne guardId after) 4
+    Spec.assertEqWith s "and the card left alice's hand" (S.handSize S.alice after) 0
+  -- Gameplay level, under the ceiling on both sides, so nothing here is about
+  -- the ceiling: what it proves is that CR 601.2b's announced X is the number
+  -- the blight charges and the number the damage deals, and that "each opponent
+  -- and each creature they control" reaches neither alice nor her creatures.
+  Spec.it s "CR 107.3a the announced X is blighted, dealt to each opponent, and dealt to their creatures" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    guard <- S.printingOf s registry "Palace Guard"
+    wolves <- S.printingOf s registry "Russet Wolves"
+    immolation <- S.printingOf s registry "Soul Immolation"
+    let (spellId, pikerId, guardId, wolvesId, board) = soulImmolationBoard mountain piker guard wolves immolation
+        after = S.runPure (answerSoulImmolation guardId 2) board (do S.cast S.alice spellId; Stack.resolveTop)
+    Spec.assertEqWith s "bob took two" (S.lifeOf S.bob after) (Just 18)
+    Spec.assertEqWith s "carol took two" (S.lifeOf S.carol after) (Just 18)
+    -- CR 109.5: alice is not her own opponent, and neither of her creatures is
+    -- one an opponent controls. An ObjectRef.EachPlayer in either instruction's
+    -- place would have taken two from her and two from each of them.
+    Spec.assertEqWith s "alice took nothing" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "her Palace Guard took no damage" (S.damageOf guardId after) (Just 0)
+    Spec.assertEqWith s "her Goblin Piker took no damage" (S.damageOf pikerId after) (Just 0)
+    Spec.assertEqWith s "bob's Wolves took two" (S.damageOf wolvesId after) (Just 2)
+    -- CR 601.2f/601.2h: the additional cost was paid with the same X, on the
+    -- creature the prompt was answered with rather than on the first candidate.
+    Spec.assertEqWith s "two -1/-1 counters on the Palace Guard" (S.counterOf CounterKind.MinusOneMinusOne guardId after) 2
+    Spec.assertEqWith s "and none on the Goblin Piker" (S.counterOf CounterKind.MinusOneMinusOne pikerId after) 0
