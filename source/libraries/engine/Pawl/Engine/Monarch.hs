@@ -312,13 +312,17 @@ returnExiledForMonarch = do
 -- sentence 1, fails sentence 2's departure condition and leaves the crown
 -- unmoved -- which makes sentence 3 unreachable.
 --
--- The write and the CR 725.1 event record are ONE step, for the reason
--- Departure.depart gives for keeping this call inside itself: a crowning that
--- records nothing is a crowning CR 603.2 cannot see, and separating the two
--- lets a later caller move the crown silently. A rule rather than an effect
--- moves it here, which changes nothing -- CR 725.2's stolen crown is a rule too
--- and records the same event. Nothing is recorded for CR 725.4's third
--- sentence: no player became the monarch.
+-- The write, the CR 725.1 event record and the exile watches are ONE step,
+-- because this crowns through `crown` -- for the reason Departure.depart gives
+-- for keeping this call inside itself: a crowning that records nothing is a
+-- crowning CR 603.2 cannot see, and separating them lets a later caller move the
+-- crown silently. A rule rather than an effect moves it here, which changes
+-- nothing -- CR 725.2's stolen crown is a rule too and goes the same way.
+--
+-- CR 725.4's third sentence is the ONE arm that writes GameState.monarch
+-- directly, and rightly: it crowns nobody, so it records no event and marks no
+-- watch. "An opponent becomes the monarch" is never satisfied by there being no
+-- monarch.
 reassignOnDeparture :: PlayerId -> [PlayerId] -> GameState -> GameState
 reassignOnDeparture leaving playing gs =
   if GameState.monarch gs /= Just leaving
