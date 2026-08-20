@@ -3182,9 +3182,8 @@ data ControlGrant = MkControlGrant
 -- Every layer-2 control-granting STATIC ability on the battlefield, gathered
 -- once. NOT `gather`, and PROJECTION-FREE throughout: affects reads controllerOf
 -- to supply CR 109.5's "you", so a controlGrants that consulted the layers would
--- be mutually recursive with it. That is why Affected.Matching and
--- MatchingAnywhere are unsupported below (#195), and why no CR 305.7 gate is
--- applied here. Hoisted for the same reason setLandSubtypeEffects is: `controls`
+-- be mutually recursive with it. That is why controlNames below reads copiable
+-- values rather than the projection, and why no CR 305.7 gate is applied here. Hoisted for the same reason setLandSubtypeEffects is: `controls`
 -- calls controllerOf once per battlefield object.
 --
 -- Not implemented: CR 604.2's "as long as" gate, which setLandSubtypeEffects
@@ -3240,7 +3239,7 @@ controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
         let visited' = Set.insert oid visited
             -- Does an affected set carried by `source` name `oid`? controlNames
             -- below is the enumeration this membership test reads off.
-            namesFrom source a = Set.member oid (controlNames gs source a)
+            namesFrom source a = Set.member oid (controlNames grants visited' gs source a)
             storedSetter eff = case ContinuousEffect.modification eff of
               Modification.SetController pid
                 | namesFrom (ContinuousEffect.source eff) (ContinuousEffect.affected eff) ->
@@ -3260,18 +3259,58 @@ controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
 
 -- Which objects an affected set NAMES, for the CR 613.1b layer-2 control fold.
 -- Parameterized by the source because Affected.Attached asks about the SOURCE's
--- state. Total with no wildcard, and three of five arms empty: this fold must
--- not project (see controlGrants), and AttachedPlayerControls would re-enter
--- controllerOf. No card produces any of the three (#195).
-controlNames :: GameState -> ObjectId -> Affected.Affected -> Set ObjectId
-controlNames gs source a = case a of
+-- state, and by the grant list and the caller's visited set because a PREDICATE
+-- set has to answer control questions of its own -- CR 109.5's "you" for the
+-- filter's perspective, and the candidate's own controller for a filter that
+-- asks. Both go back through controllerOfGiven, never through the projection
+-- (see controlGrants).
+--
+-- Not implemented: MatchingAnywhere, MatchingOffBattlefield and
+-- AttachedPlayerControls, which stay empty and so grant nothing (#1927).
+controlNames :: [ControlGrant] -> Set ObjectId -> GameState -> ObjectId -> Affected.Affected -> Set ObjectId
+controlNames grants visited gs source a = case a of
   Affected.TheseObjects s -> s
   -- CR 303.4m: the source's own attachment, with no projection needed.
   Affected.Attached -> maybe Set.empty Set.singleton (hostOf source gs)
-  Affected.Matching _ -> Set.empty
+  -- CR 611.3a: a static ability's effect is not locked in, so the set is
+  -- re-derived from the battlefield at every projection and a permanent that
+  -- enters later is in it. CR 613.1a/613.2c: layer 2 reads an object's COPIABLE
+  -- values, since layer 1 is the only layer before it and CR 613.8a confines
+  -- dependency to one layer -- so no layer-4 type change feeds this test, which
+  -- is what lets it run without projecting.
+  Affected.Matching f -> Set.filter (matchesLeanly grants visited gs source f) (GameState.battlefield gs)
   Affected.MatchingAnywhere _ -> Set.empty
   Affected.MatchingOffBattlefield _ -> Set.empty
   Affected.AttachedPlayerControls _ -> Set.empty
+
+-- Does `oid` match a layer-2 affected set's Filter, read at the copiable values
+-- controlNames explains and with CR 109.5's "you" bound to the SOURCE's
+-- controller? Projection-free throughout: every controller it needs comes from
+-- controllerOfGiven carrying the caller's visited set, which answers an object's
+-- owner once it revisits that object, so a control-dependent conjunct terminates
+-- rather than re-entering the fold that is asking (#946). Termination is
+-- structural here, not a matter of Filter.View's laziness -- which is what
+-- separates this path from the liveness gate #197 describes.
+matchesLeanly :: [ControlGrant] -> Set ObjectId -> GameState -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
+matchesLeanly grants visited gs source f oid =
+  Filter.matches
+    (Filter.contextFor (controllerOfGiven grants visited source gs) (Just source))
+    (leanViewOf grants visited gs oid)
+    f
+
+-- The Filter.View a layer-2 affected set reads: copiable characteristics
+-- (CR 613.2c) and a controller from the lean fold. The counterpart to
+-- viewOfObjectGiven for a caller that must not project at all; a host is read
+-- the same way, which is finite for the reason viewOfObjectGiven gives.
+leanViewOf :: [ControlGrant] -> Set ObjectId -> GameState -> ObjectId -> Filter.View
+leanViewOf grants visited gs oid =
+  viewOfCharacteristics
+    (Just . leanViewOf grants visited gs)
+    oid
+    (copiableCharacteristics oid gs)
+    (controllerOfGiven grants visited oid gs)
+    (countersOf oid gs)
+    gs
 
 -- CR 110.2 / 108.4a: the controller a CR 613.1b layer-2 effect OVERRIDES. A
 -- permanent's default controller is whoever it entered under (CR 110.2), and
