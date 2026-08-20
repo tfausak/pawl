@@ -119,6 +119,16 @@ data Response
     -- (every creature its chooser controls), so nothing but a distinct
     -- constructor keeps a transcript of one from replaying as the other.
     ChoseBlight ObjectId.ObjectId
+  | -- | CR 107.14: how much {E} a player chose to pay to an
+    -- Effect.PayAnyEnergy.
+    --
+    -- Its own constructor and not ChoseX below, though both carry one Natural:
+    -- that one is CR 601.2b's announcement, made while CASTING, and this one is
+    -- made mid-resolution. A transcript of one replaying as the other is exactly
+    -- what ChoseBolster's reason forbids, and Harnessed Lightning off a
+    -- Hatred-style announcement would be a silent wrong answer rather than a
+    -- desync.
+    ChosePaidEnergy Natural.Natural
   | -- | CR 609.7a: the damage source a player chose for a prevention effect that
     -- names one.
     --

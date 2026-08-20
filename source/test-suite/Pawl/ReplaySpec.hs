@@ -977,6 +977,24 @@ combatReplaySpec s =
             "the head"
             (Replay.defaultAnswer (Prompt.ChooseBlight decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])))
             (ObjectId.MkObjectId 7)
+        -- CR 107.14: how much {E} a player paid mid-resolution is a decision, so
+        -- it has to survive a transcript like any other.
+        Spec.it s "ChoosePaidEnergy round-trips through the transcript" $ do
+          let p = Prompt.ChoosePaidEnergy decider S.alice oid 5
+          Spec.assertEqWith s "paying four round trips" (Replay.decode p (Replay.encode p 4)) (Just 4)
+          -- Discriminating: a decode that ignored the response and answered zero
+          -- would pass the declining leg by accident.
+          Spec.assertEqWith s "paying nothing round trips" (Replay.decode p (Replay.encode p 0)) (Just 0)
+        Spec.it s "a paid-energy amount does not decode as an announced X" $ do
+          -- Discriminating: fails if ChoosePaidEnergy reuses ChoseX rather than
+          -- getting its own Natural-shaped constructor. CR 601.2b announces X
+          -- while CASTING and CR 107.14's amount is named mid-resolution, so a
+          -- transcript of one replaying as the other is a silent wrong answer.
+          let p = Prompt.ChoosePaidEnergy decider S.alice oid 5
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseX 4)) Nothing
+        Spec.it s "a short paid-energy transcript pays nothing" $
+          -- Paying nothing is legal on any board, whatever the payer holds.
+          Spec.assertEqWith s "zero" (Replay.defaultAnswer (Prompt.ChoosePaidEnergy decider S.alice oid 5)) 0
         -- CR 608.2d: which card the resolving controller took out of a graveyard
         -- is a decision, so it has to survive a transcript like any other.
         Spec.it s "ChooseCardInGraveyard round-trips through the transcript" $ do

@@ -162,6 +162,22 @@ data Prompt r where
   -- ChooseBolster. ChooseBolster's posture, constructor argument and elision;
   -- not raised for zero, by CR 101.3 or CR 701.68b depending on the caller.
   ChooseBlight :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
+  -- | CR 107.14: how much {E} this player pays to an Effect.PayAnyEnergy, asked
+  -- as the spell or ability RESOLVES (Harnessed Lightning). The ObjectId is the
+  -- resolving object.
+  --
+  -- The Natural is the payer's own energy count, and unlike ChooseX's advisory
+  -- bound this one is ENFORCED: CR 118.3 says a player can't pay a cost without
+  -- the resources to pay it fully, and Pawl.Engine.Resolve clamps the answer to
+  -- it rather than letting an answerer spend counters nobody has. Rule 601.2's
+  -- reversal, which is what makes ChooseX's bound advisory, has no counterpart
+  -- mid-resolution.
+  --
+  -- ZERO is a legal answer -- the printed amount is "any amount" -- and is how
+  -- the "may" is declined, so this prompt carries no separate yes/no. Not
+  -- implemented: skipping it when the bound is 0, where the one payable amount is
+  -- determined (#1920).
+  ChoosePaidEnergy :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt Natural.Natural
   -- | CR 609.7a: which SOURCE OF DAMAGE a player chooses for a prevention
   -- effect that names one (Healing Grace's "by a source of your choice"). The
   -- ObjectId is the spell or ability resolving; the NonEmpty is the sources it

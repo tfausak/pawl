@@ -40,6 +40,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
@@ -1454,6 +1455,71 @@ aimingAtEveryPlayer n p = case p of
       Recipient.ToBattle _ -> False
       Recipient.ToObject _ -> False
 
+-- CR 107.14's "you may pay any amount of {E}" (Effect.PayAnyEnergy): the payer
+-- names the amount as the spell RESOLVES -- not at CR 601.2b, which is what
+-- separates this from CostComponent.PayLifeX's announced X -- and what they paid
+-- is what the next effect of the same resolution reads.
+--
+-- Harnessed Lightning {1}{R} Instant (data/cards/harnessed-lightning.json):
+-- "Choose target creature. You get {E}{E}{E} (three energy counters), then you
+-- may pay any amount of {E}. Harnessed Lightning deals that much damage to that
+-- creature." Name, cost, type line and oracle text checked against Scryfall
+-- 2026-08-19.
+--
+-- WHY HARNESSED LIGHTNING and not Die Young, which #121's body nominates: the
+-- two say the same sentence, and this one reads the amount back as damage rather
+-- than as a -1/-1 per {E}, so nothing but the payment is under test.
+payAnyEnergySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+payAnyEnergySpec s registry =
+  Spec.describe s "Harnessed Lightning (CR 107.14)" $ do
+    -- The amount is a real read, not a fixed number: alice banks two {E}, the
+    -- spell gives her three more, and she names four of the five. Every number
+    -- on the board is distinct, so no two readings of the rule coincide.
+    Spec.it s "CR 107.14 the {E} its controller pays is the damage it deals" $ do
+      (wallId, cast) <- harnessedBoard s registry
+      let after = S.runPure (paying 4) cast Stack.resolveTop
+      Spec.assertEqWith s "the Wall took the 4 damage alice paid for" (S.damageOf wallId after) (Just 4)
+      Spec.assertEqWith s "and one of her five energy counters is left" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 1
+    -- Zero is one of the "any amount" the card offers, and paying it is what the
+    -- printed "may" declines to. The energy assertion is what tells this apart
+    -- from a spell that never resolved at all -- the three {E} it gives are in
+    -- the total either way, and CR 120.8 makes 0 damage no damage.
+    Spec.it s "CR 107.14 paying nothing deals nothing and keeps the counters" $ do
+      (wallId, cast) <- harnessedBoard s registry
+      let after = S.runPure (paying 0) cast Stack.resolveTop
+      Spec.assertEqWith s "the Wall took no damage" (S.damageOf wallId after) (Just 0)
+      Spec.assertEqWith s "and all five energy counters are still hers" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 5
+    -- CR 118.3: "a player can't pay a cost without having the necessary resources
+    -- to pay it fully". The answer is nine and the board holds five, so a trusted
+    -- answer would deal nine and leave a negative count.
+    Spec.it s "CR 118.3 an answer above the payer's energy is capped at what they have" $ do
+      (wallId, cast) <- harnessedBoard s registry
+      let after = S.runPure (paying 9) cast Stack.resolveTop
+      Spec.assertEqWith s "the Wall took five, not nine" (S.damageOf wallId after) (Just 5)
+      Spec.assertEqWith s "and alice spent every counter she had" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 0
+
+-- alice holds Harnessed Lightning with two Mountains untapped for its {1}{R} and
+-- two {E} already banked; bob's Wall of Stone (0/8) is the only creature in play,
+-- so the cast's one target is determined and survives every amount below. Returns
+-- the Wall and the state with the spell cast and waiting on the stack.
+harnessedBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState)
+harnessedBoard s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  wall <- S.printingOf s registry "Wall of Stone"
+  harnessed <- S.printingOf s registry "Harnessed Lightning"
+  let (wallId, withWall) = S.addCreature wall S.bob (S.landsInPlay mountain 2)
+      (inHand, spellId) = S.handOne harnessed withWall
+      banked = S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice inHand
+  pure (wallId, snd (Engine.runGamePure S.identityAnswer banked (S.cast S.alice spellId)))
+
+-- Answers Prompt.ChoosePaidEnergy with a fixed amount, deferring everything else
+-- to S.identityAnswer. PINNED rather than read off the prompt's own bound, so a
+-- mutation to that bound cannot quietly repair the answer.
+paying :: Natural -> Prompt.Prompt r -> r
+paying n p = case p of
+  Prompt.ChoosePaidEnergy {} -> n
+  _ -> S.identityAnswer p
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   upToOneTargetSpec s registry
@@ -1465,3 +1531,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   blightPlayerSpec s registry
   blightCostSpec s registry
   soulfireEruptionSpec s registry
+  payAnyEnergySpec s registry

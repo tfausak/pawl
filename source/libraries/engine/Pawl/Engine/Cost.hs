@@ -1318,9 +1318,7 @@ canPayComponent pid oid component gs = case component of
     Maybe.isJust (topExileCandidate pid criterion gs)
   -- CR 107.14 / CR 118.3: payable only if the player has at least that many
   -- energy counters.
-  CostComponent.PayEnergy n -> case Map.lookup pid (GameState.players gs) of
-    Nothing -> False
-    Just player -> Map.findWithDefault 0 PlayerCounterKind.Energy (Player.counters player) >= n
+  CostComponent.PayEnergy n -> energyOf pid gs >= n
   -- CR 606.4: always payable, CR 606.6 gating only the removing half -- but the
   -- permanent must still be one this player controls on the battlefield, rule
   -- 606.4 putting the counters on "that permanent".
@@ -1818,11 +1816,7 @@ payComponent pid oid component = case component of
   -- Natural subtraction is PARTIAL, so `left` is guarded; canPayComponent
   -- guarantees `have >= n` at pay time, and the guard keeps this total anyway.
   CostComponent.PayEnergy n -> do
-    let spend player =
-          let have = Map.findWithDefault 0 PlayerCounterKind.Energy (Player.counters player)
-              left = if have >= n then have - n else 0
-           in player {Player.counters = Map.insert PlayerCounterKind.Energy left (Player.counters player)}
-    State.modify' (\gs -> gs {GameState.players = Map.adjust spend pid (GameState.players gs)})
+    spendEnergy pid n
     pure bindsNothing
   -- CR 606.4: put the loyalty counters on. A DIRECT edit and deliberately NOT
   -- through Event.putCounters, the CR 614 funnel: CR 614.16 admits a
@@ -2077,3 +2071,29 @@ applyAdjustments adjustments cost =
           Just manaType | elem manaType unspent -> cancel (List.delete manaType unspent) rest
           _ -> symbol : cancel unspent rest
    in List.foldl' reduce (raise cost) reductions
+
+-- CR 107.14: how many energy counters this player has, which is CR 118.3's
+-- ceiling on what they can pay. Player.counters' absent-means-zero convention,
+-- and a player who is not in the game has none.
+--
+-- SHARED rather than inlined at its readers: canPayComponent's PayEnergy gate,
+-- spendEnergy below, and Pawl.Engine.Resolve's Effect.PayAnyEnergy bound must
+-- agree about what "how much {E} do you have" means, and the last of those is a
+-- number shown to the payer rather than a predicate.
+energyOf :: PlayerId -> GameState -> Natural
+energyOf pid gs =
+  maybe 0 (Map.findWithDefault 0 PlayerCounterKind.Energy . Player.counters) (Map.lookup pid (GameState.players gs))
+
+-- CR 107.14: pay this much {E} -- remove that many energy counters from the
+-- player. Natural subtraction is PARTIAL, so the floor is explicit; every caller
+-- has already measured against energyOf, and the guard keeps this total anyway.
+--
+-- The one writer, so Pawl.Engine.Resolve's Effect.PayAnyEnergy spends through
+-- exactly the same edit CostComponent.PayEnergy does.
+spendEnergy :: PlayerId -> Natural -> Game ()
+spendEnergy pid n =
+  let spend player =
+        let have = Map.findWithDefault 0 PlayerCounterKind.Energy (Player.counters player)
+            left = if have >= n then have - n else 0
+         in player {Player.counters = Map.insert PlayerCounterKind.Energy left (Player.counters player)}
+   in State.modify' (\gs -> gs {GameState.players = Map.adjust spend pid (GameState.players gs)})

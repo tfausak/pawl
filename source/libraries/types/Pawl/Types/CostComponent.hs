@@ -173,10 +173,17 @@ data CostComponent keyword
     -- the object the cost is on, and a cost on an object that is no longer in a
     -- hand is simply unpayable.
     DiscardThis DiscardCause.DiscardCause
-  | -- | CR 107.14 / 118: pay N energy counters. Energy-specific, not a general
-    -- PayPlayerCounters -- energy is the only player counter ever spent as a
-    -- cost. A Natural, not a Quantity, for PayLife's reason; a variable-amount
-    -- energy cost is not representable (#121).
+  | -- | CR 107.14 / 118: pay N energy counters (Longtusk Cub). Energy-specific,
+    -- not a general PayPlayerCounters -- energy is the only player counter ever
+    -- spent as a cost. A Natural, not a Quantity, for PayLife's reason.
+    --
+    -- NOT the arm for either variable amount, and the two are different rules.
+    -- CR 107.14's "you may pay any amount of {E}" names its amount as the spell
+    -- RESOLVES (Harnessed Lightning), which is Effect.PayAnyEnergy and not a cost
+    -- at all -- CR 118.1's "necessary to take another action" is what it fails.
+    -- Not implemented: "Pay X {E}" as an ACTIVATION cost, CR 107.3a's X announced
+    -- at CR 601.2b through CR 602.2b, which is PayLifeX's shape rather than a
+    -- Quantity here (Chthonian Nightmare, HELIOS One) (#1921).
     PayEnergy Natural.Natural
   | -- | CR 606.4: put this many loyalty counters on the permanent the cost is on
     -- -- Jace Beleren's `+2`. It carries no recipient, and takes the "This"
