@@ -396,9 +396,23 @@ namesFor mObj card = case mObj of
 -- that goes looking, so CR 708.5's "you can't look at face-down permanents
 -- controlled by another player" is unimplemented (#682).
 faceOf :: ObjectId -> GameState -> Maybe (Face Card)
-faceOf oid gs = case fmap Object.facing (lookupObject oid gs) of
-  Just (Facing.FaceDown _ listed) -> Just (Card.faceDownFace listed)
-  _ -> faceUpFaceOf oid gs
+faceOf oid gs = faceOfObject =<< lookupObject oid gs
+
+-- `faceOf` for a caller that already holds the object, and the function `faceOf`
+-- itself is written in terms of -- ONE lookup where the chain through
+-- faceUpFaceOf below took three (the facing, the card, and the object again for
+-- resolveFaceFor).
+--
+-- Worth its own name because the projection's CR 113.6 walks read a face per
+-- card in every hand and every library on every projection, and those lookups
+-- were most of what the walk cost; see #1935.
+--
+-- EXHAUSTIVE over Facing, where `faceOf` above could only be exhaustive over a
+-- Maybe: a third way for an object to be turned has to be classified here.
+faceOfObject :: Object.Object -> Maybe (Face Card)
+faceOfObject obj = case Object.facing obj of
+  Facing.FaceDown _ listed -> Just (Card.faceDownFace listed)
+  Facing.FaceUp -> fmap (resolveFaceFor (Just obj)) (cardOfSource (Just (Object.source obj)))
 
 -- CR 201.1 / 709.4a: the names of the object an id names -- `faceOf`'s plural
 -- companion, and the value Pawl.Engine.Projection.baseCharacteristics seeds

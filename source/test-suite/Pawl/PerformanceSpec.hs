@@ -25,6 +25,13 @@
 -- reaches every pass -- Combat.legalAttackers, Combat.legalBlockers,
 -- Mana.manaSources, Cast.castableSpells -- have no bound here (#717).
 --
+-- A THIRD FIXTURE guards a different axis: the size of the HIDDEN zones (CR
+-- 400.2). The two boards above build through Setup.emptyGame, whose hands and
+-- libraries are empty, so neither ceiling can see a per-library-card cost at
+-- all -- which is how CR 113.6b's hand and library walks (#1912) cost the suite
+-- 26% with nothing failing. boardWithLibrary below stocks both libraries and
+-- libraryCeilingBytesPerCard bounds the MARGINAL allocation per card in them.
+--
 -- Measured in BYTES ALLOCATED rather than in seconds. Allocation is a
 -- deterministic function of the code and its input: the same build measuring
 -- the same board allocates the same amount every run, on a loaded shared runner
@@ -67,6 +74,22 @@ import qualified Pawl.Types.Zone as Zone
 smallBoard, largeBoard :: Int
 smallBoard = 64
 largeBoard = 256
+
+-- The two LIBRARY sizes the hidden-zone measurement is taken at, per player.
+-- Their DIFFERENCE is what that measurement reads -- see
+-- libraryCeilingBytesPerCard -- so the pair only has to be far enough apart
+-- that a per-card cost is not rounded away, and 45 cards a side is more than
+-- enough. The larger is a constructed deck's library after an opening hand.
+smallLibrary, largeLibrary :: Int
+smallLibrary = 15
+largeLibrary = 60
+
+-- The battlefield boardWithLibrary holds while its libraries vary: fixed, so
+-- that everything the enumeration does per PERMANENT cancels out of the
+-- differential below. Small, because it is a cost this measurement pays twice
+-- and never reads.
+libraryBoardPermanents :: Int
+libraryBoardPermanents = 16
 
 -- `n` copies of a printing on the battlefield under alice, in her precombat
 -- main phase.
@@ -113,6 +136,44 @@ boardOf printing n =
 enumerationOver :: Printing.Printing -> Int -> Int
 enumerationOver printing n = length (Action.legalActions S.alice (boardOf printing n))
 {-# NOINLINE enumerationOver #-}
+
+-- boardOf's stocked twin: a FIXED battlefield of `permanent`, plus `n` cards of
+-- `libraryCard` in EACH player's library.
+--
+-- Both libraries, because Projection.gather's CR 113.6b walk is over every
+-- player's, not over the enumerating player's -- a fixture that stocked alice
+-- alone would measure half the walk and read a passing figure if the walk ever
+-- narrowed to one seat for the wrong reason.
+--
+-- The library card must have NO static ability of its own, which is the case
+-- #1935 was about: the walk reads the printed face of an ordinary card to find
+-- out that it states no zone, and pays that read on every projection. A library
+-- card that DID state a hidden zone would be gathered, and then the cost would
+-- be the rule rather than the lookup.
+boardWithLibrary :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
+boardWithLibrary permanent libraryCard n =
+  let addOne gs _ = snd (S.addCreature permanent S.alice gs)
+      stockOne gs pid = snd (S.addLibraryCard libraryCard pid gs)
+      board = List.foldl' addOne (Setup.emptyGame S.bothPlayers) [1 .. libraryBoardPermanents]
+      stocked = List.foldl' stockOne board (concat (replicate n [S.alice, S.bob]))
+   in stocked {GameState.phase = Phase.PrecombatMain}
+
+-- referenceActivations over a stocked-library board, forced. NOINLINE and
+-- taking the SIZE, for enumerationOver's reason.
+--
+-- The UNHOISTED path, deliberately, and this is the one choice the hidden-zone
+-- ceiling below rests on. Action.legalActions performs a CONSTANT number of
+-- whole-board projections, so it pays for a library once per enumeration and a
+-- ceiling read through it is nearly blind to library size -- it passed
+-- unchanged across the walks that cost the suite 26%. What the suite actually
+-- spends is many projections per board: Activate.activatable projects each
+-- object for itself, and a whole game does that at every priority window and
+-- every state-based-action sweep. So this measures a projection's OWN marginal
+-- cost per library card, multiplied up by a path that really does take one per
+-- object, which is the cost #1935 measured.
+referenceOverLibrary :: Printing.Printing -> Printing.Printing -> Int -> Int
+referenceOverLibrary permanent libraryCard n = length (referenceActivations S.alice (boardWithLibrary permanent libraryCard n))
+{-# NOINLINE referenceOverLibrary #-}
 
 -- `n` of EACH printing on the battlefield under alice, in her precombat main
 -- phase. boardOf's mixed twin, for the assertion that pins the enumeration's
@@ -262,6 +323,46 @@ ceilingBytesPerPermanent = 17500
 sorcererCeilingBytesPerPermanent :: Integer
 sorcererCeilingBytesPerPermanent = 235000
 
+-- The committed allocation ceiling on the HIDDEN-ZONE axis, in BYTES PER
+-- LIBRARY CARD -- a whole per-object gate pass's marginal cost of one more card
+-- in a library.
+--
+-- A DIFFERENTIAL, not a ratio and not a whole-board figure: it is
+-- (large - small) / (cards added), so every fixed cost of the fixture -- the
+-- empty game, the battlefield, the gate's own constant work -- cancels, and what
+-- is left is the per-library-card term and nothing else. That is the only shape
+-- that can see this axis at all, since the library term is a slice of a board
+-- the two absolute ceilings above are dominated by.
+--
+-- What it CANNOT cancel is building the extra cards themselves:
+-- S.addLibraryCard allocates an Object and a Map entry per card, inside the
+-- measured expression for boardOf's reason (a board hoisted out would be shared
+-- between the two readings and the differential would read as nothing at all).
+-- So this figure is fixture construction PLUS the walk, and construction is its
+-- floor.
+--
+-- THE BRACKET, all on GHC 9.10.3 / aarch64, and kept for its RATIOS:
+--
+--   * 1,475 with the CR 113.6b walks removed outright -- the floor, which is
+--     the fixture construction and nothing else.
+--   * 93,380 as it stands.
+--   * 422,972 with mayStateZone's card-level pre-filter taken away, so that
+--     every card in a library has a Face built for it.
+--   * 690,899 as #1936 landed the walks, which is 422,972 plus Game.faceOf's
+--     three lookups per card.
+--
+-- So 250,000 carries ~2.7x headroom over the reading -- comfortably more than
+-- the ~1.8x the two ceilings above have drifted across compiler versions -- and
+-- still fails on the walk as it landed, 2.8x under it. It does NOT catch losing
+-- the single-lookup faceOf alone, which the last two figures put at 1.6x; what
+-- holds that one is that Game.faceOf has no second implementation left to drift
+-- back into.
+--
+-- REGENERATED exactly as the two above are: run this test and read the observed
+-- figure out of the failure message.
+libraryCeilingBytesPerCard :: Integer
+libraryCeilingBytesPerCard = 250000
+
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "performance" $ do
   -- The discriminating fixture check. Everything else here asserts a number
@@ -367,3 +468,30 @@ spec s registry = Spec.describe s "performance" $ do
     large <- allocationsOf (enumerationOver sorcerer) largeBoard
     let perPermanent = large `div` toInteger largeBoard
     Spec.assertLeWith s ("observed " <> show perPermanent <> " bytes per permanent (" <> show large <> " bytes over " <> show largeBoard <> " permanents)") perPermanent sorcererCeilingBytesPerPermanent
+
+  -- The discriminating fixture check for the stocked-library board, and the one
+  -- the measurement below is worthless without: the libraries have to really
+  -- hold the cards, and the gate has to answer the SAME menu at both sizes. The
+  -- second half is what makes the differential a pure cost reading -- a library
+  -- card is not castable and not activatable, so every byte the larger board
+  -- allocates beyond the smaller one is spent finding that out.
+  Spec.it s "the stocked-library fixture really stocks both libraries and answers the same menu" $ do
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    giant <- S.printingOf s registry "Hill Giant"
+    let board = boardWithLibrary sorcerer giant
+        libraryOf pid n = length (Game.zoneMembers Zone.Library pid (board n))
+    Spec.assertEqWith s "each player's library holds one card per requested size" (fmap (\n -> fmap (`libraryOf` n) [S.alice, S.bob]) [smallLibrary, largeLibrary]) [[smallLibrary, smallLibrary], [largeLibrary, largeLibrary]]
+    Spec.assertEqWith s "the battlefield is the same size at both" (fmap (Set.size . GameState.battlefield . board) [smallLibrary, largeLibrary]) [libraryBoardPermanents, libraryBoardPermanents]
+    Spec.assertEqWith s "and the per-object gate answers one activation per permanent whatever the libraries hold" (fmap (referenceOverLibrary sorcerer giant) [smallLibrary, largeLibrary]) [libraryBoardPermanents, libraryBoardPermanents]
+
+  Spec.it s "a per-object projection stays within its committed ceiling per library card" $ do
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    giant <- S.printingOf s registry "Hill Giant"
+    _ <- allocationsOf (referenceOverLibrary sorcerer giant) 1
+    small <- allocationsOf (referenceOverLibrary sorcerer giant) smallLibrary
+    large <- allocationsOf (referenceOverLibrary sorcerer giant) largeLibrary
+    -- Two libraries grow, so the differential is over twice the size step.
+    let added = toInteger (2 * (largeLibrary - smallLibrary))
+        perCard = (large - small) `div` added
+    Spec.assertGtWith s "the larger board cost more than the smaller one" large small
+    Spec.assertLeWith s ("observed " <> show perCard <> " bytes per library card (" <> show large <> " bytes at " <> show largeLibrary <> " a side against " <> show small <> " at " <> show smallLibrary <> ")") perCard libraryCeilingBytesPerCard

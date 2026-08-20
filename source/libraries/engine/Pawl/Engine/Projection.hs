@@ -66,6 +66,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -1696,9 +1697,12 @@ anyConditional gs =
   let conditional oid = case Game.faceOf oid gs of
         Nothing -> False
         Just face -> any (Maybe.isJust . StaticAbility.condition) (Face.staticAbilities face)
-      conditionalStating zone oid = case Game.faceOf oid gs of
+      conditionalStating zone oid = case Game.lookupObject oid gs of
         Nothing -> False
-        Just face -> any (\sa -> Maybe.isJust (StaticAbility.condition sa) && statesZone zone sa) (Face.staticAbilities face)
+        Just obj | not (mayStateZone zone obj) -> False
+        Just obj -> case Game.faceOfObject obj of
+          Nothing -> False
+          Just face -> any (\sa -> Maybe.isJust (StaticAbility.condition sa) && statesZone zone sa) (Face.staticAbilities face)
    in any conditional (Set.toList (GameState.battlefield gs))
         || any conditional (Set.toList (GameState.command gs))
         || any conditional (GameState.stack gs)
@@ -1712,8 +1716,8 @@ anyConditional gs =
         -- state the zone is one gatherGiven's hidden walks cannot keep however
         -- the clause answers. Without the narrowing an ordinary Kird Ape in hand
         -- would buy a second whole-board walk on every projection.
-        || any (conditionalStating Zone.Hand) (zoneCards GameState.hand gs)
-        || any (conditionalStating Zone.Library) (zoneCards GameState.library gs)
+        || anyZoneCard GameState.hand (conditionalStating Zone.Hand) gs
+        || anyZoneCard GameState.library (conditionalStating Zone.Library) gs
 
 -- CR 604.2: is this static ability's "as long as" clause true right now?
 --
@@ -1780,7 +1784,7 @@ gatherGiven stripped functioning gs =
       static = concatMap (fmap snd . permanentParts stripped functioning setEffs gs) (abilitySources gs)
       fromEmblem emblemId = case Game.lookupObject emblemId gs of
         Nothing -> []
-        Just emblemObj -> case Game.faceOf emblemId gs of
+        Just emblemObj -> case Game.faceOfObject emblemObj of
           Nothing -> []
           Just face ->
             -- CR 114.4 / 113.6: an emblem's abilities function in the command
@@ -1790,7 +1794,7 @@ gatherGiven stripped functioning gs =
       emblems = concatMap fromEmblem (Set.toList (GameState.command gs))
       fromSpell spellId = case Game.lookupObject spellId gs of
         Nothing -> []
-        Just spellObj -> case Game.faceOf spellId gs of
+        Just spellObj -> case Game.faceOfObject spellObj of
           Nothing -> []
           Just face ->
             -- CR 604.2's second limb and CR 113.6: an instant's or sorcery's
@@ -1814,7 +1818,7 @@ gatherGiven stripped functioning gs =
       spells = concatMap fromSpell (GameState.stack gs)
       fromGraveyardCard cardId = case Game.lookupObject cardId gs of
         Nothing -> []
-        Just cardObj -> case Game.faceOf cardId gs of
+        Just cardObj -> case Game.faceOfObject cardObj of
           Nothing -> []
           Just face ->
             -- CR 113.6f: an ability that restricts or modifies which zones its
@@ -1853,19 +1857,25 @@ gatherGiven stripped functioning gs =
       -- shares the card's own timestamp. Never stripped, for the emblem
       -- branch's reason.
       --
-      -- No index stands in front of these two walks, so every card in every
-      -- library has its face read on every projection (#1935).
+      -- Walked on EVERY projection, once per card in every hand and every
+      -- library, so what the walk costs per card is the whole of what it costs:
+      -- mayStateZone below settles the common card without building a face, and
+      -- Game.faceOfObject takes one lookup where the chain through Game.faceOf
+      -- took three. Pawl.PerformanceSpec's per-library-card ceiling is what
+      -- holds both -- see #1935, which measured the walk at 26% of the suite
+      -- before them.
       --
       -- Not implemented: exile gets no arm of its own, so a stated set naming it
       -- is ignored -- Grist's does (gap #1933).
       fromHiddenCard zone cardId = case Game.lookupObject cardId gs of
         Nothing -> []
-        Just cardObj -> case Game.faceOf cardId gs of
+        Just cardObj | not (mayStateZone zone cardObj) -> []
+        Just cardObj -> case Game.faceOfObject cardObj of
           Nothing -> []
           Just face ->
             concat [gatherStatic (functioning cardId) cardId (Object.timestamp cardObj) [] False n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), statesZone zone sa]
-      hands = concatMap (fromHiddenCard Zone.Hand) (zoneCards GameState.hand gs)
-      libraries = concatMap (fromHiddenCard Zone.Library) (zoneCards GameState.library gs)
+      hands = foldZoneCards GameState.hand (fromHiddenCard Zone.Hand) gs
+      libraries = foldZoneCards GameState.library (fromHiddenCard Zone.Library) gs
       counters = counterGathered gs
       designations = designationGathered gs
    in stored <> static <> emblems <> spells <> graveyards <> hands <> libraries <> counters <> designations
@@ -1902,13 +1912,47 @@ functionsFromZone zone sa =
 statesZone :: Zone.Zone -> StaticAbility.StaticAbility card -> Bool
 statesZone zone = Set.member zone . StaticAbility.functionsFrom
 
--- Every card in one per-player zone, across every player.
-zoneCards :: (GameState -> Map PlayerId.PlayerId (Seq.Seq ObjectId)) -> GameState -> [ObjectId]
-zoneCards field = foldMap (foldr (:) []) . Map.elems . field
+-- statesZone asked of an object's CARD rather than of the face it is showing:
+-- could any face this object might be showing state `zone`?
+--
+-- A SUPERSET, and that is the whole of its correctness argument. Every face an
+-- object shows is one of its card's faces (CR 709.3b, CR 712.8a, CR 715.4) or a
+-- merge of several (CR 709.4's combined view, CR 709.5's subtracted one), and
+-- Card.merge2 builds a merge out of the halves' own fields -- so no shown face
+-- carries a static ability that no printed face carries. A True answer decides
+-- nothing; a False answer means the exact test below cannot keep anything.
+--
+-- Here because it is CHEAP where the exact test is not: a field read and a fold
+-- over the printed faces, against BUILDING the face the object shows --
+-- Game.resolveFaceFor's layout case, a NonEmpty, and Card.foldSplit's merge.
+-- gatherGiven's hidden walks read it once per card in every hand and every
+-- library on every projection, so that difference is the walk; see #1935.
+--
+-- A FACE-DOWN object is the one case it cannot narrow, and it does not try: CR
+-- 708.2's substituted face comes from the ability that turned the object down
+-- rather than from its card, so this answers True and leaves the work to the
+-- exact test in gatherGiven.
+mayStateZone :: Zone.Zone -> Object.Object -> Bool
+mayStateZone zone obj = case Object.facing obj of
+  Facing.FaceDown _ _ -> True
+  Facing.FaceUp -> case Game.cardOfSource (Just (Object.source obj)) of
+    Nothing -> False
+    Just card -> any (any (statesZone zone) . Face.staticAbilities) (Card.Type.faces card)
+
+-- Fold over every card in one per-player zone, across every player, WITHOUT
+-- materializing the ids: gatherGiven walks the two hidden zones on every
+-- projection, and a list of every card in every library allocated and thrown
+-- away each time is the other half of what #1935 measured. anyZoneCard below is
+-- the `any` companion, which short-circuits and so cannot go through a Monoid.
+foldZoneCards :: (Monoid m) => (GameState -> Map PlayerId.PlayerId (Seq.Seq ObjectId)) -> (ObjectId -> m) -> GameState -> m
+foldZoneCards field f = foldMap (foldMap f) . field
+
+anyZoneCard :: (GameState -> Map PlayerId.PlayerId (Seq.Seq ObjectId)) -> (ObjectId -> Bool) -> GameState -> Bool
+anyZoneCard field p = any (any p) . field
 
 -- Every card in every graveyard.
 graveyardCards :: GameState -> [ObjectId]
-graveyardCards = zoneCards GameState.graveyard
+graveyardCards = foldMap (foldr (:) []) . Map.elems . GameState.graveyard
 
 -- CR 113.6f's classification, one keyword at a time: does rule 702 turn this
 -- keyword into a permission to cast the object it is on from somewhere? The face
