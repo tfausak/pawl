@@ -2253,6 +2253,72 @@ evaluateForRecipient viewOf context gs announcedOn source pid quantity =
     source
     (Quantity.forCandidate pid quantity)
 
+-- The objects a slot holds as a BINDING: the whole GROUP an earlier effect of
+-- this resolution bound, or the single object bound in its place -- the two
+-- shapes every binder dispatches between on how many objects it named. Nothing
+-- where the slot holds neither, which the MoveToZone InSlot gather reads as
+-- "then look at the targets".
+--
+-- Read AHEAD of the caller's legal-target map: a group binding is a definition,
+-- never a target (CR 115.10a), so it owes CR 608.2b nothing. `slotOne` and not
+-- objectRefObjects, since slotOne is what lets a slot an EARLIER EFFECT OF THIS
+-- SAME RESOLUTION bound name its object here; a slot the `chosen` map mentions
+-- was targeted, so it is left to the target path behind CR 608.2b's
+-- re-validation.
+slotBoundObjects :: ObjectId -> Map.Map SlotName (Set Recipient) -> SlotName -> Game (Maybe [ObjectId])
+slotBoundObjects resolving chosen slot = do
+  group <- State.gets (slotGroup slot resolving)
+  case group of
+    -- Mint order, which CR 608.2f leaves standing.
+    Just objects -> pure (Just (Foldable.toList objects))
+    Nothing -> do
+      bound <- if Map.member slot chosen then pure Nothing else State.gets (slotOne slot resolving)
+      pure (fmap (: []) bound)
+
+-- The printed "from among them", a CR 608.2d choice: the candidates are the
+-- members of a GROUP an earlier clause of this resolution bound rather than a
+-- zone's contents, which is the whole difference from the zone-keyed choices --
+-- and the reason a batch CR 701.20a's reveal or CR 701.20e's look left in the
+-- LIBRARY is reachable at all (CR 701.20b), there being no filtered sweep of a
+-- library (#1309).
+--
+-- ONE function rather than one per opcode, because it is ONE choice: Carth the
+-- Lion's "you may reveal a planeswalker card from among them and put it into
+-- your hand" reveals and moves the SAME card, so the reveal asks this and binds
+-- what it showed, and the move reads that binding. Two opcodes each asking their
+-- own would be two independent choices, which the printed "and" forbids.
+--
+-- The candidates are read from the state the instruction is reached in (CR
+-- 608.2c) through slotBoundObjects, so every reader of the group sees the same
+-- members. Narrowed by the ref's own Filter, matched in THIS EFFECT's context (CR
+-- 109.5's "you" is the resolving controller), against the CR 613 projection -- so
+-- a card a continuous effect made a creature is a creature card here.
+--
+-- WHO is asked is the resolving controller and only ever them (CR 608.2d, #1957).
+-- Elided at one candidate and skipped at none (CR 101.3, CR 609.3). Filtered, not
+-- trusted: an answer naming a card never offered falls back to the first
+-- candidate. At most one object comes back, which is #1956's count read as one.
+chooseCardFromAmong ::
+  ObjectId ->
+  ObjectId ->
+  PlayerId ->
+  Map.Map SlotName (Set Recipient) ->
+  Map.Map SlotName (Set Recipient) ->
+  ChosenCardFromAmong.ChosenCardFromAmong ->
+  Game [ObjectId]
+chooseCardFromAmong resolving source controller legal chosen (ChosenCardFromAmong.MkChosenCardFromAmong slot filter_) = do
+  members <- fmap (Maybe.fromMaybe []) (slotBoundObjects resolving chosen slot)
+  gs <- State.get
+  let context = effectContext controller source legal (slotGroups resolving gs)
+      candidates = filter (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_) members
+  case candidates of
+    [] -> pure []
+    [only] -> pure [only]
+    first : second : more -> do
+      let offered = first NonEmpty.:| (second : more)
+      answer <- Game.choose (Prompt.ChooseCardFromAmong (Decide.deciderFor controller gs) controller source offered)
+      pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
+
 -- One effect, applied, wrapped in the window CR 607.2a's link is filed from:
 -- what was in exile before, and what is in it after.
 applyEffectWith :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Effect Card.Type.Card -> Game ()
@@ -2883,20 +2949,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- reads as "then look at the targets".
         --
         -- Read AHEAD of `legal` and shared with the choice ChosenCardFromAmong
-        -- makes among the same members: a group binding is a definition, never a
-        -- target (CR 115.10a), so it owes CR 608.2b nothing. `slotOne` and not
-        -- objectRefObjects, since slotOne is what lets a slot an EARLIER EFFECT OF
-        -- THIS SAME RESOLUTION bound name its object here; a slot `chosen`
-        -- mentions was targeted, so it is left to the target path behind CR
-        -- 608.2b's re-validation.
-        boundObjects slot = do
-          group <- State.gets (slotGroup slot resolving)
-          case group of
-            -- Mint order, which CR 608.2f leaves standing.
-            Just objects -> pure (Just (Foldable.toList objects))
-            Nothing -> do
-              bound <- if Map.member slot chosen then pure Nothing else State.gets (slotOne slot resolving)
-              pure (fmap (: []) bound)
+        -- makes among the same members, wherever that choice is made -- see
+        -- slotBoundObjects, which is the one function that answers it.
+        boundObjects = slotBoundObjects resolving chosen
         -- CR 400.7j: bind what arrived into the resolving object's live bindings,
         -- where a later effect of this resolution or a delayed ability it arms
         -- (CR 603.7c) can name it. The shape follows how many arrived: one takes
@@ -3021,42 +3076,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
               fmap concat . Monad.mapM (\pid -> ask pid (handCardsOf (chooseContext gs) gs pid filter_)) $
                 handChoosers legal controller gs player
-            -- The printed "from among them", a CR 608.2d choice: the candidates
-            -- are the members of a GROUP an earlier clause of this resolution
-            -- bound rather than a zone's contents, which is the whole difference
-            -- from the two arms above -- and the reason a batch CR 701.20a's
-            -- reveal or CR 701.20e's look left in the LIBRARY is reachable at all
-            -- (CR 701.20b), there being no filtered sweep of a library (#1309).
-            --
-            -- The candidates are read from the pre-move state (CR 608.2c) through
-            -- the same boundObjects the InSlot gather reads, so the choice and
-            -- "the rest" cannot see different groups. Narrowed by the ref's own
-            -- Filter, matched in THIS EFFECT's context (CR 109.5's "you" is the
-            -- resolving controller), against the CR 613 projection -- so a card a
-            -- continuous effect made a creature is a creature card here.
-            --
-            -- WHO is asked is the resolving controller and only ever them (CR
-            -- 608.2d, #1957). Elided at one candidate and skipped at none (CR
-            -- 101.3, CR 609.3). Filtered, not trusted: an answer naming a card
-            -- never offered falls back to the first candidate.
+            -- The printed "from among them", a CR 608.2d choice, asked by
+            -- chooseCardFromAmong -- which is where the rule lives, this opcode
+            -- and CR 701.20a's reveal being the two that ask it. The candidates
+            -- come off the pre-move state (CR 608.2c) through the same
+            -- slotBoundObjects the InSlot gather reads, so the choice and "the
+            -- rest" cannot see different groups.
             --
             -- ONE card: what the group has left over is not named here at all.
             -- "The rest" is the same slot read by ObjectRef.InSlot in a LATER
             -- clause, which finds the chosen card gone -- CR 400.7 minted a new
             -- object for it on the way to its new zone, and the id the group still
             -- holds resolves to nothing, so moveOne passes over it.
-            ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong slot filter_) -> do
-              members <- fmap (Maybe.fromMaybe []) (boundObjects slot)
-              gs <- State.get
-              let context = chooseContext gs
-                  candidates = filter (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_) members
-              case candidates of
-                [] -> pure []
-                [only] -> pure [only]
-                first : second : more -> do
-                  let offered = first NonEmpty.:| (second : more)
-                  answer <- Game.choose (Prompt.ChooseCardFromAmong (Decide.deciderFor controller gs) controller source offered)
-                  pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
+            ObjectRef.ChosenCardFromAmong from -> chooseCardFromAmong resolving source controller legal chosen from
             -- Not implemented: a card moved at random out of a hand, CR 701.9b's
             -- random discard. Nothing moves it here, so a card writing the ref
             -- under this opcode names no object; the count and that rule's other
@@ -3286,6 +3318,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               answer <- Game.ask (Prompt.RandomObject offered)
               showOne pid $
                 if List.elem answer (NonEmpty.toList offered) then answer else first
+      -- CR 608.2d's "from among them", the ONE choice the printed "reveal ... and
+      -- put it into your hand" makes: chooseCardFromAmong asks it, this arm shows
+      -- what it named (CR 701.20a), and mSlot below is what a later clause moves
+      -- -- so the card revealed and the card moved cannot come apart. Asked here
+      -- rather than read, which is why it is not among the refs objectRefObjects
+      -- answers.
+      ObjectRef.ChosenCardFromAmong from -> do
+        picked <- chooseCardFromAmong resolving source controller legal chosen from
+        Monad.mapM_ (showOne controller) picked
       _ -> do
         let named = objectRefObjects legal resolving controller source gs ref
         Monad.mapM_ (Event.reveal RevealCause.Ordinary controller) named

@@ -34,12 +34,13 @@
 -- Carth the Lion -- {2}{B}{G} Legendary Creature -- Human Warrior, 3/5 -- is the
 -- CombinedLoyaltyCost group's alone: it is the one card in the pool that adds a
 -- loyalty cost to somebody else's loyalty ability, which is what makes CR 606.5
--- observable. Two things about pawl's Carth are not the printed card. Its
--- triggered ability is not transcribed at all (gap #1699), and its "loyalty
+-- observable. Only the second sentence is read here; the first -- the
+-- enters-or-planeswalker-dies trigger -- is Pawl.MassEffectSpec's CarthTheLion
+-- group. One thing about pawl's Carth is not the printed card: its "loyalty
 -- abilities" is transcribed as "abilities of a planeswalker", because
 -- AddActivationCost.whichAbilities filters the ability's source permanent rather
--- than the ability (gap #1698). Both leave the tax at least as expensive as
--- printed, so neither can make an activation legal that the real card refuses.
+-- than the ability (gap #1698). That leaves the tax at least as expensive as
+-- printed, so it cannot make an activation legal that the real card refuses.
 module Pawl.PlaneswalkerSpec where
 
 import qualified Control.Monad as Monad

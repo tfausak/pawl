@@ -217,6 +217,11 @@ data Prompt r where
   --
   -- The PlayerId is the resolving controller, the only seat that chooses today
   -- (#1957). Raised only for two or more candidates.
+  --
+  -- ONE prompt however many opcodes read the answer: Carth the Lion's "you may
+  -- reveal a planeswalker card from among them and put it into your hand" asks
+  -- this at the reveal and moves what the reveal bound, so the printed "and"
+  -- stays one choice rather than two.
   ChooseCardFromAmong :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 309.5a \/ 701.49b: which arrow a venturing player follows. The
   -- ObjectId is the dungeon card their marker is on; the NonEmpty is the rooms
