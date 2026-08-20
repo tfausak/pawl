@@ -591,6 +591,46 @@ hasteSpec s registry = Spec.describe s "Haste" $ do
         (_, enchanted) = S.addCreature crossroads S.alice (justArrived gs)
         after = snd (Engine.runGamePure S.aggressiveAnswer enchanted (Combat.declareAttackers S.alice))
     Spec.assertEqWith s "attacks anyway" (declaredAttackers after) mine
+  -- CR 113.6b, the zone half of the same contrast. Anger's ability states where
+  -- it functions -- "as long as this card is in your graveyard and you control a
+  -- Mountain, creatures you control have haste" -- so the three boards below
+  -- differ in exactly one thing each: the first pair in which zone Anger's card
+  -- sits, the second pair in whether alice controls a Mountain. Anger is never a
+  -- creature alice can attack with in the graveyard boards, so the Piker is the
+  -- only attacker either reading could produce.
+  Spec.it s "CR 113.6b Anger in the graveyard grants haste, so a summoning-sick Piker attacks" $ do
+    anger <- S.printingOf s registry "Anger"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [piker] [piker]
+        (_, withMountain) = S.addCreature mountain S.alice (justArrived gs)
+        (_, buried) = S.addGraveyardCard anger S.alice withMountain
+        after = snd (Engine.runGamePure S.aggressiveAnswer buried (Combat.declareAttackers S.alice))
+    Spec.assertEqWith s "attacks anyway" (declaredAttackers after) mine
+  -- CR 113.6b's "only": on the battlefield the very same printed ability grants
+  -- nothing, so the Piker is stuck. Anger itself has printed haste and attacks
+  -- from either reading, which is why the assertion names the Piker rather than
+  -- counting the declaration.
+  Spec.it s "CR 113.6b the same ability on the battlefield grants nothing" $ do
+    anger <- S.printingOf s registry "Anger"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [piker] [piker]
+        (_, withMountain) = S.addCreature mountain S.alice (justArrived gs)
+        (_, onBattlefield) = S.addCreature anger S.alice withMountain
+        after = snd (Engine.runGamePure S.aggressiveAnswer onBattlefield (Combat.declareAttackers S.alice))
+    case mine of
+      [pikerId] -> Spec.assertBool s (notElem pikerId (declaredAttackers after)) "the Piker still cannot attack"
+      _ -> Spec.assertFailure s "fixture should have one creature"
+  -- CR 604.2's clause is still asked, and asked of a source in a GRAVEYARD: drop
+  -- the Mountain and the graveyard board above stops granting.
+  Spec.it s "CR 604.2 without a Mountain the graveyard ability grants nothing" $ do
+    anger <- S.printingOf s registry "Anger"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, _, _) = S.combatBoardOf [piker] [piker]
+        (_, buried) = S.addGraveyardCard anger S.alice (justArrived gs)
+        after = snd (Engine.runGamePure S.aggressiveAnswer buried (Combat.declareAttackers S.alice))
+    Spec.assertEqWith s "cannot attack" (declaredAttackers after) []
   Spec.it s "CR 702.10b a hasty creature and a sick one, in the same declaration" $ do
     -- Both sick; only the Chariot may attack. A blanket "sickness ignored"
     -- bug would let both through.

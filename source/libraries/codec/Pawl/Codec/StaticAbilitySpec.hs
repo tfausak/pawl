@@ -1,6 +1,7 @@
 module Pawl.Codec.StaticAbilitySpec where
 
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.StaticAbility as StaticAbility
 import qualified Pawl.Json.Value as Value
@@ -39,7 +40,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
     Common.assertCodec
       s
       codec
-      (StaticAbility.MkStaticAbility Affected.Attached Nothing Nothing (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying)))
+      (StaticAbility.MkStaticAbility Affected.Attached Nothing Set.empty Nothing (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying)))
       " {\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Flying\"}}]} "
   -- Humility's shape: several parts under one affected set (CR 613.6).
   Spec.it s "several parts" $
@@ -49,6 +50,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
       ( StaticAbility.MkStaticAbility
           Affected.Attached
           Nothing
+          Set.empty
           Nothing
           (Modification.LoseAllAbilities NonEmpty.:| [Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1))])
       )
@@ -72,6 +74,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
                   )
               )
           )
+          Set.empty
           Nothing
           (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying))
       )
@@ -86,10 +89,26 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
       ( StaticAbility.MkStaticAbility
           Affected.Attached
           Nothing
+          Set.empty
           (Just Duration.UntilEndOfTurn)
           (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying))
       )
       " {\"affected\":{\"type\":\"Attached\"},\"lingers\":{\"type\":\"UntilEndOfTurn\"},\"modifications\":[{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Flying\"}}]} "
+  -- CR 113.6b's zone clause, Anger's shape. Optional for the condition's
+  -- reason, and the two cases above pin the absent half: an encoder that always
+  -- emitted the key would rewrite every card already committed.
+  Spec.it s "a stated set of zones" $
+    Common.assertCodec
+      s
+      codec
+      ( StaticAbility.MkStaticAbility
+          Affected.Attached
+          Nothing
+          (Set.fromList [Zone.Graveyard, Zone.Stack])
+          Nothing
+          (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying))
+      )
+      " {\"affected\":{\"type\":\"Attached\"},\"functionsFrom\":[{\"type\":\"Graveyard\"},{\"type\":\"Stack\"}],\"modifications\":[{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Flying\"}}]} "
   -- CR 613.6 is why a static ability is one affected set and one or more parts, so
   -- the wire format is an array -- and an array can be empty. An ability with
   -- no parts does nothing, which no card means, so it is a decode FAILURE

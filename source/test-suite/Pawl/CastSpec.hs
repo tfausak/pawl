@@ -1519,9 +1519,12 @@ fireboltSpec s registry = Spec.describe s "Firebolt" $ do
 -- Viral Spawning {2}{G} Sorcery is the producer: "Create a 3/3 green Phyrexian
 -- Beast creature token with toxic 1." plus "Corrupted -- As long as an opponent
 -- has three or more poison counters and this card is in your graveyard, it has
--- flashback {2}{G}." Its static ability functions in the graveyard by CR 113.6f,
+-- flashback {2}{G}." Its static ability functions in the graveyard by CR 113.6b,
+-- which the card's own text states ("this card is in your graveyard") and its
+-- functionsFrom carries; CR 113.6f would put the same ability there anyway,
 -- since the keyword it grants is one that says which zone the card may be cast
--- from.
+-- from, but CR 113.6b's "only" is what also keeps it OFF the stack while the
+-- card is a spell.
 --
 -- The pair of boards differs in ONE number, the opponent's poison count, so the
 -- branch cannot flip on mana, timing, the stack or the card. Three poison
