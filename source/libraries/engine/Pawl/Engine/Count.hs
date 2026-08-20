@@ -393,20 +393,16 @@ playersFor context gs ref =
 -- recorded rather than from any object that may no longer exist.
 --
 -- The snapshot fills the characteristic fields it records (see viewOfSnapshot
--- below): card types, colours, subtypes, keywords (CR 109.3 counts abilities
--- among an object's characteristics), power and mana value. Everything that is
--- not a characteristic is vacuously empty over a past event -- identity and
--- playerIdentity are Nothing, and combat status, attachment, tap status and
--- what the object did this turn are all False.
+-- below): card types, supertypes, colours, subtypes, keywords (CR 109.3 counts
+-- abilities among an object's characteristics), power and mana value.
+-- Everything that is not a characteristic is vacuously empty over a past event
+-- -- identity and playerIdentity are Nothing, and combat status, attachment,
+-- tap status and what the object did this turn are all False.
 --
 -- `controller` and `token` are the exceptions, and neither is a characteristic
 -- (CR 109.3 / CR 111.6), so neither can ride the snapshot. Each arm answers
 -- them for itself: CR 601.2a makes the player who cast a spell its controller,
 -- and a move reads CR 608.2h's record filed under the id it left behind.
---
--- `supertypes` is the odd one out: it IS a characteristic and
--- ProjectedCharacteristics records it, but this view leaves it empty, so a
--- supertype filter over a past event answers False (#646).
 snapshotView :: GameState -> EventShape.EventShape -> GameEvent.GameEvent -> Maybe Filter.View
 snapshotView gs shape event = case event of
   GameEvent.Moved (Moved.MkMoved zc snapshot) -> case shape of
@@ -518,7 +514,11 @@ viewOfSnapshot mController isToken snapshot =
       -- object's names were AT THE EVENT, which is the whole point of a snapshot.
       Filter.names = PC.names snapshot,
       Filter.cardTypes = PC.cardTypes snapshot,
-      Filter.supertypes = Set.empty,
+      -- CR 205.4a off the snapshot, beside the card types it qualifies: a
+      -- supertype IS a characteristic (CR 109.3), so a past event has a real
+      -- answer to give and Relic Runner's "historic" reads the Legendary
+      -- disjunct off it (Pawl.CountSpec).
+      Filter.supertypes = PC.supertypes snapshot,
       Filter.colors = PC.colors snapshot,
       Filter.subtypes = PC.subtypes snapshot,
       Filter.keywords = Map.keysSet (PC.keywords snapshot),
@@ -534,10 +534,9 @@ viewOfSnapshot mController isToken snapshot =
       Filter.manaValue = PC.manaValue snapshot,
       Filter.controller = mController,
       -- CR 108.3: an owner is read off an OBJECT, and a ProjectedCharacteristics
-      -- carries none -- the position `supertypes` and `counters` below are in
-      -- (#646). Unlike those two the fact does not change, and the Moved arm's
-      -- CR 608.2h record would be the place to keep it, but no field of it holds
-      -- one (#1069).
+      -- carries none -- the position `counters` below is in (#993). Unlike that
+      -- one the fact does not change, and the Moved arm's CR 608.2h record would
+      -- be the place to keep it, but no field of it holds one (#1069).
       Filter.owner = Nothing,
       Filter.identity = Nothing,
       Filter.playerIdentity = Nothing,
@@ -559,15 +558,15 @@ viewOfSnapshot mController isToken snapshot =
       Filter.tapped = False,
       -- CR 122.1: a ProjectedCharacteristics records no counters -- CR 613.4c
       -- has already folded them into the power and toughness above -- so a past
-      -- event carries none to read, the position `supertypes` is in (#646). The
+      -- event carries none to read. The
       -- Moved arm's CR 608.2h record does carry them, and is not read for them:
       -- no card in the pool asks an event snapshot for a counter tally, so a
       -- quantity that does is still answered 0 (#993).
       Filter.counters = Map.empty,
       -- CR 701.54b: a designation, which a ProjectedCharacteristics does not carry
       -- and never could -- CR 109.3's characteristic list has no room for one. So a
-      -- past event records none, the position `supertypes` and `counters` are in
-      -- (#646). Nothing rather than a remembered player: an event snapshot is not
+      -- past event records none, the position `counters` is in (#993). Nothing
+      -- rather than a remembered player: an event snapshot is not
       -- an object, and "is your Ring-bearer" is a question about a permanent on the
       -- battlefield now (CR 701.54e), not about one at the moment of an event.
       Filter.ringBearerFor = Nothing,

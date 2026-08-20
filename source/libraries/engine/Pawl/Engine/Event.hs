@@ -3720,8 +3720,7 @@ declarationsOf bearer gs =
 -- applied to each earlier cast too. Each earlier one is read through
 -- Count.snapshotView, the CR 608.2h snapshot its event recorded, because CR
 -- 601.2a's stack incarnation is long gone for every cast but the one being
--- matched; that view answers a supertype filter False (gap #646), which no
--- printed ordinal trigger asks about.
+-- matched.
 --
 -- POSITIONAL rather than a count of the whole log. CR 601.2i files the cast
 -- before CR 603.2 checks the condition against it, so the log already holds this

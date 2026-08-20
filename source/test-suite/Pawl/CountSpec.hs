@@ -12,6 +12,7 @@ module Pawl.CountSpec where
 
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Binding as Binding
@@ -359,6 +360,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   roothaSpec s registry
   tyranidInvasionSpec s registry
   oreskosExplorerSpec s registry
+  relicRunnerSpec s registry
 
 -- CR 608.2i read over CR 601.2i's event: "for each spell you've cast this
 -- turn", the first count whose scope is a shape of event that is NOT a zone
@@ -823,3 +825,114 @@ findsWhatItCan :: Prompt.Prompt r -> r
 findsWhatItCan p = case p of
   Prompt.SearchLibrary _ _ matches cap -> List.genericTake cap matches
   _ -> S.identityAnswer p
+
+-- CR 608.2i read over CR 601.2i's record of a CAST, with a SUPERTYPE in the
+-- filter. GAMEPLAY LEVEL for the Aetherflux group's reason, and through the
+-- whole combat phase besides: what it proves is that the snapshot CR 608.2h
+-- filed as each spell became cast still answers "was it legendary?", which a
+-- stubbed ViewOf would prove nothing about.
+--
+-- Relic Runner, DOM 62, {1}{U} Creature -- Human Rogue 2/1: "This creature can't
+-- be blocked if you've cast a historic spell this turn." CR 700.6 defines
+-- historic as "the legendary supertype, the artifact card type, or the Saga
+-- subtype", which is why this card reaches a supertype at all -- the printed
+-- template says historic where pawl's filter says HasSupertype Legendary, and
+-- no card prints the word "legendary" beside "this turn".
+--
+-- The card states the gate the other way round from
+-- Pawl.Types.CantBeBlockedBy's `unless`, which is CR 508.1c's "unless" and the
+-- only gate shape a combat restriction has. "Can't be blocked IF you've cast
+-- one" is written as "can't be blocked UNLESS you've cast none" -- the two are
+-- the same predicate, since the count is a Natural and Comparison.AtMost 0 is
+-- exactly the negation of AtLeast 1.
+--
+-- `blockers` is the empty conjunction, matching every candidate: CR 509.1a lets
+-- only creatures be declared as blockers, so "can't be blocked" and "can't be
+-- blocked by any creature" name the same set. Questing Beast, the sibling
+-- producer, is where that field carries a real description.
+--
+-- FOUR boards differing in exactly one thing -- which single spell alice cast in
+-- her precombat main phase -- and every leg runs the real steps from that main
+-- phase through combat damage, so the block is declared and rejected by
+-- Pawl.Engine.Combat rather than asked of it. All four casts are paid out of the
+-- same four Swamps, and the two {1}{B}{B} creature spells differ in nothing an
+-- assertion here reads except the Legendary supertype:
+--
+--   nothing cast          the Piker blocks, both 2/1s trade, bob stays at 20
+--   Legions of Lim-Dul    likewise -- a Zombie is not historic
+--   Kalakscion            legendary: no legal block, bob falls to 18
+--   Arcbound Worker       an artifact: the same, through the other disjunct
+--
+-- The Arcbound Worker leg is the control for the wiring rather than for this
+-- unit: its disjunct is HasCardType, which the snapshot has always answered. It
+-- passes on a tree where the supertype is thrown away, and the Kalakscion leg is
+-- the one that does not.
+relicRunnerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+relicRunnerSpec s registry =
+  let -- combatBoardOf's board rewound to the precombat main phase, with the
+      -- declare attackers step put back at the head of the schedule so the
+      -- engine reaches it on its own. The defending player combatBoardOf states
+      -- outright stands, CR 703.4h's beginning of combat step not being on the
+      -- schedule.
+      board relicRunner piker swamp =
+        let (gs0, _, _) = S.combatBoardOf [relicRunner] [piker]
+         in (S.landsFor swamp S.alice 4 gs0)
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.priority = Just S.alice,
+                GameState.remaining = Phase.Combat CombatStep.DeclareAttackers Seq.<| GameState.remaining gs0
+              }
+      -- One spell into alice's hand, cast, and the stack run down.
+      castOne printing gs =
+        let (oid, gs1) = S.addHandCard printing S.alice gs
+            cast = S.runPure S.identityAnswer gs1 (S.cast S.alice oid)
+         in S.runPure S.identityAnswer cast Engine.priorityLoop
+      -- Whole steps until the combat phase is over. aggressiveAnswer attacks
+      -- with everything it is offered and blocks the first attacker with
+      -- everything, so the declaration under test is the widest one bob can
+      -- make.
+      throughCombat gs0 =
+        let go n g =
+              if n <= (0 :: Int) || GameState.phase g == Phase.PostcombatMain
+                then g
+                else go (n - 1) (S.runPure S.aggressiveAnswer g Engine.runStep)
+         in go 12 gs0
+   in Spec.describe s "Relic Runner" $ do
+        Spec.it s "CR 700.6 a LEGENDARY spell cast this turn is historic, and the block is illegal" $ do
+          relicRunner <- S.printingOf s registry "Relic Runner"
+          piker <- S.printingOf s registry "Goblin Piker"
+          swamp <- S.printingOf s registry "Swamp"
+          kalakscion <- S.printingOf s registry "Kalakscion, Hunger Tyrant"
+          let after = throughCombat (castOne kalakscion (board relicRunner piker swamp))
+          Spec.assertEqWith s "bob is dealt 2 by an unblocked Runner" (S.lifeOf S.bob after) (Just 18)
+          Spec.assertEqWith s "bob's blocker never traded" (S.creaturesInPlay S.bob after) 1
+          Spec.assertEqWith s "and the Runner lived, beside the Crocodile" (S.creaturesInPlay S.alice after) 2
+        Spec.it s "CR 205.4a a NONlegendary spell of the same cost and colour is not historic" $ do
+          -- The discriminating twin: Legions of Lim-Dul is {1}{B}{B} like
+          -- Kalakscion, is no artifact and no Saga, and differs from it in the
+          -- Legendary supertype and nothing this case reads.
+          relicRunner <- S.printingOf s registry "Relic Runner"
+          piker <- S.printingOf s registry "Goblin Piker"
+          swamp <- S.printingOf s registry "Swamp"
+          legions <- S.printingOf s registry "Legions of Lim-Dûl"
+          let after = throughCombat (castOne legions (board relicRunner piker swamp))
+          Spec.assertEqWith s "bob takes nothing: the block stood" (S.lifeOf S.bob after) (Just 20)
+          Spec.assertEqWith s "his blocker traded with the Runner" (S.creaturesInPlay S.bob after) 0
+          Spec.assertEqWith s "leaving alice the Zombie alone" (S.creaturesInPlay S.alice after) 1
+        Spec.it s "CR 509.1b with no spell cast at all the Runner is blocked" $ do
+          -- The floor: the restriction is gated, not unconditional.
+          relicRunner <- S.printingOf s registry "Relic Runner"
+          piker <- S.printingOf s registry "Goblin Piker"
+          swamp <- S.printingOf s registry "Swamp"
+          let after = throughCombat (board relicRunner piker swamp)
+          Spec.assertEqWith s "bob takes nothing" (S.lifeOf S.bob after) (Just 20)
+          Spec.assertEqWith s "the two 2/1s traded" (S.creaturesInPlay S.bob after) 0
+          Spec.assertEqWith s "on both sides" (S.creaturesInPlay S.alice after) 0
+        Spec.it s "CR 700.6 an ARTIFACT spell is historic too, through the other disjunct" $ do
+          relicRunner <- S.printingOf s registry "Relic Runner"
+          piker <- S.printingOf s registry "Goblin Piker"
+          swamp <- S.printingOf s registry "Swamp"
+          worker <- S.printingOf s registry "Arcbound Worker"
+          let after = throughCombat (castOne worker (board relicRunner piker swamp))
+          Spec.assertEqWith s "bob is dealt 2" (S.lifeOf S.bob after) (Just 18)
+          Spec.assertEqWith s "bob's blocker never traded" (S.creaturesInPlay S.bob after) 1
+          Spec.assertEqWith s "and the Runner lived, beside the Worker" (S.creaturesInPlay S.alice after) 2
