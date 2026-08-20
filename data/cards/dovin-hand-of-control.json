@@ -29,6 +29,21 @@
                             "value": "target"
                           }
                         }
+                      },
+                      {
+                        "type": "PreventAllDamage",
+                        "value": {
+                          "direction": {
+                            "type": "DealtBy"
+                          },
+                          "duration": {
+                            "type": "UntilYourNextTurn"
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
+                        }
                       }
                     ]
                   }

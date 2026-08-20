@@ -1427,16 +1427,12 @@ soulfireSpec s registry = Spec.describe s "SoulfireEruption" $ do
 -- this card. The Hag above is the same duration on the other carrier, which is
 -- the contrast that makes this group worth its own board.
 --
--- The printed clause's "and dealt by" direction is absent from pawl's
--- transcription, leaving this Dovin WEAKER than the printing: damage the
--- shielded permanent deals still lands. Pawl.Types.DamagePattern does carry a
--- baked source id now (whichSource), but the only writer is CR 609.7a's player
--- CHOICE; a shield whose source is the permanent its resolution TARGETED has no
--- opcode field to say so (gap #1903). Filter.IsBound is not a stand-in for it:
--- that atom reads a resolution's slot map, and a floating shield is read at the
--- damage event long after that map is gone. The last case below asserts the
--- omission rather than describing it, and is what goes red the day the clause is
--- completed.
+-- The printed clause states BOTH directions, and pawl's card writes one
+-- Effect.PreventAllDamage per direction over the one target slot: the "dealt to"
+-- half bakes the target into DamagePattern.whichRecipient, and the "dealt by"
+-- half bakes it into whichSource and names no recipient at all. The last two
+-- cases below are the two halves, and the by-direction one is what proves the
+-- second row watches a source rather than a recipient.
 dovinAbility :: Printing.Printing -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
 dovinAbility p = take 1 (Face.activatedAbilities (S.combinedFace p))
 
@@ -1523,11 +1519,14 @@ dovinSpec s registry = Spec.describe s "DovinHandOfControl" $ do
       hit src recipient n = DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
       amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
       settleDamage gs batch = S.runPure S.identityAnswer gs (Damage.applyDamage batch)
-  Spec.it s "CR 611.2a / 615.3 the -1 installs one shield, armed to its controller's next turn"
+  -- TWO rows for the one printed clause: pawl installs a shield per relation, so
+  -- "dealt to" and "dealt by" are a row each over the same target, and both are
+  -- armed to the one duration the clause states.
+  Spec.it s "CR 611.2a / 615.3 the -1 installs a shield per direction, each armed to its controller's next turn"
     . withBoard
     $ \(_, _, _, gs) -> do
-      Spec.assertEqWith s "exactly one floating replacement" (length (GameState.replacements gs)) 1
-      Spec.assertEqWith s "CR 611.2a / 109.5: it ends at alice's next turn" (fmap ActiveReplacement.expiry (GameState.replacements gs)) [Expiry.Type.AtTurnOf S.alice]
+      Spec.assertEqWith s "one floating replacement per direction" (length (GameState.replacements gs)) 2
+      Spec.assertEqWith s "CR 611.2a / 109.5: both end at alice's next turn" (fmap ActiveReplacement.expiry (GameState.replacements gs)) [Expiry.Type.AtTurnOf S.alice, Expiry.Type.AtTurnOf S.alice]
   Spec.it s "CR 615.1 the shielded permanent takes none of the batch, and bob's other creature takes all of its own"
     . withBoard
     $ \(shielded, control, attacker, gs) -> do
@@ -1547,8 +1546,8 @@ dovinSpec s registry = Spec.describe s "DovinHandOfControl" $ do
       -- count of GameState.replacements absorbing the mutation ahead of it.
       Spec.assertEqWith s "bob's turn began" (GameState.activePlayer bobsTurn) S.bob
       Spec.assertEqWith s "the same damage is still prevented" (S.damageOf shielded after) (Just 0)
-      Spec.assertEqWith s "cleanup leaves the row alone" (length (GameState.replacements (Expiry.dropAtCleanup gs))) 1
-      Spec.assertEqWith s "and so does the handoff" (length (GameState.replacements bobsTurn)) 1
+      Spec.assertEqWith s "cleanup leaves both rows alone" (length (GameState.replacements (Expiry.dropAtCleanup gs))) 2
+      Spec.assertEqWith s "and so does the handoff" (length (GameState.replacements bobsTurn)) 2
   Spec.it s "CR 611.2a it ends as alice's next turn begins, and the same damage then lands"
     . withBoard
     $ \(shielded, _, attacker, gs) -> do
@@ -1560,15 +1559,20 @@ dovinSpec s registry = Spec.describe s "DovinHandOfControl" $ do
       Spec.assertEqWith s "the whole 2 is marked now" (S.damageOf shielded after) (Just 2)
       Spec.assertEqWith s "and the event happened" (amounts after) [2]
       Spec.assertEqWith s "the row is gone, not masked" (fmap ActiveReplacement.expiry (GameState.replacements alicesNext)) []
-  -- The omission, asserted. The printing prevents this damage and pawl's card
-  -- does not (gap #1903), so this case states what pawl's Dovin actually does
-  -- rather than leaving the divergence in a comment.
-  Spec.it s "CR 615.1 damage the shielded permanent DEALS is not prevented"
+  -- The printed clause's OTHER direction, "and dealt by". One batch carries all
+  -- three legs, so the shielded permanent's own damage and the control leg are
+  -- read off one board: the shielded permanent's 3 and the unshielded attacker's
+  -- 2 land on the same creature, which is what makes the two readings of the
+  -- rule disagree about a single number.
+  Spec.it s "CR 615.1 damage the shielded permanent DEALS is prevented too, to permanent and player alike"
     . withBoard
-    $ \(shielded, control, _, gs) -> do
-      let after = settleDamage gs [hit shielded (Recipient.ToCreature control) 3]
-      Spec.assertEqWith s "it lands in full" (S.damageOf control after) (Just 3)
-      Spec.assertEqWith s "and the event happened" (amounts after) [3]
+    $ \(shielded, control, attacker, gs) -> do
+      let after = settleDamage gs [hit shielded (Recipient.ToCreature control) 3, hit attacker (Recipient.ToCreature control) 2, hit shielded (Recipient.ToPlayer S.alice) 4]
+      Spec.assertEqWith s "only the unshielded attacker's 2 reaches bob's other creature" (S.damageOf control after) (Just 2)
+      -- The shield names no recipient at all in this direction, so a PLAYER is
+      -- covered by it as much as a permanent is.
+      Spec.assertEqWith s "and alice takes none of the 4 aimed at her" (S.lifeOf S.alice after) (Just 20)
+      Spec.assertEqWith s "so one event of the three happened" (amounts after) [2]
   -- "target permanent an OPPONENT controls", which nothing above reads: every
   -- case there aims at bob's Piker, and a slot with no filter at all would offer
   -- it just the same. Aiming at alice's own creature is what tells the two

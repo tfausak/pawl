@@ -1300,8 +1300,8 @@ rewriteEffect pairs effect = case effect of
   -- CR 612.1: a rider's text is as changeable as any other.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration kind ref chosenSource quantity rider) ->
     Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage (rewriteDuration pairs duration) kind ref chosenSource quantity (fmap (rewriteEffect pairs) rider))
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration kind ref rider) ->
-    Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage (rewriteDuration pairs duration) kind ref (fmap (rewriteEffect pairs) rider))
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration kind ref direction rider) ->
+    Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage (rewriteDuration pairs duration) kind ref direction (fmap (rewriteEffect pairs) rider))
   Effect.RedirectDamage {} -> effect
   Effect.Counter (Counter.MkCounter ref mSlot) -> Effect.Counter (Counter.MkCounter (rewriteObjectRef pairs ref) mSlot)
   -- Not implemented: a CR 122.1b keyword counter named in the kind keeps its
@@ -3088,8 +3088,9 @@ shieldOf oid gs =
                   -- onto, which the CR 616.1 loop already scopes by source.
                   DamagePattern.whatRecipient = Nothing,
                   DamagePattern.whichRecipient = Nothing,
-                  -- CR 609.7a: no player chose this pair's source; rule 122.1c
-                  -- minted it off the permanent's counters.
+                  -- No player chose this pair's source (CR 609.7a) and nothing
+                  -- targeted it (CR 601.2c); rule 122.1c minted it off the
+                  -- permanent's counters.
                   DamagePattern.whichSource = Nothing
                 }
               DamageRewrite.PreventRemovingShieldCounter

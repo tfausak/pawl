@@ -33,6 +33,7 @@ import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
+import qualified Pawl.Types.DamageDirection as DamageDirection
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageR as DamageR
@@ -752,7 +753,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage Duration.UntilEndOfTurn Nothing (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))) Seq.empty))
+      (Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage Duration.UntilEndOfTurn Nothing (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))) DamageDirection.DealtTo Seq.empty))
       " {\"type\":\"PreventAllDamage\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"you\"}}} "
   -- The same shield with both defaulted keys written: CR 510.2's kind
   -- (Inkshield's "all COMBAT damage") and CR 615.5's rider (Brace for Impact's
@@ -767,6 +768,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
             { PreventAllDamage.duration = Duration.UntilEndOfTurn,
               PreventAllDamage.kind = Just DamageKind.Combat,
               PreventAllDamage.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
+              PreventAllDamage.direction = DamageDirection.DealtTo,
               PreventAllDamage.riders =
                 Seq.singleton (Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.InSlot (SlotName.MkSlotName (Text.pack "thatMuch"))) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
             }

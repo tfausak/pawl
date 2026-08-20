@@ -26,7 +26,8 @@ defaultWhatSource = Filter.And []
 -- this codec is structural over the record and so accepts one from card JSON.
 -- A corpus lint keeps the pool honest instead, as for PhasePattern's
 -- `whosePhase`. `whichSource` is runtime-only for the same reason and swept by
--- the same lint -- CR 609.7a's source is chosen when the shield is created.
+-- the same lint -- the source a shield watches is chosen (CR 609.7a) or targeted
+-- (CR 601.2c) when the shield is created.
 -- `whatRecipient` beside it is the authored half and needs no such lint: it
 -- describes the recipient rather than naming one.
 codec :: Codec.Codec DamagePattern.DamagePattern

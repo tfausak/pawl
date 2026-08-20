@@ -208,6 +208,8 @@ library codec
     Pawl.Codec.CreateSpec
     Pawl.Codec.Cycling
     Pawl.Codec.CyclingSpec
+    Pawl.Codec.DamageDirection
+    Pawl.Codec.DamageDirectionSpec
     Pawl.Codec.DamageEvent
     Pawl.Codec.DamageEventSpec
     Pawl.Codec.DamageKind
@@ -979,6 +981,7 @@ library types
     Pawl.Types.Create
     Pawl.Types.CreateCopy
     Pawl.Types.Cycling
+    Pawl.Types.DamageDirection
     Pawl.Types.DamageEvent
     Pawl.Types.DamageKind
     Pawl.Types.DamagePattern
