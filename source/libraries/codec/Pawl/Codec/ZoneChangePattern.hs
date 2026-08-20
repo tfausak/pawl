@@ -7,10 +7,12 @@ import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 
 -- | Saying what the object is -- CR 702.34a's "this card", Anafenza, the
@@ -18,6 +20,12 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- predicate is what a pattern that says nothing about the object means.
 defaultWhatObject :: Filter.Filter Keyword.Keyword
 defaultWhatObject = Filter.And []
+
+-- | CR 702.34a's "instead of putting it anywhere else" names no destination at
+-- all, and every destination is the unrestricted reading, so it is what a
+-- pattern that says nothing means.
+defaultWhenDestination :: Maybe Zone.Zone
+defaultWhenDestination = Nothing
 
 -- | CR 109.5 reads a controller relation against the effect's source;
 -- "anyone's" is the unrestricted reading, so it is what a pattern that says
@@ -27,7 +35,7 @@ defaultWhoseObject = ControllerRelation.Anyones
 
 codec :: Codec.Codec ZoneChangePattern.ZoneChangePattern
 codec = Fields.object $ do
-  whenDestination <- Fields.required "whenDestination" Zone.codec ZoneChangePattern.whenDestination
+  whenDestination <- Fields.defaulted "whenDestination" defaultWhenDestination (Common.maybe Zone.codec) ZoneChangePattern.whenDestination
   whoseObject <- Fields.defaulted "whoseObject" defaultWhoseObject ControllerRelation.codec ZoneChangePattern.whoseObject
   whatObject <- Fields.defaulted "whatObject" defaultWhatObject (Filter.codec Keyword.codec) ZoneChangePattern.whatObject
   pure

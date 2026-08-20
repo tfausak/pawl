@@ -933,10 +933,11 @@ foretellCost keywords =
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
 -- The one exile CR 702.34a, CR 702.127a and CR 702.133a all print, in the same
--- words. Filter.IsSource, because the rule says "this card". The destination is
--- Graveyard rather than "anywhere else": a ZoneChangePattern names ONE
--- destination, and the graveyard is the only place a spell leaves the stack for in
--- this pool (#293).
+-- words. Filter.IsSource, because the rule says "this card". `whenDestination =
+-- Nothing` is the rule's "instead of putting it anywhere else" -- every
+-- destination, not the graveyard alone, so Reprieve returning a flashed-back
+-- spell to its owner's hand exiles it instead (Pawl.CastSpec's "CR 702.34a a
+-- flashback spell bounced off the stack is exiled, not returned to hand").
 --
 -- GATED on the clause each of the three rules puts in front of it, and the three
 -- clauses are not the same question. `castFor` is the keyword whose candidate cost
@@ -972,7 +973,7 @@ castFromGraveyardExile =
   ReplacementEffect.ZoneChangeR
     ( ZoneChangeR.MkZoneChangeR
         ZoneChangePattern.MkZoneChangePattern
-          { ZoneChangePattern.whenDestination = Zone.Graveyard,
+          { ZoneChangePattern.whenDestination = Nothing,
             ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
             ZoneChangePattern.whatObject = Filter.IsSource
           }

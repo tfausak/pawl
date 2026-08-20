@@ -2480,7 +2480,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
       s
       "one redirect replacement"
       (Projection.replacementsOf rip gs)
-      [ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Anyones (Filter.Type.And [])) Zone.Exile)]
+      [ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR (ZoneChangePattern.MkZoneChangePattern (Just Zone.Graveyard) ControllerRelation.Anyones (Filter.Type.And [])) Zone.Exile)]
 
   Spec.it s "a vanilla creature projects no replacements" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"

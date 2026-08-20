@@ -19,7 +19,7 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangePattern" $ do
       s
       ZoneChangePattern.codec
       ZoneChangePattern.MkZoneChangePattern
-        { ZoneChangePattern.whenDestination = Zone.Graveyard,
+        { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
           ZoneChangePattern.whatObject = Filter.And [],
           ZoneChangePattern.whoseObject = ControllerRelation.Anyones
         }
@@ -32,9 +32,21 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangePattern" $ do
       s
       ZoneChangePattern.codec
       ZoneChangePattern.MkZoneChangePattern
-        { ZoneChangePattern.whenDestination = Zone.Graveyard,
+        { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
           ZoneChangePattern.whatObject = Filter.And [Filter.HasCardType CardType.Creature, Filter.Not Filter.IsToken],
           ZoneChangePattern.whoseObject = ControllerRelation.Opponents
         }
       " {\"whatObject\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"Not\",\"value\":{\"type\":\"IsToken\"}}]},\"whenDestination\":{\"type\":\"Graveyard\"},\"whoseObject\":{\"type\":\"Opponents\"}} "
+  -- CR 702.34a's "instead of putting it anywhere else": no destination named,
+  -- which is the default, so the whole pattern is the empty object.
+  Spec.it s "MkZoneChangePattern (flashback, any destination)" $
+    Common.assertCodec
+      s
+      ZoneChangePattern.codec
+      ZoneChangePattern.MkZoneChangePattern
+        { ZoneChangePattern.whenDestination = Nothing,
+          ZoneChangePattern.whatObject = Filter.IsSource,
+          ZoneChangePattern.whoseObject = ControllerRelation.Anyones
+        }
+      " {\"whatObject\":{\"type\":\"IsSource\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ZoneChangePattern.codec

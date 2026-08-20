@@ -49,7 +49,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
       ( ReplacementEffect.ZoneChangeR
           ( ZoneChangeR.MkZoneChangeR
               ZoneChangePattern.MkZoneChangePattern
-                { ZoneChangePattern.whenDestination = Zone.Graveyard,
+                { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
                   ZoneChangePattern.whatObject = Filter.And [],
                   ZoneChangePattern.whoseObject = ControllerRelation.Anyones
                 }
@@ -66,7 +66,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
       ( ReplacementEffect.ZoneChangeR
           ( ZoneChangeR.MkZoneChangeR
               ZoneChangePattern.MkZoneChangePattern
-                { ZoneChangePattern.whenDestination = Zone.Graveyard,
+                { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
                   ZoneChangePattern.whatObject = Filter.And [],
                   ZoneChangePattern.whoseObject = ControllerRelation.Opponents
                 }
