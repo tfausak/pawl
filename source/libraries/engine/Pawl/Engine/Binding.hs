@@ -111,6 +111,35 @@ you = SlotName.MkSlotName (Text.pack "you")
 triggerPlayer :: SlotName
 triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 
+-- CR 118.12a: the reserved slot under which the players a resolution cost's
+-- answer SELECTED are bound -- the printed word "they" in Rishadan Cutpurse's
+-- "each opponent sacrifices a permanent of their choice unless they pay {1}".
+-- Stamped by Pawl.Engine.Resolve.payGateAdmits as the gate is answered, so the
+-- clause's own instructions read an ordinary slot rather than a "the players who
+-- didn't pay" opcode.
+--
+-- Which players are in it depends on Pawl.Types.PayBranch: the IfNotPaid branch
+-- gets the offered players who did not pay, the IfPaid branch the ones who did.
+-- One slot for both, because the printed word is the same word and which branch
+-- a clause is is a fact about the CLAUSE.
+--
+-- SEVERAL players, which is the whole point and what parts it from
+-- `triggerPlayer`: CR 118.12a's rewriting is per player, so a gate whose payer
+-- names each opponent makes one offer per opponent and this slot holds every
+-- seat whose answer selected the branch. A reader that takes one recipient
+-- (Pawl.Types.SlotArity.One) therefore reads NOTHING out of it once two seats
+-- are in it; only Pawl.Engine.Resolve's Effect.PlayerSacrifices arm takes them
+-- all today. Not implemented: PlayerRef.InSlot is one of those one-recipient
+-- readers, so no life-total opcode can read this slot yet (#1966).
+--
+-- Not a target (nothing was chosen), so CR 608.2b has nothing to re-validate --
+-- Resolve's legalSlot answers True for any slot that declares no target. `you`'s
+-- "no card's targetSlots may name it" rule applies here too, under the same
+-- sweep, and Pawl.CardSpec's dataflow lint answers a read of it only for a mode
+-- one of whose clauses states a gate.
+gatePlayers :: SlotName
+gatePlayers = SlotName.MkSlotName (Text.pack "thosePlayers")
+
 -- CR 400.7e / CR 603.6c: the reserved slot under which a zone-change trigger's
 -- ARRIVING incarnation is bound -- and, since CR 708.7's readers took it, the
 -- slot for the object an event trigger's event NAMES more generally.
@@ -484,6 +513,13 @@ toObjects oids = Binding.empty {Binding.objects = Just oids}
 -- not an object.
 toPlayer :: PlayerId -> Binding
 toPlayer pid = toRecipients (Set.singleton (Recipient.ToPlayer pid))
+
+-- toPlayer's plural: a binding that names SEVERAL players and nothing else --
+-- CR 118.12a's per-player gate answer, bound by Pawl.Engine.Resolve under
+-- `gatePlayers`. Rides `targets` rather than `objects` for toPlayer's reason: a
+-- player is a Recipient (CR 115.1) and the objects field holds ObjectIds.
+toPlayers :: Set PlayerId -> Binding
+toPlayers = toRecipients . Set.map Recipient.ToPlayer
 
 -- A binding that names one NUMBER and nothing else -- what a Destroy that
 -- counts what it destroyed binds for a later "for each ... destroyed this way"

@@ -1282,7 +1282,10 @@ modalSlotsOffend abilityBound modal =
             -- A slot DEFINED in this mode (a Create's minted token, or a
             -- PlaySubgame's bound subgame outcome) and then read by a later
             -- effect is legitimate dataflow, not an undeclared target.
-            defined = Resolve.definedSlots effects
+            -- Plus what this mode's own CR 118.12 gate binds: the players its
+            -- answer selected, which is how "each opponent ... unless THEY ..."
+            -- says "they" (Binding.gatePlayers).
+            defined = Set.union (Resolve.definedSlots effects) (Resolve.gateDefinedSlots mode)
             -- The whole MODE's reads, not just its effect list's: CR 118.12a's
             -- "unless [a player] pays" names its payer by slot too.
             wanted = Map.keysSet (Resolve.modeSlots mode)
@@ -1948,6 +1951,7 @@ reservedSlots =
       Binding.triggerSource,
       Binding.you,
       Binding.triggerPlayer,
+      Binding.gatePlayers,
       Binding.became,
       Binding.eventAmount,
       Binding.sacrificedCount,

@@ -789,7 +789,10 @@ data Prompt r where
   -- The PlayerId is emphatically NOT the resolving controller, which separates
   -- this from every other resolution-time prompt: CR 118.12's clause names a
   -- player, and for this family that is the player the effects are aimed at.
-  -- Still routed through Decide.deciderFor, so CR 723.1 control applies.
+  -- Still routed through Decide.deciderFor, so CR 723.1 control applies. It is
+  -- also what tells two offers of ONE gate apart: CR 118.12a's rewriting is per
+  -- player, so Rishadan Cutpurse's "each opponent ... unless they pay {1}" raises
+  -- this prompt once per opponent, in CR 101.4's APNAP order.
   --
   -- Asked when the spell or ability RESOLVES, so a countered Mana Leak never
   -- asks. Never elided for a payable optional cost.
@@ -801,7 +804,8 @@ data Prompt r where
   -- Pawl.ResolveSpec's PayGate group fails if this prompt is raised there.
   --
   -- One offer per PAYMENT and not per clause: a clause naming another's offer
-  -- (Pawl.Types.PayGate.offeredAt) reuses the recorded answer.
+  -- (Pawl.Types.PayGate.offeredAt) reuses the recorded answers, each payer's
+  -- own.
   --
   -- The Cost carried is the one the payer will actually be charged, with CR
   -- 107.3a's X already resolved (Pawl.Engine.Resolve.announcedXOn): Clash of
