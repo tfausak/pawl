@@ -39,7 +39,9 @@ data ObjectRef
     -- EachCardExiledWithSource -- and a FILTERED sweep of a zone is written on
     -- the arm for that zone: the battlefield's is here, and a graveyard's, the
     -- stack's and the linked exile set's are on their own arms. A hand and a
-    -- library still have none (#1309).
+    -- library still have none (#1309) -- TopOfLibraryUntil below is not one, since
+    -- it names a PREFIX of a library that a match ends rather than the cards in it
+    -- that match.
     --
     -- Not a target and never one (CR 115.10a), so CR 608.2b has nothing to
     -- fizzle. The set is swept when the effect executes (CR 608.2c) and is then
@@ -380,9 +382,11 @@ data ObjectRef
     -- by CR 701.20a's reveal, CR 701.20e's look, CR 701.17c's mill or a move, and
     -- it sits wherever that effect left it -- which for a look or a reveal is the
     -- LIBRARY, since neither moves anything (CR 701.20b). No zone-keyed arm can
-    -- offer a choice there: there is no filtered sweep of a library at all
-    -- (#1309). Where the batch DID move to a graveyard, Midnight Tilling writes
-    -- the same sentence as ChosenCardInGraveyard narrowed by Filter.IsBound; this
+    -- offer a choice there: a library still has no filtered sweep (#1309), and
+    -- TopOfLibraryUntil's walk is not one either -- it names a prefix and cannot
+    -- reach past the first match. Where the batch DID move to a graveyard,
+    -- Midnight Tilling writes the same sentence as ChosenCardInGraveyard narrowed
+    -- by Filter.IsBound; this
     -- arm reads the slot directly instead, so it needs no such sweep.
     --
     -- Reads the slot's GROUP first and its single binding second, the two shapes

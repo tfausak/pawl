@@ -13,7 +13,9 @@ import qualified Pawl.Types.SlotName as SlotName
 -- Commune with the Gods' revealed five (CR 701.20a), Carth the Lion's looked-at
 -- seven (CR 701.20e) -- and where those cards are is whatever the effect that
 -- bound them left them. A library batch is the case no zone-keyed arm can reach,
--- there being no filtered sweep of a library at all (#1309).
+-- a library still having no filtered sweep (#1309) -- and
+-- Pawl.Types.ObjectRef.TopOfLibraryUntil's walk is not one, since it stops at the
+-- first match rather than collecting every one of them.
 --
 -- No chooser field: CR 608.2d hands the choice to the player applying the effect,
 -- and a group bound by a look is shown to that player alone (CR 701.20e), so the
