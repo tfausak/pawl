@@ -366,11 +366,13 @@ data ObjectRef
     -- match are all Pawl.Types.ChosenCardFromAmong's notes.
     --
     -- Read when the effect executes (CR 608.2c), and a QUESTION rather than a
-    -- read, so only Pawl.Engine.Resolve's MoveToZone arm can carry it out --
-    -- ChosenCardInGraveyard's note above describes what a card writing it under
-    -- any other opcode gets, and why that inert answer earns no lint. Carth the
-    -- Lion's "you may REVEAL a planeswalker card from among them" is the printing
-    -- that would want the Reveal arm to answer it too (#1699).
+    -- read, so an opcode carries it out only by asking
+    -- Pawl.Engine.Resolve.chooseCardFromAmong -- which MoveToZone and CR 701.20a's
+    -- Reveal both do, Carth the Lion's "you may REVEAL a planeswalker card from
+    -- among them and put it into your hand" being one choice its reveal makes and
+    -- its move reads back out of a slot. Under any OTHER opcode the ref names no
+    -- object; ChosenCardInGraveyard's note above describes that inert answer and
+    -- why it earns no lint.
     ChosenCardFromAmong ChosenCardFromAmong.ChosenCardFromAmong
   | -- | A card RANDOMNESS names out of a hand -- Merfolk Spy's "that player
     -- reveals a card at random from their hand". ChosenCardInHand's PlayerRef,

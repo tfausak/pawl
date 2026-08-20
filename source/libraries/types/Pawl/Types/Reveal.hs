@@ -12,7 +12,9 @@ import qualified Pawl.Types.SlotName as SlotName
 -- the opcode; a reveal is public, so the GameEvent.Revealed it appends is
 -- already a record and a slotless reveal is the whole of rule 701.20a. Merfolk
 -- Spy writes one; Wild Evocation's "that player reveals a card at random from
--- their hand ... the player casts IT" needs the name.
+-- their hand ... the player casts IT" needs the name, and so does Carth the
+-- Lion's "reveal a planeswalker card from among them AND put it into your hand",
+-- where the slot is the whole of what keeps the reveal and the move on one card.
 --
 -- Maybe rather than a second opcode, for the reason #1743 declined a
 -- RevealAtRandom: one rule, one arm. A sibling that revealed AND bound would

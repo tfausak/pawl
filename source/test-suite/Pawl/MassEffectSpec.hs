@@ -6,6 +6,7 @@
 -- The machinery is Pawl.ResolveSpec.
 module Pawl.MassEffectSpec where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -64,6 +65,7 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Reveal as Reveal
+import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotArity as SlotArity
 import qualified Pawl.Types.SlotName as SlotName
@@ -982,6 +984,154 @@ communeWithTheGodsSpec s registry =
             "and all five revealed cards are in the graveyard"
             (List.sort (namesIn Zone.Graveyard S.alice after))
             (List.sort [named "Commune with the Gods", named "Island", named "Island", named "Murder", named "Murder", named "Murder"])
+
+-- CR 701.20e's look, CR 701.20a's reveal of ONE card chosen from among what it
+-- showed, and CR 401.4's arrangement handed to randomness -- the three halves
+-- communeWithTheGodsSpec and enduranceSpec above each carry one of, on the
+-- printing that carries all three at once.
+--
+-- Carth the Lion {2}{B}{G} Legendary Creature -- Human Warrior 3/5, "Whenever
+-- Carth enters or a planeswalker you control dies, look at the top seven cards
+-- of your library. You may reveal a planeswalker card from among them and put it
+-- into your hand. Put the rest on the bottom of your library in a random order. /
+-- Planeswalkers' loyalty abilities you activate cost an additional [+1] to
+-- activate." (name, cost, type line, power, toughness and Oracle text checked
+-- against api.scryfall.com, 2026-08-20). The second sentence is
+-- Pawl.PlaneswalkerSpec's, and is transcribed as "abilities of a planeswalker"
+-- for the reason recorded there (gap #1698).
+--
+-- ONE CHOICE, revealed AND moved: the reveal names ObjectRef.ChosenCardFromAmong
+-- and binds what it showed to a slot, and the move reads that slot. A second
+-- ChosenCardFromAmong under the move would be a second, independent choice, which
+-- the printed "and" forbids -- so the reveal event and the card in hand must name
+-- the SAME object, which is what the second assertion of each case below checks.
+--
+-- The look records nothing (CR 701.20e is private, #1412), so exactly one
+-- GameEvent.Revealed is the whole of what the trigger shows -- the six cards left
+-- over stay unrevealed however public the bottoming makes their destination.
+--
+-- THE RANDOMNESS IS THE ANSWERER'S, as it is for Endurance above: the fixture
+-- names a permutation built from the OBJECT IDS, so the resulting library is
+-- neither the batch's order nor its reverse.
+carthTheLionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+carthTheLionSpec s registry =
+  let named = Just . CardName.MkCardName . Text.pack
+      -- alice's library, BOTTOM FIRST -- S.addLibraryCard puts each new card on
+      -- top -- so the top seven, top first, are Island, Jace Beleren, Murder,
+      -- Goblin Piker, Chandra, Forest, Bird Maiden, and the Swamp beneath them is
+      -- never looked at. Two planeswalker cards among seven, five cards matching
+      -- nothing, and the offer is therefore [Jace Beleren, Chandra] where the
+      -- group is all seven.
+      stockNames = ["Swamp", "Bird Maiden", "Forest", "Chandra, Fire Artisan", "Goblin Piker", "Murder", "Jace Beleren", "Island"]
+      stock printings gs = List.mapAccumL (\g p -> let (oid, g') = S.addLibraryCard p S.alice g in (g', oid)) gs printings
+      -- The stocked card of a given name, by the id S.addLibraryCard minted for
+      -- it: the permutation below is built from these rather than from the
+      -- batch's own order.
+      idOf ids name = Maybe.fromMaybe S.noSource (Maybe.listToMaybe [oid | (n, oid) <- zip stockNames ids, n == name])
+      nth n offered = Maybe.fromMaybe (NonEmpty.head offered) (Maybe.listToMaybe (drop n (NonEmpty.toList offered)))
+      -- Takes the printed "may" -- clause 1, the reveal and the move to hand;
+      -- clause 0 is the look and clause 2 the rest -- answers the group choice
+      -- with the nth card offered, and names `order` as the random order, deepest
+      -- card first. A `Nothing` order leaves Pawl.Engine.Game.honourShuffle the
+      -- batch it offered.
+      answering :: Maybe Int -> Maybe [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+      answering mTake order p = case p of
+        Prompt.ChooseOptional _ _ _ _ clause
+          | clause == ClauseIndex.MkClauseIndex 1 && Maybe.isJust mTake -> OptionalDecision.Exercises
+        Prompt.ChooseCardFromAmong _ _ _ offered -> nth (Maybe.fromMaybe 0 mTake) offered
+        Prompt.Shuffle offered -> Maybe.fromMaybe offered order
+        _ -> S.identityAnswer p
+      -- Which objects a CR 701.20a reveal has shown so far. A look shows nobody
+      -- anything and appends no event, so this counts the reveal alone.
+      revealed gs =
+        Maybe.mapMaybe
+          ( \event -> case event of
+              GameEvent.Revealed (Revealed.MkRevealed _ oid _ _) -> Just oid
+              _ -> Nothing
+          )
+          (S.eventsOf gs)
+   in Spec.describe s "CarthTheLion" $ do
+        -- The headline: the SECOND planeswalker card among the seven is revealed
+        -- and taken, and the six left over reach the bottom in the order the
+        -- randomness named.
+        Spec.it s "CR 701.20a the enters trigger reveals the chosen card and puts that same object into its controller's hand" $ do
+          carth <- S.printingOf s registry "Carth the Lion"
+          printings <- Monad.mapM (S.printingOf s registry) stockNames
+          let (stocked, ids) = stock printings (Setup.emptyGame S.bothPlayers)
+              (_, entered) = S.entersWithTrigger carth S.alice stocked
+              -- Deepest first, and neither the batch's order nor its reverse.
+              order = fmap (idOf ids) ["Murder", "Bird Maiden", "Island", "Forest", "Jace Beleren", "Goblin Piker"]
+              answer :: Prompt.Prompt r -> r
+              answer = answering (Just 1) (Just order)
+              placed = S.runPure answer entered Engine.placePendingTriggers
+              after = S.runPure answer placed Stack.resolveTop
+          Spec.assertEqWith s "the second planeswalker card among the seven is the one in alice's hand" (namesIn Zone.Hand S.alice after) [named "Chandra, Fire Artisan"]
+          Spec.assertEqWith s "and it is the one object the trigger revealed -- one reveal, not seven" (revealed after) [idOf ids "Chandra, Fire Artisan"]
+          Spec.assertEqWith
+            s
+            "alice's library, top first, is the card the look never reached and then the six left over in the named order"
+            (namesIn Zone.Library S.alice after)
+            [named "Swamp", named "Goblin Piker", named "Jace Beleren", named "Forest", named "Island", named "Bird Maiden", named "Murder"]
+          Spec.assertEqWith s "nothing was put into a graveyard" (namesIn Zone.Graveyard S.alice after) []
+        -- The paired control: the same board and the same offer, answered at
+        -- index 0. If the engine were picking, both legs would name one card.
+        Spec.it s "CR 608.2d the engine does not pick: another answer reveals and takes the other planeswalker card" $ do
+          carth <- S.printingOf s registry "Carth the Lion"
+          printings <- Monad.mapM (S.printingOf s registry) stockNames
+          let (stocked, ids) = stock printings (Setup.emptyGame S.bothPlayers)
+              (_, entered) = S.entersWithTrigger carth S.alice stocked
+              answer :: Prompt.Prompt r -> r
+              answer = answering (Just 0) Nothing
+              placed = S.runPure answer entered Engine.placePendingTriggers
+              after = S.runPure answer placed Stack.resolveTop
+          Spec.assertEqWith s "the first planeswalker card comes to hand instead" (namesIn Zone.Hand S.alice after) [named "Jace Beleren"]
+          Spec.assertEqWith s "and that is the object revealed" (revealed after) [idOf ids "Jace Beleren"]
+        -- CR 603.5: the printed "may" is a real choice. Declining reveals nothing
+        -- and sends all seven to the bottom -- the look still ran, so this cannot
+        -- pass because the trigger never resolved.
+        Spec.it s "CR 603.5 declining the may reveals nothing and bottoms all seven" $ do
+          carth <- S.printingOf s registry "Carth the Lion"
+          printings <- Monad.mapM (S.printingOf s registry) stockNames
+          let (stocked, ids) = stock printings (Setup.emptyGame S.bothPlayers)
+              (_, entered) = S.entersWithTrigger carth S.alice stocked
+              order = fmap (idOf ids) ["Chandra, Fire Artisan", "Island", "Bird Maiden", "Jace Beleren", "Murder", "Forest", "Goblin Piker"]
+              answer :: Prompt.Prompt r -> r
+              answer = answering Nothing (Just order)
+              placed = S.runPure answer entered Engine.placePendingTriggers
+              after = S.runPure answer placed Stack.resolveTop
+          Spec.assertEqWith s "nothing reached alice's hand" (namesIn Zone.Hand S.alice after) []
+          Spec.assertEqWith s "and nothing was revealed" (revealed after) []
+          Spec.assertEqWith
+            s
+            "all seven are on the bottom in the named order"
+            (namesIn Zone.Library S.alice after)
+            [named "Swamp", named "Goblin Piker", named "Forest", named "Murder", named "Jace Beleren", named "Bird Maiden", named "Island", named "Chandra, Fire Artisan"]
+        -- The condition's OTHER disjunct (CR 603.1b read as "any"): a planeswalker
+        -- alice controls dying fires the same ability, with Carth long settled and
+        -- entering nothing.
+        --
+        -- Both Jaces are placed with no loyalty counters -- the fixture puts them
+        -- there rather than an entry rider -- so CR 704.5i buries both in one
+        -- state-based check. That is the pair the case turns on: bob's dies in the
+        -- same batch as alice's, and only alice's is a planeswalker SHE controls,
+        -- so an ability that read the filter as "a planeswalker" would resolve
+        -- TWICE and put two cards in her hand.
+        Spec.it s "CR 603.2 a planeswalker its controller controls dying fires the same ability, and an opponent's does not" $ do
+          carth <- S.printingOf s registry "Carth the Lion"
+          jace <- S.printingOf s registry "Jace Beleren"
+          printings <- Monad.mapM (S.printingOf s registry) stockNames
+          let (stocked, ids) = stock printings (Setup.emptyGame S.bothPlayers)
+              (_, withCarth) = S.addCreature carth S.alice stocked
+              (_, withHers) = S.addCreature jace S.alice withCarth
+              (_, withHis) = S.addCreature jace S.bob withHers
+              buried = S.settleSba withHis
+              answer :: Prompt.Prompt r -> r
+              answer = answering (Just 1) Nothing
+              placed = S.runPure answer buried Engine.placePendingTriggers
+              after = S.runPure answer placed (Monad.replicateM_ 2 Stack.resolveTop)
+          Spec.assertEqWith s "one trigger resolved, so exactly the chosen planeswalker card is in alice's hand" (namesIn Zone.Hand S.alice after) [named "Chandra, Fire Artisan"]
+          Spec.assertEqWith s "and exactly one card was revealed" (revealed after) [idOf ids "Chandra, Fire Artisan"]
+          Spec.assertEqWith s "both planeswalkers died" (namesIn Zone.Graveyard S.alice after, namesIn Zone.Graveyard S.bob after) ([named "Jace Beleren"], [named "Jace Beleren"])
 
 -- The same arm reached from a TRIGGER rather than an activated ability, and over
 -- LAND cards rather than creature cards -- the two axes portOfKarfellSpec above
@@ -2886,6 +3036,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   portOfKarfellSpec s registry
   midnightTillingSpec s registry
   communeWithTheGodsSpec s registry
+  carthTheLionSpec s registry
   blossomingTortoiseSpec s registry
   exhumeSpec s registry
   bloodForBonesSpec s registry
