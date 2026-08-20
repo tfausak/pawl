@@ -203,6 +203,6 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
     Common.assertCodec
       s
       (EntryRewrite.codec (Effect.codec Card.codec))
-      (EntryRewrite.RunEffects (Seq.fromList [Effect.Type.Mill (Mill.MkMill (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 4) Nothing)]))
+      (EntryRewrite.RunEffects (Seq.fromList [Effect.Type.Mill (Mill.MkMill (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 4) Nothing Nothing)]))
       " {\"type\":\"RunEffects\",\"value\":[{\"type\":\"Mill\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"quantity\":{\"type\":\"Literal\",\"value\":4}}}]} "
   Spec.it s "has a schema" $ Common.assertHasSchema s (EntryRewrite.codec (Effect.codec Card.codec))

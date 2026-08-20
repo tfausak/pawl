@@ -442,17 +442,26 @@ data Context = MkContext
     --
     -- Nothing wherever the atom cannot appear, which is everywhere else.
     recipient :: Maybe PlayerId.PlayerId,
-    -- The objects the surrounding resolution's LEGAL slots name, for
+    -- The objects the surrounding resolution's slots name, for
     -- Quantity.AgainstSlot to aim an evaluation at one (CR 608.2b keeps an
     -- illegal slot out), and for the IsBound atom above. It rides here because
     -- this record is already the evaluation context every Quantity is handed,
     -- and a slot map is exactly the part of a resolution the evaluator cannot
     -- derive.
     --
-    -- EMPTY everywhere but a resolution, which is the honest answer rather than a
-    -- forgotten filler: outside one there are no slots. Pawl.Engine.Resolve's
-    -- effectContext is the sole non-empty producer.
-    slotObjects :: Map.Map SlotName.SlotName ObjectId.ObjectId,
+    -- A SET per slot, because a slot may name several objects at once: CR
+    -- 115.10a's group binding is what Act on Impulse's "those cards" and Midnight
+    -- Tilling's "from among them" read, and the readers that can take no more
+    -- than one ask through `slotOneObject` below rather than off this map
+    -- directly. An EMPTY set never appears -- a slot naming nothing is an absent
+    -- key -- so `Map.member` and "names something" are the same question.
+    --
+    -- EMPTY everywhere but a resolution and CR 603.4's intervening-"if" checks,
+    -- which is the honest answer rather than a forgotten filler: elsewhere there
+    -- are no slots. Pawl.Engine.Resolve's effectContext,
+    -- Pawl.Engine.Event.interveningHolds and Pawl.Engine.Stack are the non-empty
+    -- producers, and all three go through contextWithSlots below.
+    slotObjects :: Map.Map SlotName.SlotName (Set.Set ObjectId.ObjectId),
     -- CR 201.1 / 709.4a: the NAMES of the objects the surrounding announcement's
     -- slots hold, for the one atom that compares a candidate's against them
     -- (SameNameAsBound, Harness the Storm). Supplied by the caller for
@@ -522,10 +531,21 @@ data Context = MkContext
 contextFor :: Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
 contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, sourceAttachedTo = Nothing}
 
--- contextFor with the resolution's slot objects supplied. The one caller is
--- Pawl.Engine.Resolve.effectContext; see slotObjects above.
-contextWithSlots :: Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Map.Map SlotName.SlotName ObjectId.ObjectId -> Context
+-- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
+-- slotObjects above for who supplies them.
+contextWithSlots :: Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Map.Map SlotName.SlotName (Set.Set ObjectId.ObjectId) -> Context
 contextWithSlots p s m = (contextFor p s) {slotObjects = m}
+
+-- The ONE object a slot names, for the readers that can take no more than one --
+-- Quantity.AgainstSlot's evaluation, Count's IsControllerOfBound. Nothing where
+-- the slot names nothing AND where it names several: a reader that cannot take a
+-- group must not silently take one of its members, which is the doctrine
+-- Pawl.Engine.Binding.onlyOne states one type over. Filter.IsBound is the reader
+-- that CAN take them, and it goes to `slotObjects` itself.
+slotOneObject :: SlotName.SlotName -> Context -> Maybe ObjectId.ObjectId
+slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot (slotObjects context)) of
+  [oid] -> Just oid
+  _ -> Nothing
 
 -- contextFor with the source's power supplied. Kept lazy at the call site, since
 -- the field is: a Filter that never names the atom pays for no projection.
@@ -664,9 +684,14 @@ matches context view predicate = case predicate of
   -- IsSource one field over: the id the RESOLUTION bound rather than the id the
   -- evaluation is sourced at. Vacuously False for a view with no object behind
   -- it and for a slot naming nothing, which is the posture the atom above takes.
-  Filter.IsBound slot -> case (identity view, Map.lookup slot (slotObjects context)) of
-    (Just oid, Just bound) -> oid == bound
-    _ -> False
+  --
+  -- MEMBERSHIP, so a slot bound to a GROUP admits every one of its members: CR
+  -- 701.17c's "from among them" is a question about the whole batch a mill,
+  -- a look or a move named, and a slot naming one object is the singleton case
+  -- of it rather than a different question.
+  Filter.IsBound slot -> case identity view of
+    Just oid -> Set.member oid (Map.findWithDefault Set.empty slot (slotObjects context))
+    Nothing -> False
   -- CR 709.4a at both ends: the candidate has the bound object's name if one of
   -- its names is one of that object's, which is a non-empty INTERSECTION. A slot
   -- naming nothing, and a bound object with no name (CR 708.2a), each leave the

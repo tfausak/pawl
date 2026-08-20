@@ -750,7 +750,7 @@ effectCounts effect = case effect of
   -- also where the four opcodes that route their ref are named.
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> refCounts ref
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
-  Effect.Mill (Mill.MkMill _ quantity _) -> quantityCounts quantity
+  Effect.Mill (Mill.MkMill _ quantity _ _) -> quantityCounts quantity
   Effect.Reveal (Reveal.MkReveal ref _) -> refCounts ref
   Effect.LookAt (LookAt.MkLookAt ref _) -> refCounts ref
   Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
@@ -3334,7 +3334,7 @@ effectFilters effect = case effect of
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   -- The tally's Filter is a position a card author writes, so the lint reaches
   -- it: rule 728.1's "nonland card" is one of these.
-  Effect.Mill (Mill.MkMill _ quantity mTally) -> unframed (quantityFilters quantity <> fmap MillTally.filter (Maybe.maybeToList mTally))
+  Effect.Mill (Mill.MkMill _ quantity mTally _) -> unframed (quantityFilters quantity <> fmap MillTally.filter (Maybe.maybeToList mTally))
   -- The ObjectRef's Filter is a position a card author writes, so the lint
   -- reaches it, as Explore's does. Both halves of CR 701.20 answer alike.
   Effect.Reveal (Reveal.MkReveal ref _) -> sourceHosted (objectRefFilters ref)
@@ -4973,7 +4973,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- Moths' "it"), and a GROUP for a move of several (Act on Impulse's "those
   -- cards"). Pawl.Engine.Resolve picks by how many actually arrived, and only the
   -- singular shape is visible to a SINGULAR READER -- Resolve.slotOne reads
-  -- Binding.targets, which a group never fills.
+  -- Binding.targets, which a group never fills. Filter.IsBound is NOT one: it
+  -- goes to Filter.Context's slotObjects, where a group is every one of its
+  -- members.
   --
   -- So the shape a card must not author is a singular read of a slot a move that
   -- may take SEVERAL cards bound: it would silently name nothing rather than
@@ -5050,15 +5052,26 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           PlayerRef.Candidate -> True
           -- One seat -- InSlot's answer, one indirection out.
           PlayerRef.ControllerOfBound _ -> True
-        -- Every opcode that binds an ObjectRef's result under a name of the
-        -- card's own: a move, CR 701.20e's look and CR 701.20a's reveal. All
-        -- three dispatch on how many objects arrived, so all three can leave the
-        -- group binding a singular reader cannot see.
+        -- Every opcode that binds a batch under a name of the card's own: a
+        -- move, CR 701.20e's look, CR 701.20a's reveal and CR 701.17c's mill.
+        -- All four dispatch on how many objects arrived, so all four can leave
+        -- the group binding a singular reader cannot see.
         boundPlurally effect = case effect of
           Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ mSlot _ _) | not (movesAtMostOne ref) -> Maybe.maybeToList mSlot
           Effect.LookAt (LookAt.MkLookAt ref slot) | not (movesAtMostOne ref) -> [slot]
           Effect.Reveal (Reveal.MkReveal ref mSlot) | not (movesAtMostOne ref) -> Maybe.maybeToList mSlot
+          -- CR 701.17c's slot, whose plurality is the mill's DEPTH rather than an
+          -- ObjectRef's: a mill of one card binds the singular shape and any
+          -- deeper mill may bind a group, so only a literal 1 is singular here.
+          -- The depth is per miller, so a ref naming several seats is plural at
+          -- any depth -- movesAtMostOne's own reading of a TopOfLibrary.
+          Effect.Mill (Mill.MkMill player quantity _ mSlot)
+            | not (millsAtMostOne player quantity) ->
+                Maybe.maybeToList mSlot
           _ -> []
+        millsAtMostOne player quantity = case quantity of
+          Quantity.Type.Literal n -> n <= 1 && namesOneSeat player
+          _ -> False
         readSingly effect = case effect of
           Effect.OfferCast (OfferCast.MkOfferCast slot _ _ _) -> [slot]
           _ -> []

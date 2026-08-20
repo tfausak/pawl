@@ -175,7 +175,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   -- vacuous posture above: an unanswerable atom admits no candidate rather than
   -- admitting every one.
   Filter.Type.IsControllerOfBound slot ->
-    truth (Just candidate == (Map.lookup slot (Filter.slotObjects context) >>= viewOf >>= Filter.controller))
+    truth (Just candidate == (Filter.slotOneObject slot context >>= viewOf >>= Filter.controller))
   -- CR 400.1 / 404.1: how big is THIS candidate's graveyard? Baked here for the
   -- two atoms above's reason, one rule further out -- the question is about a
   -- ZONE rather than about the candidate's characteristics, and

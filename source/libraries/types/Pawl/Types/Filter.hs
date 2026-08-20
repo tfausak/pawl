@@ -298,9 +298,16 @@ data Filter keyword
     -- 108.4 gives a card in a library none at all, so that atom is vacuously
     -- False for the very candidates this one exists to match.
     --
+    -- MEMBERSHIP where the slot names SEVERAL objects: CR 115.10a's group binding
+    -- -- the batch a mill (CR 701.17c), a look (CR 701.20e) or a move named --
+    -- admits every one of its members, which is what "from among them" asks
+    -- (Midnight Tilling). A slot naming one object is the singleton case of the
+    -- same read.
+    --
     -- Vacuously False where the slot names no object: outside a resolution the
-    -- map is empty, an illegal target (CR 608.2b) and a multi-object slot drop
-    -- out of it, and a slot bound to a GROUP never enters it (#1532). That is
+    -- map is empty, and an illegal target (CR 608.2b) and a multi-TARGET slot
+    -- drop out of it -- the one plural shape this does not admit, no card in
+    -- data/cards/ writing the atom over a slot whose count is above one. That is
     -- the posture every context-relative atom here takes.
     IsBound SlotName.SlotName
   | -- | CR 201.2 / 709.4a asked of TWO objects: the candidate shares a name with

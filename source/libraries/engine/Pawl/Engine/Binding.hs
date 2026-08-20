@@ -2,6 +2,7 @@ module Pawl.Engine.Binding where
 
 import Control.Applicative ((<|>))
 import qualified Control.Monad as Monad
+import qualified Data.Foldable as Foldable
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -544,7 +545,7 @@ setMentoredCreature oid = Map.insert mentoredCreature (toObject oid)
 -- there is nothing of the card's to clobber.
 --
 -- Set-valued like a target slot, so a payment that sacrificed SEVERAL permanents
--- lands on `onlyOne`'s Nothing rather than on one of them (#1532).
+-- lands on `onlyOne`'s Nothing rather than on one of them.
 setPaid :: Map SlotName (Set Recipient) -> Map SlotName Binding -> Map SlotName Binding
 setPaid paid = Map.union (fmap toRecipients paid)
 
@@ -564,14 +565,15 @@ modesOf m = Maybe.fromMaybe Seq.empty (Binding.modes =<< Map.lookup chosenModes 
 targetsOf :: Map SlotName Binding -> Map SlotName (Set Recipient)
 targetsOf = Map.filter (not . Set.null) . Map.mapMaybe Binding.targets
 
--- The OBJECTS a binding environment names, one slot at a time: targetsOf with
--- the player recipients dropped, which is what Pawl.Engine.Filter.Context's
--- slotObjects holds so a Quantity.AgainstSlot can aim at one.
+-- The OBJECTS a binding environment names as a TARGET, one slot at a time:
+-- targetsOf with the player recipients dropped. Half of what
+-- Pawl.Engine.Filter.Context's slotObjects holds -- `slotObjects` below is the
+-- whole, group binding included.
 --
 -- No CR 608.2b legality filter, unlike Pawl.Engine.Resolve.effectContext's
--- version: the callers here are CR 603.4's two intervening-"if" checks, and what
--- they aim at is a slot the EVENT bound (Binding.became), which was never chosen
--- and so was never a target to become illegal.
+-- version: what this is read for is CR 603.4's two intervening-"if" checks, and
+-- what they aim at is a slot the EVENT bound (Binding.became), which was never
+-- chosen and so was never a target to become illegal.
 objectSlots :: Map SlotName Binding -> Map SlotName ObjectId
 objectSlots = Map.mapMaybe (Recipient.objectOf Monad.<=< onlyOne) . targetsOf
 
@@ -596,8 +598,9 @@ playersIn = Map.mapMaybe (Recipient.playerOf Monad.<=< onlyOne)
 -- The ONE recipient a slot names, or Nothing when it names none or several. What
 -- every reader that can point at one object and no more asks of a slot -- CR
 -- 601.2c lets a slot hold several, and a reader that cannot take them must not
--- silently take one of them. Which readers those are is Resolve.pluralSlots, and
--- Pawl.CardSpec rejects a card that aims a multi-target slot at one of them.
+-- silently take one of them. Pawl.Engine.Filter.slotOneObject states the same
+-- doctrine over a Filter.Context, and Pawl.CardSpec's "no multi-target slot is
+-- read one at a time" rejects a card that aims such a slot at one of them.
 onlyOne :: Set Recipient -> Maybe Recipient
 onlyOne rs = case Set.toList rs of
   [r] -> Just r
@@ -612,6 +615,35 @@ amountOf slot m = Binding.amount =<< Map.lookup slot m
 -- can tell "them" from "it" without a tag.
 objectsOf :: SlotName -> Map SlotName Binding -> Maybe (Seq ObjectId)
 objectsOf slot m = Binding.objects =<< Map.lookup slot m
+
+-- Every GROUP binding an environment holds, keyed by slot: objectsOf over the
+-- whole map, for a reader that wants them all at once rather than one name at a
+-- time. What Pawl.Engine.Resolve.effectContext puts in
+-- Pawl.Engine.Filter.Context's slotObjects so that CR 115.10a's group is visible
+-- to the IsBound atom.
+groupsOf :: Map SlotName Binding -> Map SlotName (Seq ObjectId)
+groupsOf = Map.mapMaybe Binding.objects
+
+-- What Pawl.Engine.Filter.Context's slotObjects holds: every object a slot
+-- names, both shapes at once -- the ONE object a target slot names (objectSlots)
+-- and every member of a group (groupsOf). One function so that no reader of that
+-- field learns only half of what a slot may name; the singular readers narrow it
+-- back through Pawl.Engine.Filter.slotOneObject.
+slotObjects :: Map SlotName Binding -> Map SlotName (Set ObjectId)
+slotObjects m = withGroups (objectSlots m) (groupsOf m)
+
+-- slotObjects over the two halves separately, for the caller that cannot take
+-- the target half off an environment: Pawl.Engine.Resolve reads it out of CR
+-- 608.2b's re-validated recipients instead. An empty group is dropped, so an
+-- absent key and "names nothing" stay the same question, and a slot holds one
+-- shape or the other -- the union is written for a case the binders do not
+-- produce rather than for one they do.
+withGroups :: Map SlotName ObjectId -> Map SlotName (Seq ObjectId) -> Map SlotName (Set ObjectId)
+withGroups singles groups =
+  Map.unionWith
+    Set.union
+    (fmap Set.singleton singles)
+    (Map.filter (not . Set.null) (fmap (Set.fromList . Foldable.toList) groups))
 
 -- The copy snapshot stored on an object, if any (CR 707.2).
 copyOf :: Map SlotName Binding -> Maybe ProjectedCharacteristics

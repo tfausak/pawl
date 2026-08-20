@@ -10110,7 +10110,7 @@ interveningHolds gs pending =
         -- Ray of Frost's "if enchanted creature is red" is about the SOURCE's
         -- attachment rather than about the event, and Stack's CR 608.2a re-check
         -- supplies the same field so the two checks cannot disagree.
-        ((Filter.contextWithSlots (Just (PendingTrigger.controller pending)) (Just oid) (Binding.objectSlots (PendingTrigger.bindings pending))) {Filter.sourceAttachedTo = Projection.hostOf oid gs})
+        ((Filter.contextWithSlots (Just (PendingTrigger.controller pending)) (Just oid) (Binding.slotObjects (PendingTrigger.bindings pending))) {Filter.sourceAttachedTo = Projection.hostOf oid gs})
         gs
         oid
         cond

@@ -167,7 +167,7 @@ resolveTopWith runSubgame = do
           -- pass one check and fail the other.
           case TriggeredAbility.intervening ability of
             Just cond
-              | not (Condition.holds (Projection.viewWithLastKnownAnywhere gs) ((Filter.contextWithSlots (Just (Object.owner obj)) (Just srcId) (Binding.objectSlots (Object.bindings obj))) {Filter.sourceAttachedTo = Projection.hostOf srcId gs}) gs srcId cond) ->
+              | not (Condition.holds (Projection.viewWithLastKnownAnywhere gs) ((Filter.contextWithSlots (Just (Object.owner obj)) (Just srcId) (Binding.slotObjects (Object.bindings obj))) {Filter.sourceAttachedTo = Projection.hostOf srcId gs}) gs srcId cond) ->
                   State.modify' (Game.cease oid)
             _ ->
               let chosen = Binding.modesOf (Object.bindings obj)
@@ -208,7 +208,7 @@ resolveTopWith runSubgame = do
           -- field would be Nothing however it was filled.
           case TriggeredAbility.intervening ability of
             Just cond
-              | not (Condition.holds (Projection.viewWithLastKnownAnywhere gs) (Filter.contextWithSlots (Just (Object.owner obj)) (Just oid) (Binding.objectSlots (Object.bindings obj))) gs oid cond) ->
+              | not (Condition.holds (Projection.viewWithLastKnownAnywhere gs) (Filter.contextWithSlots (Just (Object.owner obj)) (Just oid) (Binding.slotObjects (Object.bindings obj))) gs oid cond) ->
                   State.modify' (Game.cease oid)
             _ ->
               let chosen = Binding.modesOf (Object.bindings obj)

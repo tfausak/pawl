@@ -174,12 +174,13 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- to the resolving object however the evaluation is aimed.
   --
   -- Nothing when the slot names no object. Filter.slotObjects is empty outside a
-  -- resolution and omits an illegal slot (CR 608.2b) and a player recipient, so
-  -- the three cases collapse onto the one answer -- unanswered, which every
-  -- caller already treats as a no-op.
+  -- resolution and omits an illegal slot (CR 608.2b) and a player recipient, and
+  -- Filter.slotOneObject declines a slot naming SEVERAL rather than picking one
+  -- of them -- so the four cases collapse onto the one answer, unanswered, which
+  -- every caller already treats as a no-op.
   --
   -- Terminating: the payload is a strictly smaller subterm.
-  Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> case Map.lookup slot (Filter.slotObjects context) of
+  Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> case Filter.slotOneObject slot context of
     Nothing -> Nothing
     Just oid -> evaluateAgainst viewOf context gs announcedOn (Just oid) (viewOf oid) inner
   Quantity.Plus (Plus.MkPlus a b) -> case (recur a, recur b) of
@@ -467,7 +468,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
       -- Candidate's posture: the quantity is unanswered rather than answered off
       -- the resolving controller.
       PlayerRef.ControllerOfBound slot ->
-        fmap pure (Map.lookup slot (Filter.slotObjects context) >>= viewOf >>= Filter.controller)
+        fmap pure (Filter.slotOneObject slot context >>= viewOf >>= Filter.controller)
       PlayerRef.EachPlayer -> Count.playersFor context gs ref
       PlayerRef.EachPlayerExcept _ -> Count.playersFor context gs ref
       PlayerRef.Relative _ -> Count.playersFor context gs ref
