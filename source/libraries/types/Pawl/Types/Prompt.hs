@@ -92,13 +92,17 @@ data Prompt r where
   -- the payment then comes up short and CR 601.2h reverses it.
   --
   -- Never elided, single candidates included: declining is a real answer on
-  -- every board, and same-card candidates are not interchangeable -- two
-  -- Llanowar Elves can differ by an Equipment, an Aura or counters (#217).
+  -- every board. The candidate LIST is collapsed to one source per
+  -- interchangeability class (Pawl.Engine.Interchangeable), which is why two
+  -- Llanowar Elves may be one candidate -- but only where nothing tells them
+  -- apart, since an Equipment, an Aura or a counter makes them two answers.
   ChooseManaSource :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt (Maybe ObjectId.ObjectId)
   -- | CR 605.3a, asked once the pool ALREADY covers the cost: which further
   -- source to activate, or Nothing to close CR 601.2g's window and pay. A
   -- sibling of ChooseManaSource because silence means the opposite here.
-  -- Floating is observable (Omnath, Locus of Mana), so this is never elided.
+  -- Floating is observable (Omnath, Locus of Mana), so this is never elided --
+  -- and its candidate list is collapsed exactly as ChooseManaSource's is, since
+  -- both come out of the one window.
   ChooseExtraManaSource :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt (Maybe ObjectId.ObjectId)
   -- | CR 605.3b: which mana the source produces, asked as the mana ability
   -- resolves. A ManaOption is the whole mana one activation adds together with

@@ -31,6 +31,7 @@ import qualified Pawl.Engine.Detain as Detain
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Interchangeable as Interchangeable
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
@@ -1517,10 +1518,14 @@ payMana spending pid cost = do
     window refused = do
       gs <- State.get
       let covered = Maybe.isJust (settlement gs)
-      case filter (`Set.notMember` refused) (Mana.manaSources manaActivations pid gs) of
+          -- One projection per pass, shared by the enumeration and the
+          -- interchangeability test rather than computed twice: Mana.manaSources
+          -- is this same call.
+          pcs = Projection.projectAll gs
+      case filter (`Set.notMember` refused) (Mana.manaSourcesGiven manaActivations (Projection.controlGrants gs) pcs pid gs) of
         [] -> settle
         candidate : rest -> do
-          answer <- chooseSource covered pid (candidate NonEmpty.:| rest) gs
+          answer <- chooseSource covered pid (Interchangeable.representatives pcs gs (candidate NonEmpty.:| rest)) gs
           case answer of
             Nothing -> settle
             Just oid -> do
@@ -1547,10 +1552,12 @@ payMana spending pid cost = do
 --
 -- Asked on every pass, and NEVER elided, not even for a single candidate:
 -- declining is an answer on every board, and Mana Confluence's "{T}, Pay 1 life"
--- is a cost a player at 1 life would rather not pay. Same-card candidates are not
--- collapsed either -- two Llanowar Elves differ in what is attached, what
--- counters they carry, who controls them and whether they are blocking, none of
--- which `Game.cardOf`'s printed identity can see (#217).
+-- is a cost a player at 1 life would rather not pay.
+--
+-- The CANDIDATES are collapsed, one per interchangeability class
+-- (Pawl.Engine.Interchangeable.representatives), which is a different question:
+-- two Llanowar Elves are one option only where nothing on the board tells them
+-- apart, and printed identity is nowhere near enough to say so.
 --
 -- FILTERED, NOT TRUSTED. An unrecognised id reads as declining rather than as
 -- the head candidate, since the fallback must not tap something for the player.

@@ -664,6 +664,7 @@ library engine
     Pawl.Engine.Foretell
     Pawl.Engine.Game
     Pawl.Engine.Ignore
+    Pawl.Engine.Interchangeable
     Pawl.Engine.Keyword
     Pawl.Engine.Mana
     Pawl.Engine.ManaAbility
