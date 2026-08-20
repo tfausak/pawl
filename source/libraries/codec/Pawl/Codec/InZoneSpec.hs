@@ -33,9 +33,10 @@ spec s = Spec.describe s "Pawl.Codec.InZone" $ do
       InZone.codec
       (InZone.MkInZone {InZone.zone = Zone.Graveyard, InZone.player = PlayerRef.Relative PlayerRelation.Opponent})
       " {\"zone\":{\"type\":\"Graveyard\"},\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"Opponent\"}}} "
-  -- CR 400.1's invariant, at the point card data enters the engine. The two
-  -- payloads differ in the zone alone: the pairing above is the same reference
-  -- over a zone its owner has a copy of.
+  -- CR 400.1's invariant, at the point card data enters the engine. The first
+  -- payload below and the accepted one above differ in the ZONE alone -- the
+  -- same reference either way -- so what is rejected is the pairing rather than
+  -- the reference.
   Spec.it s "CR 400.1 rejects one player's share of a shared zone" $ do
     Spec.assertBool
       s
