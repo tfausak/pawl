@@ -173,6 +173,15 @@ waxWaneJson = do
   root <- Registry.defaultRoot
   TextIO.readFile (root <> "/wax-wane.json")
 
+-- The committed Nightmare file, the pool's plainest CR 400.1 count: "Swamps you
+-- control", written as the shared battlefield paired with PlayerRef.EachPlayer
+-- and a Filter.ControlledBy conjunct. Read for the same reason the two above
+-- are, and used where a case needs a card whose scope it can divide by hand.
+nightmareJson :: IO Text.Text
+nightmareJson = do
+  root <- Registry.defaultRoot
+  TextIO.readFile (root <> "/nightmare.json")
+
 printingOf :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m Printing.Printing
 printingOf s registry = fmap Printing.MkPrinting . cardOf s registry
 

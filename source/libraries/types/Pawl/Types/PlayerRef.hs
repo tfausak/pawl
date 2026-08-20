@@ -18,7 +18,8 @@ import qualified Pawl.Types.SlotName as SlotName
 data PlayerRef
   = -- | Every player's copy of the zone. For a SHARED zone (CR 400.1: battlefield,
     -- stack, exile, command) this is the only meaningful value; the pairing is
-    -- checked by the card lint, not by this type (#161).
+    -- rejected by Pawl.Codec.InZone as card data is decoded and swept for again
+    -- by Pawl.CardSpec, not by this type, see #161.
     EachPlayer
   | -- | EachPlayer minus the player a slot names -- Shahrazad's "each player who
     -- doesn't win the subgame", where the slot holds the subgame's winner.

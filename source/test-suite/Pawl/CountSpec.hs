@@ -102,48 +102,56 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
             Aggregation.DistinctCardTypes
     Spec.assertEqWith s "two types" (S.countOf viewOf (Filter.contextFor Nothing Nothing) gs count) $ Just 2
 
+  -- A GRAVEYARD rather than the battlefield, here and in the three-seat case
+  -- below, and CR 400.1 is why: a graveyard is one player's, so "whose copy" is
+  -- a question it has an answer to, while the battlefield is shared and
+  -- Pawl.Codec.InZone refuses to decode a scope dividing it (see #161). These
+  -- two cases are about the REFERENCE rather than about the zone, so they are
+  -- written over a zone a card may pair one with.
   Spec.it s "CR 102.2 Relative Opponent excludes the perspective" $ do
-    -- The same board as the first case, read from Bob's perspective: his
-    -- opponent Alice controls two Swamps.
+    -- Read from Bob's perspective: his opponent Alice has one Swamp in her
+    -- graveyard, and his own does not count.
     swampPrinting <- S.printingOf s registry "Swamp"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (a1, gs1) = S.addCreature swampPrinting S.alice gs0
-        (b1, gs) = S.addCreature swampPrinting S.bob gs1
+        (a1, gs1) = S.addGraveyardCard swampPrinting S.alice gs0
+        (b1, gs) = S.addGraveyardCard swampPrinting S.bob gs1
         swamp = Set.singleton Subtype.Swamp
         land = Set.singleton CardType.Land
-        viewOf = S.stubView [(a1, land, swamp, Just S.alice), (b1, land, swamp, Just S.bob)]
+        -- CR 108.4: a card in a graveyard has no controller, so the stub answers
+        -- Nothing for one. The filter below asks about a subtype, not about a
+        -- player, so the fold is the reference's work alone.
+        viewOf = S.stubView [(a1, land, swamp, Nothing), (b1, land, swamp, Nothing)]
         count =
           Count.Type.MkCount
-            (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.Opponent)))
+            (Scope.InZone (InZone.MkInZone Zone.Graveyard (PlayerRef.Relative PlayerRelation.Opponent)))
             (Filter.Type.HasSubtype Subtype.Swamp)
             Aggregation.Members
     Spec.assertEqWith s "Alice's one" (S.countOf viewOf (Filter.contextFor (Just S.bob) Nothing) gs count) $ Just 1
 
   Spec.it s "CR 806.1 at three seats Relative Opponent folds BOTH opponents' zones" $ do
-    -- Nightmare's shape (a count of Swamps you control) read from the OTHER
-    -- side: from alice's perspective, a count of Swamps an opponent controls
+    -- From alice's perspective, a count of Swamps in an opponent's graveyard
     -- must fold bob's zone and carol's. DISCRIMINATING: the answer is 3, and
     -- every wrong reading gives a different number -- one opponent gives 1 or
     -- 2, and including the perspective gives 4. A two-seat board cannot
     -- separate those, which is why the sibling case above tops out at 1.
     swampPrinting <- S.printingOf s registry "Swamp"
     let gs0 = Setup.emptyGame S.threePlayers
-        (a1, gs1) = S.addCreature swampPrinting S.alice gs0
-        (b1, gs2) = S.addCreature swampPrinting S.bob gs1
-        (c1, gs3) = S.addCreature swampPrinting S.carol gs2
-        (c2, gs) = S.addCreature swampPrinting S.carol gs3
+        (a1, gs1) = S.addGraveyardCard swampPrinting S.alice gs0
+        (b1, gs2) = S.addGraveyardCard swampPrinting S.bob gs1
+        (c1, gs3) = S.addGraveyardCard swampPrinting S.carol gs2
+        (c2, gs) = S.addGraveyardCard swampPrinting S.carol gs3
         swamp = Set.singleton Subtype.Swamp
         land = Set.singleton CardType.Land
         viewOf =
           S.stubView
-            [ (a1, land, swamp, Just S.alice),
-              (b1, land, swamp, Just S.bob),
-              (c1, land, swamp, Just S.carol),
-              (c2, land, swamp, Just S.carol)
+            [ (a1, land, swamp, Nothing),
+              (b1, land, swamp, Nothing),
+              (c1, land, swamp, Nothing),
+              (c2, land, swamp, Nothing)
             ]
         count =
           Count.Type.MkCount
-            (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.Opponent)))
+            (Scope.InZone (InZone.MkInZone Zone.Graveyard (PlayerRef.Relative PlayerRelation.Opponent)))
             (Filter.Type.HasSubtype Subtype.Swamp)
             Aggregation.Members
     Spec.assertEqWith s "bob's one plus carol's two, and none of alice's" (S.countOf viewOf (Filter.contextFor (Just S.alice) Nothing) gs count) $ Just 3

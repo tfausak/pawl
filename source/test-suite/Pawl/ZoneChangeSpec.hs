@@ -779,7 +779,7 @@ loseLifeSpec s registry = Spec.describe s "LoseLife" $ do
 --   * Stronghold Discipline, {2}{B}{B} Sorcery: "Each player loses 1 life for
 --     each creature they control." Effect.LoseLife over a count filtered by
 --     Filter.ControlledByRecipient -- CR 110.2's CONTROL, read over the shared
---     battlefield (CR 400.1), which no per-seat scope can express (#161).
+--     battlefield (CR 400.1), which no per-seat scope can express (see #161).
 --   * Nature's Resurgence, {2}{G}{G} Sorcery: "Each player draws a card for each
 --     creature card in their graveyard." Effect.Draw over a count whose SCOPE is
 --     the recipient's own graveyard -- PlayerRef.Candidate, substituted by
