@@ -225,8 +225,8 @@ data Face card = MkFace
     -- | CR 101.1: the ceiling this face's own words put on the value of X its
     -- controller announces at CR 601.2b -- Soul Immolation's "X can't be greater
     -- than the greatest toughness among creatures you control". Nothing for every
-    -- card that states none, which is all but six printings (Scryfall
-    -- `o:/X can.t be greater than/`, 2026-08-20).
+    -- card that states none, which is nearly all of them -- Scryfall
+    -- `o:/X can.t be greater than/`, 2026-08-20, is what finds the ones that do.
     --
     -- CR 101.1 and not CR 107.3a is the rule with the force here: rule 107.3a
     -- says only that the controller "chooses and announces the value of X", and

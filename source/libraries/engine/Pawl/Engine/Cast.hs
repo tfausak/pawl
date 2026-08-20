@@ -324,13 +324,13 @@ payableCostAt x spending pid oid gs cost =
 --   * as a BLIGHT (Cost.substituteXInComponent again, a CostComponent.BlightX
 --     becoming a Blight). Monotone VACUOUSLY, CR 701.68b refusing a blight only
 --     where the player controls no creature and naming no number of counters
---     that is too many -- so this route never fails and the climb needs the
---     `ceiling` below to stop. Soul Immolation is the card whose X reaches a
+--     that is too many -- so this route never fails and the climb needs
+--     `mCeiling` below to stop. Soul Immolation is the card whose X reaches a
 --     cost only this way.
 --
--- The CEILING is CR 101.1's, evaluated off the face being cast
--- (Cost.maximumX) and passed straight through: it bounds the search as well as
--- the announcement, which is what makes the blight route terminate.
+-- `mCeiling` is CR 101.1's, evaluated off the face being cast (Cost.maximumX)
+-- and passed straight through: it bounds the search as well as the
+-- announcement, which is what makes the blight route terminate.
 --
 -- The two degenerate costs -- one with no X in it, which would climb forever,
 -- and one unpayable even at X=0 -- both answer 0, and Cost.greatestPayableX says

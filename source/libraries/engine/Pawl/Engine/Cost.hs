@@ -481,11 +481,14 @@ substituteXInComponent x component = case component of
 -- an EXAMPLE and CR 107.3a lists the additional cost beside it, so Hatred, whose
 -- only X is in "pay X life", is asked exactly as Blaze is.
 hasVariable :: Cost Keyword.Type.Keyword -> Bool
-hasVariable cost = manaHasVariable || any componentHasVariable (Cost.components cost)
-  where
-    manaHasVariable = case Cost.mana cost of
-      Nothing -> False
-      Just (ManaCost.MkManaCost symbols) -> elem ManaSymbol.Variable symbols
+hasVariable cost = manaHasVariable cost || any componentHasVariable (Cost.components cost)
+
+-- Does the MANA half of this cost carry CR 107.3's {X}? Nothing is CR 118.6's
+-- unpayable cost, which declares nothing.
+manaHasVariable :: Cost Keyword.Type.Keyword -> Bool
+manaHasVariable cost = case Cost.mana cost of
+  Nothing -> False
+  Just (ManaCost.MkManaCost symbols) -> elem ManaSymbol.Variable symbols
 
 -- substituteXInComponent's predicate half, and exhaustive for its reason. The
 -- two must agree: a component this answers False for is one no announcement
@@ -524,8 +527,8 @@ componentHasVariable component = case component of
 -- grow; Pawl.CostSpec's "Hatred is asked for X, bounded by the life its cost can
 -- pay" stops running at all if the life half ever stops charging.
 --
--- TERMINATING on either of two grounds, and a cost needs one of them: the
--- `ceiling`, or a demand that GROWS without bound (`demandGrowsWithX` below).
+-- TERMINATING on either of two grounds, and a cost needs one of them:
+-- `mCeiling`, or a demand that GROWS without bound (`demandGrowsWithX` below).
 -- Neither is redundant -- Toxic Deluge's "pay X life" states no ceiling and is
 -- stopped by CR 119.4's life total, while Soul Immolation's "blight X" is
 -- payable at every X (rule 701.68b names no number) and is stopped only by its
@@ -546,14 +549,12 @@ greatestPayableX mCeiling payableAt cost =
 -- whether `greatestPayableX`'s ascending search needs CR 101.1's ceiling to
 -- stop. NOT the same question as `hasVariable`: a cost can carry an X whose
 -- demand never grows.
+-- The mana half's two questions have ONE answer, which is CR 107.4b: {X} is a
+-- generic symbol, so an announced X is that much more mana to find and a board
+-- produces finitely much. `manaHasVariable` therefore answers both, and the
+-- COMPONENTS are where the two questions come apart.
 demandGrowsWithX :: Cost Keyword.Type.Keyword -> Bool
-demandGrowsWithX cost = manaHasVariable || any componentDemandGrowsWithX (Cost.components cost)
-  where
-    manaHasVariable = case Cost.mana cost of
-      Nothing -> False
-      -- CR 107.4b's generic symbol: {X} resolves to that much mana, and a board
-      -- produces finitely much.
-      Just (ManaCost.MkManaCost symbols) -> elem ManaSymbol.Variable symbols
+demandGrowsWithX cost = manaHasVariable cost || any componentDemandGrowsWithX (Cost.components cost)
 
 -- `componentHasVariable`'s question sharpened, and exhaustive for its reason: a
 -- new X-carrying component owes an answer here as well as there.
