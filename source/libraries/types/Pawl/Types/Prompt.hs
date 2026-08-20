@@ -618,6 +618,11 @@ data Prompt r where
   --
   -- Elided at one candidate, the effect being mandatory. The current host is
   -- never among the candidates (CR 701.3b).
+  --
+  -- The PlayerId is the RESOLVING controller for an effect that names one
+  -- destination (CR 608.2d), and the SUBJECT's controller for one that names
+  -- several -- CR 303.4d for an Aura, CR 301.5c for an Equipment, both routed
+  -- through Pawl.Engine.Attach.arbitrate.
   ChooseAttachment :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 303.4k with CR 614.1e: whether an Aura being turned face up exercises
   -- its printed "you MAY attach it" (Gift of Doom). CR 303.4k names the player.

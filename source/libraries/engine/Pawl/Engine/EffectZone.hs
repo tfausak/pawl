@@ -153,6 +153,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.ExileHaunting {} -> Nothing
   Effect.Attach _ -> Nothing
   Effect.AttachTarget {} -> Nothing
+  Effect.AttachTargetToEach {} -> Nothing
   Effect.PlaySubgame _ -> Nothing
   Effect.ChooseOpponent _ -> Nothing
   Effect.TakeExtraTurn {} -> Nothing

@@ -793,6 +793,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   equipmentSpec s registry
   unattachableSpec s registry
   reattachSpec s registry
+  arbitrationSpec s registry
   auraGraftSpec s registry
   miracleWorkerSpec s registry
   enchantPlayerSpec s registry
@@ -1184,6 +1185,101 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
         Spec.assertBool s (Projection.hasKeyword Keyword.Trample mine moved) "with trample (CR 702.19)"
         Spec.assertEqWith s "and the Piker is a plain 2/1" (S.powerToughnessOf host moved) (Just (2, 1))
       _ -> Spec.assertFailure s "the fixture wanted one Aura on the Piker, one Crown on the battlefield, and one printed ability"
+
+-- CR 303.4d's last two sentences, and CR 301.5c's, which are the same rule
+-- written twice: "an Aura can't enchant more than one object or player. If a
+-- spell or ability would cause an Aura to become attached to more than one
+-- object or player, the Aura's controller chooses which object or player it
+-- becomes attached to."
+--
+-- Synthetic Aura Diffusion is the producer -- "{T}: Attach target Aura attached
+-- to a creature to each other permanent it can enchant" -- and it is synthetic
+-- because these Scryfall queries turned up no printing that names more than one
+-- destination:
+-- `o:"attach" o:"to each"`, `o:"attached to each"`, `o:/attach[a-z]* .* to each/`,
+-- `o:"attach" o:"to two"`, `o:"attach" o:"to any number of"` and
+-- `o:"enchant more than one"`, 2026-08-19, no hit that attaches ONE permanent to
+-- several. Unfinished Business would refute that -- it is the closest printed
+-- shape, and it runs the other way, returning up to two Auras onto one creature.
+--
+-- WHAT IS ACTUALLY BEING PROVED is the chooser, since "pick one of N" is what
+-- Attach.chooseHost already did for Crown of the Ages. So the Aura is BOB's and
+-- the ability is ALICE's: under CR 608.2d alone alice would choose, and these two
+-- rules take it away from her. Two seats is the minimum that can tell them
+-- apart, and the answerer branches on the PlayerId the prompt names rather than
+-- pinning one answer, so the two readings cannot collapse onto the same host.
+arbitrationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+arbitrationSpec s registry =
+  let -- The nth offered destination, one-based. Pinned BY INDEX rather than by
+      -- searching for a legal option, so no mutation lets the answerer repair the
+      -- assertion. Attach.hostsFor sorts ascending and the creatures go in in
+      -- this order, so 1 is the Piker and 2 the Mammoth.
+      nth n candidates = case drop (n - 1) (NonEmpty.toList candidates) of
+        x : _ -> x
+        [] -> NonEmpty.head candidates
+      -- Bird Maiden 1/2 holds the Aura, Goblin Piker 2/1 and War Mammoth 3/3 are
+      -- the two destinations, and Unholy Strength's +2/+1 lands on exactly one of
+      -- them -- four distinct power/toughness pairs across the two readings, so
+      -- no numeric coincidence can hide a wrong host.
+      board maiden piker mammoth unholy diffusion =
+        let base = Setup.emptyGame S.bothPlayers
+            (host, g1) = S.addCreature maiden S.alice base
+            (firstHost, g2) = S.addCreature piker S.alice g1
+            (secondHost, g3) = S.addCreature mammoth S.alice g2
+            (aura, g4) = S.addCreature unholy S.bob g3
+            (artifact, g5) = S.addCreature diffusion S.alice g4
+         in (host, firstHost, secondHost, aura, artifact, (S.attach aura host g5) {GameState.priority = Just S.alice})
+      -- Targets the Aura, then routes the destination choice by WHO is asked.
+      byChooser :: ObjectId.ObjectId -> Int -> Int -> Prompt.Prompt r -> r
+      byChooser aura forBob forAlice p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject aura))) sets
+        Prompt.ChooseAttachment _ chooser _ offered ->
+          if chooser == S.bob then nth forBob offered else nth forAlice offered
+        _ -> S.identityAnswer p
+   in Spec.describe s "Arbitration" $ do
+        Spec.it s "CR 303.4d the AURA's controller chooses which of the named hosts it keeps" $ do
+          maiden <- S.printingOf s registry "Bird Maiden"
+          piker <- S.printingOf s registry "Goblin Piker"
+          mammoth <- S.printingOf s registry "War Mammoth"
+          unholy <- S.printingOf s registry "Unholy Strength"
+          diffusion <- S.printingOf s registry "Synthetic Aura Diffusion"
+          let (host, firstHost, secondHost, aura, artifact, gs) = board maiden piker mammoth unholy diffusion
+          case Face.activatedAbilities (S.combinedFace diffusion) of
+            [] -> Spec.assertFailure s "Synthetic Aura Diffusion should print one activated ability"
+            ability : _ -> do
+              -- bob takes the SECOND destination, alice the first. Alice's answer
+              -- is live on this board: it is what a CR 608.2d-only reading would use.
+              let activated = S.runPure (byChooser aura 2 1) gs (Activate.activateAbility S.alice artifact ability)
+                  after = S.runPure (byChooser aura 2 1) activated Stack.resolveTop
+                  settled = S.settleSba (S.settleSba after)
+              Spec.assertEqWith s "the Mammoth carries Unholy Strength's +2/+1, which is bob's answer" (S.powerToughnessOf secondHost after) (Just (5, 4))
+              Spec.assertEqWith s "the Piker, which alice's answer named, is a plain 2/1" (S.powerToughnessOf firstHost after) (Just (2, 1))
+              Spec.assertEqWith s "and the old host is back to 1/2" (S.powerToughnessOf host after) (Just (1, 2))
+              Spec.assertEqWith s "and the Aura's one host is the creature bob named" (fmap Object.attachedTo (Game.lookupObject aura after)) (Just (Just (Recipient.ToCreature secondHost)))
+              -- CR 704.5m: it landed on a legal host, so nothing bins it, and CR
+              -- 303.4e leaves it bob's on alice's creature.
+              Spec.assertBool s (Set.member aura (GameState.battlefield settled)) "the Aura survives the state-based actions"
+              Spec.assertEqWith s "still bob's" (Projection.controllerOf aura settled) (Just S.bob)
+        -- The paired control, differing in ONE thing: bob's answer. If the engine
+        -- were picking the host, the two legs could not disagree. Alice's answer
+        -- is the other index in each leg, so a mutation that hands her the choice
+        -- swaps both outcomes and reddens both cases rather than neither.
+        Spec.it s "CR 303.4d another answer from the same player puts it elsewhere" $ do
+          maiden <- S.printingOf s registry "Bird Maiden"
+          piker <- S.printingOf s registry "Goblin Piker"
+          mammoth <- S.printingOf s registry "War Mammoth"
+          unholy <- S.printingOf s registry "Unholy Strength"
+          diffusion <- S.printingOf s registry "Synthetic Aura Diffusion"
+          let (host, firstHost, secondHost, aura, artifact, gs) = board maiden piker mammoth unholy diffusion
+          case Face.activatedAbilities (S.combinedFace diffusion) of
+            [] -> Spec.assertFailure s "Synthetic Aura Diffusion should print one activated ability"
+            ability : _ -> do
+              let activated = S.runPure (byChooser aura 1 2) gs (Activate.activateAbility S.alice artifact ability)
+                  after = S.runPure (byChooser aura 1 2) activated Stack.resolveTop
+              Spec.assertEqWith s "the Piker carries the +2/+1 now" (S.powerToughnessOf firstHost after) (Just (4, 2))
+              Spec.assertEqWith s "and the Mammoth is a plain 3/3" (S.powerToughnessOf secondHost after) (Just (3, 3))
+              Spec.assertEqWith s "the old host is still 1/2" (S.powerToughnessOf host after) (Just (1, 2))
+              Spec.assertEqWith s "one host, not two" (fmap Object.attachedTo (Game.lookupObject aura after)) (Just (Just (Recipient.ToCreature firstHost)))
 
 -- CR 303.4e's half of the CR 701.3 Attach work: an effect that changes the AURA's
 -- own controller and moves it in one resolution. Aura Graft is the proving card --

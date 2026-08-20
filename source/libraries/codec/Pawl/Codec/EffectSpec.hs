@@ -321,6 +321,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.AttachTarget (AttachTarget.MkAttachTarget (SlotName.MkSlotName (Text.pack "target")) (Filter.HasCardType CardType.Creature)))
       " {\"type\":\"AttachTarget\",\"value\":{\"slot\":\"target\",\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+  -- CR 303.4d / CR 301.5c: the same payload as AttachTarget above, so only the
+  -- tag tells the two opcodes apart on the wire.
+  Spec.it s "AttachTargetToEach" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.AttachTargetToEach (AttachTarget.MkAttachTarget (SlotName.MkSlotName (Text.pack "target")) (Filter.HasCardType CardType.Creature)))
+      " {\"type\":\"AttachTargetToEach\",\"value\":{\"slot\":\"target\",\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   -- MoveToZone's payload is the ObjectRef and the destination zone, then four
   -- independently elided extras -- the EntryRiders, the bound slot, CR 113.6m's
   -- origin zone and CR 401.2's library position -- so it is told apart by JSON

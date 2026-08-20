@@ -1336,6 +1336,7 @@ rewriteEffect pairs effect = case effect of
   Effect.ExileHaunting {} -> effect
   Effect.Attach _ -> effect
   Effect.AttachTarget (AttachTarget.MkAttachTarget slot filter_) -> Effect.AttachTarget (AttachTarget.MkAttachTarget slot (Filter.rewrite pairs filter_))
+  Effect.AttachTargetToEach (AttachTarget.MkAttachTarget slot filter_) -> Effect.AttachTargetToEach (AttachTarget.MkAttachTarget slot (Filter.rewrite pairs filter_))
   Effect.PlaySubgame _ -> effect
   Effect.ChooseOpponent _ -> effect
   Effect.TakeExtraTurn {} -> effect

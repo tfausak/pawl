@@ -194,6 +194,19 @@ data Effect card
     -- 701.3b making attachment to the current host a no-op whatever the card
     -- says. An illegal destination leaves the subject where it was, unrestamped.
     AttachTarget AttachTarget.AttachTarget
+  | -- | CR 303.4d / CR 301.5c: attach the SLOT'S TARGET to EACH permanent the
+    -- Filter matches, rather than to one of them. Both rules end the same
+    -- sentence -- an Aura can't enchant more than one object or player, an
+    -- Equipment can't equip more than one creature, and in each case the
+    -- ATTACHMENT's controller chooses which one it ends up on -- so this opcode
+    -- names the whole set and Pawl.Engine.Attach.arbitrate reduces it.
+    --
+    -- AttachTarget's sibling, and the payload is the same record read a second
+    -- way: there the Filter's matches are the menu the resolving controller
+    -- picks from (CR 608.2d), here they are all named at once and the choice
+    -- moves to the subject's controller. That reassignment is the only thing
+    -- observable about this opcode, and it needs two seats to see.
+    AttachTargetToEach AttachTarget.AttachTarget
   | -- | CR 400.7: move the objects the ObjectRef names to a zone through the
     -- changeZone funnel. The destination is data, so this is one opcode for every
     -- zone move; Hand is owner-relative, changeZone carrying Object.owner.
