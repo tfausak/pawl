@@ -100,7 +100,9 @@ data Prompt r where
   -- | CR 605.3a, asked once the pool ALREADY covers the cost: which further
   -- source to activate, or Nothing to close CR 601.2g's window and pay. A
   -- sibling of ChooseManaSource because silence means the opposite here.
-  -- Floating is observable (Omnath, Locus of Mana), so this is never elided.
+  -- Floating is observable (Omnath, Locus of Mana), so this is never elided --
+  -- and its candidate list is collapsed exactly as ChooseManaSource's is, since
+  -- both come out of the one window.
   ChooseExtraManaSource :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt (Maybe ObjectId.ObjectId)
   -- | CR 605.3b: which mana the source produces, asked as the mana ability
   -- resolves. A ManaOption is the whole mana one activation adds together with

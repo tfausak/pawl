@@ -91,6 +91,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Sickness as Sickness
@@ -2693,8 +2694,10 @@ interchangeableSourcesSpec s registry = Spec.describe s "Interchangeable mana so
     Spec.assertBool s paid "the {G} was paid"
     Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
 
-  -- CR 506.4b is not the point here; the Equipment is. What the elision must not
-  -- do is answer "which Elf" for a player whose two Elves are a 1/1 and a 3/1.
+  -- The owner's minimal falsifier for collapsing by printed card: what the
+  -- elision must not do is answer "which Elf" for a player whose Elves are a 3/1
+  -- and a 1/1. It is caught twice over -- Bonesplitter's +2/+0 is in the
+  -- projection, and the Equipment names its host through Object.attachedTo.
   Spec.it s "CR 601.2g an equipped Elf is a candidate of its own" $ do
     elf <- S.printingOf s registry "Llanowar Elves"
     splitter <- S.printingOf s registry "Bonesplitter"
@@ -2716,6 +2719,35 @@ interchangeableSourcesSpec s registry = Spec.describe s "Interchangeable mana so
         board = freeze (NonEmpty.head elves) plain
         (offers, paid, after) = greenWindow board
     Spec.assertEqWith s "asked once, with the frozen Elf beside the two that are alike" (fmap length offers) [2]
+    Spec.assertBool s paid "the {G} was paid"
+    Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
+
+  -- Object.bindings, the other half of what one object can say about another: a
+  -- spell on the stack that took one Elf as its target (CR 601.2c) separates it
+  -- from the two it is otherwise identical to, and neither the Elf's own record
+  -- nor its projection carries a word about it.
+  --
+  -- Two steps, because a spell's targets reach Object.bindings only once CR
+  -- 601.2i has finished the cast -- the window CR 601.2g opens for that same
+  -- cast runs while they are still a local. The Forest pays for the Giant
+  -- Growth, so all three Elves are still untapped for the window that follows.
+  Spec.it s "CR 601.2g an Elf a spell on the stack targets is a candidate of its own" $ do
+    elf <- S.printingOf s registry "Llanowar Elves"
+    forest <- S.printingOf s registry "Forest"
+    growth <- S.printingOf s registry "Giant Growth"
+    let (elves, plain) = elfBoard elf 3
+        (land, wooded) = S.addCreature forest S.alice plain
+        (board, spell) = S.handOne growth wooded
+        aimed = NonEmpty.head elves
+        casting :: Prompt.Prompt r -> r
+        casting p = case p of
+          Prompt.ChooseTargets _ _ _ offer -> S.preferring ((==) (Just aimed) . Recipient.objectOf) offer
+          _ -> prefersSource land p
+        onStack = S.runPure casting board (S.cast S.alice spell)
+        (offers, paid, after) = greenWindow onStack
+    -- [1] is what a lost target or a rewound cast would leave, so this is also
+    -- the guard that the two steps above did what they say.
+    Spec.assertEqWith s "asked once, with the targeted Elf beside the two that are alike" (fmap length offers) [2]
     Spec.assertBool s paid "the {G} was paid"
     Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
 

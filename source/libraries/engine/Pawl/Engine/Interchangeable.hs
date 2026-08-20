@@ -130,6 +130,19 @@ noCombat =
 -- ability on the stack that took it as a target (CR 601.2c) or that named it as
 -- something an instruction produced. Binding's other three fields carry no
 -- object -- an amount, a Seq of mode indices, and a copiable-values snapshot.
+--
+-- A spell's targets reach Object.bindings only as CR 601.2i finishes the cast,
+-- so the window CR 601.2g opens for that same cast cannot see them; every
+-- earlier spell on the stack is visible. Pawl.ManaSpec's "an Elf a spell on the
+-- stack targets is a candidate of its own" case is the two-step proof.
+--
+-- The ATTACHMENT arm is a regression fence rather than a proved behaviour: every
+-- rider in data/cards changes what it is attached to, so the projection refuses
+-- the pair before this line is reached, and no mutation of it reddens the suite.
+-- Overgrowth ("Whenever enchanted land is tapped for mana, its controller adds
+-- an additional {G}{G}") is the shape that would need it -- the trigger is the
+-- AURA's, so the enchanted land projects exactly like the one beside it -- and
+-- it is unexpressible while no trigger condition watches a tap (#1970).
 namedByAnother :: ObjectId -> GameState -> Bool
 namedByAnother oid gs = any names (Map.toList (GameState.objects gs))
   where
