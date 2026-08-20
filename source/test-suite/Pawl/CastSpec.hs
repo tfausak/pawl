@@ -1688,10 +1688,11 @@ graveRecitalSpec s registry = Spec.describe s "GraveRecital" $ do
 -- than a sum.
 --
 -- The Fugitive Doctor {3}{R}{G} is the pool's one producer of a graveyard card
--- holding two. It is also the only PRINTING that grants a literal flashback
--- cost to another card: every other granter states "the flashback cost is equal
--- to that card's mana cost", which Modification.GainKeyword's literal Keyword
--- cannot express (#1981).
+-- holding two, and the only printing whose grant of one is a LITERAL cost and
+-- nothing else. Archmage's Newt and Iroh, Grand Lotus each state a literal cost
+-- for one class of card and "the flashback cost is equal to that card's mana
+-- cost" for another; every remaining granter states only the second, which
+-- Modification.GainKeyword's literal Keyword cannot express (#1981).
 --
 -- Firebolt's printed {4}{R} and the granted {2}{R}{G} share no reading, and
 -- WHICH of them is the unreachable one is decided by Keyword's derived Ord:
