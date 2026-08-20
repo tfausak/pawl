@@ -106,6 +106,7 @@ import qualified Pawl.Codec.DungeonRoomSpec
 import qualified Pawl.Codec.DurationRefSpec
 import qualified Pawl.Codec.DurationSpec
 import qualified Pawl.Codec.DuringPhaseSpec
+import qualified Pawl.Codec.EachCardFromAmongSpec
 import qualified Pawl.Codec.EachCardInGraveyardSpec
 import qualified Pawl.Codec.EffectSpec
 import qualified Pawl.Codec.EndingStepSpec
@@ -477,6 +478,7 @@ spec s registry = do
   Pawl.Codec.ChooseBetweenSpec.spec s
   Pawl.Codec.ChooserSpec.spec s
   Pawl.Codec.ChosenCardFromAmongSpec.spec s
+  Pawl.Codec.EachCardFromAmongSpec.spec s
   Pawl.Codec.ChosenCardInGraveyardSpec.spec s
   Pawl.Codec.ChosenCardInHandSpec.spec s
   Pawl.Codec.ClauseIndexSpec.spec s

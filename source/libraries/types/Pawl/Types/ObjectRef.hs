@@ -3,6 +3,7 @@ module Pawl.Types.ObjectRef where
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
+import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
@@ -414,9 +415,11 @@ data ObjectRef
     -- by Filter.IsBound; this
     -- arm reads the slot directly instead, so it needs no such sweep.
     --
-    -- Reads the slot's GROUP first and its single binding second, the two shapes
-    -- every binder dispatches between on how many objects it named -- so a look
-    -- at a one-card library offers that card rather than nothing.
+    -- Reads the slot's GROUP first, its single binding second and its still-legal
+    -- targets last -- Pawl.Engine.Resolve.fromAmongMembers, the one definition
+    -- the InSlot arm above and EachCardFromAmong below share -- so a look at a
+    -- one-card library, which binds the singular shape, offers that card rather
+    -- than nothing.
     --
     -- NOT A TARGET and never one (CR 115.10a): the slot was filled by an
     -- instruction of this resolution rather than announced on the stack (CR
@@ -437,6 +440,38 @@ data ObjectRef
     -- object; ChosenCardInGraveyard's note above describes that inert answer and
     -- why it earns no lint.
     ChosenCardFromAmong ChosenCardFromAmong.ChosenCardFromAmong
+  | -- | EVERY card in the GROUP a slot holds that the Filter matches -- the
+    -- printed "all land cards revealed this way", as in Mulch's "reveal the top
+    -- four cards of your library. Put all land cards revealed this way into your
+    -- hand and the rest into your graveyard". The arm above's plural.
+    --
+    -- The SLOT reaches where no zone-keyed arm does, for the arm above's reason:
+    -- the group sits wherever the effect that bound it left the cards, which for
+    -- CR 701.20a's reveal and CR 701.20e's look is the LIBRARY, and a library has
+    -- no filtered sweep (#1309).
+    --
+    -- A READ, not a question, which is the whole difference from the arm above:
+    -- "all" states no count and hands out no choice, so CR 608.2d has nobody to
+    -- ask and Pawl.Engine.Resolve.objectRefObjects answers this arm for real
+    -- under every opcode. The members are matched against their own CR 613
+    -- projections when the instruction is reached (CR 608.2c), in the group's
+    -- mint order, which CR 608.2f leaves standing.
+    --
+    -- Reads the slot through the arm above's own Pawl.Engine.Resolve.fromAmongMembers,
+    -- so a sentence naming the matches and a sentence naming the rest cannot see
+    -- different groups.
+    --
+    -- NOT A TARGET and never one (CR 115.10a): a slot filled by an instruction of
+    -- this resolution was never announced (CR 601.2c), so CR 608.2b has nothing
+    -- to re-validate.
+    --
+    -- "THE REST" is not an arm at all. A later clause naming the same slot with
+    -- InSlot finds the matched cards gone -- CR 400.7 minted new objects for them
+    -- on the way to their new zone -- so the two halves of Mulch's one sentence
+    -- are this arm and InSlot, in that order. A group holding no match yields
+    -- nothing and that share of the instruction is ignored (CR 609.3, CR 101.3),
+    -- which leaves every member to the InSlot clause.
+    EachCardFromAmong EachCardFromAmong.EachCardFromAmong
   | -- | A card RANDOMNESS names out of a hand -- Merfolk Spy's "that player
     -- reveals a card at random from their hand". ChosenCardInHand's PlayerRef,
     -- doing that arm's double duty (CR 402.3 collapses the seat whose hand it is

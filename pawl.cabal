@@ -260,6 +260,8 @@ library codec
     Pawl.Codec.DurationSpec
     Pawl.Codec.DuringPhase
     Pawl.Codec.DuringPhaseSpec
+    Pawl.Codec.EachCardFromAmong
+    Pawl.Codec.EachCardFromAmongSpec
     Pawl.Codec.EachCardInGraveyard
     Pawl.Codec.EachCardInGraveyardSpec
     Pawl.Codec.Effect
@@ -1024,6 +1026,7 @@ library types
     Pawl.Types.Duration
     Pawl.Types.DurationRef
     Pawl.Types.DuringPhase
+    Pawl.Types.EachCardFromAmong
     Pawl.Types.EachCardInGraveyard
     Pawl.Types.Effect
     Pawl.Types.EndingStep

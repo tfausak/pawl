@@ -12,6 +12,7 @@ import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
+import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GraveyardScope as GraveyardScope
@@ -232,6 +233,13 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       " {\"type\":\"ChosenCardFromAmong\",\"value\":{\"slot\":\"revealed\",\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   -- The bare slot name an InSlot takes is not a whole payload here: dropping the
   -- filter would make the two arms tell one story on the wire.
+  -- The plural sibling: the same two keys, a different tag.
+  Spec.it s "EachCardFromAmong" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong (SlotName.MkSlotName (Text.pack "revealed")) (Filter.HasCardType CardType.Land)))
+      " {\"type\":\"EachCardFromAmong\",\"value\":{\"slot\":\"revealed\",\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}} "
   Spec.it s "ChosenCardFromAmong rejects a bare slot name" $
     Spec.assertBool
       s
@@ -276,11 +284,12 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature))),
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (PlayerRef.Relative PlayerRelation.You) (Filter.HasCardType CardType.Creature))),
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong (SlotName.MkSlotName (Text.pack "revealed")) (Filter.HasCardType CardType.Creature))),
+                Codec.encode ObjectRef.codec (ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong (SlotName.MkSlotName (Text.pack "revealed")) (Filter.HasCardType CardType.Land))),
                 Codec.encode ObjectRef.codec (ObjectRef.RandomCardInHand (PlayerRef.Relative PlayerRelation.You))
               ]
           )
       )
-      15
+      16
   -- A tag the decoder does not know is an error rather than a silent slot. The
   -- tag has to be one no arm will ever claim -- @EachOpponent@ stood here until
   -- that became a real arm, and the case then failed rather than going quiet,

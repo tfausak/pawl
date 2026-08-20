@@ -119,6 +119,7 @@ import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DungeonRoom as DungeonRoom
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
+import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryR as EntryR
@@ -2687,6 +2688,9 @@ objectRefFilters ref = case ref of
   -- slot names the group and holds no characteristic, so the Filter is the whole
   -- of what there is to lint -- the two chosen arms above's answer.
   ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ f) -> [f]
+  -- The arm above's plural: the same Filter position, saying which members are
+  -- taken rather than which may be picked, and linted the same way.
+  ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong _ f) -> [f]
   -- Merfolk Spy's "a card at random from their hand" carries no Filter at all,
   -- only the PlayerRef naming whose hand, so there is nothing here to lint
   -- (gap #1742).
@@ -5087,6 +5091,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- group however many members it holds, there being no chooser to
           -- multiply the question by (#1957) and no count above one (#1956).
           ObjectRef.ChosenCardFromAmong {} -> True
+          -- FALSE where the arm above is True, which is the whole difference
+          -- between them: "all" takes every member that matches, and nothing
+          -- about the ref bounds how many a group holds.
+          ObjectRef.EachCardFromAmong {} -> False
           -- One card per SEAT, the arm above's answer with randomness in the
           -- chooser's place: Merfolk Spy's slot names one seat and so one card.
           ObjectRef.RandomCardInHand player -> namesOneSeat player

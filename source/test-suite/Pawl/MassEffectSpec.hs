@@ -984,6 +984,21 @@ communeWithTheGodsSpec s registry =
             "and all five revealed cards are in the graveyard"
             (List.sort (namesIn Zone.Graveyard S.alice after))
             (List.sort [named "Commune with the Gods", named "Island", named "Island", named "Murder", named "Murder", named "Murder"])
+        -- A reveal that names exactly ONE card binds the SINGULAR shape rather
+        -- than a group, and "from among them" has to see it: the offer is elided
+        -- at one candidate (CR 101.3), so taking the printed "may" puts that card
+        -- in hand and leaves the rest empty. A read that saw only the group shape
+        -- would offer nothing and bury the card instead -- which is what this
+        -- fixture did before fromAmongMembers gave the three readers of a slot
+        -- one definition.
+        Spec.it s "CR 608.2d a one-card library still offers its card from among them" $ do
+          forest <- S.printingOf s registry "Forest"
+          commune <- S.printingOf s registry "Commune with the Gods"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          let after = cast (taking 0) (board forest commune [maiden])
+          Spec.assertEqWith s "the one revealed card came to alice's hand" (namesIn Zone.Hand S.alice after) [named "Bird Maiden"]
+          Spec.assertEqWith s "and only the spell is in her graveyard" (namesIn Zone.Graveyard S.alice after) [named "Commune with the Gods"]
+          Spec.assertEqWith s "her library is empty" (namesIn Zone.Library S.alice after) []
 
 -- ObjectRef.TopOfLibraryUntil: a prefix of a library whose LENGTH is what a
 -- Filter decides, where ObjectRef.TopOfLibrary's is what a Quantity counts.
@@ -1073,6 +1088,123 @@ treasureHuntSpec s registry =
             (List.sort (namesIn Zone.Hand S.alice after))
             (List.sort [named "Forest", named "Island", named "Swamp"])
           Spec.assertEqWith s "and the library is empty" (namesIn Zone.Library S.alice after) []
+
+-- ObjectRef.EachCardFromAmong: the members of a bound group that a Filter
+-- matches, where ObjectRef.ChosenCardFromAmong above takes ONE that a player
+-- picks -- so one sentence can send the matching half of a group one way and the
+-- remainder another.
+--
+-- Mulch {1}{G} Sorcery, "Reveal the top four cards of your library. Put all land
+-- cards revealed this way into your hand and the rest into your graveyard."
+-- (name, cost, type line and Oracle text checked against api.scryfall.com,
+-- 2026-08-20). Three clauses: CR 701.20a's reveal binding the four as a group,
+-- the matching half moved out of it, and "the rest" as ObjectRef.InSlot over the
+-- SAME slot -- which finds the land cards gone, CR 400.7 having minted new
+-- objects for them on the way to the hand. That is PR #1958's reading of "the
+-- rest" for the singular choice, and this is the plural of it.
+--
+-- The board INTERLEAVES lands and nonlands in the revealed four, which is what
+-- separates "the cards that match" from "the first two" and from "the last two";
+-- two cards sit under them so the reveal's own depth is still observable, and a
+-- three-seat game with a stocked opponent library keeps "your library" from
+-- collapsing onto the table's.
+mulchSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+mulchSpec s registry =
+  let -- alice: two Forests for the {1}{G}, `stock` into her library BOTTOM FIRST
+      -- (S.addLibraryCard puts each new card on top), Mulch in hand. `decoy` goes
+      -- into BOB's library, which alice's "your library" must not reach.
+      board forest mulch stock decoy =
+        let mana = S.landsFor forest S.alice 2 S.threePlayerGame
+            withStock = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.alice g)) mana stock
+            withDecoy = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.bob g)) withStock decoy
+            (withSpell, spellId) = S.handOne mulch withDecoy
+         in (spellId, withSpell {GameState.priority = Just S.alice})
+      named = Just . CardName.MkCardName . Text.pack
+      cast (spellId, gs) =
+        let announced = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
+         in S.runPure S.identityAnswer announced Stack.resolveTop
+   in Spec.describe s "Mulch" $ do
+        -- The headline. Top to bottom alice's library is Swamp, Murder, Island,
+        -- Bird Maiden, Mountain, Murder: the revealed four hold two lands and two
+        -- nonland cards, ALTERNATING, so neither half is a prefix of the batch.
+        Spec.it s "CR 608.2c the matching members go one way and the rest the other" $ do
+          forest <- S.printingOf s registry "Forest"
+          mulch <- S.printingOf s registry "Mulch"
+          swamp <- S.printingOf s registry "Swamp"
+          island <- S.printingOf s registry "Island"
+          murder <- S.printingOf s registry "Murder"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          mountain <- S.printingOf s registry "Mountain"
+          let after = cast (board forest mulch [murder, mountain, maiden, island, murder, swamp] [island, island])
+          Spec.assertEqWith
+            s
+            "the two land cards among the revealed four are alice's hand"
+            (List.sort (namesIn Zone.Hand S.alice after))
+            (List.sort [named "Island", named "Swamp"])
+          Spec.assertEqWith
+            s
+            "and the rest of the four, with the spell itself (CR 608.2n), are her graveyard"
+            (List.sort (namesIn Zone.Graveyard S.alice after))
+            (List.sort [named "Bird Maiden", named "Mulch", named "Murder"])
+          Spec.assertEqWith
+            s
+            "the two cards under the revealed four are still her library, in that order"
+            (namesIn Zone.Library S.alice after)
+            [named "Mountain", named "Murder"]
+          -- CR 400.1: "your library" is one player's. bob's holds two cards that
+          -- would both have matched, and nothing looked at them.
+          Spec.assertEqWith s "bob's library is untouched" (namesIn Zone.Library S.bob after) [named "Island", named "Island"]
+          Spec.assertEqWith s "and nothing reached bob's hand" (namesIn Zone.Hand S.bob after) []
+        -- CR 609.3 and CR 101.3: a group holding no matching member yields
+        -- nothing, so that half of the sentence is skipped and "the rest" is all
+        -- four. Pairs with the case above on exactly one changed thing -- which
+        -- cards are stocked.
+        Spec.it s "CR 609.3 a group with no matching member sends every one of the four to the graveyard" $ do
+          forest <- S.printingOf s registry "Forest"
+          mulch <- S.printingOf s registry "Mulch"
+          murder <- S.printingOf s registry "Murder"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          mountain <- S.printingOf s registry "Mountain"
+          let after = cast (board forest mulch [murder, mountain, maiden, maiden, murder, maiden] [])
+          Spec.assertEqWith s "nothing reached alice's hand" (namesIn Zone.Hand S.alice after) []
+          Spec.assertEqWith
+            s
+            "and all four revealed cards are in the graveyard with the spell"
+            (List.sort (namesIn Zone.Graveyard S.alice after))
+            (List.sort [named "Bird Maiden", named "Bird Maiden", named "Bird Maiden", named "Mulch", named "Murder"])
+          Spec.assertEqWith s "the two under them are still her library" (namesIn Zone.Library S.alice after) [named "Mountain", named "Murder"]
+        -- The other end of the same pair: every member matches, so "the rest" is
+        -- EMPTY and the InSlot clause moves nothing. CR 400.7 is what makes that
+        -- true -- the ids the group still holds resolve to nothing once the cards
+        -- have moved -- so a graveyard holding only the spell is the assertion
+        -- that a second move did not drag the four back out of the hand.
+        Spec.it s "CR 400.7 a group whose members all match leaves nothing for the rest" $ do
+          forest <- S.printingOf s registry "Forest"
+          mulch <- S.printingOf s registry "Mulch"
+          swamp <- S.printingOf s registry "Swamp"
+          island <- S.printingOf s registry "Island"
+          mountain <- S.printingOf s registry "Mountain"
+          murder <- S.printingOf s registry "Murder"
+          let after = cast (board forest mulch [murder, swamp, island, mountain, swamp] [])
+          Spec.assertEqWith
+            s
+            "all four revealed cards are alice's hand"
+            (List.sort (namesIn Zone.Hand S.alice after))
+            (List.sort [named "Island", named "Mountain", named "Swamp", named "Swamp"])
+          Spec.assertEqWith s "and only the spell is in her graveyard" (namesIn Zone.Graveyard S.alice after) [named "Mulch"]
+        -- A library of ONE card binds the slot as a SINGLE object rather than as
+        -- a group, the two shapes every binder dispatches between. The ref reads
+        -- both, so the one card still matches and still moves; a read that saw
+        -- only the group shape would leave it in the library. CR 609.3 shortens
+        -- the reveal itself from four cards to one.
+        Spec.it s "CR 609.3 a one-card library binds a single object and the ref still matches it" $ do
+          forest <- S.printingOf s registry "Forest"
+          mulch <- S.printingOf s registry "Mulch"
+          swamp <- S.printingOf s registry "Swamp"
+          let after = cast (board forest mulch [swamp] [])
+          Spec.assertEqWith s "the one card came to hand" (namesIn Zone.Hand S.alice after) [named "Swamp"]
+          Spec.assertEqWith s "her library is empty" (namesIn Zone.Library S.alice after) []
+          Spec.assertEqWith s "and only the spell is in her graveyard" (namesIn Zone.Graveyard S.alice after) [named "Mulch"]
 
 -- CR 701.20e's look, CR 701.20a's reveal of ONE card chosen from among what it
 -- showed, and CR 401.4's arrangement handed to randomness -- the three halves
@@ -3126,6 +3258,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   midnightTillingSpec s registry
   communeWithTheGodsSpec s registry
   treasureHuntSpec s registry
+  mulchSpec s registry
   carthTheLionSpec s registry
   blossomingTortoiseSpec s registry
   exhumeSpec s registry
