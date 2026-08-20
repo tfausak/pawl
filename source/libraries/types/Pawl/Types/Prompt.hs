@@ -173,9 +173,10 @@ data Prompt r where
   -- reversal, which is what makes ChooseX's bound advisory, has no counterpart
   -- mid-resolution.
   --
-  -- ZERO is a legal answer and is how the printed "may" is declined (CR 118.3a),
-  -- so this prompt carries no separate yes/no. Not implemented: skipping it when
-  -- the bound is 0, where the one payable amount is determined (#1920).
+  -- ZERO is a legal answer -- the printed amount is "any amount" -- and is how
+  -- the "may" is declined, so this prompt carries no separate yes/no. Not
+  -- implemented: skipping it when the bound is 0, where the one payable amount is
+  -- determined (#1920).
   ChoosePaidEnergy :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt Natural.Natural
   -- | CR 609.7a: which SOURCE OF DAMAGE a player chooses for a prevention
   -- effect that names one (Healing Grace's "by a source of your choice"). The

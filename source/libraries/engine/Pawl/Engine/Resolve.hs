@@ -4086,7 +4086,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- controller (CR 109.5's "you"), the amount is theirs to name, and CR 118.3
   -- caps it at the energy they actually have -- so unlike CR 601.2b's
   -- announcement the bound is ENFORCED, and an answer above it is clamped rather
-  -- than trusted. Paying 0 is how the printed "may" is declined (CR 118.3a).
+  -- than trusted. Paying 0 is how the printed "may" is declined.
   --
   -- Through Pawl.Engine.Cost's own reader and writer, so CR 107.14 has one
   -- meaning here and in a CostComponent.PayEnergy payment.

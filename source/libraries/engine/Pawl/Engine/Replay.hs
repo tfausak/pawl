@@ -554,8 +554,8 @@ defaultAnswer p = case p of
   Prompt.CastWhileSearching {} -> Nothing
   -- CR 601.2b: X=0 is always payable.
   Prompt.ChooseX {} -> 0
-  -- CR 118.3a: paying 0 is always available, and CR 107.14's optional payment is
-  -- declined by paying it.
+  -- CR 107.14's payment is "any amount", zero included, and paying nothing is
+  -- how a transcript that ran out declines it.
   Prompt.ChoosePaidEnergy {} -> 0
   -- The first `count` legal modes, deterministically -- and under CR 700.2d's
   -- "You may choose the same mode more than once" the LEAST legal mode that many

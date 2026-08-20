@@ -993,7 +993,7 @@ combatReplaySpec s =
           let p = Prompt.ChoosePaidEnergy decider S.alice oid 5
           Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseX 4)) Nothing
         Spec.it s "a short paid-energy transcript pays nothing" $
-          -- CR 118.3a: paying 0 is always available, whatever the payer holds.
+          -- Paying nothing is legal on any board, whatever the payer holds.
           Spec.assertEqWith s "zero" (Replay.defaultAnswer (Prompt.ChoosePaidEnergy decider S.alice oid 5)) 0
         -- CR 608.2d: which card the resolving controller took out of a graveyard
         -- is a decision, so it has to survive a transcript like any other.

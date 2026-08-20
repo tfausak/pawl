@@ -581,10 +581,10 @@ data Effect card
     -- first, its OTHER payment ("unless its controller pays {1} for each {E}
     -- paid this way") being a CR 118.12 gate on a different player.
     --
-    -- The "MAY" is subsumed: CR 118.3a's "players can always pay 0" makes paying
-    -- nothing exactly what declining is, so there is no second decision to
-    -- carry. Not implemented: "pay ONE OR MORE {E}", whose floor is 1 and whose
-    -- "If you do" is CR 118.12's branch (#1965).
+    -- The "MAY" is subsumed rather than carried as a second decision: the
+    -- printed amount is "ANY amount", zero included, so declining and paying
+    -- nothing are the same answer. Not implemented: "pay ONE OR MORE {E}", whose
+    -- floor is 1 and whose "If you do" is CR 118.12's branch (#1919).
     --
     -- The slot is not optional. Every printing reads the amount back ("that
     -- much", "for each {E} paid this way", "the amount of {E} paid this way"),

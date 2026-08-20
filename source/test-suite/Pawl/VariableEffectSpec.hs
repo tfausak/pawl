@@ -1480,10 +1480,11 @@ payAnyEnergySpec s registry =
       let after = S.runPure (paying 4) cast Stack.resolveTop
       Spec.assertEqWith s "the Wall took the 4 damage alice paid for" (S.damageOf wallId after) (Just 4)
       Spec.assertEqWith s "and one of her five energy counters is left" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 1
-    -- CR 118.3a: "players can always pay 0", which is what the printed "may"
-    -- amounts to. The energy assertion is what tells this apart from a spell that
-    -- never resolved at all -- the three {E} it gives are in the total either way.
-    Spec.it s "CR 118.3a paying nothing deals nothing and keeps the counters" $ do
+    -- Zero is one of the "any amount" the card offers, and paying it is what the
+    -- printed "may" declines to. The energy assertion is what tells this apart
+    -- from a spell that never resolved at all -- the three {E} it gives are in
+    -- the total either way, and CR 120.8 makes 0 damage no damage.
+    Spec.it s "CR 107.14 paying nothing deals nothing and keeps the counters" $ do
       (wallId, cast) <- harnessedBoard s registry
       let after = S.runPure (paying 0) cast Stack.resolveTop
       Spec.assertEqWith s "the Wall took no damage" (S.damageOf wallId after) (Just 0)
