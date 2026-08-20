@@ -71,6 +71,7 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -1680,6 +1681,92 @@ graveRecitalSpec s registry = Spec.describe s "GraveRecital" $ do
     Spec.assertEqWith s "the printed-cost cast dealt its 2 as well" (S.lifeOf S.alice boughtBack) (Just 18)
     Spec.assertEqWith s "and the card was NOT exiled, since the flashback cost was not paid" (boltsIn Zone.Exile boughtBack) 0
     Spec.assertEqWith s "it went to the graveyard" (boltsIn Zone.Graveyard boughtBack) 1
+
+-- CR 702.34a states no limit on how many flashback abilities an object has, and
+-- CR 601.2b's "a player can't apply two alternative methods of casting or two
+-- alternative costs to a single spell" is what makes two of them a CHOICE rather
+-- than a sum.
+--
+-- The Fugitive Doctor {3}{R}{G} is the pool's one producer of a graveyard card
+-- holding two. It is also the only PRINTING that grants a literal flashback
+-- cost to another card: every other granter states "the flashback cost is equal
+-- to that card's mana cost", which Modification.GainKeyword's literal Keyword
+-- cannot express (#1981).
+--
+-- Firebolt's printed {4}{R} and the granted {2}{R}{G} share no reading, and
+-- WHICH of them is the unreachable one is decided by Keyword's derived Ord:
+-- Generic 2 sorts under Generic 4, so the GRANTED cost is the lesser and the
+-- PRINTED one is the second. Ten lands pay either, so no assertion below turns
+-- on mana.
+--
+-- Not implemented: CR 603.12's reflexive triggered ability. "You may sacrifice a
+-- Clue. When you do, target instant or sorcery card in your graveyard gains
+-- flashback {2}{R}{G} until end of turn" is transcribed as one clause with a CR
+-- 118.12 pay gate, so the target is chosen as the attack trigger goes on the
+-- stack rather than after the sacrifice (#1982).
+fugitiveDoctorAnswer :: Prompt.Prompt r -> r
+fugitiveDoctorAnswer p = case p of
+  -- The Clue is worth spending: without the sacrifice the pay gate's IfPaid
+  -- branch never runs and no second flashback is granted.
+  Prompt.ChooseToPay {} -> PaymentDecision.Pays
+  -- The graveyard holds ONE instant-or-sorcery card, so taking every legal
+  -- recipient takes exactly the Firebolt, and the slot's count is satisfied.
+  Prompt.ChooseTargets _ _ _ sets -> fmap snd sets
+  _ -> S.aggressiveAnswer p
+
+-- alice attacks with The Fugitive Doctor, sacrifices the Clue its own enters
+-- trigger made, and grants the graveyard Firebolt a second flashback. The board
+-- returned sits in the postcombat main phase, where a sorcery may be cast.
+fugitiveDoctorBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId)
+fugitiveDoctorBoard s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  forest <- S.printingOf s registry "Forest"
+  firebolt <- S.printingOf s registry "Firebolt"
+  doctor <- S.printingOf s registry "The Fugitive Doctor"
+  let (combat, _, _) = S.combatBoardOf [] []
+      lands = S.landsFor forest S.alice 3 (S.landsFor mountain S.alice 7 combat)
+      (inGraveyard, buried) = S.addGraveyardCard firebolt S.alice lands
+      -- entersWithTrigger rather than addCreature: the Clue this ability's
+      -- pay gate spends is the Doctor's OWN CR 701.16a investigate, so the
+      -- fixture makes it the way the card does.
+      (_, entered) = S.entersWithTrigger doctor S.alice buried
+      withClue = S.runPure S.identityAnswer entered (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
+  pure (S.runCombat fugitiveDoctorAnswer withClue, inGraveyard)
+
+fugitiveDoctorSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+fugitiveDoctorSpec s registry = Spec.describe s "FugitiveDoctor" $ do
+  Spec.it s "CR 702.34a/601.2b two flashback abilities offer two costs, and either one exiles the card" $ do
+    firebolt <- S.printingOf s registry "Firebolt"
+    (board, inGraveyard) <- fugitiveDoctorBoard s registry
+    let granted = ManaCost.MkManaCost [ManaSymbol.Generic 2, theRed, ManaSymbol.OfType (ManaType.Colored Color.Green)]
+        printed = ManaCost.MkManaCost [ManaSymbol.Generic 4, theRed]
+        -- graveRecitalSpec's announcement, answered by naming a cost: the two
+        -- flashback costs share no reading, so no answer here is an index.
+        paying :: ManaCost.ManaCost -> Prompt.Prompt r -> r
+        paying wanted p = case p of
+          Prompt.ChooseCost _ _ _ candidates ->
+            Maybe.fromMaybe (Cost.firstOffered candidates) (List.find ((== Just wanted) . Cost.Type.mana) candidates)
+          -- Firebolt's own "any target", aimed at alice so that its 2 damage
+          -- reports which cast resolved rather than which permanent died.
+          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.alice))) sets
+          _ -> S.identityAnswer p
+        resolveWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState
+        resolveWith answer = S.runPure answer (S.runPure answer board (S.cast S.alice inGraveyard)) Stack.resolveTop
+        boltsIn zone gs = length (filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName firebolt)) (Game.zoneMembers zone S.alice gs))
+    Spec.assertEqWith s "the fixture reached the postcombat main phase" (GameState.phase board) Phase.PostcombatMain
+    Spec.assertEqWith
+      s
+      "CR 601.2b: both flashback costs are on offer, the granted one first by Ord"
+      (fmap Cost.Type.mana (Cost.costsFor (S.printingName firebolt) inGraveyard board))
+      [Just granted, Just printed]
+    -- CR 702.34a's SECOND static ability, asked of the cost a first-only read
+    -- never returns: paying the PRINTED {4}{R} must exile the card too.
+    Spec.assertEqWith s "the printed cost's cast dealt its 2" (S.lifeOf S.alice (resolveWith (paying printed))) (Just 18)
+    Spec.assertEqWith s "and exiled the card (CR 702.34a)" (boltsIn Zone.Exile (resolveWith (paying printed))) 1
+    Spec.assertEqWith s "not put it into the graveyard" (boltsIn Zone.Graveyard (resolveWith (paying printed))) 0
+    Spec.assertEqWith s "the granted cost's cast dealt its 2 as well" (S.lifeOf S.alice (resolveWith (paying granted))) (Just 18)
+    Spec.assertEqWith s "and exiled the card too" (boltsIn Zone.Exile (resolveWith (paying granted))) 1
+    Spec.assertEqWith s "not put it into the graveyard either" (boltsIn Zone.Graveyard (resolveWith (paying granted))) 0
 
 -- Harness the Storm {2}{R} Enchantment (data/cards/harness-the-storm.json):
 -- "Whenever you cast an instant or sorcery spell from your hand, you may cast
@@ -3317,6 +3404,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   flashbackCardTypeSpec s registry
   grantedFlashbackSpec s registry
   graveRecitalSpec s registry
+  fugitiveDoctorSpec s registry
   harnessTheStormSpec s registry
   jumpStartSpec s registry
   legendarySpellSpec s registry
