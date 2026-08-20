@@ -353,8 +353,12 @@ applies gs event candidate =
         -- CR 614.1a: which zone changes this redirect intercepts -- the
         -- destination, the moving object's OWNER, and (Anafenza, the Foremost's
         -- "a nontoken creature") what the moving object IS.
+        --
+        -- A pattern naming NO destination admits every one, which is CR 702.34a's
+        -- "instead of putting it anywhere else"; the destinations are not
+        -- enumerated, so this is a Maybe rather than a set of zones.
         (ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR pat _), ProposedEvent.WouldChangeZone zc) ->
-          ZoneChange.to zc == ZoneChangePattern.whenDestination pat
+          maybe True (== ZoneChange.to zc) (ZoneChangePattern.whenDestination pat)
             && matchesZoneOwner gs (ReplacementCandidate.controller candidate) (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
             && matchesFiltered gs candidate (ZoneChangePattern.whatObject pat) (ZoneChange.object zc)
         -- CR 615.1: which events the pattern admits (see matchesDamagePattern),

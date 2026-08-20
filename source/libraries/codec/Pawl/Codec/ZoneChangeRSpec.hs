@@ -19,7 +19,7 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangeR" $ do
       ( ZoneChangeR.MkZoneChangeR
           { ZoneChangeR.matching =
               ZoneChangePattern.MkZoneChangePattern
-                { ZoneChangePattern.whenDestination = Zone.Graveyard,
+                { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
                   ZoneChangePattern.whatObject = Filter.And [],
                   ZoneChangePattern.whoseObject = ControllerRelation.Anyones
                 },

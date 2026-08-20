@@ -259,7 +259,7 @@ leylineShape :: ObjectId.ObjectId -> Timestamp.Timestamp -> ActiveReplacement.Ac
 leylineShape src ts =
   ActiveReplacement.MkActiveReplacement
     { ActiveReplacement.effect =
-        ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Opponents (Filter.Type.And [])) Zone.Exile),
+        ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR (ZoneChangePattern.MkZoneChangePattern (Just Zone.Graveyard) ControllerRelation.Opponents (Filter.Type.And [])) Zone.Exile),
       ActiveReplacement.source = src,
       ActiveReplacement.controller = S.alice,
       ActiveReplacement.timestamp = ts,

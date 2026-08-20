@@ -1422,6 +1422,39 @@ fireboltSpec s registry = Spec.describe s "Firebolt" $ do
         let countered = S.runPure S.identityAnswer cast (Event.counter S.noSource S.bob onStack)
         Spec.assertEqWith s "not in the graveyard" (Game.zoneMembers Zone.Graveyard S.alice countered) []
         Spec.assertEqWith s "exiled" (length (Game.zoneMembers Zone.Exile S.alice countered)) 1
+  -- Rule 702.34a's "anywhere ELSE", the half a pattern pinned to one destination
+  -- cannot say. Reprieve {1}{W} returns the flashed-back Firebolt to its owner's
+  -- HAND, a destination that is neither graveyard nor exile, so the two readings
+  -- of the rule put the card in different zones.
+  Spec.it s "CR 702.34a a flashback spell bounced off the stack is exiled, not returned to hand" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    firebolt <- S.printingOf s registry "Firebolt"
+    reprieve <- S.printingOf s registry "Reprieve"
+    let (inGraveyard, gs0) = inGraveyardWith mountain firebolt 5
+        gs1 = S.landsFor plains S.alice 2 gs0
+        (bounce, gs2) = S.addHandCard reprieve S.alice gs1
+        -- Reprieve's second sentence draws, and CR 104.3c would lose alice the
+        -- game out from under the assertion on an empty library.
+        (_, gs3) = S.addLibraryCard mountain S.alice gs2
+        cast1 = S.runPure S.identityAnswer gs3 (S.cast S.alice inGraveyard)
+    case GameState.stack cast1 of
+      [] -> Spec.assertFailure s "expected the flashback spell on the stack"
+      onStack : _ -> do
+        -- The offered set is FILTERED rather than hand-built: Reprieve is on the
+        -- stack beside its own target once CR 601.2a has put it there, so an
+        -- answerer taking the smallest recipient could aim at the wrong spell.
+        let aimAt :: Prompt.Prompt r -> r
+            aimAt p = case p of
+              Prompt.ChooseTargets _ _ _ sets -> S.preferring ((==) (Just onStack) . Recipient.objectOf) sets
+              _ -> S.identityAnswer p
+            cast2 = S.runPure aimAt cast1 (S.cast S.alice bounce)
+            bounced = S.runPure aimAt cast2 Stack.resolveTop
+            boltsIn zone gs = length (filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName firebolt)) (Game.zoneMembers zone S.alice gs))
+        Spec.assertEqWith s "CR 702.34a: the flashback card was NOT returned to its owner's hand" (boltsIn Zone.Hand bounced) 0
+        Spec.assertEqWith s "it was exiled instead" (boltsIn Zone.Exile bounced) 1
+        Spec.assertEqWith s "and not put into the graveyard either" (boltsIn Zone.Graveyard bounced) 0
+        Spec.assertEqWith s "Reprieve's own sentences both happened: the spell left the stack and alice drew" (length (GameState.stack bounced), length (Game.zoneMembers Zone.Hand S.alice bounced)) (0, 1)
   -- The self-scoping in rule 702.34a's "exile THIS card". A flashback spell
   -- waiting on the stack must not exile every OTHER card of its controller's
   -- that heads for a graveyard while it sits there -- which is exactly what a
