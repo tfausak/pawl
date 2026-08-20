@@ -505,9 +505,9 @@ angelOfFinalitySpec s registry = Spec.describe s "AngelOfFinality" $ do
 -- THREE SEATS: alice controls the Endurance and targets bob, and carol's
 -- graveyard is stocked too, so "the targeted player's graveyard" is told apart
 -- from "yours", "each player's" and "your opponents'" (CR 102.3 read through CR
--- 806.1's free-for-all makes carol an opponent as much as bob). bob's library is stocked with one card the trigger
--- never touches, so the three arrivals are read as the BOTTOM of a library rather
--- than as the whole of one.
+-- 806.1's free-for-all makes carol an opponent as much as bob). bob's library is
+-- stocked with one card the trigger never touches, so the three arrivals are read
+-- as the BOTTOM of a library rather than as the whole of one.
 enduranceSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 enduranceSpec s registry = Spec.describe s "Endurance" $ do
   Spec.it s "CR 401.4 a stated random order puts the batch on the bottom in the order the randomness named" $ do

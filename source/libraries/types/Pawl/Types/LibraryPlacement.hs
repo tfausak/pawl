@@ -25,9 +25,9 @@ data LibraryPlacement
   | OwnerChooses
   | -- | The end is stated and the ORDER is the effect's rather than the owner's.
     -- CR 401.4 lets the owner arrange two or more cards an effect puts in one
-    -- position at once; text that states a random order takes that back, so the
-    -- batch is randomised to CR 701.24a's standard -- no player knows the order
-    -- -- instead of arranged.
+    -- position at once; text that states a random order takes that back, so
+    -- nobody arranges and the batch is randomised instead, to CR 701.24a's
+    -- standard of no player knowing the order.
     --
     -- NOT a shuffle (CR 701.24a randomises a whole library or pile): only the
     -- arriving cards are randomised, the library they join keeps its order, and
