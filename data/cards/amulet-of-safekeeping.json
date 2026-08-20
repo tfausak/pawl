@@ -82,7 +82,10 @@
                           }
                         ]
                       },
-                      "payer": "thatTargetingObject"
+                      "payer": {
+                        "type": "ControllerOfBound",
+                        "value": "thatTargetingObject"
+                      }
                     }
                   }
                 ]

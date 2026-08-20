@@ -14,12 +14,13 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PayObligation as PayObligation
+import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.SlotName as SlotName
 
 manaLeak :: PayGate.PayGate
 manaLeak =
   PayGate.MkPayGate
-    { PayGate.payer = SlotName.MkSlotName (Text.pack "spell"),
+    { PayGate.payer = PlayerRef.ControllerOfBound (SlotName.MkSlotName (Text.pack "spell")),
       PayGate.cost = Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 3]), Cost.components = []},
       PayGate.branch = PayBranch.IfNotPaid,
       PayGate.obligation = PayObligation.Optional,
@@ -28,14 +29,15 @@ manaLeak =
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.PayGate" $ do
-  -- CR 118.12a: Mana Leak's "unless its controller pays {3}" -- the payer named
-  -- by the same slot the Counter effect reads, and the cost it offers.
+  -- CR 118.12a: Mana Leak's "unless its controller pays {3}" -- the payer read
+  -- off the same slot the Counter effect names (CR 109.4), and the cost it
+  -- offers.
   Spec.it s "MkPayGate, Mana Leak's clause" $
     Common.assertCodec
       s
       PayGate.codec
       manaLeak
-      " {\"payer\":\"spell\",\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]},\"branch\":{\"type\":\"IfNotPaid\"}} "
+      " {\"payer\":{\"type\":\"ControllerOfBound\",\"value\":\"spell\"},\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]},\"branch\":{\"type\":\"IfNotPaid\"}} "
   -- CR 118.12's other branch, Merfolk Seer's: the same three keys, and only the
   -- branch differs.
   Spec.it s "MkPayGate, Merfolk Seer's clause" $
@@ -43,7 +45,7 @@ spec s = Spec.describe s "Pawl.Codec.PayGate" $ do
       s
       PayGate.codec
       manaLeak {PayGate.branch = PayBranch.IfPaid}
-      " {\"payer\":\"spell\",\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]},\"branch\":{\"type\":\"IfPaid\"}} "
+      " {\"payer\":{\"type\":\"ControllerOfBound\",\"value\":\"spell\"},\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]},\"branch\":{\"type\":\"IfPaid\"}} "
   -- CR 118.12's mandatory limb, Standstill's, and the shared offer, Don't Make
   -- a Sound's second clause -- the two keys that are elided everywhere else.
   Spec.it s "MkPayGate, Standstill's mandatory sacrifice" $
@@ -51,13 +53,13 @@ spec s = Spec.describe s "Pawl.Codec.PayGate" $ do
       s
       PayGate.codec
       manaLeak {PayGate.branch = PayBranch.IfPaid, PayGate.obligation = PayObligation.Mandatory}
-      " {\"payer\":\"spell\",\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]},\"branch\":{\"type\":\"IfPaid\"},\"obligation\":{\"type\":\"Mandatory\"}} "
+      " {\"payer\":{\"type\":\"ControllerOfBound\",\"value\":\"spell\"},\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]},\"branch\":{\"type\":\"IfPaid\"},\"obligation\":{\"type\":\"Mandatory\"}} "
   Spec.it s "MkPayGate, a clause hanging off an earlier clause's offer" $
     Common.assertCodec
       s
       PayGate.codec
       manaLeak {PayGate.branch = PayBranch.IfPaid, PayGate.offeredAt = Just (ClauseIndex.MkClauseIndex 0)}
-      " {\"payer\":\"spell\",\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]},\"branch\":{\"type\":\"IfPaid\"},\"offeredAt\":0} "
+      " {\"payer\":{\"type\":\"ControllerOfBound\",\"value\":\"spell\"},\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]},\"branch\":{\"type\":\"IfPaid\"},\"offeredAt\":0} "
   -- The first three keys are required: none has a default an absent key could
   -- mean.
   Spec.it s "an omitted payer field is a decode error" $
@@ -68,11 +70,11 @@ spec s = Spec.describe s "Pawl.Codec.PayGate" $ do
   Spec.it s "an omitted cost field is a decode error" $
     Spec.assertBool
       s
-      (Either.isLeft (Codec.decode PayGate.codec (Value.object [Value.pair "payer" (Value.text (Text.pack "spell")), Value.pair "branch" (Value.object [Value.pair "type" (Value.text (Text.pack "IfNotPaid"))])])))
+      (Either.isLeft (Codec.decode PayGate.codec (Value.object [Value.pair "payer" (Value.object [Value.pair "type" (Value.text (Text.pack "ControllerOfBound")), Value.pair "value" (Value.text (Text.pack "spell"))]), Value.pair "branch" (Value.object [Value.pair "type" (Value.text (Text.pack "IfNotPaid"))])])))
       "expected a decode failure"
   Spec.it s "an omitted branch field is a decode error" $
     Spec.assertBool
       s
-      (Either.isLeft (Codec.decode PayGate.codec (Value.object [Value.pair "payer" (Value.text (Text.pack "spell")), Value.pair "cost" (Value.object [Value.pair "mana" (Value.array [])])])))
+      (Either.isLeft (Codec.decode PayGate.codec (Value.object [Value.pair "payer" (Value.object [Value.pair "type" (Value.text (Text.pack "ControllerOfBound")), Value.pair "value" (Value.text (Text.pack "spell"))]), Value.pair "cost" (Value.object [Value.pair "mana" (Value.array [])])])))
       "expected a decode failure"
   Spec.it s "has a schema" $ Common.assertHasSchema s PayGate.codec

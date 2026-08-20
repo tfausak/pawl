@@ -515,7 +515,7 @@ modeSlots mode =
       maybe Map.empty (Map.fromSet (const SlotArity.One) . Filter.boundSlots)
         . TargetSlot.filter
     -- Every clause's payer: CR 118.12 scopes a resolution cost to its clause.
-    payerSlot = maybe Map.empty (oneSlot . PayGate.payer) . Clause.payGate
+    payerSlot = maybe Map.empty (playerRefSlots . PayGate.payer) . Clause.payGate
 
 -- The slot a target pool draws its candidates from, if it draws them from one
 -- (CR 400.1's per-player graveyard), read singly.
@@ -1229,6 +1229,7 @@ resolveSpellWith runSubgame oid = do
                                in payGateAdmits
                                     oid
                                     oid
+                                    effectController
                                     idx
                                     cIdx
                                     (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Map.mapWithKey legalSlot chosenAtStart))
@@ -1355,7 +1356,7 @@ resolveModesWith runSubgame stackId srcId modes = do
                       taken <- if gated then exercises stackId effectController idx cIdx clause else pure False
                       -- CR 118.12: then the cost paid on resolution, against the
                       -- START-of-resolution slots.
-                      (admitted, answers') <- if taken then payGateAdmits stackId srcId idx cIdx (instanceView legal) answers clause else pure (False, answers)
+                      (admitted, answers') <- if taken then payGateAdmits stackId srcId effectController idx cIdx (instanceView legal) answers clause else pure (False, answers)
                       Monad.when admitted (Monad.mapM_ applyOne (Clause.effects clause))
                       pure answers'
                   )
@@ -1437,15 +1438,15 @@ exercises resolving controller idx cIdx clause = case Clause.optionality clause 
 --
 -- Not implemented: CR 118.13b's announcement -- how a symbol payable in
 -- multiple ways is being paid, chosen immediately before this payment (#373).
-payGateAdmits :: ObjectId -> ObjectId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Map.Map ClauseIndex Bool -> Clause.Clause Card.Type.Card -> Game (Bool, Map.Map ClauseIndex Bool)
-payGateAdmits resolving source idx cIdx legal answers clause = case Clause.payGate clause of
+payGateAdmits :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Map.Map ClauseIndex Bool -> Clause.Clause Card.Type.Card -> Game (Bool, Map.Map ClauseIndex Bool)
+payGateAdmits resolving source controller idx cIdx legal answers clause = case Clause.payGate clause of
   Nothing -> pure (True, answers)
   Just gate ->
     let offerAt = Maybe.fromMaybe cIdx (PayGate.offeredAt gate)
      in case Map.lookup offerAt answers of
           Just wasPaid -> pure (branchTaken (PayGate.branch gate) wasPaid, answers)
           Nothing -> do
-            wasPaid <- payGatePaid resolving source idx cIdx legal gate
+            wasPaid <- payGatePaid resolving source controller idx cIdx legal gate
             pure (branchTaken (PayGate.branch gate) wasPaid, Map.insert offerAt wasPaid answers)
 
 -- Which branch of CR 118.12 a payment outcome selects, off the classification a
@@ -1465,11 +1466,11 @@ branchTaken branch wasPaid = case branch of
 -- that substitution is what every reader below sees -- CR 118.3's affordability
 -- test, the prompt the payer is shown, and the payment itself -- so none of them
 -- can disagree about what {X} is.
-payGatePaid :: ObjectId -> ObjectId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> PayGate.PayGate -> Game Bool
-payGatePaid resolving source idx cIdx legal gate = do
+payGatePaid :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> PayGate.PayGate -> Game Bool
+payGatePaid resolving source controller idx cIdx legal gate = do
   gs <- State.get
   let cost = Cost.substituteX (announcedXOn resolving gs) (PayGate.cost gate)
-  case payerOf (PayGate.payer gate) legal gs of
+  case payerOf (PayGate.payer gate) legal controller gs of
     Nothing -> pure False
     Just payer ->
       if not (Cost.canPay payer source cost gs)
@@ -1513,16 +1514,9 @@ announcedXOn oid gs =
     0
     (Game.lookupObject oid gs >>= Binding.amountOf Binding.variableX . Object.bindings)
 
--- Which player a resolution cost is offered to. ONE slot read answering two ways:
--- a slot bound to a PLAYER names that player, one bound to an OBJECT names
--- whoever controls it (CR 109.4, CR 405.4 for a spell). Not CR 109.5, the rule
--- for "you". A slot naming SEVERAL pays nothing -- an "unless [a player] pays"
--- names one payer (`legalOne`).
-payerOf :: SlotName -> Map.Map SlotName (Set Recipient) -> GameState -> Maybe PlayerId
-payerOf slot legal gs = case legalOne slot legal of
-  Just (Recipient.ToPlayer pid) -> Just pid
-  Just recipient -> Recipient.objectOf recipient >>= \oid -> Projection.controllerOf oid gs
-  _ -> Nothing
+-- Which player a resolution cost is offered to.
+payerOf :: PlayerRef -> Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> Maybe PlayerId
+payerOf ref legal controller gs = Maybe.listToMaybe (playerRefPlayers legal controller gs ref)
 
 -- The no-subgame mode executor: every direct caller, and any path that cannot
 -- reach a PlaySubgame.

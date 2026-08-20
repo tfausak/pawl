@@ -45,7 +45,10 @@
                       }
                     ]
                   },
-                  "payer": "spell"
+                  "payer": {
+                    "type": "ControllerOfBound",
+                    "value": "spell"
+                  }
                 }
               },
               {
