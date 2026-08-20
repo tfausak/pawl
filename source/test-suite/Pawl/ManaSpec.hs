@@ -2608,6 +2608,23 @@ geosurgeSpec s registry = Spec.describe s "Geosurge" $ do
     Spec.assertEqWith s "Sol Ring is on the stack" (length (GameState.stack paid)) 1
     Spec.assertEqWith s "six restricted red are left" (poolOf S.alice paid) (replicate 6 restrictedRed)
 
+  -- CR 106.4's other half, and the one that keeps the restriction from being a
+  -- way to LOSE mana: a cost the seven cannot pay is paid out of something else,
+  -- and the seven are still in the pool afterwards. One Mountain added AFTER
+  -- Geosurge resolved is the only difference from the board above, so the {R}
+  -- Lightning Bolt now has a legal payment that does not touch the restricted
+  -- mana -- and pawl must both offer that cast and pay it the way the rule says.
+  Spec.it s "CR 106.4 an instant paid from a Mountain leaves all seven restricted red floating" $ do
+    geosurge <- S.printingOf s registry "Geosurge"
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let spare = S.landsFor mountain S.alice 1 (snd (geosurgeBoards geosurge mountain))
+        (boltId, withBolt) = S.addHandCard bolt S.alice spare
+        after = S.runPure S.identityAnswer withBolt (S.cast S.alice boltId)
+    Spec.assertBool s (S.castable S.alice boltId withBolt) "the spare Mountain makes the instant castable"
+    Spec.assertEqWith s "Lightning Bolt is on the stack" (length (GameState.stack after)) 1
+    Spec.assertEqWith s "and the seven restricted red are untouched" (poolOf S.alice after) (replicate 7 restrictedRed)
+
 -- alice with four untapped Mountains and Geosurge in hand, before and after she
 -- casts it and the sorcery resolves. The pair differs in nothing a test set up:
 -- the second board is the first one played forward.
