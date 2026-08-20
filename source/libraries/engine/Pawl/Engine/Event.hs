@@ -267,10 +267,11 @@ simultaneously body = do
   pure result
 
 -- `simultaneously` for a body that is a pure function of the board rather than a
--- Game action. CR 800.4a is the caller: a player leaving the game is not a game
--- action anybody takes, so Pawl.Engine.Departure performs it purely -- the CR
--- 704.5 pass folds it over several players before recomputing the outcome once
--- -- and every object it takes leaves at the same instant.
+-- Game action. CR 800.4a's FIRST clause is the caller: leaving the game is not a
+-- zone change, so what Pawl.Engine.Departure does there is delete objects and
+-- record events, which needs no funnel -- and every object it takes leaves at the
+-- same instant. That rule's fourth clause IS a zone change and takes the monadic
+-- bracket above instead.
 --
 -- The two halves are shared with the bracket above rather than restated, so a
 -- pure caller cannot come to disagree with a monadic one about what a group is.

@@ -47,9 +47,10 @@ import qualified Pawl.Types.Zone as Zone
 -- everything the rules attach to that moment.
 --
 -- MONADIC, and only the fourth clause needs it to be: CR 800.4a's exile is a
--- zone change like any other, so it funnels through Event.changeZone (CR 400.7,
--- CR 613.7d, CR 603.6c) rather than editing the zone maps. The other three
--- clauses stay pure functions on the state, composed here in the rule's order.
+-- zone change like any other, so it goes through the zone-change funnel (CR
+-- 400.7, CR 613.7d, CR 603.6c) rather than editing the zone maps. The other
+-- three clauses stay pure functions on the state, composed here in the rule's
+-- order.
 --
 -- CR 725.4 belongs INSIDE this function, not after it: the active player becomes
 -- the monarch at the same time the player leaves. Both doors -- leaveGame (CR
@@ -466,11 +467,11 @@ nonCardStackObjectsCease pid gs =
 -- continuesAfterDeparture skips all of CR 800.4a, which that spec's paired case
 -- pins.
 --
--- Through Event.changeZone, and that is the whole reason `depart` is monadic:
--- the exile is a permanent moving from the battlefield to exile, so CR 400.7's
--- new object, CR 613.7d's fresh timestamp, CR 608.2h's last known information
--- and CR 603.6c's leaves-the-battlefield triggers are all owed here, and the
--- funnel is where every one of them lives. A DEPARTING player's own such
+-- Through Event.changeZoneInBatch, and that is the whole reason `depart` is
+-- monadic: the exile is a permanent moving from the battlefield to exile, so CR
+-- 400.7's new object, CR 613.7d's fresh timestamp, CR 608.2h's last known
+-- information and CR 603.6c's leaves-the-battlefield triggers are all owed
+-- here, and the funnel is where every one of them lives. A DEPARTING player's own such
 -- trigger still never reaches the stack -- CR 603.3a makes them its controller
 -- and CR 800.4d bars it -- so what the spec proves this with is a bystander's.
 --
@@ -479,10 +480,11 @@ nonCardStackObjectsCease pid gs =
 -- own existence check is what drops one that a replacement effect moved
 -- elsewhere in the meantime.
 --
--- IN BATCH, against that same board, for the reason the first clause files its
--- last known information against it: "those objects are exiled" is one event,
--- so neither a member's CR 608.2h record nor its CR 616.1 candidate list may
--- read a board its siblings have already left.
+-- IN BATCH and in ONE event group, against that same board, for the reason the
+-- first clause files its last known information against it: "those objects are
+-- exiled" is one event, so neither a member's CR 608.2h record nor its CR 616.1
+-- candidate list may read a board its siblings have already left, and a CR
+-- 603.10a look-back must read the group rather than a sequence.
 remainingControlledExiled :: PlayerId -> Game ()
 remainingControlledExiled pid = do
   gs <- State.get
@@ -491,7 +493,7 @@ remainingControlledExiled pid = do
   -- plain query is not worth a second hoist.
   let onStack = filter (\oid -> Projection.controllerOf oid gs == Just pid) (GameState.stack gs)
       theirs = Projection.controls pid gs <> onStack
-  Monad.mapM_ (\oid -> Event.changeZoneInBatch gs oid Zone.Exile) theirs
+  Event.simultaneously (Monad.mapM_ (\oid -> Event.changeZoneInBatch gs oid Zone.Exile) theirs)
 
 -- CR 104.2a: a player still in the game wins if their opponents have all left.
 --
