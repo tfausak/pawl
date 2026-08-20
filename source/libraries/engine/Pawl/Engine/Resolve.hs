@@ -3813,8 +3813,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- BECOMES rather than increments, and the level bar's own
   -- ActivatedAbility.condition is the only thing that keeps the ladder in order
   -- (CR 716.2a's "activate only if this Class is level N-1"). Nothing is re-checked
-  -- here, which is CR 602.5d: an activated ability whose activation condition is no
-  -- longer met when it resolves still resolves.
+  -- here, which is CR 113.7a: once activated, an ability exists on the stack
+  -- independently of its source, so a level that moved in between changes nothing.
   --
   -- A player recipient, an illegal slot (CR 608.2b) and an id naming no object all
   -- write nothing -- Designate's postures.

@@ -115,7 +115,8 @@ data CounterKind keyword
     --
     -- CR 716.4 keeps this apart from a Class's level: "Level counters do not
     -- interact with Class cards, and class levels do not interact with leveler
-    -- cards." A class level is not a counter at all, so it is not a kind here.
+    -- cards." A class level is not a counter at all, so it is not a kind here --
+    -- it is Object.classLevel, and the two must not share a field.
     Level
   | -- | Gemstone Caverns' luck counter. Rule 122.1 gives it no lettered clause --
     -- 122.1a-j never name it -- so rule 122.1's own first sentence is the whole

@@ -23,6 +23,11 @@ module Pawl.Types.Designation where
 --
 -- * CR 731.1's day and night designate the GAME (Pawl.Types.Daytime).
 --
+-- * CR 716.2b's level is a NUMBER -- "a level is a designation that any permanent
+--   can have" -- so it is Object.classLevel, a Maybe Pawl.Types.ClassLevel, read
+--   by Quantity.ClassLevel. A constructor here could only say whether a permanent
+--   has some level, which is not what CR 716.2a's "level N or greater" asks.
+--
 -- Membership here says the mark is STORED and READ alike; it does not say the
 -- marks are interchangeable, and two places deliberately keep them apart. What
 -- SETS one differs: CR 702.112a mints renown's trigger, CR 701.37a's monstrosity

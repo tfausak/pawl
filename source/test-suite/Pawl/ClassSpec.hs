@@ -33,8 +33,8 @@
 --     a quoted triggered ability, landed with #1943 and is unused here.
 --
 -- CR 716.1 is a frame rule with no rules meaning -- the striated text box and the
--- sideways type line -- so nothing here asserts about the layout, the same reading
--- Pawl.RoomSpec's CR 709 note takes.
+-- sideways type line -- so nothing here asserts about the layout, and
+-- data/cards/paladin-class.json states none.
 --
 -- What is NOT proven here, because Paladin Class cannot reach it:
 --
@@ -164,7 +164,7 @@ ladderSpec s registry = Spec.describe s "Level bar activation" $ do
       [1, 1, 0]
   -- Two boards differing in exactly one thing: whose turn it is. Both hold the
   -- same twelve untapped Plains, so the bar is affordable on each, and CR 307.5's
-  -- "during a main phase of their turn" is the only thing that moves.
+  -- "it must be during the main phase of their turn" is the only thing that moves.
   Spec.it s "CR 716.2a a level bar is activatable only as a sorcery" $ do
     paladinClass <- S.printingOf s registry "Paladin Class"
     plains <- S.printingOf s registry "Plains"

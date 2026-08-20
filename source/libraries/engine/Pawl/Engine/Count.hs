@@ -571,8 +571,9 @@ viewOfSnapshot mController isToken snapshot =
       -- battlefield now (CR 701.54e), not about one at the moment of an event.
       Filter.ringBearerFor = Nothing,
       Filter.designations = Set.empty,
-      -- CR 716.2b: a designation, which a ProjectedCharacteristics does not carry
-      -- either, so a past event records none (#993).
+      -- CR 716.2b: a designation too, which a ProjectedCharacteristics does not
+      -- carry and never could, so a past event records none -- `designations`
+      -- above, same sentence.
       Filter.classLevel = Nothing,
       Filter.kicked = False,
       -- CR 602.1 / 605.1a off the snapshot, which is what it reads for `keywords`

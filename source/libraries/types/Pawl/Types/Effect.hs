@@ -786,8 +786,8 @@ data Effect card
     -- increments -- rule 716.2a states an absolute -- and the "only if this Class
     -- is level N-1" half of the same sentence rides
     -- Pawl.Types.ActivatedAbility.condition on the level bar's own ability rather
-    -- than being re-checked here (CR 602.5d: an ability whose activation
-    -- condition is no longer met still resolves).
+    -- than being re-checked here, which is CR 113.7a: once activated, an ability
+    -- exists on the stack independently of its source.
     SetClassLevel SetClassLevel.SetClassLevel
   | -- | CR 701.60a's other ending: the named permanents are NO LONGER SUSPECTED.
     -- Rule 701.60a's "until it leaves the battlefield" needs no opcode,
