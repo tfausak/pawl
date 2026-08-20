@@ -397,7 +397,10 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
   -- a set rather than a list of ids: CR 613.1b applies control changes in
   -- layer 2, before the layer 7c this ability lands in, so a creature the
   -- enchanted player no longer controls is out of the set on the very next
-  -- projection. Control Magic is the only control-changer in the pool.
+  -- projection. Control Magic moves it: `data/cards/`'s control-changing Auras
+  -- are it and Confiscate, and Control Magic's creature-only enchant slot is the
+  -- narrower fit. Synthetic Goblin Dominion moves control too, but by a
+  -- predicate rather than an attachment, so it cannot be pointed at one creature.
   Spec.it s "CR 613.1b: a creature stolen from the enchanted player leaves the Curse's affected set" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     curse <- S.printingOf s registry "Curse of Death's Hold"

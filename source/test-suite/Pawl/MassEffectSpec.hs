@@ -1954,7 +1954,8 @@ auraThiefSpec s registry =
           Spec.assertEqWith s "bob's, taken from him, start their clock over" (fmap sicknessOf theirs) (fmap (const (Just Sickness.Sick)) theirs)
           Spec.assertEqWith s "alice's own was never interrupted" (fmap sicknessOf hers) (fmap (const (Just (Sickness.Settled S.alice))) hers)
         -- The card is named Aura Thief, so an Aura is the case worth proving,
-        -- and Control Magic is the pool's one control-granting Aura. CR 109.5:
+        -- and Control Magic is one of `data/cards/`'s two control-granting Auras
+        -- (Confiscate is the other). CR 109.5:
         -- "For a static ability, [you] is the current controller of the object
         -- it's on" -- so taking the Aura takes what the Aura grants, WITHOUT
         -- moving the Aura. That is the whole content of the printed reminder
