@@ -342,7 +342,7 @@ slotsOf effect = case effect of
   Effect.RestartGame exempt -> foldMap objectRefSlots exempt
   Effect.ControlPlayerNextTurn slot -> oneSlot slot
   -- The third field is a DEFINITION, not a read; it belongs to boundSlots below.
-  Effect.Destroy (Destroy.MkDestroy ref _ _) -> objectRefSlots ref
+  Effect.Destroy (Destroy.MkDestroy ref _ _ _) -> objectRefSlots ref
   Effect.Sacrifice slot -> oneSlot slot
   Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown slot _) -> oneSlot slot
   Effect.TurnFaceUp slot -> oneSlot slot
@@ -897,8 +897,9 @@ boundSlots effect = case effect of
   -- CR 608.2d: the opponent this effect chose.
   Effect.ChooseOpponent slot -> Set.singleton slot
   -- How many permanents this destruction ACTUALLY destroyed, for a later "for
-  -- each ... destroyed this way".
-  Effect.Destroy (Destroy.MkDestroy _ _ mSlot) -> foldMap Set.singleton mSlot
+  -- each ... destroyed this way", and the cards it put into a graveyard, for a
+  -- later clause that NAMES them (CR 400.7's incarnations).
+  Effect.Destroy (Destroy.MkDestroy _ _ mSlot mBuried) -> foldMap Set.singleton mSlot <> foldMap Set.singleton mBuried
   -- How many milled cards matched the tally's filter (CR 728.1).
   Effect.Mill (Mill.MkMill _ _ mTally) -> foldMap (Set.singleton . MillTally.slot) mTally
   -- The cards CR 701.20a's reveal showed, where the card named a slot. Optional,
@@ -2615,7 +2616,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           gs {GameState.pendingControl = Map.insert target (Decider.MkDecider controller) (GameState.pendingControl gs)}
         -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
         _ -> gs
-  Effect.Destroy (Destroy.MkDestroy ref regenerability mSlot) -> do
+  Effect.Destroy (Destroy.MkDestroy ref regenerability mSlot mBuried) -> do
     gs <- State.get
     -- CR 701.8: destroy them through the single funnel -- indestructible (CR
     -- 702.12b) and regeneration (CR 701.19a) are Event.destroy's to decide, and
@@ -2631,6 +2632,36 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- would make the rider's quantity unevaluable instead.
     Monad.forM_ mSlot $ \slot ->
       State.modify' (bindAmountSlot source slot (Natural.length destroyed))
+    -- The other reading of the same printed phrase: the CARDS "put into a
+    -- graveyard this way", for Come Back Wrong's "return it to the battlefield"
+    -- to name. Bound onto `resolving` and as a GROUP, which is where and how
+    -- MoveToZone binds its own arrivals (CR 400.7j) and the only shape every
+    -- reader of a slot a destruction defines can see: slotGroup reads live
+    -- GameState unconditionally, where a single binding would have to survive
+    -- `chosen`.
+    --
+    -- Two filters, both read off the board AFTER the funnel rather than off the
+    -- funnel's answer, because the answer names the incarnation and not where it
+    -- ended up:
+    --
+    --   * in a GRAVEYARD. A CR 614 replacement may send the destroyed permanent
+    --     to exile instead (Rest in Peace), and then nothing was put into a
+    --     graveyard this way. A cancelled move (CR 616.1) has no incarnation at
+    --     all and is already Nothing.
+    --   * a CARD. CR 111.6 says a token is not a card, and every printed reader
+    --     of this slot says "card" -- "if a creature CARD is put into a graveyard
+    --     this way", "return each CARD put into a graveyard this way". The filter
+    --     also keeps CR 111.8 (a token that has left the battlefield can't come
+    --     back) out of reach of the one shape that would ask for it (gap #1950).
+    --
+    -- Nothing is bound when nothing qualifies, MoveToZone's rule: no slot names
+    -- an empty set, so the later clause finds an unbound slot and does nothing --
+    -- which is exactly what "IF a creature card is put into a graveyard this way"
+    -- asks for.
+    Monad.forM_ mBuried $ \slot -> do
+      after <- State.get
+      let buriedCards = filter (\oid -> isCardInAGraveyard oid after) (Maybe.mapMaybe snd destroyed)
+      Monad.unless (null buriedCards) (State.modify' (bindObjectsSlot resolving slot (Seq.fromList buriedCards)))
   Effect.Sacrifice slot -> do
     -- A slot a Create bound to a GROUP names every token at once, so all of them
     -- are sacrificed, in mint order. Read off the resolving object's live
@@ -4457,6 +4488,20 @@ bindObjectsSlot :: ObjectId -> SlotName -> Seq.Seq ObjectId -> GameState -> Game
 bindObjectsSlot holder slot targets gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toObjects targets) (Object.bindings obj)}
    in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
+
+-- CR 701.8b's "put into a graveyard this way", asked of one CR 400.7 incarnation:
+-- is it a card, and is it in a graveyard? Both halves are questions about where
+-- the object ended up rather than about the destruction, which is why they are
+-- asked of the board after the funnel ran (see Effect.Destroy's arm).
+--
+-- WHOSE graveyard is not asked: CR 400.3 files the arrival under the owner and
+-- no printed reader of this slot distinguishes them. Object.zone is the read
+-- because it tracks the zone sets and answers in one lookup; CR 111.6 is the
+-- card half.
+isCardInAGraveyard :: ObjectId -> GameState -> Bool
+isCardInAGraveyard oid gs = case Game.lookupObject oid gs of
+  Nothing -> False
+  Just obj -> Object.zone obj == Zone.Graveyard && not (Game.isToken oid gs)
 
 -- The default runner for the resolutions the live loop does not drive: a
 -- PlaySubgame effect reports a draw and binds nothing. Pawl.Engine.Engine's

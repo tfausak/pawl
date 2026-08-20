@@ -1274,7 +1274,7 @@ rewriteEffect pairs effect = case effect of
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot filter_ quantity) -> Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot (Filter.rewrite pairs filter_) quantity)
   Effect.RestartGame exempt -> Effect.RestartGame (fmap (rewriteObjectRef pairs) exempt)
   Effect.ControlPlayerNextTurn _ -> effect
-  Effect.Destroy (Destroy.MkDestroy ref regenerability mSlot) -> Effect.Destroy (Destroy.MkDestroy (rewriteObjectRef pairs ref) regenerability mSlot)
+  Effect.Destroy (Destroy.MkDestroy ref regenerability mSlot mBuried) -> Effect.Destroy (Destroy.MkDestroy (rewriteObjectRef pairs ref) regenerability mSlot mBuried)
   Effect.Sacrifice _ -> effect
   Effect.TurnFaceDown _ -> effect
   Effect.TurnFaceUp _ -> effect
