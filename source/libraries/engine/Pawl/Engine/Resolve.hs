@@ -2015,8 +2015,9 @@ installDamageRow players controller source duration kind rewrite rider g (recipi
                           -- source's printed properties, for CR 615.9's recheck
                           -- at the damage event.
                           DamagePattern.whatSource = maybe (Filter.Type.And []) fst sourceChoice,
-                          -- The recipient is BAKED as an id below rather than
-                          -- described: the resolution has already chosen it.
+                          -- The recipient is BAKED below rather than described:
+                          -- the resolution has already chosen it, or the row
+                          -- names none and covers every recipient.
                           DamagePattern.whatRecipient = Nothing,
                           DamagePattern.whichRecipient = recipient,
                           -- CR 609.7a's chosen source or CR 601.2c's targeted
@@ -3602,14 +3603,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- CR 615.1 / 615.3: one floating shield per object the ref names, with no
     -- amount to count down. PreventNextDamage's row but for its rewrite, hence
     -- the shared `installDamageRow`; CR 615.7's "reduced to 0" terminator does
-    -- not exist here, so only the duration ends it. Through
-    -- Damage.damageRecipient for PreventNextDamage's reason (CR 120.1a).
+    -- not exist here, so only the duration ends it. The recipient side goes
+    -- through Damage.damageRecipient for PreventNextDamage's reason (CR
+    -- 120.1a); the source side is an ObjectId and needs no such translation.
     gs <- State.get
     let named = objectRefRecipients legal resolving controller source gs ref
-        -- Which SIDE of the damage event the ref's objects sit on. DealtBy is
-        -- CR 120.1's source, which is always an OBJECT, so a player the ref
-        -- named drops out; and it names no recipient, so Dovin, Hand of
-        -- Control's shielded permanent cannot damage a player either.
+        -- Which SIDE of the damage event the ref's objects sit on. A DealtBy
+        -- row watches CR 120.1's source, which is always an OBJECT, so a player
+        -- the ref named drops out -- and it names no recipient, so the damage
+        -- Dovin, Hand of Control's shielded permanent would deal to a PLAYER is
+        -- prevented as much as the damage it would deal to a permanent.
         rows = case direction of
           DamageDirection.DealtTo -> fmap (\recipient -> (Just recipient, Nothing)) (Maybe.mapMaybe (Damage.damageRecipient gs) named)
           -- The trivial predicate beside the id: CR 615.9's recheck is of a

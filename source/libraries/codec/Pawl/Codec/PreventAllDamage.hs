@@ -17,10 +17,10 @@ import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 -- | A bare object keyed by the record's field names, as
 -- Pawl.Codec.PreventNextDamage writes the countdown shield's.
 --
--- All three optional keys are 'Fields.defaulted', which is what lets every unbounded
--- shield already in the pool round trip unchanged: a card naming no kind and
--- carrying no CR 615.5 clause writes exactly the two keys
--- Pawl.Codec.DurationRef used to.
+-- All three optional keys are 'Fields.defaulted', which is what lets every
+-- unbounded shield already in the pool round trip unchanged: a card naming no
+-- kind, shielding a recipient and carrying no CR 615.5 clause writes exactly the
+-- two keys Pawl.Codec.DurationRef used to.
 --
 -- The effect codec is a PARAMETER rather than an import, for the reason
 -- Pawl.Types.PreventAllDamage gives: the record is parametric in the effect so

@@ -22,7 +22,7 @@ codec = PreventAllDamage.codec Common.text
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.PreventAllDamage" $ do
   -- CR 615.1's shield naming no kind and carrying no CR 615.5 clause -- Selfless
-  -- Squire's. Both optional keys are elided, so this is byte for byte what
+  -- Squire's. All three optional keys are elided, so this is byte for byte what
   -- Pawl.Codec.DurationRef used to write for this arm.
   Spec.it s "MkPreventAllDamage, kind, direction and riders elided" $
     Common.assertCodec
