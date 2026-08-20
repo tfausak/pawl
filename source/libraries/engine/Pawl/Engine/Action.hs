@@ -164,6 +164,12 @@ legalActions pid gs =
       -- the two halves cannot disagree about where flash is read from. The face
       -- is the one this play would put onto the battlefield (CR 712.12), resolved
       -- the way Cast.proposedFace resolves the half being cast.
+      --
+      -- Not implemented: the CR 613.11 player axis's "as though it had flash"
+      -- (CR 601.3b, PlayerEffect.mayCastAsThoughItHadFlash), which Cast.timingOk
+      -- reads beside Cast.instantSpeed for a cast. A printing whose permission
+      -- says PLAY rather than cast -- Scout's Warning -- would move this window
+      -- too, by CR 601.1a (#1938).
       landTimingOk (oid, mName) =
         Turn.sorcerySpeedWindow pid gs
           || maybe False (\card -> Cast.flashOn oid (Game.resolveFace mName card) gs) (Game.cardOf oid gs)

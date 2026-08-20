@@ -134,14 +134,13 @@ proposedFace oid name gs = case fmap Object.facing (Game.lookupObject oid gs) of
 -- they have priority, rather than only in the sorcery-speed window? Two ways in,
 -- and they are two because one is a CARD TYPE and the other is a KEYWORD.
 --
--- CR 702.8a's widening is this predicate's second disjunct, and it is lifted HERE
--- and emphatically not inside Turn.sorcerySpeedWindow: that window
+-- CR 702.8a's widening is this predicate's second disjunct -- flashOn below,
+-- which stands on its own because CR 116.2a's land play asks it too -- and it is
+-- lifted HERE and emphatically not inside Turn.sorcerySpeedWindow: that window
 -- has one copy because CR 307.1 and CR 307.5 are the same three conjuncts, and
 -- CR 702.8a is about neither. Flash is a permission a CARD carries about casting
 -- ITSELF, so widening the shared window would make an equip ability on the same
 -- board instant-speed, which no rule says.
---
--- CR 702.8a's keyword is flashOn below, which the LAND PLAY asks too.
 --
 -- The PLAYER-scoped sibling is NOT this and is deliberately not folded in: an
 -- effect that lets a player cast OTHER spells as though they had flash (CR
