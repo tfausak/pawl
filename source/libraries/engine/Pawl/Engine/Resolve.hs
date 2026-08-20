@@ -1807,7 +1807,9 @@ handCardsOf context gs pid filter_ =
 -- then be PERFORMED in. Both questions are asked before anything moves (CR
 -- 608.2f): CR 401.2 once per object, asked of the OWNER in the sweep's APNAP
 -- order (CR 101.4); CR 401.4 once per (owner, end) group of two or more, whose
--- decider is the owner rather than CR 608.2f's resolving controller.
+-- decider is the owner rather than CR 608.2f's resolving controller -- except
+-- where the effect states a RANDOM order, which takes that arrangement back from
+-- the owner and randomises the group instead (CR 701.24a's standard).
 --
 -- The arrangement answer names the cards from the chosen end INWARD, and
 -- Game.insertIntoZone puts every arrival AT that end, so the batch is performed
@@ -1831,6 +1833,7 @@ settleArrivals zone placement targets = case zone of
         Just owner -> do
           position <- case placement of
             LibraryPlacement.Stated stated -> pure stated
+            LibraryPlacement.RandomOrder stated -> pure stated
             LibraryPlacement.OwnerChooses ->
               Game.choose (Prompt.ChooseLibraryEnd (Decide.deciderFor owner gs) owner oid)
           pure ((Just owner, position), oid)
@@ -1839,9 +1842,21 @@ settleArrivals zone placement targets = case zone of
           (mOwner, position) = key
       case (mOwner, batch) of
         (Just owner, _ : _ : _) -> do
-          gs <- State.get
-          answer <- Game.choose (Prompt.ArrangeLibraryArrivals (Decide.deciderFor owner gs) owner position batch)
-          pure (fmap (\oid -> (oid, position)) (reverse (Game.permute batch answer)))
+          ordered <- case placement of
+            -- The effect states the order, so CR 401.4's owner is not asked.
+            -- Prompt.Shuffle is the randomness channel the mulligan and CR
+            -- 701.24a's own shuffle already go through, so the engine still
+            -- rolls nothing; Game.honourShuffle refuses an answer that is not a
+            -- permutation of the batch, which is what keeps a random order from
+            -- inventing or destroying cards.
+            LibraryPlacement.RandomOrder _ -> do
+              answer <- Game.ask (Prompt.Shuffle batch)
+              pure (Game.honourShuffle batch answer)
+            _ -> do
+              gs <- State.get
+              answer <- Game.choose (Prompt.ArrangeLibraryArrivals (Decide.deciderFor owner gs) owner position batch)
+              pure (Game.permute batch answer)
+          pure (fmap (\oid -> (oid, position)) (reverse ordered))
         -- One card is one order, which is CR 401.4's own "two or more".
         _ -> pure (fmap (\oid -> (oid, position)) batch)
 
