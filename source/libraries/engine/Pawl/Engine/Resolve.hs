@@ -2146,17 +2146,22 @@ damageSourceCandidates context gs filter_ =
       pool = Set.toList (GameState.battlefield gs) <> GameState.stack gs <> filter faceUp (Set.toList (GameState.command gs))
    in List.sort (filter (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_) pool)
 
--- The context every effect of a resolution evaluates its quantities in: CR
--- 109.5's "you" is the resolving controller, the source frames CR 113.7, and the
--- resolution's slot objects ride along so a Quantity.AgainstSlot can aim at one.
+-- The context every effect of a resolution evaluates its quantities and its
+-- ref-borne filters in: CR 109.5's "you" is the resolving controller, the source
+-- frames CR 113.7, and the resolution's slot objects ride along so a
+-- Quantity.AgainstSlot can aim at one and a Filter.IsBound can ask whether a
+-- candidate is among them.
 --
--- Only LEGAL recipients, only OBJECT ones, and only where the slot names exactly
--- one (CR 608.2b); all three drop out as an absent key, so the quantity is
--- unanswered rather than answered off the source.
+-- Of the TARGET half, only LEGAL recipients and only OBJECT ones, and only where
+-- the slot names exactly one (CR 608.2b); all three drop out as an absent key, so
+-- a quantity is unanswered rather than answered off the source.
+--
+-- The GROUP half comes in beside `legal` rather than through it: CR 115.10a makes
+-- a group a definition and never a target, so it owes CR 608.2b nothing and is
+-- read live off the resolving object (slotGroups) instead. It reaches
+-- Filter.IsBound whole, and the singular readers decline it
+-- (Filter.slotOneObject).
 effectContext :: PlayerId -> ObjectId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Seq.Seq ObjectId) -> Filter.Context
--- The GROUPS come in beside `legal` rather than through it: CR 115.10a makes a
--- group a definition and never a target, so it owes CR 608.2b nothing and is
--- read live off the resolving object (slotGroups) instead.
 effectContext controller source legal groups =
   Filter.contextWithSlots (Just controller) (Just source) (Binding.withGroups (effectSlotObjects legal) groups)
 
@@ -2848,9 +2853,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- CR 400.7j: bind what arrived into the resolving object's live bindings,
         -- where a later effect of this resolution or a delayed ability it arms
         -- (CR 603.7c) can name it. The shape follows how many arrived: one takes
-        -- the single binding, the only shape slotOne sees; several take the group,
-        -- which only the ObjectRef readers see; none binds nothing, so no slot
-        -- names an empty set.
+        -- the single binding, which every reader sees; several take the group,
+        -- which the ObjectRef readers and Filter.IsBound see and slotOne does
+        -- not; none binds nothing, so no slot names an empty set.
         bindArrivals slot arrived = case arrived of
           [] -> pure ()
           [only] -> State.modify' (bindSlot resolving slot only)
@@ -3176,8 +3181,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.Reveal (Reveal.MkReveal ref mSlot) -> do
     gs <- State.get
     -- Show one card, and name it if the card asked for a name. bindSlot and NOT
-    -- bindObjectsSlot: only the SINGLE binding is visible to Filter.IsBound and to
-    -- slotOne (#1532).
+    -- bindObjectsSlot: this arm names one card per seat, so there is no group to
+    -- bind, and the single shape is the one every reader sees -- slotOne included,
+    -- where Filter.IsBound reads either.
     let showOne pid oid = do
           Event.reveal RevealCause.Ordinary pid oid
           Monad.forM_ mSlot $ \slot -> State.modify' (bindSlot resolving slot oid)
@@ -3206,8 +3212,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         let named = objectRefObjects legal resolving controller source gs ref
         Monad.mapM_ (Event.reveal RevealCause.Ordinary controller) named
         -- LookAt's one-versus-many line: a lone card takes the SINGLE binding,
-        -- which is the only shape Filter.IsBound and slotOne can see, and several
-        -- take the group binding (#1532).
+        -- which every reader sees, and several take the group binding, which the
+        -- ObjectRef readers and Filter.IsBound see and slotOne does not.
         Monad.forM_ mSlot $ \slot -> case named of
           [] -> pure ()
           [only] -> State.modify' (bindSlot resolving slot only)
@@ -3221,8 +3227,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- and a public GameEvent.Revealed would be a different rule (CR 701.20a).
     case objectRefObjects legal resolving controller source gs ref of
       [] -> pure ()
-      -- One card takes the SINGLE binding, the only one a Filter.IsBound can see
-      -- (#1532).
+      -- One card takes the SINGLE binding, which every reader sees; several take
+      -- the group, which Filter.IsBound reads as CR 701.20e's "among them".
       [only] -> State.modify' (bindSlot resolving slot only)
       several -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList several))
   Effect.Scry (PlayerQuantity.MkPlayerQuantity ref quantity) -> do

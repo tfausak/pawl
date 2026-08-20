@@ -4973,7 +4973,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- Moths' "it"), and a GROUP for a move of several (Act on Impulse's "those
   -- cards"). Pawl.Engine.Resolve picks by how many actually arrived, and only the
   -- singular shape is visible to a SINGULAR READER -- Resolve.slotOne reads
-  -- Binding.targets, which a group never fills.
+  -- Binding.targets, which a group never fills. Filter.IsBound is NOT one: it
+  -- goes to Filter.Context's slotObjects, where a group is every one of its
+  -- members.
   --
   -- So the shape a card must not author is a singular read of a slot a move that
   -- may take SEVERAL cards bound: it would silently name nothing rather than
@@ -5050,10 +5052,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           PlayerRef.Candidate -> True
           -- One seat -- InSlot's answer, one indirection out.
           PlayerRef.ControllerOfBound _ -> True
-        -- Every opcode that binds an ObjectRef's result under a name of the
-        -- card's own: a move, CR 701.20e's look and CR 701.20a's reveal. All
-        -- three dispatch on how many objects arrived, so all three can leave the
-        -- group binding a singular reader cannot see.
+        -- Every opcode that binds a batch under a name of the card's own: a
+        -- move, CR 701.20e's look, CR 701.20a's reveal and CR 701.17c's mill.
+        -- All four dispatch on how many objects arrived, so all four can leave
+        -- the group binding a singular reader cannot see.
         boundPlurally effect = case effect of
           Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ mSlot _ _) | not (movesAtMostOne ref) -> Maybe.maybeToList mSlot
           Effect.LookAt (LookAt.MkLookAt ref slot) | not (movesAtMostOne ref) -> [slot]

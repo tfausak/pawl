@@ -270,10 +270,12 @@ data Effect card
     -- ObjectRef.TopOfLibrary names a card in a library by POSITION, the one thing
     -- no Filter can say about a hidden zone (CR 400.2).
     --
+    -- A look naming SEVERAL cards binds them as a GROUP, which CR 701.20e's "from
+    -- among them" reads back through Filter.IsBound.
+    --
     -- Not implemented: no seat is shown anything, there being no per-player view
     -- of the state (#1412), so the binding is the whole of the look and WHO looks
-    -- is not carried; and a look naming SEVERAL cards binds them as a group,
-    -- which Filter.IsBound cannot read (#1532).
+    -- is not carried.
     LookAt LookAt.LookAt
   | -- | CR 701.22a: the players the PlayerRef names each scry this many -- look
     -- at the top N of their own library, then put any number on the bottom in any

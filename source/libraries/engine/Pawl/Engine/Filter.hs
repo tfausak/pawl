@@ -456,9 +456,11 @@ data Context = MkContext
     -- directly. An EMPTY set never appears -- a slot naming nothing is an absent
     -- key -- so `Map.member` and "names something" are the same question.
     --
-    -- EMPTY everywhere but a resolution, which is the honest answer rather than a
-    -- forgotten filler: outside one there are no slots. Pawl.Engine.Resolve's
-    -- effectContext is the sole non-empty producer.
+    -- EMPTY everywhere but a resolution and CR 603.4's intervening-"if" checks,
+    -- which is the honest answer rather than a forgotten filler: elsewhere there
+    -- are no slots. Pawl.Engine.Resolve's effectContext,
+    -- Pawl.Engine.Event.interveningHolds and Pawl.Engine.Stack are the non-empty
+    -- producers, and all three go through contextWithSlots below.
     slotObjects :: Map.Map SlotName.SlotName (Set.Set ObjectId.ObjectId),
     -- CR 201.1 / 709.4a: the NAMES of the objects the surrounding announcement's
     -- slots hold, for the one atom that compares a candidate's against them
@@ -529,8 +531,8 @@ data Context = MkContext
 contextFor :: Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
 contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, sourceAttachedTo = Nothing}
 
--- contextFor with the resolution's slot objects supplied. The one caller is
--- Pawl.Engine.Resolve.effectContext; see slotObjects above.
+-- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
+-- slotObjects above for who supplies them.
 contextWithSlots :: Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Map.Map SlotName.SlotName (Set.Set ObjectId.ObjectId) -> Context
 contextWithSlots p s m = (contextFor p s) {slotObjects = m}
 

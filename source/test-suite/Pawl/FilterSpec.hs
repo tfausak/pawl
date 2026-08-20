@@ -534,6 +534,33 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
         (not (Filter.matches (Filter.contextFor (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 7))) devoidBigCreature Filter.Type.IsSource))
         "no identity"
 
+  -- CR 115.10a: what the RESOLUTION named, in either shape. blackCreature is
+  -- object 7 throughout, so a slot naming 7 among others is the group read and a
+  -- slot naming 6 and 8 is the negative built off the same board.
+  Spec.describe s "IsBound" $ do
+    let slot = SlotName.MkSlotName (Text.pack "milled")
+        bound oids = Filter.contextWithSlots (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 7)) (Map.singleton slot (Set.fromList (fmap ObjectId.MkObjectId oids)))
+    Spec.it s "matches the one object the slot names" $ do
+      Spec.assertBool s (Filter.matches (bound [7]) blackCreature (Filter.Type.IsBound slot)) "the bound object"
+
+    -- The group read: CR 701.17c's "from among them" is a question about every
+    -- member, so a batch naming the candidate among others admits it.
+    Spec.it s "CR 115.10a matches every member of a slot bound to a group" $ do
+      Spec.assertBool s (Filter.matches (bound [6, 7, 8]) blackCreature (Filter.Type.IsBound slot)) "a member of the group"
+
+    Spec.it s "does not match an object the slot does not name" $ do
+      Spec.assertBool s (not (Filter.matches (bound [6, 8]) blackCreature (Filter.Type.IsBound slot))) "not in the group"
+
+    Spec.it s "a slot naming nothing is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches (bound []) blackCreature (Filter.Type.IsBound slot))) "nothing bound"
+
+    -- The other half of the same map, and the reason it is a set: a reader that
+    -- can point at one object and no more declines a group rather than taking
+    -- whichever member sorts first.
+    Spec.it s "CR 601.2c a singular reader takes the single binding and declines the group" $ do
+      Spec.assertEqWith s "the singleton is answerable" (Filter.slotOneObject slot (bound [7])) (Just (ObjectId.MkObjectId 7))
+      Spec.assertEqWith s "and the group is not" (Filter.slotOneObject slot (bound [6, 7, 8])) Nothing
+
   Spec.describe s "IsAttacking" $ do
     Spec.it s "matches a view whose combat status says so" $ do
       Spec.assertBool s (Filter.matches self (blackCreature {Filter.attacking = True}) Filter.Type.IsAttacking) "attacking"

@@ -202,11 +202,10 @@ evaluated in.
   reach them and the brief must reason about them itself.
 - Where two opcodes must see each other, say whether one builder supplies both.
   A slot is visible to `IsBound` only where the resolution's own map is handed
-  over (`Resolve.effectContext`), and only where it names exactly one object ---
-  a group binding is invisible to it (#1532). A target slot's own filter is
-  matched before any of that exists (`Target.admittedGiven`), and an
-  intervening-"if" reads a map filtered differently again
-  (`Binding.objectSlots`).
+  over (`Resolve.effectContext`); it reads a single binding and a group binding
+  alike, where `Quantity.AgainstSlot` and the other singular readers take the
+  single one only (`Filter.slotOneObject`). A target slot's own filter is matched
+  before any of that exists (`Target.admittedGiven`).
 
 When reading cannot settle it, say so: "these opcodes exist and I did not verify
 they compose along <path>" is an honest brief and points the implementer at the

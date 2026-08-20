@@ -545,7 +545,7 @@ setMentoredCreature oid = Map.insert mentoredCreature (toObject oid)
 -- there is nothing of the card's to clobber.
 --
 -- Set-valued like a target slot, so a payment that sacrificed SEVERAL permanents
--- lands on `onlyOne`'s Nothing rather than on one of them (#1532).
+-- lands on `onlyOne`'s Nothing rather than on one of them.
 setPaid :: Map SlotName (Set Recipient) -> Map SlotName Binding -> Map SlotName Binding
 setPaid paid = Map.union (fmap toRecipients paid)
 
@@ -565,14 +565,15 @@ modesOf m = Maybe.fromMaybe Seq.empty (Binding.modes =<< Map.lookup chosenModes 
 targetsOf :: Map SlotName Binding -> Map SlotName (Set Recipient)
 targetsOf = Map.filter (not . Set.null) . Map.mapMaybe Binding.targets
 
--- The OBJECTS a binding environment names, one slot at a time: targetsOf with
--- the player recipients dropped, which is what Pawl.Engine.Filter.Context's
--- slotObjects holds so a Quantity.AgainstSlot can aim at one.
+-- The OBJECTS a binding environment names as a TARGET, one slot at a time:
+-- targetsOf with the player recipients dropped. Half of what
+-- Pawl.Engine.Filter.Context's slotObjects holds -- `slotObjects` below is the
+-- whole, group binding included.
 --
 -- No CR 608.2b legality filter, unlike Pawl.Engine.Resolve.effectContext's
--- version: the callers here are CR 603.4's two intervening-"if" checks, and what
--- they aim at is a slot the EVENT bound (Binding.became), which was never chosen
--- and so was never a target to become illegal.
+-- version: what this is read for is CR 603.4's two intervening-"if" checks, and
+-- what they aim at is a slot the EVENT bound (Binding.became), which was never
+-- chosen and so was never a target to become illegal.
 objectSlots :: Map SlotName Binding -> Map SlotName ObjectId
 objectSlots = Map.mapMaybe (Recipient.objectOf Monad.<=< onlyOne) . targetsOf
 

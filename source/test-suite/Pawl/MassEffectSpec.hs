@@ -756,7 +756,7 @@ midnightTillingSpec s registry =
         -- in the order Goblin Piker, Murder, Bird Maiden, Swamp.
         pure (board forest tilling hero sentry [island, swamp, maiden, murder, piker])
       -- What stays behind when nothing is returned: the card buried before the
-      -- mill, all four milled cards, and the spell itself (CR 608.2m).
+      -- mill, all four milled cards, and the spell itself (CR 608.2n).
       allBuried = List.sort ([named "Benalish Hero", named "Bird Maiden", named "Goblin Piker", named "Midnight Tilling", named "Murder"] <> [named "Swamp"])
    in Spec.describe s "MidnightTilling" $ do
         -- The headline, and the case the whole unit exists for: the SECOND card

@@ -1416,8 +1416,8 @@ payInOrder pid oid components = case components of
 -- rather than left-biased: Jarad, Golgari Lich Lord's "Sacrifice a Swamp and a
 -- Forest" is two Sacrifice components writing one reserved name, and what that
 -- names is the pair -- which Pawl.Engine.Binding.onlyOne then declines to read as
--- a single object (#1532), rather than silently answering with whichever
--- component was paid first.
+-- a single object, rather than silently answering with whichever component was
+-- paid first.
 mergeBound :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> Payment.Payment -> Payment.Payment
 mergeBound bound outcome = case outcome of
   Payment.Unpaid -> Payment.Unpaid
