@@ -9,6 +9,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
+import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
 
 -- | WHICH OBJECTS an object-affecting effect names -- the object-side counterpart
 -- of Pawl.Types.PlayerRef.
@@ -239,6 +240,39 @@ data ObjectRef
     -- executes (CR 608.2c), which is what makes an empty library a no-op rather
     -- than an error: there is no top card, so the arm names nothing.
     TopOfLibrary TopOfLibrary.TopOfLibrary
+  | -- | The cards on top of a library down to and INCLUDING the first one the
+    -- Filter matches -- Treasure Hunt's "reveal cards from the top of your
+    -- library until you reveal a nonland card". TopOfLibrary's sibling, and a
+    -- second way to say HOW DEEP rather than a second way to reveal: both name a
+    -- prefix of CR 401.2's ordered pile taken from its head (CR 121.1), and they
+    -- differ only in what ends it -- a Quantity there, a match here.
+    --
+    -- NOT the filtered sweep of a library the arms above still lack (#1309), and
+    -- the difference is the one that issue turns on. A sweep would have to read
+    -- every card in a hidden zone (CR 400.2) and report which ones matched; this
+    -- walks the pile from the top and stops, so which cards it names is a
+    -- POSITION question that a Filter only terminates. Every card the walk names
+    -- is then shown by the effect reading it (CR 701.20a), where the cards a
+    -- sweep passed over would not be.
+    --
+    -- The MATCHING card is in the set, which is what "until you reveal a nonland
+    -- card" says: the walk stops having revealed it, not before it. A library
+    -- holding no match at all gives up the whole of itself and stops at the
+    -- bottom (CR 609.3), and the rest of the instruction is then performed on all
+    -- of it.
+    --
+    -- No rule of the CR governs "until": the stopping condition is the card's own
+    -- text, and what the walk owes the rulebook is CR 401.2's order, CR 121.1's
+    -- head and CR 609.3's shortfall.
+    --
+    -- The PlayerRef is WHOSE library, TopOfLibrary's field for its reason, and
+    -- the walk runs once per library it names rather than once across all of
+    -- them.
+    --
+    -- Not a target and never one (CR 115.10a) -- the player may be targeted, the
+    -- cards are not -- and read when the effect executes (CR 608.2c), the two
+    -- properties TopOfLibrary above has. An empty library names nothing.
+    TopOfLibraryUntil TopOfLibraryUntil.TopOfLibraryUntil
   | -- | A card in a graveyard, matching the Filter, CHOSEN as the effect runs
     -- rather than swept -- Port of Karfell's "return a creature card from your
     -- graveyard to the battlefield tapped".

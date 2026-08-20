@@ -14,7 +14,8 @@ import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.TopOfLibrary" $ do
-  -- CR 401.1. Act on Impulse's literal three.
+  -- CR 401.2's ordered pile read from its head (CR 121.1). Act on Impulse's
+  -- literal three.
   Spec.it s "MkTopOfLibrary, both keys" $
     Common.assertCodec
       s

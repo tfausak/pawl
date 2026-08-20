@@ -70,6 +70,7 @@ zoneFunctionedFrom effect = case effect of
     ObjectRef.EachPlayer -> Nothing
     ObjectRef.ChosenPlayer -> Nothing
     ObjectRef.TopOfLibrary {} -> Nothing
+    ObjectRef.TopOfLibraryUntil {} -> Nothing
     ObjectRef.ChosenCardInGraveyard {} -> Nothing
     ObjectRef.ChosenCardInHand {} -> Nothing
     ObjectRef.ChosenCardFromAmong {} -> Nothing

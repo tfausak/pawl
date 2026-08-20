@@ -222,6 +222,7 @@ import qualified Pawl.Types.TapPermanents as TapPermanents
 import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
+import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
@@ -2662,6 +2663,10 @@ objectRefFilters ref = case ref of
   -- itself a fold -- so the depth goes through refCounts for the reason
   -- Effect.DealDamage's quantity does.
   ObjectRef.TopOfLibrary {} -> countFilters (refCounts ref)
+  -- Treasure Hunt's "until you reveal a nonland card" states its Filter directly
+  -- rather than through a depth, so both are linted: the walk-ending Filter here,
+  -- and whatever a Count under it would hold via the arm above's route.
+  ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil _ f) -> f : countFilters (refCounts ref)
   -- Port of Karfell's "a creature card from your graveyard"; its PlayerScope and
   -- its Chooser name players, so the Filter is the whole of what there is to
   -- lint, exactly as for the graveyard sweep above.
@@ -5025,6 +5030,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player depth) -> case depth of
             Quantity.Type.Literal n -> n <= 1 && namesOneSeat player
             _ -> False
+          -- FALSE however narrow the seat: a walk ends where a card matches, and
+          -- nothing about the ref bounds how many cards it passes first. The same
+          -- reading the computed depth above gets -- this lint asks what a card
+          -- may be written as.
+          ObjectRef.TopOfLibraryUntil {} -> False
           -- One card per CHOOSER: the resolving controller chooses once however
           -- many graveyards the scope draws candidates from, where Exhume's
           -- "each player" is one choice each and so several cards on any board
