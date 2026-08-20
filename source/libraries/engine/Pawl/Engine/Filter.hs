@@ -7,6 +7,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -263,6 +264,23 @@ data View = MkView
     -- Pawl.Engine.CombatRestriction.inForce hold no view and read the object
     -- directly.
     designations :: Set.Set Designation.Designation,
+    -- CR 716.2b: the level designation on this candidate, or Nothing for the
+    -- overwhelming majority of permanents, which have never been given one. Read
+    -- straight off Object.classLevel, for `designations` above's reason -- rule
+    -- 716.2b makes it a designation rather than a characteristic, so no projection
+    -- writes it -- and a Maybe rather than a member of that Set because it is a
+    -- NUMBER, which is also why it needs its own field rather than a fifth
+    -- Pawl.Types.Designation constructor.
+    --
+    -- CR 716.2d's "treated as though its level is 1" is deliberately NOT applied
+    -- here: this field reports the mark, and Pawl.Engine.Quantity's ClassLevel arm
+    -- defaults at the read, so the one asker the rule speaks to is the one place
+    -- that defaults.
+    --
+    -- Nothing for every candidate with no object to read it off: a printed card
+    -- off the battlefield, a player, an event snapshot -- the vacuous posture
+    -- `ringBearerFor` above takes.
+    classLevel :: Maybe ClassLevel.ClassLevel,
     -- CR 702.33d: has this candidate been kicked? Read off Object.kicked, and
     -- False where there is no object to read it off, both for the reasons
     -- `designations` above gives. Its one reader is Pawl.Engine.Quantity's WasKicked
@@ -368,6 +386,9 @@ playerView pid =
       -- CR 701.60b and CR 719.3b saying the same of the other marks, and a
       -- player is not one.
       designations = Set.empty,
+      -- CR 716.2b: a level is a designation A PERMANENT can have, and a player is
+      -- not one -- `designations` above, same sentence.
+      classLevel = Nothing,
       kicked = False,
       -- CR 602.1: an activated ability is an ability OF AN OBJECT, and CR 109.1's
       -- list of what an object is has no player in it -- `keywords` above, one

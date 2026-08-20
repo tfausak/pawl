@@ -42,6 +42,7 @@ import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.Search as Search
+import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotName as SlotName
@@ -776,6 +777,18 @@ data Effect card
     -- written here. Idempotent by construction, which CR 702.112c and CR 701.60d
     -- lean on; emits GameEvent.BecameDesignated only on a change.
     Designate Designate.Designate
+  | -- | CR 716.2a's first half: "[Cost]: This Class's level becomes N." The
+    -- slot's permanent gets that level.
+    --
+    -- Designate's shape above, and for its reason: CR 716.2b makes a level a
+    -- designation, so this writes Object.classLevel rather than creating a CR 613
+    -- modification, and nothing in CR 613 could carry it. BECOMES rather than
+    -- increments -- rule 716.2a states an absolute -- and the "only if this Class
+    -- is level N-1" half of the same sentence rides
+    -- Pawl.Types.ActivatedAbility.condition on the level bar's own ability rather
+    -- than being re-checked here, which is CR 113.7a: once activated, an ability
+    -- exists on the stack independently of its source.
+    SetClassLevel SetClassLevel.SetClassLevel
   | -- | CR 701.60a's other ending: the named permanents are NO LONGER SUSPECTED.
     -- Rule 701.60a's "until it leaves the battlefield" needs no opcode,
     -- Object.newIncarnation already dropping the designation.

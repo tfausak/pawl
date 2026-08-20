@@ -24,6 +24,7 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastOffer as CastOffer.Type
 import qualified Pawl.Types.ChangeText as ChangeText
+import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
@@ -102,6 +103,7 @@ import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotName as SlotName
@@ -1252,6 +1254,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Designate (Designate.MkDesignate Designation.Suspected (SlotName.MkSlotName (Text.pack "self"))))
       " {\"type\":\"Designate\",\"value\":{\"designation\":{\"type\":\"Suspected\"},\"slot\":\"self\"}} "
+  -- CR 716.2a's first half. Designate's shape with a number where that has a
+  -- designation tag.
+  Spec.it s "SetClassLevel" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.SetClassLevel (SetClassLevel.MkSetClassLevel (ClassLevel.MkClassLevel 2) (SlotName.MkSlotName (Text.pack "self"))))
+      " {\"type\":\"SetClassLevel\",\"value\":{\"level\":2,\"slot\":\"self\"}} "
   -- CR 701.60a's ending, with an ObjectRef on the wire where Designate above
   -- writes a slot name directly: Eliminate the Impossible names a set rather
   -- than one permanent.

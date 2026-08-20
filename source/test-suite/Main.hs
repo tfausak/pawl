@@ -9,6 +9,7 @@ import qualified Pawl.CardSpec
 import qualified Pawl.CardsSpec
 import qualified Pawl.CaseSpec
 import qualified Pawl.CastSpec
+import qualified Pawl.ClassSpec
 import qualified Pawl.Codec.AbilityNameSpec
 import qualified Pawl.Codec.AbilityTriggeredSpec
 import qualified Pawl.Codec.ActivatedAbilitySpec
@@ -52,6 +53,7 @@ import qualified Pawl.Codec.ChooseBetweenSpec
 import qualified Pawl.Codec.ChooserSpec
 import qualified Pawl.Codec.ChosenCardInGraveyardSpec
 import qualified Pawl.Codec.ChosenCardInHandSpec
+import qualified Pawl.Codec.ClassLevelSpec
 import qualified Pawl.Codec.ClauseIndexSpec
 import qualified Pawl.Codec.ClauseSpec
 import qualified Pawl.Codec.ColorSpec
@@ -227,6 +229,7 @@ import qualified Pawl.Codec.SearchDestinationSpec
 import qualified Pawl.Codec.SearchSpec
 import qualified Pawl.Codec.SelfCountersReachedSpec
 import qualified Pawl.Codec.SetBasePowerToughnessSpec
+import qualified Pawl.Codec.SetClassLevelSpec
 import qualified Pawl.Codec.SetPowerToughnessSpec
 import qualified Pawl.Codec.ShuffleIntoLibrarySpec
 import qualified Pawl.Codec.SkipNextPhaseSpec
@@ -428,6 +431,7 @@ spec s registry = do
   Pawl.CardSpec.spec s registry
   Pawl.CardsSpec.spec s
   Pawl.CaseSpec.spec s registry
+  Pawl.ClassSpec.spec s registry
   Pawl.CastSpec.spec s registry
   Pawl.Codec.AbilityNameSpec.spec s
   Pawl.Codec.AbilityTriggeredSpec.spec s
@@ -473,6 +477,7 @@ spec s registry = do
   Pawl.Codec.ChosenCardInGraveyardSpec.spec s
   Pawl.Codec.ChosenCardInHandSpec.spec s
   Pawl.Codec.ClauseIndexSpec.spec s
+  Pawl.Codec.ClassLevelSpec.spec s
   Pawl.Codec.ClauseSpec.spec s
   Pawl.Codec.ColorSpec.spec s
   Pawl.Codec.CombatRestrictionSpec.spec s
@@ -647,6 +652,7 @@ spec s registry = do
   Pawl.Codec.SearchSpec.spec s
   Pawl.Codec.SelfCountersReachedSpec.spec s
   Pawl.Codec.SetBasePowerToughnessSpec.spec s
+  Pawl.Codec.SetClassLevelSpec.spec s
   Pawl.Codec.SetPowerToughnessSpec.spec s
   Pawl.Codec.ShuffleIntoLibrarySpec.spec s
   Pawl.Codec.SkipNextPhaseSpec.spec s

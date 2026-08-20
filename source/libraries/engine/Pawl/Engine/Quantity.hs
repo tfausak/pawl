@@ -14,6 +14,7 @@ import qualified Pawl.Engine.ManaCount as ManaCount
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Face as Face
@@ -321,6 +322,10 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- Power and ObjectCounters have it: an object nobody designated is not renowned,
   -- which is an answer.
   Quantity.HasDesignation d -> fmap (\view -> if Set.member d (Filter.designations view) then 1 else 0) mView
+  -- CR 716.2d is applied HERE and nowhere else: a permanent with no level reads
+  -- as level 1 for every rule and effect that asks, so the default belongs at the
+  -- one read rather than in the field Filter.classLevel reports.
+  Quantity.ClassLevel -> fmap (toInteger . ClassLevel.defaulted . Filter.classLevel) mView
   -- CR 702.33d's designation as a 0/1, HasDesignation's arm in every respect. The
   -- object it reads is the RESOLVING SPELL, which is still on the stack while its
   -- own clause conditions are gated (Pawl.Engine.Resolve.gateHolds).
@@ -549,6 +554,7 @@ substituteStar star quantity = case quantity of
   Quantity.PlayerCounters {} -> quantity
   Quantity.ObjectCounters _ -> quantity
   Quantity.HasDesignation _ -> quantity
+  Quantity.ClassLevel -> quantity
   Quantity.WasKicked -> quantity
   Quantity.OpponentsAttacked _ -> quantity
   Quantity.CardsDiscardedThisTurn _ -> quantity
@@ -617,6 +623,7 @@ slots quantity = case quantity of
   -- The designation, which carries no reference either -- ObjectCounters' position,
   -- with which designation in the kind's place.
   Quantity.HasDesignation _ -> Set.empty
+  Quantity.ClassLevel -> Set.empty
   Quantity.WasKicked -> Set.empty
   -- And a seventh PlayerRef in that same position, CR 508.3b's record having
   -- nothing else on it.
@@ -673,6 +680,7 @@ slotsAreExhaustive quantity = case quantity of
   Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref _) -> playerRefIsSlotless ref
   Quantity.ObjectCounters _ -> True
   Quantity.HasDesignation _ -> True
+  Quantity.ClassLevel -> True
   Quantity.WasKicked -> True
   Quantity.OpponentsAttacked ref -> playerRefIsSlotless ref
   Quantity.CardsDiscardedThisTurn ref -> playerRefIsSlotless ref
@@ -808,6 +816,7 @@ mapPlayerRefs f intoCount quantity = case quantity of
   Quantity.Star -> quantity
   Quantity.ObjectCounters _ -> quantity
   Quantity.HasDesignation _ -> quantity
+  Quantity.ClassLevel -> quantity
   Quantity.WasKicked -> quantity
   Quantity.EnteredThisTurn -> quantity
   Quantity.BlockersBeyondFirst -> quantity
@@ -909,6 +918,7 @@ readsX quantity = case quantity of
   Quantity.PlayerCounters {} -> False
   Quantity.ObjectCounters _ -> False
   Quantity.HasDesignation _ -> False
+  Quantity.ClassLevel -> False
   Quantity.WasKicked -> False
   Quantity.OpponentsAttacked _ -> False
   Quantity.CardsDiscardedThisTurn _ -> False
