@@ -2314,6 +2314,11 @@ cheetahAndMammothInHand forest cheetah warMammoth =
 --
 -- Pouncing Cheetah is the whole producer: a {2}{G} 3/2 Cat whose entire rules
 -- text is the keyword, so every case here is the keyword and nothing else.
+--
+-- The CAST half of rule 702.8a's "you may play this card". The other half is CR
+-- 116.2a's land play, which CR 601.1a makes the same sentence reach: those cases
+-- are Pawl.GameSpec's Action group, where Teferi grants flash to Dryad Arbor in
+-- a hand and the gate is Action.legalActions rather than Cast.timingOk.
 flashSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 flashSpec s registry = Spec.describe s "Flash" $ do
   -- The baseline both halves start from: with no flash in the question at all,

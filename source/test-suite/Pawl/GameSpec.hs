@@ -58,6 +58,7 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -251,6 +252,9 @@ actionSpec s registry = Spec.describe s "Action" $ do
     mountain <- S.printingOf s registry "Mountain"
     Spec.assertBool s (A.Pass `elem` Action.legalActions S.alice (S.oneMountainState mountain Phase.PrecombatMain)) "pass"
 
+  -- The DEFAULT window, which CR 702.8a lifts for the card the keyword is on and
+  -- for no other -- a Mountain prints no flash, so this is the case the flash
+  -- group below is measured against.
   Spec.it s "no land play outside a main phase" $ do
     mountain <- S.printingOf s registry "Mountain"
     Spec.assertEqWith s "only pass" (Action.legalActions S.alice (S.oneMountainState mountain (Phase.Beginning BeginningStep.Upkeep))) [A.Pass]
@@ -275,6 +279,75 @@ actionSpec s registry = Spec.describe s "Action" $ do
     mountain <- S.printingOf s registry "Mountain"
     let gs = (S.oneMountainState mountain Phase.PrecombatMain) {GameState.landsPlayed = Map.singleton S.alice 1}
     Spec.assertEqWith s "only pass" (Action.legalActions S.alice gs) [A.Pass]
+
+  -- CR 702.8a says "you may PLAY this card any time you could cast an instant",
+  -- and CR 601.1a makes playing a card either casting it or playing it as a
+  -- land -- so the keyword moves CR 116.2a's window as well as CR 117.1a's.
+  -- Teferi, Mage of Zhalfir's "creature cards you own that aren't on the
+  -- battlefield have flash" is the printed route to it: Dryad Arbor is a Land
+  -- Creature, so a copy in a hand is in Teferi's set and Cast.flashOn reads the
+  -- CR 613.1f grant off the projection.
+  --
+  -- A PAIR of boards differing in exactly one thing: whether Teferi is on the
+  -- battlefield. Same Arbor in the same hand, same upkeep, same seat active. The
+  -- UPKEEP is what makes the pair discriminating -- in a main phase the Arbor
+  -- goes onto the battlefield either way -- and priorityLoop advances no step,
+  -- so alice never reaches a main phase inside it.
+  --
+  -- Not implemented, so the card file omits it: Teferi's third clause, "each
+  -- opponent can cast spells only any time they could cast a sorcery" (#1860).
+  -- Bob plays nothing here, so nothing below turns on it.
+  Spec.it s "CR 702.8a/116.2a a land card with flash is played during its controller's upkeep" $ do
+    dryadArbor <- S.printingOf s registry "Dryad Arbor"
+    teferi <- S.printingOf s registry "Teferi, Mage of Zhalfir"
+    let (arborId, withTeferi) = arborBoard dryadArbor (Just teferi)
+        bare = snd (arborBoard dryadArbor Nothing)
+        play gs = S.runPure S.playLandAnswer gs Engine.priorityLoop
+        after = play withTeferi
+    Spec.assertEqWith s "the Arbor is on the battlefield" (S.countOnBattlefieldByName (S.printingName dryadArbor) S.alice after) 1
+    Spec.assertEqWith s "and without Teferi it never left her hand" (S.countOnBattlefieldByName (S.printingName dryadArbor) S.alice (play bare)) 0
+    Spec.assertEqWith s "it was still the upkeep" (GameState.phase after) (Phase.Beginning BeginningStep.Upkeep)
+    Spec.assertBool s (Projection.hasKeyword Keyword.Flash arborId withTeferi) "the card in hand projects flash"
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flash arborId bare)) "and does not without Teferi"
+
+  -- CR 305.3: "a player can't play a land, for any reason, if it isn't their
+  -- turn." Flash lifts CR 116.2a's phase-and-stack window and nothing else, so
+  -- the per-player gate keeps this conjunct -- which is what Dryad Arbor's own
+  -- 2021-03-19 ruling says ("you can't play Dryad Arbor during another player's
+  -- turn").
+  --
+  -- The SAME board as the pair above with one thing changed, whose turn it is,
+  -- and the flash assertion is repeated on it so the negative cannot pass by
+  -- the Arbor having lost the keyword.
+  Spec.it s "CR 305.3 flash does not let a land be played on another player's turn" $ do
+    dryadArbor <- S.printingOf s registry "Dryad Arbor"
+    teferi <- S.printingOf s registry "Teferi, Mage of Zhalfir"
+    let (arborId, alices) = arborBoard dryadArbor (Just teferi)
+        bobs = alices {GameState.activePlayer = S.bob}
+        after = S.runPure S.playLandAnswer bobs Engine.priorityLoop
+    Spec.assertEqWith s "the Arbor stayed in her hand" (S.countOnBattlefieldByName (S.printingName dryadArbor) S.alice after) 0
+    Spec.assertBool s (Projection.hasKeyword Keyword.Flash arborId bobs) "and it still has flash there"
+
+  -- CR 305.2a/305.2b: flash moves the WINDOW, not the count. The allowance is a
+  -- per-player gate the keyword never reaches, so an Arbor with flash is refused
+  -- once the turn's one land play is spent -- the same board as the pair above
+  -- with one thing changed, the tally.
+  Spec.it s "CR 305.2b flash moves the land-play window, not the allowance" $ do
+    dryadArbor <- S.printingOf s registry "Dryad Arbor"
+    teferi <- S.printingOf s registry "Teferi, Mage of Zhalfir"
+    let spent = (snd (arborBoard dryadArbor (Just teferi))) {GameState.landsPlayed = Map.singleton S.alice 1}
+        after = S.runPure S.playLandAnswer spent Engine.priorityLoop
+    Spec.assertEqWith s "the Arbor stayed in her hand" (S.countOnBattlefieldByName (S.printingName dryadArbor) S.alice after) 0
+
+-- Dryad Arbor in alice's hand during alice's UPKEEP with alice holding
+-- priority, and Teferi, Mage of Zhalfir on the battlefield or not. The Arbor has
+-- no mana cost, so affordability is identical either way and the only thing that
+-- varies is the printing this takes.
+arborBoard :: Printing.Printing -> Maybe Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+arborBoard dryadArbor mTeferi =
+  let (gs0, arborId) = S.handOne dryadArbor (Setup.emptyGame S.bothPlayers)
+      gs1 = maybe gs0 (\teferi -> snd (S.addCreature teferi S.alice gs0)) mTeferi
+   in (arborId, gs1 {GameState.phase = Phase.Beginning BeginningStep.Upkeep})
 
 goldfishResult :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (Result.Result, GameState.GameState)
 goldfishResult s registry = do
