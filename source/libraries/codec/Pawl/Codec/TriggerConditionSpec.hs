@@ -313,6 +313,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.SelfLeavesTheBattlefield
       " {\"type\":\"SelfLeavesTheBattlefield\"} "
+  -- The same written form read by a bystander, PermanentDies' relationship to
+  -- SelfDies one rule wider: a separate tag carrying the Filter that holds
+  -- "another".
+  Spec.it s "PermanentLeavesTheBattlefield round-trips with its Filter" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PermanentLeavesTheBattlefield (Filter.Not Filter.IsSource))
+      " {\"type\":\"PermanentLeavesTheBattlefield\",\"value\":{\"type\":\"Not\",\"value\":{\"type\":\"IsSource\"}}} "
   -- CR 700.4's death read off the enchanted permanent. Nullary: the link it
   -- matches on is board state, HauntedCreatureDies' reason.
   Spec.it s "AttachedCreatureDies" $

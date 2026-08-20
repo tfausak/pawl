@@ -27,7 +27,6 @@ import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
-import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
@@ -1166,7 +1165,7 @@ delayedSpec s registry =
               ready = l4 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.bob, GameState.priority = Just S.bob}
               cast = S.runPure S.identityAnswer ready (S.cast S.bob waveId)
               armed = S.runPure S.identityAnswer cast Engine.priorityLoop
-              gone = Departure.depart Departure.Type.Conceded S.bob armed
+              gone = S.departs Departure.Type.Conceded S.bob armed
               began = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gone {GameState.phase = endStep})
               (placedAny, placed) = S.runPureWith S.identityAnswer began Engine.placePendingTriggers
               (controlAny, control) = S.runPureWith S.identityAnswer (Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (armed {GameState.phase = endStep})) Engine.placePendingTriggers
@@ -1812,7 +1811,7 @@ orderingSpec s registry =
               (_, gs1) = S.addCreature barbarianOutcast S.alice gs0
               (bobsOutcast, gs2) = S.addCreature barbarianOutcast S.bob gs1
               (_, gs3) = S.addCreature barbarianOutcast S.carol gs2
-              gone = Departure.depart Departure.Type.Conceded S.bob gs3
+              gone = S.departs Departure.Type.Conceded S.bob gs3
               placed = snd (Engine.runGamePure S.identityAnswer gone Engine.placePendingTriggers)
               controllerOf oid = fmap Object.owner (Game.lookupObject oid placed)
           Spec.assertBool s (Maybe.isJust (Game.lookupObject bobsOutcast gs3)) "the fixture really gave bob one"

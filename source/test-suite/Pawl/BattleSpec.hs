@@ -63,7 +63,6 @@ import qualified Data.Text as Text
 import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
-import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -225,7 +224,7 @@ repairSpec s registry = Spec.describe s "Repair" $ do
   Spec.it s "CR 704.5x a battle whose protector leaves the game gets a new one" $ do
     (entered, oid) <- castInvasionThreeSeated s registry (protectTo S.carol)
     Spec.assertEqWith s "carol protects it to begin with" (protectorOf oid entered) (Just S.carol)
-    let gone = Departure.depart Departure.Type.Conceded S.carol entered
+    let gone = S.departs Departure.Type.Conceded S.carol entered
         repaired = S.runPure S.identityAnswer gone Sba.checkStateBasedActions
     -- bob is the only opponent left, so the re-choice is elided and its answer is
     -- forced -- which is what makes this assert the SBA firing rather than an
@@ -249,7 +248,7 @@ repairSpec s registry = Spec.describe s "Repair" $ do
     -- pass that repaired a designation must SAY it acted. Read off
     -- performStateBasedActions' own answer, which is the value that loop reads;
     -- nothing else about the repair is visible to it.
-    let gone = Departure.depart Departure.Type.Conceded S.carol entered
+    let gone = S.departs Departure.Type.Conceded S.carol entered
         (acted, _) = S.runPureWith S.identityAnswer gone Sba.performStateBasedActions
     Spec.assertBool s acted "the pass reports the repair"
   Spec.it s "CR 400.7 a battle that leaves the battlefield forgets its protector" $ do
@@ -476,7 +475,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     (gs, battle, _, _, _) <- battleCombat s registry S.carol S.carol [piker] [] []
     let attacked = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
-        gone = Departure.depart Departure.Type.Conceded S.carol attacked
+        gone = S.departs Departure.Type.Conceded S.carol attacked
         checked = S.runPure S.identityAnswer gone Sba.checkStateBasedActions
     Spec.assertBool s (Battle.isBeingAttacked battle gone) "the Siege is under attack"
     Spec.assertBool s (notElem S.carol (Game.stillPlaying gone)) "and carol is gone"
@@ -488,7 +487,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     -- preference.
     piker <- S.printingOf s registry "Goblin Piker"
     (gs, battle, _, _, _) <- battleCombat s registry S.carol S.carol [piker] [] []
-    let gone = Departure.depart Departure.Type.Conceded S.carol gs
+    let gone = S.departs Departure.Type.Conceded S.carol gs
         checked = S.runPure S.identityAnswer gone Sba.checkStateBasedActions
     Spec.assertBool s (not (Battle.isBeingAttacked battle gone)) "nothing is attacking it"
     Spec.assertEqWith s "bob protects it now" (protectorOf battle checked) (Just S.bob)

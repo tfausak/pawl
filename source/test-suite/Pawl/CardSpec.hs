@@ -615,6 +615,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- Filter holds no Count (Pawl.Types.Filter's atoms are all characteristics).
   TriggerCondition.PermanentEnters _ -> []
   TriggerCondition.PermanentDies _ -> []
+  TriggerCondition.PermanentLeavesTheBattlefield _ -> []
   TriggerCondition.StepBegins {} -> []
   TriggerCondition.StateIs condition -> conditionCounts condition
   TriggerCondition.SelfDealsCombatDamageToPlayer -> []
@@ -2726,6 +2727,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- final chapter number rather than through a Filter.
   TriggerCondition.SagaFinalChapterTriggers _ -> []
   TriggerCondition.PermanentDies f -> [f]
+  -- CR 603.6c's bystander form carries the same kind of Filter one rule wider.
+  TriggerCondition.PermanentLeavesTheBattlefield f -> [f]
   TriggerCondition.StateIs condition -> conditionFilters condition
   TriggerCondition.SelfEnters -> []
   TriggerCondition.StepBegins {} -> []

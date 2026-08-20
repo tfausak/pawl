@@ -178,7 +178,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   -- monarch at the same time as that player leaves the game."
   Spec.it s "CR 725.4 the monarch departs on someone else's turn: the active player takes the crown" $ do
     let board = S.withMonarch S.bob S.threePlayerGame
-        gone = Departure.depart Departure.Type.Conceded S.bob board
+        gone = S.departs Departure.Type.Conceded S.bob board
     Spec.assertEqWith s "alice is the active player on this board" (GameState.activePlayer board) S.alice
     Spec.assertEqWith s "so alice is the monarch" (GameState.monarch gone) (Just S.alice)
     -- CR 603.2: that is a player BECOMING the monarch, so the reassignment
@@ -192,7 +192,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   -- becomes the monarch."
   Spec.it s "CR 725.4 the monarch departs on their own turn: the next seat in turn order takes the crown" $ do
     let board = S.withMonarch S.alice S.threePlayerGame
-        gone = Departure.depart Departure.Type.Conceded S.alice board
+        gone = S.departs Departure.Type.Conceded S.alice board
     Spec.assertEqWith s "bob, the seat after alice's" (GameState.monarch gone) (Just S.bob)
     Spec.assertEqWith s "and the crowning names him, so the walk's branch records too" (crownings gone) [S.bob]
 
@@ -206,8 +206,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     -- scan finds it first -- a walk anchored on the DEPARTING MONARCH's seat
     -- instead of the active player's would also land on bob. The four-seat
     -- case below is what actually discriminates the two anchor readings.
-    let board = S.withMonarch S.carol (Departure.depart Departure.Type.Conceded S.alice S.threePlayerGame)
-        gone = Departure.depart Departure.Type.Conceded S.carol board
+    let board = S.withMonarch S.carol (S.departs Departure.Type.Conceded S.alice S.threePlayerGame)
+        gone = S.departs Departure.Type.Conceded S.carol board
     Spec.assertEqWith s "alice is still the active player's seat (CR 800.4j)" (GameState.activePlayer gone) S.alice
     Spec.assertEqWith s "bob takes the crown" (GameState.monarch gone) (Just S.bob)
 
@@ -223,9 +223,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   -- `List.break (== active)` for `List.break (== leaving)` makes this fail
   -- with "expected: Just bob, got: Just dave".
   Spec.it s "CR 725.4 four seats: the walk is anchored on the active player's seat, not the departing monarch's" $ do
-    let aliceGone = Departure.depart Departure.Type.Conceded S.alice S.fourPlayerGame
+    let aliceGone = S.departs Departure.Type.Conceded S.alice S.fourPlayerGame
         board = S.withMonarch S.carol aliceGone
-        gone = Departure.depart Departure.Type.Conceded S.carol board
+        gone = S.departs Departure.Type.Conceded S.carol board
     Spec.assertEqWith s "bob, the seat after alice's -- dave would be the seat after carol's" (GameState.monarch gone) (Just S.bob)
 
   -- CR 725.4's OTHER half: "the next player in turn order WHO CAN BECOME THE
@@ -248,7 +248,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     jared <- S.printingOf s registry "Jared Carthalion, True Heir"
     let (jaredId, gs1) = S.addCreature jared S.alice S.threePlayerGame
         board = entersResolved jaredId gs1
-        gone = Departure.depart Departure.Type.Conceded S.bob board
+        gone = S.departs Departure.Type.Conceded S.bob board
     Spec.assertEqWith s "alice is the active player" (GameState.activePlayer board) S.alice
     Spec.assertEqWith s "bob was crowned by Jared's trigger" (GameState.monarch board) (Just S.bob)
     Spec.assertEqWith s "carol takes the crown, not the restricted active player" (GameState.monarch gone) (Just S.carol)
@@ -269,7 +269,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     let (alicesJared, gs1) = S.addCreature jared S.alice S.fourPlayerGame
         (bobsJared, gs2) = S.addCreature jared S.bob gs1
         board = entersResolved bobsJared (entersResolved alicesJared gs2)
-        gone = Departure.depart Departure.Type.Conceded S.carol (S.withMonarch S.carol board)
+        gone = S.departs Departure.Type.Conceded S.carol (S.withMonarch S.carol board)
     Spec.assertEqWith s "alice is the active player" (GameState.activePlayer board) S.alice
     -- Bob's Jared targeted the first opponent his slot offered, which is alice --
     -- already restricted by her own Jared, so that crowning did nothing and bob
@@ -281,12 +281,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   -- game continues with no monarch."
   Spec.it s "CR 725.4 the last player standing is the monarch and leaves: no monarch, and no partial head" $ do
     let twoGone =
-          Departure.depart
+          S.departs
             Departure.Type.Conceded
             S.bob
-            (Departure.depart Departure.Type.Conceded S.alice S.threePlayerGame)
+            (S.departs Departure.Type.Conceded S.alice S.threePlayerGame)
         board = S.withMonarch S.carol twoGone
-        gone = Departure.depart Departure.Type.Conceded S.carol board
+        gone = S.departs Departure.Type.Conceded S.carol board
     Spec.assertEqWith s "nobody is left to become the monarch" (GameState.monarch gone) Nothing
     Spec.assertEqWith s "and the roster is untouched" (GameState.turnOrder gone) [S.alice, S.bob, S.carol]
     -- The third sentence records NOTHING: a crown that went nowhere is not a
@@ -304,7 +304,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
         (inGraveyard, g4) = S.addGraveyardCard mountain S.bob g3
         (onStack, g5) = S.spellOnStack piker S.bob g4
         (aliceKeeps, g6) = S.addCreature piker S.alice g5
-        gone = Departure.depart Departure.Type.Conceded S.bob g6
+        gone = S.departs Departure.Type.Conceded S.bob g6
     Spec.assertEqWith s "bob's battlefield permanent is gone" (Game.lookupObject onField gone) Nothing
     Spec.assertEqWith s "bob's hand card is gone" (Game.lookupObject inHand gone) Nothing
     Spec.assertEqWith s "bob's library card is gone" (Game.lookupObject inLibrary gone) Nothing
@@ -323,14 +323,14 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (onField, g1) = S.addCreature piker S.bob S.threePlayerGame
         snapshotted = g1 {GameState.combat = (GameState.combat g1) {Combat.Type.struckFirst = Just (Set.singleton onField)}}
-        gone = Departure.depart Departure.Type.Conceded S.bob snapshotted
+        gone = S.departs Departure.Type.Conceded S.bob snapshotted
     Spec.assertEqWith s "bob's id is pruned from the CR 510.4 first-strike snapshot" (Combat.Type.struckFirst (GameState.combat gone)) (Just Set.empty)
 
   Spec.it s "CR 725 an exiledUntilMonarch entry KEYED on the departing player's own object is dropped" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (onField, g1) = S.addCreature piker S.bob S.threePlayerGame
         exiled = g1 {GameState.exiledUntilMonarch = Map.singleton onField (MonarchWatch.MkMonarchWatch {MonarchWatch.controller = S.alice, MonarchWatch.lastMonarch = Nothing})}
-        gone = Departure.depart Departure.Type.Conceded S.bob exiled
+        gone = S.departs Departure.Type.Conceded S.bob exiled
     Spec.assertEqWith s "the entry keyed on bob's own (now-gone) object is dropped" (GameState.exiledUntilMonarch gone) Map.empty
 
   -- CR 509.1h's last sentence: "A creature remains blocked even if all the
@@ -349,7 +349,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
               Combat.Type.blockers = Map.singleton attacker (Set.singleton blocker)
             }
         blocked = g2 {GameState.combat = combat}
-        gone = Departure.depart Departure.Type.Conceded S.bob blocked
+        gone = S.departs Departure.Type.Conceded S.bob blocked
     Spec.assertEqWith s "the blocker's object is gone (it was bob's)" (Game.lookupObject blocker gone) Nothing
     Spec.assertEqWith s "but the attacker is still recorded as blocked" (Combat.blockersOf attacker gone) (Set.singleton blocker)
     Spec.assertBool s (Combat.isBlocked attacker gone) "Combat.isBlocked agrees"
@@ -366,8 +366,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (onField, twoSeats) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
         (alsoOnField, threeSeats) = S.addCreature piker S.bob (Setup.emptyGame S.threePlayers)
-        twoGone = Departure.depart Departure.Type.Conceded S.bob twoSeats
-        threeGone = Departure.depart Departure.Type.Conceded S.bob threeSeats
+        twoGone = S.departs Departure.Type.Conceded S.bob twoSeats
+        threeGone = S.departs Departure.Type.Conceded S.bob threeSeats
     Spec.assertEqWith s "two seats: bob's Piker stays in the game" (fmap Object.owner (Game.lookupObject onField twoGone)) (Just S.bob)
     Spec.assertEqWith s "three seats: it does not" (Game.lookupObject alsoOnField threeGone) Nothing
     Spec.assertEqWith s "and the seam agrees" (fmap Departure.continuesAfterDeparture [twoSeats, threeSeats]) [False, True]
@@ -385,11 +385,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
             { GameState.activePlayer = S.carol,
               GameState.activeControl = Just (Decider.MkDecider S.bob)
             }
-        pendingGone = Departure.depart Departure.Type.Conceded S.bob pending
-        activeGone = Departure.depart Departure.Type.Conceded S.bob duringTurn
+        pendingGone = S.departs Departure.Type.Conceded S.bob pending
+        activeGone = S.departs Departure.Type.Conceded S.bob duringTurn
     Spec.assertEqWith s "the scheduled control is gone" (GameState.pendingControl pendingGone) Map.empty
     Spec.assertEqWith s "the live control is gone" (GameState.activeControl activeGone) Nothing
-    Spec.assertEqWith s "and a control held by someone still playing is untouched" (GameState.activeControl (Departure.depart Departure.Type.Conceded S.bob (duringTurn {GameState.activeControl = Just (Decider.MkDecider S.alice)}))) (Just (Decider.MkDecider S.alice))
+    Spec.assertEqWith s "and a control held by someone still playing is untouched" (GameState.activeControl (S.departs Departure.Type.Conceded S.bob (duringTurn {GameState.activeControl = Just (Decider.MkDecider S.alice)}))) (Just (Decider.MkDecider S.alice))
 
   Spec.it s "CR 800.4a nothing in the game is owned or controlled by a player who has left it" $ do
     -- The postcondition CR 800.4a's four clauses exist to guarantee, on a
@@ -405,7 +405,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
         (bobsSpell, g3) = S.spellOnStack piker S.bob g2
         (bobsSlaver, g4) = S.addCreature mindslaver S.bob g3
         g5 = S.giveControl aliceMyr S.bob g4
-        gone = Departure.depart Departure.Type.Conceded S.bob g5
+        gone = S.departs Departure.Type.Conceded S.bob g5
         ownedBy who = Map.keys (Map.filter (\obj -> Object.owner obj == who) (GameState.objects gone))
         controlledBy who = filter (\oid -> Projection.controllerOf oid gone == Just who) (Map.keys (GameState.objects gone))
     Spec.assertBool s (all (\oid -> Map.member oid (GameState.objects g5)) [bobsPiker, bobsSpell, bobsSlaver]) "the fixture put bob's permanent, spell, and Mindslaver into play before he left"
@@ -428,7 +428,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     let (creature, withCreature) = S.addCreature piker S.bob S.threePlayerGame
         (aura, withAura) = S.addCreature controlMagic S.alice withCreature
         attached = S.attach aura creature withAura
-        after = Departure.depart Departure.Type.Conceded S.alice attached
+        after = S.departs Departure.Type.Conceded S.alice attached
     Spec.assertEqWith s "alice controlled it before she left" (Projection.controllerOf creature attached) (Just S.alice)
     Spec.assertEqWith s "the Aura left the game with her" (Game.lookupObject aura after) Nothing
     Spec.assertEqWith s "and bob has his creature back" (Projection.controllerOf creature after) (Just S.bob)
@@ -451,7 +451,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
         (aura, withAura) = S.addCreature controlMagic S.alice withCreature
         attached = S.attach aura creature withAura
         stolen = S.giveControl aura S.bob attached
-        after = Departure.depart Departure.Type.Conceded S.bob stolen
+        after = S.departs Departure.Type.Conceded S.bob stolen
     Spec.assertEqWith s "bob controlled the Aura he does not own" (Projection.controllerOf aura stolen) (Just S.bob)
     Spec.assertEqWith s "and so controlled carol's creature through it" (Projection.controllerOf creature stolen) (Just S.bob)
     Spec.assertEqWith s "the Aura is alice's again -- she owns it and clause 1 did not touch it" (Projection.controllerOf aura after) (Just S.alice)
@@ -501,6 +501,39 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     Spec.assertEqWith s "so it did NOT snap back to bob on the battlefield" (fmap (\(oid, _) -> Set.member oid (GameState.battlefield after)) afterTurtle) (Just False)
     Spec.assertEqWith s "CR 104.2a: bob and carol are still playing, so the game continues" (GameState.result after) Nothing
     Spec.assertEqWith s "and alice controls nothing" (Projection.controls S.alice after) []
+
+  -- The same clause, the same fixture, and the one thing a direct write to the
+  -- zone maps cannot do: CR 800.4a's exile is a permanent moving from the
+  -- battlefield to exile, so CR 603.6c's leaves-the-battlefield abilities
+  -- trigger on it.
+  --
+  -- The WATCHER is carol's, and it has to be somebody's other than alice's: by
+  -- CR 603.3a the Towershell's own leaves-the-battlefield trigger would be
+  -- controlled by the player who controlled it as it left -- alice -- and CR
+  -- 800.4d then keeps that trigger off the stack entirely. So the departing
+  -- player's own triggers are unobservable by construction, and a bystander is
+  -- the only shape this rule can be proved in.
+  --
+  -- Super Shredder is added to the finished board rather than to the fixture so
+  -- that the count discriminates: the line of play up to here contains the
+  -- Towershell's own attack-trigger exile and CR 704.5m's burial of the Control
+  -- Magic, both of which are departures this watcher would have seen.
+  Spec.it s "CR 800.4a/603.6c the exile is a zone change, so a bystander's leaves-the-battlefield trigger fires" $ do
+    towershell <- S.printingOf s registry "Meandering Towershell"
+    controlMagic <- S.printingOf s registry "Control Magic"
+    island <- S.printingOf s registry "Island"
+    shredder <- S.printingOf s registry "Super Shredder"
+    let board = stolenTowershellBoard S.threePlayerGame towershell controlMagic island
+        returned = runToTurnStep 4 (Phase.Combat CombatStep.DeclareBlockers) board
+        (shredderId, watching) = S.addCreature shredder S.carol returned
+        after = S.runPure S.identityAnswer watching (Departure.leaveGame Departure.Type.Conceded S.alice)
+        settled = resolveTriggers after
+    Spec.assertEqWith s "carol's Shredder is a 1/1 with no counters before alice leaves" (Projection.powerOf shredderId watching, fmap (Map.lookup CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject shredderId watching)) (Just 1, Just Nothing)
+    Spec.assertEqWith s "alice really did control bob's Towershell at that moment" (fmap (\(oid, _) -> Projection.controllerOf oid watching) (soleObjectOf towershell watching)) (Just (Just S.alice))
+    -- The rule under test: the exile fired carol's trigger, and it resolved.
+    Spec.assertEqWith s "carol's Super Shredder saw the departing player's permanent leave (CR 603.6c)" (Projection.powerOf shredderId settled, Projection.toughnessOf shredderId settled) (Just 2, Just 2)
+    Spec.assertEqWith s "exactly one counter -- one permanent left the battlefield" (fmap (Map.lookup CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject shredderId settled)) (Just (Just 1))
+    Spec.assertEqWith s "and the Towershell is in exile, which is what it saw" (fmap (Object.zone . snd) (soleObjectOf towershell settled)) (Just Zone.Exile)
 
   -- CR 800.4a's fourth clause on the STACK, which is the other half of "still
   -- controlled by that player": CR 405.4 makes a spell's controller the player

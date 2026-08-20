@@ -26,6 +26,7 @@ import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Damage as Damage
+import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
@@ -62,6 +63,7 @@ import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Deck as Deck
+import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EventGroup as EventGroup
@@ -1134,6 +1136,13 @@ runPureWith = Engine.runGamePure
 -- pre-P5 pure `Sba.checkStateBasedActions gs`.
 settleSba :: GameState.GameState -> GameState.GameState
 settleSba gs = runPure identityAnswer gs Sba.checkStateBasedActions
+
+-- CR 104.2a/800.4a: one player leaves the game, run purely. The direct
+-- replacement for the pure `Departure.depart reason pid gs` -- that function is
+-- monadic because CR 800.4a's fourth clause exiles through Event.changeZone,
+-- and almost every case that calls it wants only the resulting board.
+departs :: Departure.Type.Departure -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+departs reason pid gs = runPure identityAnswer gs (Departure.depart reason pid)
 
 -- Run whole steps through the engine while the current phase is in the combat
 -- phase, stopping once combat is left or the game ends. Bounded so a bug cannot

@@ -342,7 +342,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     let withMana = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) S.threePlayerGame [1 .. (2 :: Int)]
         withLibs = stockLibrary piker S.carol 2 (stockLibrary piker S.bob 2 (stockLibrary piker S.alice 2 withMana))
         (gs0, spellId) = S.handOne visionSkeins withLibs
-        gs = Departure.depart Departure.Type.Conceded S.carol gs0
+        gs = S.departs Departure.Type.Conceded S.carol gs0
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "the two players still in the game drew, in APNAP order" (drawersOf after) [S.alice, S.alice, S.bob, S.bob]

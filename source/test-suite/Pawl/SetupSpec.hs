@@ -403,7 +403,7 @@ restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
     --
     -- Alice's life is knocked down too, so "alice is back to 20" is a real
     -- assertion and not something Setup.emptyGame already produced.
-    let g0 = Departure.depart Departure.Type.Conceded S.bob (Setup.emptyGame S.threePlayers)
+    let g0 = S.departs Departure.Type.Conceded S.bob (Setup.emptyGame S.threePlayers)
         g1 =
           g0
             { GameState.players =
@@ -427,7 +427,7 @@ restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
     -- gives him a library, a shuffle and a 7-card opening hand.
     mountain <- S.printingOf s registry "Mountain"
     let g0 = addMany mountain 8 S.carol (addMany mountain 8 S.bob (addMany mountain 8 S.alice (Setup.emptyGame S.threePlayers)))
-        g1 = Departure.depart Departure.Type.Conceded S.bob g0
+        g1 = S.departs Departure.Type.Conceded S.bob g0
         after = snd (Engine.runGamePure S.identityAnswer g1 (Setup.restartGame S.performer Set.empty S.alice))
         libSizeOf pid = length (Game.zoneMembers Zone.Library pid after)
     Spec.assertEqWith s "two seats in the rebuilt order, in their seating order" (GameState.turnOrder after) [S.alice, S.carol]
@@ -544,7 +544,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
         g1 = poolToLibrary S.carol (poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain 3 S.carol (addMany mountain 3 S.bob (addMany mountain 3 S.alice g0)))))
         sub0 = Setup.subgameStateFrom S.alice g1
         (_, seated) = Engine.runGamePure S.identityAnswer sub0 (Setup.startGameFromCards S.performer Set.empty)
-        departedSub = Departure.depart Departure.Type.Lost S.bob seated
+        departedSub = S.departs Departure.Type.Lost S.bob seated
         after = Setup.funnelBack departedSub g1
     Spec.assertEqWith s "the subgame really was multiplayer, so CR 800.4a's removal fired" (Departure.continuesAfterDeparture departedSub) True
     Spec.assertEqWith s "bob's own subgame objects are gone" (Game.zoneMembers Zone.Library S.bob departedSub <> Game.zoneMembers Zone.Hand S.bob departedSub) []
@@ -570,7 +570,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
         parent = dirtyPool g1
         sub0 = Setup.subgameStateFrom S.alice parent
         (_, seated) = Engine.runGamePure S.identityAnswer sub0 (Setup.startGameFromCards S.performer Set.empty)
-        departedSub = dirtyPool (Departure.depart Departure.Type.Lost S.bob seated)
+        departedSub = dirtyPool (S.departs Departure.Type.Lost S.bob seated)
         after = Setup.funnelBack departedSub parent
         libraryObjects pid = Maybe.mapMaybe (`Game.lookupObject` after) (Game.zoneMembers Zone.Library pid after)
         everyone = concatMap libraryObjects [S.alice, S.bob, S.carol]
@@ -598,7 +598,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
         g1 = poolToLibrary S.carol (poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain 3 S.carol (addMany mountain 3 S.bob (addMany mountain 3 S.alice g0)))))
         sub0 = Setup.subgameStateFrom S.alice g1
         (_, seated) = Engine.runGamePure S.identityAnswer sub0 (Setup.startGameFromCards S.performer Set.empty)
-        departedSub = Departure.depart Departure.Type.Lost S.bob seated
+        departedSub = S.departs Departure.Type.Lost S.bob seated
         (_, restarted) = Engine.runGamePure S.identityAnswer departedSub (Setup.restartGame S.performer Set.empty S.alice)
         after = Setup.funnelBack restarted g1
     Spec.assertEqWith s "the in-subgame restart really did shrink finalSub's own turnOrder to two" (length (GameState.turnOrder restarted)) 2
@@ -614,7 +614,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
     -- the game -- CR 729.4: "All players not currently in the subgame are
     -- considered outside the subgame." Today the rebuilt order is
     -- rotateTo carol [alice, bob, carol] = [carol, alice, bob], with bob in it.
-    let g0 = Departure.depart Departure.Type.Conceded S.bob (Setup.emptyGame S.threePlayers)
+    let g0 = S.departs Departure.Type.Conceded S.bob (Setup.emptyGame S.threePlayers)
         sub = Setup.subgameStateFrom S.carol g0
     Spec.assertEqWith s "two seats, rotated to the starter" (GameState.turnOrder sub) [S.carol, S.alice]
     Spec.assertEqWith s "carol goes first" (GameState.activePlayer sub) S.carol

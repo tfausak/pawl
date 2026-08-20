@@ -17,7 +17,6 @@ import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Damage as Damage
-import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
@@ -168,7 +167,7 @@ handoffSpec s = Spec.describe s "DropAtTurnOf" $ do
     -- turn doesn't begin, so carol becomes active. CR 800.4m: bob's "until
     -- your next turn" effect ends AT BOB'S SEAT -- not immediately when he
     -- left, and not never.
-    let gone = Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame
+    let gone = S.departs Departure.Type.Conceded S.bob S.threePlayerGame
         armed = effectWith (Expiry.Type.AtTurnOf S.bob) gone
         after = S.runPure S.identityAnswer armed Engine.handoffTurn
     Spec.assertEqWith s "it survived bob's departure itself" (length (GameState.continuousEffects armed)) 1
@@ -182,7 +181,7 @@ handoffSpec s = Spec.describe s "DropAtTurnOf" $ do
     -- `dropAtTurnOf newActive` code, because with bob departed immediately
     -- after alice, newActive is ALSO bob, so the old code happened to sweep
     -- the same seat as the walk and left continuousEffects byte-identical.
-    let gone = Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame
+    let gone = S.departs Departure.Type.Conceded S.bob S.threePlayerGame
         armed = effectWith (Expiry.Type.AtTurnOf S.alice) (effectWith (Expiry.Type.AtTurnOf S.bob) gone)
         after = S.runPure S.identityAnswer armed Engine.handoffTurn
     Spec.assertEqWith s "carol takes the turn, not bob" (GameState.activePlayer after) S.carol
@@ -198,10 +197,10 @@ handoffSpec s = Spec.describe s "DropAtTurnOf" $ do
     -- player (bob here), so carol's effect survived under the old code. See
     -- the fix report for the RED proof.
     let gone =
-          Departure.depart
+          S.departs
             Departure.Type.Conceded
             S.carol
-            (Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame)
+            (S.departs Departure.Type.Conceded S.bob S.threePlayerGame)
         armed = effectWith (Expiry.Type.AtTurnOf S.carol) gone
         after = S.runPure S.identityAnswer armed Engine.handoffTurn
     Spec.assertEqWith s "alice takes the turn (wrapping past both departed seats)" (GameState.activePlayer after) S.alice
@@ -266,7 +265,7 @@ endOfNextTurnSpec s = Spec.describe s "DropAtEndOfTurnOf" $ do
   -- begins, so the cleanup that would end this never comes and the rule ends it
   -- at the point that turn would have begun instead.
   Spec.it s "CR 800.4m a departed controller's effect ends at the seat their turn would have begun at" $ do
-    let gone = Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame
+    let gone = S.departs Departure.Type.Conceded S.bob S.threePlayerGame
         armed = effectWith (Expiry.Type.AtEndOfTurnOf (AfterTurn.MkAfterTurn S.bob 1)) gone
         after = handoff armed
     Spec.assertEqWith s "it survived bob's departure itself" (length (GameState.continuousEffects armed)) 1
@@ -560,7 +559,7 @@ masterThiefSpec s registry = Spec.describe s "MasterThief" $ do
     darksteelMyr <- S.printingOf s registry "Darksteel Myr"
     masterThief <- S.printingOf s registry "Master Thief"
     let (thief, myr, stolen) = masterThiefThreeWay darksteelMyr masterThief
-        gone = Departure.depart Departure.Type.Conceded S.bob stolen
+        gone = S.departs Departure.Type.Conceded S.bob stolen
     Spec.assertEqWith s "alice really had it before bob left" (Projection.controllerOf myr stolen) (Just S.alice)
     Spec.assertEqWith s "the Myr is gone from the game" (Game.lookupObject myr gone) Nothing
     Spec.assertEqWith s "so it has no controller" (Projection.controllerOf myr gone) Nothing
@@ -584,7 +583,7 @@ masterThiefSpec s registry = Spec.describe s "MasterThief" $ do
     darksteelMyr <- S.printingOf s registry "Darksteel Myr"
     masterThief <- S.printingOf s registry "Master Thief"
     let (thief, myr, stolen) = masterThiefThreeWay darksteelMyr masterThief
-        gone = Departure.depart Departure.Type.Conceded S.alice stolen
+        gone = S.departs Departure.Type.Conceded S.alice stolen
     Spec.assertEqWith s "alice really had it before she left" (Projection.controllerOf myr stolen) (Just S.alice)
     Spec.assertEqWith s "Master Thief left the game with its owner" (Game.lookupObject thief gone) Nothing
     Spec.assertEqWith s "the Myr is still in the game" (fmap Object.owner (Game.lookupObject myr gone)) (Just S.bob)
@@ -679,7 +678,7 @@ monarchSpec s registry = Spec.describe s "Monarch" $ do
         entered = ZoneChange.MkZoneChange jailer jailer Zone.Stack Zone.Battlefield
         gs3 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project jailer gs2))] gs2
         afterEtb = monarchResolveAll (monarchSettle (gs3 {GameState.activePlayer = S.carol}))
-        gone = Departure.depart Departure.Type.Conceded S.alice afterEtb
+        gone = S.departs Departure.Type.Conceded S.alice afterEtb
         settled = monarchSettle gone
     Spec.assertEqWith s "alice is the monarch on ETB" (GameState.monarch afterEtb) (Just S.alice)
     Spec.assertEqWith s "bob's creature is exiled under the watch, keyed to alice, baselined on her crown" (Map.elems (GameState.exiledUntilMonarch afterEtb)) [MonarchWatch.MkMonarchWatch {MonarchWatch.controller = S.alice, MonarchWatch.lastMonarch = Just S.alice}]
