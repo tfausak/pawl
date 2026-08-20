@@ -585,7 +585,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   -- objectsLeaveWith files as it deletes the object.
   --
   -- alice OWNS this one, so it is clause 1 that removes it and the exile clause
-  -- never sees it; the case above is the same watcher on the other clause.
+  -- never sees it; the two bystander cases are the same watcher on the two
+  -- clauses.
   Spec.it s "CR 800.4a/603.6c a permanent leaving the game with its owner is a departure a bystander sees" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     shredder <- S.printingOf s registry "Super Shredder"

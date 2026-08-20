@@ -1888,15 +1888,6 @@ everyTriggerCondition =
     TriggerCondition.SelfBecomesAttachedBy (Filter.Type.And [])
   ]
 
--- CR 603.6c's penultimate sentence -- "An ability that attempts to do something
--- to the card that left the battlefield checks for it only in the first zone
--- that it went to" -- said positively by CR 400.7e: "Abilities that trigger when
--- an object moves from one zone to another ... can find the new object that it
--- became in the zone it moved to when the ability triggered, if that zone is a
--- public zone."
---
--- Endless Cockroaches, {1}{B}{B} Creature -- Insect 1/1, "When this creature
--- dies, return it to its owner's hand." Two different objects hide inside that
 -- CR 603.6c's first written form read by a BYSTANDER -- Super Shredder {1}{B}
 -- Legendary Creature -- Mutant Ninja Human 1/1, "Whenever another permanent
 -- leaves the battlefield, put a +1/+1 counter on Super Shredder."
@@ -2015,6 +2006,15 @@ permanentLeavesTheBattlefieldSpec s registry =
               Spec.assertBool s (not (Event.matchesTrigger gone shredderId S.bob (TriggerCondition.PermanentLeavesTheBattlefield (Filter.Type.Not Filter.Type.IsSource)) departure)) "so the printed \"another\" is the only thing declining it"
             other -> Spec.assertFailure s ("expected exactly one zone change, got " <> show (length other))
 
+-- CR 603.6c's penultimate sentence -- "An ability that attempts to do something
+-- to the card that left the battlefield checks for it only in the first zone
+-- that it went to" -- said positively by CR 400.7e: "Abilities that trigger when
+-- an object moves from one zone to another ... can find the new object that it
+-- became in the zone it moved to when the ability triggered, if that zone is a
+-- public zone."
+--
+-- Endless Cockroaches, {1}{B}{B} Creature -- Insect 1/1, "When this creature
+-- dies, return it to its owner's hand." Two different objects hide inside that
 -- one printed word "it": the ability's SOURCE (CR 113.7a -- the permanent that
 -- died, which CR 603.10a's look-back reads from CR 608.2h last known
 -- information) and the CARD it became in the graveyard, which is what the
