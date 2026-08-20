@@ -535,6 +535,25 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     Spec.assertEqWith s "exactly one counter -- one permanent left the battlefield" (fmap (Map.lookup CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject shredderId settled)) (Just (Just 1))
     Spec.assertEqWith s "and the Towershell is in exile, which is what it saw" (fmap (Object.zone . snd) (soleObjectOf towershell settled)) (Just Zone.Exile)
 
+  -- CR 603.6c's SECOND trigger event, which is CR 800.4a's FIRST clause rather
+  -- than its fourth: "a phased-in permanent leaves the game because its owner
+  -- leaves the game". No zone is reached, so the watcher reads the departing
+  -- permanent from CR 608.2h last known information alone -- the record
+  -- objectsLeaveWith files as it deletes the object.
+  --
+  -- alice OWNS this one, so it is clause 1 that removes it and the exile clause
+  -- never sees it; the case above is the same watcher on the other clause.
+  Spec.it s "CR 800.4a/603.6c a permanent leaving the game with its owner is a departure a bystander sees" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    shredder <- S.printingOf s registry "Super Shredder"
+    let (pikerId, withPiker) = S.addCreature piker S.alice S.threePlayerGame
+        (shredderId, board) = S.addCreature shredder S.carol withPiker
+        after = S.runPure S.identityAnswer board (Departure.leaveGame Departure.Type.Conceded S.alice)
+        settled = resolveTriggers after
+    Spec.assertEqWith s "carol's Shredder is a 1/1 while alice's Piker is on the battlefield" (Projection.powerOf shredderId board) (Just 1)
+    Spec.assertEqWith s "carol's Super Shredder saw the Piker leave the GAME (CR 603.6c)" (Projection.powerOf shredderId settled, Projection.toughnessOf shredderId settled) (Just 2, Just 2)
+    Spec.assertEqWith s "the Piker is gone entirely -- it left the game, it did not change zones" (Game.lookupObject pikerId settled) Nothing
+
   -- CR 800.4a's fourth clause on the STACK, which is the other half of "still
   -- controlled by that player": CR 405.4 makes a spell's controller the player
   -- who cast it, so a spell alice cast off a card bob owns survives clause 1
