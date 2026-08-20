@@ -304,11 +304,18 @@ data Filter keyword
     -- (Midnight Tilling). A slot naming one object is the singleton case of the
     -- same read.
     --
-    -- Vacuously False where the slot names no object: outside a resolution the
-    -- map is empty, and an illegal target (CR 608.2b) and a multi-TARGET slot
-    -- drop out of it -- the one plural shape this does not admit, no card in
-    -- data/cards/ writing the atom over a slot whose count is above one. That is
-    -- the posture every context-relative atom here takes.
+    -- Vacuously False where the slot names no object: the map is empty for most
+    -- readers, and an illegal target (CR 608.2b) and a multi-TARGET slot drop out
+    -- of it -- the one plural shape this does not admit, no card in data/cards/
+    -- writing the atom over a slot whose count is above one. That is the posture
+    -- every context-relative atom here takes.
+    --
+    -- READABLE PAST THE RESOLUTION for the one carrier that snapshots the map:
+    -- a floating replacement row (Pawl.Types.ActiveReplacement) keeps the
+    -- installing resolution's bindings, so a pattern written with this atom names
+    -- the object the resolution named rather than a class of them, and CR 400.7h
+    -- is what moves that name onto the spell a card cast under the row's source's
+    -- permission became.
     IsBound SlotName.SlotName
   | -- | CR 201.2 / 709.4a asked of TWO objects: the candidate shares a name with
     -- the object this slot holds -- Harness the Storm's "target card with the

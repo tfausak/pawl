@@ -1,5 +1,7 @@
 module Pawl.Types.ReplacementCandidate where
 
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Pawl.Types.CandidateId as CandidateId
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Effect as Effect
@@ -9,6 +11,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PreventionRider as PreventionRider
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Uses as Uses
 
 -- | One replacement effect instance as the CR 616.1 loop sees it: what it does,
@@ -58,6 +61,11 @@ data ReplacementCandidate = MkReplacementCandidate
     -- environment is the live board rather than a snapshot. Nothing wherever the
     -- effect has no rider, which is every replacement but a prevention that
     -- prints one.
-    rider :: Maybe PreventionRider.PreventionRider
+    rider :: Maybe PreventionRider.PreventionRider,
+    -- | The installing resolution's slot bindings, copied off a FLOATING row (see
+    -- Pawl.Types.ActiveReplacement) so this instance's own Filters can be read in
+    -- a context that knows them. Empty for a permanent's static replacement
+    -- ability, which has no resolution behind it to have bound anything.
+    slots :: Map.Map SlotName.SlotName (Set.Set ObjectId.ObjectId)
   }
   deriving (Eq, Ord, Show)

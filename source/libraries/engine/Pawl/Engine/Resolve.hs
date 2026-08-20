@@ -79,6 +79,8 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterPattern as CounterPattern
+import qualified Pawl.Types.CounterR as CounterR
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamageDirection as DamageDirection
@@ -99,6 +101,7 @@ import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
@@ -205,8 +208,11 @@ import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
+import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
+import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 
 -- The read side of the D4 dataflow lint: WHICH slots, and HOW MANY recipients
 -- apiece (a slot read through an ObjectRef can hold CR 601.2c's "up to two").
@@ -402,7 +408,11 @@ slotsOf effect = case effect of
   -- Both refs: either may name a slot.
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) -> joinTwo (objectRefSlots original) (objectRefSlots subject)
   -- The Duration and Condition each carry Quantities; a Quantity.InSlot is a read.
-  Effect.Replace (Replace.MkReplace duration _ _ condition _) -> joinTwo (durationSlots duration) (joinSlots (fmap conditionSlots (Maybe.maybeToList condition)))
+  -- The pattern's Filter is a READ too: Filter.IsBound in one names an object an
+  -- earlier effect of this same resolution defined (Dire Fleet Daredevil's "that
+  -- spell"), which is what the row's captured environment answers at CR 616.1.
+  Effect.Replace (Replace.MkReplace duration _ _ condition re) ->
+    joinSlots [durationSlots duration, joinSlots (fmap conditionSlots (Maybe.maybeToList condition)), replacementPatternSlots re]
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase ref _) -> playerRefSlots ref
   -- CR 615.5's rider reads slots of its own, so its reads join this effect's,
   -- LESS the reserved amount slot: the prevention binds that one itself
@@ -535,6 +545,32 @@ conditionSlots condition = case condition of
   Condition.Type.Any conditions -> joinSlots (fmap conditionSlots conditions)
   Condition.Type.All conditions -> joinSlots (fmap conditionSlots conditions)
 
+-- The slots a replacement's PATTERN names: every arm's pattern says which objects
+-- the row applies to as a Filter, and Filter.IsBound in one is a read of the
+-- installing resolution's binding environment (Pawl.Types.ActiveReplacement).
+-- Arity One, since IsBound is a membership test rather than a target slot.
+--
+-- No wildcard: an arm added to Pawl.Types.ReplacementEffect must answer here, and
+-- the three that carry no Filter say so rather than falling through. The nested
+-- EFFECTS an EntryR rewrite or a DamageR rider carries are not walked -- see
+-- slotsAreExhaustive's Replace arm.
+replacementPatternSlots :: ReplacementEffect.ReplacementEffect (Effect Card.Type.Card) -> Map.Map SlotName SlotArity
+replacementPatternSlots re = case re of
+  ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR pat _) -> filterSlotsOf (ZoneChangePattern.whatObject pat)
+  ReplacementEffect.EntryR (EntryR.MkEntryR pat _) -> filterSlotsOf pat
+  ReplacementEffect.DamageR (DamageR.MkDamageR pat _ _) ->
+    joinTwo (filterSlotsOf (DamagePattern.whatSource pat)) (joinSlots (fmap filterSlotsOf (Maybe.maybeToList (DamagePattern.whatRecipient pat))))
+  ReplacementEffect.DestructionR _ -> Map.empty
+  ReplacementEffect.CounterR (CounterR.MkCounterR pat _) -> filterSlotsOf (CounterPattern.onWhat pat)
+  ReplacementEffect.TokenR _ -> Map.empty
+  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR pat _) -> filterSlotsOf pat
+  ReplacementEffect.PhaseR _ -> Map.empty
+
+-- One Filter's slot reads, at arity One -- the same shape modeSlots folds over a
+-- mode's target-slot Filters.
+filterSlotsOf :: Filter.Type.Filter Keyword.Type.Keyword -> Map.Map SlotName SlotArity
+filterSlotsOf = Map.fromSet (const SlotArity.One) . Filter.boundSlots
+
 -- CR 603.3b: is slotsOf's answer the WHOLE of what applying this effect reads off
 -- the resolving object's bindings? A classification of effect SHAPE, never of
 -- which effect it is; Engine.orderInert may elide CR 603.3b's ordering prompt
@@ -598,7 +634,12 @@ slotsAreExhaustive effect = case effect of
   Effect.Create (Create.MkCreate quantity _ _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.BecomeCopy {} -> True
-  -- The ReplacementEffect holds no Quantity and no reference.
+  -- The ReplacementEffect holds no Quantity, and the one reference it can hold --
+  -- a Filter.IsBound in its pattern -- slotsOf reports through
+  -- replacementPatternSlots. Not implemented: the effects a rewrite or a CR 615.5
+  -- rider nests under this opcode read slots of their own and neither this answer
+  -- nor slotsOf reports them; every Effect.Replace in data/cards/ nests none
+  -- (gap #1962).
   Effect.Replace (Replace.MkReplace duration _ _ condition _) ->
     durationSlotsAreExhaustive duration && all conditionSlotsAreExhaustive condition
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> True
@@ -2122,7 +2163,8 @@ installDamageRow players controller source duration kind rewrite rider g (recipi
               -- OWN resolution deals, which none of these rows does -- not even
               -- one whose CR 609.7a choice happened to land on this very source.
               ActiveReplacement.origin = ReplacementOrigin.Other,
-              ActiveReplacement.rider = rider
+              ActiveReplacement.rider = rider,
+              ActiveReplacement.slots = Map.empty
             }
      in g1 {GameState.replacements = active : GameState.replacements g1}
 
@@ -3766,7 +3808,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- The clause's own "if", read with the resolution's controller as CR
       -- 109.5's "you". The full view, not viewWithLastKnown: a spell creating a
       -- self-replacement is on the stack and the board is live.
-      let met = maybe True (Condition.holds (Projection.fullView gs) (effectContext controller source legal (slotGroups resolving gs)) gs source) condition
+      let context = effectContext controller source legal (slotGroups resolving gs)
+          met = maybe True (Condition.holds (Projection.fullView gs) context gs source) condition
        in case (met, Expiry.arm (Binding.playersIn legal) controller source duration gs) of
             -- The stated condition is false, so the clause creates nothing.
             (False, _) -> gs
@@ -3787,7 +3830,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         ActiveReplacement.expiry = expiry,
                         ActiveReplacement.uses = uses,
                         ActiveReplacement.origin = origin,
-                        ActiveReplacement.rider = Nothing
+                        ActiveReplacement.rider = Nothing,
+                        -- The resolution's own slot bindings, captured as the
+                        -- row is installed for the reason Pawl.Types.DelayedTrigger
+                        -- captures them (CR 603.7c): this resolution is about to
+                        -- end and its object with it, so a pattern naming a slot
+                        -- would have nothing live to read. The SAME context the
+                        -- condition above was asked in, so the gate and the row
+                        -- cannot disagree about what a slot names.
+                        ActiveReplacement.slots = Filter.slotObjects context
                       }
                in gs1 {GameState.replacements = active : GameState.replacements gs1}
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration kind ref sourceFilter quantity riderEffects) -> do
@@ -3930,7 +3981,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                     ActiveReplacement.expiry = Expiry.Type.Never,
                     ActiveReplacement.uses = Uses.Once,
                     ActiveReplacement.origin = ReplacementOrigin.Other,
-                    ActiveReplacement.rider = Nothing
+                    ActiveReplacement.rider = Nothing,
+                    ActiveReplacement.slots = Map.empty
                   }
            in g1 {GameState.replacements = active : GameState.replacements g1}
     State.modify' (\g -> List.foldl' (flip install) g named)

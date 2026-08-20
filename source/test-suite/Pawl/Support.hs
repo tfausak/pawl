@@ -1381,7 +1381,8 @@ addRegenShield oid gs =
             ActiveReplacement.expiry = Expiry.AtCleanup,
             ActiveReplacement.uses = Uses.Once,
             ActiveReplacement.origin = ReplacementOrigin.Other,
-            ActiveReplacement.rider = Nothing
+            ActiveReplacement.rider = Nothing,
+            ActiveReplacement.slots = Map.empty
           }
    in addReplacement active gs1
 

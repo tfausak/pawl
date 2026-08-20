@@ -1168,7 +1168,42 @@ castSpellWith applied pid oid name facing = do
       moved <- Event.changeZoneCasting pid oid Zone.Stack (Just name) facing
       case moved of
         Nothing -> State.put before
-        Just sid -> castProposed spending pid sid face castFrom keywordsBefore candidates before
+        Just sid -> do
+          -- CR 400.7h, run BEFORE the announcement so every step below reads one
+          -- board: the rest of the effect that allowed this cast now names the
+          -- spell rather than the card. CR 601.2e's rejection puts `before` back,
+          -- which puts the old name back with it.
+          State.modify' (followIntoSpell (Game.lookupObject oid before >>= Object.playableFromExile) oid sid)
+          castProposed spending pid sid face castFrom keywordsBefore candidates before
+
+-- CR 400.7h: "if an effect allows a nonland card to be cast, other parts of that
+-- effect can find the new object that card becomes after it moves to the stack as
+-- a result of being cast this way". `old` is the card as it lay in exile and `new`
+-- is the CR 400.7 incarnation on the stack, so every reference the granting effect
+-- captured is moved from one to the other. Dire Fleet Daredevil's "if that spell
+-- would be put into a graveyard, exile it instead" is what needs it: the ability
+-- installed the redirect while the spell it names did not yet exist.
+--
+-- Scoped by the PERMISSION's source, which is rule 400.7h's "that effect" at the
+-- granularity pawl records: a row some other object installed keeps naming the
+-- card, and correctly, since no rule lets it follow. Nothing for a cast the rules
+-- themselves allowed (CR 601.3's first clause), where there is no granting effect
+-- to have named anything.
+--
+-- The floating replacement store is the only captured environment rewritten. A
+-- delayed triggered ability captures one too (Pawl.Types.DelayedTrigger), and no
+-- card in data/cards/ arms one from the same effect that grants a cast; not
+-- implemented there (#1961).
+followIntoSpell :: Maybe ExilePlayPermission.ExilePlayPermission -> ObjectId -> ObjectId -> GameState -> GameState
+followIntoSpell permission old new gs = case permission of
+  Nothing -> gs
+  Just granted ->
+    let rename oid = if oid == old then new else oid
+        follow row
+          | ActiveReplacement.source row == ExilePlayPermission.source granted =
+              row {ActiveReplacement.slots = fmap (Set.map rename) (ActiveReplacement.slots row)}
+          | otherwise = row
+     in gs {GameState.replacements = fmap follow (GameState.replacements gs)}
 
 -- CR 601.2b-i for a spell already on the stack -- castSpell's body once its CR
 -- 601.2a move has happened. `sid` is the stack incarnation (CR 400.7), the object
@@ -1568,7 +1603,8 @@ armCastFromGraveyard caster keywords castFor spellId =
                   ActiveReplacement.expiry = Expiry.Never,
                   ActiveReplacement.uses = Uses.Once,
                   ActiveReplacement.origin = ReplacementOrigin.Other,
-                  ActiveReplacement.rider = Nothing
+                  ActiveReplacement.rider = Nothing,
+                  ActiveReplacement.slots = Map.empty
                 }
          in gs1 {GameState.replacements = active : GameState.replacements gs1}
    in Monad.mapM_ arm (Keyword.castFromGraveyardReplacementsOf keywords castFor)

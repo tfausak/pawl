@@ -2941,12 +2941,12 @@ victorManchaSpec s registry = Spec.describe s "VictorMancha" $ do
 -- player cast a card somebody else OWNS, which is the one board where CR 405.4's
 -- controller and CR 108.3's owner name different players (#83).
 --
--- One clause of the printed card is not implemented: "if that spell would be put
--- into a graveyard, exile it instead" (#1358), a floating CR 614.1a redirect
--- naming one object, which card data cannot write. That leaves pawl's card
--- STRICTER than printed.
+-- Both riders are expressed. "If that spell would be put into a graveyard, exile
+-- it instead" is a floating CR 614.1a redirect whose pattern names the object
+-- the ability's own MoveToZone bound, and CR 400.7h is what carries that name
+-- from the exiled card to the spell it becomes; the case below proves it.
 --
--- The other rider IS expressed: "and mana of any type can be spent to cast that
+-- The other rider: "and mana of any type can be spent to cast that
 -- spell" is CR 118.14, carried by the grant as ManaSpending.AnyType, and the two
 -- cases at the end of this group are what prove it.
 daredevilName, renewedFaithName :: CardName.CardName
@@ -3027,6 +3027,26 @@ daredevilRedOnly mountain daredevil faith =
       after = S.runPure S.identityAnswer placed Stack.resolveTop
    in (Maybe.listToMaybe (exiledNamed renewedFaithName after), handFaithId, after)
 
+-- daredevilExiled's board with a SECOND Renewed Faith in alice's hand and enough
+-- lands to cast both: nine, since the Daredevil takes two and each Faith takes
+-- three. Three Mountains, so the worst payment for its {1}{R} still leaves six
+-- Plains for two {2}{W}. Returns the hand copy's id and the board.
+--
+-- The hand copy is what makes the exiled card's exile-instead a claim about ONE
+-- OBJECT rather than about a card name: bob owns the exiled Faith and alice owns
+-- the one in her hand, so the two also differ in which graveyard CR 608.2n would
+-- reach.
+daredevilTwoFaiths :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+daredevilTwoFaiths mountain plains daredevil faith =
+  let lands = S.landsFor plains S.alice 6 (S.landsFor mountain S.alice 3 S.threePlayerGame)
+      (_, stocked) = S.addGraveyardCard faith S.bob lands
+      (handFaithId, withFaith) = S.addHandCard faith S.alice stocked
+      (handId, board) = S.addHandCard daredevil S.alice withFaith
+      cast = S.runPure S.identityAnswer board (Cast.castSpell S.alice handId daredevilName Facing.FaceUp)
+      entered = S.runPure S.identityAnswer cast Stack.resolveTop
+      placed = S.runPure S.identityAnswer entered Engine.settleForPriority
+   in (handFaithId, S.runPure S.identityAnswer placed Stack.resolveTop)
+
 -- One symbol of the colour the board cannot make, as a cost to ask canPay about.
 whiteCost :: ManaCost.ManaCost
 whiteCost = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.White)]
@@ -3073,10 +3093,43 @@ direFleetDaredevilSpec s registry = Spec.describe s "DireFleetDaredevil" $ do
     Spec.assertEqWith s "alice cast it, so alice gains the life" (S.lifeOf S.alice after) (Just 26)
     Spec.assertEqWith s "its owner gains nothing" (S.lifeOf S.bob after) (Just 20)
     Spec.assertEqWith s "and the third seat is untouched" (S.lifeOf S.carol after) (Just 20)
-    -- CR 608.2n sends the card to its OWNER's graveyard, which is what keeps the
-    -- life assertion above from being readable as "owner and controller are the
-    -- same player after all".
-    Spec.assertEqWith s "CR 608.2n: the card goes to bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+    -- CR 608.2n would send the card to its OWNER's graveyard, and the card's own
+    -- replacement sends it to exile instead (the case below) -- either way it
+    -- lands under bob, which is what keeps the life assertion above from being
+    -- readable as "owner and controller are the same player after all".
+    Spec.assertEqWith s "the card ends up under bob, not under its caster" (length (Game.zoneMembers Zone.Exile S.bob after)) 1
+    Spec.assertEqWith s "and alice's own zones hold none of it" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
+  -- CR 400.7h with CR 614.1a: "If that spell would be put into a graveyard,
+  -- exile it instead". The clause names the SPELL, which CR 400.7 made a new
+  -- object when the card was cast -- so the printed sentence is a claim about an
+  -- id that did not exist when the ability resolved.
+  --
+  -- The pair is on ONE board: the same card, at the same cost, cast by the same
+  -- player in the same step, differing only in whether it was cast off the
+  -- Daredevil's exile or out of alice's hand.
+  Spec.it s "CR 400.7h a spell cast off the exiled card is exiled as it resolves, and one from hand is not" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    daredevil <- S.printingOf s registry "Dire Fleet Daredevil"
+    faith <- S.printingOf s registry "Renewed Faith"
+    let (handFaithId, board) = daredevilTwoFaiths mountain plains daredevil faith
+    case exiledNamed renewedFaithName board of
+      [exiledId] -> do
+        let cast = S.runPure S.identityAnswer board (Cast.castSpell S.alice exiledId renewedFaithName Facing.FaceUp)
+            after = S.runPure S.identityAnswer cast Stack.resolveTop
+        Spec.assertBool s (not (null (GameState.stack cast))) "the exiled Faith really was cast"
+        Spec.assertEqWith s "and it resolved, so alice gained its 6 life" (S.lifeOf S.alice after) (Just 26)
+        Spec.assertEqWith s "CR 400.7h: the SPELL was exiled, so its owner's graveyard is empty" (Game.zoneMembers Zone.Graveyard S.bob after) []
+        Spec.assertEqWith s "and the card the spell became is in exile" (length (Game.zoneMembers Zone.Exile S.bob after)) 1
+        -- The other half of the pair, cast from alice's hand on this same board:
+        -- the replacement names one object, not the card's name, so this Faith
+        -- goes where CR 608.2n sends it.
+        let fromHand = S.runPure S.identityAnswer after (Cast.castSpell S.alice handFaithId renewedFaithName Facing.FaceUp)
+            resolved = S.runPure S.identityAnswer fromHand Stack.resolveTop
+        Spec.assertBool s (not (null (GameState.stack fromHand))) "the hand Faith really was cast"
+        Spec.assertEqWith s "CR 608.2n: the hand copy goes to alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
+        Spec.assertEqWith s "and alice gained the second Faith's life too" (S.lifeOf S.alice resolved) (Just 32)
+      other -> Spec.assertFailure s ("expected exactly one exiled Faith, got " <> show (length other))
   -- CR 118.14: "mana of any type can be spent to cast that spell". The offer
   -- side, on a board with no white mana on it at all -- and the same board's
   -- second Renewed Faith, in alice's hand, is the negative: same cost, same
