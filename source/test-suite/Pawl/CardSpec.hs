@@ -306,6 +306,7 @@ grantsItself keyword =
   StaticAbility.MkStaticAbility
     (Affected.Matching Filter.Type.IsSource)
     Nothing
+    Set.empty
     Nothing
     (NonEmpty.singleton (Modification.GainKeyword keyword))
 
@@ -5810,6 +5811,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           StaticAbility.MkStaticAbility
             (Affected.Matching Filter.Type.IsSource)
             Nothing
+            Set.empty
             Nothing
             (NonEmpty.singleton (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness quantity (Quantity.Type.Literal 0))))
         planted =
@@ -5825,6 +5827,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                     [ StaticAbility.MkStaticAbility
                         (Affected.Matching buried)
                         Nothing
+                        Set.empty
                         Nothing
                         (NonEmpty.singleton (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1))))
                     ]
@@ -5927,7 +5930,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                       [ Effect.Create
                           Create.MkCreate
                             { Create.quantity = Quantity.Type.Literal 1,
-                              Create.card = oneFaced (base {Face.staticAbilities = [StaticAbility.MkStaticAbility (Affected.Matching buried) Nothing Nothing (NonEmpty.singleton Modification.LoseAllAbilities)]}),
+                              Create.card = oneFaced (base {Face.staticAbilities = [StaticAbility.MkStaticAbility (Affected.Matching buried) Nothing Set.empty Nothing (NonEmpty.singleton Modification.LoseAllAbilities)]}),
                               Create.riders = EntryRiders.defaultValue,
                               Create.slot = Nothing
                             }
@@ -6017,6 +6020,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           StaticAbility.MkStaticAbility
             (Affected.Matching Filter.Type.IsSource)
             Nothing
+            Set.empty
             Nothing
             (NonEmpty.singleton (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness quantity (Quantity.Type.Literal 0))))
         planted =
@@ -6034,6 +6038,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                     [ StaticAbility.MkStaticAbility
                         (Affected.Matching buried)
                         Nothing
+                        Set.empty
                         Nothing
                         (NonEmpty.singleton (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1))))
                     ]
@@ -6082,7 +6087,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                       [ Effect.Create
                           Create.MkCreate
                             { Create.quantity = Quantity.Type.Literal 1,
-                              Create.card = oneFaced (base {Face.staticAbilities = [StaticAbility.MkStaticAbility (Affected.Matching buried) Nothing Nothing (NonEmpty.singleton Modification.LoseAllAbilities)]}),
+                              Create.card = oneFaced (base {Face.staticAbilities = [StaticAbility.MkStaticAbility (Affected.Matching buried) Nothing Set.empty Nothing (NonEmpty.singleton Modification.LoseAllAbilities)]}),
                               Create.riders = EntryRiders.defaultValue,
                               Create.slot = Nothing
                             }

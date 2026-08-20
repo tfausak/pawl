@@ -1,11 +1,13 @@
 module Pawl.Types.StaticAbility where
 
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Set as Set
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.Zone as Zone
 
 -- | A card's printed static continuous ability (CR 604.1/604.2: a static ability
 -- creates a continuous effect active while its permanent is on the battlefield).
@@ -48,6 +50,35 @@ data StaticAbility card = MkStaticAbility
     -- re-asked on every projection (CR 613.5) and so turns the same effect off and
     -- on again as the board moves, with no resolution and no trigger in between.
     condition :: Maybe Condition.Condition,
+    -- | CR 113.6b: the zones this ability STATES it functions in -- Anger's "as
+    -- long as this card is in your graveyard" -- and empty for an ability that
+    -- states none, which is nearly all of them.
+    --
+    -- Structural rather than a Condition, and that is the whole point: CR 113.6
+    -- decides which zone's walk gathers an ability at all, BEFORE CR 604.2's
+    -- clause is asked of anything. A zone written as a condition would be
+    -- answered only for an ability some walk had already kept, so it could
+    -- narrow a gather but never widen one -- Anger's effect would still be
+    -- gathered off the battlefield and never off the graveyard. Empty leaves CR
+    -- 113.6's own defaults standing: the battlefield for a permanent, the stack
+    -- for an instant or a sorcery (CR 113.6's first sentence), the command zone
+    -- for an emblem (CR 114.4), everywhere for a cast permission (CR 113.6f).
+    --
+    -- CR 113.6b's "only" is why a stated set OVERRIDES those defaults rather
+    -- than adding to them, CR 113.6f included: Viral Spawning's Corrupted
+    -- ability both grants flashback and names the graveyard, and the naming
+    -- wins, so it does not also function while the card is a spell on the stack.
+    --
+    -- A Set of Zone and not a per-zone flag, because the rule quantifies over
+    -- zones and rule 400.1's list is the vocabulary; "your graveyard" needs no
+    -- ownership payload, since a card in a graveyard is always in its owner's.
+    --
+    -- CR 113.6c's clause -- which zones an ability does NOT function in -- needs
+    -- no second field and no inversion flag: rule 400.1's list is finite, so
+    -- Grist, the Hunger Tide's "as long as this card isn't on the battlefield"
+    -- is this field holding every zone but the battlefield. What that card still
+    -- waits on is a walk to gather it from a hand or a library (gap #1912).
+    functionsFrom :: Set.Set Zone.Zone,
     -- | Titania's Song's second sentence: "If this enchantment leaves the
     -- battlefield, this effect continues until end of turn." Nothing -- almost
     -- every ability -- is CR 604.2 as written, the effect ending with the

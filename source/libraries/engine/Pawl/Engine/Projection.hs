@@ -130,6 +130,7 @@ import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.WithCounters as WithCounters
+import qualified Pawl.Types.Zone as Zone
 
 -- CR 613.1f's grant carries a whole activated ability, and a card's abilities are
 -- written against a whole Card (CR 707.8a).
@@ -1063,7 +1064,7 @@ setLandSubtypeEffectsGiven functioning gs =
               -- an unconditional ability, since staticLives answers first.
               lives sa = staticLives (functioning permId) changes (minimum (fmap layer (staticParts changes sa))) sa
            in fmap (\sa -> (permId, rewriteAffected changes (StaticAbility.affected sa))) $
-                filter (\sa -> any isSet (StaticAbility.modifications sa) && lives sa) (Face.staticAbilities face)
+                filter (\sa -> any isSet (StaticAbility.modifications sa) && functionsFromZone Zone.Battlefield sa && lives sa) (Face.staticAbilities face)
    in concatMap fromStored (GameState.continuousEffects gs)
         <> concatMap fromPerm (abilitySources gs)
 
@@ -1770,7 +1771,7 @@ gatherGiven stripped functioning gs =
             -- CR 114.4 / 113.6: an emblem's abilities function in the command
             -- zone, sharing the emblem's timestamp (CR 613.7a). Never stripped:
             -- the pool's CR 613.1f removers reach creatures (CR 114.5).
-            concat (zipWith (gatherStatic (functioning emblemId) emblemId (Object.timestamp emblemObj) [] False) [0 ..] (Face.staticAbilities face))
+            concat [gatherStatic (functioning emblemId) emblemId (Object.timestamp emblemObj) [] False n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), functionsFromZone Zone.Command sa]
       emblems = concatMap fromEmblem (Set.toList (GameState.command gs))
       fromSpell spellId = case Game.lookupObject spellId gs of
         Nothing -> []
@@ -1786,7 +1787,7 @@ gatherGiven stripped functioning gs =
             -- timestamp. Never stripped, for the emblem branch's reason.
             if Set.null (Set.intersection spellStaticTypes (TypeLine.types (Face.typeLine face)))
               then []
-              else concat (zipWith (gatherStatic (functioning spellId) spellId (Object.timestamp spellObj) [] False) [0 ..] (Face.staticAbilities face))
+              else concat [gatherStatic (functioning spellId) spellId (Object.timestamp spellObj) [] False n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), functionsFromZone Zone.Stack sa]
       spells = concatMap fromSpell (GameState.stack gs)
       fromGraveyardCard cardId = case Game.lookupObject cardId gs of
         Nothing -> []
@@ -1803,16 +1804,50 @@ gatherGiven stripped functioning gs =
             -- 613.7a: the effect shares the card's own timestamp. Never
             -- stripped, for the emblem and spell branches' reason.
             --
-            -- Not implemented: the ability's own zone clause, so an ability
-            -- gathered here is also gathered from the stack by `fromSpell`
-            -- above when its card is an instant or a sorcery (#1413).
+            -- CR 113.6b takes precedence where an ability states its zones,
+            -- CR 113.6f's classification decides where it does not, and the two
+            -- meet on Viral Spawning: its Corrupted ability grants flashback AND
+            -- names the graveyard, so it is kept here and dropped by `fromSpell`
+            -- above rather than gathered twice.
+            --
+            -- Not implemented: an ability that states NO zone and grants no
+            -- cast permission is still dropped here -- Grist, the Hunger Tide's
+            -- CR 113.6c clause is that shape -- and a hand or a library gets no
+            -- walk of its own at all (gap #1912).
             let qualifies sa = any (grantsKeywordWhere (castZoneKeyword face)) (StaticAbility.modifications sa)
+                keeps sa =
+                  if Set.null (StaticAbility.functionsFrom sa)
+                    then qualifies sa
+                    else functionsFromZone Zone.Graveyard sa
                 indexed = zip [0 :: Natural ..] (Face.staticAbilities face)
-             in concat [gatherStatic (functioning cardId) cardId (Object.timestamp cardObj) [] False n sa | (n, sa) <- indexed, qualifies sa]
+             in concat [gatherStatic (functioning cardId) cardId (Object.timestamp cardObj) [] False n sa | (n, sa) <- indexed, keeps sa]
       graveyards = concatMap fromGraveyardCard (graveyardCards gs)
       counters = counterGathered gs
       designations = designationGathered gs
    in stored <> static <> emblems <> spells <> graveyards <> counters <> designations
+
+-- CR 113.6b: does this static ability function from `zone`? THE zone
+-- classification -- one question, asked by each of gatherGiven's four
+-- static-ability walks and by the two battlefield walks beside them
+-- (setLandSubtypeEffectsGiven and controlGrants), so a permanent's printed
+-- ability cannot become a continuous effect through one of those three and not
+-- the others.
+--
+-- An EMPTY set is an ability that states no zone, and then CR 113.6's own
+-- defaults stand -- which is what makes the caller's zone argument the whole
+-- answer for nearly every ability in the pool. A stated set is CR 113.6b's
+-- "only", so it replaces those defaults rather than adding to them;
+-- `fromGraveyardCard` above is the one caller that has to tell the two cases
+-- apart, because the default it would otherwise override is CR 113.6f's
+-- classification rather than a bare zone.
+--
+-- Structural, and deliberately not a Condition: CR 604.2's clause is asked of an
+-- ability some walk has already kept, so it could narrow a gather but never
+-- widen one.
+functionsFromZone :: Zone.Zone -> StaticAbility.StaticAbility card -> Bool
+functionsFromZone zone sa =
+  let zones = StaticAbility.functionsFrom sa
+   in Set.null zones || Set.member zone zones
 
 -- Every card in every graveyard.
 graveyardCards :: GameState -> [ObjectId]
@@ -1852,7 +1887,12 @@ permanentParts stripped functioning setEffs gs permId = case Game.lookupObject p
               -- One thunk per permanent, shared by all its abilities. Bound
               -- here, OUTSIDE the zipWith, which is what shares it.
               partsOf = gatherStatic (functioning permId) permId (Object.timestamp permObj) changes (stripped permId)
-              tagged n sa = fmap ((,) n) (partsOf n sa)
+              -- CR 113.6b, applied WITHOUT disturbing the index: `n` is the key
+              -- half of CR 613.6's decision memo and Pawl.Engine.Event's
+              -- departure handover indexes Face.staticAbilities by it, so an
+              -- ability this rule drops must leave a hole rather than shift its
+              -- neighbours up.
+              tagged n sa = if functionsFromZone Zone.Battlefield sa then fmap ((,) n) (partsOf n sa) else []
            in concat (zipWith tagged [0 ..] (Face.staticAbilities face))
         else []
 
@@ -3206,7 +3246,7 @@ controlGrants gs =
                       cgAffected = StaticAbility.affected sa,
                       cgTimestamp = Object.timestamp permObj
                     }
-             in fmap toGrant (filter isControl (Face.staticAbilities face))
+             in fmap toGrant (filter (\sa -> isControl sa && functionsFromZone Zone.Battlefield sa) (Face.staticAbilities face))
    in concatMap grantsOf (abilitySources gs)
 
 -- CR 303.4b: WHICH object this one is attached to -- what an Aura "enchants".
