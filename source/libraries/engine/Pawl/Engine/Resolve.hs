@@ -262,15 +262,20 @@ graveyardScopeSlots scope = case scope of
   GraveyardScope.InSlot slot -> Map.singleton slot SlotArity.Many
 
 -- The slots an ObjectRef reads. InSlot names one directly and
--- EachCardInGraveyard through its scope; the other sweeping arms name nothing at
--- cast, so CR 608.2b has nothing to fizzle (CR 115.10a).
+-- EachCardInGraveyard names one through its scope; the other sweeping arms name
+-- none. Reporting a scope's slot does not make the SWEPT CARDS targets -- CR
+-- 115.10a needs the word "target" against them, and a graveyard scope says it
+-- against the PLAYER -- so what CR 608.2b judges is still the card's own target
+-- slot, holding that player, and not this read.
 objectRefSlots :: ObjectRef -> Map.Map SlotName SlotArity
 objectRefSlots ref = case ref of
   ObjectRef.InSlot slot -> Map.singleton slot SlotArity.Many
   ObjectRef.EachMatching _ -> Map.empty
   -- The one sweeping arm that DOES name a slot: CR 400.1's per-player graveyards
   -- leave "whose" to be said, and Angel of Finality says it by pointing at the
-  -- player another slot of the same announcement targets.
+  -- player another slot of the same announcement targets. Reported, not dropped,
+  -- because the D4 dataflow lint reads this: a card whose ONLY use of that slot
+  -- is the scope would otherwise declare a target nothing reads.
   ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard scope _) -> graveyardScopeSlots scope
   ObjectRef.EachCardInYourHand -> Map.empty
   ObjectRef.EachCardExiledWithSource {} -> Map.empty

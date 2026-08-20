@@ -401,8 +401,8 @@ riseOfTheDarkRealmsSpec s registry = Spec.describe s "RiseOfTheDarkRealms" $ do
 
 -- The same CR 109.2a sweep with its scope taken from another SLOT of the same
 -- announcement rather than from CR 109.5's perspective: riseOfTheDarkRealmsSpec
--- above names the whole table, this names the one player the trigger targeted
--- (#1310).
+-- above names the whole table, this names the one player the trigger targeted;
+-- see #1310.
 --
 -- Angel of Finality {3}{W} Creature -- Angel 3/4 -- "Flying / When this creature
 -- enters, exile target player's graveyard." (name, cost, type line, power,

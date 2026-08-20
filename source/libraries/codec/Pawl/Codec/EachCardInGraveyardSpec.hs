@@ -25,7 +25,7 @@ spec s = Spec.describe s "Pawl.Codec.EachCardInGraveyard" $ do
       )
       " {\"graveyards\":{\"type\":\"Scoped\",\"value\":{\"type\":\"You\"}},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   -- The arm the PlayerScope this field used to hold could not say: Angel of
-  -- Finality's "target player's graveyard" (#1310).
+  -- Finality's "target player's graveyard"; see #1310.
   Spec.it s "MkEachCardInGraveyard, a slot-named graveyard" $
     Common.assertCodec
       s

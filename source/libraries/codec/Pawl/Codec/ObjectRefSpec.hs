@@ -144,8 +144,8 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
   -- matching set. Its filter is EachCardInGraveyard's exactly and its scope is
   -- the PlayerScope that arm used to carry, so the tag, the leading chooser and
   -- the scope's own shape tell them apart -- which is what the distinctness case
-  -- below is for; see #1310 for why the sweep's scope widened and this one
-  -- did not.
+  -- below is for; see #1952 for what this arm still cannot say that the sweep
+  -- now can.
   Spec.it s "ChosenCardInGraveyard" $
     Common.assertCodec
       s
