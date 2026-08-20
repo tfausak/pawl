@@ -1339,6 +1339,10 @@ withEvents events gs =
 
 -- Set the monarch directly, for tests that need the designation without
 -- resolving the effect that grants it.
+-- The monarch designation, seeded straight onto the board. NOT a crowning: it
+-- records no CR 725.1 event and marks no CR 725 exile watch, so a test about
+-- what happens AS a player becomes the monarch calls Pawl.Engine.Monarch.crown
+-- instead.
 withMonarch :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
 withMonarch pid gs = gs {GameState.monarch = Just pid}
 

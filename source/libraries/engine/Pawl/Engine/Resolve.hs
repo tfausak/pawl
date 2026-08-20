@@ -34,6 +34,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
@@ -3754,10 +3755,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- and the crown does not move. Read here rather than at the three
       -- MonarchTarget arms, so every route this opcode has is stopped at once.
       Just p | PlayerEffect.prohibitsBecomingMonarch p gs -> pure ()
-      Just p -> do
-        -- CR 725.3: the previous monarch ceases because `monarch` is overwritten.
-        State.modify' (\g -> g {GameState.monarch = Just p})
-        State.modify' (Event.recordEvent (GameEvent.BecameMonarch p))
+      -- CR 725.3's handoff, the CR 603.2 event and CR 725's exile watches are all
+      -- Monarch.crown's, so no caller can move the crown without them.
+      Just p -> State.modify' (Monarch.crown p)
   -- The slot's permanent gains the designation (CR 702.112a, CR 701.37a, CR
   -- 701.60a) -- a state write, not a CR 613 modification.
   --
@@ -3875,17 +3875,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         Just target -> do
           -- CR 400.7: exile through the funnel and register the incarnation for
           -- return when an opponent of `controller` (CR 102.2) BECOMES the
-          -- monarch. The monarch as of now is stamped into the watch, so an
-          -- opponent who already holds the crown does not discharge it.
+          -- monarch. Armed undischarged whoever holds the crown now, so an
+          -- opponent who already holds it does not free the creature.
           mNew <- Event.changeZoneReturning target Zone.Exile
           case mNew of
             Nothing -> pure ()
             Just newId -> do
-              monarchNow <- State.gets GameState.monarch
               let watch =
                     MonarchWatch.MkMonarchWatch
                       { MonarchWatch.controller = controller,
-                        MonarchWatch.lastMonarch = monarchNow
+                        MonarchWatch.due = False
                       }
               State.modify' (\g -> g {GameState.exiledUntilMonarch = Map.insert newId watch (GameState.exiledUntilMonarch g)})
       _ -> pure ()

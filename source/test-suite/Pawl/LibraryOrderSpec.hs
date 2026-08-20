@@ -1945,10 +1945,13 @@ exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
             (Effect.ExileUntilMonarch slot)
         exiled = snd (Engine.runGamePure S.identityAnswer base exile)
         -- Palace Jailer's OTHER entry trigger: alice takes the crown. She is
-        -- not her own opponent, so this must not return the creature.
-        alicesCrown = snd (Engine.runGamePure S.identityAnswer exiled {GameState.monarch = Just S.alice} Monarch.returnExiledForMonarch)
+        -- not her own opponent, so this must not return the creature. Through
+        -- Monarch.crown and not a write to GameState.monarch, because that is
+        -- where a crowning marks the watches now -- a bare field write is not a
+        -- crowning at all.
+        alicesCrown = snd (Engine.runGamePure S.identityAnswer (Monarch.crown S.alice exiled) Monarch.returnExiledForMonarch)
         -- bob deals combat damage to the monarch (CR 725.3) and takes it back.
-        bobsCrown = snd (Engine.runGamePure S.identityAnswer alicesCrown {GameState.monarch = Just S.bob} Monarch.returnExiledForMonarch)
+        bobsCrown = snd (Engine.runGamePure S.identityAnswer (Monarch.crown S.bob alicesCrown) Monarch.returnExiledForMonarch)
     Spec.assertEqWith s "alice holding the crown does not discharge the watch" (Map.size (GameState.exiledUntilMonarch alicesCrown)) 1
     Spec.assertEqWith s "nor return the creature" (Set.size (GameState.battlefield alicesCrown)) 0
     Spec.assertEqWith s "bob retaking it does return the creature" (Set.size (GameState.battlefield bobsCrown)) 1
@@ -1971,9 +1974,73 @@ exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
             (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
             (Effect.ExileUntilMonarch slot)
         exiled = snd (Engine.runGamePure S.identityAnswer base exile)
+        -- CR 725.4's third sentence is the only way back to no monarch, and it
+        -- crowns nobody, so this is a bare field write by construction.
         noMonarch = snd (Engine.runGamePure S.identityAnswer exiled {GameState.monarch = Nothing} Monarch.returnExiledForMonarch)
     Spec.assertEqWith s "the watch is still armed" (Map.size (GameState.exiledUntilMonarch noMonarch)) 1
     Spec.assertEqWith s "and nothing returned" (Set.size (GameState.battlefield noMonarch)) 0
+
+  -- SYNTHETIC. "Synthetic Regency Swap" {1}{W} Sorcery: "Target player becomes
+  -- the monarch. Then you become the monarch." Two crownings in ONE resolution,
+  -- which is what #208 needs and what no printing does: Scryfall
+  -- oracle:"become the monarch" (2026-08-20) returns fifty-five cards, and the
+  -- five that can crown somebody other than their controller -- Denethor, Stone
+  -- Seer, Eomer, King of Rohan, Garland, Royal Kidnapper, Jared Carthalion, True
+  -- Heir and M'Baku, Jabari Chieftain -- each crown exactly one player per
+  -- resolution, so every printed sequence of two crownings has a settle between
+  -- them. Nothing in rule 725 forbids a card that crowns twice; a printing that
+  -- does replaces this one.
+  --
+  -- The crown ends the resolution where it began, so NO reading of the current
+  -- monarch, at this settle or any later one, can see that bob held it. Only the
+  -- crowning itself can.
+  Spec.it s "CR 725 a crown that goes to an opponent and back inside one resolution still frees the prisoner" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    palaceJailer <- S.printingOf s registry "Palace Jailer"
+    regencySwap <- S.printingOf s registry "Synthetic Regency Swap"
+    let (_, g1) = S.addCreature piker S.carol S.threePlayerGame
+        g2 = S.landsFor plains S.alice 2 g1
+        (_, g3) = S.entersWithTrigger palaceJailer S.alice g2
+        -- Palace Jailer's two entry triggers resolve: alice takes the crown, and
+        -- carol's Piker -- the only creature an opponent controls, so the target
+        -- is forced -- is exiled under the watch.
+        armed = S.runPure S.identityAnswer g3 Engine.priorityLoop
+        (withSpell, spell) = S.handOne regencySwap armed
+        -- FILTER the offered set rather than building a recipient: CR 608.2b
+        -- re-reads the target at resolution, and a hand-built one is a different
+        -- recipient the re-read would drop.
+        crownsTo :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+        crownsTo who p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer who) sets
+          _ -> S.identityAnswer p
+        -- `crownsTo who` is spelled out at each call rather than let-bound:
+        -- MonoLocalBinds (this module turns GADTs on) would fix a local binding
+        -- at one `r`, where S.runPure asks for a rank-2 answerer.
+        run who =
+          let castGs = S.runPure (crownsTo who) withSpell (S.cast S.alice spell)
+              resolved = S.runPure (crownsTo who) castGs Stack.resolveTop
+           in S.runPure (crownsTo who) resolved Engine.settleForPriority
+        -- Run A: the crown goes to bob and comes straight back to alice.
+        toBob = run S.bob
+        -- Run B: the same board and the same spell, with alice naming HERSELF.
+        -- She is not her own opponent, and the second crowning finds her already
+        -- crowned, so no opponent becomes the monarch at any point.
+        toAlice = run S.alice
+    -- The fixture really is what the test claims.
+    Spec.assertEqWith s "alice holds the crown before the spell" (GameState.monarch withSpell) (Just S.alice)
+    Spec.assertEqWith s "exactly one creature is under the watch" (Map.size (GameState.exiledUntilMonarch withSpell)) 1
+    Spec.assertEqWith s "and carol's Piker is off the battlefield" (S.creaturesInPlay S.carol withSpell) 0
+    -- Run A, the behaviour this case exists to prove. CR 400.7 gives the
+    -- returning card yet another id, so carol's creature COUNT is what survives.
+    Spec.assertEqWith s "bob's reign inside the resolution freed the prisoner" (S.creaturesInPlay S.carol toBob) 1
+    Spec.assertEqWith s "though the crown is back with alice, so no later look at the monarch could tell" (GameState.monarch toBob) (Just S.alice)
+    Spec.assertEqWith s "and the watch is discharged" (Map.size (GameState.exiledUntilMonarch toBob)) 0
+    -- Run B: one different answer, and nothing else.
+    Spec.assertEqWith s "alice crowning herself frees nobody" (S.creaturesInPlay S.carol toAlice) 0
+    Spec.assertEqWith s "she is still the monarch" (GameState.monarch toAlice) (Just S.alice)
+    Spec.assertEqWith s "and the watch is still armed" (Map.size (GameState.exiledUntilMonarch toAlice)) 1
+    Spec.assertEqWith s "both runs resolved the spell" (length (GameState.stack toBob), length (GameState.stack toAlice)) (0, 0)
 
 -- M4.5 P1 gate: Act of Treason strings GainControl + Untap + ModifyTarget
 -- (GainKeyword Haste) together end to end -- cast, resolve, attack, revert.

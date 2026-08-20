@@ -3144,6 +3144,34 @@ monarchTriggerSpec s registry =
           Spec.assertEqWith s "carol, untargeted, lost none" (S.creaturesInPlay S.carol after) 1
           Spec.assertBool s (S.onBattlefield lich after) "and alice's own Lich is untouched"
           Spec.assertEqWith s "the stack is empty, so nothing is still pending" (GameState.stack after) []
+        -- Gatherer, 2016-08-23, on this very card: "Abilities that trigger
+        -- whenever you 'become the monarch' trigger only if you aren't already
+        -- the monarch. For example, if you are already the monarch as Custodi
+        -- Lich enters the battlefield, its last ability won't trigger." So a
+        -- crowning of the player who already holds the crown is not an event at
+        -- all, and Monarch.crown records nothing for it -- which is also what
+        -- keeps this reading and CR 725's exile watch (Palace Jailer's "until an
+        -- opponent becomes the monarch") answering the same question the same
+        -- way.
+        --
+        -- The case above is the exact paired control: same card, same seats, same
+        -- answerer, and the one difference is who holds the crown as the Lich
+        -- enters.
+        Spec.it s "CR 725.3 a player who is ALREADY the monarch does not become the monarch, so the Lich's edict stays silent" $ do
+          custodiLich <- S.printingOf s registry "Custodi Lich"
+          piker <- S.printingOf s registry "Goblin Piker"
+          birdMaiden <- S.printingOf s registry "Bird Maiden"
+          bogWraith <- S.printingOf s registry "Bog Wraith"
+          let base = bystanders piker birdMaiden bogWraith (S.withMonarch S.alice (Setup.emptyGame S.threePlayers))
+              (lich, gs) = S.entersWithTrigger custodiLich S.alice base
+              after = resolveAll (targetsPlayer S.bob) gs
+          Spec.assertEqWith s "alice was the monarch before the Lich entered" (GameState.monarch gs) (Just S.alice)
+          Spec.assertEqWith s "CR 701.21a bob, whom the edict would have targeted, kept both of his" (S.creaturesInPlay S.bob after) 2
+          Spec.assertEqWith s "carol kept hers" (S.creaturesInPlay S.carol after) 1
+          Spec.assertEqWith s "alice still holds the crown, so the entry trigger did resolve" (GameState.monarch after) (Just S.alice)
+          Spec.assertBool s (notElem (GameEvent.BecameMonarch S.alice) (S.eventsOf after)) "and recorded no crowning, because nobody became the monarch"
+          Spec.assertBool s (S.onBattlefield lich after) "the Lich itself is on the battlefield"
+          Spec.assertEqWith s "the stack is empty, so nothing is still pending" (GameState.stack after) []
         -- CR 603.3a / 109.5: the relation is read against the ABILITY'S
         -- CONTROLLER, so a crowning of somebody else is silence. Denethor, Stone
         -- Seer's "target player becomes the monarch" is the pool's one way to
