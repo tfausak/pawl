@@ -3640,7 +3640,7 @@ drawCard pid = do
 --
 -- Not implemented: CR 702.94b's LASTING reveal -- the card stays revealed until it
 -- leaves the hand or the ability leaves the stack -- which needs the per-object
--- flag #185 and #282 are about (#1408). Nor CR 121.8's face-down drawn card
+-- flag #282 is about (#1408). Nor CR 121.8's face-down drawn card
 -- (#1409).
 offerMiracleReveal :: PlayerId -> ObjectId -> Game ()
 offerMiracleReveal pid drawn = do

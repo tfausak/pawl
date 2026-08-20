@@ -1040,6 +1040,7 @@ library types
     Pawl.Types.Halved
     Pawl.Types.HandActionIndex
     Pawl.Types.HandActionPerformer
+    Pawl.Types.HandWindowCap
     Pawl.Types.Hybrid
     Pawl.Types.HybridPayment
     Pawl.Types.IgnoredAbility

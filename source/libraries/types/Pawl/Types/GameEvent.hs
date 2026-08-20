@@ -342,7 +342,7 @@ data GameEvent
     -- This is the MOMENTARY reveal only. CR 701.20a's lasting cases -- a card
     -- revealed to pay a cost, and one that stays revealed while a triggered
     -- ability it caused is on the stack -- need a per-object flag that no card
-    -- in the pool asks for (#185, #282).
+    -- in the pool asks for (#282, #1408).
     Revealed Revealed.Revealed
   | -- | CR 701.6a: a spell was COUNTERED. Emitted by Pawl.Engine.Event.counter,
     -- the one funnel every countering in the engine goes through, alongside the

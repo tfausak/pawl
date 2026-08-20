@@ -1094,6 +1094,19 @@ cardCarrierEffects card =
 handActions :: Face.Face Card.Type.Card -> [[Effect.Effect Card.Type.Card]]
 handActions card = Face.mulliganActions card <> Face.openingHandActions card
 
+-- Every effect a card AUTHORS, its two pregame windows included: what
+-- cardResolutionEffects reaches, plus the hand actions it deliberately leaves
+-- out, each closed over its own nesting.
+--
+-- The view the CR 603.7 delayed-ability lints take, and Chancellor of the Forge
+-- is why: it arms its delayed ability from a CR 103.6 opening-hand action, so the
+-- narrower view saw a declared entry that nothing appeared to arm. Flattening the
+-- actions is sound HERE and not for ownBoundSlots -- these lints ask which names
+-- and slots a card MENTIONS, never which of them share a scope.
+cardAuthoredEffects :: Face.Face Card.Type.Card -> [Effect.Effect Card.Type.Card]
+cardAuthoredEffects card =
+  cardResolutionEffects card <> concatMap effectWithNested (concat (handActions card))
+
 cardCounts :: Face.Face Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
 cardCounts card =
   concatMap quantityCounts (Maybe.maybeToList (Face.characteristicPT card))
@@ -1796,7 +1809,7 @@ onsetOffends card =
   let scoped name = case Map.lookup name (Face.delayedAbilities card) of
         Nothing -> False
         Just ability -> Event.controllerTurnScoped (TriggeredAbility.condition ability)
-   in not (all scoped (Set.toList (Resolve.onsetGatedAbilities (cardResolutionEffects card))))
+   in not (all scoped (Set.toList (Resolve.onsetGatedAbilities (cardAuthoredEffects card))))
 
 -- A one-mode, targetless triggered ability running one effect under one
 -- condition -- the fixture the lint's own self-test misauthors on purpose. Kept
@@ -1881,7 +1894,7 @@ shadowsSlots defined abilities =
 shadowsDefinedSlot :: Face.Face Card.Type.Card -> Bool
 shadowsDefinedSlot card =
   shadowsSlots
-    (Resolve.definedSlots (cardResolutionEffects card))
+    (Resolve.definedSlots (cardAuthoredEffects card))
     (Map.elems (Face.delayedAbilities card))
 
 modalTrigger ::
@@ -4320,10 +4333,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- The "every slot a delayed ability reads is one its card defines" lint below
   -- takes the same wide view, for the same reason: nothing about where a Create
   -- binds its minted tokens is peculiar to a spell mode.
+  --
+  -- cardAuthoredEffects and not cardResolutionEffects, for the reason that
+  -- function gives: a CR 103.6 opening-hand action can arm one.
   Spec.it s "every armed delayed ability is declared, and every declared one is armed" $ do
     ps <- S.allPrintings s
     let cardOffends card =
-          Resolve.armedAbilities (cardResolutionEffects card) /= Map.keysSet (Face.delayedAbilities card)
+          Resolve.armedAbilities (cardAuthoredEffects card) /= Map.keysSet (Face.delayedAbilities card)
         offenders = filter (anyFace cardOffends . Printing.card) ps
     Spec.assertEqWith s "no dangling or unused delayed abilities" (fmap (S.nameOf . Printing.card) offenders) []
   -- The lint above joins names WITHIN a card; this one keeps that namespace clear
