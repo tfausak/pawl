@@ -3009,21 +3009,20 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     Monad.forM_ milledBy $ \(pid, cards) -> do
       arrived <- Maybe.catMaybes <$> Monad.mapM (\c -> Event.changeZoneReturning c Zone.Graveyard) cards
       Monad.unless (null arrived) (State.modify' (Event.recordEvent (GameEvent.Milled (Milled.MkMilled pid (Seq.fromList arrived)))))
-    -- The tally, counted off the PRINTED card and read from the pre-move state
-    -- because CR 400.7 has since minted new ids; rule 728.1's "nonland" is a
-    -- card-type question the printed face answers.
-    --
-    -- Not implemented: the milled card has a CR 613 projection of its own, so a
-    -- tally keyed on an axis some effect changed reads the wrong number (#160).
+    -- The tally, read from the pre-move state because CR 400.7 has since minted
+    -- new ids. Each milled card is judged by its own CR 613 projection: rule
+    -- 613.1 starts from the actual object and names no zone, so a library card is
+    -- folded exactly as a permanent is, and a layer-4 type change (CR 613.1d)
+    -- decides rule 728.1's "nonland card" there. Every milled id names a card in
+    -- a library, so there is no faceless object for the projection to answer
+    -- blankly about.
     --
     -- Bound onto this effect's SOURCE, so a later effect reads it as
     -- Quantity.InSlot; bound even at zero, since zero is an answer. ONE number
     -- across every miller, as no Quantity has a per-player reader.
     Monad.forM_ mTally $ \tally ->
       let tallyContext = Filter.contextFor Nothing Nothing
-          counted oid = case Game.faceOf oid gs of
-            Nothing -> False
-            Just face -> Filter.matches tallyContext (Projection.viewOfCardIn gs oid face) (MillTally.filter tally)
+          counted oid = Filter.matches tallyContext (Projection.viewOfObject oid gs) (MillTally.filter tally)
        in State.modify' (bindAmountSlot source (MillTally.slot tally) (Natural.length (filter counted milled)))
   -- CR 701.20a: show the named cards to every player. CR 701.20b keeps them where
   -- they are, so the GameEvent.Revealed the funnel appends IS the whole effect.

@@ -124,6 +124,33 @@ abilitySpec s registry = Spec.describe s "CR 728.1's inherent ability" $ do
     Spec.assertEqWith s "three cards milled all the same" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 3
     Spec.assertEqWith s "no life lost" (S.lifeOf S.alice after) (Just 20)
     Spec.assertEqWith s "and all three rad counters still there" (radOf S.alice after) 3
+  -- CR 728.1's "nonland card" asked of each milled card's own CR 613 projection
+  -- rather than of its printed face. Rule 613.1 starts from the actual object and
+  -- names no zone, so Synthetic Fossil Warren's layer-4 type change (CR 613.1d,
+  -- CR 205.1b's "in addition to their other types") reaches the Goblin Pikers
+  -- while they sit in alice's library: they are LAND cards when the mill puts
+  -- them in the graveyard, so rule 728.1 pays for neither.
+  --
+  -- The LIFE TOTAL is the assertion this case exists for, and every number the
+  -- two readings produce differs: 20 life against 18, two counters left against
+  -- none. The graveyard is the same size either way, which is the point -- what
+  -- changed is what the tally COUNTED, not what was milled.
+  Spec.it s "CR 613.1d a milled card a continuous effect made a land costs no life and no counter" $ do
+    board <- warrenBoard s registry True
+    let after = S.runPure S.identityAnswer (precombatMainOf S.alice board) (Engine.runStep >> Engine.priorityLoop)
+    Spec.assertEqWith s "no life lost, both milled cards being land cards" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "and both rad counters still there" (radOf S.alice after) 2
+    Spec.assertEqWith s "two cards milled all the same" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 2
+    Spec.assertEqWith s "and the card under them spared" (length (Game.zoneMembers Zone.Library S.alice after)) 1
+  -- The negative half of the pair, differing in exactly one thing: whether the
+  -- Warren is on the battlefield. Same library, same counters, same mill.
+  Spec.it s "CR 728.1 without the Warren the same Pikers are nonland cards and are paid for" $ do
+    board <- warrenBoard s registry False
+    let after = S.runPure S.identityAnswer (precombatMainOf S.alice board) (Engine.runStep >> Engine.priorityLoop)
+    Spec.assertEqWith s "1 life lost per nonland card milled" (S.lifeOf S.alice after) (Just 18)
+    Spec.assertEqWith s "and both rad counters spent" (radOf S.alice after) 0
+    Spec.assertEqWith s "two cards milled all the same" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 2
+    Spec.assertEqWith s "and the card under them spared" (length (Game.zoneMembers Zone.Library S.alice after)) 1
   -- CR 603.4's intervening "if". A player with none does not trigger at all.
   Spec.it s "CR 728.1 a player with no rad counters mills nothing" $ do
     bolt <- S.printingOf s registry "Lightning Bolt"
@@ -212,6 +239,39 @@ reanimationSpec s registry = Spec.describe s "The Master, Transcendent's reanima
     Spec.assertEqWith s "but the ability is not offered" (activationsOffered masterId milled) 0
     Spec.assertEqWith s "and the Piker is still in the graveyard" (fmap Object.zone (Game.lookupObject pikerId after)) (Just Zone.Graveyard)
     Spec.assertEqWith s "with nothing but The Master on the battlefield" (Game.zoneMembers Zone.Battlefield S.alice after) [masterId]
+
+-- alice with two rad counters and two Goblin Pikers on top of her library over a
+-- Mountain, and Synthetic Fossil Warren on the battlefield when `petrified` --
+-- identical boards otherwise. The Warren reads "Goblin cards you own that aren't
+-- on the battlefield are lands in addition to their other types": CR 613.1d's
+-- layer 4 over an Affected.MatchingOffBattlefield set, so a Piker in the library
+-- is a land card that no printed characteristic of it says it is.
+--
+-- Synthetic (#1910): Teferi, Mage of Zhalfir and Biotransference print this
+-- affected set, and Toph, the First Metalbender prints "are lands in addition to
+-- their other types", but nothing prints the two together -- Scryfall o:"are
+-- lands" and o:"land in addition to its other types", 2026-08-19, no card that
+-- makes an off-battlefield nonland card a land. Toph is what would refute that;
+-- its set is the battlefield.
+--
+-- The Warren reaches the battlefield AFTER the library is stocked, which
+-- separates "the card was always a land" and "the effect applied to it as it
+-- arrived" from a continuous effect applying to a card sitting in a library. The
+-- Mountain under the Pikers is the library CR 104.3c needs and is not a Goblin,
+-- so the Warren cannot reach it.
+warrenBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  Bool ->
+  m GameState.GameState
+warrenBoard s registry petrified = do
+  piker <- S.printingOf s registry "Goblin Piker"
+  mountain <- S.printingOf s registry "Mountain"
+  warren <- S.printingOf s registry "Synthetic Fossil Warren"
+  let base = S.addPlayerCounter PlayerCounterKind.Rad 2 S.alice (Setup.emptyGame S.bothPlayers)
+      stocked = libraryTopped [piker, piker, mountain] S.alice base
+  pure (if petrified then snd (S.addCreature warren S.alice stocked) else stocked)
 
 -- alice with The Master settled on the battlefield, one rad counter, and one
 -- creature card sitting in her graveyard from the start.

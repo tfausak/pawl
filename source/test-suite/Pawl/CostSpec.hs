@@ -794,8 +794,8 @@ frailExhumationBoard swamp nightmare exhumation battlefield buried =
 --
 -- It is also what pins CR 208.2a's power still ARRIVING now that the criterion
 -- reads Projection.viewOfObject: the number comes from layer 7a of the graveyard
--- card's own fold rather than from Projection.characteristicPowerIn, and these
--- five cases say it is the same number.
+-- card's own fold rather than from a printed-card view, and these five cases say
+-- it is the same number.
 --
 -- Why the card is synthetic: no printing exiles a graveyard card qualified by
 -- POWER as a cost. Every printed power criterion over a graveyard -- Alesha's and

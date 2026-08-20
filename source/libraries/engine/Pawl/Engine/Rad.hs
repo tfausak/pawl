@@ -93,9 +93,9 @@ radCountersOf pid gs =
 milledSlot :: SlotName.SlotName
 milledSlot = SlotName.MkSlotName (Text.pack "milledThisWay")
 
--- | CR 728.1's "nonland card". A card type question, so the tally is judged
--- against the printed card (Resolve's Mill arm), which is what a card in a
--- library has.
+-- | CR 728.1's "nonland card". A card type question, judged against each milled
+-- card's own CR 613 projection (Resolve's Mill arm): rule 613.1 names no zone, so
+-- a layer-4 effect that makes a library card a land is one this rule sees.
 nonland :: Filter.Filter Keyword.Keyword
 nonland = Filter.Not (Filter.HasCardType CardType.Land)
 

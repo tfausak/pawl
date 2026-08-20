@@ -3679,11 +3679,10 @@ discard cause pid oid = do
 -- The snapshot is Projection.project -- the object's CR 613 characteristics and
 -- deliberately not its printed card, since a reveal has to show what a player at
 -- the table would see, on every axis a continuous effect reaches off the
--- battlefield. Resolve's CR 728.1 mill tally is the one reader left that takes
--- the printed view instead and so could disagree with this (#160); the explore
--- that follows this very reveal is not one of them any more, its land test
--- taking the same projection, so what is shown and what the branch is taken from
--- cannot part company.
+-- battlefield. The readers that judge a card off the battlefield take that same
+-- projection -- the explore that follows this very reveal, and rule 728.1's mill
+-- tally (see #1911) -- so what is shown and what is judged cannot part
+-- company.
 --
 -- The `cause` is CR 702.94a's "this way" (see RevealCause): every caller but the
 -- draw funnel's miracle window shows a card for a reason no rule asks about
