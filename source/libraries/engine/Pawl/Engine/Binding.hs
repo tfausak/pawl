@@ -469,7 +469,9 @@ toRecipients rs = Binding.empty {Binding.targets = if Set.null rs then Nothing e
 
 -- A binding that names SEVERAL objects and nothing else -- what a Create binds
 -- for a card that refers back to every token it made at once, Thatcher Revolt's
--- "those tokens". toObject's plural, and a distinct field rather than a list of
+-- "those tokens", and what a Destroy binds for a card that refers back to the
+-- cards it buried, Come Back Wrong's "put into a graveyard this way".
+-- toObject's plural, and a distinct field rather than a list of
 -- Recipients: this is a definition and never a target (CR 115.10a), so it is not
 -- subject to CR 608.2b.
 toObjects :: Seq ObjectId -> Binding

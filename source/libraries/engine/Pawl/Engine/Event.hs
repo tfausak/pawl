@@ -2460,7 +2460,14 @@ changeZoneCasting caster oid requestedDest shown facing = changeZoneAttaching No
 -- A separate door rather than a fourth parameter on changeZone: a batch is the
 -- rare case, and for a single move the board it begins on IS the live one.
 changeZoneInBatch :: GameState -> ObjectId -> Zone -> Game ()
-changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneAttaching (Just asOf) Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False)
+changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneInBatchReturning asOf oid requestedDest)
+
+-- changeZoneInBatch, answering with the destination incarnation's id -- what
+-- changeZoneReturning is to changeZone, and the same answer: Just the CR 400.7
+-- id, Nothing when the move was cancelled or the id named no object. The destroy
+-- funnel is the one caller, for CR 701.8b's "put into a graveyard this way".
+changeZoneInBatchReturning :: GameState -> ObjectId -> Zone -> Game (Maybe ObjectId)
+changeZoneInBatchReturning asOf oid requestedDest = changeZoneAttaching (Just asOf) Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False
 
 -- changeZoneReturning's body, returning the destination incarnation's id: Just
 -- newId on a completed move (CR 400.7 minted a fresh id), Nothing when the id is
@@ -3093,9 +3100,17 @@ destroy regenerability oids = Monad.void (destroyIn Nothing DestructionCause.ByE
 -- about, for the reason the graveyard move follows it -- a CR 616.1 rewrite may
 -- redirect the destruction. Nothing in the pool does, so the lists are equal today.
 --
+-- PAIRED with the CR 400.7 incarnation the graveyard move minted, which is a
+-- different object from the one destroyed and the only one a later clause can
+-- name: "put into a graveyard this way" is a card in a graveyard, and the
+-- permanent that was destroyed no longer exists. Nothing for a move the CR 616.1
+-- loop cancelled, and the id alone says nothing about WHERE it landed -- a CR
+-- 614 replacement may have sent it to exile instead (Rest in Peace), which is
+-- why the reader asks the board rather than trusting this answer's presence.
+--
 -- A second door rather than a return type on `destroy`, the changeZoneReturning
--- posture: only the Destroy opcode's bound-count slot uses the answer.
-destroyReturning :: Regenerability.Regenerability -> [ObjectId] -> Game [ObjectId]
+-- posture: only the Destroy opcode's bound slots use the answer.
+destroyReturning :: Regenerability.Regenerability -> [ObjectId] -> Game [(ObjectId, Maybe ObjectId)]
 destroyReturning = destroyIn Nothing DestructionCause.ByEffect
 
 -- destroy for a batch that is one PART of a larger simultaneous event, whose board
@@ -3144,7 +3159,7 @@ destroyInBatch asOf cause regenerability oids = Monad.void (destroyIn (Just asOf
 -- against one board, not a sequence -- so the bracket adds no claim they do not.
 -- Day of Judgment's deaths are the case it decides, and CR 603.10a's own Example
 -- is why they must not be a sequence.
-destroyIn :: Maybe GameState -> DestructionCause.DestructionCause -> Regenerability.Regenerability -> [ObjectId] -> Game [ObjectId]
+destroyIn :: Maybe GameState -> DestructionCause.DestructionCause -> Regenerability.Regenerability -> [ObjectId] -> Game [(ObjectId, Maybe ObjectId)]
 destroyIn asOf cause regenerability oids = simultaneously $ do
   live <- State.get
   let gs = Maybe.fromMaybe live asOf
@@ -3159,8 +3174,8 @@ destroyIn asOf cause regenerability oids = simultaneously $ do
       -- the destruction is honoured. changeZone is a no-op for an object already
       -- gone, which is what makes naming the batch's members up front safe.
       Just target -> do
-        changeZoneInBatch gs target Zone.Graveyard
-        pure (Just target)
+        arrived <- changeZoneInBatchReturning gs target Zone.Graveyard
+        pure (Just (target, arrived))
 
 -- The single countering funnel (CR 701.6a -- not to be confused with putCounters
 -- above, CR 122.6's counter markers).

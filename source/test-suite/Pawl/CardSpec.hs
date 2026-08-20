@@ -3323,7 +3323,7 @@ effectFilters effect = case effect of
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ f quantity) -> unframed (f : quantityFilters quantity)
   Effect.RestartGame _ -> []
   Effect.ControlPlayerNextTurn _ -> []
-  Effect.Destroy (Destroy.MkDestroy ref _ _) -> sourceHosted (objectRefFilters ref)
+  Effect.Destroy (Destroy.MkDestroy ref _ _ _) -> sourceHosted (objectRefFilters ref)
   Effect.Sacrifice _ -> []
   -- The riders reach a Filter one level further down than the ObjectRef: CR
   -- 122.6a's counters are keyed by CounterKind, and CR 122.1b's keyword counter
@@ -4178,7 +4178,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "the lint itself catches an effect that binds a reserved slot" $ do
     baneOfProgress <- S.printingOf s registry "Bane of Progress"
     let rebind slot effect = case effect of
-          Effect.Destroy (Destroy.MkDestroy ref regenerability (Just _)) -> Effect.Destroy (Destroy.MkDestroy ref regenerability (Just slot))
+          Effect.Destroy (Destroy.MkDestroy ref regenerability (Just _) mBuried) -> Effect.Destroy (Destroy.MkDestroy ref regenerability (Just slot) mBuried)
           other -> other
         overModal f modal =
           modal {Modal.modes = fmap (\m -> m {Mode.clauses = fmap (\c -> c {Clause.effects = fmap f (Clause.effects c)}) (Mode.clauses m)}) (Modal.modes modal)}
@@ -4227,7 +4227,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 Modal.MkModal
                   ( Seq.singleton
                       ( Mode.MkMode
-                          (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot Binding.you) Regenerability.Regenerable (Just Binding.eventAmount))))))
+                          (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot Binding.you) Regenerability.Regenerable (Just Binding.eventAmount) Nothing)))))
                           (Map.singleton Binding.you (TargetSlot.required Pool.AnyTarget Nothing))
                       )
                   )
@@ -5881,7 +5881,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               base {Face.spell = spellOf [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Quantity.Type.Literal 1, Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand}] Map.empty}
             ),
             ( "an ObjectRef.EachMatching set",
-              base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing)] Map.empty}
+              base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing Nothing)] Map.empty}
             ),
             ( "CR 603.6a's trigger condition",
               base
@@ -6092,7 +6092,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               base {Face.spell = spellOf [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Quantity.Type.Literal 1, Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand}] Map.empty}
             ),
             ( "an ObjectRef.EachMatching set",
-              base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing)] Map.empty}
+              base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing Nothing)] Map.empty}
             ),
             ( "CR 603.6a's trigger condition",
               base

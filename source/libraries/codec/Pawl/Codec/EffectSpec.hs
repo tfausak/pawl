@@ -269,19 +269,19 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.Regenerable Nothing))
+      (Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.Regenerable Nothing Nothing))
       " {\"type\":\"Destroy\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"t\"},\"regenerability\":{\"type\":\"Regenerable\"}}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.CantBeRegenerated Nothing))
+      (Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.CantBeRegenerated Nothing Nothing))
       " {\"type\":\"Destroy\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"t\"},\"regenerability\":{\"type\":\"CantBeRegenerated\"}}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)) Regenerability.Regenerable Nothing))
+      (Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)) Regenerability.Regenerable Nothing Nothing))
       " {\"type\":\"Destroy\",\"value\":{\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"regenerability\":{\"type\":\"Regenerable\"}}} "
   -- The slot the sweep binds its count into is ELIDED when absent, so the case
   -- above writes two keys and this one writes three. Since #1305 that is
@@ -292,7 +292,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.HasCardType CardType.Artifact)) Regenerability.Regenerable (Just (SlotName.MkSlotName (Text.pack "destroyed")))))
+      (Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.HasCardType CardType.Artifact)) Regenerability.Regenerable (Just (SlotName.MkSlotName (Text.pack "destroyed"))) Nothing))
       " {\"type\":\"Destroy\",\"value\":{\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}}},\"regenerability\":{\"type\":\"Regenerable\"},\"slot\":\"destroyed\"}} "
   Spec.it s "PayAnyEnergy" $
     Common.assertJsonCodec

@@ -44,6 +44,7 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -2400,6 +2401,102 @@ corrosiveGaleSpec s registry = Spec.describe s "CorrosiveGale" $ do
     Spec.assertEqWith s "no damage marked on the grounded Bird Maiden" (markedOn maidenId after) (Just 0)
     Spec.assertBool s (S.onBattlefield maidenId after) "so it survives"
 
+-- Come Back Wrong {2}{B} Sorcery (DSK 86): "Destroy target creature. If a
+-- creature card is put into a graveyard this way, return it to the battlefield
+-- under your control. Sacrifice it at the beginning of your next end step."
+--
+-- The pool's first card to NAME what a destruction buried, where Bane of
+-- Progress above only COUNTS it. The two are different questions about the same
+-- printed phrase, and the difference is CR 400.7: the permanent that was
+-- destroyed does not exist by the time the second sentence runs, so the only
+-- object left to name is the incarnation the graveyard move minted -- a
+-- different id, in a different zone, which is why Effect.Destroy's `buried` slot
+-- is bound from the move's answer rather than from its own target slot.
+--
+-- One board throughout: bob's lone creature, alice's three Swamps, and Come Back
+-- Wrong in alice's hand. The creature is bob's on purpose -- "under YOUR
+-- control" is a change of controller (CR 110.2a), which one seat could not show.
+comeBackWrongSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+comeBackWrongSpec s registry =
+  let endStep = Phase.Ending EndingStep.EndStep
+      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep})
+      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      creaturesOnBattlefield gs = filter (`Projection.isCreatureOf` gs) (Set.toList (GameState.battlefield gs))
+      -- alice casts Come Back Wrong at `victim` off three Swamps and lets it
+      -- resolve, then settles state-based actions.
+      castAt spell base =
+        let (withSpell, spellId) = S.handOne spell base
+            afterCast = S.runPure S.identityAnswer withSpell (S.cast S.alice spellId)
+         in S.settleSba (S.runPure S.identityAnswer afterCast Stack.resolveTop)
+   in Spec.describe s "ComeBackWrong" $ do
+        -- The whole claim, at gameplay level: the creature bob controlled is
+        -- gone from the battlefield AND back on it under alice's control, with
+        -- nothing left in bob's graveyard. Nothing but the `buried` binding can
+        -- produce that -- the MoveToZone that returns it reads a slot only the
+        -- Destroy defines, and the id it names never existed before the
+        -- destruction.
+        Spec.it s "CR 400.7 the card put into a graveyard this way comes back, under the caster's control" $ do
+          comeBackWrong <- S.printingOf s registry "Come Back Wrong"
+          swamp <- S.printingOf s registry "Swamp"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (victim, board) = S.addCreature piker S.bob (S.landsInPlay swamp 3)
+              after = castAt comeBackWrong board
+          case creaturesOnBattlefield after of
+            [returned] -> do
+              Spec.assertEqWith s "CR 110.2a the returned creature is under alice's control" (Projection.controllerOf returned after) (Just S.alice)
+              Spec.assertBool s (returned /= victim) "CR 400.7 and it is a new object, not the permanent that was destroyed"
+              Spec.assertEqWith s "and it is the creature that was destroyed" (fmap S.nameOf (Game.cardOf returned after)) (fmap S.nameOf (Game.cardOf victim board))
+            other -> Spec.assertFailure s ("expected exactly one creature on the battlefield, got " <> show (length other))
+          Spec.assertBool s (not (S.onBattlefield victim after)) "the permanent that was destroyed is gone"
+          Spec.assertEqWith s "and CR 701.8 left nothing in its owner's graveyard: it did not stay there" (namesIn Zone.Graveyard S.bob after) []
+        -- The card's last sentence, and the reason the MoveToZone binds a slot of
+        -- its own: "it" is the BATTLEFIELD incarnation, a third object again (CR
+        -- 400.7). "Your next end step" is TurnScope.ControllersTurn, so alice's.
+        Spec.it s "CR 603.7 the delayed ability sacrifices what came back at the caster's next end step" $ do
+          comeBackWrong <- S.printingOf s registry "Come Back Wrong"
+          swamp <- S.printingOf s registry "Swamp"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (_, board) = S.addCreature piker S.bob (S.landsInPlay swamp 3)
+              armed = castAt comeBackWrong board
+              after = resolveAll (settle (beginEndStep armed))
+          Spec.assertEqWith s "one creature was on the battlefield to sacrifice" (length (creaturesOnBattlefield armed)) 1
+          Spec.assertEqWith s "and none is left" (creaturesOnBattlefield after) []
+          Spec.assertEqWith s "CR 701.21 a sacrifice puts it in its OWNER's graveyard, not the caster's" (namesIn Zone.Graveyard S.bob after) [Just (S.nameOf (Printing.card piker))]
+          Spec.assertEqWith s "the delayed store is spent" (length (GameState.delayedTriggers after)) 0
+        -- The first discriminating twin: the SAME board plus Rest in Peace ("If a
+        -- card would be put into a graveyard from anywhere, exile it instead").
+        -- The destruction still happens -- CR 701.8a's "put that permanent into
+        -- its owner's graveyard" is what CR 614 replaces -- but nothing is put
+        -- into a graveyard this way, so the second sentence names nothing and the
+        -- creature stays gone.
+        Spec.it s "CR 614.1 a destruction the replacement sends to exile buries nothing, so nothing returns" $ do
+          comeBackWrong <- S.printingOf s registry "Come Back Wrong"
+          swamp <- S.printingOf s registry "Swamp"
+          piker <- S.printingOf s registry "Goblin Piker"
+          restInPeace <- S.printingOf s registry "Rest in Peace"
+          let (victim, g1) = S.addCreature piker S.bob (S.landsInPlay swamp 3)
+              (_, board) = S.addCreature restInPeace S.alice g1
+              after = castAt comeBackWrong board
+          Spec.assertEqWith s "no creature came back" (creaturesOnBattlefield after) []
+          Spec.assertBool s (not (S.onBattlefield victim after)) "the creature was still destroyed"
+          Spec.assertEqWith s "nothing in the graveyard either: CR 614 sent it to exile" (namesIn Zone.Graveyard S.bob after) []
+        -- The second discriminating twin, differing from the first case in
+        -- exactly one thing: the victim is a TOKEN of the same card rather than a
+        -- card. CR 111.6 says a token is not a card, so "if a CREATURE CARD is
+        -- put into a graveyard this way" is false and nothing returns. That is
+        -- also what keeps CR 111.8 ("a token that has left the battlefield can't
+        -- come back onto the battlefield") out of reach here (#1953).
+        Spec.it s "CR 111.6 a destroyed token is not a card put into a graveyard, so nothing returns" $ do
+          comeBackWrong <- S.printingOf s registry "Come Back Wrong"
+          swamp <- S.printingOf s registry "Swamp"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (victim, board) = S.addToken (Printing.card piker) S.bob (S.landsInPlay swamp 3)
+              after = castAt comeBackWrong board
+          Spec.assertEqWith s "no creature came back" (creaturesOnBattlefield after) []
+          Spec.assertBool s (not (S.onBattlefield victim after)) "the token was still destroyed"
+          Spec.assertEqWith s "CR 111.7 and it ceased to exist rather than staying in a graveyard" (namesIn Zone.Graveyard S.bob after) []
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   plummetSpec s registry
@@ -2416,6 +2513,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   trumpetBlastSpec s registry
   auraThiefSpec s registry
   baneOfProgressSpec s registry
+  comeBackWrongSpec s registry
   swiftSilenceSpec s registry
   countOnLuckSpec s registry
   actOnImpulseSpec s registry
