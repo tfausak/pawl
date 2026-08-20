@@ -117,8 +117,10 @@ data Effect card
     -- the mana in "a player's mana pool" without saying whose.
     --
     -- Two routes reach a pool. A MANA ABILITY's is Cost.tapForMana at payment
-    -- (CR 605.3b), which reads the ManaProduction and ignores the PlayerRef;
-    -- everything else resolves through Resolve.applyEffect, which reads both.
+    -- (CR 605.3b), which reads the ManaProduction alone and ignores the rest of
+    -- the payload -- the recipient (#1673), the retention (#1808) and CR 106.6's
+    -- spending restriction (#1976); everything else resolves through
+    -- Resolve.applyEffect, which reads the whole record.
     AddMana ManaAddition.ManaAddition
   | -- | CR 701.23: the players Search.searcher names each search the library of
     -- each player Search.owner names, for Search.quantity cards matching

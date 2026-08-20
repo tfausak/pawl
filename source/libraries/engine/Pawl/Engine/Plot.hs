@@ -127,7 +127,7 @@ plot pid oid = do
   if not (canPlot pid oid before)
     then pure ()
     else do
-      payment <- Cost.pay ManaSpending.AsProduced pid oid (Maybe.fromMaybe Cost.unpayable (plotCostOf oid before))
+      payment <- Cost.pay Nothing ManaSpending.AsProduced pid oid (Maybe.fromMaybe Cost.unpayable (plotCostOf oid before))
       case payment of
         Payment.Unpaid -> State.put before
         -- Dropped, Pawl.Engine.Foretell's reason exactly: the card is exiled and

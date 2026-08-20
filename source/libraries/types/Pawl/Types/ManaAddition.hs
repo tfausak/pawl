@@ -1,5 +1,7 @@
 module Pawl.Types.ManaAddition where
 
+import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -24,6 +26,13 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 -- adds a recipient and a duration to that instruction and changes nothing about
 -- its size.
 --
+-- The RESTRICTION rides this instruction for the same reason, and CR 106.6a is
+-- the rule that says so in as many words: a restriction is "created by the spell
+-- or ability" and "will apply to all mana produced" by it, so it belongs to the
+-- instruction and is copied onto every unit that instruction adds rather than
+-- being authored one unit at a time. Geosurge writes its seven AddMana effects
+-- with the same restriction on each.
+--
 -- The RETENTION rides this instruction rather than a second opcode, because
 -- Shizuko's "they don't lose THIS mana" names the units the preceding
 -- instruction added and there is no slot machinery for mana units for a second
@@ -35,6 +44,10 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 data ManaAddition = MkManaAddition
   { player :: PlayerRef.PlayerRef,
     production :: ManaProduction.ManaProduction,
-    retention :: ManaRetention.ManaRetention
+    retention :: ManaRetention.ManaRetention,
+    -- | CR 106.6: what the mana this instruction adds may be spent on, stamped
+    -- onto every unit it produces (Pawl.Types.ManaUnit.restriction). Nothing is
+    -- the unrestricted default every printing but a CR 106.6 one means.
+    restriction :: Maybe (Filter.Filter Keyword.Keyword)
   }
   deriving (Eq, Ord, Show)

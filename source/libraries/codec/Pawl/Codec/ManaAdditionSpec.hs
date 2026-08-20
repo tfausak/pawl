@@ -4,7 +4,9 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.ManaAddition as ManaAddition
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.ManaRetention as ManaRetention
@@ -24,7 +26,8 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
       ( ManaAddition.MkManaAddition
           { ManaAddition.player = PlayerRef.Relative PlayerRelation.You,
             ManaAddition.production = ManaProduction.OfType (ManaType.Colored Color.Green),
-            ManaAddition.retention = ManaRetention.Ordinary
+            ManaAddition.retention = ManaRetention.Ordinary,
+            ManaAddition.restriction = Nothing
           }
       )
       " {\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}}} "
@@ -37,7 +40,8 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
       ( ManaAddition.MkManaAddition
           { ManaAddition.player = PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer")),
             ManaAddition.production = ManaProduction.OfType (ManaType.Colored Color.Green),
-            ManaAddition.retention = ManaRetention.Ordinary
+            ManaAddition.retention = ManaRetention.Ordinary,
+            ManaAddition.restriction = Nothing
           }
       )
       " {\"player\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"},\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}}} "
@@ -53,8 +57,24 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
       ( ManaAddition.MkManaAddition
           { ManaAddition.player = PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer")),
             ManaAddition.production = ManaProduction.OfType (ManaType.Colored Color.Green),
-            ManaAddition.retention = ManaRetention.UntilEndOfTurn
+            ManaAddition.retention = ManaRetention.UntilEndOfTurn,
+            ManaAddition.restriction = Nothing
           }
       )
       " {\"player\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"},\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}},\"retention\":{\"type\":\"UntilEndOfTurn\"}} "
+  -- The same pair for CR 106.6's spending restriction, and it needs its own case
+  -- for the reason the retention one gives: nothing forces the field (#1715).
+  -- Geosurge is the printing that writes it.
+  Spec.it s "MkManaAddition, a spending restriction written on the wire" $
+    Common.assertCodec
+      s
+      ManaAddition.codec
+      ( ManaAddition.MkManaAddition
+          { ManaAddition.player = PlayerRef.Relative PlayerRelation.You,
+            ManaAddition.production = ManaProduction.OfType (ManaType.Colored Color.Red),
+            ManaAddition.retention = ManaRetention.Ordinary,
+            ManaAddition.restriction = Just (Filter.Or [Filter.HasCardType CardType.Artifact, Filter.HasCardType CardType.Creature])
+          }
+      )
+      " {\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}}},\"restriction\":{\"type\":\"Or\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}},{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}]}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ManaAddition.codec

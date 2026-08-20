@@ -142,6 +142,7 @@ import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LimitUnless as LimitUnless
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.Loyalty as Loyalty
+import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -3312,7 +3313,10 @@ effectFilters effect = case effect of
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     unframed (durationFilters duration <> modificationFilters (Projection.widenModification modification)) <> sourceHosted (objectRefFilters ref)
   Effect.ChangeText {} -> []
-  Effect.AddMana _ -> []
+  -- CR 106.6's spending restriction. UNFRAMED: it is evaluated against the spell
+  -- being paid for (Pawl.Engine.Mana.spendableOn), which is neither an attach
+  -- destination nor a target slot.
+  Effect.AddMana addition -> unframed (Maybe.maybeToList (ManaAddition.restriction addition))
   Effect.Search (Search.MkSearch _ _ _ f _ _) -> unframed [f]
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []

@@ -271,6 +271,13 @@ payableCost = payableCostAt 0
 -- 601.2f, and a gate that priced the symbol at nothing refused casts the payer
 -- was entitled to.
 --
+-- CR 106.6's spending restriction is asked here too, and `oid` is what it is
+-- asked ABOUT: this is the only payability gate in the engine whose payment is a
+-- CAST, so it is the only one that hands Cost.canPaySomeCompletion a spell. At
+-- the gate `oid` is the card in a hand and at CR 601.2f it is the stack
+-- incarnation, and the restrictions in the vocabulary read characteristics both
+-- share.
+--
 -- BOTH halves of CR 601.2f's totalling, exactly as Activate.payableCostAt asks
 -- them: the mana arithmetic rides in as a function, and the additional non-mana
 -- components an effect applies to this spell (CR 118.8) are appended to the cost
@@ -280,7 +287,7 @@ payableCost = payableCostAt 0
 payableCostAt :: Natural -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAt x spending pid oid gs cost =
   let adjustments = Cost.spellAdjustments pid oid gs
-   in Cost.canPaySomeCompletion spending pid oid (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs
+   in Cost.canPaySomeCompletion (Just oid) spending pid oid (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs
 
 -- CR 601.2b: the greatest value of X this player could actually pay for, which is
 -- what Prompt.ChooseX carries -- measured on the cost the cast is measuring, with
@@ -1418,7 +1425,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                   -- Swamp" in view would be offered against a board that has one
                   -- Swamp too many.
                   let gathered = Cost.spellAdjustments pid sid gs
-                  announcedCost <- Cost.announce spending pid sid (Cost.totalManas gathered) (Cost.plusComponents gathered announcedAtX)
+                  announcedCost <- Cost.announce (Just sid) spending pid sid (Cost.totalManas gathered) (Cost.plusComponents gathered announcedAtX)
                   -- CR 601.2c, and the spell is on the stack for it: `sets` above
                   -- was computed from the same post-move `gs`, so a "target spell"
                   -- slot draws from the pool CR 601.2a built -- with this spell in
@@ -1462,7 +1469,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                       -- Reap still costs {B}).
                       adjustments <- Cost.announceReductions pid sid gs announcedCost (Cost.spellAdjustments pid sid gs)
                       let paidCost = Cost.totalWith adjustments announcedCost
-                      payment <- Cost.pay spending pid sid paidCost
+                      payment <- Cost.pay (Just sid) spending pid sid paidCost
                       case payment of
                         -- CR 601.2h: the payment failed, so the cast is illegal
                         -- and CR 601.2 returns the game to before it was proposed

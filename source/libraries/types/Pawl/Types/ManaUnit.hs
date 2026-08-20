@@ -1,26 +1,29 @@
 module Pawl.Types.ManaUnit where
 
 import qualified Data.Set as Set
+import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ProductionTag as ProductionTag
 
 -- | One unit of mana in a pool.
 --
--- THREE axes, and the third is not one of the two collections below.
--- Pawl.Types.ManaRetention is a DURATION something must end (CR 514.2), not a
--- fact about how the mana was made, and it comes from the wording of the effect
--- that added the mana rather than from any property of its source -- which is
--- why it is a field of its own and not a production tag.
+-- FOUR axes, and only the first is a fact about how the mana was made.
+-- Pawl.Types.ProductionTag is the CLOSED half -- snow-ness, "this activation
+-- caused you to lose life" -- observable facts about the production event that
+-- the engine determines with no card knowledge.
 --
--- Grows TWO separate collections, and conflating them would be a mistake.
--- Production-time tags are the CLOSED half -- snow-ness, "this activation caused
--- you to lose life" -- observable facts about the production event that the
--- engine determines with no card knowledge. Spending restrictions are the OPEN
--- half: Cavern of Souls' "spend this mana only to cast a creature spell of the
--- chosen type" is a predicate over spells, so payment must ask a classification
--- and must NEVER case on the restriction itself. Only the first is here
--- (Pawl.Types.ProductionTag); spending restrictions are #252.
+-- Pawl.Types.ManaRetention is a DURATION something must end (CR 514.2) rather
+-- than such a fact, and it comes from the wording of the effect that added the
+-- mana rather than from any property of its source -- which is why it is a field
+-- of its own and not a production tag.
+--
+-- The RESTRICTION is the OPEN half, and conflating it with the tags would be a
+-- mistake: Geosurge's "spend this mana only to cast artifact or creature spells"
+-- is a predicate over the spell being paid for, not a fact about this mana, so
+-- payment evaluates it through the one generic matcher
+-- (Pawl.Engine.Filter.matches) and never cases on what it says.
 --
 -- Deliberately no source ObjectId. Snow cares about a PROPERTY of the source, not
 -- its identity, and a reference would dangle by construction: mana outlives its
@@ -37,6 +40,23 @@ data ManaUnit = MkManaUnit
     -- Stamped by the same two producers as `tags`, but read off the ADDITION
     -- (Pawl.Types.ManaAddition) rather than off the source: a mana ability paid
     -- inline states no retention, so that path always adds Ordinary.
-    retention :: ManaRetention.ManaRetention
+    retention :: ManaRetention.ManaRetention,
+    -- | CR 106.6: what this mana may be spent on -- Nothing for mana that may
+    -- be spent on anything, which is almost every mana. @Just f@ reads "spend
+    -- this mana only to cast a spell matching @f@", so a payment that is not a
+    -- CAST cannot use it at all (Pawl.Engine.Mana.spendableOn).
+    --
+    -- Stamped off the ADDITION (Pawl.Types.ManaAddition) rather than off the
+    -- source, exactly as `retention` is, and for CR 106.6a's reason: the
+    -- restriction belongs to the spell or ability that produced the mana and so
+    -- applies to every mana it produced.
+    --
+    -- Not implemented: CR 106.6's other two shapes -- an additional effect on
+    -- the spell the mana is spent on (Cavern of Souls' "can't be countered"),
+    -- and a delayed triggered ability that triggers when the mana is spent
+    -- (#1977). Not implemented either: the restriction whose subject is an
+    -- ACTIVATION rather than a cast, Dalakos, Crafter of Wonders' "or activate
+    -- abilities of artifacts" (#1975).
+    restriction :: Maybe (Filter.Filter Keyword.Keyword)
   }
   deriving (Eq, Ord, Show)

@@ -227,7 +227,7 @@ doorSpec s registry =
     Spec.it s "CR 118.6 paying an unpayable cost changes nothing" $ do
       mountain <- S.printingOf s registry "Mountain"
       let gs = S.landsInPlay mountain 3
-          (outcome, after) = S.runPureWith S.identityAnswer gs (Cost.pay ManaSpending.AsProduced S.alice S.noSource (Cost.Type.MkCost Nothing []))
+          (outcome, after) = S.runPureWith S.identityAnswer gs (Cost.pay Nothing ManaSpending.AsProduced S.alice S.noSource (Cost.Type.MkCost Nothing []))
       Spec.assertEqWith s "Unpaid" outcome Payment.Unpaid
       Spec.assertEqWith s "no land tapped" (S.tappedCount S.alice after) 0
     -- CR 701.21a: enough controlled permanents matching the criterion.
