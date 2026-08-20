@@ -259,8 +259,10 @@ crown pid gs =
 -- rulings draw that line explicitly. Which is why the decision is `crown`'s and
 -- not this function's: a comparison against the monarch seen at the previous
 -- settle cannot tell a crown that never moved from one that moved away and came
--- back (#208), and no comparison against the CURRENT monarch can see a reign that
--- began and ended between two settles at all.
+-- back, and no comparison against the CURRENT monarch can see a reign that began
+-- and ended between two settles at all. Pawl.LibraryOrderSpec's "a crown that goes
+-- to an opponent and back inside one resolution still frees the prisoner" is the
+-- proof (see #208).
 --
 -- Departure.objectsLeaveWith drops an entry whose KEY (the exiled object) belongs
 -- to a departing player, never one whose VALUE does, so the effect survives its

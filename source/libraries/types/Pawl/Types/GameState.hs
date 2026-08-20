@@ -463,10 +463,12 @@ data GameState = MkGameState
     spellsCastLastTurn :: Natural.Natural,
     -- | CR 725 (Palace Jailer): objects exiled "until an opponent becomes the
     -- monarch", keyed by the exiled incarnation id to the watch that ends the
-    -- exile -- the effect's controller, plus the monarch as of the last look, so
-    -- that a CHANGE of crown can be told from an opponent merely holding it. Not
-    -- an Expiry: the Expiry sweeps are delete-and-recompute and cannot perform
-    -- the return zone change.
+    -- exile -- the effect's controller, plus whether a crowning has already
+    -- discharged it, so that an opponent BECOMING the monarch can be told from an
+    -- opponent merely holding the crown. Marked by Pawl.Engine.Monarch.crown and
+    -- swept by Pawl.Engine.Monarch.returnExiledForMonarch. Not an Expiry: the
+    -- Expiry sweeps are delete-and-recompute and cannot perform the return zone
+    -- change.
     exiledUntilMonarch :: Map.Map ObjectId.ObjectId MonarchWatch.MonarchWatch,
     -- | CR 702.55b: which object each haunting card haunts, keyed by the exiled
     -- incarnation Effect.ExileHaunting minted and answering with the object that
