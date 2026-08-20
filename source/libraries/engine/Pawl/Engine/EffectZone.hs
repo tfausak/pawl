@@ -129,6 +129,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.RemoveCounters {} -> Nothing
   Effect.GainPlayerCounters {} -> Nothing
   Effect.RemovePlayerCounters {} -> Nothing
+  Effect.PayAnyEnergy _ -> Nothing
   Effect.Tap _ -> Nothing
   Effect.Untap _ -> Nothing
   Effect.Detain _ -> Nothing

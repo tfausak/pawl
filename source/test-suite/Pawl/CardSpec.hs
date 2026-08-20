@@ -793,6 +793,7 @@ effectCounts effect = case effect of
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> quantityCounts quantity
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
+  Effect.PayAnyEnergy _ -> []
   Effect.Tap _ -> []
   Effect.Untap _ -> []
   Effect.Detain _ -> []
@@ -1030,6 +1031,7 @@ effectNestedEffects effect = case effect of
   Effect.RemoveCounters {} -> []
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
+  Effect.PayAnyEnergy _ -> []
   Effect.Tap {} -> []
   Effect.Untap {} -> []
   Effect.Detain {} -> []
@@ -1436,6 +1438,7 @@ effectReplacements effect = case effect of
   Effect.RemoveCounters {} -> []
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
+  Effect.PayAnyEnergy _ -> []
   Effect.Tap _ -> []
   Effect.Untap _ -> []
   Effect.Detain _ -> []
@@ -2048,6 +2051,7 @@ effectMintedFaces effect = case effect of
   Effect.RemoveCounters {} -> []
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
+  Effect.PayAnyEnergy _ -> []
   Effect.Tap _ -> []
   Effect.Untap _ -> []
   Effect.Detain _ -> []
@@ -3348,6 +3352,7 @@ effectFilters effect = case effect of
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> unframed (quantityFilters quantity)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> unframed (quantityFilters quantity)
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> unframed (quantityFilters quantity)
+  Effect.PayAnyEnergy _ -> []
   Effect.Tap ref -> sourceHosted (objectRefFilters ref)
   Effect.Untap ref -> sourceHosted (objectRefFilters ref)
   Effect.Detain ref -> sourceHosted (objectRefFilters ref)

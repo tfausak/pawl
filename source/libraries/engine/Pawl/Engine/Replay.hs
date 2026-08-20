@@ -65,6 +65,7 @@ encode p answer = case p of
   Prompt.ChooseBolster {} -> Response.ChoseBolster answer
   Prompt.ChooseAmass {} -> Response.ChoseAmass answer
   Prompt.ChooseBlight {} -> Response.ChoseBlight answer
+  Prompt.ChoosePaidEnergy {} -> Response.ChosePaidEnergy answer
   Prompt.ChooseDamageSource {} -> Response.ChoseDamageSource answer
   Prompt.ChooseCardInGraveyard {} -> Response.ChoseCardInGraveyard answer
   Prompt.ChooseCardInHand {} -> Response.ChoseCardInHand answer
@@ -202,6 +203,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseBlight {} -> case response of
     Response.ChoseBlight oid -> Just oid
+    _ -> Nothing
+  Prompt.ChoosePaidEnergy {} -> case response of
+    Response.ChosePaidEnergy n -> Just n
     _ -> Nothing
   Prompt.ChooseDamageSource {} -> case response of
     Response.ChoseDamageSource oid -> Just oid
@@ -550,6 +554,9 @@ defaultAnswer p = case p of
   Prompt.CastWhileSearching {} -> Nothing
   -- CR 601.2b: X=0 is always payable.
   Prompt.ChooseX {} -> 0
+  -- CR 118.3a: paying 0 is always available, and CR 107.14's optional payment is
+  -- declined by paying it.
+  Prompt.ChoosePaidEnergy {} -> 0
   -- The first `count` legal modes, deterministically -- and under CR 700.2d's
   -- "You may choose the same mode more than once" the LEAST legal mode that many
   -- times, since there may be fewer legal modes than the count and the answer

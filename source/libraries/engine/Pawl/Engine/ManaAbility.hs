@@ -161,6 +161,7 @@ manaProduced effect = case effect of
   Effect.RemoveCounters {} -> Nothing
   Effect.GainPlayerCounters {} -> Nothing
   Effect.RemovePlayerCounters {} -> Nothing
+  Effect.PayAnyEnergy _ -> Nothing
   Effect.Tap _ -> Nothing
   Effect.Untap _ -> Nothing
   Effect.Detain _ -> Nothing
@@ -310,6 +311,7 @@ movesLibraryCard effect = case effect of
   Effect.RemoveCounters {} -> False
   Effect.GainPlayerCounters {} -> False
   Effect.RemovePlayerCounters {} -> False
+  Effect.PayAnyEnergy _ -> False
   Effect.Tap _ -> False
   Effect.Untap _ -> False
   Effect.Detain _ -> False

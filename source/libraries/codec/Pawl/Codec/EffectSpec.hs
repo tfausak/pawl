@@ -291,6 +291,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.HasCardType CardType.Artifact)) Regenerability.Regenerable (Just (SlotName.MkSlotName (Text.pack "destroyed")))))
       " {\"type\":\"Destroy\",\"value\":{\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}}},\"regenerability\":{\"type\":\"Regenerable\"},\"slot\":\"destroyed\"}} "
+  Spec.it s "PayAnyEnergy" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.PayAnyEnergy (SlotName.MkSlotName (Text.pack "paid")))
+      " {\"type\":\"PayAnyEnergy\",\"value\":\"paid\"} "
   Spec.it s "Sacrifice" $
     Common.assertJsonCodec
       s

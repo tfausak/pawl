@@ -400,6 +400,8 @@ slotsOf effect = case effect of
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity slot) -> insertOne slot (quantitySlots quantity)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters ref _ quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters ref _ quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  -- The SlotName is a DEFINITION, not a read; it belongs to boundSlots below.
+  Effect.PayAnyEnergy _ -> Map.empty
   Effect.Tap ref -> objectRefSlots ref
   Effect.Untap ref -> objectRefSlots ref
   Effect.Detain ref -> objectRefSlots ref
@@ -578,6 +580,7 @@ slotsAreExhaustive effect = case effect of
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.PayAnyEnergy _ -> True
   Effect.Tap _ -> True
   Effect.Untap _ -> True
   Effect.Detain _ -> True
@@ -711,6 +714,9 @@ readsX = any effectReadsX
       Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.readsX quantity
       Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
       Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
+      -- CR 107.14's amount is asked for as the spell resolves, never CR
+      -- 601.2b's announced X.
+      Effect.PayAnyEnergy _ -> False
       Effect.Tap _ -> False
       Effect.Untap _ -> False
       Effect.Detain _ -> False
@@ -804,6 +810,7 @@ searchesLibrary effect = case effect of
   Effect.RemoveCounters {} -> False
   Effect.GainPlayerCounters {} -> False
   Effect.RemovePlayerCounters {} -> False
+  Effect.PayAnyEnergy _ -> False
   Effect.Tap _ -> False
   Effect.Untap _ -> False
   Effect.Detain _ -> False
@@ -937,6 +944,9 @@ boundSlots effect = case effect of
   Effect.RemoveCounters {} -> Set.empty
   Effect.GainPlayerCounters {} -> Set.empty
   Effect.RemovePlayerCounters {} -> Set.empty
+  -- CR 107.14: how much {E} the payer paid, for a later effect of the same
+  -- resolution to read as Quantity.InSlot.
+  Effect.PayAnyEnergy slot -> Set.singleton slot
   Effect.Tap _ -> Set.empty
   Effect.Untap _ -> Set.empty
   Effect.Detain _ -> Set.empty
@@ -4072,6 +4082,27 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       }
                 )
         _ -> pure ()
+  -- CR 107.14: "you may pay any amount of {E}". The payer is the resolving
+  -- controller (CR 109.5's "you"), the amount is theirs to name, and CR 118.3
+  -- caps it at the energy they actually have -- so unlike CR 601.2b's
+  -- announcement the bound is ENFORCED, and an answer above it is clamped rather
+  -- than trusted. Paying 0 is how the printed "may" is declined (CR 118.3a).
+  --
+  -- Through Pawl.Engine.Cost's own reader and writer, so CR 107.14 has one
+  -- meaning here and in a CostComponent.PayEnergy payment.
+  --
+  -- Not implemented: skipping the offer when the payer has no energy, where 0 is
+  -- the only payable amount (#1920).
+  Effect.PayAnyEnergy slot -> do
+    gs <- State.get
+    let have = Cost.energyOf controller gs
+    answer <- Game.choose (Prompt.ChoosePaidEnergy (Decide.deciderFor controller gs) controller resolving have)
+    let paid = min answer have
+    Cost.spendEnergy controller paid
+    -- Bound onto this effect's SOURCE even when nothing was paid, Effect.Destroy's
+    -- count for its reason: zero is an answer, where an unbound slot would leave a
+    -- later clause's quantity unevaluable instead.
+    State.modify' (bindAmountSlot source slot paid)
   Effect.Tap ref ->
     State.modify' $ \gs ->
       -- CR 701.26a: turn each named permanent sideways. The victims are

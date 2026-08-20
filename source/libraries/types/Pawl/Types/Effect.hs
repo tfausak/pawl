@@ -549,6 +549,47 @@ data Effect card
     -- count being a Natural and CR 122 knowing no negative counter, rather than
     -- being an error or a no-op.
     RemovePlayerCounters PlayerCounters.PlayerCounters
+  | -- | CR 107.14: "you may pay any amount of {E}" -- the resolving controller
+    -- names an amount as the spell or ability resolves, removes that many energy
+    -- counters from themselves, and the amount is bound to this SlotName for a
+    -- later effect of the same resolution to read as Quantity.InSlot. Harnessed
+    -- Lightning's "then you may pay any amount of {E}. Harnessed Lightning deals
+    -- that much damage to that creature" is the printing.
+    --
+    -- NOT a Pawl.Types.CostComponent, and that is the whole reason it is an
+    -- effect: CR 118.1 makes a cost "an action or payment necessary to take
+    -- another action", and nothing on this card is gated on the payment -- pay
+    -- nothing and the damage clause still runs, dealing 0. CR 118.12's gate is
+    -- the other shape and prints an "If you do" (Aether Refinery), which
+    -- Pawl.Types.PayGate already carries. So this opcode neither reaches
+    -- Pawl.Engine.Cost.canPay nor takes CR 118.12's branch.
+    --
+    -- NOT RemovePlayerCounters above with some "chosen" Quantity: a Quantity is
+    -- EVALUATED against the game, and this amount is ASKED FOR (CR 107.14 read
+    -- through CR 118.3, which caps it at what the payer has). Folding a prompt
+    -- into Quantity would put a choice inside the vocabulary every quantity read
+    -- shares.
+    --
+    -- The payer is the resolving controller (CR 109.5's "you") rather than a
+    -- PlayerRef, and no printing separates the two: Scryfall
+    -- o:"pay any amount of {E}" and o:"pay one or more {E}", 2026-08-19, name
+    -- "you" on every hit (Die Young, Harnessed Lightning, Galvanic Discharge,
+    -- Aether Spike, Wheel of Potential, Wrath of the Skies, Suppression Ray,
+    -- Vault 112: Sadistic Simulation, Aether Refinery, Localized Destruction,
+    -- Pia Nalaar, Chief Mechanic). A card offering the payment to somebody else
+    -- would be a PlayerRef field here, and Aether Spike is the card to check
+    -- first, its OTHER payment ("unless its controller pays {1} for each {E}
+    -- paid this way") being a CR 118.12 gate on a different player.
+    --
+    -- The "MAY" is subsumed: CR 118.3a's "players can always pay 0" makes paying
+    -- nothing exactly what declining is, so there is no second decision to
+    -- carry. Not implemented: "pay ONE OR MORE {E}", whose floor is 1 and whose
+    -- "If you do" is CR 118.12's branch (#1965).
+    --
+    -- The slot is not optional. Every printing reads the amount back ("that
+    -- much", "for each {E} paid this way", "the amount of {E} paid this way"),
+    -- which is what makes the payment worth stating at all.
+    PayAnyEnergy SlotName.SlotName
   | -- | CR 701.26a: tap the permanents the ObjectRef names. A permanent that is
     -- ALREADY tapped is left alone, which is that rule's second sentence and
     -- falls out of the resolution being an assignment to TapState.Tapped.

@@ -122,6 +122,7 @@ codec cardCodec =
       Arm.payload "RemoveCounters" RemoveCounters.codec Effect.RemoveCounters (\x -> case x of Effect.RemoveCounters y -> Just y; _ -> Nothing),
       Arm.payload "GainPlayerCounters" PlayerCounters.codec Effect.GainPlayerCounters (\x -> case x of Effect.GainPlayerCounters y -> Just y; _ -> Nothing),
       Arm.payload "RemovePlayerCounters" PlayerCounters.codec Effect.RemovePlayerCounters (\x -> case x of Effect.RemovePlayerCounters y -> Just y; _ -> Nothing),
+      Arm.payload "PayAnyEnergy" SlotName.codec Effect.PayAnyEnergy (\x -> case x of Effect.PayAnyEnergy y -> Just y; _ -> Nothing),
       Arm.payload "Tap" ObjectRef.codec Effect.Tap (\x -> case x of Effect.Tap y -> Just y; _ -> Nothing),
       Arm.payload "Untap" ObjectRef.codec Effect.Untap (\x -> case x of Effect.Untap y -> Just y; _ -> Nothing),
       Arm.payload "Detain" ObjectRef.codec Effect.Detain (\x -> case x of Effect.Detain y -> Just y; _ -> Nothing),
