@@ -244,7 +244,7 @@ data Quantity
     -- Not implemented: CR 103.1c's Power Play, which makes its controller the
     -- starting player after the determination. That card is not in
     -- @data\/cards\/@ and there is no effect that reseats a turn order, so the
-    -- head of the roster is the whole answer today (#1927).
+    -- head of the roster is the whole answer today (#1923).
     --
     -- A LEAF, like LifeTotal, Speed and IsMonarch: it holds no Quantity.
     IsStartingPlayer PlayerRef.PlayerRef

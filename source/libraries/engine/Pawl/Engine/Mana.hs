@@ -164,6 +164,14 @@ producedTypes oid gs production = case production of
 -- Takes a PRE-PROJECTED board, because every caller asks this of every source a
 -- player controls, and each of the two projection reads here was a fresh gather
 -- per source (#200).
+--
+-- Not implemented: a route that reads its clauses' CR 701.46a-shaped gates.
+-- Modal.selectionEffects flattens every clause of a mode whatever
+-- Clause.condition says, so an ability written as "Add {C}. If ..., instead add
+-- one mana of any color" would route both manas at once, which is weaker than
+-- printed. Gemstone Caverns says that sentence as two abilities whose
+-- ActivatedAbility.conditions are complements instead -- a gate abilitiesGiven
+-- does apply, with the board in hand (#1924).
 manaRoutesOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [(Cost Keyword.Keyword, [ManaProduction])]
 manaRoutesOfGiven pcs oid gs =
   let fromSubtypes =

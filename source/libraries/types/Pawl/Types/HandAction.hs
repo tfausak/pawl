@@ -26,7 +26,8 @@ data HandAction card = MkHandAction
     -- so an earlier action of the same window that changed the board is seen.
     --
     -- Evaluated against the CARD IN HAND with the acting player as CR 109.5's
-    -- "you". Nothing is the unmarked case every other action in the corpus takes.
+    -- "you" -- that rule's OWNER clause, a card in a hand having no controller.
+    -- Nothing is the unmarked case every other action in the corpus takes.
     condition :: Maybe Condition.Condition,
     -- | What taking the action does, in written order. A list rather than a Seq
     -- for the reason the field it replaced was one: this is read straight off the

@@ -92,9 +92,10 @@ actionsFor field pid gs =
 -- that writes none is allowed to everyone.
 --
 -- Evaluated against the CARD IN HAND, with the acting player as CR 109.5's "you"
--- -- which is what makes PlayerRef.Relative You resolve to the player being
--- offered the action rather than to whoever a projection would call the card's
--- controller.
+-- -- that rule's OWNER clause, since a card in a hand has no controller -- so
+-- PlayerRef.Relative You resolves to the player being offered the action. The
+-- perspective is passed in rather than derived, which is also why this needs no
+-- projected controller for a card the projection does not reach.
 --
 -- A CLASSIFICATION, not an identity test, exactly as actionsFor above is: this
 -- asks whether the card's own gate holds, never which card it is.

@@ -278,7 +278,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
   -- gated abilities whose conditions are complements (ActivatedAbility.condition
   -- over Quantity.ObjectCounters), so exactly one exists at a time and "instead"
   -- falls out of the pair -- see Pawl.Engine.Mana.manaRoutesOfGiven for why a
-  -- single ability with two conditional CLAUSES would offer both at once.
+  -- single ability with two conditional CLAUSES would offer both at once (#1924).
   Spec.it s "CR 122.1 a luck counter swaps Gemstone Caverns' {C} for any color" $ do
     caverns <- S.printingOf s registry "Gemstone Caverns"
     let base = Setup.emptyGame S.bothPlayers

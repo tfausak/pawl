@@ -695,6 +695,11 @@ data Prompt r where
   -- capping this window where CR 103.5b caps nothing
   -- (Pawl.Types.HandWindowCap). A separate channel because that window sits at a
   -- mulligan declaration and this one opens after the process.
+  --
+  -- The candidate list is also narrowed by each action's OWN clause
+  -- (Pawl.Types.HandAction.condition): Gemstone Caverns' "you're not the starting
+  -- player" is answered before the offer, so the starting player holding one is
+  -- not asked a question with one answer.
   OpeningHandAction :: Decider.Decider -> PlayerId.PlayerId -> [(ObjectId.ObjectId, HandActionIndex.HandActionIndex)] -> Prompt (Maybe (ObjectId.ObjectId, HandActionIndex.HandActionIndex))
   -- | CR 603.5 / 608.2d: whether the controller of a resolving spell or ability
   -- exercises a printed "may". The ObjectId is the object RESOLVING, not its
