@@ -11,7 +11,7 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- The Modification is instantiated at Void, which says in the type that a
 -- modification created by a RESOLUTION cannot grant a quoted ability. That is a
 -- module-graph fact and not a rules one: Modification's grant carries a whole
--- Pawl.Types.ActivatedAbility, an ability carries Effects, and an Effect carrying
+-- Pawl.Types.GrantedAbility, an ability carries Effects, and an Effect carrying
 -- an ability back would close a cycle that no type parameter can open. A card
 -- worded "target creature gains '[ability]' until end of turn" therefore has no
 -- home here yet (#1642).

@@ -19,8 +19,9 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 -- naming either ability type there would close the module cycle that variable
 -- exists to open.
 --
--- CR 113.3a's static and CR 113.3d's replacement abilities have no arm. Not
--- implemented: a granted STATIC or REPLACEMENT ability (#1942).
+-- CR 113.3d's static abilities have no arm, nor do the replacement effects CR
+-- 614.1 makes some of them. Not implemented: a granted STATIC or REPLACEMENT
+-- ability (#1942).
 data GrantedAbility card
   = Activated (ActivatedAbility.ActivatedAbility card)
   | Triggered (TriggeredAbility.TriggeredAbility card)

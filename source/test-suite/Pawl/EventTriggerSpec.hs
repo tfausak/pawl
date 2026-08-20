@@ -3908,8 +3908,9 @@ sixthSenseBoard piker sense mountain island attached =
         _ -> withAura
    in (mine, senseId, board)
 
--- Attacks bob with everything and takes every "may". CR 506.2 leaves the
--- defending player to a choice on a three-seat board, so it has to be pinned.
+-- Attacks bob with everything and takes every "may". CR 507.1 leaves the
+-- defending player to the active player's choice on a three-seat board, so it
+-- has to be pinned.
 sixthSenseAnswer :: Prompt.Prompt r -> r
 sixthSenseAnswer p = case p of
   Prompt.ChooseOptional {} -> OptionalDecision.Exercises
