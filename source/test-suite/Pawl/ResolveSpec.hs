@@ -17,7 +17,6 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Decide as Decide
-import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
@@ -124,7 +123,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
       (Target.legalRecipients Nothing S.noSource (TargetSlot.required Pool.AnyTarget Nothing) gs)
       (Set.fromList [Recipient.ToCreature oid, Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob])
   Spec.it s "a departed player is not a legal target" $ do
-    let gs = Departure.depart Departure.Type.Lost S.bob (Setup.emptyGame S.bothPlayers)
+    let gs = S.departs Departure.Type.Lost S.bob (Setup.emptyGame S.bothPlayers)
     Spec.assertBool
       s
       (not (Set.member (Recipient.ToPlayer S.bob) (Target.legalRecipients Nothing S.noSource (TargetSlot.required Pool.AnyTarget Nothing) gs)))
@@ -136,7 +135,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
     -- resolve on behalf of a player who is no longer in the game.
     darksteelMyr <- S.printingOf s registry "Darksteel Myr"
     let (myr, board) = S.addCreature darksteelMyr S.carol S.threePlayerGame
-        gone = Departure.depart Departure.Type.Conceded S.bob board
+        gone = S.departs Departure.Type.Conceded S.bob board
         slot = SlotName.MkSlotName (Text.pack "target")
         after =
           S.runPure S.identityAnswer gone $
@@ -1474,7 +1473,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     -- reports alice won, so carol is the whole non-winner set; bob still appears
     -- in the raw seating roster (GameState.turnOrder) and is the non-participant
     -- a roster bug would wrongly charge.
-    let g0 = Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame
+    let g0 = S.departs Departure.Type.Conceded S.bob S.threePlayerGame
         stubRunner :: Game Result.Result
         stubRunner = pure (Result.Won S.alice)
         (spellId, g1) = subgameSpellOn lightningBolt "Subgame Test Spell (Three Seats, One Departed)" nonWinnersLose3 g0

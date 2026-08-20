@@ -23,7 +23,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
-import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -371,7 +370,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     -- with three players, CR 800.1), and the choice has one candidate.
     -- Discriminating against an elision keyed on the SEAT COUNT rather than on
     -- the candidate count -- that version would prompt here.
-    let gone = Departure.depart Departure.Type.Conceded S.carol S.threePlayerGame
+    let gone = S.departs Departure.Type.Conceded S.carol S.threePlayerGame
         (after, asked) =
           State.runState
             (fmap snd (Engine.runGame (choosesDefender S.carol) gone (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
@@ -382,7 +381,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     -- Not reachable in a running game (CR 104.2a ends it), but the branch has
     -- to be total and NonEmpty is why. Discriminating against an
     -- implementation that built the prompt from an empty list.
-    let alone = Departure.depart Departure.Type.Conceded S.carol (Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame)
+    let alone = S.departs Departure.Type.Conceded S.carol (S.departs Departure.Type.Conceded S.bob S.threePlayerGame)
         (after, asked) =
           State.runState
             (fmap snd (Engine.runGame (choosesDefender S.bob) alone (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
@@ -404,7 +403,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     -- so this case passes with either one alone and isolates neither. The
     -- sibling case below is the one that isolates chooseDefender's; the
     -- engine-side copy is redundant on this path and has nothing to isolate.
-    let gone = Departure.depart Departure.Type.Conceded S.alice S.threePlayerGame
+    let gone = S.departs Departure.Type.Conceded S.alice S.threePlayerGame
         (after, asked) =
           State.runState
             (fmap snd (Engine.runGame (choosesDefender S.carol) gone (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
@@ -419,7 +418,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     -- defending player on a turn CR 800.4j says has no active player to choose
     -- one. Three seats again, so two candidates survive alice's departure and
     -- the single-candidate elision (#169) cannot be what suppresses the ask.
-    let gone = Departure.depart Departure.Type.Conceded S.alice S.threePlayerGame
+    let gone = S.departs Departure.Type.Conceded S.alice S.threePlayerGame
         (after, asked) =
           State.runState
             (fmap snd (Engine.runGame (choosesDefender S.carol) gone Combat.chooseDefender))
@@ -446,7 +445,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     -- that TWO candidates survive one departure -- with three seats the
     -- surviving list is a singleton and cannot distinguish "filtered" from
     -- "truncated to one".
-    let gone = Departure.depart Departure.Type.Conceded S.bob S.fourPlayerGame
+    let gone = S.departs Departure.Type.Conceded S.bob S.fourPlayerGame
     Spec.assertEqWith s "bob is dropped, carol and dave remain" (Combat.attackableOpponents gone) [S.carol, S.dave]
     Spec.assertEqWith s "and before he left there were three" (Combat.attackableOpponents S.fourPlayerGame) [S.bob, S.carol, S.dave]
   Spec.it s "CR 506.2a the candidates come back in SEATING order, not player-id order" $ do

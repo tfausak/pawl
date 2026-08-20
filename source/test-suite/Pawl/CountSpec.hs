@@ -16,7 +16,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Count as Count
-import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -162,7 +161,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   -- with them (CR 800.4a) and Game.zoneMembers already answered [] for every
   -- zone of theirs, but a scope that folds the PLAYERS charges one apiece.
   Spec.it s "CR 800.4a neither EachPlayer nor Opponent names a player who has left the game" $ do
-    let gs = Departure.depart Departure.Type.Conceded S.carol S.threePlayerGame
+    let gs = S.departs Departure.Type.Conceded S.carol S.threePlayerGame
         countOver ref = S.countOf (S.stubView []) (Filter.contextFor (Just S.alice) Nothing) gs (Count.Type.MkCount (Scope.OverPlayers ref) (Filter.Type.And []) Aggregation.Members)
     Spec.assertEqWith
       s
@@ -738,7 +737,7 @@ tyranidInvasionSpec s registry =
         Spec.it s "CR 800.4a a player who has conceded is not one of alice's opponents" $ do
           invasion <- S.printingOf s registry "Tyranid Invasion"
           forest <- S.printingOf s registry "Forest"
-          let base = Departure.depart Departure.Type.Conceded S.carol (board forest)
+          let base = S.departs Departure.Type.Conceded S.carol (board forest)
               after = castInvasion invasion base
           Spec.assertEqWith s "one opponent left, so one token" (length (S.tokensOf after)) 1
           Spec.assertEqWith s "the spell resolved" (GameState.stack after) []

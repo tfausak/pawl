@@ -4,7 +4,6 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
@@ -150,7 +149,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
   Spec.it s "CR 800.4b no token is created under the control of a player who has left the game" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let goblinCard = Printing.card piker
-        gone = Departure.depart Departure.Type.Conceded S.alice S.threePlayerGame
+        gone = S.departs Departure.Type.Conceded S.alice S.threePlayerGame
         before = Game.objectCount gone
         after = S.runPure S.identityAnswer gone (Event.createTokens S.alice goblinCard Nothing 2 TapState.Untapped Map.empty)
     Spec.assertBool s (notElem S.alice (Game.stillPlaying gone)) "alice really has left"
@@ -162,7 +161,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
   Spec.it s "CR 800.4b a player still in the game still gets their tokens" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let goblinCard = Printing.card piker
-        gone = Departure.depart Departure.Type.Conceded S.alice S.threePlayerGame
+        gone = S.departs Departure.Type.Conceded S.alice S.threePlayerGame
         before = Game.objectCount gone
         after = S.runPure S.identityAnswer gone (Event.createTokens S.bob goblinCard Nothing 2 TapState.Untapped Map.empty)
     Spec.assertEqWith s "bob's two tokens exist" (Game.objectCount after) (before + 2)

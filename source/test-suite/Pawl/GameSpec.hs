@@ -881,7 +881,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     mountain <- S.printingOf s registry "Mountain"
     let g0 = Setup.emptyGame S.threePlayers
         g1 = poolToLibraryG S.carol (poolToLibraryG S.bob (poolToLibraryG S.alice (addManyG mountain 7 S.carol (addManyG mountain 3 S.bob (addManyG mountain 7 S.alice g0)))))
-        parent = Departure.depart Departure.Type.Conceded S.bob g1
+        parent = S.departs Departure.Type.Conceded S.bob g1
         ((_, after), rolls) = State.runState (Engine.runGame subgameRosterAnswer parent Engine.playSubgame) []
     Spec.assertEqWith s "the roll offers only the players still in the game" rolls [[S.alice, S.carol]]
     Spec.assertEqWith s "CR 800.4a: bob's cards left the game with him" (Game.zoneMembers Zone.Library S.bob parent) []
@@ -1393,7 +1393,7 @@ greedThenPassAnswer greedId ability p = case p of
 turnOrderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
   Spec.it s "CR 800.4k a departed player's turn does not begin" $ do
-    let gone = Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame
+    let gone = S.departs Departure.Type.Conceded S.bob S.threePlayerGame
         after = S.runPure S.identityAnswer gone Engine.handoffTurn
     Spec.assertEqWith s "carol is active, bob is skipped" (GameState.activePlayer after) S.carol
     Spec.assertEqWith s "exactly one turn began" (GameState.turnNumber after) 2
@@ -1403,10 +1403,10 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     -- Proves the walk keeps walking rather than skipping exactly one seat.
     -- With bob and carol both gone, alice takes consecutive turns.
     let gone =
-          Departure.depart
+          S.departs
             Departure.Type.Conceded
             S.carol
-            (Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame)
+            (S.departs Departure.Type.Conceded S.bob S.threePlayerGame)
         after = S.runPure S.identityAnswer gone Engine.handoffTurn
     Spec.assertEqWith s "alice takes the next turn too" (GameState.activePlayer after) S.alice
     Spec.assertEqWith s "and it is a new turn" (GameState.turnNumber after) 2
@@ -1417,13 +1417,13 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     -- bounded by the seat count and falls back rather than looping or
     -- reaching for a partial head.
     let gone =
-          Departure.depart
+          S.departs
             Departure.Type.Conceded
             S.carol
-            ( Departure.depart
+            ( S.departs
                 Departure.Type.Conceded
                 S.bob
-                (Departure.depart Departure.Type.Conceded S.alice S.threePlayerGame)
+                (S.departs Departure.Type.Conceded S.alice S.threePlayerGame)
             )
         after = S.runPure S.identityAnswer gone Engine.handoffTurn
     Spec.assertEqWith s "the active player is unchanged" (GameState.activePlayer after) S.alice
@@ -1434,7 +1434,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     -- begins, she is NOT controlled: "If a player would be controlled by a
     -- player who has left the game, they aren't."
     let armed = S.threePlayerGame {GameState.pendingControl = Map.singleton S.carol (Decider.MkDecider S.bob)}
-        gone = Departure.depart Departure.Type.Conceded S.bob armed
+        gone = S.departs Departure.Type.Conceded S.bob armed
         after = S.runPure S.identityAnswer gone Engine.handoffTurn
     Spec.assertEqWith s "CR 800.4a's second clause already cleared it at bob's departure" (GameState.pendingControl gone) Map.empty
     Spec.assertEqWith s "carol's turn began" (GameState.activePlayer after) S.carol
@@ -1449,7 +1449,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     -- arming the entry after bob has already gone, a state CR 800.4a makes
     -- unreachable in play and which therefore only the promotion guard can
     -- answer for.
-    let gone = Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame
+    let gone = S.departs Departure.Type.Conceded S.bob S.threePlayerGame
         armed = gone {GameState.pendingControl = Map.singleton S.carol (Decider.MkDecider S.bob)}
         after = S.runPure S.identityAnswer armed Engine.handoffTurn
     Spec.assertEqWith s "carol's turn began" (GameState.activePlayer after) S.carol
@@ -1468,7 +1468,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     -- The unit-level statement of #143's first half. Bob's seat is looked up
     -- in the FULL seating order, so his successor is carol -- not alice, the
     -- head of the filtered list.
-    let gone = Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame
+    let gone = S.departs Departure.Type.Conceded S.bob S.threePlayerGame
     Spec.assertEqWith s "bob's successor is carol" (Engine.nextStillPlaying gone S.bob) S.carol
     Spec.assertEqWith s "carol's successor is alice (wraps)" (Engine.nextStillPlaying gone S.carol) S.alice
     Spec.assertEqWith s "alice's successor skips departed bob" (Engine.nextStillPlaying gone S.alice) S.carol
@@ -1497,7 +1497,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
   Spec.it s "CR 800.4j the active player having left does not stop the turn: priority starts at the next seat" $ do
     -- Alice left during her own turn. The turn continues to its completion
     -- WITHOUT an active player: alice is never asked, bob is asked first.
-    let gone = Departure.depart Departure.Type.Conceded S.alice (S.threePlayerGame {GameState.phase = Phase.PrecombatMain})
+    let gone = S.departs Departure.Type.Conceded S.alice (S.threePlayerGame {GameState.phase = Phase.PrecombatMain})
         ((_, after), asks) = State.runState (Engine.runGame (concedeOrderAnswer S.carol) gone Engine.priorityLoop) []
     Spec.assertEqWith s "priorityHolder skips the departed active player" (Engine.priorityHolder gone) S.bob
     Spec.assertEqWith s "bob is asked first, alice never" (take 2 asks) [S.bob, S.carol]
@@ -1511,7 +1511,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     -- priorityHolder the third ask would be alice's.
     piker <- S.printingOf s registry "Goblin Piker"
     let (_, withSpell) = S.spellOnStack piker S.carol S.threePlayerGame
-        gone = Departure.depart Departure.Type.Conceded S.alice (withSpell {GameState.phase = Phase.PrecombatMain})
+        gone = S.departs Departure.Type.Conceded S.alice (withSpell {GameState.phase = Phase.PrecombatMain})
         ((_, after), asks) = State.runState (Engine.runGame (concedeOrderAnswer S.alice) gone Engine.priorityLoop) []
     Spec.assertEqWith s "bob, carol, then bob AGAIN -- never alice" asks [S.bob, S.carol, S.bob, S.carol]
     Spec.assertEqWith s "the spell resolved" (length (GameState.stack after)) 0
@@ -1521,7 +1521,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     -- With no library, a draw flags drewFromEmpty -- so "did not draw" is
     -- directly observable without building a deck.
     let base = S.threePlayerGame {GameState.phase = Phase.Beginning BeginningStep.DrawStep, GameState.turnNumber = 2}
-        gone = Departure.depart Departure.Type.Conceded S.alice base
+        gone = S.departs Departure.Type.Conceded S.alice base
         after = S.runPure S.identityAnswer gone S.drawStep
         control = S.runPure S.identityAnswer base S.drawStep
     Spec.assertBool s (not (Set.member S.alice (GameState.drewFromEmpty after))) "a departed active player never attempts the draw"
@@ -1535,7 +1535,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
             { GameState.phase = Phase.Beginning BeginningStep.Untap,
               GameState.landsPlayed = Map.singleton S.alice 1
             }
-        gone = Departure.depart Departure.Type.Conceded S.alice base
+        gone = S.departs Departure.Type.Conceded S.alice base
         after = S.runPure S.identityAnswer gone (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
         control = S.runPure S.identityAnswer base (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
     Spec.assertEqWith s "no untap-step action happened" (GameState.landsPlayed after) (Map.singleton S.alice 1)
@@ -1554,7 +1554,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
               GameState.combat = (GameState.combat S.threePlayerGame) {Combat.Type.defender = Just S.bob}
             }
         (pikerId, board) = S.addCreature piker S.alice seated
-        gone = Departure.depart Departure.Type.Conceded S.alice board
+        gone = S.departs Departure.Type.Conceded S.alice board
         ((_, after), askedAfter) = State.runState (Engine.runGame declareAttackersAskAnswer gone (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers))) []
         ((_, control), askedControl) = State.runState (Engine.runGame declareAttackersAskAnswer board (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers))) []
     -- At three seats, CR 800.4a has already stripped her battlefield by the
@@ -1597,7 +1597,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
               GameState.combat = (GameState.combat (Setup.emptyGame S.bothPlayers)) {Combat.Type.defender = Just S.bob}
             }
         (pikerId, board) = S.addCreature piker S.alice seated
-        gone = Departure.depart Departure.Type.Conceded S.alice board
+        gone = S.departs Departure.Type.Conceded S.alice board
         ((_, after), askedAfter) = State.runState (Engine.runGame declareAttackersAskAnswer gone (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers))) []
     Spec.assertEqWith s "she still controls her Piker -- CR 800.4a never ran at two seats" (Projection.controls S.alice gone) [pikerId]
     Spec.assertEqWith s "the guard is what keeps her from being asked, not an empty board" askedAfter []

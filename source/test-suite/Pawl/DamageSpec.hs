@@ -19,7 +19,6 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
-import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
@@ -2143,7 +2142,7 @@ departedAttackerSpec s registry =
                       Combat.Type.defender = Just S.bob
                     }
               }
-          gone = Departure.depart Departure.Type.Conceded S.alice fighting
+          gone = S.departs Departure.Type.Conceded S.alice fighting
           (assignedAfter, _) = S.runPureWith S.identityAnswer gone (Damage.gatherCombatDamage (const True))
           (assignedBefore, _) = S.runPureWith S.identityAnswer fighting (Damage.gatherCombatDamage (const True))
       Spec.assertBool s (Map.member attacker (Combat.Type.blockers (GameState.combat gone))) "CR 509.1h: the blockers key really is still there, so this is the live path"
@@ -2209,7 +2208,7 @@ departedDefenderSpec s registry =
                       Combat.Type.defender = Just S.bob
                     }
               }
-          gone = Departure.depart Departure.Type.Conceded S.bob attacking
+          gone = S.departs Departure.Type.Conceded S.bob attacking
           (assignedAfter, _) = S.runPureWith S.identityAnswer gone (Damage.gatherCombatDamage (const True))
           (assignedBefore, _) = S.runPureWith S.identityAnswer attacking (Damage.gatherCombatDamage (const True))
       Spec.assertEqWith s "nothing is assigned to the departed defender" assignedAfter []
@@ -2252,7 +2251,7 @@ departedDefenderSpec s registry =
                       Combat.Type.defender = Just S.carol
                     }
               }
-          gone = Departure.depart Departure.Type.Conceded S.carol attacking
+          gone = S.departs Departure.Type.Conceded S.carol attacking
           (assignedAfter, _) = S.runPureWith defenderOrBlockerAnswer gone (Damage.gatherCombatDamage (const True))
           (assignedBefore, _) = S.runPureWith defenderOrBlockerAnswer attacking (Damage.gatherCombatDamage (const True))
       Spec.assertBool s (Maybe.isJust (Game.lookupObject blocker gone)) "the blocker survived carol's departure, so the board is still in the prompt arm"

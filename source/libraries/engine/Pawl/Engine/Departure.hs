@@ -12,6 +12,7 @@
 module Pawl.Engine.Departure where
 
 import Control.Applicative ((<|>))
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -31,7 +32,6 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LastKnown as LastKnown
-import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
@@ -44,28 +44,38 @@ import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Zone as Zone
 
 -- Mark a player as having left, with the reason they left, and perform
--- everything the rules attach to that moment. Pure, because the CR 704.5 pass
--- folds it over several players before recomputing the outcome once.
+-- everything the rules attach to that moment.
+--
+-- MONADIC, and only the fourth clause needs it to be: CR 800.4a's exile is a
+-- zone change like any other, so it goes through the zone-change funnel (CR
+-- 400.7, CR 613.7d, CR 603.6c) rather than editing the zone maps. The other
+-- three clauses stay pure functions on the state, composed here in the rule's
+-- order.
 --
 -- CR 725.4 belongs INSIDE this function, not after it: the active player becomes
 -- the monarch at the same time the player leaves. Both doors -- leaveGame (CR
 -- 104.3a) and Pawl.Engine.Sba's fold (CR 704.5) -- get it by construction rather
 -- than by remembering to call it.
-depart :: Departure -> PlayerId -> GameState -> GameState
-depart reason pid gs =
+depart :: Departure -> PlayerId -> Game ()
+depart reason pid = do
+  -- CR 800.4a's own ordering is load-bearing, so the clauses run in the rule's
+  -- order. They run before the status flip, and THAT much is arbitrary: no
+  -- clause reads Player.status, and continuesAfterDeparture reads
+  -- GameState.turnOrder, which the flip does not touch. The flip's position is
+  -- load-bearing only for the monarch call below, which
+  -- Monarch.reassignOnDeparture requires to have already happened.
+  --
+  -- The status flip trailing the exile is load-bearing in one further way now
+  -- that the exile emits events: CR 603.10a reads the board as it was
+  -- immediately before the move, and CR 800.4d's filter on where a trigger may
+  -- go is applied at CR 117.5, later than either.
+  continues <- State.gets continuesAfterDeparture
+  Monad.when continues $ do
+    State.modify' (nonCardStackObjectsCease pid . controlEffectsEnd pid . objectsLeaveWith pid)
+    remainingControlledExiled pid
   let lose p = p {Player.status = Status.Departed reason}
-      -- CR 800.4a's own ordering is load-bearing, so the clauses are composed in
-      -- the rule's order. They run before the status flip, and THAT much is
-      -- arbitrary: no clause reads Player.status, and continuesAfterDeparture
-      -- reads GameState.turnOrder, which the flip does not touch. The flip's
-      -- position is load-bearing only for the monarch call below, which
-      -- Monarch.reassignOnDeparture requires to have already happened.
-      settled =
-        if continuesAfterDeparture gs
-          then remainingControlledExiled pid (nonCardStackObjectsCease pid (controlEffectsEnd pid (objectsLeaveWith pid gs)))
-          else gs
-      flipped = settled {GameState.players = Map.adjust lose pid (GameState.players settled)}
-   in Monarch.reassignOnDeparture pid (Game.stillPlayingInOrder flipped) flipped
+  State.modify' (\gs -> gs {GameState.players = Map.adjust lose pid (GameState.players gs)})
+  State.modify' (\gs -> Monarch.reassignOnDeparture pid (Game.stillPlayingInOrder gs) gs)
 
 -- CR 800.4: a multiplayer game can continue after players leave, and CR 800.1
 -- makes "multiplayer" mean a game that BEGINS with more than two players.
@@ -455,26 +465,42 @@ nonCardStackObjectsCease pid gs =
 -- which is a permanent this clause exiles. Three or more seats are needed for
 -- any of it -- at two, CR 104.2a ends the game the moment a player leaves and
 -- continuesAfterDeparture skips all of CR 800.4a, which that spec's paired case
--- pins. The exile is a direct move rather than an Event.changeZone -- this
--- function is pure, so it cannot funnel, and a leaves-the-battlefield trigger on
--- this move is therefore not emitted (#179). It is still a move, so CR 400.7's
--- forgetting applies and Object.newIncarnation runs -- the part of the funnel
--- that needs no Game monad. CR 613.7d's fresh timestamp is the part that does,
--- and is not applied here (#179).
-remainingControlledExiled :: PlayerId -> GameState -> GameState
-remainingControlledExiled pid gs =
-  let -- Projection.controls already hoists the control-grant list once rather
-      -- than rebuilding it per battlefield object. The stack is short enough that
-      -- the plain query is not worth a second hoist.
-      onStack = filter (\oid -> Projection.controllerOf oid gs == Just pid) (GameState.stack gs)
+-- pins.
+--
+-- Through Event.changeZoneInBatch, and that is the whole reason `depart` is
+-- monadic: the exile is a permanent moving from the battlefield to exile, so CR
+-- 400.7's new object, CR 613.7d's fresh timestamp, CR 608.2h's last known
+-- information and CR 603.6c's leaves-the-battlefield triggers are all owed
+-- here, and the funnel is where every one of them lives. A DEPARTING player's own such
+-- trigger still never reaches the stack -- CR 603.3a makes them its controller
+-- and CR 800.4d bars it -- so what the spec proves this with is a bystander's.
+--
+-- The victims are fixed from the board BEFORE the first move, so a permanent
+-- this loop has already exiled cannot be re-derived into the list; the funnel's
+-- own existence check is what drops one that a replacement effect moved
+-- elsewhere in the meantime.
+--
+-- Not implemented: CR 800.4g's reassignment of a choice this move puts to the
+-- departing player. The funnel's CR 616.1 loop asks the affected object's
+-- controller, who here is the player leaving, so a board with two applicable
+-- rewrites would put the race to them rather than to another player; no card in
+-- `data/cards/` replaces a permanent being exiled, so no board reaches it
+-- (#181).
+--
+-- IN BATCH and in ONE event group, against that same board, for the reason the
+-- first clause files its last known information against it: "those objects are
+-- exiled" is one event, so neither a member's CR 608.2h record nor its CR 616.1
+-- candidate list may read a board its siblings have already left, and a CR
+-- 603.10a look-back must read the group rather than a sequence.
+remainingControlledExiled :: PlayerId -> Game ()
+remainingControlledExiled pid = do
+  gs <- State.get
+  -- Projection.controls already hoists the control-grant list once rather than
+  -- rebuilding it per battlefield object. The stack is short enough that the
+  -- plain query is not worth a second hoist.
+  let onStack = filter (\oid -> Projection.controllerOf oid gs == Just pid) (GameState.stack gs)
       theirs = Projection.controls pid gs <> onStack
-      exileOne g oid = case Game.lookupObject oid g of
-        Nothing -> g
-        Just obj ->
-          let g1 = Game.removeFromZones (Object.owner obj) oid g
-              g2 = Game.insertIntoZone Zone.Exile LibraryPosition.defaultValue (Object.owner obj) oid g1
-           in g2 {GameState.objects = Map.insert oid (Object.newIncarnation obj) {Object.zone = Zone.Exile} (GameState.objects g2)}
-   in List.foldl' exileOne gs theirs
+  Event.simultaneously (Monad.mapM_ (\oid -> Event.changeZoneInBatch gs oid Zone.Exile) theirs)
 
 -- CR 104.2a: a player still in the game wins if their opponents have all left.
 --
@@ -495,6 +521,6 @@ outcomeAfterLeaving leaving gs = case Game.stillPlaying gs of
 -- and CR 104.2a's override describes the win itself, not a license to replace a
 -- result the game already has. Pawl.Engine.Sba's pass settles the same way.
 leaveGame :: Departure -> PlayerId -> Game ()
-leaveGame reason pid = State.modify' $ \gs ->
-  let departed = depart reason pid gs
-   in departed {GameState.result = GameState.result departed <|> outcomeAfterLeaving [pid] departed}
+leaveGame reason pid = do
+  depart reason pid
+  State.modify' (\departed -> departed {GameState.result = GameState.result departed <|> outcomeAfterLeaving [pid] departed})

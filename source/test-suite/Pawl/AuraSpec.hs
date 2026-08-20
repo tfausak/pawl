@@ -30,7 +30,6 @@ import qualified Data.Text as Text
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Combat as Combat
-import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -421,7 +420,7 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
     let (aura, withAura) = S.addCreature curse S.alice S.threePlayerGame
         attached = S.attachTo aura (Recipient.ToPlayer S.carol) withAura
         before = S.settleSba attached
-        departed = Departure.depart Departure.Type.Conceded S.carol before
+        departed = S.departs Departure.Type.Conceded S.carol before
         after = S.settleSba departed
     Spec.assertBool s (Set.member aura (GameState.battlefield before)) "while carol is in the game the Curse is legally attached"
     Spec.assertBool s (not (Set.member aura (GameState.battlefield after))) "she leaves, and it is off the battlefield after one pass"

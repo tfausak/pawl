@@ -520,7 +520,7 @@ subgameSpec s registry = Spec.describe s "Subgame" $ do
     let parent = designating [(S.alice, shimatsu), (S.bob, jedit)] (Setup.emptyGame S.threePlayers)
         sub0 = Setup.subgameStateFrom S.alice parent
         (_, seated) = Engine.runGamePure S.identityAnswer sub0 (Setup.startGameFromCards S.performer Set.empty)
-        departed = Departure.depart Departure.Type.Lost S.bob seated
+        departed = S.departs Departure.Type.Lost S.bob seated
         after = Setup.funnelBack departed parent
     Spec.assertEqWith s "two commanders went in" (length (inCommandZone parent)) 2
     Spec.assertEqWith s "the subgame really was multiplayer, so CR 800.4a's removal fired" (Departure.continuesAfterDeparture departed) True

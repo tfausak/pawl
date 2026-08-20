@@ -17,7 +17,6 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
-import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
@@ -599,7 +598,7 @@ proliferateSpec s registry = Spec.describe s "Proliferate" $ do
     let (_, withLibrary) = S.addLibraryCard piker S.alice S.threePlayerGame
         withMana = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) withLibrary [1 .. (2 :: Int)]
         (gs0, spellId) = S.handOne prologueToPhyresis withMana
-        gs = Departure.depart Departure.Type.Conceded S.carol gs0
+        gs = S.departs Departure.Type.Conceded S.carol gs0
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "bob, still in the game, is poisoned" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 1
@@ -640,7 +639,7 @@ proliferateSpec s registry = Spec.describe s "Proliferate" $ do
     let (src, g0) = S.addCreature piker S.alice S.threePlayerGame
         g1 = S.addPlayerCounter PlayerCounterKind.Poison 2 S.bob g0
         g2 = S.addPlayerCounter PlayerCounterKind.Poison 3 S.carol g1
-        gs = Departure.depart Departure.Type.Conceded S.carol g2
+        gs = S.departs Departure.Type.Conceded S.carol g2
         after = proliferate proliferatesAll src gs
     Spec.assertEqWith s "carol has left, so her poison does not move" (S.playerCounterOf PlayerCounterKind.Poison S.carol after) 3
     Spec.assertEqWith s "bob is still in the game, so his does" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 3
@@ -1850,7 +1849,7 @@ targetedMonarchSpec s registry = Spec.describe s "TargetedMonarch" $ do
     (ability, srcId, gs0) <- denethorBoard s registry
     let answers = Map.fromList [(denethorCrownSlot, Set.singleton (Recipient.ToPlayer S.bob)), (denethorDamageSlot, Set.singleton (Recipient.ToPlayer S.carol))]
         activated = snd (State.evalState (Engine.runGame (answerSlots answers) gs0 (Activate.activateAbility S.alice srcId ability)) [])
-        concede = Departure.depart Departure.Type.Conceded
+        concede = S.departs Departure.Type.Conceded
         resolveAfter f = S.runPure S.identityAnswer (f activated) Stack.resolveTop
         damageIllegal = resolveAfter (concede S.carol)
         crownIllegal = resolveAfter (concede S.bob)

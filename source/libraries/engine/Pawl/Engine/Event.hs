@@ -267,10 +267,11 @@ simultaneously body = do
   pure result
 
 -- `simultaneously` for a body that is a pure function of the board rather than a
--- Game action. CR 800.4a is the caller: a player leaving the game is not a game
--- action anybody takes, so Pawl.Engine.Departure performs it purely -- the CR
--- 704.5 pass folds it over several players before recomputing the outcome once
--- -- and every object it takes leaves at the same instant.
+-- Game action. CR 800.4a's FIRST clause is the caller: leaving the game is not a
+-- zone change, so what Pawl.Engine.Departure does there is delete objects and
+-- record events, which needs no funnel -- and every object it takes leaves at the
+-- same instant. That rule's fourth clause IS a zone change and takes the monadic
+-- bracket above instead.
 --
 -- The two halves are shared with the bracket above rather than restated, so a
 -- pure caller cannot come to disagree with a monadic one about what a group is.
@@ -2450,9 +2451,10 @@ changeZoneCasting caster oid requestedDest shown facing = changeZoneAttaching No
 -- Not the only batch door: an Effect.MoveToZone batch goes through
 -- changeZoneEnteringIn, which carries the entry riders, the library position and
 -- the entry controller this one has no parameters for. This door carries the
--- batches whose members reach a graveyard or the command zone -- Pawl.Engine.Sba's
--- sweeps and the destroy funnel -- so nothing enters the battlefield and there is
--- no `batch` set for CR 614.12a to narrow.
+-- batches whose members reach a graveyard, the command zone or exile --
+-- Pawl.Engine.Sba's sweeps, the destroy funnel and CR 800.4a's fourth clause --
+-- so nothing enters the battlefield and there is no `batch` set for CR 614.12a
+-- to narrow.
 --
 -- A separate door rather than a fourth parameter on changeZone: a batch is the
 -- rare case, and for a single move the board it begins on IS the live one.
@@ -5618,6 +5620,63 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+  -- The SAME two trigger events read by a BYSTANDER: PermanentDies' Filter over
+  -- CR 608.2h last known information, asked of the arm above's wider destination
+  -- test and of its CR 800.4a leaving-the-game form alike.
+  --
+  -- viewWithLastKnown aimed at the departed id twice over, PermanentDies'
+  -- posture and its reasons: CR 603.10a's look-back is what makes "you control"
+  -- answerable about a permanent that is a card in a graveyard -- or in a hand,
+  -- or nowhere at all -- by the time the scan runs. A permanent that filed no
+  -- last known information is one no Filter can honestly answer about, so it
+  -- matches nothing.
+  TriggerCondition.PermanentLeavesTheBattlefield f ->
+    let admits departed = case Projection.viewWithLastKnown departed gs departed of
+          Nothing -> False
+          Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
+     in case event of
+          GameEvent.Moved (Moved.MkMoved zc _)
+            | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc /= Zone.Battlefield ->
+                admits (ZoneChange.departed zc)
+          GameEvent.Moved {} -> False
+          GameEvent.LeftTheGame oid -> admits oid
+          GameEvent.Milled {} -> False
+          GameEvent.Scried _ -> False
+          GameEvent.Surveiled _ -> False
+          GameEvent.Plotted _ -> False
+          GameEvent.Explored _ -> False
+          GameEvent.Exerted _ -> False
+          GameEvent.DamageDealt _ -> False
+          GameEvent.StepBegan {} -> False
+          GameEvent.SpellCast {} -> False
+          GameEvent.DamagePrevented {} -> False
+          GameEvent.BecameMonarch _ -> False
+          GameEvent.Discarded {} -> False
+          GameEvent.Drew {} -> False
+          GameEvent.Revealed {} -> False
+          GameEvent.AttackerDeclared {} -> False
+          GameEvent.BlockerDeclared {} -> False
+          GameEvent.BlocksDeclared {} -> False
+          GameEvent.AttackerBlocked {} -> False
+          GameEvent.AttackerUnblocked _ -> False
+          GameEvent.SpellCountered _ -> False
+          GameEvent.HalfUnlocked {} -> False
+          GameEvent.TurnedFaceUp _ -> False
+          GameEvent.BecameDesignated {} -> False
+          GameEvent.Evolved _ -> False
+          GameEvent.Mentored {} -> False
+          GameEvent.Trained _ -> False
+          GameEvent.PermanentSacrificed {} -> False
+          GameEvent.AbilityTriggered {} -> False
+          GameEvent.LoyaltyAbilityActivated _ -> False
+          GameEvent.LifeLost {} -> False
+          GameEvent.LifeGained {} -> False
+          GameEvent.CountersPut {} -> False
+          GameEvent.CountersRemoved {} -> False
+          GameEvent.ControlChanged {} -> False
+          GameEvent.VentureMarkerEntered {} -> False
+          GameEvent.BecameTarget {} -> False
+          GameEvent.BecameAttached {} -> False
   -- CR 702.55b/702.55c: SelfDies' zone pair, asked of the object the BEARER
   -- HAUNTS rather than of the bearer itself -- so the id compared against
   -- ZoneChange.departed is the one GameState.haunting files the bearer under, and
@@ -7285,6 +7344,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.SelfDies -> False
   TriggerCondition.PermanentDies _ -> False
   TriggerCondition.SelfLeavesTheBattlefield -> False
+  TriggerCondition.PermanentLeavesTheBattlefield _ -> False
   -- CR 702.55b watches a death, not another ability triggering.
   TriggerCondition.HauntedCreatureDies -> False
   -- CR 701.6a's countering is a spell or ability DOING something, not one
@@ -7460,6 +7520,13 @@ eventBindings cond event = case (cond, event) of
   -- Classified by the ZONE, never by whether the card is currently visible -- CR
   -- 400.2 draws exactly that distinction.
   (TriggerCondition.SelfLeavesTheBattlefield, GameEvent.Moved (Moved.MkMoved zc _))
+    | not (Game.isHiddenZone (ZoneChange.to zc)) ->
+        Binding.setBecame (ZoneChange.object zc) Map.empty
+  -- The bystander reading of that same arm, guarded the same way and for the same
+  -- rule. Its OTHER event binds nothing and has no arm: CR 603.6c's
+  -- leaving-the-game form reaches no zone at all, so there is no arriving
+  -- incarnation for CR 400.7e to rescue.
+  (TriggerCondition.PermanentLeavesTheBattlefield _, GameEvent.Moved (Moved.MkMoved zc _))
     | not (Game.isHiddenZone (ZoneChange.to zc)) ->
         Binding.setBecame (ZoneChange.object zc) Map.empty
   -- CR 400.7e again, read in the ENTRY direction: the object that moved is the
@@ -7968,6 +8035,10 @@ eventBindingSlots cond = case cond of
   -- empty. A card whose leaves-the-battlefield payload names `became` is therefore
   -- rejected by the lint (#505).
   TriggerCondition.SelfLeavesTheBattlefield -> Set.empty
+  -- Empty for the arm above's reason, and for a second one: this condition's
+  -- other event (CR 603.6c's leaving-the-game form) reaches no zone, so even a
+  -- public destination is not guaranteed by a match.
+  TriggerCondition.PermanentLeavesTheBattlefield _ -> Set.empty
   -- Nothing, where PermanentDies binds CR 400.7e's graveyard card: rule 702.55b's
   -- ability speaks about the creature it HAUNTS and never about the card that
   -- creature became, so no printing of haunt names the arrival. eventBindings has
@@ -8211,6 +8282,7 @@ looksBack condition = case condition of
   TriggerCondition.SelfDies -> True
   TriggerCondition.PermanentDies _ -> True
   TriggerCondition.SelfLeavesTheBattlefield -> True
+  TriggerCondition.PermanentLeavesTheBattlefield _ -> True
   -- CR 603.10a's first family read off the HOST rather than the bearer: this
   -- triggers when a permanent leaves the battlefield, so the rule reaches the
   -- ability however the bearer is found.
@@ -9352,6 +9424,9 @@ zonesTriggeredFrom cond = case cond of
   -- the destination may be a hand or library, and an ability found in a GRAVEYARD
   -- could not be what fired for a permanent that went somewhere else.
   TriggerCondition.SelfLeavesTheBattlefield -> battlefield
+  -- The same answer once more, and here it is the ONLY one CR 113.6k could give:
+  -- the bearer is a bystander that never left the battlefield at all.
+  TriggerCondition.PermanentLeavesTheBattlefield _ -> battlefield
   -- CR 113.6k's third zone, and rule 702.55c states it outright: "triggered
   -- abilities of cards with haunt that refer to the haunted creature can trigger
   -- in the exile zone". A permanent on the battlefield haunts nothing -- only a
@@ -9532,6 +9607,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfDies -> False
   TriggerCondition.PermanentDies _ -> False
   TriggerCondition.SelfLeavesTheBattlefield -> False
+  TriggerCondition.PermanentLeavesTheBattlefield _ -> False
   -- Rule 702.55b names no turn.
   TriggerCondition.HauntedCreatureDies -> False
   TriggerCondition.SpellOrAbilityCounters _ -> False
@@ -9702,6 +9778,7 @@ stateTriggers gs
               TriggerCondition.SelfDies -> False
               TriggerCondition.PermanentDies _ -> False
               TriggerCondition.SelfLeavesTheBattlefield -> False
+              TriggerCondition.PermanentLeavesTheBattlefield _ -> False
               TriggerCondition.HauntedCreatureDies -> False
               TriggerCondition.SpellOrAbilityCounters _ -> False
               TriggerCondition.DamageToPlayerPrevented _ -> False

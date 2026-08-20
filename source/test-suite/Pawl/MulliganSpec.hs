@@ -14,7 +14,6 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Binding as Binding
-import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mulligan as Mulligan
@@ -758,7 +757,7 @@ spec s registry =
       Spec.assertEqWith
         s
         "still one free mulligan with two survivors"
-        (Mulligan.freeMulligans (Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame))
+        (Mulligan.freeMulligans (S.departs Departure.Type.Conceded S.bob S.threePlayerGame))
         1
     Spec.it s "CR 103.5c: the first mulligan bottoms nothing and the second bottoms one" $ do
       -- Two runs over the same three-seat board. Today both bottom one more

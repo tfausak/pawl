@@ -753,8 +753,15 @@ performStateBasedActions = Event.simultaneously $ do
   Monad.mapM_ (uncurry Event.sacrifice) told
   destroyed <- State.get
   let leaving = filter (losesNow destroyed) (Game.stillPlaying destroyed)
-      departed = foldr (Departure.depart Departure.Type.Lost) destroyed leaving
-      -- CR 704.5d: a token in any zone other than the battlefield ceases to exist.
+  -- CR 104.2a/800.4a: one departure at a time, in REVERSE of `leaving` -- the
+  -- order the `foldr` this replaced applied them in, kept because CR 800.4a's
+  -- fourth clause now emits zone changes and CR 725.4 hands the crown along, so
+  -- who goes first is observable. Departure.depart is monadic for that clause's
+  -- sake, which is why this is a statement rather than another binding in the
+  -- `let`.
+  Monad.mapM_ (Departure.depart Departure.Type.Lost) (List.reverse leaving)
+  departed <- State.get
+  let -- CR 704.5d: a token in any zone other than the battlefield ceases to exist.
       -- Computed from the post-bury state so a token that just died (now in the
       -- graveyard) or was redirected (Rest in Peace -> exile) is removed here; its
       -- move already emitted a zone-change event, so a future dies-trigger still

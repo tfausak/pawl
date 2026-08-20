@@ -365,6 +365,23 @@ data TriggerCondition
     -- It is the one form that fires without a zone change, so its bearer can
     -- only be read from CR 608.2h last known information.
     SelfLeavesTheBattlefield
+  | -- | The SAME written form read by a BYSTANDER (Super Shredder's "whenever
+    -- another permanent leaves the battlefield"). SelfLeavesTheBattlefield's
+    -- events -- any destination, plus CR 603.6c's leaving-the-game form -- with
+    -- PermanentDies' scoping: filtered rather than self-scoped, so it reads the
+    -- departing permanent's characteristics, and "another" is `Not IsSource`
+    -- inside the Filter.
+    --
+    -- The candidate is ZoneChange.departed and NOT ZoneChange.object, read from
+    -- CR 608.2h last known information (CR 603.10a) -- PermanentDies' argument,
+    -- and stronger here: this condition's destination may be a hand or a library,
+    -- where there is no public incarnation to read at all.
+    --
+    -- No card in `data/cards/` needs the arriving incarnation, so what the
+    -- payload could act on is bound exactly as SelfLeavesTheBattlefield binds it
+    -- -- only for a public destination (CR 400.7e), and never for the
+    -- leaving-the-game form, which reaches no zone.
+    PermanentLeavesTheBattlefield (Filter.Filter Keyword.Keyword)
   | -- | CR 700.4's "dies" read off the permanent the BEARER IS ATTACHED TO
     -- (Screams from Within's "when enchanted creature dies"). PermanentDies'
     -- battlefield-to-graveyard pair and a look-back for its reasons; WHICH

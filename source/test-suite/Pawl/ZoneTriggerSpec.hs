@@ -1618,6 +1618,10 @@ representativeEvents cond =
         -- binds nothing -- which is what keeps the floor empty.
         TriggerCondition.SelfLeavesTheBattlefield ->
           moved Zone.Battlefield Zone.Graveyard NonEmpty.:| [moved Zone.Battlefield Zone.Hand, GameEvent.LeftTheGame departed]
+        -- The bystander reading of the arm above, whose three events are the same
+        -- three and whose floor is empty for the same two reasons.
+        TriggerCondition.PermanentLeavesTheBattlefield _ ->
+          moved Zone.Battlefield Zone.Graveyard NonEmpty.:| [moved Zone.Battlefield Zone.Hand, GameEvent.LeftTheGame departed]
         -- SelfDies' event, since CR 700.4 is the same word: the haunted creature
         -- is put into a graveyard from the battlefield. Which permanent it is
         -- rides GameState.haunting rather than the event, so one event says all
@@ -1809,6 +1813,7 @@ everyTriggerCondition =
     TriggerCondition.SelfPutIntoGraveyardFromAnywhere,
     TriggerCondition.SelfDies,
     TriggerCondition.SelfLeavesTheBattlefield,
+    TriggerCondition.PermanentLeavesTheBattlefield Filter.Type.IsSource,
     TriggerCondition.HauntedCreatureDies,
     TriggerCondition.SpellOrAbilityCounters PlayerRelation.You,
     TriggerCondition.DamageToPlayerPrevented PlayerRelation.You,
@@ -1882,6 +1887,124 @@ everyTriggerCondition =
     TriggerCondition.SelfExerted,
     TriggerCondition.SelfBecomesAttachedBy (Filter.Type.And [])
   ]
+
+-- CR 603.6c's first written form read by a BYSTANDER -- Super Shredder {1}{B}
+-- Legendary Creature -- Mutant Ninja Human 1/1, "Whenever another permanent
+-- leaves the battlefield, put a +1/+1 counter on Super Shredder."
+--
+-- leavesBattlefieldSpec above is the SELF-scoped half of the same rule, and
+-- permanentDiesSpec is this same bystander scoping one rule narrower. What this
+-- group has to prove that neither of those does is that the watcher sees a
+-- departure it had no part in, to a destination CR 700.4 does not reach: the
+-- printed word "another" is Not IsSource in the condition's own Filter, and
+-- nothing else narrows it -- "permanent" is no predicate here, since
+-- matchesTrigger has already required the battlefield as the origin.
+--
+-- The bearer is bob's, the departing permanent alice's, so a condition that had
+-- quietly read "you control" would answer these cases 0.
+permanentLeavesTheBattlefieldSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+permanentLeavesTheBattlefieldSpec s registry =
+  let -- bob's Super Shredder watching, alice's Goblin Piker as the victim, and
+      -- `lands` of alice's to pay with. The Shredder is bob's so that no case
+      -- here can pass on a controller check the condition does not make.
+      shredderBoard lands = do
+        shredder <- S.printingOf s registry "Super Shredder"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (shredderId, withShredder) = S.addCreature shredder S.bob lands
+            (pikerId, gs) = S.addCreature piker S.alice withShredder
+        pure (shredderId, pikerId, gs)
+      -- Cast the one spell in hand at `oid`, resolve it, settle (CR 117.5 is
+      -- where the scan sees the departure), then resolve the trigger the settle
+      -- placed. Aimed by ID: S.identityAnswer takes the least Recipient, and
+      -- with two creatures on the board that is whichever id sorts first rather
+      -- than the one the case is about.
+      castAt :: ObjectId.ObjectId -> (GameState.GameState, ObjectId.ObjectId) -> (GameState.GameState, GameState.GameState)
+      castAt oid (gs, spellId) =
+        let answer :: Prompt.Prompt r -> r
+            answer p = case p of
+              -- FILTERED rather than built: which Recipient constructor a pool
+              -- offers is the pool's business (Angelic Edict's is Permanents,
+              -- Unsummon's is Creatures), and a hand-built one of the other
+              -- shape is silently dropped at CR 608.2b's re-read.
+              Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just oid) . Recipient.objectOf) . snd) sets
+              _ -> S.identityAnswer p
+            cast = S.runPure answer gs (S.cast S.alice spellId)
+            resolved = S.runPure answer cast Stack.resolveTop
+            settled = S.runPure answer resolved Engine.settleForPriority
+         in (settled, S.runPure answer settled Stack.resolveTop)
+      -- CR 113.7a's source id for every triggered ability currently on the stack.
+      triggerSourcesOn gs =
+        Maybe.mapMaybe
+          ( \oid -> case fmap Object.source (Game.lookupObject oid gs) of
+              Just (Source.OfTrigger owner _) -> Just owner
+              _ -> Nothing
+          )
+          (GameState.stack gs)
+   in Spec.describe s "PermanentLeavesTheBattlefield" $ do
+        -- The gameplay-level proof, and the destination that makes this
+        -- condition rather than PermanentDies the one under test: CR 400.2
+        -- makes exile a public zone that is not a graveyard, so a dies trigger
+        -- would stay silent here.
+        Spec.it s "CR 603.6c whole card: alice's Piker is exiled and bob's Super Shredder grows" $ do
+          plains <- S.printingOf s registry "Plains"
+          edict <- S.printingOf s registry "Angelic Edict"
+          (shredderId, pikerId, board) <- shredderBoard (S.landsInPlay plains 5)
+          let (settled, after) = castAt pikerId (S.handOne edict board)
+          Spec.assertEqWith s "the Shredder is a 1/1 before anything leaves" (Projection.powerOf shredderId board, Projection.toughnessOf shredderId board) (Just 1, Just 1)
+          Spec.assertEqWith s "the Piker really was exiled, not destroyed" (fmap Object.zone (Game.lookupObject pikerId settled)) Nothing
+          Spec.assertEqWith s "and it is bob's Shredder that grew, off alice's permanent" (Projection.powerOf shredderId after, Projection.toughnessOf shredderId after) (Just 2, Just 2)
+          Spec.assertEqWith s "one counter, from one departure" (fmap (Map.lookup CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject shredderId after)) (Just (Just 1))
+        -- CR 400.2's hidden half of the same rule: a bounce reaches a HAND, and
+        -- the watcher still sees it. The bearer reads the departing permanent
+        -- from CR 608.2h last known information, which is what makes this
+        -- answerable at all -- there is no public incarnation to read.
+        Spec.it s "CR 603.6c whole card: Unsummon bounces the Piker to a hidden zone and the Shredder still grows" $ do
+          island <- S.printingOf s registry "Island"
+          unsummon <- S.printingOf s registry "Unsummon"
+          (shredderId, pikerId, board) <- shredderBoard (S.landsInPlay island 1)
+          let (settled, after) = castAt pikerId (S.handOne unsummon board)
+          Spec.assertEqWith s "the Piker is in its owner's hand" (Game.lookupObject pikerId settled) Nothing
+          Spec.assertEqWith s "the Shredder grew on a departure to a hidden zone" (Projection.powerOf shredderId after, Projection.toughnessOf shredderId after) (Just 2, Just 2)
+        -- CR 603.10a's look-back, which this condition needs for the reason
+        -- PermanentDies needs it and one step further: the WATCHER can be gone
+        -- too. alice's Day of Judgment destroys her Piker and bob's Shredder in
+        -- one CR 704.3 batch, so by the CR 117.5 boundary the ability's own
+        -- bearer is a card in a graveyard -- and CR 603.10a reads "the existence
+        -- of those abilities ... immediately prior to the event", so it triggers
+        -- anyway.
+        --
+        -- The stack is what this case can read: the counter the trigger puts on
+        -- "Super Shredder" lands on a card in a graveyard and changes nothing
+        -- observable, so what the rule decides here is whether the ability
+        -- reached the stack at all. ONE trigger, not two -- the Shredder's own
+        -- departure is in the same batch and the printed "another" declines it.
+        Spec.it s "CR 603.10a a Shredder swept alongside the Piker still sees the Piker go" $ do
+          plains <- S.printingOf s registry "Plains"
+          dayOfJudgment <- S.printingOf s registry "Day of Judgment"
+          (shredderId, _, board) <- shredderBoard (S.landsInPlay plains 4)
+          let (withSpell, spell) = S.handOne dayOfJudgment board
+              afterCast = S.runPure S.identityAnswer withSpell (S.cast S.alice spell)
+              swept = S.runPure S.identityAnswer afterCast Stack.resolveTop
+              settled = S.runPure S.identityAnswer swept Engine.settleForPriority
+          Spec.assertEqWith s "the sweep left no creatures, the watcher included" (Set.size (Set.filter (`Projection.isCreatureOf` settled) (GameState.battlefield settled))) 0
+          -- CR 113.7a: the placed ability's source is the id the Shredder had on
+          -- the battlefield, which is what makes this a statement about WHOSE
+          -- ability reached the stack rather than about how many did.
+          Spec.assertEqWith s "the Shredder's own ability still reached the stack, exactly once" (triggerSourcesOn settled) [shredderId]
+
+        -- The printed "another", with the two Filters side by side on ONE
+        -- departure so the exclusion is the only thing that differs. Without it
+        -- a Super Shredder that left the battlefield would see itself go.
+        Spec.it s "CR 603.6c the printed \"another\" is the only thing declining the bearer's own departure" $ do
+          plains <- S.printingOf s registry "Plains"
+          (shredderId, _, board) <- shredderBoard (S.landsInPlay plains 0)
+          let gone = S.runPure S.identityAnswer board (Event.changeZone shredderId Zone.Exile)
+              moves = filter (\e -> case e of GameEvent.Moved {} -> True; _ -> False) (S.eventsOf gone)
+          case moves of
+            [departure] -> do
+              Spec.assertBool s (Event.matchesTrigger gone shredderId S.bob (TriggerCondition.PermanentLeavesTheBattlefield (Filter.Type.And [])) departure) "a Filter without the exclusion admits the Shredder's own departure"
+              Spec.assertBool s (not (Event.matchesTrigger gone shredderId S.bob (TriggerCondition.PermanentLeavesTheBattlefield (Filter.Type.Not Filter.Type.IsSource)) departure)) "so the printed \"another\" is the only thing declining it"
+            other -> Spec.assertFailure s ("expected exactly one zone change, got " <> show (length other))
 
 -- CR 603.6c's penultimate sentence -- "An ability that attempts to do something
 -- to the card that left the battlefield checks for it only in the first zone
@@ -3970,6 +4093,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   permanentDiesSpec s registry
   merenEndStepSpec s registry
   leavesBattlefieldSpec s registry
+  permanentLeavesTheBattlefieldSpec s registry
   becameSlotSpec s registry
   promiseOfTomorrowSpec s registry
   promiseOfTomorrowReturnSpec s registry
