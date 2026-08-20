@@ -303,8 +303,9 @@ objectRefSlots ref = case ref of
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser _ _) -> chooserSlots chooser
   -- CR 402.3: the choosers own the hands, so the PlayerRef is the whole read.
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player _) -> playerRefSlots player
-  -- The one arm whose CANDIDATES come from a slot; the two chosen arms above name
-  -- a slot only where their chooser does. Reported for EachCardInGraveyard's
+  -- The first of the two arms whose CANDIDATES come from a slot -- the plural is
+  -- below -- where the two chosen arms above name a slot only through their
+  -- chooser. Reported for EachCardInGraveyard's
   -- reason -- the D4 dataflow lint reads this, and a group one clause binds and a
   -- later one reads is exactly the dataflow that lint checks. Many, not One,
   -- which is the arity InSlot reports of the same binding: the ref reads every
@@ -1181,7 +1182,7 @@ targetsAllIllegal oid gs = case Game.lookupObject oid gs of
 -- Otherwise the effects run in order (CR 608.2c), each skipping a slot whose
 -- target is illegal, and the spell goes to its owner's graveyard (CR 608.2n).
 --
--- Per CR 729.1b the bindings are re-read before EACH effect, so a slot DEFINED
+-- Per CR 608.2c the bindings are re-read before EACH effect, so a slot DEFINED
 -- mid-resolution is visible to a later one; target-slot legality stays fixed at
 -- the start. `runSubgame` is the injected nested-game runner.
 resolveSpellWith :: Game Result -> ObjectId -> Game ()

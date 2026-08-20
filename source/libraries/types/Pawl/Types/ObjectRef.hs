@@ -42,7 +42,9 @@ data ObjectRef
     -- stack's and the linked exile set's are on their own arms. A hand and a
     -- library still have none (#1309) -- TopOfLibraryUntil below is not one, since
     -- it names a PREFIX of a library that a match ends rather than the cards in it
-    -- that match.
+    -- that match, and EachCardFromAmong is not one either, since it names the
+    -- matches in a GROUP an earlier clause bound rather than the matches in
+    -- whatever zone those cards happen to sit in.
     --
     -- Not a target and never one (CR 115.10a), so CR 608.2b has nothing to
     -- fizzle. The set is swept when the effect executes (CR 608.2c) and is then

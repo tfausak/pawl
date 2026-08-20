@@ -267,7 +267,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
   Spec.it s "every arm carries a distinct tag" $
     Spec.assertEqWith
       s
-      "a slot, a battlefield sweep, a graveyard sweep, the hand sweep, the linked exile sweep, the stack sweep, the player sweep, the opponent sweep, the chosen player, a library's top card, a chosen graveyard card, a chosen card in hand, a chosen card from among a group and a random card in hand all encode differently"
+      "a slot, a battlefield sweep, a graveyard sweep, the hand sweep, the linked exile sweep, the stack sweep, the player sweep, the opponent sweep, the chosen player, a library's top cards, a walk of a library, a chosen graveyard card, a chosen card in hand, a chosen card from among a group, every card from among a group and a random card in hand all encode differently"
       ( length
           ( List.nub
               [ Codec.encode ObjectRef.codec (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
