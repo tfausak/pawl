@@ -141,14 +141,32 @@ proposedFace oid name gs = case fmap Object.facing (Game.lookupObject oid gs) of
 -- ITSELF, so widening the shared window would make an equip ability on the same
 -- board instant-speed, which no rule says.
 --
--- CR 702.8a's keyword arrives two ways, so the keyword half is itself a
--- disjunction. One limb is the PROPOSED HALF's printed keywords (CR 709.3a: only
--- the chosen half is evaluated); the other is the OBJECT's post-layer keywords,
--- where an effect granting flash to a card off the battlefield lands (CR 613.1f)
--- -- Teferi, Mage of Zhalfir's "creature cards you own that aren't on the
--- battlefield have flash". Read wherever the cast is being proposed from, which
--- is CR 702.8a's "functions in any zone from which you could play the card it's
--- on".
+-- CR 702.8a's keyword is flashOn below, which the LAND PLAY asks too.
+--
+-- The PLAYER-scoped sibling is NOT this and is deliberately not folded in: an
+-- effect that lets a player cast OTHER spells as though they had flash (CR
+-- 601.3b, Vedalken Orrery) is read in timingOk above, beside this predicate,
+-- through PlayerEffect.mayCastAsThoughItHadFlash. Widening this one instead would
+-- say the Orrery gave every card in every zone the flash keyword, which is not
+-- what CR 702.8a's "the card it's on" means.
+instantSpeed :: ObjectId -> Face.Face Card.Type.Card -> GameState -> Bool
+instantSpeed oid face gs = Card.isInstant face || flashOn oid face gs
+
+-- CR 702.8a: does this card carry flash where it now sits? The ONE reader of the
+-- keyword for both things rule 702.8a's "you may play this card" reaches -- a
+-- cast (instantSpeed above) and CR 116.2a's land play
+-- (Pawl.Engine.Action.legalActions) -- so the two windows can never disagree
+-- about where flash is read from. CR 601.1a is why that is one question and not
+-- two: "playing a card" means playing it as a land or casting it, whichever is
+-- appropriate.
+--
+-- The keyword arrives two ways, so this is a disjunction. One limb is the
+-- PROPOSED HALF's printed keywords (CR 709.3a: only the chosen half is
+-- evaluated); the other is the OBJECT's post-layer keywords, where an effect
+-- granting flash to a card off the battlefield lands (CR 613.1f) -- Teferi, Mage
+-- of Zhalfir's "creature cards you own that aren't on the battlefield have
+-- flash". Read wherever the play is being proposed from, which is CR 702.8a's
+-- "functions in any zone from which you could play the card it's on".
 --
 -- The two limbs are disjoined rather than merged because they answer about
 -- different things: a split card off the stack shows both halves' printed
@@ -158,16 +176,15 @@ proposedFace oid name gs = case fmap Object.facing (Game.lookupObject oid gs) of
 -- is:split o:flash on 2026-08-18 returned none, so nothing separates the two
 -- readings today.
 --
--- The PLAYER-scoped sibling is NOT this and is deliberately not folded in: an
--- effect that lets a player cast OTHER spells as though they had flash (CR
--- 601.3b, Vedalken Orrery) is read in timingOk above, beside this predicate,
--- through PlayerEffect.mayCastAsThoughItHadFlash. Widening this one instead would
--- say the Orrery gave every card in every zone the flash keyword, which is not
--- what CR 702.8a's "the card it's on" means.
-instantSpeed :: ObjectId -> Face.Face Card.Type.Card -> GameState -> Bool
-instantSpeed oid face gs =
-  Card.isInstant face
-    || Keyword.hasFlash (Face.keywords face)
+-- The PRINTED limb is unobservable on the land side and asked all the same:
+-- no printing puts flash on a land face, so Teferi's grant to Dryad Arbor is the
+-- only route there (an api.scryfall.com search for keyword:flash type:land on
+-- 2026-08-20 returns only Hydroelectric Specimen // Hydroelectric Laboratory,
+-- whose flash is on the creature front face). A land card printing flash is what
+-- would separate the limbs, and nothing in CR 305 or CR 702.8 forbids one.
+flashOn :: ObjectId -> Face.Face Card.Type.Card -> GameState -> Bool
+flashOn oid face gs =
+  Keyword.hasFlash (Face.keywords face)
     || Keyword.hasFlash (Map.keysSet (Projection.keywordsOf oid gs))
 
 -- CR 601.2c / 700.2a: castable when the fillable modes admit some selection at

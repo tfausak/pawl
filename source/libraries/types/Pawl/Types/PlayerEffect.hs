@@ -177,10 +177,14 @@ data PlayerEffect
     -- boolean-plus-one -- see Pawl.Engine.PlayerEffect.landPlaysAllowed.
     --
     -- The "on each of YOUR TURNS" both cards print is not modelled as a turn
-    -- restriction, and that is exact rather than a shortcut about Magic:
+    -- restriction, and that is exact rather than a shortcut about Magic: CR
+    -- 305.3 forbids playing a land on another player's turn "for any reason", so
     -- Pawl.Engine.Action.legalActions gates every land play on being the active
-    -- player, unconditionally, so a grant that also applied on another player's
-    -- turn is unobservable until something can play a land there at all (#566).
+    -- player and a grant reaching another player's turn could never be observed.
+    -- Nor is that waiting on a timing widening: CR 702.8a's flash lifts CR
+    -- 116.2a's phase and empty-stack conjuncts and leaves CR 305.3 standing
+    -- (Pawl.GameSpec's "CR 305.3 flash does not let a land be played on another
+    -- player's turn").
     PlayAdditionalLands Natural.Natural
   | -- | CR 402.2 / Reliquary Tower: this player has no maximum hand size.
     NoMaximumHandSize

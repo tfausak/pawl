@@ -61,6 +61,13 @@ grantsPriority phase = case phase of
 -- (Action.legalActions). Every one of them names the same moment: a main phase
 -- of the player's own turn with the stack empty.
 --
+-- The land caller asks it as one DISJUNCT rather than as the whole window: CR
+-- 702.8a's "you may play this card any time you could cast an instant" reaches a
+-- land play through CR 601.1a, and lifts this window for the one card the
+-- keyword is on. That widening stays out of here for the reason
+-- Cast.instantSpeed gives -- it is a permission a card carries about itself, not
+-- a change to the moment.
+--
 -- Priority is NOT among the conjuncts. Every caller is reached only from
 -- Action.legalActions, which the priority loop asks solely of the player who
 -- holds it. Nothing else belongs either: CR 307.5's last sentence means no

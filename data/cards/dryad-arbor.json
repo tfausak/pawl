@@ -1,0 +1,38 @@
+{
+  "faces": [
+    {
+      "colorIndicator": [
+        {
+          "type": "Green"
+        }
+      ],
+      "name": "Dryad Arbor",
+      "power": {
+        "type": "Literal",
+        "value": 1
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Forest"
+          },
+          {
+            "type": "Dryad"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          },
+          {
+            "type": "Land"
+          }
+        ]
+      }
+    }
+  ]
+}

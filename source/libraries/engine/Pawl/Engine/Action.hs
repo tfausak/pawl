@@ -131,16 +131,15 @@ discardableCards pid gs =
 
 legalActions :: PlayerId -> GameState -> [Action]
 legalActions pid gs =
-  let -- CR 305.1 / 116.2a: the window is a main phase of this player's own turn
-      -- with the stack empty, which is CR 307.5's "as a sorcery" window
-      -- conjunct for conjunct -- so it is asked through the one predicate rather
-      -- than a near-copy that can drift (see Turn.sorcerySpeedWindow).
-      --
-      -- CR 702.8a's window says "play this card", which reaches a land as well
-      -- as a spell; this gate does not consult the keyword, so a land card with
-      -- flash would still be playable only at sorcery speed (#566).
+  let -- CR 305.3: "a player can't play a land, for any reason, if it isn't their
+      -- turn." The one conjunct of CR 116.2a's window that CR 702.8a does NOT
+      -- lift, which is why it is asked here, per PLAYER, while the phase and the
+      -- empty stack are asked per CARD in landTimingOk below. Dryad Arbor's own
+      -- ruling reads the split the same way: a land granted flash "can't be
+      -- played during another player's turn", and the land plays remaining still
+      -- gate it.
       canPlayLand =
-        Turn.sorcerySpeedWindow pid gs
+        GameState.activePlayer gs == pid
           -- CR 305.2a: compare the number of lands this player CAN play this
           -- turn with the number they HAVE already played; the play is legal
           -- only if the first is greater. A comparison of two counts and never
@@ -151,7 +150,24 @@ legalActions pid gs =
           -- reachable -- Exploration destroyed after the second land leaves an
           -- allowance of one against a tally of two.
           && Map.findWithDefault 0 pid (GameState.landsPlayed gs) < PlayerEffect.landPlaysAllowed pid gs
-      lands = if canPlayLand then fmap (uncurry Action.Play) (playableLands pid gs) else []
+      -- CR 305.1 / 116.2a: the rest of the window is a main phase with the stack
+      -- empty, which together with the active-player conjunct above is CR 307.5's
+      -- "as a sorcery" window conjunct for conjunct -- so it is asked through the
+      -- one predicate rather than a near-copy that can drift (see
+      -- Turn.sorcerySpeedWindow).
+      --
+      -- Asked per CARD, because CR 702.8a's "you may play this card any time you
+      -- could cast an instant" lifts it for the card the keyword is on and for no
+      -- other -- CR 601.1a's "playing a card" being playing it as a land or
+      -- casting it, whichever is appropriate. Read through Cast.flashOn, the same
+      -- function Cast.instantSpeed reads for the cast half of that sentence, so
+      -- the two halves cannot disagree about where flash is read from. The face
+      -- is the one this play would put onto the battlefield (CR 712.12), resolved
+      -- the way Cast.proposedFace resolves the half being cast.
+      landTimingOk (oid, mName) =
+        Turn.sorcerySpeedWindow pid gs
+          || maybe False (\card -> Cast.flashOn oid (Game.resolveFace mName card) gs) (Game.cardOf oid gs)
+      lands = if canPlayLand then fmap (uncurry Action.Play) (filter landTimingOk (playableLands pid gs)) else []
       -- CR 709.3: one action per castable HALF, so choosing a half is choosing
       -- an action and the engine never asks which one. CR 702.37d adds one more
       -- per half with morph, for the same reason: casting face down is a second
