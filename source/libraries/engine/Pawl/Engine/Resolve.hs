@@ -66,6 +66,7 @@ import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.Chooser as Chooser
+import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.Clause as Clause
@@ -288,6 +289,14 @@ objectRefSlots ref = case ref of
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser _ _) -> chooserSlots chooser
   -- CR 402.3: the choosers own the hands, so the PlayerRef is the whole read.
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player _) -> playerRefSlots player
+  -- The one CHOOSING arm that names a slot, and it names the slot its candidates
+  -- come from. Reported for EachCardInGraveyard's reason -- the D4 dataflow lint
+  -- reads this, and a group an earlier clause bound and this one reads is exactly
+  -- the dataflow that lint is checking. Many, not One: the ref reads every member
+  -- of the group to offer them, which is the arity InSlot reports of the same
+  -- binding, and reporting One would let a card bind a group under a name a
+  -- singular reader elsewhere could not see.
+  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong slot _) -> Map.singleton slot SlotArity.Many
   -- The seats whose hands randomness reads: the arm above's read.
   ObjectRef.RandomCardInHand player -> playerRefSlots player
 
@@ -308,6 +317,7 @@ objectRefQuantities ref = case ref of
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary _ count) -> [count]
   ObjectRef.ChosenCardInGraveyard {} -> []
   ObjectRef.ChosenCardInHand {} -> []
+  ObjectRef.ChosenCardFromAmong {} -> []
   ObjectRef.RandomCardInHand _ -> []
 
 -- The slots a MonarchTarget reads: only the targeted arm names one.
@@ -1720,6 +1730,7 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- an inert card-data error.
   ObjectRef.ChosenCardInGraveyard {} -> []
   ObjectRef.ChosenCardInHand {} -> []
+  ObjectRef.ChosenCardFromAmong {} -> []
   -- Answered for real by the REVEAL arm, over the seats handChoosers names.
   ObjectRef.RandomCardInHand _ -> []
 
@@ -1864,6 +1875,7 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   -- gather can ask.
   ObjectRef.ChosenCardInGraveyard {} -> []
   ObjectRef.ChosenCardInHand {} -> []
+  ObjectRef.ChosenCardFromAmong {} -> []
   -- No recipients: only the Reveal arm can ask the interpreter.
   ObjectRef.RandomCardInHand _ -> []
 
@@ -2850,6 +2862,27 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- card offering "a permanent card from among them" (Midnight Tilling)
         -- offers only what an earlier clause of this resolution named.
         chooseContext g = effectContext controller source legal (slotGroups resolving g)
+        -- The objects a slot holds as a BINDING: the whole GROUP an earlier effect
+        -- of this resolution bound, or the single object bound in its place --
+        -- the two shapes every binder dispatches between on how many objects it
+        -- named. Nothing where the slot holds neither, which the InSlot arm below
+        -- reads as "then look at the targets".
+        --
+        -- Read AHEAD of `legal` and shared with the choice ChosenCardFromAmong
+        -- makes among the same members: a group binding is a definition, never a
+        -- target (CR 115.10a), so it owes CR 608.2b nothing. `slotOne` and not
+        -- objectRefObjects, since slotOne is what lets a slot an EARLIER EFFECT OF
+        -- THIS SAME RESOLUTION bound name its object here; a slot `chosen`
+        -- mentions was targeted, so it is left to the target path behind CR
+        -- 608.2b's re-validation.
+        boundObjects slot = do
+          group <- State.gets (slotGroup slot resolving)
+          case group of
+            -- Mint order, which CR 608.2f leaves standing.
+            Just objects -> pure (Just (Foldable.toList objects))
+            Nothing -> do
+              bound <- if Map.member slot chosen then pure Nothing else State.gets (slotOne slot resolving)
+              pure (fmap (: []) bound)
         -- CR 400.7j: bind what arrived into the resolving object's live bindings,
         -- where a later effect of this resolution or a delayed ability it arms
         -- (CR 603.7c) can name it. The shape follows how many arrived: one takes
@@ -2873,21 +2906,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- and is read live. Membership rather than preference keeps a target
             -- from losing its re-validation to a binding sharing its name.
             ObjectRef.InSlot slot -> do
-              -- A slot bound to a GROUP names every member. Read FIRST and not
-              -- subject to `legal`: a group binding is a definition, never a
-              -- target (CR 115.10a). Mint order, which CR 608.2f leaves standing.
-              group <- State.gets (slotGroup slot resolving)
-              case group of
-                Just objects -> pure (Foldable.toList objects)
-                Nothing -> do
-                  bound <- if Map.member slot chosen then pure Nothing else State.gets (slotOne slot resolving)
-                  -- EVERY still-legal target in the slot, not one, which is the
-                  -- SlotArity.Many objectRefSlots declares; legalOne declines a
-                  -- slot naming several. An empty list is an unbound slot, every
-                  -- target gone illegal, or CR 115.6's zero targets chosen.
-                  pure $ case bound of
-                    Just oid -> [oid]
-                    Nothing -> Maybe.mapMaybe Recipient.objectOf (legalMany slot legal)
+              -- A slot bound to a GROUP names every member; boundObjects above is
+              -- where that read and its rule live.
+              bound <- boundObjects slot
+              case bound of
+                Just objects -> pure objects
+                -- EVERY still-legal target in the slot, not one, which is the
+                -- SlotArity.Many objectRefSlots declares; legalOne declines a
+                -- slot naming several. An empty list is an unbound slot, every
+                -- target gone illegal, or CR 115.6's zero targets chosen.
+                Nothing -> pure (Maybe.mapMaybe Recipient.objectOf (legalMany slot legal))
             -- Swept ONCE from the PRE-MOVE state (CR 608.2c, CR 608.2f), in APNAP
             -- order, then moved one at a time, each judged against the board the
             -- batch began on and against the siblings that have already arrived
@@ -2979,6 +3007,42 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
               fmap concat . Monad.mapM (\pid -> ask pid (handCardsOf (chooseContext gs) gs pid filter_)) $
                 handChoosers legal controller gs player
+            -- CR 701.20e's "from among them": the candidates are the members of a
+            -- GROUP an earlier clause of this resolution bound rather than a
+            -- zone's contents, which is the whole difference from the two arms
+            -- above -- and the reason a batch a look or a reveal left in the
+            -- LIBRARY is reachable at all (CR 701.20b), there being no filtered
+            -- sweep of a library (#1309).
+            --
+            -- The candidates are read from the pre-move state (CR 608.2c) through
+            -- the same boundObjects the InSlot gather reads, so the choice and
+            -- "the rest" cannot see different groups. Narrowed by the ref's own
+            -- Filter, matched in THIS EFFECT's context (CR 109.5's "you" is the
+            -- resolving controller), against the CR 613 projection -- so a card a
+            -- continuous effect made a creature is a creature card here.
+            --
+            -- WHO is asked is the resolving controller and only ever them (CR
+            -- 608.2d, #1957). Elided at one candidate and skipped at none (CR
+            -- 101.3, CR 609.3). Filtered, not trusted: an answer naming a card
+            -- never offered falls back to the first candidate.
+            --
+            -- ONE card: what the group has left over is not named here at all.
+            -- "The rest" is the same slot read by ObjectRef.InSlot in a LATER
+            -- clause, which finds the chosen card gone -- CR 400.7 minted a new
+            -- object for it on the way to its new zone, and the id the group still
+            -- holds resolves to nothing, so moveOne passes over it.
+            ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong slot filter_) -> do
+              members <- fmap (Maybe.fromMaybe []) (boundObjects slot)
+              gs <- State.get
+              let context = chooseContext gs
+                  candidates = filter (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_) members
+              case candidates of
+                [] -> pure []
+                [only] -> pure [only]
+                first : second : more -> do
+                  let offered = first NonEmpty.:| (second : more)
+                  answer <- Game.choose (Prompt.ChooseCardFromAmong (Decide.deciderFor controller gs) controller source offered)
+                  pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
             -- Not implemented: a card moved at random out of a hand, CR 701.9b's
             -- random discard. Nothing moves it here, so a card writing the ref
             -- under this opcode names no object; the count and that rule's other

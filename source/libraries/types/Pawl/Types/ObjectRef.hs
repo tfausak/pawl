@@ -1,5 +1,6 @@
 module Pawl.Types.ObjectRef where
 
+import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
@@ -335,6 +336,42 @@ data ObjectRef
     -- ChosenCardInGraveyard's note above describes what a card writing it under
     -- any other opcode gets, and why that inert answer earns no lint.
     ChosenCardInHand ChosenCardInHand.ChosenCardInHand
+  | -- | A card chosen out of the GROUP a slot holds -- the printed "from among
+    -- them", as in Commune with the Gods' "reveal the top five cards of your
+    -- library. You may put a creature or enchantment card from among them into
+    -- your hand". ChosenCardInGraveyard's sibling with the candidate set taken
+    -- from an earlier clause of this same resolution instead of from a zone.
+    --
+    -- The SLOT is what makes it reach where no other arm does. A group is bound
+    -- by CR 701.20a's reveal, CR 701.20e's look, CR 701.17c's mill or a move, and
+    -- it sits wherever that effect left it -- which for a look or a reveal is the
+    -- LIBRARY, since neither moves anything (CR 701.20b). No zone-keyed arm can
+    -- offer a choice there: there is no filtered sweep of a library at all
+    -- (#1309). Where the batch DID move to a graveyard, Midnight Tilling writes
+    -- the same sentence as ChosenCardInGraveyard narrowed by Filter.IsBound; this
+    -- arm reads the slot directly instead, so it needs no such sweep.
+    --
+    -- Reads the slot's GROUP first and its single binding second, the two shapes
+    -- every binder dispatches between on how many objects it named -- so a look
+    -- at a one-card library offers that card rather than nothing.
+    --
+    -- NOT A TARGET and never one (CR 115.10a): the slot was filled by an
+    -- instruction of this resolution rather than announced on the stack (CR
+    -- 601.2c), so CR 608.2b has nothing to re-validate, and the choice is made
+    -- while applying the effect (CR 608.2d). That is also why the arm is not
+    -- subject to the caller's legal-target map, exactly as InSlot's group read is
+    -- not.
+    --
+    -- WHO chooses, how many cards, and what CR 609.3 does with a group holding no
+    -- match are all Pawl.Types.ChosenCardFromAmong's notes.
+    --
+    -- Read when the effect executes (CR 608.2c), and a QUESTION rather than a
+    -- read, so only Pawl.Engine.Resolve's MoveToZone arm can carry it out --
+    -- ChosenCardInGraveyard's note above describes what a card writing it under
+    -- any other opcode gets, and why that inert answer earns no lint. Carth the
+    -- Lion's "you may REVEAL a planeswalker card from among them" is the printing
+    -- that would want the Reveal arm to answer it too (#1954).
+    ChosenCardFromAmong ChosenCardFromAmong.ChosenCardFromAmong
   | -- | A card RANDOMNESS names out of a hand -- Merfolk Spy's "that player
     -- reveals a card at random from their hand". ChosenCardInHand's PlayerRef,
     -- doing that arm's double duty (CR 402.3 collapses the seat whose hand it is

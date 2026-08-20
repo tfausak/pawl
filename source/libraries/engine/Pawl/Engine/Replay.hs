@@ -69,6 +69,7 @@ encode p answer = case p of
   Prompt.ChooseDamageSource {} -> Response.ChoseDamageSource answer
   Prompt.ChooseCardInGraveyard {} -> Response.ChoseCardInGraveyard answer
   Prompt.ChooseCardInHand {} -> Response.ChoseCardInHand answer
+  Prompt.ChooseCardFromAmong {} -> Response.ChoseCardFromAmong answer
   Prompt.ChooseRoom {} -> Response.ChoseRoom answer
   Prompt.ChooseLegend {} -> Response.ChoseLegend answer
   Prompt.DeclareAttackers {} -> Response.DeclaredAttackers answer
@@ -215,6 +216,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseCardInHand {} -> case response of
     Response.ChoseCardInHand oid -> Just oid
+    _ -> Nothing
+  Prompt.ChooseCardFromAmong {} -> case response of
+    Response.ChoseCardFromAmong oid -> Just oid
     _ -> Nothing
   Prompt.ChooseRoom {} -> case response of
     Response.ChoseRoom room -> Just room
@@ -493,6 +497,9 @@ defaultAnswer p = case p of
   -- CR 608.2d again: the prompt is only raised with two or more cards in the
   -- chooser's own hand, and every one of them is a legal choice.
   Prompt.ChooseCardInHand _ _ _ candidates -> NonEmpty.head candidates
+  -- CR 608.2d again: the prompt is only raised with two or more cards of the
+  -- bound group matching, and every one of them is a legal choice.
+  Prompt.ChooseCardFromAmong _ _ _ candidates -> NonEmpty.head candidates
   -- CR 309.5a: the prompt is only raised where two or more arrows leave the
   -- room, and every one of them is a room the marker may move into.
   Prompt.ChooseRoom _ _ _ candidates -> NonEmpty.head candidates

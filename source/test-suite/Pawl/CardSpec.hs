@@ -83,6 +83,7 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Chooser as Chooser
+import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.Clause as Clause
@@ -2665,6 +2666,10 @@ objectRefFilters ref = case ref of
   -- whole of what there is to lint -- the chosen graveyard card's arm's answer,
   -- for its reason.
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand _ f) -> [f]
+  -- Commune with the Gods' "a creature or enchantment card from among them"; its
+  -- slot names the group and holds no characteristic, so the Filter is the whole
+  -- of what there is to lint -- the two chosen arms above's answer.
+  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ f) -> [f]
   -- Merfolk Spy's "a card at random from their hand" carries no Filter at all,
   -- only the PlayerRef naming whose hand, so there is nothing here to lint
   -- (gap #1742).
@@ -5027,6 +5032,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- player" would be one each. The same per-seat count TopOfLibrary
           -- takes of its own PlayerRef, which is why they share namesOneSeat.
           ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player _) -> namesOneSeat player
+          -- One card, full stop: the resolving controller chooses once out of the
+          -- group however many members it holds, there being no chooser to
+          -- multiply the question by (#1957) and no count above one (#1956).
+          ObjectRef.ChosenCardFromAmong {} -> True
           -- One card per SEAT, the arm above's answer with randomness in the
           -- chooser's place: Merfolk Spy's slot names one seat and so one card.
           ObjectRef.RandomCardInHand player -> namesOneSeat player
