@@ -484,7 +484,7 @@ serves supply demand =
 -- CR 106.6, split over one player's pool: the units this payment may draw on,
 -- and the ones it may not. THE one reader of Pawl.Types.ManaUnit.restriction, so
 -- payment and payability cannot disagree about which mana is available -- the
--- reason `serves` gives one question lower down.
+-- reason `serves` just above gives for being one relation.
 --
 -- `casting` is the object being CAST, and Nothing says the payment is not a
 -- cast: an activation cost, an attack cost, a special action's cost, CR 118.12's

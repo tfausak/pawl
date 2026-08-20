@@ -1039,7 +1039,8 @@ canPay pid oid cost gs = case Cost.mana cost of
   Just manaCost ->
     -- CR 118.14's permission is a CAST's, and no caller of this one is casting --
     -- what reaches here is a special action's cost and CR 118.12's
-    -- resolution-time payment -- so the mana is spent as it is.
+    -- resolution-time payment -- so the mana is spent as it is, and CR
+    -- 106.6-restricted mana is no supply for any of them (`casting` is Nothing).
     Mana.canPayCommitting Nothing manaActivations ManaSpending.AsProduced pid (lifeOwedBy (Cost.components cost)) (claimsOf pid oid (Cost.components cost) gs) manaCost gs
       && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
       && jointlyPayable pid oid (Cost.components cost) gs
@@ -1361,6 +1362,13 @@ canPayComponent pid oid component gs = case component of
 -- All or nothing (CR 601.2h). The entry state is captured and restored on any
 -- rejection, so an Unpaid result is a complete no-op even though paying is
 -- monadic -- which CR 118.12's resolution-time caller rests on too.
+--
+-- `casting` is the SPELL this payment is for, and it is Just at exactly one
+-- caller: Pawl.Engine.Cast. It is not `oid` under another name -- `oid` is
+-- whatever object the cost belongs to, which for a special action or CR 118.12's
+-- resolution-time payment is not a spell being cast -- and CR 106.6's
+-- restrictions all read "spend this mana only to CAST", so the two questions are
+-- different ones. Mana.spendableFor is what reads it.
 pay :: Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
 pay casting spending pid oid cost = do
   before <- State.get
@@ -1647,7 +1655,9 @@ payActivation pid oid cost = do
   paid <- case (outcome, Cost.mana cost) of
     (Payment.Paid _, Just (ManaCost.MkManaCost [])) -> pure True
     -- CR 118.14's permission is granted to CAST a spell and never to activate an
-    -- ability, so an activation cost is paid with the mana it is.
+    -- ability, so an activation cost is paid with the mana it is -- and CR
+    -- 106.6-restricted mana cannot pay it at all, which is the same sentence
+    -- read the other way (`casting` is Nothing).
     (Payment.Paid _, Just manaCost) -> payMana Nothing ManaSpending.AsProduced pid manaCost
     -- CR 118.6: attempting to pay an unpayable cost is an illegal action.
     _ -> pure False
