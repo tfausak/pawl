@@ -1852,15 +1852,18 @@ gatherGiven stripped functioning gs =
       -- would start pumping the board from inside it. CR 613.7a: the effect
       -- shares the card's own timestamp. Never stripped, for the emblem
       -- branch's reason.
+      --
+      -- No index stands in front of these two walks, so every card in every
+      -- library has its face read on every projection (#1935).
+      --
+      -- Not implemented: exile gets no arm of its own, so a stated set naming it
+      -- is ignored -- Grist's does (gap #1933).
       fromHiddenCard zone cardId = case Game.lookupObject cardId gs of
         Nothing -> []
         Just cardObj -> case Game.faceOf cardId gs of
           Nothing -> []
           Just face ->
             concat [gatherStatic (functioning cardId) cardId (Object.timestamp cardObj) [] False n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), statesZone zone sa]
-      --
-      -- Not implemented: exile gets no arm, so a stated set naming it is
-      -- ignored -- Grist's does (gap #1933).
       hands = concatMap (fromHiddenCard Zone.Hand) (zoneCards GameState.hand gs)
       libraries = concatMap (fromHiddenCard Zone.Library) (zoneCards GameState.library gs)
       counters = counterGathered gs

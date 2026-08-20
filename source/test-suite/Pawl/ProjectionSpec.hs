@@ -1397,10 +1397,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "and the Forest is a plain Forest again" (Projection.subtypesOf forestId gs) (Set.singleton Subtype.Type.Forest)
 
   -- Not implemented, so the card file omits it: Celestial Dawn's colour clause
-  -- for spells you control and nonland cards you own off the battlefield (gap
-  -- #1859). Nothing below looks at a card outside the battlefield. Its other clauses are
-  -- printed in full, the mana sentence included -- CR 609.4b's two halves are a
-  -- pair of PlayerEffect.SpendManaAsThough entries, proved in Pawl.ManaSpec.
+  -- for spells you control and nonland cards you own off the battlefield
+  -- (#1934). Nothing below looks at a card outside the battlefield. Its other
+  -- clauses are printed in full, the mana sentence included -- CR 609.4b's two
+  -- halves are a pair of PlayerEffect.SpendManaAsThough entries, proved in
+  -- Pawl.ManaSpec.
   --
   -- CR 305.7's gate reached by an affected set that asks who CONTROLS the
   -- candidate, which is the shape that used to make Projection.controllerOf
