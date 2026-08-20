@@ -1941,6 +1941,14 @@ permanentLeavesTheBattlefieldSpec s registry =
             resolved = S.runPure answer cast Stack.resolveTop
             settled = S.runPure answer resolved Engine.settleForPriority
          in (settled, S.runPure answer settled Stack.resolveTop)
+      -- CR 113.7a's source id for every triggered ability currently on the stack.
+      triggerSourcesOn gs =
+        Maybe.mapMaybe
+          ( \oid -> case fmap Object.source (Game.lookupObject oid gs) of
+              Just (Source.OfTrigger owner _) -> Just owner
+              _ -> Nothing
+          )
+          (GameState.stack gs)
    in Spec.describe s "PermanentLeavesTheBattlefield" $ do
         -- The gameplay-level proof, and the destination that makes this
         -- condition rather than PermanentDies the one under test: CR 400.2
@@ -1966,6 +1974,33 @@ permanentLeavesTheBattlefieldSpec s registry =
           let (settled, after) = castAt pikerId (S.handOne unsummon board)
           Spec.assertEqWith s "the Piker is in its owner's hand" (Game.lookupObject pikerId settled) Nothing
           Spec.assertEqWith s "the Shredder grew on a departure to a hidden zone" (Projection.powerOf shredderId after, Projection.toughnessOf shredderId after) (Just 2, Just 2)
+        -- CR 603.10a's look-back, which this condition needs for the reason
+        -- PermanentDies needs it and one step further: the WATCHER can be gone
+        -- too. alice's Day of Judgment destroys her Piker and bob's Shredder in
+        -- one CR 704.3 batch, so by the CR 117.5 boundary the ability's own
+        -- bearer is a card in a graveyard -- and CR 603.10a reads "the existence
+        -- of those abilities ... immediately prior to the event", so it triggers
+        -- anyway.
+        --
+        -- The stack is what this case can read: the counter the trigger puts on
+        -- "Super Shredder" lands on a card in a graveyard and changes nothing
+        -- observable, so what the rule decides here is whether the ability
+        -- reached the stack at all. ONE trigger, not two -- the Shredder's own
+        -- departure is in the same batch and the printed "another" declines it.
+        Spec.it s "CR 603.10a a Shredder swept alongside the Piker still sees the Piker go" $ do
+          plains <- S.printingOf s registry "Plains"
+          dayOfJudgment <- S.printingOf s registry "Day of Judgment"
+          (shredderId, _, board) <- shredderBoard (S.landsInPlay plains 4)
+          let (withSpell, spell) = S.handOne dayOfJudgment board
+              afterCast = S.runPure S.identityAnswer withSpell (S.cast S.alice spell)
+              swept = S.runPure S.identityAnswer afterCast Stack.resolveTop
+              settled = S.runPure S.identityAnswer swept Engine.settleForPriority
+          Spec.assertEqWith s "the sweep left no creatures, the watcher included" (Set.size (Set.filter (`Projection.isCreatureOf` settled) (GameState.battlefield settled))) 0
+          -- CR 113.7a: the placed ability's source is the id the Shredder had on
+          -- the battlefield, which is what makes this a statement about WHOSE
+          -- ability reached the stack rather than about how many did.
+          Spec.assertEqWith s "the Shredder's own ability still reached the stack, exactly once" (triggerSourcesOn settled) [shredderId]
+
         -- The printed "another", with the two Filters side by side on ONE
         -- departure so the exclusion is the only thing that differs. Without it
         -- a Super Shredder that left the battlefield would see itself go.

@@ -17,6 +17,7 @@ import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -534,6 +535,48 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     Spec.assertEqWith s "carol's Super Shredder saw the departing player's permanent leave (CR 603.6c)" (Projection.powerOf shredderId settled, Projection.toughnessOf shredderId settled) (Just 2, Just 2)
     Spec.assertEqWith s "exactly one counter -- one permanent left the battlefield" (fmap (Map.lookup CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject shredderId settled)) (Just (Just 1))
     Spec.assertEqWith s "and the Towershell is in exile, which is what it saw" (fmap (Object.zone . snd) (soleObjectOf towershell settled)) (Just Zone.Exile)
+
+  -- CR 800.4a's fourth clause with its SECOND producer, and the case that says
+  -- why the rule cannot be proved through the exiled permanent's own trigger.
+  --
+  -- Alice resolves Gather Specimens, so carol's Thragtusk enters under alice's
+  -- control (CR 616.1b writing CR 110.2a's entry controller); carol still owns
+  -- it. Alice concedes: clause 1 passes it over, clause 2 ends alice's floating
+  -- row but not the control the permanent already entered with, and clause 4
+  -- exiles it.
+  --
+  -- Thragtusk's "when this creature leaves the battlefield" therefore triggers
+  -- on that exile -- and CR 603.3a makes ALICE its controller, since she
+  -- controlled the permanent as it left, so CR 800.4d keeps it off the stack and
+  -- no Beast token is ever created. That is the whole reason the case above
+  -- needs a bystander's trigger to observe this rule at all.
+  Spec.it s "CR 800.4a/800.4d the exiled permanent's OWN leaves-the-battlefield trigger belongs to the departed player, so it is not put on the stack" $ do
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    gatherSpecimens <- S.printingOf s registry "Gather Specimens"
+    thragtusk <- S.printingOf s registry "Thragtusk"
+    let lands = S.landsFor forest S.carol 5 (S.landsFor island S.alice 6 (Setup.emptyGame S.threePlayers))
+        (aliceGather, g1) = S.addHandCard gatherSpecimens S.alice lands
+        (carolsTusk, g2) = S.addHandCard thragtusk S.carol g1
+        board = g2 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        resolveFor pid oid g = S.runPure S.identityAnswer g (S.cast pid oid >> Stack.resolveTop)
+        -- Settled after the Thragtusk enters, so its CR 603.6a entry trigger is
+        -- off the stack before the departure and the only ability left pending
+        -- is the one this case is about.
+        entered = resolveTriggers (resolveFor S.carol carolsTusk (resolveFor S.alice aliceGather board))
+        conceded = S.runPure S.identityAnswer entered (Departure.leaveGame Departure.Type.Conceded S.alice)
+        settled = S.runPure S.identityAnswer conceded Engine.settleForPriority
+        after = S.runPure S.identityAnswer settled Engine.priorityLoop
+        tuskOf = soleObjectOf thragtusk
+    Spec.assertEqWith s "carol's Thragtusk entered under alice's control (CR 616.1b)" (fmap (\(oid, obj) -> (Object.owner obj, Projection.controllerOf oid entered)) (tuskOf entered)) (Just (S.carol, Just S.alice))
+    Spec.assertEqWith s "alice leaving exiles it (CR 800.4a's fourth clause)" (fmap (Object.zone . snd) (tuskOf after)) (Just Zone.Exile)
+    -- The rule under test, read at the CR 117.5 boundary itself: the trigger is
+    -- gathered and then not put on the stack. Asserted THERE rather than after
+    -- the priority loop, because a trigger that did reach the stack would resolve
+    -- and be gone by then -- and CR 800.4d's FIRST sentence would stop its token
+    -- anyway, so the token count alone cannot tell the two sentences apart.
+    Spec.assertEqWith s "the settle put nothing on the stack: the trigger is alice's and she has left (CR 800.4d)" (GameState.stack settled) []
+    Spec.assertEqWith s "so no Beast token was created, for anybody" (fmap (\pid -> S.countOnBattlefieldByName beastToken pid after) [S.alice, S.bob, S.carol]) [0, 0, 0]
 
   -- CR 603.6c's SECOND trigger event, which is CR 800.4a's FIRST clause rather
   -- than its fourth: "a phased-in permanent leaves the game because its owner
