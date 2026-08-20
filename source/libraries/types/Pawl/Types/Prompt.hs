@@ -338,19 +338,23 @@ data Prompt r where
   -- 602.2b while activating an ability. The ObjectId is whichever object is on
   -- the stack -- the spell, or the ability object.
   --
-  -- The Natural is the greatest value this player could actually PAY for now,
+  -- The Natural is the greatest value this player could LEGALLY ANNOUNCE now,
   -- climbed by Cast.affordableX / Activate.affordableX over the cost that will
-  -- really be paid. It counts LIFE as well as mana, Cost.canPay measuring CR
-  -- 601.2b's nonhybrid resolutions.
+  -- really be paid and stopped at CR 101.1's card-stated ceiling where the face
+  -- prints one (Cost.maximumX, Soul Immolation). The payable half counts LIFE as
+  -- well as mana, Cost.canPay measuring CR 601.2b's nonhybrid resolutions.
   --
-  -- ADVISORY: the answer is filtered against it nowhere. CR 601.2b lets the
-  -- player announce freely, and an unpayable announcement is answered by CR
-  -- 601.2 / 602.2's reversal (#741). What the bound adds is the INFORMATION a
-  -- player at a table has and an answerer did not.
+  -- ADVISORY, and the answer is filtered against it nowhere -- but the two halves
+  -- of the bound are refused by DIFFERENT rules once it is answered. CR 601.2b
+  -- lets the player announce past what they can PAY, and CR 601.2 / 602.2's
+  -- reversal is what answers that (#741); announcing past what the CARD permits
+  -- is CR 101.1 and CR 101.2, refused by Cast's own gate. Either way the bound
+  -- itself only carries the INFORMATION a player at a table has and an answerer
+  -- did not.
   --
   -- Prompted before targets, and only when the cost declares an X -- a
-  -- ManaSymbol.Variable, or a CostComponent.PayLifeX (Hatred); CR 107.3a is the
-  -- general statement.
+  -- ManaSymbol.Variable, a CostComponent.PayLifeX (Hatred), or a
+  -- CostComponent.BlightX (Soul Immolation); CR 107.3a is the general statement.
   ChooseX :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt Natural.Natural
   -- | CR 702.42a: whether this player entwines the modal spell they are
   -- casting. The Cost is what entwining adds on top of the candidate cost then

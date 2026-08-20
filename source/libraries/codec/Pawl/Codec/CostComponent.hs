@@ -15,11 +15,12 @@ import qualified Pawl.Types.DiscardCause as DiscardCause
 
 -- | Tagged rather than bare-nullary from the start: this family grows
 -- payload-carrying constructors (PayLife, Sacrifice), so it is built from
--- 'Arm.tagged' rather than delegated to a nullary-table helper. A new arm
--- needs an entry in the list below AND a case in the hand-written @encode@
--- below it -- 'Arm.tagged' derives the decoder and the schema from the list
--- alone, but the encoder is deliberately not derived (see 'Arm.tagged'\'s own
--- Haddock), so every arm is written twice.
+-- 'Arm.tagged' rather than delegated to a nullary-table helper -- which derives
+-- the encoder, the decoder and the schema from the list below, so a new arm is
+-- one entry and nothing else. Note that the list is the ONLY thing that says an
+-- arm exists: every extractor carries its own @_ -> Nothing@, so a constructor
+-- with no entry here compiles, encodes as @{}@ and has no round-trip test
+-- (#1715).
 --
 -- The keyword codec is a PARAMETER; see Pawl.Codec.Filter's header.
 codec :: (Typeable.Typeable keyword, Eq keyword) => Codec.Codec keyword -> Codec.Codec (CostComponent.CostComponent keyword)
@@ -49,6 +50,7 @@ codec keywordCodec =
       Arm.payload "RemoveLoyaltyFromThis" Common.natural CostComponent.RemoveLoyaltyFromThis (\x -> case x of CostComponent.RemoveLoyaltyFromThis y -> Just y; _ -> Nothing),
       Arm.payload "PutPlusOneCountersOnThis" Common.natural CostComponent.PutPlusOneCountersOnThis (\x -> case x of CostComponent.PutPlusOneCountersOnThis y -> Just y; _ -> Nothing),
       Arm.payload "Blight" Common.natural CostComponent.Blight (\x -> case x of CostComponent.Blight y -> Just y; _ -> Nothing),
+      Arm.nullary "BlightX" CostComponent.BlightX,
       Arm.nullary "ExileThisFromGraveyard" CostComponent.ExileThisFromGraveyard,
       Arm.payload "ExileCardsFromGraveyard" (ExileCardsFromGraveyard.codec keywordCodec) CostComponent.ExileCardsFromGraveyard (\x -> case x of CostComponent.ExileCardsFromGraveyard y -> Just y; _ -> Nothing),
       Arm.payload "ExileTopFromGraveyard" (Filter.codec keywordCodec) CostComponent.ExileTopFromGraveyard (\x -> case x of CostComponent.ExileTopFromGraveyard y -> Just y; _ -> Nothing)

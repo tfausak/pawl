@@ -124,6 +124,14 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       (CostComponent.Blight 2)
       " {\"type\":\"Blight\",\"value\":2} "
+  -- CR 107.3a's X in the arm above, nullary on the wire for PayLifeX's reason:
+  -- the announcement supplies the number, so the card states none.
+  Spec.it s "BlightX" $
+    Common.assertCodec
+      s
+      codec
+      CostComponent.BlightX
+      " {\"type\":\"BlightX\"} "
   -- CR 406.2's two halves: the one that names the object the cost is on, and
   -- the one that names a count and a criterion.
   Spec.it s "ExileThisFromGraveyard" $

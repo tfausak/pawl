@@ -467,9 +467,11 @@ substituteXInComponent x component = case component of
   CostComponent.AddLoyaltyToThis _ -> component
   CostComponent.RemoveLoyaltyFromThis _ -> component
   CostComponent.PutPlusOneCountersOnThis _ -> component
-  -- Not this arm's X: Soul Immolation's "blight X" is announced under a bound
-  -- rule 701.68a does not state, so it has no spelling here at all (gap #1646).
   CostComponent.Blight _ -> component
+  -- PayLifeX's rewrite one keyword action over: CR 107.3a gives ONE announced
+  -- value to the whole cost, so Soul Immolation's "blight X" takes the same X a
+  -- mana cost's {X} would have taken.
+  CostComponent.BlightX -> CostComponent.Blight x
   CostComponent.ExileThisFromGraveyard -> component
   CostComponent.ExileCardsFromGraveyard {} -> component
   CostComponent.ExileTopFromGraveyard _ -> component
@@ -479,11 +481,14 @@ substituteXInComponent x component = case component of
 -- an EXAMPLE and CR 107.3a lists the additional cost beside it, so Hatred, whose
 -- only X is in "pay X life", is asked exactly as Blaze is.
 hasVariable :: Cost Keyword.Type.Keyword -> Bool
-hasVariable cost = manaHasVariable || any componentHasVariable (Cost.components cost)
-  where
-    manaHasVariable = case Cost.mana cost of
-      Nothing -> False
-      Just (ManaCost.MkManaCost symbols) -> elem ManaSymbol.Variable symbols
+hasVariable cost = manaHasVariable cost || any componentHasVariable (Cost.components cost)
+
+-- Does the MANA half of this cost carry CR 107.3's {X}? Nothing is CR 118.6's
+-- unpayable cost, which declares nothing.
+manaHasVariable :: Cost Keyword.Type.Keyword -> Bool
+manaHasVariable cost = case Cost.mana cost of
+  Nothing -> False
+  Just (ManaCost.MkManaCost symbols) -> elem ManaSymbol.Variable symbols
 
 -- substituteXInComponent's predicate half, and exhaustive for its reason. The
 -- two must agree: a component this answers False for is one no announcement
@@ -505,25 +510,103 @@ componentHasVariable component = case component of
   CostComponent.RemoveLoyaltyFromThis _ -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
+  CostComponent.BlightX -> True
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
 
--- CR 601.2b: the greatest value of X this player could actually pay for -- what
+-- CR 601.2b: the greatest value of X this player could legally announce -- what
 -- Prompt.ChooseX carries -- found by ASCENDING SEARCH from 0 over the caller's
--- own payability-at-X predicate. Advisory, and nothing here clamps. That
+-- own payability-at-X predicate, stopping at CR 101.1's card-stated ceiling if
+-- the face prints one. Advisory, and nothing here clamps the ANSWER. The
 -- predicate must be the SAME one the caller's own gate asked at X=0, so what a
 -- gate measures and what a bound reports cannot drift apart.
 --
--- SOUND AND TERMINATING only because payability is MONOTONE in X -- a property
--- of the PREDICATE, discharged at the call site. `substituteX` is what makes the
--- demand grow, on BOTH halves of the cost; Pawl.CostSpec's "Hatred is asked for
--- X, bounded by the life its cost can pay" stops running at all if the life half
--- ever stops charging. Answers 0 for a cost with no X, a totality guard.
-greatestPayableX :: (Natural -> Bool) -> Cost Keyword.Type.Keyword -> Natural
-greatestPayableX payableAt cost =
-  let climb x = if payableAt (x + 1) then climb (x + 1) else x
+-- SOUND only because payability is MONOTONE in X -- a property of the
+-- PREDICATE, discharged at the call site. `substituteX` is what makes the demand
+-- grow; Pawl.CostSpec's "Hatred is asked for X, bounded by the life its cost can
+-- pay" stops running at all if the life half ever stops charging.
+--
+-- TERMINATING on either of two grounds, and a cost needs one of them:
+-- `mCeiling`, or a demand that GROWS without bound (`demandGrowsWithX` below).
+-- Neither is redundant -- Toxic Deluge's "pay X life" states no ceiling and is
+-- stopped by CR 119.4's life total, while Soul Immolation's "blight X" is
+-- payable at every X (rule 701.68b names no number) and is stopped only by its
+-- own sentence. Pawl.CardSpec's "CR 101.1 every printing whose X the board
+-- cannot refuse states a maximum for it" is what keeps a card with neither out
+-- of the pool.
+--
+-- Answers 0 for a cost with no X, a totality guard.
+greatestPayableX :: Maybe Natural -> (Natural -> Bool) -> Cost Keyword.Type.Keyword -> Natural
+greatestPayableX mCeiling payableAt cost =
+  let climb x
+        | Just c <- mCeiling, x >= c = x
+        | payableAt (x + 1) = climb (x + 1)
+        | otherwise = x
    in if hasVariable cost then climb 0 else 0
+
+-- Does a large enough X eventually make this cost UNPAYABLE? What decides
+-- whether `greatestPayableX`'s ascending search needs CR 101.1's ceiling to
+-- stop. NOT the same question as `hasVariable`: a cost can carry an X whose
+-- demand never grows.
+-- The mana half's two questions have ONE answer, which is CR 107.4b: {X} is a
+-- generic symbol, so an announced X is that much more mana to find and a board
+-- produces finitely much. `manaHasVariable` therefore answers both, and the
+-- COMPONENTS are where the two questions come apart.
+demandGrowsWithX :: Cost Keyword.Type.Keyword -> Bool
+demandGrowsWithX cost = manaHasVariable cost || any componentDemandGrowsWithX (Cost.components cost)
+
+-- `componentHasVariable`'s question sharpened, and exhaustive for its reason: a
+-- new X-carrying component owes an answer here as well as there.
+componentDemandGrowsWithX :: CostComponent.CostComponent Keyword.Type.Keyword -> Bool
+componentDemandGrowsWithX component = case component of
+  -- CR 119.4: payable only out of a life total at least that large, so a big
+  -- enough X refuses.
+  CostComponent.PayLifeX -> True
+  -- FALSE, and that is CR 701.68b rather than an omission: the rule refuses a
+  -- blight only where the player controls no creature, and names no number of
+  -- counters that is too many. So a Soul Immolation announcement is refused by
+  -- CR 101.1's sentence alone.
+  CostComponent.BlightX -> False
+  CostComponent.PayLife _ -> False
+  CostComponent.TapThis -> False
+  CostComponent.UntapThis -> False
+  CostComponent.SacrificeThis -> False
+  CostComponent.Sacrifice {} -> False
+  CostComponent.TapForTotalPower {} -> False
+  CostComponent.TapPermanents {} -> False
+  CostComponent.DiscardCards {} -> False
+  CostComponent.DiscardThis _ -> False
+  CostComponent.PayEnergy _ -> False
+  CostComponent.AddLoyaltyToThis _ -> False
+  CostComponent.RemoveLoyaltyFromThis _ -> False
+  CostComponent.PutPlusOneCountersOnThis _ -> False
+  CostComponent.Blight _ -> False
+  CostComponent.ExileThisFromGraveyard -> False
+  CostComponent.ExileCardsFromGraveyard {} -> False
+  CostComponent.ExileTopFromGraveyard _ -> False
+
+-- CR 101.1: the ceiling this face's own words put on CR 601.2b's announced X --
+-- Soul Immolation's "X can't be greater than the greatest toughness among
+-- creatures you control". Nothing where the face states none, which is every
+-- other printing in `data/cards/`.
+--
+-- Evaluated ONCE, here, against the board as it stands at the announcement, and
+-- never re-read: CR 601.2b names the value and no later rule revisits it, so a
+-- creature that leaves in response does not shrink an X already announced.
+--
+-- `oid` is the spell on the stack (CR 601.2a has already moved it), which is
+-- both the source the Quantity is evaluated against and CR 109.5's perspective
+-- through `pid` -- selfReductions' pairing, one announcement step later.
+--
+-- A Quantity that does not evaluate, or evaluates NEGATIVE, floors at 0: CR
+-- 101.2 makes the printed "can't" beat the permission, so an unreadable ceiling
+-- refuses rather than permits.
+maximumX :: PlayerId -> ObjectId -> Face.Face card -> GameState -> Maybe Natural
+maximumX pid oid face gs =
+  let context = Filter.contextFor (Just pid) (Just oid)
+      ceilingOf quantity = Integer.toNaturalSaturating (Maybe.fromMaybe 0 (Quantity.evaluate (Projection.fullView gs) context gs oid quantity))
+   in fmap ceilingOf (Face.maximumX face)
 
 -- CR 118.13a: a mana symbol payable in multiple ways has its payment chosen as
 -- the spell or ability is proposed (CR 601.2b) -- CR 107.4f's Phyrexian symbol
@@ -709,6 +792,7 @@ loyaltyAmountOf component = case component of
   CostComponent.PayEnergy _ -> Nothing
   CostComponent.PutPlusOneCountersOnThis _ -> Nothing
   CostComponent.Blight _ -> Nothing
+  CostComponent.BlightX -> Nothing
   CostComponent.ExileThisFromGraveyard -> Nothing
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
   CostComponent.ExileTopFromGraveyard _ -> Nothing
@@ -778,6 +862,7 @@ zoneOfComponent component = case component of
   -- out of any zone.
   CostComponent.PutPlusOneCountersOnThis _ -> Nothing
   CostComponent.Blight _ -> Nothing
+  CostComponent.BlightX -> Nothing
 
 -- CR 118.8c: does this cost include "actions involving cards with a stated
 -- quality in a hidden zone"? What Resolve.offerCast reads to decide whether a
@@ -820,6 +905,7 @@ componentStatesHiddenQuality component = case component of
   CostComponent.RemoveLoyaltyFromThis _ -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
+  CostComponent.BlightX -> False
 
 -- CR 306.5c: a planeswalker's loyalty is the number of loyalty counters on it.
 -- Zero for an object with none, which CR 704.5i reads as loyalty 0 -- so this is
@@ -995,6 +1081,7 @@ claimOf pid oid component gs = case component of
   -- nothing out of a zone. Two blights in one cost may choose the same creature,
   -- which is right -- CR 122.6 stacks counters.
   CostComponent.Blight _ -> Nothing
+  CostComponent.BlightX -> Nothing
   where
     claim a p n = Just (Claim.Type.MkClaim {Claim.Type.axis = a, Claim.Type.pool = p, Claim.Type.count = n})
     itself condition = if condition then Set.singleton oid else Set.empty
@@ -1152,6 +1239,9 @@ uncountedCeiling component = case component of
   -- An UNDERSTATEMENT: a player controlling a creature can blight as often as
   -- they can pay the rest of the cost.
   CostComponent.Blight _ -> Just 1
+  -- Zero, PayLifeX's answer above and for its reason: an unannounced X cannot be
+  -- paid even once.
+  CostComponent.BlightX -> Just 0
 
 -- This player's life total as an amount that could be PAID (CR 119.4), floored
 -- at zero: a player at or below 0 life can pay nothing but CR 119.4b's zero.
@@ -1231,6 +1321,7 @@ lifeOwedByComponent component = case component of
   CostComponent.RemoveLoyaltyFromThis _ -> 0
   CostComponent.PutPlusOneCountersOnThis _ -> 0
   CostComponent.Blight _ -> 0
+  CostComponent.BlightX -> 0
   CostComponent.ExileThisFromGraveyard -> 0
   CostComponent.ExileCardsFromGraveyard {} -> 0
   CostComponent.ExileTopFromGraveyard _ -> 0
@@ -1347,6 +1438,12 @@ canPayComponent pid oid component gs = case component of
   -- 701.68a's candidate is qualified by CONTROL alone, the whole difference from
   -- PutPlusOneCountersOnThis above.
   CostComponent.Blight _ -> Blight.canBlight pid gs
+  -- CR 601.2b: the component BEFORE X is announced, so there is no number of
+  -- counters to measure rule 701.68b against -- PayLifeX's arm above, verbatim.
+  -- Unreachable from either cast path, both of which substitute before they
+  -- measure or pay; a fence, with Pawl.CostSpec's "an unannounced blight X is
+  -- unpayable" as the test.
+  CostComponent.BlightX -> False
 
 -- CR 601.2g then 601.2h: the mana window first, then the payment, whose order is
 -- the PAYER's (payComponents below).
@@ -1478,6 +1575,9 @@ orderSensitive component = case component of
   CostComponent.RemoveLoyaltyFromThis _ -> True
   CostComponent.PutPlusOneCountersOnThis _ -> True
   CostComponent.Blight _ -> True
+  -- The arm above's classification, which is what CR 601.2b turns this into.
+  -- Unreachable unsubstituted: `pay` runs on the announced cost.
+  CostComponent.BlightX -> True
   CostComponent.PayLife _ -> False
   CostComponent.PayLifeX -> False
   CostComponent.PayEnergy _ -> False
@@ -1891,6 +1991,9 @@ payComponent pid oid component = case component of
   CostComponent.Blight n -> do
     blighted <- Blight.blight pid oid n
     pure (if blighted then bindsNothing else Payment.Unpaid)
+  -- Unpayable, `canPayComponent`'s answer and for its reason -- PayLifeX's arm
+  -- above, verbatim.
+  CostComponent.BlightX -> pure Payment.Unpaid
   -- CR 406.2's move, through the Event.changeZone funnel, so the card gets a CR
   -- 400.7 incarnation and anything watching a graveyard-to-exile move sees it.
   -- No prompt: the cost names this card.

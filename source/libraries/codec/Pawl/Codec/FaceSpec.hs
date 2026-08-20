@@ -138,6 +138,7 @@ baseFace =
       Face.untapRestrictions = [],
       Face.attackCosts = [],
       Face.additionalCosts = [],
+      Face.maximumX = Nothing,
       Face.alternativeCosts = [],
       Face.costReductions = [],
       Face.mulliganActions = [],
@@ -174,6 +175,7 @@ minimalFace =
       Face.enchant = [],
       Face.counterability = Counterability.Counterable,
       Face.additionalCosts = [],
+      Face.maximumX = Nothing,
       Face.alternativeCosts = [],
       Face.costReductions = [],
       Face.playerAbilities = [],
@@ -234,6 +236,7 @@ populatedFace =
       Face.untapRestrictions = [UntapRestriction.MkUntapRestriction Affected.Attached],
       Face.attackCosts = [AttackCost.MkAttackCost Affected.Attached (PerAttacker.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 2])) AttackCostScope.Controller],
       Face.additionalCosts = [CostComponent.TapThis],
+      Face.maximumX = Just Quantity.ManaValue,
       Face.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing (Cost.MkCost (Just (ManaCost.MkManaCost [])) [])],
       Face.costReductions = [CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 3]) (Quantity.Literal 1)],
       Face.counterability = Counterability.CantBeCountered,
@@ -269,6 +272,7 @@ populatedFaceJson =
     <> "\"untapRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}],"
     <> "\"attackCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perAttacker\":{\"type\":\"Fixed\",\"value\":[{\"type\":\"Generic\",\"value\":2}]},\"scope\":{\"type\":\"Controller\"}}],"
     <> "\"additionalCosts\":[{\"type\":\"TapThis\"}],"
+    <> "\"maximumX\":{\"type\":\"ManaValue\"},"
     <> "\"alternativeCosts\":[{\"cost\":{\"mana\":[]}}],"
     <> "\"costReductions\":[{\"amount\":[{\"type\":\"Generic\",\"value\":3}],\"perEach\":{\"type\":\"Literal\",\"value\":1}}],"
     <> "\"counterability\":{\"type\":\"CantBeCountered\"},"

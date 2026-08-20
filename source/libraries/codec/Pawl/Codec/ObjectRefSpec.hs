@@ -76,6 +76,15 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.codec
       ObjectRef.EachPlayer
       " {\"type\":\"EachPlayer\"} "
+  -- Nullary like EachPlayer above, and for CR 102.1 rather than an economy: the
+  -- perspective an opponent is relative to is CR 109.5's "you", which the
+  -- resolution supplies, so the arm has no player to carry.
+  Spec.it s "EachOpponent" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      ObjectRef.EachOpponent
+      " {\"type\":\"EachOpponent\"} "
   -- Nullary like EachPlayer above, and for a rule: CR 614.12a made the choice as
   -- the source entered, so the ref names it rather than restating it.
   Spec.it s "ChosenPlayer" $
@@ -250,7 +259,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
   Spec.it s "every arm carries a distinct tag" $
     Spec.assertEqWith
       s
-      "a slot, a battlefield sweep, a graveyard sweep, the hand sweep, the linked exile sweep, the stack sweep, the player sweep, the chosen player, a library's top card, a chosen graveyard card, a chosen card in hand, a chosen card from among a group and a random card in hand all encode differently"
+      "a slot, a battlefield sweep, a graveyard sweep, the hand sweep, the linked exile sweep, the stack sweep, the player sweep, the opponent sweep, the chosen player, a library's top card, a chosen graveyard card, a chosen card in hand, a chosen card from among a group and a random card in hand all encode differently"
       ( length
           ( List.nub
               [ Codec.encode ObjectRef.codec (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
@@ -260,6 +269,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardExiledWithSource Nothing),
                 Codec.encode ObjectRef.codec (ObjectRef.EachSpell (Filter.Not Filter.IsSource)),
                 Codec.encode ObjectRef.codec ObjectRef.EachPlayer,
+                Codec.encode ObjectRef.codec ObjectRef.EachOpponent,
                 Codec.encode ObjectRef.codec ObjectRef.ChosenPlayer,
                 Codec.encode ObjectRef.codec (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 3))),
                 Codec.encode ObjectRef.codec (ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil (PlayerRef.Relative PlayerRelation.You) (Filter.Not (Filter.HasCardType CardType.Land)))),
@@ -270,12 +280,15 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
               ]
           )
       )
-      14
-  -- A tag the decoder does not know is an error rather than a silent slot.
+      15
+  -- A tag the decoder does not know is an error rather than a silent slot. The
+  -- tag has to be one no arm will ever claim -- @EachOpponent@ stood here until
+  -- that became a real arm, and the case then failed rather than going quiet,
+  -- which is the direction this wants to fail in.
   Spec.it s "an unknown tag is rejected" $
     Spec.assertBool
       s
-      (Either.isLeft (Common.parse (Text.pack " {\"type\":\"EachOpponent\"} ") >>= Codec.decode ObjectRef.codec))
+      (Either.isLeft (Common.parse (Text.pack " {\"type\":\"NotAnObjectRef\"} ") >>= Codec.decode ObjectRef.codec))
       "expected a decode failure"
   -- A bare string was the slot arm's whole spelling before #1304. It is not a
   -- ref at all now, which is what stops a card file written against the old

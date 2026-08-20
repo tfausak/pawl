@@ -1395,6 +1395,7 @@ rewriteObjectRef pairs ref = case ref of
   ObjectRef.EachCardExiledWithSource f -> ObjectRef.EachCardExiledWithSource (fmap (Filter.rewrite pairs) f)
   ObjectRef.EachSpell f -> ObjectRef.EachSpell (Filter.rewrite pairs f)
   ObjectRef.EachPlayer -> ref
+  ObjectRef.EachOpponent -> ref
   ObjectRef.ChosenPlayer -> ref
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary p c) -> ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary p (rewriteQuantity pairs c))
   ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil p f) -> ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil p (Filter.rewrite pairs f))
@@ -1437,6 +1438,11 @@ rewriteFace pairs face = List.foldl' apply1 face pairs
               Face.keywords = Set.map (Filter.rewriteKeyword pair) (Face.keywords renamed),
               -- CR 208.2a's star, unevaluated as at layer 3.
               Face.characteristicPT = fmap (rewriteQuantity pair) (Face.characteristicPT renamed),
+              -- CR 101.1's ceiling on X, whose Quantity can Count a criterion
+              -- naming a land type word. A regression fence: neither printing
+              -- pairs a bounded X with one -- both say "the greatest toughness
+              -- among creatures you control" -- so no test can falsify it.
+              Face.maximumX = fmap (rewriteQuantity pair) (Face.maximumX renamed),
               Face.spell = rewriteModal pair (Face.spell renamed),
               Face.activatedAbilities = fmap (rewriteActivatedAbility pair) (Face.activatedAbilities renamed),
               Face.triggeredAbilities = fmap (rewriteTriggeredAbility pair) (Face.triggeredAbilities renamed),

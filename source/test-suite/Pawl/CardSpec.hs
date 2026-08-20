@@ -280,6 +280,7 @@ vanillaFace name typeLine =
       Face.openingHandActions = [],
       Face.specialActions = [],
       Face.additionalCosts = [],
+      Face.maximumX = Nothing,
       Face.alternativeCosts = [],
       Face.costReductions = [],
       Face.enchant = [],
@@ -1133,6 +1134,10 @@ cardAuthoredEffects card =
 cardCounts :: Face.Face Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
 cardCounts card =
   concatMap quantityCounts (Maybe.maybeToList (Face.characteristicPT card))
+    -- CR 101.1's ceiling on CR 601.2b's X, which every printing states as a
+    -- per-board amount (Soul Immolation's "the greatest toughness among
+    -- creatures you control").
+    <> concatMap quantityCounts (Maybe.maybeToList (Face.maximumX card))
     <> concatMap (\(Power.MkPower quantity) -> quantityCounts quantity) (Maybe.maybeToList (Face.power card))
     <> concatMap (\(Toughness.MkToughness quantity) -> quantityCounts quantity) (Maybe.maybeToList (Face.toughness card))
     <> concatMap staticAbilityCounts (Face.staticAbilities card)
@@ -2604,6 +2609,7 @@ costComponentFilters component = case component of
   CostComponent.RemoveLoyaltyFromThis _ -> []
   CostComponent.PutPlusOneCountersOnThis _ -> []
   CostComponent.Blight _ -> []
+  CostComponent.BlightX -> []
   CostComponent.ExileThisFromGraveyard -> []
 
 -- The Filter narrowing a target slot's CR 115 pool -- "target creature with
@@ -2654,6 +2660,7 @@ objectRefFilters ref = case ref of
   ObjectRef.EachSpell f -> [f]
   -- Molten Disaster's "each player" holds no Filter to lint.
   ObjectRef.EachPlayer -> []
+  ObjectRef.EachOpponent -> []
   -- Stuffy Doll's "the chosen player" holds none either: the seat was named by a
   -- choice made on entry, never by characteristics.
   ObjectRef.ChosenPlayer -> []
@@ -3516,12 +3523,13 @@ activatedAbilityFilters ability =
     <> modalFilters (ActivatedAbility.modal ability)
 
 -- EVERY Filter position reachable from a card, each paired with whether an attach
--- frames it. Twenty-four of Pawl.Types.Face's thirty-three fields can hold one, and
--- here is where each one's comes from:
+-- frames it. Most of Pawl.Types.Face's fields can hold one, and here is where
+-- each one's comes from:
 --
 --   * `keywords` -- CR 702.29e typecycling (Ash Barrens' landcycling).
 --   * `power`, `toughness`, `characteristicPT` -- CR 208.2's printed star,
 --     through a Count.
+--   * `maximumX` -- CR 101.1's ceiling on X, through a Count (Soul Immolation).
 --   * `staticAbilities` -- the affected set, CR 604.2's "as long as" condition,
 --     and the layer-6/7 modifications' own keywords and Counts.
 --   * `replacementEffects` -- CR 614.1's counter-placement pattern, plus CR
@@ -3544,7 +3552,7 @@ activatedAbilityFilters ability =
 --   * `mulliganActions` (CR 103.5b) and `openingHandActions` (CR 103.6) -- the two
 --     pregame actions, which `cardResolutionEffects` above does not reach.
 --
--- The other nine fields hold none: `name`, `manaCost`, `typeLine`, `loyalty`,
+-- The remaining fields hold none: `name`, `manaCost`, `typeLine`, `loyalty`,
 -- `defense`, `colorIndicator`, `counterability`, `castingPermissions` and
 -- `castingRestrictions`. That is checkable rather than
 -- asserted: exactly sixteen modules under Pawl.Types import Pawl.Types.Filter --
@@ -3553,7 +3561,7 @@ activatedAbilityFilters ability =
 -- TriggerCondition, TurnUpRewrite and ZoneChangePattern -- and nothing those nine
 -- fields reach is one of them.
 --
--- Twenty-four and nine is thirty-three, the whole record.
+-- The two lists together are the whole record.
 --
 -- Every case BELOW this function is exhaustive with no catch-all, so a new
 -- constructor on any of those types fails to compile until it is classified. This
@@ -3565,6 +3573,7 @@ cardFilters card =
   unframed
     ( concatMap keywordFilters (Set.toList (Face.keywords card))
         <> concatMap quantityFilters (Maybe.maybeToList (Face.characteristicPT card))
+        <> concatMap quantityFilters (Maybe.maybeToList (Face.maximumX card))
         <> concatMap (\(Power.MkPower quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.power card))
         <> concatMap (\(Toughness.MkToughness quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.toughness card))
         <> concatMap printedReplacementFilters (Face.replacementEffects card)
@@ -4048,6 +4057,29 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- unless its controller pays {X}", is the printing that would). Adding the
   -- disjunct unexercised would weaken the sweep silently; without it the first
   -- such card reddens this lint, which is where its author wants to be.
+  -- CR 101.1's ceiling, as a TOTALITY guard on Pawl.Engine.Cost.greatestPayableX:
+  -- that ascending search stops either because the demand eventually outruns the
+  -- board (Toxic Deluge's "pay X life", CR 119.4) or because the card states a
+  -- maximum (Soul Immolation's blight X, whose payability CR 701.68b does not
+  -- tie to the number). A printing with neither would climb forever, so it is a
+  -- card-data error rather than an engine one, and this is where it is caught.
+  --
+  -- Over the SPELL costs alone, `spellCostsOf`'s scope: an activated ability's X
+  -- is announced through CR 602.2b against its own cost and gets no ceiling from
+  -- the face (#1985), so the sweep would have nothing to check it against.
+  Spec.it s "CR 101.1 every printing whose X the board cannot refuse states a maximum for it" $ do
+    ps <- S.allPrintings s
+    let unrefusable c = declaresVariable c && not (Cost.demandGrowsWithX c)
+        unrefusableX = any unrefusable . spellCostsOf
+        unbounded f = unrefusableX f && Maybe.isNothing (Face.maximumX f)
+        offenders = filter (anyFace unbounded . Printing.card) ps
+    -- Guards the sweep against passing vacuously: the pool must hold a card
+    -- whose X reaches a cost only through a component with no growing demand.
+    Spec.assertBool
+      s
+      (any (anyFace unrefusableX . Printing.card) ps)
+      "the pool has a printing whose X the board cannot refuse"
+    Spec.assertEqWith s "every one of them states a maximum" (fmap (S.nameOf . Printing.card) offenders) []
   Spec.it s "CR 602.2b every activated ability that reads X declares {X} in its own cost" $ do
     ps <- S.allPrintings s
     let abilitiesOf p = fmap ((,) (Face.name (S.combinedFace p))) (Face.activatedAbilities (S.combinedFace p))
@@ -5025,6 +5057,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           ObjectRef.EachCardExiledWithSource {} -> False
           ObjectRef.EachSpell _ -> False
           ObjectRef.EachPlayer -> False
+          ObjectRef.EachOpponent -> False
           -- Names a player and so moves no object at all, the arm above's answer.
           ObjectRef.ChosenPlayer -> False
           ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player depth) -> case depth of

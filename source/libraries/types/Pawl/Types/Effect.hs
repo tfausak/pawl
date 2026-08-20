@@ -925,9 +925,12 @@ data Effect card
     -- Perfect Morcant's "each opponent blights 1"), and each named player picks
     -- from THEIR OWN creatures and is asked separately.
     --
-    -- Not implemented: a non-literal N. The one printed (Soul Immolation's
-    -- "blight X") is a COST, and Pawl.Types.CostComponent.Blight carries a
-    -- Natural (gap #1646).
+    -- The Quantity has no NON-LITERAL producer in `data/cards/`, and both
+    -- printings that would be one state their amount as a COST rather than as an
+    -- instruction -- Soul Immolation's additional cost and Blighted Nightmare's
+    -- activation cost, which are Pawl.Types.CostComponent.BlightX. Scryfall
+    -- `o:/[Bb]light X/`, 2026-08-20, returns those two and nothing else; a
+    -- printing reading "blight X" after a colon or a period would refute it.
     Blight PlayerQuantity.PlayerQuantity
   | -- | CR 701.54a: the Ring tempts the resolving controller -- they get an emblem
     -- named The Ring if they have none (CR 701.54c), then choose a creature they

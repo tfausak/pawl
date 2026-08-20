@@ -106,6 +106,7 @@ faceDownFace listed =
       Face.enchant = [],
       Face.counterability = Counterability.Counterable,
       Face.additionalCosts = [],
+      Face.maximumX = Nothing,
       Face.alternativeCosts = [],
       Face.costReductions = [],
       Face.playerAbilities = [],
@@ -296,7 +297,14 @@ merge2 l r =
       Face.toughness = firstJust (Face.toughness l) (Face.toughness r),
       Face.loyalty = firstJust (Face.loyalty l) (Face.loyalty r),
       Face.defense = firstJust (Face.defense l) (Face.defense r),
-      Face.characteristicPT = firstJust (Face.characteristicPT l) (Face.characteristicPT r)
+      Face.characteristicPT = firstJust (Face.characteristicPT l) (Face.characteristicPT r),
+      -- CR 709.4c: a sentence bounding X is an ability in a half's text box, so
+      -- the combined view keeps whichever half prints one. The first, the four
+      -- boxes above's rule -- and unreachable for the same reason
+      -- Face.costReductions is, CR 709.3b putting ONE half on the stack for
+      -- Pawl.Engine.Cost to price and Pawl.Engine.Cast to announce against. Here
+      -- so that a record UPDATE does not keep the left half's silently.
+      Face.maximumX = firstJust (Face.maximumX l) (Face.maximumX r)
       -- Face.counterability is NOT listed: record update keeps the left half's,
       -- and writing `Face.counterability l` here would be a no-op. CR 113.6g is
       -- a per-half ability, so the combined view taking the left half's is a
@@ -848,6 +856,7 @@ subtractHalf face =
       Face.enchant = [],
       Face.counterability = Counterability.Counterable,
       Face.additionalCosts = [],
+      Face.maximumX = Nothing,
       Face.alternativeCosts = [],
       Face.costReductions = [],
       Face.playerAbilities = [],

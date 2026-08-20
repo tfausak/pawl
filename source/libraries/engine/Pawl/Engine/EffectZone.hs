@@ -68,6 +68,7 @@ zoneFunctionedFrom effect = case effect of
     ObjectRef.EachCardExiledWithSource {} -> Nothing
     ObjectRef.EachSpell _ -> Nothing
     ObjectRef.EachPlayer -> Nothing
+    ObjectRef.EachOpponent -> Nothing
     ObjectRef.ChosenPlayer -> Nothing
     ObjectRef.TopOfLibrary {} -> Nothing
     ObjectRef.TopOfLibraryUntil {} -> Nothing
