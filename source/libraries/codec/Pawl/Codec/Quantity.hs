@@ -64,6 +64,7 @@ codec =
       -- at, so only the designation is on the wire.
       Arm.payload "HasDesignation" Designation.codec Quantity.HasDesignation (\x -> case x of Quantity.HasDesignation y -> Just y; _ -> Nothing),
       Arm.nullary "WasKicked" Quantity.WasKicked,
+      Arm.nullary "ClassLevel" Quantity.ClassLevel,
       -- CR 508.3b's record, with only a PlayerRef on the wire: what is counted
       -- comes from the combat record rather than from anything the card names.
       Arm.payload "OpponentsAttacked" PlayerRef.codec Quantity.OpponentsAttacked (\x -> case x of Quantity.OpponentsAttacked y -> Just y; _ -> Nothing),

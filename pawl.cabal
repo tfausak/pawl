@@ -154,6 +154,8 @@ library codec
     Pawl.Codec.ChosenCardInGraveyardSpec
     Pawl.Codec.ChosenCardInHand
     Pawl.Codec.ChosenCardInHandSpec
+    Pawl.Codec.ClassLevel
+    Pawl.Codec.ClassLevelSpec
     Pawl.Codec.Clause
     Pawl.Codec.ClauseIndex
     Pawl.Codec.ClauseIndexSpec
@@ -505,6 +507,8 @@ library codec
     Pawl.Codec.SelfCountersReachedSpec
     Pawl.Codec.SetBasePowerToughness
     Pawl.Codec.SetBasePowerToughnessSpec
+    Pawl.Codec.SetClassLevel
+    Pawl.Codec.SetClassLevelSpec
     Pawl.Codec.SetPowerToughness
     Pawl.Codec.SetPowerToughnessSpec
     Pawl.Codec.ShuffleIntoLibrary
@@ -950,6 +954,7 @@ library types
     Pawl.Types.ChosenCardInHand
     Pawl.Types.Claim
     Pawl.Types.ClaimAxis
+    Pawl.Types.ClassLevel
     Pawl.Types.Clause
     Pawl.Types.ClauseIndex
     Pawl.Types.Color
@@ -1183,6 +1188,7 @@ library types
     Pawl.Types.SearchDestination
     Pawl.Types.SelfCountersReached
     Pawl.Types.SetBasePowerToughness
+    Pawl.Types.SetClassLevel
     Pawl.Types.SetPowerToughness
     Pawl.Types.ShuffleIntoLibrary
     Pawl.Types.Sickness
@@ -1303,6 +1309,7 @@ test-suite pawl-test-suite
     Pawl.CardsSpec
     Pawl.CaseSpec
     Pawl.CastSpec
+    Pawl.ClassSpec
     Pawl.CodecIntegrationSpec
     Pawl.ColorSpec
     Pawl.CombatEffectSpec

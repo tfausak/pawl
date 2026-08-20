@@ -318,6 +318,28 @@ data Quantity
     --
     -- A LEAF: it holds no Quantity.
     HasDesignation Designation.Designation
+  | -- | CR 716.2b / CR 716.2d: the LEVEL of the object this quantity is evaluated
+    -- against -- CR 716.2a's "activate only if this Class is level N-1", carried
+    -- as an activated ability's clause condition, and its "as long as this Class
+    -- is level N or greater", carried as a static ability's CR 604.2 clause.
+    --
+    -- HasDesignation's position exactly, with a number where that has a Bool: rule
+    -- 716.2b says a level IS a designation, so this reads a mark rather than a
+    -- characteristic, and it names no object at all -- like Power and
+    -- ObjectCounters it takes the one the evaluation is aimed at, through the same
+    -- injected ViewOf. Reaching another permanent's level is AgainstSlot's job.
+    --
+    -- NOT ObjectCounters over CounterKind.Level, and CR 716.4 is why: a leveler's
+    -- level counters and a Class's level are different marks that the rules
+    -- explicitly keep from interacting.
+    --
+    -- An object with NO level reads as 1 rather than as 0 or as unanswered, which
+    -- is CR 716.2d in the one place it can be enforced for every asker
+    -- (Pawl.Types.ClassLevel.defaulted). Nothing survives only for an object the
+    -- view cannot describe at all, as ObjectCounters above.
+    --
+    -- A LEAF: it holds no Quantity.
+    ClassLevel
   | -- | CR 702.33d: was the spell this quantity is evaluated against kicked? 1 if
     -- so and 0 if not -- Burst Lightning's "if this spell was kicked", the clause
     -- condition rule 702.33e makes an ability of its own.

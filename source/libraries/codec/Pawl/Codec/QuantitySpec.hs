@@ -196,6 +196,14 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.HasDesignation Designation.Suspected)
       " {\"type\":\"HasDesignation\",\"value\":{\"type\":\"Suspected\"}} "
+  -- CR 716.2b: the object's LEVEL, also with nothing on the wire, and also not a
+  -- member of Pawl.Types.Designation -- rule 716.2b's designation is a number.
+  Spec.it s "ClassLevel" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      Quantity.ClassLevel
+      " {\"type\":\"ClassLevel\"} "
   -- CR 702.33d, with nothing on the wire: a spell's kicked flag is not a member of
   -- Pawl.Types.Designation, so it keeps a tag of its own.
   Spec.it s "WasKicked" $

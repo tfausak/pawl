@@ -202,6 +202,7 @@ import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
+import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotArity as SlotArity
@@ -481,6 +482,7 @@ quantityCounts quantity = case quantity of
   -- CR 103.1's, read the same way and holding the same nothing.
   Quantity.Type.IsStartingPlayer _ -> []
   Quantity.Type.HasDesignation _ -> []
+  Quantity.Type.ClassLevel -> []
   Quantity.Type.WasKicked -> []
   -- CR 122.1's per-player counter tally, another such scalar.
   Quantity.Type.PlayerCounters {} -> []
@@ -815,6 +817,7 @@ effectCounts effect = case effect of
   Effect.CreateEmblem card -> overFaces cardCounts card
   Effect.BecomeMonarch _ -> []
   Effect.Designate (Designate.MkDesignate _ _) -> []
+  Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> []
   Effect.Unsuspect _ -> []
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []
@@ -993,6 +996,7 @@ effectNestedEffects effect = case effect of
   Effect.CreateEmblem {} -> []
   Effect.BecomeMonarch {} -> []
   Effect.Designate {} -> []
+  Effect.SetClassLevel {} -> []
   Effect.DealDamage {} -> []
   Effect.ModifyTarget {} -> []
   Effect.AddMana {} -> []
@@ -1206,6 +1210,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.PlayerCounters {} -> False
   Quantity.Type.ObjectCounters {} -> False
   Quantity.Type.HasDesignation {} -> False
+  Quantity.Type.ClassLevel -> False
   Quantity.Type.WasKicked -> False
   Quantity.Type.OpponentsAttacked {} -> False
   Quantity.Type.CardsDiscardedThisTurn {} -> False
@@ -1467,6 +1472,7 @@ effectReplacements effect = case effect of
   Effect.RequireBlock {} -> []
   Effect.BecomeMonarch _ -> []
   Effect.Designate (Designate.MkDesignate _ _) -> []
+  Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> []
   Effect.Unsuspect _ -> []
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []
@@ -2081,6 +2087,7 @@ effectMintedFaces effect = case effect of
   Effect.RequireBlock {} -> []
   Effect.BecomeMonarch _ -> []
   Effect.Designate (Designate.MkDesignate _ _) -> []
+  Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> []
   Effect.Unsuspect _ -> []
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []
@@ -3402,6 +3409,7 @@ effectFilters effect = case effect of
   Effect.CreateEmblem card -> overFaces cardFilters card
   Effect.BecomeMonarch _ -> []
   Effect.Designate (Designate.MkDesignate _ _) -> []
+  Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> []
   Effect.Unsuspect ref -> sourceHosted (objectRefFilters ref)
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []

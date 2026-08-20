@@ -187,6 +187,7 @@ import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
@@ -420,6 +421,7 @@ slotsOf effect = case effect of
   Effect.BecomeMonarch target -> monarchTargetSlots target
   -- A READ: the slot names the permanent gaining the designation.
   Effect.Designate (Designate.MkDesignate _ slot) -> oneSlot slot
+  Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ slot) -> oneSlot slot
   -- A READ of whatever slot the ref names; CR 701.60a's ending can reach a set.
   Effect.Unsuspect ref -> objectRefSlots ref
   -- A READ, Designate's: the slot names where rule 702.100a's counter goes.
@@ -609,6 +611,7 @@ slotsAreExhaustive effect = case effect of
   Effect.BecomeMonarch MonarchTarget.ControllerOfSource -> False
   Effect.BecomeMonarch (MonarchTarget.InSlot _) -> True
   Effect.Designate (Designate.MkDesignate _ _) -> True
+  Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> True
   Effect.Unsuspect _ -> True
   Effect.Evolve _ -> True
   Effect.Mentor _ -> True
@@ -735,6 +738,7 @@ readsX = any effectReadsX
       Effect.CreateEmblem {} -> False
       Effect.BecomeMonarch {} -> False
       Effect.Designate (Designate.MkDesignate _ _) -> False
+      Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> False
       Effect.Unsuspect _ -> False
       Effect.Evolve _ -> False
       Effect.Mentor _ -> False
@@ -830,6 +834,7 @@ searchesLibrary effect = case effect of
   Effect.CreateEmblem {} -> False
   Effect.BecomeMonarch {} -> False
   Effect.Designate (Designate.MkDesignate _ _) -> False
+  Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> False
   Effect.Unsuspect _ -> False
   Effect.Evolve _ -> False
   Effect.Mentor _ -> False
@@ -967,6 +972,7 @@ boundSlots effect = case effect of
   Effect.CreateEmblem {} -> Set.empty
   Effect.BecomeMonarch {} -> Set.empty
   Effect.Designate (Designate.MkDesignate _ _) -> Set.empty
+  Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> Set.empty
   Effect.Unsuspect _ -> Set.empty
   Effect.Evolve _ -> Set.empty
   Effect.Mentor _ -> Set.empty
@@ -3798,6 +3804,32 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             State.modify'
               (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.designations = Set.insert designation (Object.designations o)}) target (GameState.objects g)})
             State.modify' (Event.recordEvent (GameEvent.BecameDesignated (BecameDesignated.MkBecameDesignated designation target)))
+      _ -> pure ()
+  -- CR 716.2a: "This Class's level becomes N." A state write on the slot's
+  -- permanent, not a CR 613 modification -- CR 716.2b makes a level a designation,
+  -- which is what Object.classLevel holds and what the Designate arm above writes
+  -- the boolean marks into.
+  --
+  -- BECOMES rather than increments, and the level bar's own
+  -- ActivatedAbility.condition is the only thing that keeps the ladder in order
+  -- (CR 716.2a's "activate only if this Class is level N-1"). Nothing is re-checked
+  -- here, which is CR 602.5d: an activated ability whose activation condition is no
+  -- longer met when it resolves still resolves.
+  --
+  -- A player recipient, an illegal slot (CR 608.2b) and an id naming no object all
+  -- write nothing -- Designate's postures.
+  --
+  -- Not implemented: CR 716's "when this Class becomes level N" triggered
+  -- abilities, which want an event carrying the level before and after, the way
+  -- GameEvent.CountersPut carries a counter tally for CR 603.2's threshold
+  -- crossing (#1944).
+  Effect.SetClassLevel (SetClassLevel.MkSetClassLevel level slot) ->
+    case legalOne slot legal of
+      Just recipient -> case Recipient.objectOf recipient of
+        Nothing -> pure ()
+        Just target ->
+          State.modify'
+            (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.classLevel = Just level}) target (GameState.objects g)})
       _ -> pure ()
   -- CR 701.60a's other ending: undoes Designate's write for that one designation.
   -- CR 701.60c's menace and can't-block are read off the set live, so nothing

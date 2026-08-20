@@ -35,6 +35,7 @@ import qualified Pawl.Types.ManaAddition as ManaAddition
 import Pawl.Types.ManaProduction (ManaProduction)
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 605.1a: an activated ability is a mana ability if it could add mana AND
@@ -176,6 +177,7 @@ manaProduced effect = case effect of
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing
   Effect.Designate (Designate.MkDesignate _ _) -> Nothing
+  Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> Nothing
   Effect.Unsuspect _ -> Nothing
   Effect.Evolve _ -> Nothing
   Effect.Mentor _ -> Nothing
@@ -336,6 +338,7 @@ movesLibraryCard effect = case effect of
   Effect.RequireBlock {} -> False
   Effect.CreateEmblem {} -> False
   Effect.Designate (Designate.MkDesignate _ _) -> False
+  Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> False
   Effect.Unsuspect _ -> False
   Effect.Evolve _ -> False
   Effect.Mentor _ -> False

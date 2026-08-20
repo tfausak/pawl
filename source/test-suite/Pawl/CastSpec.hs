@@ -673,6 +673,7 @@ handInPlay printing board =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.ventureRoom = Nothing,
+            Object.classLevel = Nothing,
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
             Object.kicked = False,

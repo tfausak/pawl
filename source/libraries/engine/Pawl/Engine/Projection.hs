@@ -117,6 +117,7 @@ import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
+import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.StaticAbility as StaticAbility
@@ -619,6 +620,9 @@ viewOfCard face =
           -- The designations ride an OBJECT, and each of those rules gives its
           -- designation only to a permanent.
           Filter.designations = Set.empty,
+          -- CR 716.2b gives a level to a PERMANENT, and this builder describes a
+          -- printed face.
+          Filter.classLevel = Nothing,
           Filter.kicked = False,
           -- CR 602.1 / 605.1a off the PRINTED face: the card's printed abilities
           -- plus rule 702's HAND ones (CR 702.29b, CR 702.77b), not the
@@ -749,6 +753,11 @@ viewOfCharacteristics peers oid pc controller counters gs =
       Filter.ringBearerFor = Game.lookupObject oid gs >>= Object.ringBearerFor,
       -- Designations rather than characteristics: ringBearerFor's posture above.
       Filter.designations = maybe Set.empty Object.designations (Game.lookupObject oid gs),
+      -- CR 716.2b: a designation too, so `designations`' posture again -- and
+      -- Nothing for an id naming no object leaves CR 716.2d to answer level 1 at
+      -- the read, which is what a CR 608.2h asker gets for a permanent that is
+      -- gone.
+      Filter.classLevel = Game.lookupObject oid gs >>= Object.classLevel,
       -- CR 702.33d: read live off the object, so the CR 608.2h path answers False
       -- for a spell that has left the stack.
       Filter.kicked = maybe False Object.kicked (Game.lookupObject oid gs),
@@ -1339,6 +1348,7 @@ rewriteEffect pairs effect = case effect of
   Effect.CreateEmblem card -> Effect.CreateEmblem (rewriteCard pairs card)
   Effect.BecomeMonarch {} -> effect
   Effect.Designate (Designate.MkDesignate _ _) -> effect
+  Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> effect
   Effect.Unsuspect ref -> Effect.Unsuspect (rewriteObjectRef pairs ref)
   Effect.Evolve _ -> effect
   Effect.Mentor _ -> effect
@@ -1636,6 +1646,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.IsMonarch _ -> quantity
   Quantity.Type.IsStartingPlayer _ -> quantity
   Quantity.Type.HasDesignation _ -> quantity
+  Quantity.Type.ClassLevel -> quantity
   Quantity.Type.WasKicked -> quantity
   Quantity.Type.PlayerCounters {} -> quantity
   Quantity.Type.ObjectCounters _ -> quantity
@@ -2567,6 +2578,7 @@ quantityReads q = case q of
   Quantity.Type.PlayerCounters {} -> Set.empty
   Quantity.Type.ObjectCounters _ -> Set.empty
   Quantity.Type.HasDesignation _ -> Set.empty
+  Quantity.Type.ClassLevel -> Set.empty
   Quantity.Type.WasKicked -> Set.empty
   Quantity.Type.OpponentsAttacked _ -> Set.empty
   Quantity.Type.CardsDiscardedThisTurn _ -> Set.empty

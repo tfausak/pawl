@@ -5,6 +5,7 @@ import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
@@ -489,6 +490,35 @@ data Object = MkObject
     -- incarnation. Cleared anyway, because the reset set is the rule and an
     -- exception would have to be argued rather than assumed.
     ventureRoom :: Maybe RoomIndex.RoomIndex,
+    -- | CR 716.2b: the LEVEL designation this permanent has, or Nothing for the
+    -- overwhelming majority of permanents, which have never been given one. "A
+    -- level is a designation that any permanent can have."
+    --
+    -- On every Object rather than only on a Class, because rule 716.2b says "any
+    -- permanent" and then "a Class retains its level even if it stops being a
+    -- Class" -- so the mark cannot be keyed off the subtype it usually arrives
+    -- with. Nothing here reads the type line, and that is the rule rather than an
+    -- oversight.
+    --
+    -- A Maybe rather than a Natural initialised to 1: CR 716.2d treats a
+    -- permanent with NO level as level 1 when something asks, which
+    -- Pawl.Types.ClassLevel.defaulted does at the read, leaving "has no level" its
+    -- own representation. The two are indistinguishable to every reader today and
+    -- the rule still writes them as different states.
+    --
+    -- NOT a counter, which is the whole of CR 716.4's separation from rule 711's
+    -- levelers -- see Pawl.Types.CounterKind's Level arm, which says the same
+    -- thing from the other side. The two must not share a field.
+    --
+    -- NOT a copiable value (CR 716.2b's last sentence), and that falls out with
+    -- nothing to enforce, exactly as ringBearerFor's note above explains: a copy
+    -- effect's payload is a ProjectedCharacteristics, never an Object.
+    --
+    -- Per-incarnation state, like damage and counters: cleared by newIncarnation,
+    -- because CR 400.7 makes the moved object a new one. CR 716.2b's retention
+    -- clause is about a permanent that stops being a CLASS, not about one that
+    -- changes zones.
+    classLevel :: Maybe ClassLevel.ClassLevel,
     -- | CR 709.5c: the UNLOCKED DESIGNATIONS this permanent has. "'Left half
     -- unlocked' and 'right half unlocked' are designations that a permanent on
     -- the battlefield can have. Together, they are called the unlocked
@@ -755,6 +785,7 @@ newIncarnation object =
       ringBearerFor = Nothing,
       protector = Nothing,
       ventureRoom = Nothing,
+      classLevel = Nothing,
       unlockedHalves = Set.empty,
       designations = Set.empty,
       kicked = False,

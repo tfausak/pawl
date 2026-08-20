@@ -59,6 +59,7 @@ blackCreature =
       Filter.counters = Map.empty,
       Filter.ringBearerFor = Nothing,
       Filter.designations = Set.empty,
+      Filter.classLevel = Nothing,
       Filter.kicked = False,
       -- CR 602.1 / 605.1a: a vanilla creature as far as this axis goes, so the
       -- atom's own cases below say which view they want rather than inheriting it.
@@ -95,6 +96,7 @@ devoidBigCreature =
       Filter.counters = Map.empty,
       Filter.ringBearerFor = Nothing,
       Filter.designations = Set.empty,
+      Filter.classLevel = Nothing,
       Filter.kicked = False,
       Filter.nonManaActivatedAbility = False
     }

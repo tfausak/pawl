@@ -55,6 +55,7 @@ import qualified Pawl.Codec.Replace as Replace
 import qualified Pawl.Codec.RequireBlock as RequireBlock
 import qualified Pawl.Codec.Reveal as Reveal
 import qualified Pawl.Codec.Search as Search
+import qualified Pawl.Codec.SetClassLevel as SetClassLevel
 import qualified Pawl.Codec.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Codec.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Codec.SlotName as SlotName
@@ -137,6 +138,7 @@ codec cardCodec =
       Arm.payload "CreateEmblem" cardCodec Effect.CreateEmblem (\x -> case x of Effect.CreateEmblem y -> Just y; _ -> Nothing),
       Arm.payload "BecomeMonarch" MonarchTarget.codec Effect.BecomeMonarch (\x -> case x of Effect.BecomeMonarch y -> Just y; _ -> Nothing),
       Arm.payload "Designate" Designate.codec Effect.Designate (\x -> case x of Effect.Designate y -> Just y; _ -> Nothing),
+      Arm.payload "SetClassLevel" SetClassLevel.codec Effect.SetClassLevel (\x -> case x of Effect.SetClassLevel y -> Just y; _ -> Nothing),
       Arm.payload "Unsuspect" ObjectRef.codec Effect.Unsuspect (\x -> case x of Effect.Unsuspect y -> Just y; _ -> Nothing),
       Arm.payload "Evolve" SlotName.codec Effect.Evolve (\x -> case x of Effect.Evolve y -> Just y; _ -> Nothing),
       Arm.payload "Mentor" SlotName.codec Effect.Mentor (\x -> case x of Effect.Mentor y -> Just y; _ -> Nothing),

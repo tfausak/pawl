@@ -208,6 +208,7 @@ enter pid = do
                 Object.foretold = Nothing,
                 Object.ringBearerFor = Nothing,
                 Object.protector = Nothing,
+                Object.classLevel = Nothing,
                 -- CR 309.4a: "as a player puts a dungeon they own into the command
                 -- zone, they put their venture marker on the topmost room".
                 Object.ventureRoom = Just RoomIndex.topmost,
