@@ -5,6 +5,11 @@
 -- arming (CR 611.2), the sweeps that end a duration (CR 514.2, 500.5, 611.2a,
 -- 611.2b), and the four gate cards (Master Thief, Hag of Inner Weakness, Jade
 -- Statue, and Soulfire Eruption for "until the END of your next turn").
+--
+-- The two floating-replacement durations have a printed producer each, at the
+-- bottom of the file: Dovin, Hand of Control's -1 for CR 611.2a's turn-relative
+-- one and Old Fat Spider Can't See Me's chapter II for CR 611.2b's conditional
+-- one.
 module Pawl.ExpirySpec where
 
 import qualified Data.List as List
@@ -43,10 +48,10 @@ import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Departure as Departure.Type
-import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
@@ -73,13 +78,10 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
-import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
-import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
-import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.While as While
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -313,28 +315,6 @@ holdsYouControlSource :: PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.Gam
 holdsYouControlSource you source gs =
   Condition.holds (Projection.fullView gs) (Filter.contextFor (Just you) (Just source)) gs source S.youControlSource
 
--- The OTHER carrier's shape of whileEffect: a floating replacement whose expiry
--- is a live condition over `src`. The effect payload is irrelevant to what this
--- proves (only `expiry` and `source` are read by sweepConditional's
--- keepReplacement predicate), so it reuses Support.addRegenShield's
--- DestructionR Regenerate as the shortest available fixture.
-whileReplacement :: ObjectId.ObjectId -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
-whileReplacement src you gs =
-  let (ts, gs1) = Game.freshTimestamp gs
-      active =
-        ActiveReplacement.MkActiveReplacement
-          { ActiveReplacement.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate,
-            ActiveReplacement.source = src,
-            ActiveReplacement.controller = you,
-            ActiveReplacement.timestamp = ts,
-            ActiveReplacement.expiry = Expiry.Type.While (While.MkWhile you S.youControlSource),
-            ActiveReplacement.uses = Uses.Unlimited,
-            ActiveReplacement.origin = ReplacementOrigin.Other,
-            ActiveReplacement.rider = Nothing,
-            ActiveReplacement.slots = Map.empty
-          }
-   in S.addReplacement active gs1
-
 -- The Master Thief shape (piker source, War Mammoth target), built from the
 -- two loaded printings each test case supplies.
 board :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
@@ -405,22 +385,6 @@ conditionalSpec s registry = Spec.describe s "Conditional" $ do
         gone = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [srcId])
         settled = S.runPure S.identityAnswer gone Engine.settleForPriority
     Spec.assertEqWith s "control reverted at the settle" (Projection.controllerOf targetId settled) (Just S.bob)
-  Spec.it s "CR 611.2b the sweep's replacements half survives while the source stands, then deletes once it doesn't" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    warMammoth <- S.printingOf s registry "War Mammoth"
-    let (srcId, _, gs0) = board piker warMammoth
-        gs = whileReplacement srcId S.alice gs0
-        (unchanged, stillUp) = Engine.runGamePure S.identityAnswer gs Expiry.sweepConditional
-        -- A direct zone change, NOT Event.destroy: the fixture's own
-        -- payload is a DestructionR (Regenerate), so routing the removal
-        -- through the destruction funnel would let it replace/regenerate
-        -- itself instead of leaving the battlefield.
-        gone = S.runPure S.identityAnswer gs (Event.changeZone srcId Zone.Graveyard)
-        (changed, swept) = Engine.runGamePure S.identityAnswer gone Expiry.sweepConditional
-    Spec.assertBool s (not unchanged) "no change while the source stands"
-    Spec.assertEqWith s "the replacement survives" (length (GameState.replacements stillUp)) 1
-    Spec.assertBool s changed "the sweep reports a change once the source is gone"
-    Spec.assertEqWith s "the replacement is gone" (GameState.replacements swept) []
 
 -- Master Thief {2}{U}{U} Creature -- Human Rogue 2/2: "When this creature
 -- enters, gain control of target artifact for as long as you control this
@@ -1600,6 +1564,141 @@ dovinSpec s registry = Spec.describe s "DovinHandOfControl" $ do
     Spec.assertEqWith s "under Dovin, the same Mountain does not" (leg True S.bob) 0
     Spec.assertEqWith s "and alice's own Bolt is untaxed off hers" (leg True S.alice) 1
 
+-- Old Fat Spider Can't See Me {2}{U} Enchantment -- Saga (The Hobbit; name,
+-- cost, type line and Oracle text checked against api.scryfall.com): "I --
+-- Target creature you control gains hexproof for as long as this Saga remains on
+-- the battlefield." / "II -- Prevent all damage that would be dealt by up to one
+-- target creature for as long as this Saga remains on the battlefield." / "III,
+-- IV -- Draw a card."
+--
+-- The pool's producer of CR 611.2b's conditional duration on a floating
+-- REPLACEMENT: every other Effect.PreventAllDamage in data/cards/ arms to end of
+-- turn or to a turn boundary, so Expiry.While reached GameState.replacements
+-- only through a hand-built fixture before this card, and no card at all walked
+-- Resolve.installDamageRow into Expiry.arm. Chapter I is the same duration off
+-- the same source on the CONTINUOUS-EFFECT carrier, which is the contrast the
+-- group's last case reads.
+--
+-- CR 714.4's sacrifice after the final chapter is what gives the condition an
+-- ending inside one game, and the card supplies it itself: the shield goes up at
+-- chapter II and the Saga is gone two chapters later, so both halves of CR
+-- 611.2b -- the duration holding, and the duration over -- are read off one
+-- board and one batch of damage.
+--
+-- "III, IV --" is CR 714.2c's shorthand for two abilities sharing one effect, so
+-- pawl's card writes the two entries that rule says it means.
+
+-- One precombat main phase of alice's: CR 505.4 / 714.3c's turn-based action puts
+-- the next lore counter on, and the priority loop resolves the chapter that
+-- counter crossed.
+advanceSaga :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+advanceSaga answer gs =
+  let atMain =
+        gs
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      advanced = S.runPure answer atMain (Engine.runTurnBasedActions Phase.PrecombatMain)
+   in S.runPure answer advanced Engine.priorityLoop
+
+-- Whether a stored expiry is CR 611.2b's conditional one, without spelling out
+-- the condition the card printed.
+isWhile :: Expiry.Type.Expiry -> Bool
+isWhile expiry = case expiry of
+  Expiry.Type.While {} -> True
+  _ -> False
+
+-- alice's Saga at one lore counter, bob's two creatures, and a library to draw
+-- chapters III and IV from (CR 104.3c). Returns the Saga, the creature chapter II
+-- shields, bob's other creature, and the board one precombat main phase on --
+-- that phase is what puts the second lore counter on and fires chapter II.
+--
+-- bob's War Mammoth earns its place twice, Dovin's board's reasons: it is the
+-- SECOND candidate chapter II's target choice picks between (CR 603.3d puts a
+-- triggered ability's targets through CR 601.2c), so the prompt is a real choice
+-- rather than one elided for offering exactly what it needs, and it is the
+-- unshielded dealer every batch below runs alongside the shielded one -- the
+-- control leg, on the same board, differing in nothing but the shield.
+--
+-- The Saga is PLACED with its first lore counter rather than cast, so chapter I
+-- never fires and the hexproof grant is not also standing; the last case casts it
+-- instead, which is where chapter I is read.
+spiderBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+spiderBoard island piker warMammoth spider =
+  let (sagaId, gs1) = S.addCreature spider S.alice (Setup.emptyGame S.bothPlayers)
+      (shielded, gs2) = S.addCreature piker S.bob gs1
+      (control, gs3) = S.addCreature warMammoth S.bob gs2
+      stocked = stockLibrary island gs3
+      withCounter = S.addCounter CounterKind.Lore 1 sagaId stocked
+   in (sagaId, shielded, control, advanceSaga (aimedAtObject shielded) withCounter)
+
+-- CR 104.3c: chapters III and IV each draw, and a decked alice would lose before
+-- any assertion below ran.
+stockLibrary :: Printing.Printing -> GameState.GameState -> GameState.GameState
+stockLibrary printing gs = List.foldl' (\g _ -> snd (S.addLibraryCard printing S.alice g)) gs [1 .. 4 :: Int]
+
+oldFatSpiderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+oldFatSpiderSpec s registry = Spec.describe s "OldFatSpiderCantSeeMe" $ do
+  let withBoard act = do
+        island <- S.printingOf s registry "Island"
+        piker <- S.printingOf s registry "Goblin Piker"
+        warMammoth <- S.printingOf s registry "War Mammoth"
+        spider <- S.printingOf s registry "Old Fat Spider Can't See Me"
+        act (spiderBoard island piker warMammoth spider)
+      hit src recipient n = DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+      amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
+      settleDamage gs events = S.runPure S.identityAnswer gs (Damage.applyDamage events)
+      -- The two dealers hit the SAME player for DIFFERENT amounts, so a board
+      -- that had the two events backwards could not satisfy both readings.
+      batch shielded control = [hit shielded (Recipient.ToPlayer S.alice) 4, hit control (Recipient.ToPlayer S.alice) 3]
+  Spec.it s "CR 615.1 / 611.2b damage the shielded creature would DEAL is prevented while the Saga stands"
+    . withBoard
+    $ \(sagaId, shielded, control, gs) -> do
+      let after = settleDamage gs (batch shielded control)
+      Spec.assertEqWith s "only the unshielded creature's 3 reaches alice" (S.lifeOf S.alice after) (Just 17)
+      Spec.assertEqWith s "so one event of the two happened at all" (amounts after) [3]
+      Spec.assertBool s (S.onBattlefield sagaId gs) "and the Saga is still telling its story"
+  -- The OTHER half of CR 611.2b, and the one an expiring duration exists for: the
+  -- same board, the same batch, after the condition has stopped holding.
+  Spec.it s "CR 611.2b / 714.4 the Saga tells the rest of its story, is sacrificed, and the same damage then lands"
+    . withBoard
+    $ \(sagaId, shielded, control, gs) -> do
+      let told = advanceSaga S.identityAnswer (advanceSaga S.identityAnswer gs)
+          after = settleDamage told (batch shielded control)
+      Spec.assertBool s (not (S.onBattlefield sagaId told)) "CR 704.5s has taken the Saga, its final chapter told"
+      -- The behaviour first and the stored row second: a sweep that failed to eat
+      -- the shield has to be reported as the damage it wrongly prevented, not as
+      -- a count of GameState.replacements absorbing the mutation ahead of it.
+      Spec.assertEqWith s "the whole 7 lands now" (S.lifeOf S.alice after) (Just 13)
+      Spec.assertEqWith s "and both events happened" (amounts after) [4, 3]
+      Spec.assertEqWith s "the row is gone, not masked" (GameState.replacements told) []
+  Spec.it s "CR 611.2b / 514.2 the shield is armed to a condition, which the cleanup sweep does not reach"
+    . withBoard
+    $ \(_, _, _, gs) -> do
+      Spec.assertEqWith s "one floating replacement" (length (GameState.replacements gs)) 1
+      Spec.assertBool s (all (isWhile . ActiveReplacement.expiry) (GameState.replacements gs)) "armed to a While, not to a turn or a cleanup"
+      Spec.assertEqWith s "CR 514.2's cleanup leaves it alone" (length (GameState.replacements (Expiry.dropAtCleanup gs))) 1
+  -- Chapter I, from a CAST, so the entering lore counter (CR 714.3a) is what
+  -- fires it. Same printed duration, same source, other carrier: the grant is a
+  -- ContinuousEffect where chapter II's shield is an ActiveReplacement, and the
+  -- one sweep ends both.
+  Spec.it s "CR 611.2b chapter I grants hexproof for the same duration, and it ends with the Saga" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    spider <- S.printingOf s registry "Old Fat Spider Can't See Me"
+    let (mine, gs1) = S.addCreature piker S.alice (S.landsFor island S.alice 3 (Setup.emptyGame S.bothPlayers))
+        (gs2, handId) = S.handOne spider (stockLibrary island gs1)
+        cast = S.runPure S.identityAnswer gs2 (do S.cast S.alice handId; Stack.resolveTop)
+        granted = S.runPure (aimedAtObject mine) cast Engine.priorityLoop
+        -- Three more chapters: II crosses at two, III at three, IV at four, and
+        -- CR 704.5s takes the Saga once the story is told.
+        told = List.foldl' (\g _ -> advanceSaga (aimedAtObject mine) g) granted [1 .. 3 :: Int]
+        hexproof g = Map.member (Keyword.Hexproof Nothing) (Projection.keywordsOf mine g)
+    Spec.assertBool s (hexproof granted) "alice's creature has hexproof while the Saga stands"
+    Spec.assertBool s (not (hexproof told)) "and loses it once the Saga is sacrificed"
+    Spec.assertEqWith s "the effect is deleted, not masked" (GameState.continuousEffects told) []
+
 poolSize :: PlayerId.PlayerId -> GameState.GameState -> Int
 poolSize pid gs = case Game.poolOf pid gs of
   Mana.Type.MkMana units -> length units
@@ -1618,4 +1717,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Expiry" $ do
   endOfNextTurnSpec s
   soulfireSpec s registry
   dovinSpec s registry
+  oldFatSpiderSpec s registry
   lingeringSpec s registry
