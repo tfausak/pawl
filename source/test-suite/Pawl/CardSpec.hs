@@ -130,6 +130,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.Halved as Halved
+import qualified Pawl.Types.HandAction as HandAction
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.Keyword as Keyword
@@ -475,6 +476,8 @@ quantityCounts quantity = case quantity of
   -- CR 725.1's game-wide player designation, read as a 0/1: a PlayerRef and
   -- nothing else, so no Count and no Filter here either.
   Quantity.Type.IsMonarch _ -> []
+  -- CR 103.1's, read the same way and holding the same nothing.
+  Quantity.Type.IsStartingPlayer _ -> []
   Quantity.Type.HasDesignation _ -> []
   Quantity.Type.WasKicked -> []
   -- CR 122.1's per-player counter tally, another such scalar.
@@ -1094,7 +1097,7 @@ cardCarrierEffects card =
 -- list would hand a dozen lints a slot-sharing claim that is false of them. The
 -- sweep below and ownBoundSlots are the two readers, and both want the split.
 handActions :: Face.Face Card.Type.Card -> [[Effect.Effect Card.Type.Card]]
-handActions card = Face.mulliganActions card <> Face.openingHandActions card
+handActions card = fmap HandAction.effects (Face.mulliganActions card <> Face.openingHandActions card)
 
 -- Every effect a card AUTHORS, its two pregame windows included: what
 -- cardResolutionEffects reaches, plus the hand actions it deliberately leaves
@@ -1188,6 +1191,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.LifeTotal {} -> False
   Quantity.Type.Speed {} -> False
   Quantity.Type.IsMonarch {} -> False
+  Quantity.Type.IsStartingPlayer {} -> False
   Quantity.Type.PlayerCounters {} -> False
   Quantity.Type.ObjectCounters {} -> False
   Quantity.Type.HasDesignation {} -> False
@@ -2268,6 +2272,7 @@ canHostSubjects predicate = case predicate of
     CounterKind.Fade -> 0
     CounterKind.Shield -> 0
     CounterKind.Level -> 0
+    CounterKind.Luck -> 0
   -- Zero and not a descent, unlike the atom above: a family is payload-free, so
   -- there is no Filter position inside it for a card author to reach.
   Filter.Type.HasKeywordFamily _ -> 0
@@ -2344,6 +2349,7 @@ counterKindFilters kind = case kind of
   CounterKind.Fade -> []
   CounterKind.Shield -> []
   CounterKind.Level -> []
+  CounterKind.Luck -> []
 
 keywordFilters :: Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
 keywordFilters keyword = case keyword of
@@ -2657,6 +2663,17 @@ quantityFilters = countFilters . quantityCounts
 
 conditionFilters :: Condition.Type.Condition -> [Filter.Type.Filter Keyword.Keyword]
 conditionFilters = countFilters . conditionCounts
+
+-- CR 103.5b / CR 103.6: the Filter positions one hand action holds -- its effects'
+-- and its own gate's. The gate is a Condition like any other, so it is reached
+-- exactly as a static ability's "as long as" clause is.
+-- UNFRAMED, unlike a static ability's CR 604.2 clause one field over:
+-- Pawl.Engine.Mulligan.allows evaluates this one through Filter.contextFor, which
+-- fills no sourceAttachedTo, so CR 303.4b's atom would answer nothing here.
+handActionFilters :: HandAction.HandAction Card.Type.Card -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+handActionFilters action =
+  concatMap effectFilters (HandAction.effects action)
+    <> unframed (concatMap conditionFilters (Maybe.maybeToList (HandAction.condition action)))
 
 durationFilters :: Duration.Duration -> [Filter.Type.Filter Keyword.Keyword]
 durationFilters = countFilters . durationCounts
@@ -3514,8 +3531,8 @@ cardFilters card =
     <> concatMap triggeredAbilityFilters (Face.triggeredAbilities card)
     <> concatMap triggeredAbilityFilters (Map.elems (Face.delayedAbilities card))
     <> concatMap (modalFilters . DungeonRoom.ability) (Face.rooms card)
-    <> concatMap (concatMap effectFilters) (Face.mulliganActions card)
-    <> concatMap (concatMap effectFilters) (Face.openingHandActions card)
+    <> concatMap handActionFilters (Face.mulliganActions card)
+    <> concatMap handActionFilters (Face.openingHandActions card)
 
 -- How many CR 701.3a atoms this card carries in an Effect.AttachTarget's
 -- destination filter, and how many anywhere else. The second number is the
@@ -3805,7 +3822,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "the lint itself catches a hand action naming a slot nothing binds" $ do
     leyline <- S.printingOf s registry "Leyline of the Void"
     let face = S.combinedFace leyline
-        overActions f card = card {Face.openingHandActions = fmap (fmap f) (Face.openingHandActions card)}
+        overActions f card = card {Face.openingHandActions = fmap (\action -> action {HandAction.effects = fmap f (HandAction.effects action)}) (Face.openingHandActions card)}
         readSlot slot effect = case effect of
           Effect.MoveToZone move -> Effect.MoveToZone move {MoveToZone.ref = ObjectRef.InSlot slot}
           other -> other
@@ -5902,7 +5919,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "CR 103.5b's pregame action",
-              base {Face.mulliganActions = [[Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Quantity.Type.Literal 1, Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand}]]}
+              base {Face.mulliganActions = [HandAction.MkHandAction Nothing [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Quantity.Type.Literal 1, Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand}]]}
             )
           ]
         report (label, card) = (label, canHostSubjectOffends card, canHostSubjectCounts card)

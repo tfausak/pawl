@@ -117,4 +117,18 @@ data CounterKind keyword
     -- interact with Class cards, and class levels do not interact with leveler
     -- cards." A class level is not a counter at all, so it is not a kind here.
     Level
+  | -- | Gemstone Caverns' luck counter. Rule 122.1 gives it no lettered clause --
+    -- 122.1a-j never name it -- so rule 122.1's own first sentence is the whole
+    -- citation: a marker that "interacts with a rule, ability, or effect".
+    --
+    -- Contributes nothing to the CR 613 layer system, so
+    -- Pawl.Engine.Projection.counterGathered grants nothing for this kind. Its
+    -- one reader is the card's own mana ability, which gates on the count
+    -- through an ActivatedAbility condition (Quantity.ObjectCounters) -- ordinary
+    -- card data, which is what makes this the Loyalty shape rather than the
+    -- Keyword shape.
+    --
+    -- Never counted DOWN, unlike Time and Fade: nothing removes it, and the
+    -- permanent carries it for the rest of the game.
+    Luck
   deriving (Eq, Ord, Show)

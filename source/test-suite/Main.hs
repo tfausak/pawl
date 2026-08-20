@@ -126,6 +126,7 @@ import qualified Pawl.Codec.GrantPlayFromExileSpec
 import qualified Pawl.Codec.GraveyardScopeSpec
 import qualified Pawl.Codec.HalfUnlockedSpec
 import qualified Pawl.Codec.HalvedSpec
+import qualified Pawl.Codec.HandActionSpec
 import qualified Pawl.Codec.HybridSpec
 import qualified Pawl.Codec.InZoneSpec
 import qualified Pawl.Codec.IncreaseSpellCostSpec
@@ -543,6 +544,7 @@ spec s registry = do
   Pawl.Codec.GraveyardScopeSpec.spec s
   Pawl.Codec.HalfUnlockedSpec.spec s
   Pawl.Codec.HalvedSpec.spec s
+  Pawl.Codec.HandActionSpec.spec s
   Pawl.Codec.HybridSpec.spec s
   Pawl.Codec.InZoneSpec.spec s
   Pawl.Codec.IncreaseSpellCostSpec.spec s

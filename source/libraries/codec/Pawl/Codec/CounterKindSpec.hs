@@ -78,5 +78,12 @@ spec s = Spec.describe s "Pawl.Codec.CounterKind" $ do
       (CounterKind.codec Keyword.codec)
       CounterKind.Level
       " {\"type\":\"Level\"} "
+  -- CR 122.1's unlettered kind, read by Gemstone Caverns' own ability alone.
+  Spec.it s "Luck" $
+    Common.assertCodec
+      s
+      (CounterKind.codec Keyword.codec)
+      CounterKind.Luck
+      " {\"type\":\"Luck\"} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s (CounterKind.codec Keyword.codec)

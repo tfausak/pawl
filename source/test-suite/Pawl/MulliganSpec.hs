@@ -24,6 +24,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -415,6 +416,19 @@ twoLeylineGame leyline mountain n =
       addMany p pid k g = List.foldl' (\h _ -> snd (S.addCreature p pid h)) g (replicate k ())
       withAlice = addMany mountain S.alice n (addMany leyline S.alice 2 g0)
    in poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain S.bob n withAlice))
+
+-- BOTH players open with a Gemstone Caverns on top of an otherwise uniform
+-- library. leylineBothGame's shape, and the reason this test wants it: CR 103.1
+-- makes alice the starting player (Setup.emptyGame seats S.bothPlayers in turn
+-- order), so the two seats differ in exactly the thing the card's gate reads and
+-- in nothing else -- same card, same answerer, same library.
+gemstoneBothGame :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
+gemstoneBothGame caverns mountain n =
+  let g0 = Setup.emptyGame S.bothPlayers
+      addMany p pid k g = List.foldl' (\h _ -> snd (S.addCreature p pid h)) g (replicate k ())
+      withAlice = addMany mountain S.alice n (addMany caverns S.alice 1 g0)
+      withBoth = addMany mountain S.bob n (addMany caverns S.bob 1 withAlice)
+   in poolToLibrary S.bob (poolToLibrary S.alice withBoth)
 
 -- Takes every offered CR 103.6 action; keeps every hand.
 useOpeningAction :: Prompt.Prompt r -> r
@@ -913,6 +927,38 @@ spec s registry =
       let after = run useOpeningAction (twoLeylineGame leyline mountain 20)
       Spec.assertEqWith s "both Leylines are on the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 2
       Spec.assertEqWith s "and the hand is two smaller" (S.handSize S.alice after) 5
+    Spec.it s "CR 103.6a: Gemstone Caverns enters with a luck counter, and its rider exiles a card" $ do
+      caverns <- S.printingOf s registry "Gemstone Caverns"
+      mountain <- S.printingOf s registry "Mountain"
+      let after = run useOpeningAction (gemstoneBothGame caverns mountain 20)
+          placed = Game.zoneMembers Zone.Battlefield S.bob after
+      -- CR 122.6a through CR 103.6a: the permanent bob began the game with, and
+      -- the count it began with. One list, so a board that placed nothing fails
+      -- here rather than at a later size check.
+      Spec.assertEqWith s "one permanent, carrying one luck counter" (fmap (\oid -> S.counterOf CounterKind.Luck oid after) placed) [1]
+      -- "If you do, exile a card from your hand" -- an effect of the same action,
+      -- so it runs exactly when the action is taken. Six cards were offered, so
+      -- the choice was a real one rather than an elision.
+      Spec.assertEqWith s "the rider exiled one card from his hand" (length (Game.zoneMembers Zone.Exile S.bob after)) 1
+      Spec.assertEqWith s "so the hand is two smaller: the Caverns and the exiled card" (S.handSize S.bob after) 5
+    Spec.it s "CR 103.1: the starting player is not offered Gemstone Caverns' action" $ do
+      caverns <- S.printingOf s registry "Gemstone Caverns"
+      mountain <- S.printingOf s registry "Mountain"
+      let gs0 = gemstoneBothGame caverns mountain 20
+          after = run useOpeningAction gs0
+          (_, tags) = State.runState (Engine.runGame recordOpeningOrder gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])) []
+          asked = reverse (fmap snd (filter (\(tag, _) -> tag == Text.pack "opening") tags))
+      -- The gated half. alice takes the first turn, so her copy allows her
+      -- nothing -- and the same answerer places bob's, which is what makes this a
+      -- pair of boards differing in the seat alone.
+      Spec.assertEqWith s "alice, the starting player, begins with an empty battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 0
+      Spec.assertEqWith s "bob, who is not the starting player, does begin with his" (length (Game.zoneMembers Zone.Battlefield S.bob after)) 1
+      -- And nothing was exiled for her either, so the rider did not half-run.
+      Spec.assertEqWith s "alice keeps a full opening hand" (S.handSize S.alice after) 7
+      Spec.assertEqWith s "and exiled nothing" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
+      -- The supporting proxy, after the board assertions: CR 103.6 filters before
+      -- the offer, so alice is never asked at all.
+      Spec.assertEqWith s "only bob's window opens" asked [S.bob]
     Spec.it s "CR 103.6: no granting card means no prompt" $ do
       mountain <- S.printingOf s registry "Mountain"
       let gs0 = libraryGame mountain 20

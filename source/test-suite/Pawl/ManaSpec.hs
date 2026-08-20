@@ -49,6 +49,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
@@ -271,6 +272,23 @@ manaSpec s registry = Spec.describe s "Mana" $ do
       [] -> Spec.assertFailure s "fixture should have one Mountain"
       oid : _ ->
         Spec.assertEqWith s "emptied" (poolSize S.alice (Mana.emptyManaPools (S.runPure S.identityAnswer gs (Cost.tapForMana oid)))) 0
+
+  -- CR 122.1 / CR 105.4: "{T}: Add {C}. If Gemstone Caverns has a luck counter on
+  -- it, instead add one mana of any color." pawl carries the sentence as two
+  -- gated abilities whose conditions are complements (ActivatedAbility.condition
+  -- over Quantity.ObjectCounters), so exactly one exists at a time and "instead"
+  -- falls out of the pair -- see Pawl.Engine.Mana.manaRoutesOfGiven for why a
+  -- single ability with two conditional CLAUSES would offer both at once (#1924).
+  Spec.it s "CR 122.1 a luck counter swaps Gemstone Caverns' {C} for any color" $ do
+    caverns <- S.printingOf s registry "Gemstone Caverns"
+    let base = Setup.emptyGame S.bothPlayers
+        (cavernsId, gs) = S.addCreature caverns S.alice base
+        lucky = S.addCounter CounterKind.Luck 1 cavernsId gs
+    Spec.assertEqWith s "no counter: colorless and nothing else" (Mana.manaTypesOf cavernsId gs) [ManaType.Colorless]
+    Spec.assertBool s (ManaType.Colored Color.White `elem` Mana.manaTypesOf cavernsId lucky) "with a luck counter, white is available"
+    Spec.assertBool s (ManaType.Colored Color.Green `elem` Mana.manaTypesOf cavernsId lucky) "and so is green -- CR 105.4's whole five"
+    -- The "instead": the {C} ability is gone, not joined.
+    Spec.assertBool s (ManaType.Colorless `notElem` Mana.manaTypesOf cavernsId lucky) "and colorless is not"
 
   Spec.it s "CR 305.6/305.7 an Urborg'd Mountain taps for black too" $ do
     mountain <- S.printingOf s registry "Mountain"

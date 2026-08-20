@@ -881,6 +881,7 @@ rewrite pairs predicate = case predicate of
     CounterKind.Fade -> kind
     CounterKind.Shield -> kind
     CounterKind.Level -> kind
+    CounterKind.Luck -> kind
 
 -- CR 612.1's word swap INSIDE a keyword. Rule 702 spells some keywords with a
 -- word in them: CR 702.14a has landwalk "appear within an object's rules text as
