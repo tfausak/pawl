@@ -3049,10 +3049,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- and no member of a batch moving ONTO THE BATTLEFIELD goes to either.
         -- The engine installs one row naming NO destination -- CR 702.34a's
         -- exile, Pawl.Engine.Keyword.castFromGraveyardExile -- which admits the
-        -- battlefield too, but its Filter.IsSource holds it to an instant or
-        -- sorcery spell (rule 702.34a permits the cast only then), and no such
-        -- spell is a member of a batch entering the battlefield. A card whose
-        -- ZoneChangeR named the battlefield would separate them.
+        -- battlefield too. It separates nothing either: the three rules that
+        -- install it arm it onto an INSTANT OR SORCERY spell alone (CR 702.34a
+        -- and CR 702.133a say so outright; CR 702.127a's aftermath is printed on
+        -- a split card's instant and sorcery halves), and no such spell is a
+        -- member of a batch entering the battlefield. A card whose ZoneChangeR
+        -- named the battlefield would separate them.
         moveOne before (sofar, acc) (target, position) = do
           mNew <- Event.changeZoneEnteringIn (Just before) sofar target zone position entry (Just controller)
           -- CR 614.6: the move was cancelled, or the id was already gone (CR
