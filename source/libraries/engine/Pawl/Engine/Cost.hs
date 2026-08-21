@@ -2197,7 +2197,8 @@ applyAdjustments adjustments cost =
       -- Point 1: every increase, onto the generic component, before any reduction.
       raise (ManaCost.MkManaCost symbols) =
         canonical (sum (fmap costGenericOf symbols) + sum increases) (filter isTyped symbols)
-      -- ONE reduction, with the floor its own effect states.
+      -- ONE reduction, with the floor and the coloured-mana confinement its own
+      -- effect states.
       reduce (ManaCost.MkManaCost symbols) reduction =
         let reducingSymbols = ManaCost.unwrap (AppliedReduction.amount reduction)
             floor_ = AppliedReduction.atLeast reduction
