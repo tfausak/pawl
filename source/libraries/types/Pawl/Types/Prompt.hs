@@ -820,8 +820,10 @@ data Prompt r where
   -- Wills offers a number rather than a symbol.
   ChooseToPay :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> ClauseIndex.ClauseIndex -> Cost.Cost Keyword.Keyword -> Prompt PaymentDecision.PaymentDecision
   -- | CR 601.2b: whether 2 life or a coloured mana pays each Phyrexian symbol.
-  -- CR 118.13a puts the choice here rather than at payment. The Color is the
-  -- symbol's own, so two symbols of different colours are distinguishable.
+  -- CR 118.13a puts the choice here rather than at payment for a cast and an
+  -- activation, and CR 118.13b puts it immediately before a resolution-time cost
+  -- is paid (Pawl.Engine.Resolve.payGatePaidBy). The Color is the symbol's own,
+  -- so two symbols of different colours are distinguishable.
   --
   -- One prompt per symbol, in printed order, and the NonEmpty is the routes
   -- payable given the announcements already made, measured at CR 601.2f's TOTAL
@@ -833,8 +835,8 @@ data Prompt r where
   AnnouncePhyrexianPayment :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Color.Color -> NonEmpty.NonEmpty PhyrexianPayment.PhyrexianPayment -> Prompt PhyrexianPayment.PhyrexianPayment
   -- | CR 601.2b: the nonhybrid equivalent cost for CR 107.4e's MONOCOLORED
   -- hybrid ({2/R}), whose two ways spend a different NUMBER of mana. CR 118.13a
-  -- puts the choice here rather than at payment. The ManaType is the symbol's
-  -- own stated type, so a {2/R} and a {2/G} are distinguishable.
+  -- and CR 118.13b put the choice here rather than at payment. The ManaType is
+  -- the symbol's own stated type, so a {2/R} and a {2/G} are distinguishable.
   --
   -- The colour/colour hybrid is AnnounceHybridHalf, a separate constructor
   -- because its two ways are two mana types rather than a type against generic

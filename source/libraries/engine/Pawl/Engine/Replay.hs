@@ -696,13 +696,13 @@ defaultAnswer p = case p of
   -- CR 118.12a: the cost rides a "may", so declining is always legal, and it
   -- spends nothing -- which keeps a short transcript from tapping a payer's board.
   Prompt.ChooseToPay {} -> PaymentDecision.Declines
-  -- CR 118.13a: every offered route is payable, and the prompt is raised only
+  -- CR 118.13a/b: every offered route is payable, and the prompt is raised only
   -- where two are.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
-  -- CR 118.13a again, for CR 107.4e's monocolored hybrid: every offered route is
-  -- payable, and the prompt is raised only where two are.
+  -- CR 118.13a/b again, for CR 107.4e's monocolored hybrid: every offered route
+  -- is payable, and the prompt is raised only where two are.
   Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
-  -- CR 118.13a once more, for CR 107.4e's colour/colour hybrid: every offered
+  -- CR 118.13a/b once more, for CR 107.4e's colour/colour hybrid: every offered
   -- half is payable, and the prompt is raised only where two are.
   Prompt.AnnounceHybridHalf _ _ _ _ offers -> NonEmpty.head offers
   -- CR 118.7e: both halves are legal answers, so the first offered one is as

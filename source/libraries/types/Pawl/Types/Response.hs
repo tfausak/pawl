@@ -344,17 +344,18 @@ data Response
     -- cost to chose to pay it. Distinct from ChoseOptional, which records CR
     -- 603.5's "may" and is always answered by the resolving controller.
     ChoseToPay PaymentDecision.PaymentDecision
-  | -- | CR 118.13a / 601.2b: which way a caster announced they would pay a
-    -- Phyrexian mana symbol, so a Mutagenic Growth paid out of life replays
-    -- exactly as it was cast.
+  | -- | CR 118.13a / 601.2b, and CR 118.13b: which way the payer announced they
+    -- would pay a Phyrexian mana symbol, so a Mutagenic Growth paid out of life
+    -- replays exactly as it was cast.
     AnnouncedPhyrexianPayment PhyrexianPayment.PhyrexianPayment
-  | -- | CR 118.13a / 601.2b: which way a caster announced they would pay a
-    -- monocolored hybrid mana symbol, so a Flame Javelin cast for {6} replays as
-    -- that and not as {R}{R}{R}.
+  | -- | CR 118.13a / 601.2b, and CR 118.13b: which way the payer announced they
+    -- would pay a monocolored hybrid mana symbol, so a Flame Javelin cast for {6}
+    -- replays as that and not as {R}{R}{R}.
     AnnouncedHybridPayment HybridPayment.HybridPayment
-  | -- | CR 118.13a / 601.2b: which half of a colour/colour hybrid mana symbol a
-    -- caster announced they would pay, as the mana type it resolved to, so a
-    -- Slippery Bogle paid with blue replays as that and not as green.
+  | -- | CR 118.13a / 601.2b, and CR 118.13b: which half of a colour/colour hybrid
+    -- mana symbol the payer announced they would pay, as the mana type it
+    -- resolved to, so a Slippery Bogle paid with blue replays as that and not as
+    -- green.
     AnnouncedHybridHalf ManaType.ManaType
   | -- | CR 118.7e: which half of a hybrid mana symbol in a cost REDUCTION its
     -- payer chose as CR 601.2f applied it. The symbol the half resolved to, so a

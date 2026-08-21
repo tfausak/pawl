@@ -9,11 +9,11 @@
 -- ability activated with priority and no payment in flight -- is here too, and
 -- is reached through Pawl.Engine.Action and Pawl.Engine.Engine.
 --
--- CR 118.13a's announcement lives
+-- CR 118.13's announcement lives
 -- here too (Mana.announce), so the cases that reach it through
--- Cast.castSpell and Activate.activateAbility are in this spec rather than in
--- CastSpec or ActivateSpec -- the module under test is this one, and the two entry
--- points are how the rule is reached.
+-- Cast.castSpell, Activate.activateAbility and Resolve.payGatePaidBy are in this
+-- spec rather than in CastSpec, ActivateSpec or ResolveSpec -- the module under
+-- test is this one, and the three entry points are how the rule is reached.
 module Pawl.ManaSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -81,6 +81,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.Player as Player
@@ -2890,6 +2891,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   solRingSpec s registry
   palladiumMyrSpec s registry
   hybridSpec s registry
+  shuYunSpec s registry
   monocoloredHybridSpec s registry
   phyrexianSpec s registry
   totalCostSpec s registry
@@ -3384,6 +3386,10 @@ greenMana, blueMana :: ManaType.ManaType
 greenMana = ManaType.Colored Color.Green
 blueMana = ManaType.Colored Color.Blue
 
+redMana, whiteMana :: ManaType.ManaType
+redMana = ManaType.Colored Color.Red
+whiteMana = ManaType.Colored Color.White
+
 -- The `announces` shape for CR 107.4e's COLOUR/COLOUR hybrid: answers
 -- Prompt.AnnounceHybridHalf with `half` whenever it is on offer, and defers
 -- everything else to S.identityAnswer.
@@ -3407,6 +3413,80 @@ halfAnnouncements responses =
 poolTypes :: PlayerId.PlayerId -> GameState.GameState -> [ManaType.ManaType]
 poolTypes pid gs = case Game.poolOf pid gs of
   Mana.Type.MkMana units -> fmap ManaUnit.manaType units
+
+-- CR 118.13b: "If a cost paid during the resolution of a spell or ability
+-- contains a mana symbol that can be paid in multiple ways, the player paying
+-- that cost chooses how to pay for that symbol immediately before they pay that
+-- cost." The moment CR 118.13a's two announcements do not cover, reached through
+-- Pawl.Engine.Resolve.payGatePaidBy rather than through a cast or an activation.
+--
+-- Shu Yun, the Silent Tempest, {2}{U} 3/2 with prowess and "Whenever you cast a
+-- noncreature spell, you may pay {R/W}{R/W}. If you do, target creature gains
+-- double strike until end of turn." The "you may pay ... if you do" is CR
+-- 118.12's pay gate, so the cost is paid while the TRIGGER resolves, and its two
+-- {R/W} are CR 107.4e symbols payable two ways each.
+--
+-- Synthetic Speed Boost, a {0} sorcery, is the noncreature spell that fires the
+-- trigger: it costs no mana, so the four lands below are all still untapped when
+-- the gate is offered. Prowess fires off the same cast and changes nothing here.
+--
+-- Two Mountains and two Plains, and the SAME source answers on both legs -- the
+-- head of every Prompt.ChooseManaSource, which is a Mountain while one is
+-- untapped -- so the only difference between the legs is which half the payer
+-- announced. Announcing red is paid by the two Mountains and the window closes;
+-- announcing white leaves the cost uncovered until both Plains are down, and the
+-- {R}{R} already in the pool is then what floats. Lightning Bolt in hand reads
+-- it: with every land tapped, the floating red is the only thing that could pay
+-- for it.
+--
+-- Mutate the announcement away and the cost stays {R/W}{R/W}, which the two
+-- Mountains cover on either leg: the pool is empty both times and the Bolt is
+-- castable neither time, so the first assertion below is the one that reddens.
+shuYunSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+shuYunSpec s registry = Spec.describe s "Shu Yun, the Silent Tempest" $ do
+  Spec.it s "CR 118.13b the half announced as the trigger resolves is the mana that resolution spends" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    shuYun <- S.printingOf s registry "Shu Yun, the Silent Tempest"
+    boost <- S.printingOf s registry "Synthetic Speed Boost"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let lands = S.landsFor plains S.alice 2 (S.landsFor mountain S.alice 2 (Setup.emptyGame S.bothPlayers))
+        (shuYunId, withShuYun) = S.addCreature shuYun S.alice lands
+        (boostId, withBoost) = S.addHandCard boost S.alice withShuYun
+        (boltId, withBolt) = S.addHandCard bolt S.alice withBoost
+        board =
+          withBolt
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        -- Pays the gate, announces `half` wherever it is on offer, and aims the
+        -- trigger at Shu Yun itself. Everything else is S.identityAnswer, whose
+        -- Prompt.ChooseManaSource answer is the head candidate.
+        answering :: ManaType.ManaType -> Prompt.Prompt r -> r
+        answering half p = case p of
+          Prompt.ChooseToPay {} -> PaymentDecision.Pays
+          Prompt.AnnounceHybridHalf _ _ _ _ offers ->
+            if elem half (NonEmpty.toList offers) then half else NonEmpty.head offers
+          Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter ((== Just shuYunId) . Recipient.objectOf) legal) sets
+          _ -> S.identityAnswer p
+        -- Cast, then let the step's priority round put both triggers on the
+        -- stack and resolve them. NOT a step advance: CR 500.5 empties the pool
+        -- as a step ends, and the pool is what the assertions read.
+        legOf half = S.runPure (answering half) (S.runPure (answering half) board (S.cast S.alice boostId)) Engine.priorityLoop
+        redLeg = legOf redMana
+        whiteLeg = legOf whiteMana
+    -- THE assertion, and the one the announcement decides: what the payment left
+    -- behind, read as a cast the player can now make.
+    Spec.assertBool s (S.castable S.alice boltId whiteLeg) "white was announced, so the unspent {R}{R} floats and pays for Lightning Bolt"
+    Spec.assertBool s (not (S.castable S.alice boltId redLeg)) "red was announced, so it was spent and the two untapped Plains cannot pay for it"
+    -- The gate was paid on BOTH legs, so the difference above is the announcement
+    -- and not one leg failing to pay at all.
+    Spec.assertBool s (Projection.hasKeyword Keyword.DoubleStrike shuYunId redLeg) "the red route paid, so CR 118.12's IfPaid branch ran"
+    Spec.assertBool s (Projection.hasKeyword Keyword.DoubleStrike shuYunId whiteLeg) "and the white route paid too"
+    Spec.assertEqWith s "the red route closed the window with the two Mountains down" (S.tappedCount S.alice redLeg) 2
+    Spec.assertEqWith s "the white route kept tapping until both Plains were down" (S.tappedCount S.alice whiteLeg) 4
+    Spec.assertEqWith s "and what floats is exactly the red the white route did not spend" (poolTypes S.alice whiteLeg) [redMana, redMana]
 
 twoOrRed :: ManaSymbol.ManaSymbol
 twoOrRed = ManaSymbol.MonocoloredHybrid (ManaType.Colored Color.Red)
@@ -3511,12 +3591,12 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
 
   -- What CR 118.13a's announcement leaves behind. Both halves are payable
   -- out of this pool and they leave DIFFERENT pools behind, so the choice
-  -- is observable and `spend` makes it: it takes the fewest units. A cast
-  -- and an activation no longer reach this, because `announce` has settled
-  -- every {2/X} before payment -- what still does is CR 118.13b/c, a cost
-  -- paid during a resolution or for a special action (#373), which is why
-  -- this calls `spend` directly.
-  Spec.it s "CR 118.13b with nothing announced, spend takes a {2/R}'s one-mana half (#373)" $
+  -- is observable and `spend` makes it: it takes the fewest units. A cast,
+  -- an activation and a CR 118.12 pay gate no longer reach this,
+  -- because `announce` has settled every {2/X} before payment -- what still
+  -- does is a special action's cost (#1990) and a cost to attack (#1991),
+  -- which is why this calls `spend` directly.
+  Spec.it s "CR 118.13c with nothing announced, spend takes a {2/R}'s one-mana half (#1990)" $
     let red = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
         colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
      in Spec.assertEqWith
@@ -3744,7 +3824,8 @@ atLife n gs = gs {GameState.players = Map.adjust (\p -> p {Player.life = n}) S.a
 --
 -- TWO PATHS, and which one a case takes decides who chooses. A case calling
 -- Cost.payMana directly pays an UNANNOUNCED cost, where the least-life rule still
--- decides (#373); a case going through Cast.castSpell announces first, under CR
+-- decides -- what the engine's own remaining unannounced payments look like
+-- (#1990, #1991); a case going through Cast.castSpell announces first, under CR
 -- 118.13a, and the player decides. The CR 118.13a cases at the end of this group
 -- are the second path.
 phyrexianSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -3755,8 +3836,8 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   --
   -- It also pins what Cost.payMana does with an UNANNOUNCED cost, which is
   -- what this and the four cases after it exercise: they call Cost.payMana
-  -- directly, so no CR 118.13a announcement has happened and the least-life
-  -- rule still decides, which here means none (#373). A cast goes through
+  -- directly, so no announcement has happened and the least-life
+  -- rule still decides, which here means none (#1990, #1991). A cast goes through
   -- Cast.castSpell instead and asks -- see the CR 118.13a cases at the end of
   -- this group.
   Spec.it s "CR 107.4f one {G/P} is paid with one green mana and no life" $ do
@@ -3919,7 +4000,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- is gone and CR 107.4f's 2 life is all that is left. pawl pays it rather
   -- than failing the payment, which is the same MORE PERMISSIVE posture
   -- Cost.payMana's haddock takes towards a mis-tapped colour. Reached only
-  -- because this calls Cost.payMana directly, with nothing announced (#373).
+  -- because this calls Cost.payMana directly, with nothing announced (#1990, #1991).
   Spec.it s "CR 107.4f a Birds tapped for blue still pays a {G/P}, out of life" $ do
     birds <- S.printingOf s registry "Birds of Paradise"
     let (_, gs) = S.addCreature birds S.alice (Setup.emptyGame S.bothPlayers)
@@ -4315,7 +4396,9 @@ moltensteelSpec s registry = Spec.describe s "Moltensteel" $ do
   -- The activation cost's symbol IS a choice off a Mountain, and answering
   -- mana taps it. CR 118.13b/c are not what governs this -- the cost is an
   -- activation cost, so CR 118.13a is, and the choice belongs at proposal
-  -- rather than at payment (#373 is the other two clauses).
+  -- rather than at payment. Rule 118.13b announces at its own site
+  -- (Pawl.Engine.Resolve.payGatePaidBy, the Shu Yun group above); rule
+  -- 118.13c's special action is still unreached (#1990).
   Spec.it s "CR 118.13a/602.2b an activation cost's {R/P} is asked, and mana taps the Mountain" $ do
     mountain <- S.printingOf s registry "Mountain"
     dragon <- S.printingOf s registry "Moltensteel Dragon"

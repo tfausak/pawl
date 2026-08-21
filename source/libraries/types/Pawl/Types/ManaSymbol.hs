@@ -50,7 +50,8 @@ data ManaSymbol
     -- no mana at all, so Pawl.Engine.Mana's cost resolution carries an amount of
     -- LIFE alongside its demands and CR 119.4's floor decides whether that way is
     -- open. WHICH way is taken is the player's, announced as they propose the
-    -- spell (CR 118.13a), so this symbol is gone before the cost is paid.
+    -- spell (CR 118.13a) or immediately before a resolution-time cost is paid
+    -- (CR 118.13b), so this symbol is gone before the cost is paid.
     --
     -- CR 107.4f's OTHER half -- the ten hybrid Phyrexian symbols ({G/U/P}) -- is
     -- not this constructor and has none of its own (#364).
