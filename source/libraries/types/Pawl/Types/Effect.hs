@@ -467,18 +467,14 @@ data Effect card
     -- ActiveReplacement.slots is what answers. Resolve stores the row into
     -- GameState.replacements with this effect's SOURCE (CR 113.7).
     --
-    -- The ReplacementOrigin is CR 614.15's self-replacement bit. Resolve checks
-    -- the Condition on resolution and installs nothing when it fails, which is
-    -- exact: a CR 614.15 self-replacement is installed and applied inside one
-    -- resolution, with no window for the board to change.
+    -- The ReplacementOrigin is CR 614.15's self-replacement bit. The Condition
+    -- rides the installed row and is asked as the event would happen (CR 614.1),
+    -- never latched on resolution -- see Pawl.Types.Replace.
     --
-    -- A field rather than a general conditional Effect arm: this gates ONE
-    -- opcode's creation of ONE object, so the effect list stays a straight-line
-    -- sequence, where an `If` arm would put a BRANCH between two effect lists.
-    -- NOT Pawl.Types.Clause.condition, which gates whether a clause runs at all.
-    --
-    -- Not implemented: a conditional replacement that OUTLIVES its resolution
-    -- (#587).
+    -- A field rather than a general conditional Effect arm: this rides ONE
+    -- opcode's ONE object, so the effect list stays a straight-line sequence,
+    -- where an `If` arm would put a BRANCH between two effect lists. NOT
+    -- Pawl.Types.Clause.condition, which gates whether a clause runs at all.
     Replace (Replace.Replace (Effect card))
   | -- | CR 614.10a: each player the PlayerRef names skips their NEXT occurrence
     -- of this step or phase. Fatigue names a step; Stonehorn Dignitary names a

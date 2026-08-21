@@ -11,8 +11,9 @@ import qualified Pawl.Types.Compares as Compares
 -- Pawl.Types.StaticAbility.condition and Pawl.Engine.Projection.gatherStatic),
 -- that same clause on a printed REPLACEMENT ability
 -- (Pawl.Types.PrintedReplacement.condition and
--- Pawl.Engine.Projection.replacementsOf), and CR 614.15's one-shot gate on
--- installing a floating row (Pawl.Types.Replace.condition).
+-- Pawl.Engine.Projection.replacementsOf), and its floating twin on a row a
+-- resolution installed (CR 614.1, Pawl.Types.Replace.condition and
+-- Pawl.Engine.Replacement.collect).
 --
 -- The duration and the "as long as" clauses are the pair most easily confused,
 -- and CR 611.2c's parenthetical keeps them apart: the duration ENDS a stored

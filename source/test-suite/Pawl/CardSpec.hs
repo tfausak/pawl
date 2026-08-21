@@ -799,8 +799,9 @@ effectCounts effect = case effect of
   -- Neither a Quantity nor a Duration, so no Count can hide here; the refs'
   -- Filters are effectFilters' business below.
   Effect.BecomeCopy {} -> []
-  -- The Condition is Galvanic Blast's "if you control three or more
-  -- artifacts", and its Counts are as much card data as a Duration's.
+  -- The Condition is Galvanic Blast's and Synthetic Voltaic Surge's "if you
+  -- control three or more artifacts", and its Counts are as much card data as a
+  -- Duration's.
   Effect.Replace (Replace.MkReplace duration _ _ condition replacement) -> durationCounts duration <> foldMap conditionCounts condition <> concatMap effectCounts (replacementEffectRiders replacement)
   -- CR 614.10a's "next" is a use count, not a Duration and not a Quantity.
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
@@ -3267,7 +3268,7 @@ replacementEffectFilters replacementEffect = case replacementEffect of
 
 -- A face's printed replacement ability reaches a Filter on a second axis beside
 -- the rewrite's: CR 604.2's "as long as" clause counts objects, exactly as the
--- gate on Effect.Replace does (effectFilters' Replace arm) and as a static
+-- clause on Effect.Replace does (effectFilters' Replace arm) and as a static
 -- ability's does (staticAbilityFilters).
 printedReplacementFilters :: PrintedReplacement.PrintedReplacement (Effect.Effect Card.Type.Card) -> [Filter.Type.Filter Keyword.Keyword]
 printedReplacementFilters printedReplacement =

@@ -1677,7 +1677,7 @@ armCastFromGraveyard caster keywords castFor spellId =
                   ActiveReplacement.expiry = Expiry.Never,
                   ActiveReplacement.uses = Uses.Once,
                   ActiveReplacement.origin = ReplacementOrigin.Other,
-                  -- No clause: rule 702.34a states none (see
+                  -- No clause: no keyword ability this arms states one (see
                   -- Pawl.Types.ActiveReplacement).
                   ActiveReplacement.condition = Nothing,
                   ActiveReplacement.rider = Nothing,

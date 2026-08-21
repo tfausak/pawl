@@ -32,9 +32,11 @@ data PrintedReplacement effect = MkPrintedReplacement
     -- board, which is why the monarchy changing hands turns Jared's shield off
     -- with no trigger and no resolution in between.
     --
-    -- NOT the twin on Pawl.Types.Replace: that one is CR 614.15's gate on whether
-    -- a FLOATING row is installed at all, asked once on resolution and never
-    -- again.
+    -- The twin on Pawl.Types.Replace reads the same way, for CR 614.1's reason
+    -- rather than CR 604.1's: it rides the floating row a resolution installs and
+    -- Pawl.Engine.Replacement.collect asks it as the event would happen. What
+    -- differs is CR 109.5's "you" -- that row bakes its controller, this one
+    -- reads it live off the battlefield.
     condition :: Maybe Condition.Condition,
     effect :: ReplacementEffect.ReplacementEffect effect
   }
