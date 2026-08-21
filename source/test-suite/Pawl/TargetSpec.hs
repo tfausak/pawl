@@ -31,6 +31,11 @@
 -- targets, so its case is about CR 601.2c's one announcement over two slots
 -- rather than about the pool alone.
 --
+-- Cancel and Stifle's case has a third beside it, on the same pool one rule
+-- over: CR 115.5's self-exclusion for an ABILITY, which Adric, Mathematical
+-- Genius is the first card in the pool to make reachable. It is a fence rather
+-- than a proof -- Pawl.Engine.Target.legalRecipients' own note says why.
+--
 -- The last case is hexproof's other axis: not who is targeting but WHETHER THE
 -- KEYWORD IS THERE AT ALL. Dawnglade Regent grants it through a CR 604.2 "as
 -- long as you're the monarch" clause, so the same Doom Blade answers both ways
