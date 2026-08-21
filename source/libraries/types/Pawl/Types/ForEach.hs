@@ -7,7 +7,10 @@ import qualified Pawl.Types.SlotName as SlotName
 -- | CR 608.2f's per-object loop: the objects and players the ObjectRef names,
 -- each taken in turn with the body run once for it -- Soulfire Eruption's "for
 -- each of them, exile the top card of your library, then ... deals damage equal
--- to that card's mana value to that permanent or player".
+-- to that card's mana value to that permanent or player", and Rampage of the
+-- Clans' "for each permanent destroyed this way, its controller creates a 3/3
+-- green Centaur creature token", whose members are the permanents a destruction
+-- already removed and so are read through CR 608.2h.
 --
 -- Parametric in the EFFECT for Pawl.Types.PreventNextDamage's reason: the
 -- record holds effects and Pawl.Types.Effect holds the record, so naming Effect

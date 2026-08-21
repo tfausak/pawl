@@ -3274,8 +3274,9 @@ centaursControlledBy pid gs =
     )
     (Set.toList (GameState.battlefield gs))
 
--- The card names in a player's graveyard, sorted. CR 108.3 puts a card in its
--- OWNER's, which is the half of "its controller" this group has to tell apart.
+-- The card names in a player's graveyard, sorted. CR 701.8a moves a destroyed
+-- permanent to its OWNER's graveyard, which is the half of "its controller" this
+-- group has to tell apart.
 graveyardNames :: PlayerId.PlayerId -> GameState.GameState -> [String]
 graveyardNames pid gs =
   List.sort
@@ -3346,8 +3347,8 @@ rampageOfTheClansSpec s registry = Spec.describe s "RampageOfTheClans" $ do
     -- The case above's negative from the other side: two objects of ONE seat's
     -- are what CR 608.2f's secondary sentence is about, so alice is asked once.
     Spec.assertEqWith s "alice ordered bob's two, having none of her own" (orderAnswersIn transcript) [[0, 1]]
-  -- CR 608.2h with CR 108.3: "its controller" is the permanent's LAST KNOWN
-  -- controller, and a card put into a graveyard goes to its OWNER's. The two
+  -- CR 608.2h with CR 701.8a: "its controller" is the permanent's LAST KNOWN
+  -- controller, and CR 701.8a moves the card to its OWNER's graveyard. The two
   -- differ here and nowhere else in this group, which is what makes this the
   -- case that says which of them the rider reads: bob's Control Magic has taken
   -- alice's Bonded Construct, and the sweep destroys the Construct and the Aura
@@ -3366,7 +3367,7 @@ rampageOfTheClansSpec s registry = Spec.describe s "RampageOfTheClans" $ do
     Spec.assertEqWith s "setup: bob's Control Magic has taken alice's artifact creature" (Projection.controllerOf construct board) (Just S.bob)
     Spec.assertEqWith s "bob controlled both destroyed permanents, so bob makes both Centaurs" (length (centaursControlledBy S.bob resolved)) 2
     Spec.assertEqWith s "and its OWNER makes none" (length (centaursControlledBy S.alice resolved)) 0
-    Spec.assertEqWith s "CR 108.3 while the Construct's card went to alice's graveyard, next to the spell itself" (graveyardNames S.alice resolved) ["Bonded Construct", "Rampage of the Clans"]
+    Spec.assertEqWith s "CR 701.8a while the Construct's card went to alice's graveyard, next to the spell itself" (graveyardNames S.alice resolved) ["Bonded Construct", "Rampage of the Clans"]
     Spec.assertEqWith s "and the Aura's card to bob's" (graveyardNames S.bob resolved) ["Control Magic"]
     Spec.assertEqWith s "alice ordered the two, both being bob's" (orderAnswersIn transcript) [[0, 1]]
   -- CR 608.2c with CR 101.3: the sweep destroys nothing, so the slot is unbound,

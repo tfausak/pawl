@@ -28,8 +28,9 @@ import qualified Pawl.Types.SlotName as SlotName
 -- ITS CONTROLLER creates a 3/3 green Centaur creature token". Neither of the
 -- other two answers that question: a count has no controller to read, and the CR
 -- 400.7 incarnation `buried` names is a card in a graveyard, which CR 108.4
--- leaves with no controller at all. What a reader of this slot gets is CR
--- 608.2h's last known information, which is what the rule asks for -- the
+-- gives no controller and CR 108.4a then answers with its OWNER -- a different
+-- player whenever the permanent was stolen. What a reader of this slot gets is
+-- CR 608.2h's last known information, which is what the rule asks for: the
 -- permanent is gone by the time the rider runs.
 --
 -- Any of the three is absent for a destruction that is not looked back at in
