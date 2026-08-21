@@ -59,6 +59,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
+import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaRetention as ManaRetention
@@ -679,6 +680,7 @@ handInPlay printing board =
             Object.designations = Set.empty,
             Object.kicked = False,
             Object.phyrexianLifePaid = 0,
+            Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
             Object.doesNotUntapNext = False,

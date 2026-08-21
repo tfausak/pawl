@@ -491,6 +491,7 @@ quantityCounts quantity = case quantity of
   Quantity.Type.HasDesignation _ -> []
   Quantity.Type.ClassLevel -> []
   Quantity.Type.WasKicked -> []
+  Quantity.Type.SnowWasSpent -> []
   -- CR 122.1's per-player counter tally, another such scalar.
   Quantity.Type.PlayerCounters {} -> []
   -- CR 122.1's per-OBJECT tally, read off the object the quantity is evaluated
@@ -1228,6 +1229,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.HasDesignation {} -> False
   Quantity.Type.ClassLevel -> False
   Quantity.Type.WasKicked -> False
+  Quantity.Type.SnowWasSpent -> False
   Quantity.Type.OpponentsAttacked {} -> False
   Quantity.Type.CardsDiscardedThisTurn {} -> False
   Quantity.Type.PlayersDealtDamageThisTurn {} -> False

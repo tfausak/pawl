@@ -59,6 +59,7 @@ import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -198,6 +199,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
               Object.designations = Set.empty,
               Object.kicked = False,
               Object.phyrexianLifePaid = 0,
+              Object.manaSpent = Mana.MkMana [],
               Object.announcedX = Nothing,
               Object.detainedUntil = Set.empty,
               Object.doesNotUntapNext = False,
@@ -2069,6 +2071,7 @@ handBobBolt lightningBolt gs =
             Object.designations = Set.empty,
             Object.kicked = False,
             Object.phyrexianLifePaid = 0,
+            Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
             Object.doesNotUntapNext = False,
@@ -2422,6 +2425,7 @@ restartOnStack mountain =
             Object.designations = Set.empty,
             Object.kicked = False,
             Object.phyrexianLifePaid = 0,
+            Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
             Object.doesNotUntapNext = False,

@@ -212,6 +212,14 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       Quantity.WasKicked
       " {\"type\":\"WasKicked\"} "
+  -- CR 107.4h's third sentence, with nothing on the wire for WasKicked's reason:
+  -- the tag it asks about is the constructor.
+  Spec.it s "SnowWasSpent" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      Quantity.SnowWasSpent
+      " {\"type\":\"SnowWasSpent\"} "
   -- CR 122.1, with BOTH halves on the wire: a PlayerRef saying whose and a
   -- PlayerCounterKind saying which. Rule 728.1's reading is the Relative one.
   Spec.it s "PlayerCounters, relative and from a slot" $ do

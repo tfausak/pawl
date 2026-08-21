@@ -23,6 +23,7 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.HandActionPerformer (HandActionPerformer)
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -190,6 +191,7 @@ createCard pid printing = do
             Object.designations = Set.empty,
             Object.kicked = False,
             Object.phyrexianLifePaid = 0,
+            Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
             Object.doesNotUntapNext = False,

@@ -109,6 +109,7 @@ import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeChange as LifeChange
+import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Moved as Moved
@@ -579,6 +580,7 @@ createEmblem pid card =
             Object.designations = Set.empty,
             Object.kicked = False,
             Object.phyrexianLifePaid = 0,
+            Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
             Object.doesNotUntapNext = False,
@@ -2800,7 +2802,16 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                     -- 702.150a is about a permanent entering, and a countered
                     -- spell on its way to a graveyard becomes a card no compleated
                     -- ability can be on.
-                    Object.phyrexianLifePaid = if dest == Zone.Battlefield then Object.phyrexianLifePaid obj else 0
+                    Object.phyrexianLifePaid = if dest == Zone.Battlefield then Object.phyrexianLifePaid obj else 0,
+                    -- CR 400.7d a fourth time, and CR 107.4h's third sentence is
+                    -- what references it: WHICH MANA paid to cast the spell, so
+                    -- Berg Strider's "if {S} was spent to cast this spell" is
+                    -- asked of the permanent that spell became.
+                    --
+                    -- BATTLEFIELD ONLY, `kicked`'s gate and for its reason: rule
+                    -- 400.7d speaks about a permanent, and a countered spell
+                    -- becomes a card no such ability can be on.
+                    Object.manaSpent = if dest == Zone.Battlefield then Object.manaSpent obj else Mana.MkMana []
                   }
               -- CR 604.2 ends a static ability's continuous effect the moment
               -- its permanent leaves the battlefield. A card whose own text
@@ -3577,6 +3588,7 @@ createTokens controller card copy n tapped entering = do
                     Object.designations = Set.empty,
                     Object.kicked = False,
                     Object.phyrexianLifePaid = 0,
+                    Object.manaSpent = Mana.MkMana [],
                     Object.announcedX = Nothing,
                     Object.detainedUntil = Set.empty,
                     Object.doesNotUntapNext = False,
