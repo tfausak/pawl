@@ -3247,12 +3247,18 @@ baneOfProgressSpec s registry = Spec.describe s "BaneOfProgress" $ do
 --
 -- Cast off four Forests through the PRIORITY LOOP, castBaneOfProgress' posture:
 -- the spell resolves inside the loop and the tokens are on the board when it
--- settles. Answers the finished board.
-castRampage :: Printing.Printing -> Printing.Printing -> GameState.GameState -> GameState.GameState
+-- settles. Answers the finished board and the TRANSCRIPT, since what CR 608.2f
+-- did or did not ask alice is half of what these cases claim.
+castRampage :: Printing.Printing -> Printing.Printing -> GameState.GameState -> (GameState.GameState, [Response.Response])
 castRampage forest rampage board =
   let (withSpell, spell) = S.handOne rampage (S.landsFor forest S.alice 4 board)
-      afterCast = S.runPure S.identityAnswer withSpell (S.cast S.alice spell)
-   in S.runPure S.identityAnswer afterCast Engine.priorityLoop
+      ((_, resolved), transcript) = Replay.record S.identityAnswer withSpell (S.cast S.alice spell >> Engine.priorityLoop)
+   in (resolved, transcript)
+
+-- The CR 608.2f intra-seat orderings alice was asked for, in order. VariableEffectSpec's
+-- own reader, one spec over.
+orderAnswersIn :: [Response.Response] -> [[Natural]]
+orderAnswersIn = Maybe.mapMaybe (\r -> case r of Response.OrderedForEach o -> Just o; _ -> Nothing)
 
 -- The permanents on the battlefield named "Centaur Token" that this player
 -- CONTROLS. Projection.controllerOf and not Support.countOnBattlefieldByName,
@@ -3292,7 +3298,7 @@ rampageOfTheClansSpec s registry = Spec.describe s "RampageOfTheClans" $ do
         (moon, g2) = S.addCreature badMoon S.bob g1
         (myr, g3) = S.addCreature darksteelMyr S.carol g2
         (bystander, board) = S.addCreature piker S.carol g3
-        resolved = castRampage forest rampage board
+        (resolved, transcript) = castRampage forest rampage board
     -- The gameplay-level assertion, and FIRST: a rider keyed to the caster puts
     -- this at 0 and alice's at 2, so neither reading is vacuous here.
     Spec.assertEqWith s "bob controlled the destroyed enchantment, so bob controls a Centaur" (length (centaursControlledBy S.bob resolved)) 1
@@ -3302,6 +3308,12 @@ rampageOfTheClansSpec s registry = Spec.describe s "RampageOfTheClans" $ do
     Spec.assertBool s (not (S.onBattlefield equipment resolved)) "the artifact died"
     Spec.assertBool s (not (S.onBattlefield moon resolved)) "the enchantment died"
     Spec.assertBool s (S.onBattlefield myr resolved) "the indestructible artifact creature stands"
+    -- CR 608.2f's secondary sentence gives away a relative order only "on
+    -- multiple objects controlled by the same player", and these two are not --
+    -- so each seat is a group of one, APNAP settles the whole order, and there
+    -- is nothing to ask. Read off the destroyed PERMANENTS through CR 608.2h,
+    -- since neither is on the battlefield by the time the loop runs.
+    Spec.assertEqWith s "and no order was asked for: the two dead permanents were two seats' " (orderAnswersIn transcript) []
     Spec.assertBool s (S.onBattlefield bystander resolved) "the creature that is neither was never named"
     -- CR 111.1: the token is what the card says it is, not a blank permanent.
     case centaursControlledBy S.bob resolved of
@@ -3321,9 +3333,12 @@ rampageOfTheClansSpec s registry = Spec.describe s "RampageOfTheClans" $ do
     badMoon <- S.printingOf s registry "Bad Moon"
     let (_, g1) = S.addCreature bonesplitter S.bob (Setup.emptyGame S.threePlayers)
         (_, board) = S.addCreature badMoon S.bob g1
-        resolved = castRampage forest rampage board
+        (resolved, transcript) = castRampage forest rampage board
     Spec.assertEqWith s "both destroyed permanents were bob's, so bob makes two Centaurs" (length (centaursControlledBy S.bob resolved)) 2
     Spec.assertEqWith s "and the caster, who lost nothing, makes none" (length (centaursControlledBy S.alice resolved)) 0
+    -- The case above's negative from the other side: two objects of ONE seat's
+    -- are what CR 608.2f's secondary sentence is about, so alice is asked once.
+    Spec.assertEqWith s "alice ordered bob's two, having none of her own" (orderAnswersIn transcript) [[0, 1]]
   -- CR 608.2c with CR 101.3: the sweep destroys nothing, so the slot is unbound,
   -- the loop has no members and nobody creates anything.
   Spec.it s "an empty sweep leaves the loop no members, so no Centaur is created" $ do
@@ -3331,7 +3346,7 @@ rampageOfTheClansSpec s registry = Spec.describe s "RampageOfTheClans" $ do
     rampage <- S.printingOf s registry "Rampage of the Clans"
     piker <- S.printingOf s registry "Goblin Piker"
     let (bystander, board) = S.addCreature piker S.bob (Setup.emptyGame S.threePlayers)
-        resolved = castRampage forest rampage board
+        (resolved, _) = castRampage forest rampage board
     Spec.assertEqWith s "no Centaur for the caster" (length (centaursControlledBy S.alice resolved)) 0
     Spec.assertEqWith s "none for bob either" (length (centaursControlledBy S.bob resolved)) 0
     Spec.assertBool s (S.onBattlefield bystander resolved) "the creature that is neither an artifact nor an enchantment stands"
