@@ -173,7 +173,9 @@ hostsFor controller source subject filter_ gs =
 -- ABILITY and any other applicable effects" is the Filter.CanHostSubject
 -- conjunct, added HERE rather than written into the card. Gift of Doom says only
 -- "a creature"; rule 303.4k, not the card, supplies the enchant-ability
--- narrowing, which is the difference from Effect.AttachTarget -- there a card
+-- narrowing -- and, through attachmentFor, the destination's own limits (CR
+-- 303.4, Pawl.Engine.AttachRestriction) -- which is the difference from
+-- Effect.AttachTarget -- there a card
 -- that does not say "it can enchant" gets every destination its text admits and
 -- CR 303.4j refuses the illegal move afterwards. Rule 303.4k leaves no such
 -- backstop open, so an offer that had to be refused would be this engine

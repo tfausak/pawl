@@ -248,9 +248,11 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
             isBattle || isCreature || (not isBattle && not isCreature && not isAura && not isEquipment)
 
 -- CR 704.5m: an Aura attached to an illegal object or player, or attached to
--- nothing, is put into its owner's graveyard. Three clauses: unattached, attached
--- to an id that is no longer a permanent, and attached to one its own enchant
--- ability no longer admits (CR 303.4c).
+-- nothing, is put into its owner's graveyard. Four clauses: unattached, attached
+-- to an id that is no longer a permanent, attached to one its own enchant
+-- ability no longer admits, and attached to one that refuses it -- CR 303.4c's
+-- "as defined by its enchant ability AND OTHER APPLICABLE EFFECTS", whose second
+-- half is Pawl.Engine.AttachRestriction.
 --
 -- ABILITIES, plural, where CR 702.5c applies: Card.enchantTargetSlot is the
 -- conjunction of every instance, so the third clause fires when the host stops

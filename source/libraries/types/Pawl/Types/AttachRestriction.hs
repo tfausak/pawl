@@ -15,16 +15,19 @@ import qualified Pawl.Types.Keyword as Keyword
 -- a creature" (CR 301.5) -- and Pawl.Engine.Attach.attachmentFor is where the two
 -- meet.
 --
--- The TENTH carrier of a printed static ability, alongside
+-- Another carrier of a printed static ability, alongside
 -- Pawl.Types.StaticAbility, Pawl.Types.PlayerStaticAbility,
 -- Pawl.Types.BlockRequirement, Pawl.Types.AttackRequirement,
 -- Pawl.Types.CombatRestriction, Pawl.Types.AttackCost, Pawl.Types.BlockCost,
--- Pawl.Types.BlockPermission and Pawl.Types.SacrificeRestriction. NOT a
--- Pawl.Types.Modification, and for the reason that type's sibling
+-- Pawl.Types.BlockPermission, Pawl.Types.SacrificeRestriction and
+-- Pawl.Types.UntapRestriction -- the ordinals those headers count with stopped
+-- at the ninth, so this one names the list instead. NOT a
+-- Pawl.Types.Modification, and for the reason
 -- Pawl.Types.SacrificeRestriction states at length: every arm of Modification is
--- a CHARACTERISTIC change computed inside CR 613's layers, and CR 613.11 puts a
--- prohibition in the class of continuous effects that "affect game rules rather
--- than objects", which CR 101.2a says is not an ability being added or removed.
+-- a CHARACTERISTIC change computed inside CR 613's layers, while CR 613.11 puts
+-- a prohibition in the class of continuous effects that "affect game rules
+-- rather than objects" -- and CR 101.2a holds rule 101.2 clear of exactly what
+-- Modification does, adding abilities to objects and removing them.
 -- Pawl.Engine.Projection sees none of these.
 --
 -- CR 101.2 is what gives it force over CR 701.3a's permission, and CR 702.16c and
@@ -36,10 +39,12 @@ import qualified Pawl.Types.Keyword as Keyword
 -- this is neither of them: an Aura spell may still target a permanent that
 -- refuses it, and it still resolves and enters attached (CR 608.3c) before CR
 -- 704.5m buries it. Protection is the only quality that also forbids the
--- targeting, and it says so in a clause of its own (CR 702.16b). Consecrate
--- Land's Gatherer ruling states the Aura half of that and Goblin Brawler's the
--- Equipment half ("you can activate an equip ability that targets Goblin Brawler,
--- but the Equipment will fail to move onto it").
+-- targeting, and it says so in a clause of its own (CR 702.16b). Goblin
+-- Brawler's Gatherer ruling says as much outright -- "you can activate an equip
+-- ability that targets Goblin Brawler, but the Equipment will fail to move onto
+-- it" -- and Consecrate Land's states the state-based half instead: an Aura
+-- already on the land is put into its owner's graveyard when Consecrate Land
+-- arrives.
 --
 -- ONE shape rather than an Aura arm and an Equipment arm: the two rules say the
 -- same thing about the same moment (CR 701.3a's attach), and which permanents are

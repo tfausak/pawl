@@ -819,10 +819,11 @@ mirageOn landId subtype p = case p of
 
 -- CR 614.1c's as-enters choice, whose value is a SUBTYPE rather than a colour,
 -- and CR 305.7's set reading it back off the Aura. Convincing Mirage is the
--- pool's only producer of either, and the only Aura in the pool that enchants a
--- non-creature OBJECT -- the two Curses (enchantPlayerSpec below) enchant
--- players, which is CR 702.5d's other shape and reaches the battlefield through
--- Affected.AttachedPlayerControls rather than Affected.Attached.
+-- pool's only producer of either. It enchants a non-creature OBJECT, which
+-- Song of the Dryads and Consecrate Land also do -- where the two Curses
+-- (enchantPlayerSpec below) enchant players, CR 702.5d's other shape, reaching
+-- the battlefield through Affected.AttachedPlayerControls rather than
+-- Affected.Attached.
 chosenLandTypeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 chosenLandTypeSpec s registry = Spec.describe s "ChosenLandType" $ do
   -- The gameplay-level proof design.md section 4 asks for: cast the Aura, answer

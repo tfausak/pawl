@@ -574,9 +574,11 @@ data Filter keyword
     -- Writing it into any other Filter position is a FAILING TEST rather than a
     -- quiet False: Pawl.CardSpec walks every Filter position a card has and
     -- rejects the atom in all but an attach's destination. Widening the subject so
-    -- every evaluation could see it is #572. Reads the subject's enchant ability
-    -- and not CR 303.4's other limits on what a permanent can be enchanted by
-    -- (#472).
+    -- every evaluation could see it is #572. Answered by
+    -- Pawl.Engine.Attach.attachmentFor, so it reads CR 303.4's other limits on
+    -- what a permanent can be enchanted by along with the subject's own enchant
+    -- ability -- Pawl.AuraSpec's "Aura Graft will not move an Aura onto a land
+    -- Consecrate Land protects" is what proves the two arrive together.
     CanHostSubject
   | -- | CR 111.6: the candidate is a token. Ashaya, Soul of the Wild's "nontoken
     -- creatures you control" is spelled `Not IsToken` -- one relation, one
