@@ -370,10 +370,11 @@ entwineTotal costs = case costs of
 --      "only the characteristics of the half being cast" already narrows the
 --      keywords read here.
 --   2. Every printed mode is LEGAL (CR 700.2a), so choosing ALL modes is not open
---      when one of them cannot be chosen. Unobservable for Dream's Grip and
---      written anyway: without it an entwined cast would announce fewer modes
---      than CR 702.42a says it chose, and castSpell's own size check would turn
---      the whole cast into a silent no-op.
+--      when one of them cannot be chosen. Unobservable for both of the entwine
+--      cards in data/cards/ -- Dream's Grip and Synthetic Twofold Braid, which
+--      print the same two modes -- and written anyway: without it an entwined
+--      cast would announce fewer modes than CR 702.42a says it chose, and
+--      castSpell's own size check would turn the whole cast into a silent no-op.
 --   3. Some candidate cost plus this one is payable -- CR 601.2f's "plus all
 --      additional costs", at CR 601.2b's X=0 floor and with the same payableCost
 --      predicate castability was gated on. An option the player cannot take is
@@ -1288,7 +1289,9 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
   -- the selection for this ONE cast, it does not reprint the card. It overrides
   -- CR 700.2d's exception along with the count, and that is the rule rather than a
   -- simplification: "all modes" names each printed mode once, so no mode entwined
-  -- onto a spell can repeat -- and no entwine card prints the exception anyway.
+  -- onto a spell can repeat. Nor does an entwine card print CR 700.2d's
+  -- exception: Scryfall keyword:entwine, 2026-08-21, no hit also saying "you may
+  -- choose the same mode more than once" -- such a printing would refute this.
   let selection = case entwined of
         Just _ -> ModeSelection.ChooseExactly (Modal.modeCount modal)
         Nothing -> Modal.Type.selection modal

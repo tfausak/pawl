@@ -1200,7 +1200,7 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
   -- what multiple instances do -- and CR 118.8a's "any number of additional
   -- costs may be applied to a spell as it's being cast" makes two of them a SUM,
   -- not a choice. No printing has two (Scryfall keyword:entwine, 2026-08-21:
-  -- thirty-two cards, each with one), so Synthetic Twofold Braid
+  -- every hit prints a single entwine ability), so Synthetic Twofold Braid
   -- (data/cards/synthetic-twofold-braid.json) is Dream's Grip's two modes for
   -- {G}, printing "Entwine {2}" AND "Entwine {1}{G}".
   --
