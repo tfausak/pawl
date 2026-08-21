@@ -806,7 +806,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
 
 -- bob at 1 life, active, with a Bitterblossom of his own and carol's Soul Warden
 -- either lent to him or not. Returns the Warden's id and the board with bob's
--- upkeep already stamped into the log, ready for Engine.priorityLoop.
+-- upkeep already stamped into the log, ready for Engine.settleForPriority to
+-- gather the Bitterblossom trigger off it.
 blossomDepartureBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (ObjectId, GameState.GameState)
 blossomDepartureBoard s registry lent = do
   bitterblossom <- S.printingOf s registry "Bitterblossom"
