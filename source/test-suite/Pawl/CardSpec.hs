@@ -2533,6 +2533,7 @@ keywordFilters keyword = case keyword of
   Keyword.Decayed -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
+  Keyword.Compleated -> []
   Keyword.Training -> []
   -- CR 702.100a is payload-free: the Filter its minted ability carries -- the
   -- entering creature's -- is the ENGINE's, never a card's.

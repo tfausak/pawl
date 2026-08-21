@@ -1608,7 +1608,9 @@ payGatePaidBy resolving source idx cIdx payer gate = do
           -- same CR 601.2b nonhybrid equivalents through Mana.resolutions --
           -- so no route Mana.announce offers is one the gate refused, and its
           -- no-payable-route fallback stays unreachable from here.
-          announced <- Cost.announce Nothing ManaSpending.AsProduced payer source pure cost
+          -- Discarded, Activate's reason: rule 702.150a asks about a spell's own
+          -- cost, not about a cost paid during a resolution (CR 118.13b).
+          (announced, _) <- Cost.announce Nothing ManaSpending.AsProduced payer source pure cost
           outcome <- Cost.pay Nothing ManaSpending.AsProduced payer source announced
           -- Not implemented: the slots this payment bound are dropped, so a
           -- CR 118.12 cost that sacrifices a permanent cannot be read by a

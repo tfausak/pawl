@@ -720,6 +720,14 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.Unleash
       " {\"type\":\"Unleash\"} "
     Spec.assertBool s (Codec.encode Keyword.codec Keyword.Unleash /= Codec.encode Keyword.codec Keyword.Riot) "unleash and riot encode differently"
+  -- CR 702.150a: nullary, the two loyalty counters being the rule's number.
+  Spec.it s "Compleated" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Compleated
+      " {\"type\":\"Compleated\"} "
+    Spec.assertBool s (Codec.encode Keyword.codec Keyword.Compleated /= Codec.encode Keyword.codec Keyword.Riot) "compleated and riot encode differently"
   Spec.it s "Daybound" $
     Common.assertCodec
       s

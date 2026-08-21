@@ -824,8 +824,16 @@ data Prompt r where
   -- | CR 601.2b: whether 2 life or a coloured mana pays each Phyrexian symbol.
   -- CR 118.13a puts the choice here rather than at payment for a cast and an
   -- activation, and CR 118.13b puts it immediately before a resolution-time cost
-  -- is paid (Pawl.Engine.Resolve.payGatePaidBy). The Color is the symbol's own,
-  -- so two symbols of different colours are distinguishable.
+  -- is paid (Pawl.Engine.Resolve.payGatePaidBy). The ManaSymbol is the symbol
+  -- itself, AnnounceHybridHalf's position, so two symbols of different colours
+  -- are distinguishable -- and so CR 107.4f's hybrid Phyrexian symbol, which
+  -- names two colours, is sayable here at all.
+  --
+  -- BOTH of rule 107.4f's shapes come through this prompt, and the hybrid one
+  -- asks a SECOND question afterwards: this constructor settles mana against
+  -- life, and AnnounceHybridHalf then settles which colour. The two prompts
+  -- together admit exactly the three routes rule 107.4f names, each filtered by
+  -- payability, so nothing the player is entitled to is decided for them.
   --
   -- One prompt per symbol, in printed order, and the NonEmpty is the routes
   -- payable given the announcements already made, measured at CR 601.2f's TOTAL
@@ -834,7 +842,7 @@ data Prompt r where
   -- and the same 2 life, so which prompt got which is not observable.
   --
   -- Elided when only one route is payable.
-  AnnouncePhyrexianPayment :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Color.Color -> NonEmpty.NonEmpty PhyrexianPayment.PhyrexianPayment -> Prompt PhyrexianPayment.PhyrexianPayment
+  AnnouncePhyrexianPayment :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ManaSymbol.ManaSymbol -> NonEmpty.NonEmpty PhyrexianPayment.PhyrexianPayment -> Prompt PhyrexianPayment.PhyrexianPayment
   -- | CR 601.2b: the nonhybrid equivalent cost for CR 107.4e's MONOCOLORED
   -- hybrid ({2/R}), whose two ways spend a different NUMBER of mana. CR 118.13a
   -- and CR 118.13b put the choice here rather than at payment. The ManaType is

@@ -614,6 +614,25 @@ data Object = MkObject
     -- A Bool and not a count: CR 702.33c's multikicker is payable "any number of
     -- times", and no card in the pool has two kicker costs either (#1234, #1235).
     kicked :: Bool,
+    -- | CR 601.2b with CR 107.4f: how many of the Phyrexian mana symbols in the
+    -- cost of the SPELL that became this permanent its controller announced they
+    -- would pay 2 life for. Rule 702.150a's compleated is the one reader, through
+    -- Pawl.Engine.Projection.intrinsicReplacementsOf.
+    --
+    -- `kicked` above's exception, verbatim: CR 400.7d lets an ability of a
+    -- permanent reference "what costs were paid" to cast the spell it was, so
+    -- Pawl.Engine.Event.changeZoneAttaching carries the number across that one
+    -- move and newIncarnation forgets it everywhere else.
+    --
+    -- A COUNT and not a Bool, where `kicked` is one: rule 702.150a subtracts "two
+    -- for EACH of those mana symbols", and a cost may print more than one
+    -- (CR 107.4f's own {W/P}{W/P} example).
+    --
+    -- Zero for every object no life-paid Phyrexian symbol cast, which is every
+    -- object but a handful -- a token, a permanent an effect put onto the
+    -- battlefield, and every spell whose cost printed no such symbol or whose
+    -- controller announced mana for all of them.
+    phyrexianLifePaid :: Natural.Natural,
     -- | CR 107.3m: the value of X chosen for the SPELL that became this
     -- permanent, which is the value of X for the permanent's
     -- enters-the-battlefield replacement effects -- Nissa, Steward of Elements'
@@ -789,6 +808,9 @@ newIncarnation object =
       unlockedHalves = Set.empty,
       designations = Set.empty,
       kicked = False,
+      -- CR 400.7 forgets the announcement, `kicked` above's route; CR 601.2b's
+      -- record is written back by Pawl.Engine.Event.changeZoneAttaching's mkObj.
+      phyrexianLifePaid = 0,
       -- CR 400.7 forgets the announcement like everything else; CR 107.3m's
       -- exception is written back by the move that carries it, in
       -- Pawl.Engine.Event.changeZoneAttaching's mkObj.

@@ -315,6 +315,7 @@ library codec
     Pawl.Codec.HandAction
     Pawl.Codec.HandActionSpec
     Pawl.Codec.Hybrid
+    Pawl.Codec.HybridPhyrexian
     Pawl.Codec.HybridSpec
     Pawl.Codec.IncreaseSpellCost
     Pawl.Codec.IncreaseSpellCostSpec
@@ -1067,6 +1068,7 @@ library types
     Pawl.Types.HandWindowCap
     Pawl.Types.Hybrid
     Pawl.Types.HybridPayment
+    Pawl.Types.HybridPhyrexian
     Pawl.Types.IgnoredAbility
     Pawl.Types.IncreaseSpellCost
     Pawl.Types.InZone

@@ -3,9 +3,10 @@ module Pawl.Types.ManaSymbol where
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Hybrid as Hybrid
+import qualified Pawl.Types.HybridPhyrexian as HybridPhyrexian
 import qualified Pawl.Types.ManaType as ManaType
 
--- | CR 107.4. Grows: hybrid Phyrexian (#364).
+-- | CR 107.4.
 data ManaSymbol
   = Generic Natural.Natural
   | OfType ManaType.ManaType
@@ -54,8 +55,28 @@ data ManaSymbol
     -- (CR 118.13b), so this symbol is gone before the cost is paid.
     --
     -- CR 107.4f's OTHER half -- the ten hybrid Phyrexian symbols ({G/U/P}) -- is
-    -- not this constructor and has none of its own (#364).
+    -- HybridPhyrexian below, not this constructor.
     Phyrexian Color.Color
+  | -- | CR 107.4f's second half: {G/U/P}, payable with one mana of either of its
+    -- component colours or by paying 2 life (Tamiyo, Compleated Sage).
+    --
+    -- Phyrexian above and Hybrid above THAT, in one symbol: three ways rather
+    -- than two, and the union of what each of those constructors already offers.
+    -- Pawl.Engine.Mana.waysOf says exactly that, so nothing below the
+    -- announcement had to learn a new shape.
+    --
+    -- TWO COLOURS, not two mana types, for Phyrexian's reason: CR 107.4f's ten
+    -- symbols are all pairs of colours (Pawl.Types.HybridPhyrexian).
+    -- Pawl.Engine.Projection's symbolColors cashes CR 202.2d's "all of the
+    -- colors of those mana symbols" by answering BOTH, so Tamiyo is green and
+    -- blue however her cost was paid.
+    --
+    -- ANNOUNCED IN TWO STEPS, where the rules ask one question: CR 601.2b's
+    -- mana-or-life half is Prompt.AnnouncePhyrexianPayment and CR 601.2b's
+    -- which-half is Prompt.AnnounceHybridHalf, each filtered by payability, so
+    -- the reachable announcements are the rule's three and no more. See
+    -- Pawl.Engine.Mana.announce.
+    HybridPhyrexian HybridPhyrexian.HybridPhyrexian
   | -- | CR 107.4h: {S} in a cost, payable with one mana of any type produced by a
     -- snow source (CR 106.3). Icehide Golem, whose whole cost this is.
     --

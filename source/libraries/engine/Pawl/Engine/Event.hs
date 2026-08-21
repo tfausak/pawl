@@ -578,6 +578,7 @@ createEmblem pid card =
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
             Object.kicked = False,
+            Object.phyrexianLifePaid = 0,
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
             Object.doesNotUntapNext = False,
@@ -2790,7 +2791,16 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                     -- to a graveyard becomes a card, and rule 400.7d speaks only
                     -- about a permanent. Nothing else reads the flag off an object
                     -- outside the stack.
-                    Object.kicked = Object.kicked obj && dest == Zone.Battlefield
+                    Object.kicked = Object.kicked obj && dest == Zone.Battlefield,
+                    -- CR 400.7d a third time, and rule 702.150a is the ability
+                    -- that references it: how many of the spell's Phyrexian mana
+                    -- symbols were announced to be paid with life (CR 601.2b).
+                    --
+                    -- BATTLEFIELD ONLY, `kicked`'s gate and for its reason: rule
+                    -- 702.150a is about a permanent entering, and a countered
+                    -- spell on its way to a graveyard becomes a card no compleated
+                    -- ability can be on.
+                    Object.phyrexianLifePaid = if dest == Zone.Battlefield then Object.phyrexianLifePaid obj else 0
                   }
               -- CR 604.2 ends a static ability's continuous effect the moment
               -- its permanent leaves the battlefield. A card whose own text
@@ -3566,6 +3576,7 @@ createTokens controller card copy n tapped entering = do
                     Object.unlockedHalves = Set.empty,
                     Object.designations = Set.empty,
                     Object.kicked = False,
+                    Object.phyrexianLifePaid = 0,
                     Object.announcedX = Nothing,
                     Object.detainedUntil = Set.empty,
                     Object.doesNotUntapNext = False,

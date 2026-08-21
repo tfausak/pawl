@@ -1461,7 +1461,12 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                   -- Swamp" in view would be offered against a board that has one
                   -- Swamp too many.
                   let gathered = Cost.spellAdjustments pid sid gs
-                  announcedCost <- Cost.announce (Just sid) spending pid sid (Cost.totalManas gathered) (Cost.plusComponents gathered announcedAtX)
+                  (announcedCost, phyrexianLifePaid) <- Cost.announce (Just sid) spending pid sid (Cost.totalManas gathered) (Cost.plusComponents gathered announcedAtX)
+                  -- CR 400.7d's cost record, stamped on the SPELL and carried
+                  -- onto the permanent it becomes by
+                  -- Pawl.Engine.Event.changeZoneAttaching, `Object.kicked`'s
+                  -- route exactly. Rule 702.150a's compleated is the one reader.
+                  State.modify' (\st -> st {GameState.objects = Map.adjust (\o -> o {Object.phyrexianLifePaid = phyrexianLifePaid}) sid (GameState.objects st)})
                   -- CR 601.2c, and the spell is on the stack for it: `sets` above
                   -- was computed from the same post-move `gs`, so a "target spell"
                   -- slot draws from the pool CR 601.2a built -- with this spell in

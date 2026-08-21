@@ -23,6 +23,7 @@ import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
@@ -78,6 +79,7 @@ import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.Hybrid as Hybrid
+import qualified Pawl.Types.HybridPhyrexian as HybridPhyrexian
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -932,6 +934,10 @@ symbolColors symbol = case symbol of
   -- CR 107.4f / 202.2d: Phyrexian symbols are coloured mana symbols. Total `[c]`
   -- since Phyrexian carries a Color -- there is no colourless Phyrexian symbol.
   ManaSymbol.Phyrexian c -> [c]
+  -- CR 107.4f: "a hybrid Phyrexian mana symbol is BOTH of its component
+  -- colors", which CR 202.2d makes the object. Tamiyo, Compleated Sage is green
+  -- and blue whichever of her {G/U/P}'s three ways paid for her.
+  ManaSymbol.HybridPhyrexian (HybridPhyrexian.MkHybridPhyrexian l r) -> [l, r]
   -- CR 107.4h: snow is neither a colour nor a type of mana.
   ManaSymbol.Snow -> []
   ManaSymbol.Generic _ -> []
@@ -3091,7 +3097,7 @@ replacementsOf oid gs =
         Nothing -> True
         Just cond -> Condition.holds (fullView gs) (Filter.contextFor (controllerOf oid gs) (Just oid)) gs oid cond
    in fmap PrintedReplacement.effect (filter lives (PC.replacementEffects pc))
-        <> intrinsicReplacementsOf (announcedXOf oid gs) pc
+        <> intrinsicReplacementsOf (announcedXOf oid gs) (phyrexianLifePaidOf oid gs) pc
         <> shieldOf oid gs
 
 -- CR 107.3m: the value of X for this object's enters-the-battlefield replacement
@@ -3100,6 +3106,12 @@ replacementsOf oid gs =
 -- 613 layer can write it and CR 707.2 does not copy it.
 announcedXOf :: ObjectId -> GameState -> Natural
 announcedXOf oid gs = Maybe.fromMaybe 0 (Object.announcedX =<< Game.lookupObject oid gs)
+
+-- CR 400.7d's other cost record, `announcedXOf` above's twin: how many of the
+-- spell that became this permanent's Phyrexian mana symbols were announced to be
+-- paid with life (CR 601.2b). Rule 702.150a's compleated is the one reader.
+phyrexianLifePaidOf :: ObjectId -> GameState -> Natural
+phyrexianLifePaidOf oid gs = maybe 0 Object.phyrexianLifePaid (Game.lookupObject oid gs)
 
 -- CR 122.1c: the pair of effects one or more shield counters create.
 --
@@ -3163,16 +3175,36 @@ shieldCounters oid gs = case Game.lookupObject oid gs of
 -- of LoseAllAbilities' reach, CR 306.5b giving it as a rule, while riot, being a
 -- keyword, is inside it. `announcedX` is CR 107.3m's, and the loyalty arm is its
 -- one reader: a printed loyalty of X is settled at CR 601.2b before it arrives.
-intrinsicReplacementsOf :: Natural -> ProjectedCharacteristics -> [ReplacementEffect (Effect.Effect Card.Type.Card)]
-intrinsicReplacementsOf announcedX pc =
+--
+-- CR 702.150a's compleated lands INSIDE the loyalty arm rather than beside it as
+-- a minted row of its own, and rule 702.150a's wording is why: it says the
+-- permanent "instead enters the battlefield with THAT MANY loyalty counters minus
+-- two", which changes the number this row places rather than placing any. Read
+-- off the same finished projection, so a compleated ability the CR 613 fold
+-- removed is gone -- which is what a keyword needs, where CR 306.5b's loyalty
+-- itself is a rule and stays.
+--
+-- Not implemented: CR 616.1's choice of order between rule 702.150a and another
+-- replacement modifying the same entry -- CR 614.16's counter multipliers are the
+-- ones that would differ, and no such card is in `data/cards/` (#1996).
+intrinsicReplacementsOf :: Natural -> Natural -> ProjectedCharacteristics -> [ReplacementEffect (Effect.Effect Card.Type.Card)]
+intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
   [ -- CR 614.1c: the entering object is the ability's own source, so the pattern
   -- is Filter.IsSource.
   ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Loyalty n)))
   | Set.member CardType.Planeswalker (PC.cardTypes pc),
     printed <- Maybe.maybeToList (PC.loyalty pc),
-    let n = case printed of
+    let base = case printed of
           Loyalty.Literal m -> m
-          Loyalty.Variable -> announcedX
+          Loyalty.Variable -> announcedX,
+    -- CR 702.150a: "minus two for each of those mana symbols". Saturating,
+    -- because a counter count is a Natural and rule 122.1 knows no negative
+    -- number of them -- rule 702.150a's own "would enter with one or more" is
+    -- what makes the floor unreachable on a printed card anyway.
+    let n =
+          if Map.member Keyword.Type.Compleated (PC.keywords pc)
+            then Natural.minusSaturating base (2 * phyrexianLifePaid)
+            else base
   ]
     -- CR 310.4b's intrinsic defense counters -- CR 306.5b's clause one rule
     -- number over, keyed on the projected card type.
