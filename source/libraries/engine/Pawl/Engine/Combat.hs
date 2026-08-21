@@ -400,10 +400,12 @@ obeysAttackRequirements (required, best) chosen =
 -- makes without asking on a board with no planeswalker and no battle. A
 -- declaration that names its targets goes through legalAttackDeclarationAs.
 legalAttackDeclaration :: PlayerId -> [ObjectId] -> GameState -> Bool
-legalAttackDeclaration pid chosen gs =
-  legalAttackDeclarationAs pid (fmap (\oid -> (oid, AttackTarget.OfPlayer defending)) chosen) gs
-  where
-    defending = Maybe.fromMaybe pid (Combat.defender (GameState.combat gs))
+legalAttackDeclaration pid chosen gs = case declarableTargets gs of
+  -- No defending player: CR 508.1b has nothing to announce, so no creature can
+  -- attack and only the empty declaration is a declaration at all. Its
+  -- requirements are empty too, every instance being minted against a target.
+  [] -> null chosen
+  target : _ -> legalAttackDeclarationAs pid (fmap (\oid -> (oid, target)) chosen) gs
 
 -- legalAttackDeclaration with CR 508.1b's announcement spelled out, which is the
 -- form a board with a planeswalker or a battle on it needs.

@@ -23,6 +23,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
@@ -35,6 +36,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
@@ -3610,6 +3612,22 @@ alluringSirenSpec s registry = Spec.describe s "AlluringSiren" $ do
           (Combat.legalAttackDeclarationAs S.alice [(lured, AttackTarget.OfPlaneswalker jaceId)] control)
           "without the Siren's ability, that same creature may attack Jace"
         Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] control) "and may decline altogether"
+  Spec.it s "CR 514.2 the stored requirement lasts exactly the turn" $ do
+    -- "This turn" is Duration.UntilEndOfTurn, which Expiry.arm turns into
+    -- Expiry.AtCleanup -- so the cleanup step's sweep is what has to drop the
+    -- stored row. Read off the store, since a second declare attackers step in
+    -- the same turn is the only other place it would show, and this fixture has
+    -- none.
+    siren <- S.printingOf s registry "Alluring Siren"
+    jace <- S.printingOf s registry "Jace Beleren"
+    piker <- S.printingOf s registry "Goblin Piker"
+    centaur <- S.printingOf s registry "Windseeker Centaur"
+    case sirenBoard siren jace piker centaur of
+      Nothing -> Spec.assertFailure s "fixture should build"
+      Just (control, lured, _, _, activated) -> do
+        Spec.assertEqWith s "stored once the ability has resolved" (fmap ActiveAttackRequirement.attacker (GameState.attackRequirements activated)) [lured]
+        Spec.assertEqWith s "and gone at cleanup (CR 514.2)" (GameState.attackRequirements (Expiry.dropAtCleanup activated)) []
+        Spec.assertEqWith s "nothing was stored without the ability" (GameState.attackRequirements control) []
   Spec.it s "CR 508.1d whole cards: a real declare attackers step sends the lured creature at bob" $ do
     -- The gameplay-level case, through Combat.declareAttackers rather than the
     -- legality predicate, with an interpreter that attacks with everything and
