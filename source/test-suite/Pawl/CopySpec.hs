@@ -187,8 +187,8 @@ mintedTokens gs = fmap (\oid -> (Projection.namesOf oid gs, S.powerToughnessOf o
 -- differs in that Maybe and in nothing else -- same seats, same lands, same
 -- priority -- so a difference in what the copy can do is Blood Moon's.
 --
--- The Mountains are BASIC on purpose: CR 305.7's setter reaches nonbasic lands
--- only, so the mana that pays Mutavault's animation is the same on both boards
+-- The Mountains are BASIC on purpose: Blood Moon's printed criterion is NONBASIC
+-- lands, so the mana that pays Mutavault's animation is the same on both boards
 -- and a refused activation is never a refusal to pay.
 vesuvaBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Maybe Printing.Printing -> (ObjectId, GameState.GameState)
 vesuvaBoard mountain mutavault vesuva mMoon =
