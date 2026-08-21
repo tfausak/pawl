@@ -15,8 +15,8 @@
 -- goaded", and two seats collapse that onto nobody. bob goads a creature ALICE
 -- controls, and carol is the player the requirement is about.
 --
--- TWO BOARDS, differing only in whom CR 506.2 made the defending player, because
--- pawl chooses one defending player per combat (#175) and that is what decides
+-- TWO BOARDS, differing only in whom CR 507.1 made the defending player, because
+-- pawl chooses one defending player per combat (see #175) and that is what decides
 -- whether the second requirement can be obeyed at all:
 --
 -- \* against CAROL, both requirements are live, and they part company on the
@@ -127,7 +127,7 @@ goadedBoard homunculus jace piker centaur decision =
     _ -> Nothing
 
 -- alice mid-declaration against one chosen defending player. Stated rather than
--- run, exactly as DetainSpec's bobAttacks states it: CR 506.2's choice is a
+-- run, exactly as DetainSpec's bobAttacks states it: CR 507.1's choice is a
 -- turn-based action this fixture does not need to run.
 attacking :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
 attacking defender gs =

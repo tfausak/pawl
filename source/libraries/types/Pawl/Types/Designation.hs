@@ -23,6 +23,11 @@ module Pawl.Types.Designation where
 --
 -- * CR 731.1's day and night designate the GAME (Pawl.Types.Daytime).
 --
+-- * CR 701.15b's goaded is per-player AND expiring, the Ring-bearer's two
+--   objections at once: Object.goadedBy is a set of seats, since CR 701.15c lets
+--   several players goad one creature, and CR 701.15a ends each entry at that
+--   player's next turn rather than when the permanent leaves the battlefield.
+--
 -- * CR 716.2b's level is a NUMBER -- "a level is a designation that any permanent
 --   can have" -- so it is Object.classLevel, a Maybe Pawl.Types.ClassLevel, read
 --   by Quantity.ClassLevel. A constructor here could only say whether a permanent

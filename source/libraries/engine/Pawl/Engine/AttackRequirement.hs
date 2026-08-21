@@ -164,7 +164,7 @@ instances candidates targets gs =
       -- player: attacking a planeswalker or a battle is not attacking a player
       -- (CR 508.1b lists the three separately), so it obeys the first
       -- requirement and not the second -- which is the only thing that makes the
-      -- second observable, pawl choosing ONE defending player per combat (#175).
+      -- second observable, pawl choosing ONE defending player per combat -- see #175.
       --
       -- Per GOADER, since CR 701.15b names "the controller of the permanent,
       -- spell, or ability that caused it to be goaded" and two goaders exclude
