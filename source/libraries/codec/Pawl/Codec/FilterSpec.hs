@@ -242,6 +242,21 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.AttachedTo (Filter.And []))
       " {\"type\":\"AttachedTo\",\"value\":{\"type\":\"And\",\"value\":[]}} "
+  Spec.it s "HasAttached" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.HasAttached (Filter.HasSubtype Subtype.Aura))
+      " {\"type\":\"HasAttached\",\"value\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Aura\"}}} "
+  -- CR 303.4b's atom is not CR 701.3a's, and the two tags are what says so: a
+  -- codec that spelled both "AttachedTo" would read an enchanted creature as an
+  -- Aura.
+  Spec.it s "HasAttached with the trivial nest" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.HasAttached (Filter.And []))
+      " {\"type\":\"HasAttached\",\"value\":{\"type\":\"And\",\"value\":[]}} "
   Spec.it s "IsAttachedToSource" $
     Common.assertCodec
       s

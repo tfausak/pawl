@@ -170,8 +170,9 @@ data Object = MkObject
     -- newIncarnation resets it, because CR 400.7 makes the moved object a new one.
     --
     -- One direction only. "What is attached to me" is derived by scanning the
-    -- battlefield, so there is no reverse index to keep consistent across zone
-    -- changes.
+    -- battlefield -- Pawl.Engine.Filter.View's `attachedViews` is that scan, and
+    -- CR 303.4b's "enchanted" reads it -- so there is no reverse index to keep
+    -- consistent across zone changes.
     attachedTo :: Maybe Recipient.Recipient,
     -- | CR 614.1c: a colour this object's controller chose as it entered
     -- (Painter's Servant). Read by Modification.AddChosenColor off the effect's

@@ -2382,6 +2382,9 @@ canHostSubjects predicate = case predicate of
   -- write any other filter. Zero would under-count against jsonAtoms, which counts
   -- the tag at any depth, and turn a legitimate card into a reported offence.
   Filter.Type.AttachedTo f -> canHostSubjects f
+  -- A DESCENT for the atom above's reason, the nest describing the ATTACHER: CR
+  -- 303.4b's atom is a Filter position a card author writes into like any other.
+  Filter.Type.HasAttached f -> canHostSubjects f
   Filter.Type.IsAttachedToSource -> 0
   Filter.Type.IsHostOfSource -> 0
   -- Zero: the MIRROR atom is not this one, and its own lint counts it through the

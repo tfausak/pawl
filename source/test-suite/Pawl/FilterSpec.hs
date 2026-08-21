@@ -52,6 +52,7 @@ blackCreature =
       Filter.attackedThisTurn = False,
       Filter.milledThisTurn = False,
       Filter.attachedToView = Nothing,
+      Filter.attachedViews = [],
       Filter.attachedTo = Nothing,
       Filter.canHostSubject = False,
       Filter.canAttachToSubject = False,
@@ -91,6 +92,7 @@ devoidBigCreature =
       Filter.attackedThisTurn = False,
       Filter.milledThisTurn = False,
       Filter.attachedToView = Nothing,
+      Filter.attachedViews = [],
       Filter.attachedTo = Nothing,
       Filter.canHostSubject = False,
       Filter.canAttachToSubject = False,
@@ -831,12 +833,95 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       let slot = SlotName.MkSlotName (Text.pack "victim")
       Spec.assertEqWith s "the slot the host's description names" (Filter.boundSlots (Filter.Type.AttachedTo (Filter.Type.ControlledByBound slot))) (Set.singleton slot)
 
-    -- CR 612.1's word swap reaches the host's description too, and for the same
-    -- reason nothing in the pool observes it: no card narrows an attachment by a
-    -- subtype. This is that arm's only observer.
+    -- CR 612.1's word swap reaches the host's description too, and nothing in
+    -- data/cards/ observes it: grep the corpus for ChangeSubtypeWord and it is
+    -- absent, so no card drives Filter.rewrite at all. This is that arm's only
+    -- observer.
     Spec.it s "CR 612.1 rewrites a subtype inside the nest" $ do
       let swapped = Filter.rewrite [(Subtype.Swamp, Subtype.Island)] (Filter.Type.AttachedTo (Filter.Type.HasSubtype Subtype.Swamp))
       Spec.assertEqWith s "the host's subtype word is swapped" swapped (Filter.Type.AttachedTo (Filter.Type.HasSubtype Subtype.Island))
+
+  Spec.describe s "HasAttached" $ do
+    -- A Tale for the Ages' "enchanted creatures", which CR 303.4b makes a
+    -- question about an AURA specifically, plus the trivial nest and the control
+    -- conjunct Archon of the Wild Rose adds to it.
+    let anAura = aHost {Filter.subtypes = Set.singleton Subtype.Aura, Filter.cardTypes = Set.singleton CardType.Enchantment}
+        theirAura = anAura {Filter.controller = Just (PlayerId.MkPlayerId 1)}
+        someGear = anAura {Filter.subtypes = Set.singleton Subtype.Equipment, Filter.cardTypes = Set.singleton CardType.Artifact}
+        carrying attachers = blackCreature {Filter.attachedViews = attachers}
+        byAnAura = Filter.Type.HasAttached (Filter.Type.HasSubtype Subtype.Aura)
+        byAnything = Filter.Type.HasAttached (Filter.Type.And [])
+        byYourAura = Filter.Type.HasAttached (Filter.Type.And [Filter.Type.HasSubtype Subtype.Aura, Filter.Type.ControlledBy PlayerRelation.You])
+
+    Spec.it s "matches a candidate something matching the nest is attached to" $ do
+      Spec.assertBool s (Filter.matches self (carrying [anAura]) byAnAura) "an Aura is on it"
+
+    -- CR 303.4b's shape, stated on its own: a creature is enchanted once an Aura
+    -- is attached to it, whatever else is attached alongside. An `all` would
+    -- answer False here.
+    Spec.it s "asks ANY of what is attached, not all" $ do
+      Spec.assertBool s (Filter.matches self (carrying [someGear, anAura]) byAnAura) "an Equipment as well as an Aura"
+
+    -- The pair that makes the nest do work, and the pair CR 303.4b and CR 301.5a
+    -- keep apart: an equipped creature is not an enchanted one.
+    Spec.it s "does not match when nothing attached satisfies the nest" $ do
+      Spec.assertBool s (not (Filter.matches self (carrying [someGear]) byAnAura)) "only an Equipment"
+      Spec.assertBool s (Filter.matches self (carrying [someGear]) byAnything) "but it DOES have something attached"
+
+    Spec.it s "does not match a candidate carrying nothing" $ do
+      Spec.assertBool s (not (Filter.matches self (carrying []) byAnAura)) "nothing attached"
+      Spec.assertBool s (not (Filter.matches self (carrying []) byAnything)) "not even the trivial nest"
+
+    -- The MIRROR stated as a pair: one view is attached to an Aura and the other
+    -- has an Aura attached, and each atom answers for exactly one of them. Neither
+    -- atom expresses the other, which is the whole reason both exist.
+    Spec.it s "is not AttachedTo with the nest rewritten" $ do
+      Spec.assertBool s (Filter.matches self (onHost anAura) (Filter.Type.AttachedTo (Filter.Type.HasSubtype Subtype.Aura))) "on an Aura"
+      Spec.assertBool s (not (Filter.matches self (onHost anAura) byAnAura)) "but nothing is attached to it"
+      Spec.assertBool s (not (Filter.matches self (carrying [anAura]) (Filter.Type.AttachedTo (Filter.Type.HasSubtype Subtype.Aura)))) "and the enchanted creature is on nothing"
+
+    -- CR 109.5 makes the nest's "you" the ability's controller and never the
+    -- candidate's: the candidate belongs to player 0 in both readings, so an
+    -- evaluator reading the CANDIDATE's controller would answer the same way
+    -- twice.
+    Spec.it s "the nest's you is the perspective, not the candidate's controller" $ do
+      Spec.assertBool s (not (Filter.matches self (carrying [theirAura]) byYourAura)) "their Aura, from your seat"
+      Spec.assertBool s (Filter.matches other (carrying [theirAura]) byYourAura) "and the other way round from their seat"
+
+    -- The nest reads the ATTACHER and never the candidate: the candidate is black
+    -- and the Aura on it is not, so an evaluator that forgot to switch views would
+    -- answer the other way.
+    Spec.it s "reads the attacher and not the candidate" $ do
+      let colorlessAura = anAura {Filter.colors = Set.empty}
+      Spec.assertBool s (Filter.matches self (carrying [colorlessAura]) (Filter.Type.HasColor Color.Black)) "the candidate is black"
+      Spec.assertBool s (not (Filter.matches self (carrying [colorlessAura]) (Filter.Type.HasAttached (Filter.Type.HasColor Color.Black)))) "the Aura on it is not"
+
+    -- CR 109.3 keeps attachment off the characteristics, so no characteristic axis
+    -- stands in for it -- being an Aura says nothing about carrying one.
+    Spec.it s "is independent of every characteristic axis" $ do
+      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.subtypes = Set.singleton Subtype.Aura}) byAnAura)) "subtype does not imply carrying one"
+
+    -- CR 303.4b does let an Aura enchant a PLAYER, so unlike AttachedTo's player
+    -- case this False is a limitation rather than the rule.
+    --
+    -- Not implemented: an enchanted player (#2030).
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self aPlayer byAnAura)) "player, narrow nest"
+      Spec.assertBool s (not (Filter.matches self aPlayer byAnything)) "player, trivial nest"
+
+    -- boundSlots pairs with bakeBound here for AttachedTo's reason, and nothing in
+    -- the pool nests a ControlledByBound under this atom either.
+    Spec.it s "reports a bound slot nested under the attachment" $ do
+      let slot = SlotName.MkSlotName (Text.pack "victim")
+      Spec.assertEqWith s "the slot the attacher's description names" (Filter.boundSlots (Filter.Type.HasAttached (Filter.Type.ControlledByBound slot))) (Set.singleton slot)
+
+    -- CR 612.1's word swap reaches the attacher's description, and A Tale for
+    -- the Ages does narrow the atom by a subtype for one to reach -- but this
+    -- stays the arm's only observer, for the reason the AttachedTo case above
+    -- gives.
+    Spec.it s "CR 612.1 rewrites a subtype inside the nest" $ do
+      let swapped = Filter.rewrite [(Subtype.Aura, Subtype.Equipment)] byAnAura
+      Spec.assertEqWith s "the attacher's subtype word is swapped" swapped (Filter.Type.HasAttached (Filter.Type.HasSubtype Subtype.Equipment))
 
   Spec.describe s "IsAttachedToSource" $ do
     -- CR 701.3a / 301.5a: the candidate's HOST against the match's source. Object

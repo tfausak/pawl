@@ -229,6 +229,12 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   -- Baking the nest against this candidate would bake a question about the HOST
   -- against a player who is not it.
   Filter.Type.AttachedTo _ -> predicate
+  -- NOT descended into either, for the atom above's reason: CR 303.4b does let an
+  -- Aura enchant a player, but this view holds no board to find it on, so
+  -- Pawl.Engine.Filter answers the atom False for a player candidate whatever the
+  -- nest says (#2030). Baking the nest here would bake a question about the
+  -- ATTACHER against the player it is attached to.
+  Filter.Type.HasAttached _ -> predicate
   Filter.Type.IsAttachedToSource -> predicate
   Filter.Type.IsHostOfSource -> predicate
   Filter.Type.CanHostSubject -> predicate
@@ -556,6 +562,9 @@ viewOfSnapshot mController isToken snapshot =
       -- CR 303.4 / 110.1: a snapshot is not an object on the battlefield and
       -- carries no attachment, so there is no host here for AttachedTo's nest.
       Filter.attachedToView = Nothing,
+      -- CR 303.4b's mirror: nothing is attached to a snapshot either, there being
+      -- no object here for a permanent's Object.attachedTo to have named.
+      Filter.attachedViews = [],
       Filter.attachedTo = Nothing,
       -- CR 701.3a, both directions: a snapshot is neither an attach's destination
       -- nor a search's candidate, so nothing framed it as either.
