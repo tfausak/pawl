@@ -292,18 +292,44 @@ merge2 l r =
       -- half's text box, so both halves' survive here -- and CR 702.5c says what
       -- a combined view carrying two of them means, which is
       -- Card.enchantTargetSlot's conjunction. Concatenated rather than
-      -- left-biased for that reason, unlike the four boxes below.
+      -- left-biased for that reason, unlike the printed boxes below.
       Face.enchant = Face.enchant l <> Face.enchant r,
-      -- The first half that has one. CR 709.4 does not say how two printed
-      -- power/toughness/loyalty/defense boxes combine, and taking the left half's
-      -- is not implemented as anything the rule sanctions (#658).
+      -- The half that prints the box. Where exactly ONE does, this is CR 709.4
+      -- read rather than guessed: "the characteristics of a split card are those
+      -- of its two halves combined", so the combined view has the power the one
+      -- half has, exactly as CR 709.4c's card types and abilities are had. That
+      -- is the case Pawl.CardSpec's SplitBox group proves, over synthetic split
+      -- cards carrying each box on the RIGHT half alone -- a record update over
+      -- `l` answers Nothing there, and the permanent is a 0/0, a planeswalker
+      -- with no loyalty counters or a battle with no defense counters.
+      --
+      -- Where BOTH halves print one, no rule answers and the left bias below is
+      -- arbitrary rather than wrong. CR 709.4's three worked readings of
+      -- "combined" -- 709.4a's two names, 709.4b's concatenated mana cost,
+      -- 709.4c's card types and abilities -- each give the combined object what
+      -- both halves have AT ONCE, and none of them picks a half. A printed box
+      -- cannot be had twice: CR 208.1 gives a creature one power, CR 208.5 speaks
+      -- of a creature having "no value for its power" and never of two, and CR
+      -- 613.4 has one number to work on. SUMMING was the alternative, generalising
+      -- the mana value that falls out of CR 709.4b -- rejected because 709.4b adds
+      -- symbol LISTS and states no arithmetic over numbers, and because addition
+      -- is not idempotent: a characteristic printed once and belonging to both
+      -- halves, which is exactly what CR 709.5a's shared type line is, survives
+      -- unionTypeLines and would be doubled here.
       Face.power = firstJust (Face.power l) (Face.power r),
       Face.toughness = firstJust (Face.toughness l) (Face.toughness r),
       Face.loyalty = firstJust (Face.loyalty l) (Face.loyalty r),
       Face.defense = firstJust (Face.defense l) (Face.defense r),
+      -- CR 709.4c reaches this one where it does not reach the four above: a
+      -- characteristic-defining ability IS "an ability in the text box" (CR
+      -- 604.3), so the combined view has BOTH halves'. One slot holds one of
+      -- them. Not implemented: a combined view carrying the P/T-defining
+      -- abilities of two halves at once (#2019) -- which CR 613.4a would then
+      -- have no order to apply them in anyway, since CR 613.7a gives both the
+      -- object's own timestamp.
       Face.characteristicPT = firstJust (Face.characteristicPT l) (Face.characteristicPT r),
       -- CR 709.4c: a sentence bounding X is an ability in a half's text box, so
-      -- the combined view keeps whichever half prints one. The first, the four
+      -- the combined view keeps whichever half prints one. The first, the printed
       -- boxes above's rule -- and unreachable for the same reason
       -- Face.costReductions is, CR 709.3b putting ONE half on the stack for
       -- Pawl.Engine.Cost to price and Pawl.Engine.Cast to announce against. Here

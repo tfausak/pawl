@@ -19,6 +19,7 @@ import qualified Pawl.Codec.Keyword as Keyword.Codec
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Event as Event
 -- Dotted, because Pawl.Types.Keyword already holds the short alias here (the
@@ -41,6 +42,7 @@ import qualified Pawl.Engine.Quantity as Quantity
 
 import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
 -- The json sublibrary's own modules, for the CR 701.3a completeness cross-check
 -- alone: it counts the atom in a card's ENCODED form, which is a traversal of the
 -- whole card written by somebody else and so an independent witness to the
@@ -113,6 +115,7 @@ import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.DealDamage as DealDamage
+import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
@@ -130,8 +133,10 @@ import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Halved as Halved
@@ -161,6 +166,7 @@ import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.Morph as Morph
 import qualified Pawl.Types.MoveToZone as MoveToZone
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Optionality as Optionality
@@ -185,6 +191,7 @@ import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
@@ -6348,6 +6355,7 @@ spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Card" $ do
   cardSpec s
   realSplitCardSpec s registry
+  splitBoxSpec s registry
   lintSpec s registry
 
 -- CR 709.4 again, on a PRINTED split card rather than the invented `splitCard`
@@ -6381,3 +6389,86 @@ realSplitCardSpec s registry = Spec.describe s "RealSplitCard" $ do
     Spec.assertEqWith s "aftermath, from the right half alone" (Face.keywords c) (Set.singleton Keyword.Aftermath)
   m2bCardSpec s registry
   basicLandSpec s
+
+-- CR 709.4 for the boxes CR 709.4b and CR 709.4c do not reach: power, toughness,
+-- loyalty, defense, and the characteristic-defining ability a printed star stands
+-- for. Every producer is synthetic, because no printing carries any of them on a
+-- split half -- Scryfall `is:split (t:creature or t:planeswalker or t:battle)` and
+-- `is:split is:permanent -t:room`, 2026-08-21, no hit against 137 split printings,
+-- of which 30 are Rooms and the rest instants and sorceries. A printed split card
+-- with a creature half is what would refute that.
+--
+-- Each card puts its box on the RIGHT half alone, which is what makes these proofs
+-- rather than restatements: merge2 is a record UPDATE over the left half, so a
+-- line that fell out of it -- or one written `Face.power l` -- answers Nothing,
+-- and the permanent is a 0/0 (CR 208.5), a planeswalker with no loyalty counters
+-- (CR 306.5b) or a battle with no defense counters (CR 310.4b).
+--
+-- The precondition every case asserts on the board: the PERMANENT shows CR 709.4's
+-- combined view and not CR 709.3b's single half. Naming the half is what casting
+-- does (CR 709.3a), and the name is carried only while the spell is on the stack,
+-- so a permanent that showed the cast half alone would read 3/4 here too and the
+-- P/T assertion would prove nothing.
+splitBoxSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+splitBoxSpec s registry = Spec.describe s "SplitBox" $ do
+  Spec.it s "CR 709.4 the combined view has the one half's printed power and toughness" $ do
+    plains <- S.printingOf s registry "Plains"
+    printing <- S.printingOf s registry "Synthetic Stone Sentinel"
+    case castHalf plains printing "Synthetic Stone Sentinel" of
+      (_, Nothing) -> Spec.assertFailure s "expected one nonland permanent"
+      (after, Just oid) -> do
+        Spec.assertEqWith s "the right half's 3/4" (S.powerToughnessOf oid after) (Just (3, 4))
+        -- The precondition, after the behaviour: CR 709.4a's two names and CR
+        -- 709.4c's two card types are what say this is the combined view.
+        Spec.assertEqWith s "and it is the halves combined" (Set.toList (PC.cardTypes (Projection.project oid after))) [CardType.Creature, CardType.Instant]
+        Spec.assertEqWith s "under both names" (Set.size (Projection.namesOf oid after)) 2
+  Spec.it s "CR 709.4c the combined view keeps the one half's P/T-defining ability" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    printing <- S.printingOf s registry "Synthetic Mirror Colossus"
+    case castHalf mountain printing "Synthetic Mirror Colossus" of
+      (_, Nothing) -> Spec.assertFailure s "expected one nonland permanent"
+      (after, Just oid) -> do
+        -- CR 604.3 / 208.2a: the star stands for "power and toughness are each
+        -- equal to this object's mana value", and CR 709.4b makes that the
+        -- COMBINED cost, {1}{U} plus {2}{R}. Five, so the CDA and the combined
+        -- cost are both load bearing -- the right half alone reads three.
+        Spec.assertEqWith s "the combined mana value, 2 + 3" (S.powerToughnessOf oid after) (Just (5, 5))
+        Spec.assertEqWith s "and it is the halves combined" (Set.size (Projection.namesOf oid after)) 2
+  Spec.it s "CR 306.5b the combined view has the one half's printed loyalty" $ do
+    forest <- S.printingOf s registry "Forest"
+    printing <- S.printingOf s registry "Synthetic Warden Ascendant"
+    case castHalf forest printing "Synthetic Warden Ascendant" of
+      (_, Nothing) -> Spec.assertFailure s "expected one nonland permanent"
+      (after, Just oid) -> do
+        Spec.assertEqWith s "four loyalty counters" (S.counterOf CounterKind.Loyalty oid after) 4
+        Spec.assertEqWith s "off the projected printed number" (PC.loyalty (Projection.project oid after)) (Just (Loyalty.Literal 4))
+        Spec.assertEqWith s "and it is the halves combined" (Set.size (Projection.namesOf oid after)) 2
+  Spec.it s "CR 310.4b the combined view has the one half's printed defense" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    printing <- S.printingOf s registry "Synthetic Border Skirmish"
+    case castHalf swamp printing "Synthetic Border Skirmish" of
+      (_, Nothing) -> Spec.assertFailure s "expected one nonland permanent"
+      (after, Just oid) -> do
+        Spec.assertEqWith s "five defense counters" (S.counterOf CounterKind.Defense oid after) 5
+        Spec.assertEqWith s "off the projected printed number" (PC.defense (Projection.project oid after)) (Just (Defense.MkDefense 5))
+        Spec.assertEqWith s "and it is the halves combined" (Set.size (Projection.namesOf oid after)) 2
+
+-- One named half of a split card cast from alice's hand and resolved, plus the
+-- permanent that arrived -- a new object, since CR 400.7 mints one as the spell
+-- moves. Four lands of one type, which pays every half these cases name.
+--
+-- Pawl.Support.cast is not usable here: it goes through soleFaceName, which errors
+-- on a card offering two castable halves precisely so a split card cannot silently
+-- cast the wrong one.
+castHalf :: Printing.Printing -> Printing.Printing -> String -> (GameState.GameState, Maybe ObjectId.ObjectId)
+castHalf land printing half =
+  let (gs, oid) = S.handOne printing (S.landsInPlay land 4)
+      name = CardName.MkCardName (Text.pack half)
+      cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice oid name Facing.FaceUp)
+      after = S.runPure S.identityAnswer cast Stack.resolveTop
+      nonLand o = not (Set.member CardType.Land (PC.cardTypes (Projection.project o after)))
+   in ( after,
+        case filter nonLand (Set.toList (GameState.battlefield after)) of
+          [only] -> Just only
+          _ -> Nothing
+      )
