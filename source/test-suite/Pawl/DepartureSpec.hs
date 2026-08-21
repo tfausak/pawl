@@ -744,9 +744,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   -- Three seats, because CR 800.1/104.2a end a two-player game at the departure
   -- rather than running CR 800.4a at all -- stolenTowershellBoard's reason.
   --
-  -- Bitterblossom is the pool's one resolution that both takes its controller to
-  -- 0 life and records an entry event in doing so, and the Faerie enters while
-  -- bob is at 0 but still in the game, so the Soul Warden really does trigger.
+  -- Bitterblossom is what makes one resolution do both halves at once: it takes
+  -- its controller to 0 life AND records an entry event, and the Faerie enters
+  -- while bob is at 0 but still in the game (CR 704.5a waits for the settle), so
+  -- the Soul Warden really does trigger before its controller is decided.
   -- The Warden is CAROL's, lent to bob by a layer-2 effect: clause 1 of CR 800.4a
   -- passes it over (she owns it) and clause 2 ends the loan, so it is hers again
   -- before the scan -- which is exactly what the two readings disagree about.
@@ -755,17 +756,34 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   -- purpose: rewriting the log clears GameState.battlefieldWhenTriggered, which
   -- sends Event.eventTriggers to its live reading and collapses the distinction
   -- this pair exists to draw.
+  --
+  -- The Bitterblossom trigger is resolved by hand rather than through the
+  -- priority loop so that `settled` is the CR 117.5 boundary the departure
+  -- happens at, which is where CR 800.4d's second sentence is observable: run to
+  -- the end of the step the stack is empty under both readings.
+  --
+  -- TWO gameplay-level readings are asserted, because the two wrong answers
+  -- differ. Reading the controller live at the scan hands the ability to CAROL,
+  -- who gains the life; keeping a departed controller's abilities in
+  -- Engine.apnapPlayers hands it to BOB, who gains it instead. Neither number
+  -- moves under the other's mutation.
   Spec.it s "CR 603.3a/800.4d a borrowed permanent's trigger is the departing player's, so it is never put on the stack" $ do
     (wardenId, board) <- blossomDepartureBoard s registry True
-    let after = S.runPure S.identityAnswer board Engine.priorityLoop
+    let onStack = S.runPure S.identityAnswer board Engine.settleForPriority
+        resolved = S.runPure S.identityAnswer onStack Stack.resolveTop
+        settled = S.runPure S.identityAnswer resolved Engine.settleForPriority
+        after = S.runPure S.identityAnswer settled Engine.priorityLoop
     Spec.assertEqWith s "carol owns the Soul Warden and bob controls it as the upkeep begins" (fmap Object.owner (Game.lookupObject wardenId board), Projection.controllerOf wardenId board) (Just S.carol, Just S.bob)
+    Spec.assertEqWith s "the Faerie entered while bob was at 0 and still in the game, so the Warden really did trigger" (S.lifeOf S.bob resolved, length (S.tokensOf resolved)) (Just 0, 1)
     -- The rule under test: the Warden's trigger was bob's when it triggered, so
     -- carol -- who has it back by the time the scan runs -- gains nothing.
-    Spec.assertEqWith s "carol gains no life: the trigger was bob's (CR 603.3a), and CR 800.4d drops it" (S.lifeOf S.carol after) (Just 20)
-    Spec.assertEqWith s "bob's own life loss took him out of the game" (statusOf S.bob after) (Just (Status.Departed Departure.Type.Lost))
-    Spec.assertEqWith s "and the loan ended with him, so the Warden is carol's again (CR 800.4a)" (Projection.controllerOf wardenId after) (Just S.carol)
+    Spec.assertEqWith s "carol gains no life: the trigger was bob's (CR 603.3a), not hers" (S.lifeOf S.carol after) (Just 20)
+    Spec.assertEqWith s "and neither does bob, because it never went on the stack to resolve (CR 800.4d)" (S.lifeOf S.bob after) (Just 0)
+    Spec.assertEqWith s "read at the CR 117.5 boundary itself: the settle put nothing on the stack" (GameState.stack settled) []
+    Spec.assertEqWith s "bob's own life loss took him out of the game" (statusOf S.bob settled) (Just (Status.Departed Departure.Type.Lost))
+    Spec.assertEqWith s "and the loan ended with him, so the Warden is carol's again (CR 800.4a)" (Projection.controllerOf wardenId settled) (Just S.carol)
     Spec.assertEqWith s "the game goes on -- three seats, so CR 800.4a runs rather than CR 104.2a ending it" (GameState.result after) Nothing
-    Spec.assertEqWith s "the Faerie left with its owner, so nothing is on the battlefield to have triggered anything else" (S.tokensOf after) []
+    Spec.assertEqWith s "the Faerie left with its owner, so nothing is left on the battlefield to have triggered anything else" (S.tokensOf after) []
 
   -- The control for the case above, differing from it in exactly one line: carol
   -- keeps her own Soul Warden, so CR 603.3a makes the trigger HERS and CR 800.4d
@@ -778,10 +796,13 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   -- Departure.objectsLeaveWith files as it goes.
   Spec.it s "CR 603.3a a Soul Warden its own controller kept sees the departing player's token enter" $ do
     (wardenId, board) <- blossomDepartureBoard s registry False
-    let after = S.runPure S.identityAnswer board Engine.priorityLoop
+    let onStack = S.runPure S.identityAnswer board Engine.settleForPriority
+        resolved = S.runPure S.identityAnswer onStack Stack.resolveTop
+        settled = S.runPure S.identityAnswer resolved Engine.settleForPriority
+        after = S.runPure S.identityAnswer settled Engine.priorityLoop
     Spec.assertEqWith s "carol both owns and controls the Soul Warden" (fmap Object.owner (Game.lookupObject wardenId board), Projection.controllerOf wardenId board) (Just S.carol, Just S.carol)
     Spec.assertEqWith s "carol gains 1 life: the trigger was hers all along" (S.lifeOf S.carol after) (Just 21)
-    Spec.assertEqWith s "bob left the game just the same" (statusOf S.bob after) (Just (Status.Departed Departure.Type.Lost))
+    Spec.assertEqWith s "the same settle that took bob out of the game put her trigger on the stack" (length (GameState.stack settled), statusOf S.bob settled) (1, Just (Status.Departed Departure.Type.Lost))
 
 -- bob at 1 life, active, with a Bitterblossom of his own and carol's Soul Warden
 -- either lent to him or not. Returns the Warden's id and the board with bob's
