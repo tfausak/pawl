@@ -350,15 +350,22 @@ applyModification viewOf src gs oid m pc =
 -- an effect grant the card type and the subtype together: Song of the Dryads,
 -- Ashaya, Grist and Life and Limb each list their card-type modifications ahead
 -- of the subtypes those types carry, and applyModification folds a static
--- ability's modifications in that order. A card written the other way round
--- would have its subtype refused, which is why data/cards is the place that
--- ordering is fixed.
+-- ability's modifications in that order.
+--
+-- Not implemented: CR 613.1 applies one effect's parts together, so the
+-- correspondence should be judged over the whole effect rather than over the
+-- part of it the fold has reached; a card naming the subtype ahead of the card
+-- type would have the subtype refused (#2041).
 correspondsTo :: Set CardType.CardType -> Subtype.Type.Subtype -> Bool
 correspondsTo types subtype =
   let family = Subtype.correlatedCardTypes subtype
    in Set.null family || not (Set.disjoint family types)
 
--- One grant, dropped when CR 205.3d refuses it.
+-- One grant, dropped when CR 205.3d refuses it. The refusal is proved at the
+-- land-type direction (Pawl.ProjectionSpec's Synthetic Marsh Song case) and is a
+-- regression fence at the creature-type one, where every grant in data/cards
+-- names creatures in its affected set (Turn to Frog, Slivdrazi Monstrosity) or
+-- adds the Creature card type first (Life and Limb, Grist).
 gainSubtype :: Subtype.Type.Subtype -> ProjectedCharacteristics -> ProjectedCharacteristics
 gainSubtype s pc
   | correspondsTo (PC.cardTypes pc) s = pc {PC.subtypes = Set.insert s (PC.subtypes pc)}
@@ -366,6 +373,11 @@ gainSubtype s pc
 
 -- The same refusal over a whole set, for the two grants that write CR 205.3m's
 -- list at once.
+--
+-- A regression fence rather than a proved behaviour: neutering it leaves the
+-- whole suite green, because neither caller can reach an object CR 205.3d
+-- refuses. Maskwood Nexus names creatures in its affected set, and CR 702.73b
+-- puts changeling on creature and Kindred cards, both of which correlate.
 gainableSubtypes :: ProjectedCharacteristics -> Set Subtype.Type.Subtype -> Set Subtype.Type.Subtype
 gainableSubtypes pc = Set.filter (correspondsTo (PC.cardTypes pc))
 

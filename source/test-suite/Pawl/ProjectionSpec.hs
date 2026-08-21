@@ -1611,6 +1611,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         (lordId, g2) = S.addCreature lord S.alice g1
         nonland = S.withEffectAt lordId (Timestamp.MkTimestamp 10) (Modification.SetLandSubtype Subtype.Type.Mountain) g2
         land = S.withEffectAt lordId (Timestamp.MkTimestamp 5) (Modification.AddCardType CardType.Land) nonland
+        red = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Red)]
+    Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice red nonland)) "the Lord gained no Mountain, so nothing of alice's pays {R}"
+    Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice red land) "made a land first, the same set gives it CR 305.6's {T}: Add {R}"
     Spec.assertEqWith s "the Lord is no land, so CR 305.7 takes nothing and the Seer is still pumped" (Projection.powerOf seerId nonland) (Just 3)
     Spec.assertEqWith s "made a land first, the same set strips the Lord's text and the Seer drops to its printed 2" (Projection.powerOf seerId land) (Just 2)
     Spec.assertEqWith s "and the Lord gained no Mountain" (Projection.subtypesOf lordId nonland) (Set.singleton Subtype.Type.Merfolk)
