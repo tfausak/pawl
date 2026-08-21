@@ -950,7 +950,7 @@ blockPermissionCounts permission =
 -- CR 508.1h's per-attacker share. Only the Counted arm holds anything: the Fixed
 -- arm is mana symbols.
 perCreatureCounts :: PerCreature.PerCreature -> [Count.Type.Count Quantity.Type.Quantity]
-perCreatureCounts perAttacker = case perAttacker of
+perCreatureCounts perCreature = case perCreature of
   PerCreature.Fixed _ -> []
   PerCreature.Counted quantity -> quantityCounts quantity
 
@@ -1161,7 +1161,10 @@ cardCounts card =
     -- you control"), the one Count a cost to attack can hold: its subject is an
     -- Affected, which holds a Filter but no Count.
     <> concatMap (perCreatureCounts . AttackCost.perAttacker) (Face.attackCosts card)
-    -- CR 509.1d's counted share, the same Count in the blocking carrier.
+    -- CR 509.1d's counted share, the same Count in the blocking carrier. A FENCE
+    -- rather than a proved line: Sphere of Safety fills the attacking one and
+    -- pins the positive assertion below, and no cost to block in `data/cards/`
+    -- writes a Counted share -- Oppressive Rays' is a literal {3}.
     <> concatMap (perCreatureCounts . BlockCost.perBlocker) (Face.blockCosts card)
 
 -- CR 400.1: "each player has their own library, hand, and graveyard. The
@@ -2640,7 +2643,7 @@ affectedFilters affected = case affected of
 -- Quantity -- Sphere of Safety counts "enchantments you control" -- where the
 -- Fixed arm is mana symbols and nothing else.
 perCreatureFilters :: PerCreature.PerCreature -> [Filter.Type.Filter Keyword.Keyword]
-perCreatureFilters perAttacker = case perAttacker of
+perCreatureFilters perCreature = case perCreature of
   PerCreature.Fixed _ -> []
   PerCreature.Counted quantity -> quantityFilters quantity
 
@@ -6016,6 +6019,22 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                             )
                         )
                         AttackCostScope.Controller
+                    ]
+                }
+            ),
+            ( "CR 509.1d's cost to block",
+              base {Face.blockCosts = [BlockCost.MkBlockCost (Affected.Matching buried) (PerCreature.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 3]))]}
+            ),
+            ( "CR 509.1d's counted share",
+              base
+                { Face.blockCosts =
+                    [ BlockCost.MkBlockCost
+                        (Affected.Matching (Filter.Type.HasCardType CardType.Creature))
+                        ( PerCreature.Counted
+                            ( Quantity.Type.Count
+                                (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) buried Aggregation.Members)
+                            )
+                        )
                     ]
                 }
             ),
