@@ -1801,6 +1801,81 @@ textChangedEdgewalkerBoard s registry changerName swap = do
             Stack.resolveTop
   pure (after, walkerId, clericSpell, zombieSpell)
 
+-- Answers CR 118.7e's half with `half` and CR 601.2f's order with the total
+-- `cost`, deferring everything else to S.identityAnswer. TWO prompts in one
+-- cast, and both have to be answered for the pair below to be about the order
+-- rather than about the half.
+takesHalfAndCost :: ManaSymbol.ManaSymbol -> ManaCost.ManaCost -> Prompt.Prompt r -> r
+takesHalfAndCost half cost p = case p of
+  Prompt.ChooseReducedCost _ _ _ offers ->
+    if elem cost offers then cost else NonEmpty.head offers
+  _ -> takesHalf half p
+
+-- alice controls one Edgewalker, one Synthetic Monocolored Hybrid Discount and
+-- two untapped Swamps; her hand holds a Cabal Evangel ({1}{B} Creature -- Human
+-- Cleric 2/2, vanilla -- checked against Scryfall, 2026-08-20). Loaded fresh
+-- inside each case that needs it -- equivalent because loading is deterministic
+-- and cached (batch-recipe.md).
+mixedReductionBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+mixedReductionBoard swamp edgewalker discount evangel =
+  let base = S.landsInPlay swamp 2
+      (_, g1) = S.addCreature edgewalker S.alice base
+      (_, g2) = S.addCreature discount S.alice g1
+      (evangelId, g3) = S.addHandCard evangel S.alice g2
+   in ( evangelId,
+        g3
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- CR 601.2f's "if multiple cost reductions apply, the player may apply them in
+-- any order", where the order is observable BECAUSE the two reducers disagree
+-- about CR 101.1's coloured-mana confinement.
+--
+-- Cabal Evangel is a black Cleric with a generic component, so both reducers
+-- match it: Edgewalker's {W}{B} confined to the coloured mana paid, and the
+-- Synthetic Monocolored Hybrid Discount's {2/B} taken as {B}, which is not.
+-- Against {1}{B} the two orders part company -- Edgewalker first takes the black
+-- symbol, leaving the unconfined {B} nothing to take and CR 118.7b to spill it
+-- onto the {1}, for {0}; the unconfined one first takes the black symbol, and
+-- Edgewalker's own sentence then strands both its halves, for {1}.
+--
+-- That is the whole reason `reductionOrders` prunes on the confinement as well
+-- as on the floor. Two reducers agreeing on both commute, and pruning them costs
+-- the payer nothing; these two do not, and pruning them would be pawl choosing.
+mixedReductionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+mixedReductionSpec s registry =
+  Spec.describe s "MixedConfinementReductions" $ do
+    -- THE HEADLINE FALSIFIER: the payer names {0} and pays no mana at all. An
+    -- engine that pruned the order away would fold in the gathered order and
+    -- never ask, so one of this pair would come out with the other's count.
+    Spec.it s "CR 601.2f the payer may apply the confined reduction first, for {0}" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      edgewalker <- S.printingOf s registry "Edgewalker"
+      discount <- S.printingOf s registry "Synthetic Monocolored Hybrid Discount"
+      evangel <- S.printingOf s registry "Cabal Evangel"
+      let (evangelId, gs) = mixedReductionBoard swamp edgewalker discount evangel
+          paid = S.runPure (takesHalfAndCost black (ManaCost.MkManaCost [])) gs (S.cast S.alice evangelId)
+      Spec.assertEqWith s "no Swamp tapped" (S.tappedCount S.alice paid) 0
+      -- The anti-vacuity check: an untapped board also describes a cast that
+      -- never happened.
+      Spec.assertEqWith s "and the Evangel left the hand" (S.handSize S.alice paid) 0
+
+    -- THE OTHER ORDER, same board and same half, and the pair is what proves the
+    -- ANSWER decides: applying the unconfined {B} first leaves Edgewalker's
+    -- {W}{B} with nothing to take and nothing to spill onto, so the {1} stands.
+    Spec.it s "CR 601.2f or the unconfined one first, for {1}" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      edgewalker <- S.printingOf s registry "Edgewalker"
+      discount <- S.printingOf s registry "Synthetic Monocolored Hybrid Discount"
+      evangel <- S.printingOf s registry "Cabal Evangel"
+      let (evangelId, gs) = mixedReductionBoard swamp edgewalker discount evangel
+          paid = S.runPure (takesHalfAndCost black (ManaCost.MkManaCost [ManaSymbol.Generic 1])) gs (S.cast S.alice evangelId)
+      Spec.assertEqWith s "one Swamp tapped" (S.tappedCount S.alice paid) 1
+      Spec.assertEqWith s "and the Evangel left the hand" (S.handSize S.alice paid) 0
+
 -- CR 612.1 reaching the FILTER a player static ability's effect carries.
 --
 -- Edgewalker's "Cleric spells you cast cost {W}{B} less to cast" names which
@@ -1816,8 +1891,7 @@ textChangedEdgewalkerBoard s registry changerName swap = do
 -- word the discount cannot be seen through: Edgewalker reduces by {W}{B}, and
 -- its own sentence confines that to the coloured mana paid (CR 101.1), so a
 -- stranded half never reaches the generic component and only a white or black
--- spell shows the difference
--- at all. Every Wizard in the pool is mono-blue; Whipstitched Zombie ({1}{B}
+-- spell shows the difference at all. Every Wizard in the pool is mono-blue; Whipstitched Zombie ({1}{B}
 -- Creature -- Zombie 2/2, "At the beginning of your upkeep, sacrifice this
 -- creature unless you pay {B}." -- checked against Scryfall, 2026-08-05) is the
 -- black Zombie that makes the new word observable, and its upkeep trigger never
@@ -4479,6 +4553,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   snowDiscountSpec s registry
   monocoloredHybridDiscountSpec s registry
   hybridDiscountSpec s registry
+  mixedReductionSpec s registry
   textChangedEdgewalkerSpec s registry
   reliquaryTowerSpec s registry
   theTenRingsSpec s registry
