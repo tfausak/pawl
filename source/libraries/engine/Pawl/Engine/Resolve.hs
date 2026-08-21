@@ -317,8 +317,8 @@ objectRefSlots ref = case ref of
   -- The seats whose hands randomness reads: the arm above's read.
   ObjectRef.RandomCardInHand player -> playerRefSlots player
 
--- The Quantities an ObjectRef carries: the two library walks' counts. Exhaustive, no
--- wildcard: slotsAreExhaustive, readsX and Pawl.CardSpec's Count traversal all
+-- The Quantities an ObjectRef carries: the two library walks' counts.
+-- Exhaustive, no wildcard: slotsAreExhaustive, readsX and Pawl.CardSpec's Count traversal all
 -- reach a nested Quantity through this, and their own ObjectRef-taking arms are
 -- written `{}` and answer a constant.
 objectRefQuantities :: ObjectRef -> [Quantity.Type.Quantity]

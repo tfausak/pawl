@@ -1218,7 +1218,7 @@ mulchSpec s registry =
 -- MATCHES, where treasureHuntSpec above pins the same walk at one match and
 -- mulchSpec pins the split of what it bound. The three halves of Open the Way's
 -- sentence are those two arms plus CR 401.4's random bottoming enduranceSpec
--- pins, and the card is the pool's only printing that writes all three at once.
+-- pins, and it is the only card in `data/cards/` that writes all three at once.
 --
 -- Open the Way {X}{G}{G} Sorcery, "X can't be greater than the number of players
 -- in the game. / Reveal cards from the top of your library until you reveal X
