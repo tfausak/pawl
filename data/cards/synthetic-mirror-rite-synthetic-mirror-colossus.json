@@ -1,0 +1,71 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Synthetic Mirror Rite",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    },
+    {
+      "characteristicPT": {
+        "type": "ManaValue"
+      },
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Synthetic Mirror Colossus",
+      "power": {
+        "type": "Star"
+      },
+      "toughness": {
+        "type": "Star"
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Golem"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ],
+  "layout": {
+    "type": "Split"
+  }
+}
