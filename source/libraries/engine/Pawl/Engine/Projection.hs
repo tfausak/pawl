@@ -2397,6 +2397,20 @@ designationGathered gs = concatMap fromObject (Set.toList (GameState.battlefield
 -- A characteristic a projection holds, at the coarseness CR 613.8a's dependency
 -- question needs: applying one effect can only change what another applies to if
 -- it WRITES something that one READS.
+--
+-- NECESSARY and not sufficient, deliberately. `movesSet` screens on an aspect
+-- overlap and then CONFIRMS by applying the other effect and re-asking the
+-- affected set (`changesAt`), so an over-declared read costs that confirmation
+-- and never a different order; `movableLayers` and `countingLayers` over-admit
+-- for the same reason. Under-declaring is the defect this type can carry, which
+-- is why `filterReads` and `modificationWrites` are exhaustive.
+--
+-- Names an aspect of ONE object's projection, with no way to say WHOSE, and that
+-- is not a shortfall: `unitWrites` names no object either, and the per-object
+-- question is exactly what `changesAt` answers. So a cross-object atom declares
+-- the aspects it reads off ANOTHER object as if they were the candidate's, and
+-- an aspect qualified by WHOSE would still have to match a plain write of the
+-- same aspect -- an identical order for a larger type; see #357.
 data Aspect
   = Types
   | Subtypes
@@ -2468,13 +2482,17 @@ filterReads f = case f of
   Filter.Type.AttackedThisTurn -> Set.empty
   Filter.Type.MilledThisTurn -> Set.empty
   -- The nest's own reads, declared as if they were the CANDIDATE's even though
-  -- they are the HOST's: over-declaring is the conservative direction. The
-  -- attachment itself reads nothing (CR 303.4, CR 110.1).
+  -- they are the HOST's -- exactly right rather than merely safe, for the reason
+  -- the note on Aspect above gives. The attachment itself reads nothing, for
+  -- IsAttacking's reason: CR 109.3 keeps what an Aura enchants off the
+  -- characteristics, so no Modification writes Object.attachedTo, and CR 303.4's
+  -- attaching runs between projections as CR 110.1's zone change does.
   Filter.Type.AttachedTo g -> filterReads g
   Filter.Type.IsAttachedToSource -> Set.empty
   Filter.Type.IsHostOfSource -> Set.empty
-  -- Over-declared deliberately: the characteristics behind this atom are the
-  -- candidate's (CR 301.5) and the subject's (CR 702.5a).
+  -- Over-declared deliberately, per the note on Aspect above: the characteristics
+  -- behind this atom are the candidate's (CR 301.5) and the subject's (CR
+  -- 702.5a), and nothing distinguishes the two here.
   Filter.Type.CanHostSubject -> Set.fromList [Types, Subtypes, Colors, Keywords, PowerA, Controller]
   -- Reads nothing: no Modification writes Object.source.
   Filter.Type.IsToken -> Set.empty
