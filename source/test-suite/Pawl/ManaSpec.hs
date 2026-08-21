@@ -2900,6 +2900,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   phyrexianTollSpec s registry
   moltensteelSpec s registry
   tamiyoSpec s registry
+  sigilSpec s registry
   upwellingSpec s registry
   omnathSpec s registry
   priorityWindowSpec s registry
@@ -4628,6 +4629,68 @@ announcesBoth way half p = case p of
   Prompt.AnnouncePhyrexianPayment {} -> announces way p
   Prompt.AnnounceHybridHalf {} -> announcesHalf half p
   _ -> S.identityAnswer p
+
+-- Synthetic Hybrid Phyrexian Sigil ({G/U/P} Instant, "Target creature gets +1/+1
+-- until end of turn") -- a card whose WHOLE mana cost is one hybrid Phyrexian
+-- symbol, which no printing is.
+--
+-- SYNTHETIC because the rule is otherwise unobservable, not because no card
+-- prints the symbol. All four printings are compleated planeswalkers and every
+-- one of them prints BOTH of its symbol's colours elsewhere in the same cost
+-- ({2}{G}{G/U/P}{U}, {1}{G}{G/W/P}{W}, {2}{R}{R/G/P}{G}, {1}{R}{R/W/P}{W}), so
+-- CR 202.2d's clause about the SYMBOL cannot be told apart from the printed
+-- coloured symbols beside it -- Tamiyo is green and blue either way. The same
+-- goes for CR 202.3g's contribution of 1, which on a five-symbol cost is one
+-- fifth of the answer. Mutagenic Growth plays exactly this role for the
+-- monocoloured symbol one group up.
+--
+-- It also makes the half a BOARD fact rather than a transcript one: a Gyre
+-- Engineer's "{T}: Add {G}{U}" oversupplies the cost, and which of the two
+-- floats afterwards is which half was announced.
+sigilSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+sigilSpec s registry = Spec.describe s "SyntheticHybridPhyrexianSigil" $ do
+  Spec.it s "CR 107.4f/202.2d a hybrid Phyrexian symbol makes its object BOTH colours" $ do
+    sigil <- S.printingOf s registry "Synthetic Hybrid Phyrexian Sigil"
+    let (oid, gs) = S.addCreature sigil S.alice (Setup.emptyGame S.bothPlayers)
+    Spec.assertEqWith
+      s
+      "green AND blue, from the one symbol"
+      (Projection.colorsOf oid gs)
+      (Set.fromList [Color.Green, Color.Blue])
+    Spec.assertEqWith s "CR 202.3g: one symbol, mana value 1" (fmap Quantity.manaValueOf (Game.manaCostFaceOf oid gs)) (Just 1)
+
+  -- The half, at board level. Gyre Engineer ("{T}: Add {G}{U}") is the
+  -- oversupply the Slippery Bogle case one group up uses for CR 107.4e's
+  -- hybrid: one activation puts BOTH halves in the pool, the Sigil spends one,
+  -- and WHICH ONE FLOATS is the announcement. An assertion that could not
+  -- differ on Tamiyo's board, where every route taps all five lands.
+  Spec.it s "CR 601.2b whichever half of {G/U/P} is announced, the OTHER floats" $ do
+    gyreEngineer <- S.printingOf s registry "Gyre Engineer"
+    piker <- S.printingOf s registry "Goblin Piker"
+    sigil <- S.printingOf s registry "Synthetic Hybrid Phyrexian Sigil"
+    let (_, withEngineer) = S.addCreature gyreEngineer S.alice (Setup.emptyGame S.bothPlayers)
+        (_, withPiker) = S.addCreature piker S.alice withEngineer
+        (gs, sigilId) = S.handOne sigil withPiker
+        castWith half = castAndResolve (announcesBoth PhyrexianPayment.PaysMana half) gs sigilId
+        (askedGreen, afterGreen) = castWith greenMana
+        (askedBlue, afterBlue) = castWith blueMana
+    Spec.assertEqWith s "green paid, so BLUE floats" (poolTypes S.alice afterGreen) [blueMana]
+    Spec.assertEqWith s "blue paid, so GREEN floats" (poolTypes S.alice afterBlue) [greenMana]
+    Spec.assertEqWith s "and both halves were really asked" (halfAnnouncements askedGreen, halfAnnouncements askedBlue) ([greenMana], [blueMana])
+    Spec.assertEqWith s "neither cost life" (S.lifeOf S.alice afterGreen, S.lifeOf S.alice afterBlue) (Just 20, Just 20)
+
+  -- CR 107.4f's third way, and the whole cost is it: no land at all, so the
+  -- mana route is unpayable, nothing is asked, and 2 life casts the spell.
+  Spec.it s "CR 107.4f off no land at all, 2 life pays the whole cost" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    sigil <- S.printingOf s registry "Synthetic Hybrid Phyrexian Sigil"
+    let (_, withPiker) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+        (gs, sigilId) = S.handOne sigil withPiker
+        (asked, resolved) = castAndResolve (announcesBoth PhyrexianPayment.PaysMana greenMana) gs sigilId
+    Spec.assertEqWith s "CR 107.4f: 2 life" (S.lifeOf S.alice resolved) (Just 18)
+    Spec.assertEqWith s "no mana route existed, so nothing was asked" (phyrexianAnnouncements asked) []
+    Spec.assertEqWith s "nor about a half" (halfAnnouncements asked) []
+    Spec.assertEqWith s "and the Sigil resolved" (length (GameState.stack resolved)) 0
 
 -- Tamiyo on the battlefield, `dragonOn`'s shape: the permanent the resolved
 -- spell became, which is a fresh object and so not the id that was cast.
