@@ -895,19 +895,26 @@ kickerCost keywords =
         _ -> Nothing
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
--- CR 702.42a: the ADDITIONAL cost this card's controller may pay to choose all of
--- its modes, or Nothing when it has no entwine. Offered at CR 601.2b and added to
--- whichever candidate cost was announced (CR 601.2f). A wildcard, morphCost's
--- shape.
+-- CR 702.42a: every ADDITIONAL cost this card's controller may pay to choose all
+-- of its modes, in ascending Set order, and empty when it has no entwine. Offered
+-- at CR 601.2b and added to whichever candidate cost was announced (CR 601.2f).
 --
--- Nothing beyond the FIRST entwine cost is reachable: a card printing two
--- entwine abilities is expressible and unrepresented (gap #474).
-entwineCost :: Set Keyword -> Maybe (Cost Keyword)
-entwineCost keywords =
+-- A LIST, flashbackCosts' shape, and for the mirror-image reason: rule 702.42
+-- states no limit on how many entwine abilities an object has (contrast CR
+-- 702.41b for affinity and CR 702.43b for modular), and entwine's cost is
+-- ADDITIONAL rather than alternative, so CR 118.8a's "any number of additional
+-- costs may be applied" makes two of them a SUM rather than a choice. The
+-- summing is Pawl.Engine.Cast.entwineOffer's, since CR 601.2f's addition lives
+-- in Pawl.Engine.Cost, which reads this module.
+--
+-- A wildcard rather than an exhaustive case, flashbackCosts' reason: this asks
+-- about ONE named constructor rather than classifying every keyword.
+entwineCosts :: Set Keyword -> [Cost Keyword]
+entwineCosts keywords =
   let costOf keyword = case keyword of
         Keyword.Entwine cost -> Just cost
         _ -> Nothing
-   in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
+   in Maybe.mapMaybe costOf (Set.toAscList keywords)
 
 -- CR 702.170a: what CR 116.2k's special action costs, or Nothing when the card has
 -- no plot.

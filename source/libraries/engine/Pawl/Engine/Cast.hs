@@ -339,22 +339,42 @@ payableCostAt x spending pid oid gs cost =
 affordableX :: Maybe Natural -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
 affordableX mCeiling spending pid oid gs cost = Cost.greatestPayableX mCeiling (\x -> payableCostAt x spending pid oid gs cost) cost
 
+-- CR 118.8a: "Any number of additional costs may be applied to a spell as it's
+-- being cast", summed into the total by CR 601.2f. So a card printing two entwine
+-- abilities is asked ONE question at the combined price, and Nothing here means
+-- it has no entwine at all.
+--
+-- The SUM and not a choice, which is what separates this from flashback: rule
+-- 702.34a's cost is alternative, and CR 118.9a allows only one of those per
+-- spell, so Pawl.Engine.Cost.costsFor offers each flashback cost as a candidate
+-- of its own. Nothing in rule 702.42 makes entwine costs exclusive.
+--
+-- Left-associated in ascending Set order, which is only a spelling: Cost.plus
+-- concatenates the mana parts and appends the components, so the total is the
+-- same however it is nested.
+entwineTotal :: [Cost Keyword] -> Maybe (Cost Keyword)
+entwineTotal costs = case costs of
+  [] -> Nothing
+  cost : rest -> Just (List.foldl' Cost.plus cost rest)
+
 -- CR 702.42a: the ADDITIONAL cost this player may pay right now to choose all of
 -- this modal spell's modes, or Nothing when entwining is not on offer at all.
 --
 -- Three conditions, and each is a different rule:
 --
---   1. The card HAS entwine. CR 702.42a is a static ability of the spell itself,
---      so it is read off the card's printed keywords and not through the CR 613
---      projection of the stack object CR 601.2a has already made. Game.faceOf,
---      because the half being cast is stamped on that object before this is
---      asked, so CR 709.3b's "only the characteristics of the half being cast"
---      already narrows the keywords read here.
+--   1. The card HAS entwine, at entwineTotal's combined price above. CR 702.42a
+--      is a static ability of the spell itself, so it is read off the card's
+--      printed keywords and not through the CR 613 projection of the stack
+--      object CR 601.2a has already made. Game.faceOf, because the half being
+--      cast is stamped on that object before this is asked, so CR 709.3b's
+--      "only the characteristics of the half being cast" already narrows the
+--      keywords read here.
 --   2. Every printed mode is LEGAL (CR 700.2a), so choosing ALL modes is not open
---      when one of them cannot be chosen. Unobservable for Dream's Grip and
---      written anyway: without it an entwined cast would announce fewer modes
---      than CR 702.42a says it chose, and castSpell's own size check would turn
---      the whole cast into a silent no-op.
+--      when one of them cannot be chosen. Unobservable for both of the entwine
+--      cards in data/cards/ -- Dream's Grip and Synthetic Twofold Braid, which
+--      print the same two modes -- and written anyway: without it an entwined
+--      cast would announce fewer modes than CR 702.42a says it chose, and
+--      castSpell's own size check would turn the whole cast into a silent no-op.
 --   3. Some candidate cost plus this one is payable -- CR 601.2f's "plus all
 --      additional costs", at CR 601.2b's X=0 floor and with the same payableCost
 --      predicate castability was gated on. An option the player cannot take is
@@ -373,7 +393,7 @@ entwineOffer :: ManaSpending -> PlayerId -> ObjectId -> [Cost Keyword] -> GameSt
 entwineOffer spending pid oid candidates gs = case Game.faceOf oid gs of
   Nothing -> Nothing
   Just face -> do
-    cost <- Keyword.entwineCost (Face.keywords face)
+    cost <- entwineTotal (Keyword.entwineCosts (Face.keywords face))
     let modal = Face.spell face
         legal = Target.fillableModes (Just pid) Map.empty oid (Card.enchantSlotMap face) modal gs
     Monad.guard (Natural.length legal == Modal.modeCount modal)
@@ -1269,7 +1289,9 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
   -- the selection for this ONE cast, it does not reprint the card. It overrides
   -- CR 700.2d's exception along with the count, and that is the rule rather than a
   -- simplification: "all modes" names each printed mode once, so no mode entwined
-  -- onto a spell can repeat -- and no entwine card prints the exception anyway.
+  -- onto a spell can repeat. Nor does an entwine card print CR 700.2d's
+  -- exception: Scryfall keyword:entwine, 2026-08-21, no hit also saying "you may
+  -- choose the same mode more than once" -- such a printing would refute this.
   let selection = case entwined of
         Just _ -> ModeSelection.ChooseExactly (Modal.modeCount modal)
         Nothing -> Modal.Type.selection modal
