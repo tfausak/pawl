@@ -1677,6 +1677,9 @@ armCastFromGraveyard caster keywords castFor spellId =
                   ActiveReplacement.expiry = Expiry.Never,
                   ActiveReplacement.uses = Uses.Once,
                   ActiveReplacement.origin = ReplacementOrigin.Other,
+                  -- No clause: rule 702.34a states none (see
+                  -- Pawl.Types.ActiveReplacement).
+                  ActiveReplacement.condition = Nothing,
                   ActiveReplacement.rider = Nothing,
                   ActiveReplacement.slots = Map.empty
                 }

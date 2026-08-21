@@ -36,6 +36,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -139,6 +140,10 @@ asZoneChange event = case event of
 --      frozen one: CR 614.3 spends a one-shot as it is applied, and `consume`
 --      writes that back here.
 --
+-- Both segments drop a row whose printed clause is false right now, which is CR
+-- 614.1's "they aren't locked in ahead of time": the permanent segment's CR 604.2
+-- clause in Projection.replacementsOf, the floating one's in `lives` below.
+--
 -- The two segments take separate arguments -- rather than one GameState apiece,
 -- which would be two interchangeable parameters of the same type -- so the split
 -- cannot be got backwards.
@@ -200,8 +205,29 @@ collect sources floating =
             -- own pattern can name one object (see Pawl.Types.ActiveReplacement).
             ReplacementCandidate.slots = ActiveReplacement.slots active
           }
+      -- CR 614.1: a replacement effect is not locked in ahead of time, so the
+      -- printed "if" the installing clause carried is asked HERE rather than at
+      -- installation -- the row stays in GameState.replacements and is asked
+      -- again next time. The permanent segment's twin is
+      -- Projection.replacementsOf, which drops a CR 604.2 clause the same way and
+      -- against the same board.
+      --
+      -- CR 109.5's "you" is the row's BAKED controller, and the reading object is
+      -- its source: the clause outlives the resolution that installed it, so
+      -- there is nothing live to derive either from. The row's captured slots
+      -- ride along, so a clause and its pattern read one context
+      -- (candidateContext's).
+      lives active = case ActiveReplacement.condition active of
+        Nothing -> True
+        Just condition ->
+          Condition.holds
+            (Projection.fullView sources)
+            (Filter.contextWithSlots (Just (ActiveReplacement.controller active)) (Just (ActiveReplacement.source active)) (ActiveReplacement.slots active))
+            sources
+            (ActiveReplacement.source active)
+            condition
    in fmap fromPermanent (numberInstances (Projection.replacementsAffecting sources))
-        <> fmap fromFloating floating
+        <> fmap fromFloating (filter lives floating)
 
 -- CR 615.5: the additional effect a PERMANENT's static prevention ability
 -- prints, packaged with the environment it will run in.
@@ -1887,6 +1913,9 @@ installTurnSkips entry gs =
                   ActiveReplacement.expiry = Expiry.AtCleanup,
                   ActiveReplacement.uses = Uses.Once,
                   ActiveReplacement.origin = ReplacementOrigin.Other,
+                  -- No clause: the skip is unconditional (see
+                  -- Pawl.Types.ActiveReplacement).
+                  ActiveReplacement.condition = Nothing,
                   ActiveReplacement.rider = Nothing,
                   ActiveReplacement.slots = Map.empty
                 }

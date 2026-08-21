@@ -2408,6 +2408,9 @@ installDamageRow players controller source duration kind rewrite rider g (recipi
               -- OWN resolution deals, which none of these rows does -- not even
               -- one whose CR 609.7a choice happened to land on this very source.
               ActiveReplacement.origin = ReplacementOrigin.Other,
+              -- No clause: the prevention opcodes carry no printed "if" (see
+              -- Pawl.Types.ActiveReplacement).
+              ActiveReplacement.condition = Nothing,
               ActiveReplacement.rider = rider,
               ActiveReplacement.slots = Map.empty
             }
@@ -4158,17 +4161,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- timestamp is the row's CR 614.5 identity (#687). CR 614.15: the ORIGIN
     -- travels with the row rather than being re-derived.
     State.modify' $ \gs ->
-      -- The clause's own "if", read with the resolution's controller as CR
-      -- 109.5's "you". The full view, not viewWithLastKnown: a spell creating a
-      -- self-replacement is on the stack and the board is live.
       let context = effectContext controller source legal (slotGroups resolving gs)
-          met = maybe True (Condition.holds (Projection.fullView gs) context gs source) condition
-       in case (met, Expiry.arm (Binding.playersIn legal) controller source duration gs) of
-            -- The stated condition is false, so the clause creates nothing.
-            (False, _) -> gs
+       in case Expiry.arm (Binding.playersIn legal) controller source duration gs of
             -- CR 611.2b: the duration never started.
-            (_, Nothing) -> gs
-            (True, Just expiry) ->
+            Nothing -> gs
+            Just expiry ->
               let (ts, gs1) = Game.freshTimestamp gs
                   active =
                     ActiveReplacement.MkActiveReplacement
@@ -4183,14 +4180,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         ActiveReplacement.expiry = expiry,
                         ActiveReplacement.uses = uses,
                         ActiveReplacement.origin = origin,
+                        -- CR 614.1: the clause's printed "if" rides the row and
+                        -- is asked as the event would happen, never latched here
+                        -- (see Pawl.Types.ActiveReplacement).
+                        ActiveReplacement.condition = condition,
                         ActiveReplacement.rider = Nothing,
                         -- The resolution's own slot bindings, captured as the
                         -- row is installed for the reason Pawl.Types.DelayedTrigger
                         -- captures them (CR 603.7c): this resolution is about to
                         -- end and its object with it, so a pattern naming a slot
-                        -- would have nothing live to read. The SAME context the
-                        -- condition above was asked in, so the gate and the row
-                        -- cannot disagree about what a slot names.
+                        -- would have nothing live to read. The row's `condition`
+                        -- is asked against these too (Replacement.collect), so
+                        -- the clause and the pattern cannot disagree about what a
+                        -- slot names.
                         ActiveReplacement.slots = Filter.slotObjects context
                       }
                in gs1 {GameState.replacements = active : GameState.replacements gs1}
@@ -4334,6 +4336,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                     ActiveReplacement.expiry = Expiry.Type.Never,
                     ActiveReplacement.uses = Uses.Once,
                     ActiveReplacement.origin = ReplacementOrigin.Other,
+                    -- No clause: CR 614.10a's skip states none (see
+                    -- Pawl.Types.ActiveReplacement).
+                    ActiveReplacement.condition = Nothing,
                     ActiveReplacement.rider = Nothing,
                     ActiveReplacement.slots = Map.empty
                   }

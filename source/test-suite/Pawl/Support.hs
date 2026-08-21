@@ -1408,6 +1408,7 @@ addRegenShield oid gs =
             ActiveReplacement.expiry = Expiry.AtCleanup,
             ActiveReplacement.uses = Uses.Once,
             ActiveReplacement.origin = ReplacementOrigin.Other,
+            ActiveReplacement.condition = Nothing,
             ActiveReplacement.rider = Nothing,
             ActiveReplacement.slots = Map.empty
           }
