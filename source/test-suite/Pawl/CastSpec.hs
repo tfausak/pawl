@@ -1062,12 +1062,16 @@ modalCastSpec s registry = Spec.describe s "ModalCast" $ do
 --   1. "Untap target permanent." -- slot "untapped"
 -- plus "Entwine {1}" (CR 702.42).
 --
--- The board: alice has `islands` untapped Islands, bob has a Goblin Piker
--- (untapped) and a Wall of Stone (TAPPED), and Dream's Grip is in alice's hand.
+-- The board: alice has `lands` untapped `land`s, bob has a Goblin Piker
+-- (untapped) and a Wall of Stone (TAPPED), and `modal` is in alice's hand.
 -- The two victims start in OPPOSITE tap states on purpose -- an entwined cast
 -- that tapped the Piker and untapped the Wall leaves a board that neither mode
 -- alone can produce, and that a cast which fused the two slots could not produce
 -- either.
+--
+-- `land` and `modal` are parameters rather than Island and Dream's Grip because
+-- Synthetic Twofold Braid prints Dream's Grip's two modes over Forests, so the
+-- two-entwine-ability group below reads its board off this one.
 entwineBoard ::
   Printing.Printing ->
   Printing.Printing ->
@@ -1075,10 +1079,10 @@ entwineBoard ::
   Printing.Printing ->
   Int ->
   (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
-entwineBoard island dreamsGrip piker wallOfStone islands =
-  let (pikerId, gs1) = S.addCreature piker S.bob (S.landsInPlay island islands)
+entwineBoard land modal piker wallOfStone lands =
+  let (pikerId, gs1) = S.addCreature piker S.bob (S.landsInPlay land lands)
       (wallId, gs2) = S.addCreature wallOfStone S.bob gs1
-      (gs, spellId) = S.handOne dreamsGrip (S.tapObject wallId gs2)
+      (gs, spellId) = S.handOne modal (S.tapObject wallId gs2)
    in (gs, spellId, pikerId, wallId)
 
 tapSlot :: SlotName.SlotName
@@ -1191,6 +1195,75 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
       (Cast.entwineOffer ManaSpending.AsProduced S.alice richSpell (Cost.costsFor (S.printingName dreamsGrip) richSpell rich) rich)
       (Just (Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]), Cost.Type.components = []}))
     Spec.assertEqWith s "one Island: unaffordable, so not offered" (Cast.entwineOffer ManaSpending.AsProduced S.alice poorSpell (Cost.costsFor (S.printingName dreamsGrip) poorSpell poor) poor) Nothing
+  -- CR 702.42 states no limit on how many entwine abilities an object has --
+  -- contrast CR 702.41b for affinity and CR 702.43b for modular, which each say
+  -- what multiple instances do -- and CR 118.8a's "any number of additional
+  -- costs may be applied to a spell as it's being cast" makes two of them a SUM,
+  -- not a choice. No printing has two (Scryfall keyword:entwine, 2026-08-21:
+  -- thirty-two cards, each with one), so Synthetic Twofold Braid
+  -- (data/cards/synthetic-twofold-braid.json) is Dream's Grip's two modes for
+  -- {G}, printing "Entwine {2}" AND "Entwine {1}{G}".
+  --
+  -- Entwining therefore costs {G} plus {1}{G} plus {2}: five mana, two green.
+  -- Five Forests pay it exactly, so the tapped count is what tells the sum from
+  -- either cost alone -- {G} plus one of them is three mana, and a board of five
+  -- would leave two Forests standing.
+  Spec.it s "CR 118.8a two entwine abilities sum: entwining the Braid taps all five Forests" $ do
+    forest <- S.printingOf s registry "Forest"
+    braid <- S.printingOf s registry "Synthetic Twofold Braid"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
+    let (gs, spellId, pikerId, wallId) = entwineBoard forest braid piker wallOfStone 5
+        (asked, after) = castAndResolve (grips EntwineDecision.Entwines pikerId wallId) gs spellId
+    Spec.assertEqWith s "{G} plus the entwine {1}{G} plus the entwine {2}: all five Forests are tapped" (S.tappedCount S.alice after) 5
+    Spec.assertEqWith s "mode 0 tapped the Piker" (tapStateOf pikerId after) (Just TapState.Tapped)
+    Spec.assertEqWith s "mode 1 untapped the Wall" (tapStateOf wallId after) (Just TapState.Untapped)
+    Spec.assertEqWith s "the player was asked once, at the combined price, and entwined" (entwineAnnouncements asked) [EntwineDecision.Entwines]
+  -- The negative, one Forest away from the board above and identical otherwise:
+  -- four mana pays {G} plus EITHER entwine cost but not both, so under CR 118.8a
+  -- entwining is not on offer. An engine that read one of the two costs would
+  -- offer it here, which is what makes this the discriminating case.
+  Spec.it s "CR 118.8a with four Forests neither entwine cost alone is enough, so nothing is offered" $ do
+    forest <- S.printingOf s registry "Forest"
+    braid <- S.printingOf s registry "Synthetic Twofold Braid"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
+    let (gs, spellId, pikerId, wallId) = entwineBoard forest braid piker wallOfStone 4
+        -- An interpreter that WOULD entwine, entwineSpec's shape above: it
+        -- never gets the chance.
+        (asked, after) = castAndResolve (grips EntwineDecision.Entwines pikerId wallId) gs spellId
+    Spec.assertEqWith s "mode 1 never ran, so the Wall is still tapped" (tapStateOf wallId after) (Just TapState.Tapped)
+    Spec.assertEqWith s "mode 0 tapped the Piker, so the ordinary cast did happen" (tapStateOf pikerId after) (Just TapState.Tapped)
+    Spec.assertEqWith s "only {G} was paid: three Forests are still untapped" (S.tappedCount S.alice after) 1
+    Spec.assertBool s (S.castable S.alice spellId gs) "the spell is still castable"
+    Spec.assertEqWith s "no entwine question was put" (entwineAnnouncements asked) []
+  -- The gate itself, so the summed cost is pinned rather than inferred from the
+  -- mana it consumed. The mana parts CONCATENATE in ascending Set order
+  -- (Cost.plus), which puts {1}{G} before {2}.
+  Spec.it s "CR 601.2f Cast.entwineOffer is the two entwine costs summed" $ do
+    forest <- S.printingOf s registry "Forest"
+    braid <- S.printingOf s registry "Synthetic Twofold Braid"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
+    let (gs, spellId, _, _) = entwineBoard forest braid piker wallOfStone 5
+    Spec.assertEqWith
+      s
+      "five Forests: the additional cost is {1}{G} plus {2}"
+      (Cast.entwineOffer ManaSpending.AsProduced S.alice spellId (Cost.costsFor (S.printingName braid) spellId gs) gs)
+      ( Just
+          ( Cost.Type.MkCost
+              { Cost.Type.mana =
+                  Just
+                    ( ManaCost.MkManaCost
+                        [ ManaSymbol.Generic 1,
+                          ManaSymbol.OfType (ManaType.Colored Color.Green),
+                          ManaSymbol.Generic 2
+                        ]
+                    ),
+                Cost.Type.components = []
+              }
+          )
+      )
   -- A card with no entwine is never asked, which is the other half of "where
   -- the rules leave nothing to ask, don't prompt".
   Spec.it s "CR 702.42a a modal spell without entwine (Chaos Charm) is never offered one" $ do

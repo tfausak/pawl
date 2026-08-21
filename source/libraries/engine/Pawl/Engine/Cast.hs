@@ -339,17 +339,36 @@ payableCostAt x spending pid oid gs cost =
 affordableX :: Maybe Natural -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
 affordableX mCeiling spending pid oid gs cost = Cost.greatestPayableX mCeiling (\x -> payableCostAt x spending pid oid gs cost) cost
 
+-- CR 118.8a: "Any number of additional costs may be applied to a spell as it's
+-- being cast", summed into the total by CR 601.2f. So a card printing two entwine
+-- abilities is asked ONE question at the combined price, and Nothing here means
+-- it has no entwine at all.
+--
+-- The SUM and not a choice, which is what separates this from flashback: rule
+-- 702.34a's cost is alternative, and CR 118.9a allows only one of those per
+-- spell, so Pawl.Engine.Cost.costsFor offers each flashback cost as a candidate
+-- of its own. Nothing in rule 702.42 makes entwine costs exclusive.
+--
+-- Left-associated in ascending Set order, which is only a spelling: Cost.plus
+-- concatenates the mana parts and appends the components, so the total is the
+-- same however it is nested.
+entwineTotal :: [Cost Keyword] -> Maybe (Cost Keyword)
+entwineTotal costs = case costs of
+  [] -> Nothing
+  cost : rest -> Just (List.foldl' Cost.plus cost rest)
+
 -- CR 702.42a: the ADDITIONAL cost this player may pay right now to choose all of
 -- this modal spell's modes, or Nothing when entwining is not on offer at all.
 --
 -- Three conditions, and each is a different rule:
 --
---   1. The card HAS entwine. CR 702.42a is a static ability of the spell itself,
---      so it is read off the card's printed keywords and not through the CR 613
---      projection of the stack object CR 601.2a has already made. Game.faceOf,
---      because the half being cast is stamped on that object before this is
---      asked, so CR 709.3b's "only the characteristics of the half being cast"
---      already narrows the keywords read here.
+--   1. The card HAS entwine, at entwineTotal's combined price above. CR 702.42a
+--      is a static ability of the spell itself, so it is read off the card's
+--      printed keywords and not through the CR 613 projection of the stack
+--      object CR 601.2a has already made. Game.faceOf, because the half being
+--      cast is stamped on that object before this is asked, so CR 709.3b's
+--      "only the characteristics of the half being cast" already narrows the
+--      keywords read here.
 --   2. Every printed mode is LEGAL (CR 700.2a), so choosing ALL modes is not open
 --      when one of them cannot be chosen. Unobservable for Dream's Grip and
 --      written anyway: without it an entwined cast would announce fewer modes
@@ -373,7 +392,7 @@ entwineOffer :: ManaSpending -> PlayerId -> ObjectId -> [Cost Keyword] -> GameSt
 entwineOffer spending pid oid candidates gs = case Game.faceOf oid gs of
   Nothing -> Nothing
   Just face -> do
-    cost <- Keyword.entwineCost (Face.keywords face)
+    cost <- entwineTotal (Keyword.entwineCosts (Face.keywords face))
     let modal = Face.spell face
         legal = Target.fillableModes (Just pid) Map.empty oid (Card.enchantSlotMap face) modal gs
     Monad.guard (Natural.length legal == Modal.modeCount modal)
