@@ -6441,7 +6441,7 @@ splitBoxSpec s registry = Spec.describe s "SplitBox" $ do
       (_, Nothing) -> Spec.assertFailure s "expected one nonland permanent"
       (after, Just oid) -> do
         Spec.assertEqWith s "four loyalty counters" (S.counterOf CounterKind.Loyalty oid after) 4
-        Spec.assertEqWith s "off the projected printed number" (PC.loyalty (Projection.project oid after)) (Just (Loyalty.Literal 4))
+        Spec.assertEqWith s "and the projection carries the printed number" (PC.loyalty (Projection.project oid after)) (Just (Loyalty.Literal 4))
         Spec.assertEqWith s "and it is the halves combined" (Set.size (Projection.namesOf oid after)) 2
   Spec.it s "CR 310.4b the combined view has the one half's printed defense" $ do
     swamp <- S.printingOf s registry "Swamp"
@@ -6450,7 +6450,7 @@ splitBoxSpec s registry = Spec.describe s "SplitBox" $ do
       (_, Nothing) -> Spec.assertFailure s "expected one nonland permanent"
       (after, Just oid) -> do
         Spec.assertEqWith s "five defense counters" (S.counterOf CounterKind.Defense oid after) 5
-        Spec.assertEqWith s "off the projected printed number" (PC.defense (Projection.project oid after)) (Just (Defense.MkDefense 5))
+        Spec.assertEqWith s "and the projection carries the printed number" (PC.defense (Projection.project oid after)) (Just (Defense.MkDefense 5))
         Spec.assertEqWith s "and it is the halves combined" (Set.size (Projection.namesOf oid after)) 2
 
 -- One named half of a split card cast from alice's hand and resolved, plus the
