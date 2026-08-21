@@ -13,6 +13,12 @@
 -- Gameplay-level: Clone enters via the zone-change funnel, the Counterpart is
 -- cast and resolved, the Radstag evolves and the Shapeshifter's trigger resolves,
 -- and their projected characteristics are asserted.
+--
+-- Also CR 305.7's copiable-effects clause, where a copy meets the layer system:
+-- Vesuva is played as a land, copies Mutavault, and a Blood Moon arriving after
+-- takes the copied abilities with the printed ones
+-- (Pawl.Engine.Projection.setLandSubtypeTo) -- plus the other order, where CR
+-- 614.12 leaves Vesuva no copy ability to apply at all.
 module Pawl.CopySpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -25,21 +31,29 @@ import qualified Data.Text as Text
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.Action as A
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.KickerDecision as KickerDecision
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
+import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
@@ -47,6 +61,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
 -- The battlefield objects whose PRINTED card has this name (a printed card is
@@ -161,6 +176,71 @@ rites decision victim p = case p of
 -- wrong things fails on this where a length check would not.
 mintedTokens :: GameState.GameState -> [(Set.Set CardName.CardName, Maybe (Integer, Integer))]
 mintedTokens gs = fmap (\oid -> (Projection.namesOf oid gs, S.powerToughnessOf oid gs)) (tokensOnBattlefield gs)
+
+-- Vesuva Land: "You may have this land enter tapped as a copy of any land on the
+-- battlefield" (data/cards/vesuva.json; Oracle text checked against
+-- api.scryfall.com, 2026-08-21). The whole of its printed text, and what makes a
+-- copy of a LAND reachable at all in data/cards.
+--
+-- alice's board: two Mountains, Mutavault, `mMoon` when one is passed, and Vesuva
+-- in her hand with the turn's land drop unspent. `mMoon` puts Blood Moon there
+-- BEFORE Vesuva is played, which the CR 614.12 case wants; the CR 305.7 case
+-- passes Nothing and adds it after, since a Blood Moon already out leaves no copy
+-- ability to apply.
+--
+-- The Mountains are BASIC on purpose: Blood Moon's printed criterion is NONBASIC
+-- lands, so the mana that pays Mutavault's animation is the same whether or not a
+-- Blood Moon is on the board, and a refused activation is never a refusal to
+-- pay.
+vesuvaBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Maybe Printing.Printing -> (ObjectId, GameState.GameState)
+vesuvaBoard mountain mutavault vesuva mMoon =
+  let base = S.landsInPlay mountain 2
+      (mutavaultId, g1) = S.addCreature mutavault S.alice base
+      g2 = maybe g1 (\moon -> snd (S.addCreature moon S.alice g1)) mMoon
+      g3 = snd (S.addHandCard vesuva S.alice g2)
+   in ( mutavaultId,
+        g3
+          { GameState.priority = Just S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice
+          }
+      )
+
+-- Plays whatever land the board offers and pins the as-enters copy choice to ONE
+-- named permanent, copyNamed's posture for copyNamed's reason: an answerer that
+-- searched for a legal source would find another land after a mutation.
+playsAndCopies :: ObjectId -> Prompt.Prompt r -> r
+playsAndCopies wanted p = case p of
+  Prompt.ChooseCopyTarget {} -> Just wanted
+  _ -> S.playLandAnswer p
+
+-- playsAndCopies' opposite: play the land and DECLINE the copy, which is the
+-- other half of the printed "may".
+playsAndDeclines :: Prompt.Prompt r -> r
+playsAndDeclines p = case p of
+  Prompt.ChooseCopyTarget {} -> Nothing
+  _ -> S.playLandAnswer p
+
+-- Takes ONE named activated ability of ONE named permanent whenever the priority
+-- loop offers it, and passes otherwise -- so an ability that reaches the stack
+-- did so because the engine offered it, not because this answerer reached past a
+-- gate.
+activates :: ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card -> Prompt.Prompt r -> r
+activates srcId ability p = case p of
+  Prompt.ChooseAction _ _ actions ->
+    let wanted a = case a of
+          A.Activate oid ab -> oid == srcId && ab == ability
+          _ -> False
+     in case filter wanted actions of
+          h : _ -> h
+          [] -> A.Pass
+  _ -> S.identityAnswer p
+
+-- Mutavault's SECOND printed ability -- "{1}: This land becomes a 2/2 creature
+-- with all creature types until end of turn. It's still a land". The first is the
+-- mana ability CR 605.3b keeps off the stack, which no priority window offers.
+animationAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+animationAbility = Maybe.listToMaybe . drop 1 . Face.activatedAbilities . S.combinedFace
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
@@ -683,3 +763,116 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     -- trigger that copied and can never copy again -- STRICTER than printed, and
     -- this is where that is observable.
     Spec.assertEqWith s "it has the Giant's abilities and only those" (length (Projection.triggeredAbilitiesOf shifterId after)) 0
+
+  -- THE PROVING TEST for CR 305.7's THIRD clause: a land whose subtype is set to a
+  -- basic type "loses all abilities generated from its rules text, its old land
+  -- types, and any copiable effects affecting that land". Vesuva enters as a copy
+  -- of Mutavault -- a copiable effect, applied in layer 1 (CR 613.2a), so the
+  -- animation and the {C} are Vesuva's own -- and a Blood Moon arriving AFTER
+  -- takes them.
+  --
+  -- The clause falls out of WHERE the copy lives rather than needing a layer-1
+  -- unwind: Projection.copiableCharacteristics SEEDS the fold with the copy
+  -- snapshot, so by layer 4 the copied text is as much "the land's rules text" as
+  -- a printed line, and setLandSubtypeTo's one strip reaches both. CR 305.7 asks
+  -- for no less -- the copy keeps nothing either clause would spare.
+  --
+  -- ONE entered board, forked by adding Blood Moon to it, so the two legs differ
+  -- in that permanent and in nothing else -- and the copy on the stripped leg is
+  -- the very same copy the other leg animates. The ORDER is what makes the clause
+  -- reachable at all: a Blood Moon already out strips Vesuva's own copy ability
+  -- before it can apply, which is the case below.
+  --
+  -- Vesuva NAMES Mutavault on both legs (CR 305.7 changes no name), which is what
+  -- keeps the stripped leg from passing because no copy ever happened.
+  --
+  -- The animation is driven through the priority loop rather than
+  -- Activate.activateAbility, which does not gate: the negative has to be the
+  -- engine refusing to offer the action, not this test declining to take it.
+  Spec.it s "CR 305.7 Blood Moon strips the abilities Vesuva copied from another land" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    mutavault <- S.printingOf s registry "Mutavault"
+    vesuva <- S.printingOf s registry "Vesuva"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
+    case animationAbility mutavault of
+      Nothing -> Spec.assertFailure s "Mutavault prints no second activated ability"
+      Just animation -> do
+        let (mutavaultId, board) = vesuvaBoard mountain mutavault vesuva Nothing
+            without = S.runPure (playsAndCopies mutavaultId) board Engine.priorityLoop
+            with = snd (S.addCreature bloodMoon S.alice without)
+            named = CardName.MkCardName . Text.pack
+        case newest (printedOnBattlefield "Vesuva" without) of
+          Nothing -> Spec.assertFailure s "Vesuva never reached the battlefield"
+          Just vesuvaId -> do
+            let animate gs = S.runPure (activates vesuvaId animation) gs Engine.priorityLoop
+                plain = animate without
+                mooned = animate with
+            -- The copy is real: Vesuva took Mutavault's animation and became a
+            -- 2/2. This is also the assertion a strip that reached too far -- one
+            -- with no Blood Moon to switch it on -- would redden.
+            Spec.assertEqWith s "the copied animation resolves and Vesuva is a 2/2" (S.powerToughnessOf vesuvaId plain) $ Just (2, 2)
+            -- CR 305.7's third clause: the same copy, under Blood Moon, has no
+            -- animation to offer, so nothing animates.
+            Spec.assertEqWith s "under Blood Moon the copied animation is gone, and Vesuva is no creature" (S.powerToughnessOf vesuvaId mooned) Nothing
+            -- Not vacuous: the copy is still there to be stripped. A name is not
+            -- among the things CR 305.7 takes.
+            Spec.assertEqWith s "the mooned Vesuva is still a copy of Mutavault by name (CR 707.2)" (Projection.namesOf vesuvaId mooned) $ Set.singleton (named "Mutavault")
+            -- The mana half of the same clause, with CR 305.6's replacement for
+            -- it: Mutavault's copied "{T}: Add {C}" goes, and the new Mountain
+            -- type hands back red.
+            Spec.assertEqWith s "the copy taps for the colorless it copied" (Mana.manaTypesOf vesuvaId plain) [ManaType.Colorless]
+            Spec.assertEqWith s "and under Blood Moon for red alone (CR 305.6)" (Mana.manaTypesOf vesuvaId mooned) [ManaType.Colored Color.Red]
+            -- CR 614.1d rides the same printed sentence: Vesuva enters TAPPED as a
+            -- copy.
+            Spec.assertEqWith s "and it entered tapped, as the printed sentence says" (fmap Object.tapped (Game.lookupObject vesuvaId without)) $ Just TapState.Tapped
+
+  -- The declining half of the printed "may", which is what keeps `tapped` on the
+  -- AsCopy rewrite rather than in a second EntryRewrite.Tapped beside it: Vesuva's
+  -- own ruling (2021-03-19) says that a Vesuva which chooses no land "enters the
+  -- battlefield untapped as itself, and will not be able to tap for mana". Both
+  -- halves are asserted, and a second replacement would falsify the first.
+  Spec.it s "a Vesuva that declines the copy enters untapped and taps for nothing (CR 614.1c)" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    mutavault <- S.printingOf s registry "Mutavault"
+    vesuva <- S.printingOf s registry "Vesuva"
+    let (_, board) = vesuvaBoard mountain mutavault vesuva Nothing
+        played = S.runPure playsAndDeclines board Engine.priorityLoop
+        named = CardName.MkCardName . Text.pack
+    case newest (printedOnBattlefield "Vesuva" played) of
+      Nothing -> Spec.assertFailure s "Vesuva never reached the battlefield"
+      Just vesuvaId -> do
+        Spec.assertEqWith s "it taps for no mana at all -- Vesuva prints no mana ability" (Mana.manaTypesOf vesuvaId played) []
+        Spec.assertEqWith s "and it entered untapped, the tapping having gone with the declined copy" (fmap Object.tapped (Game.lookupObject vesuvaId played)) $ Just TapState.Untapped
+        Spec.assertEqWith s "and it is still itself by name" (Projection.namesOf vesuvaId played) $ Set.singleton (named "Vesuva")
+
+  -- The OTHER order, and the reason the case above adds Blood Moon afterwards: CR
+  -- 614.12 checks the entering permanent's characteristics "as it would exist on
+  -- the battlefield, taking into account ... continuous effects that already exist
+  -- and would apply to the permanent". A Blood Moon already out has stripped
+  -- Vesuva's own copy ability by then (CR 305.7's FIRST clause), so there is no
+  -- copy to make -- Blood Moon's own ruling (2020-08-07) says as much of every
+  -- ability that applies as a land enters.
+  --
+  -- The same answerer, which is what makes this a real refusal: it names
+  -- Mutavault whenever a copy choice is raised, so a Vesuva that still had its
+  -- ability would copy.
+  Spec.it s "CR 614.12 a Vesuva entering under Blood Moon has no copy ability left to apply" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    mutavault <- S.printingOf s registry "Mutavault"
+    vesuva <- S.printingOf s registry "Vesuva"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
+    let (mutavaultId, board) = vesuvaBoard mountain mutavault vesuva (Just bloodMoon)
+        played = S.runPure (playsAndCopies mutavaultId) board Engine.priorityLoop
+        named = CardName.MkCardName . Text.pack
+    case newest (printedOnBattlefield "Vesuva" played) of
+      Nothing -> Spec.assertFailure s "Vesuva never reached the battlefield"
+      Just vesuvaId -> do
+        Spec.assertEqWith s "Vesuva copied nothing and is still itself by name" (Projection.namesOf vesuvaId played) $ Set.singleton (named "Vesuva")
+        -- The tapped half of the printed sentence went with the copy half: both
+        -- are the one ability, and it was stripped before either could apply.
+        Spec.assertEqWith s "and it entered untapped, the ability having gone with the rest" (fmap Object.tapped (Game.lookupObject vesuvaId played)) $ Just TapState.Untapped
+        -- CR 305.6: what a Vesuva with nothing copied taps for is the new Mountain
+        -- type's red, where a Vesuva that copied nothing and kept its printed text
+        -- would tap for nothing at all.
+        Spec.assertEqWith s "and it taps for red as a Mountain" (Mana.manaTypesOf vesuvaId played) [ManaType.Colored Color.Red]
+        Spec.assertBool s (elem Subtype.Mountain (Set.toList (Projection.subtypesOf vesuvaId played))) "Blood Moon made it a Mountain"

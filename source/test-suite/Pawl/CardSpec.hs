@@ -3191,8 +3191,8 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   -- belongs in this walk. CR 707.9's exceptions beside it carry no Filter: an
   -- "except ..." clause states values, never a criterion over objects
   -- (Pawl.Types.CopyException imports no Filter, which is what keeps that
-  -- honest).
-  EntryRewrite.AsCopy (AsCopy.MkAsCopy f _) -> [f]
+  -- honest), and neither does the CR 614.1d `tapped` flag beside them (Vesuva).
+  EntryRewrite.AsCopy (AsCopy.MkAsCopy f _ _) -> [f]
   EntryRewrite.ChoiceOf _ -> []
   EntryRewrite.ChooseColor -> []
   EntryRewrite.ChooseBasicLandType -> []

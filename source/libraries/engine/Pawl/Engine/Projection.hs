@@ -356,8 +356,11 @@ retainedThroughCardTypeSet t = t == CardType.Instant || t == CardType.Sorcery
 -- had not started applying by the end of layer 4, which is where an object that
 -- became a land AT layer 4 is caught, and liveGiven for the rest.
 --
--- Not stripped: CR 305.7's copiable-effects clause, a layer-1 question this
--- layer-4 strip cannot answer (#406).
+-- CR 305.7's copiable-effects clause needs nothing beyond this one strip: the
+-- fold is SEEDED from copiableCharacteristics (CR 613.2c), so an ability a layer-1
+-- copy effect gave the land is in these lists by the time layer 4 runs, and goes
+-- with the printed text rather than surviving it. Proved by Pawl.CopySpec's "CR
+-- 305.7 Blood Moon strips the abilities Vesuva copied from another land".
 setLandSubtypeTo :: Subtype.Type.Subtype -> ProjectedCharacteristics -> ProjectedCharacteristics
 setLandSubtypeTo s pc =
   pc

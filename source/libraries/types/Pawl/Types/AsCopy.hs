@@ -26,6 +26,16 @@ import qualified Pawl.Types.Keyword as Keyword
 -- self and no exception applies.
 data AsCopy = MkAsCopy
   { eligible :: Filter.Filter Keyword.Keyword,
-    exceptions :: [CopyException.CopyException]
+    exceptions :: [CopyException.CopyException],
+    -- | CR 614.1d inside CR 614.1c's sentence: Vesuva's "you may have this land
+    -- enter TAPPED as a copy of any land on the battlefield". One replacement
+    -- doing two things, so the status rides the rewrite rather than sitting in a
+    -- second EntryRewrite.Tapped beside it: a second replacement would tap a
+    -- Vesuva that DECLINED the copy, which the printed sentence does not.
+    --
+    -- Not a CopyException: CR 707.2 excludes status from the copiable values, so
+    -- this may not be written into the snapshot. It goes onto the object through
+    -- Pawl.Engine.Event.enterTapped, the same write EntryRewrite.Tapped makes.
+    tapped :: Bool
   }
   deriving (Eq, Ord, Show)
