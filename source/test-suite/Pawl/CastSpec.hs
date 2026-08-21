@@ -2324,11 +2324,12 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
     Spec.assertBool s (not (any (S.isCastOf bobsRally) (Action.legalActions S.bob later))) "and not offered"
     Spec.assertBool s (elem (A.Cast boltId (S.printingName bolt) Facing.FaceUp) (Action.legalActions S.bob later)) "bob's unrestricted instant still is"
   -- CR 508.6 on CR 500.1's span: "you've been attacked this step" asks about ONE
-  -- STEP. No printing can tell that from "this combat phase" -- all fifteen that
-  -- carry the clause also carry "only during the declare attackers step", where
-  -- the two spans coincide -- so the discriminating card is Synthetic Belated
-  -- Rally, Rally the Troops with the DuringPhase clause removed and nothing else
-  -- changed.
+  -- STEP, and no printed card tells that from "this combat phase" -- Scryfall
+  -- `o:"been attacked this step"`, 2026-08-21, returns fifteen cards and every
+  -- one of them also prints "only during the declare attackers step", where the
+  -- two spans coincide. So the discriminating card is Synthetic Belated Rally,
+  -- Rally the Troops with the DuringPhase clause removed and nothing else
+  -- changed; a printing that drops that clause would refute this and replace it.
   --
   -- The boundary is crossed by RUNNING the engine rather than by writing
   -- GameState.phase, as the case above does: what makes the answer flip is a
