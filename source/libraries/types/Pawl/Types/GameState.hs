@@ -4,6 +4,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
@@ -309,6 +310,11 @@ data GameState = MkGameState
     -- permanent's printed block requirements are NOT here --
     -- Pawl.Engine.BlockRequirement re-derives those live.
     blockRequirements :: [ActiveBlockRequirement.ActiveBlockRequirement],
+    -- | CR 508.1d / 613.11: stored ATTACKING REQUIREMENTS from resolutions
+    -- (Alluring Siren), the field above's twin on the other side of the combat
+    -- phase. A permanent's printed attack requirements are NOT here --
+    -- Pawl.Engine.AttackRequirement re-derives those live.
+    attackRequirements :: [ActiveAttackRequirement.ActiveAttackRequirement],
     -- | CR 116.2d: the ignores players have paid for, each with an expiry the
     -- Pawl.Engine.Expiry sweeps consult. Read by Pawl.Engine.PlayerEffect.applying,
     -- which drops an ignored permanent's abilities for the ignoring player alone

@@ -23,6 +23,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
@@ -35,6 +36,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
@@ -426,7 +428,7 @@ boundedDeclarationSpec s registry = Spec.describe s "BoundedDeclaration" $ do
         Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [plain] gs)) "but the Piker alone obeys one requirement where two were available"
         -- The second discriminator, over attackCeilingGiven's tie-break.
         let candidates = Combat.legalAttackers S.alice gs
-        Spec.assertEqWith s "and the forced declaration names the Berserkers" (Combat.forcedAttackDeclaration (Combat.attackCeiling candidates gs) candidates) [bers]
+        Spec.assertEqWith s "and the forced declaration names the Berserkers" (fmap fst (Combat.forcedAttackDeclaration (Combat.attackCeiling candidates gs) candidates)) [bers]
         -- Control: strip the Arbiter and the two readings agree again.
         Spec.assertBool s (Combat.legalAttackDeclaration S.alice [bers, plain] control) "without the Arbiter, both together is legal"
         Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [bers] control)) "and the Berserkers alone no longer attains the maximum"
@@ -2851,13 +2853,13 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
   Spec.it s "CR 508.1d the cost clause excuses a requirement only when EVERY attack costs" $ do
     -- ANY free attack, not ALL attacks free. A creature that could attack Jace for
     -- nothing is not one that "can't attack unless a player pays a cost", so the
-    -- Curse still forces it onto the battlefield's other side -- and it is the
-    -- player's own CR 508.1b announcement, never the engine's, that then decides
-    -- whether they end up paying Ghostly Prison.
+    -- Curse still forces it onto the battlefield's other side -- against Jace,
+    -- since the free announcement is the only one the cost clause leaves in
+    -- Combat.attackCeilingGiven's reach.
     --
     -- The two boards differ ONLY by the planeswalker, which is what makes this the
-    -- test for `attacksFreely`'s quantifier: with no planeswalker every target is
-    -- taxed and the answers coincide.
+    -- test for that clause being applied per (creature, target) PAIR: with no
+    -- planeswalker every announcement is taxed and the answers coincide.
     curse <- S.printingOf s registry "Curse of the Nightly Hunt"
     prison <- S.printingOf s registry "Ghostly Prison"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -3559,6 +3561,131 @@ exertAnswer decision p = case p of
   Prompt.ChooseExert {} -> decision
   _ -> S.aggressiveAnswer p
 
+-- CR 508.1d's OBJECT axis -- what a required creature has to attack, rather than
+-- merely that it must attack -- proved by Alluring Siren ("{T}: Target creature
+-- an opponent controls attacks you this turn if able"). The subject-only shape is
+-- Curse of the Nightly Hunt's, in attackCostSpec above and in Pawl.CombatSpec.
+--
+-- bob controls a Jace Beleren, so CR 508.1b offers alice's attacker TWO
+-- announcements and the narrowing has something to narrow. That is the Siren's
+-- own ruling: "if the targeted creature would be able to attack either you or a
+-- planeswalker you control, it must attack you, not the planeswalker."
+--
+-- alice also controls a second creature the Siren never touched, which is what
+-- makes the target prompt a real choice (one candidate would short-circuit it)
+-- and what keeps "every creature must attack bob" from passing for the answer.
+alluringSirenSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+alluringSirenSpec s registry = Spec.describe s "AlluringSiren" $ do
+  Spec.it s "CR 508.1d the requirement is obeyed by attacking bob and not by attacking bob's Jace" $ do
+    siren <- S.printingOf s registry "Alluring Siren"
+    jace <- S.printingOf s registry "Jace Beleren"
+    piker <- S.printingOf s registry "Goblin Piker"
+    centaur <- S.printingOf s registry "Windseeker Centaur"
+    case sirenBoard siren jace piker centaur of
+      Nothing -> Spec.assertFailure s "fixture should build"
+      Just (control, lured, free, jaceId, activated) -> do
+        -- THE OBJECT AXIS. Attacking Jace is a declaration that attacks with the
+        -- required creature and still disobeys the requirement, which is the one
+        -- thing the subject-only carrier could not say.
+        Spec.assertBool
+          s
+          (not (Combat.legalAttackDeclarationAs S.alice [(lured, AttackTarget.OfPlaneswalker jaceId)] activated))
+          "CR 508.1d: announcing Jace does not obey 'attacks you if able'"
+        Spec.assertBool
+          s
+          (Combat.legalAttackDeclarationAs S.alice [(lured, AttackTarget.OfPlayer S.bob)] activated)
+          "announcing bob does"
+        -- The subject axis, still live: declining is illegal under the same
+        -- requirement.
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] activated)) "declining to attack obeys nothing"
+        -- The creature the Siren never named is unconstrained on both axes, so
+        -- "attacking Jace is illegal" is about the requirement rather than about
+        -- the board.
+        Spec.assertBool
+          s
+          (Combat.legalAttackDeclarationAs S.alice [(lured, AttackTarget.OfPlayer S.bob), (free, AttackTarget.OfPlaneswalker jaceId)] activated)
+          "and the unnamed creature may still attack Jace alongside it"
+        -- The control board differs in exactly one thing: the Siren's ability
+        -- never resolved.
+        Spec.assertBool
+          s
+          (Combat.legalAttackDeclarationAs S.alice [(lured, AttackTarget.OfPlaneswalker jaceId)] control)
+          "without the Siren's ability, that same creature may attack Jace"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] control) "and may decline altogether"
+  Spec.it s "CR 514.2 the stored requirement lasts exactly the turn" $ do
+    -- "This turn" is Duration.UntilEndOfTurn, which Expiry.arm turns into
+    -- Expiry.AtCleanup -- so the cleanup step's sweep is what has to drop the
+    -- stored row. Read off the store, since a second declare attackers step in
+    -- the same turn is the only other place it would show, and this fixture has
+    -- none.
+    siren <- S.printingOf s registry "Alluring Siren"
+    jace <- S.printingOf s registry "Jace Beleren"
+    piker <- S.printingOf s registry "Goblin Piker"
+    centaur <- S.printingOf s registry "Windseeker Centaur"
+    case sirenBoard siren jace piker centaur of
+      Nothing -> Spec.assertFailure s "fixture should build"
+      Just (control, lured, _, _, activated) -> do
+        Spec.assertEqWith s "stored once the ability has resolved" (fmap ActiveAttackRequirement.attacker (GameState.attackRequirements activated)) [lured]
+        Spec.assertEqWith s "and gone at cleanup (CR 514.2)" (GameState.attackRequirements (Expiry.dropAtCleanup activated)) []
+        Spec.assertEqWith s "nothing was stored without the ability" (GameState.attackRequirements control) []
+  Spec.it s "CR 508.1d whole cards: a real declare attackers step sends the lured creature at bob" $ do
+    -- The gameplay-level case, through Combat.declareAttackers rather than the
+    -- legality predicate, with an interpreter that attacks with everything and
+    -- announces JACE for every attacker. CR 508.1d makes that declaration illegal,
+    -- so the engine replaces it, and what the combat record then says the lured
+    -- creature is attacking is the whole assertion.
+    siren <- S.printingOf s registry "Alluring Siren"
+    jace <- S.printingOf s registry "Jace Beleren"
+    piker <- S.printingOf s registry "Goblin Piker"
+    centaur <- S.printingOf s registry "Windseeker Centaur"
+    case sirenBoard siren jace piker centaur of
+      Nothing -> Spec.assertFailure s "fixture should build"
+      Just (control, lured, _, jaceId, activated) -> do
+        let after = S.runPure (announcing jaceId) activated (Combat.declareAttackers S.alice)
+            without = S.runPure (announcing jaceId) control (Combat.declareAttackers S.alice)
+            announced gs oid = Map.lookup oid (Combat.Type.attackers (GameState.combat gs))
+        Spec.assertEqWith s "the lured creature attacks bob, not the Jace it was announced against" (announced after lured) (Just (AttackTarget.OfPlayer S.bob))
+        -- The SAME interpreter, the same board bar the Siren's resolution: without
+        -- the requirement its announcement stands, so the redirect above is CR
+        -- 508.1d and not a rule about announcements.
+        Spec.assertEqWith s "without the Siren's ability the announcement stands" (announced without lured) (Just (AttackTarget.OfPlaneswalker jaceId))
+
+-- Attacks with everything (aggressiveAnswer) and announces the PLANESWALKER for
+-- every attacker, which CR 508.1d then has to refuse.
+announcing :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+announcing jaceId p = case p of
+  Prompt.ChooseAttackTarget {} -> AttackTarget.OfPlaneswalker jaceId
+  _ -> S.aggressiveAnswer p
+
+-- CR 601.2c: aim the Siren's ability at one particular creature. The offered set
+-- is FILTERED rather than rebuilt, so the target the engine re-reads at
+-- resolution (CR 608.2b) is the one it offered.
+aimingAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimingAt oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just oid) . Recipient.objectOf) . snd) sets
+  _ -> S.identityAnswer p
+
+-- alice's two creatures against bob's Jace and bob's Siren, returned twice: once
+-- untouched, and once with the Siren's ability resolved on alice's FIRST creature.
+-- The two differ in that resolution and what paying for it did to bob's own side
+-- (the Siren is tapped); nothing on alice's side of the board moves, which is
+-- what every paired assertion below rests on.
+sirenBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Maybe (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+sirenBoard siren jace piker centaur =
+  let (gs0, mine, theirs) = S.combatBoardOf [piker, centaur] [jace, siren]
+   in case (mine, theirs, Face.activatedAbilities (S.combinedFace siren)) of
+        ([lured, free], [jaceId, sirenId], ability : _) ->
+          let control = S.addCounter CounterKind.Loyalty 3 jaceId gs0
+              ready = control {GameState.priority = Just S.bob}
+              activated = snd (Engine.runGamePure (aimingAt lured) ready (Activate.activateAbility S.bob sirenId ability))
+           in Just (control, lured, free, jaceId, snd (Engine.runGamePure (aimingAt lured) activated Stack.resolveTop))
+        _ -> Nothing
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   combatLegalitySpec s registry
@@ -3583,5 +3710,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   sharedBlockerSpec s registry
   lastKnownDefendingPlayerSpec s registry
   attackCostSpec s registry
+  alluringSirenSpec s registry
   blockCostSpec s registry
   exertSpec s registry

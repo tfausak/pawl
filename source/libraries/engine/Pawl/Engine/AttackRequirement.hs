@@ -3,9 +3,11 @@
 -- one of the modules on the axis CR 613.11 reaches past the layer system. None
 -- is a layer, and Pawl.Engine.Projection sees none of them.
 --
--- The only reader of Pawl.Types.AttackRequirement. Pawl.Engine.Combat asks for
--- requirement INSTANCES -- bare creature ids, with a count apiece -- and never
--- learns which card produced one.
+-- The only reader of Pawl.Types.AttackRequirement and of
+-- Pawl.Types.ActiveAttackRequirement -- the printed carrier and the stored one,
+-- as Pawl.Engine.BlockRequirement reads its own pair. Pawl.Engine.Combat asks
+-- for requirement INSTANCES -- bare (attacker, target) pairs -- and never learns
+-- which card produced one, nor which carrier.
 module Pawl.Engine.AttackRequirement where
 
 import Data.Map (Map)
@@ -14,23 +16,24 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
 
 -- CR 508.1d: every requirement in force right now, INSTANTIATED as the
--- creatures the active player is required to declare as attackers, each
+-- (creature, target) pairs the active player is required to declare, each
 -- carrying HOW MANY requirements name it.
 --
--- Keyed by the creature and not a bare count, because CR 508.1d counts
--- requirements being OBEYED by a particular declaration, and a declaration
--- obeys an instance exactly when it attacks with that creature -- so each one
--- must stay identifiable against the declaration it is checked against. One
--- instance per CREATURE per requirement, not per ability: CR 508.1d checks each
--- creature the active player controls, so one Curse over three able creatures
--- is three requirements.
+-- Keyed by the pair, because CR 508.1d counts requirements being OBEYED by a
+-- particular declaration, and a declaration obeys an instance exactly when it
+-- attacks with that creature and announces that target for it (CR 508.1b) -- so
+-- each one must stay identifiable against the declaration it is checked against.
+-- Per CREATURE, not per ability: CR 508.1d checks each creature the active
+-- player controls, so one Curse over three able creatures is three requirements.
 --
 -- A MULTISET and not a set, because the rule counts requirements rather than
 -- creatures: a Berserkers of Blood Ridge ("this creature attacks each combat if
@@ -38,19 +41,28 @@ import Pawl.Types.ObjectId (ObjectId)
 -- and one on each other creature the cursed player controls, so under a Silent
 -- Arbiter's bound of one only the Berserkers attains the maximum. Proved by
 -- boundedDeclarationSpec's "two requirements on ONE creature count twice".
--- BlockRequirement.instances is the twin, on pairs.
+-- BlockRequirement.instances is the twin, on its own pairs.
 --
 -- The multiplicity counts DISTINCT REQUIREMENTS, not gathering events: the
--- battlefield walk is over a Set, `candidates` is duplicate-free (Combat filters
--- it from that same Set), and fromRequirement filters `candidates` once per
--- requirement -- so a creature is emitted exactly once per requirement naming
--- it, and two Curses are two sources and therefore two emissions.
+-- battlefield walk is over a Set, `candidates` and `targets` are duplicate-free
+-- (Combat filters the first from that same Set and derives the second from
+-- Combat.attackTargets), and fromRequirement filters `candidates` once per
+-- requirement -- so a pair is emitted exactly once per requirement naming it,
+-- and two Curses are two sources and therefore two emissions.
 --
 -- `candidates` is CR 508.1a's chosen-from set, and it carries the "if able" of
--- "attacks each combat if able". Passed IN rather than computed here, as
--- BlockRequirement takes its `able` predicate, so this module never learns the
--- restrictions. Pruning by it changes no answer -- a creature that cannot
--- attack attacks in no legal declaration.
+-- "attacks each combat if able". `targets` is CR 508.1b's announcement list,
+-- every one of which any candidate may legally be announced as attacking --
+-- pawl models no restriction on WHAT a creature attacks, only on whether it
+-- attacks. Both are passed IN rather than computed here, as BlockRequirement
+-- takes its `able` predicate and its `attackers`, so this module never learns
+-- the restrictions.
+--
+-- A requirement that does NOT name its object mints one pair per target, which
+-- is Curse of the Nightly Hunt's "attack each combat if able" and the posture
+-- BlockRequirement.instances takes for an absent axis. CR 508.1a caps how many
+-- of those one creature can obey at one -- a creature attacks a single target --
+-- so attacking anything attains that requirement's maximum.
 --
 -- What the instance multiset is NOT is CR 508.1d's maximum. Its total is an
 -- upper bound on it, and Combat.attackCeiling is what turns the bound into the
@@ -64,8 +76,8 @@ import Pawl.Types.ObjectId (ObjectId)
 -- be decided per blocker. Every attacking restriction pawl models is either per
 -- creature -- already inside Combat.canAttack -- or about the whole declaration,
 -- which no per-creature predicate could carry either.
-instances :: [ObjectId] -> GameState -> Map ObjectId Natural
-instances candidates gs =
+instances :: [ObjectId] -> [AttackTarget.AttackTarget] -> GameState -> Map (ObjectId, AttackTarget.AttackTarget) Natural
+instances candidates targets gs =
   let -- Hoisted out of the walk as BlockRequirement.instances hoists them, and
       -- both unforced until some permanent actually declares a requirement.
       setEffs = Projection.setLandSubtypeEffects gs
@@ -108,9 +120,38 @@ instances candidates gs =
           (Projection.project creature gs)
           gs
       -- CR 612.1: a hacked "Swamps attack each combat if able" requires Islands.
+      --
+      -- The printed carrier states no object (Pawl.Types.AttackRequirement says
+      -- why), so every target is admissible and the requirement mints a pair per
+      -- one.
       fromRequirement source changes requirement =
         let subject = AttackRequirement.subject requirement
-         in filter (named source (if null changes then subject else Projection.rewriteAffected changes subject)) candidates
+         in [ (creature, target)
+            | creature <- filter (named source (if null changes then subject else Projection.rewriteAffected changes subject)) candidates,
+              target <- targets
+            ]
+      -- CR 508.1d again, off the STORED carrier. No CR 305.7 or CR 604.2 gate and
+      -- no CR 612.1 rewrite, which is the posture BlockRequirement.instances takes
+      -- for its stored rows: those three ask what a permanent's TEXT still says,
+      -- and a resolution-created requirement has outlived its source's text (CR
+      -- 611.2).
+      --
+      -- Pruned by membership exactly as the printed pairs are: a creature that has
+      -- since left the battlefield, or that can no longer attack, is not among
+      -- `candidates`, and a player who has left the game is not among `targets`
+      -- (Combat.attackTargets is derived from Game.stillPlayingInOrder).
+      fromStored active =
+        let creature = ActiveAttackRequirement.attacker active
+            target = AttackTarget.OfPlayer (ActiveAttackRequirement.defender active)
+         in [ (creature, target)
+            | creature `elem` candidates,
+              target `elem` targets
+            ]
    in Map.fromListWith
         (+)
-        (fmap (\oid -> (oid, 1)) (concatMap fromPermanent (Set.toList (GameState.battlefield gs))))
+        ( fmap
+            (\pair -> (pair, 1))
+            ( concatMap fromPermanent (Set.toList (GameState.battlefield gs))
+                <> concatMap fromStored (GameState.attackRequirements gs)
+            )
+        )

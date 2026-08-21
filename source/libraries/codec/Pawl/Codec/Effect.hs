@@ -52,6 +52,7 @@ import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.RedirectDamage as RedirectDamage
 import qualified Pawl.Codec.RemoveCounters as RemoveCounters
 import qualified Pawl.Codec.Replace as Replace
+import qualified Pawl.Codec.RequireAttack as RequireAttack
 import qualified Pawl.Codec.RequireBlock as RequireBlock
 import qualified Pawl.Codec.Reveal as Reveal
 import qualified Pawl.Codec.Search as Search
@@ -135,6 +136,7 @@ codec cardCodec =
       Arm.payload "ArmDelayedTrigger" ArmDelayedTrigger.codec Effect.ArmDelayedTrigger (\x -> case x of Effect.ArmDelayedTrigger y -> Just y; _ -> Nothing),
       Arm.payload "AffectPlayers" AffectPlayers.codec Effect.AffectPlayers (\x -> case x of Effect.AffectPlayers y -> Just y; _ -> Nothing),
       Arm.payload "RequireBlock" RequireBlock.codec Effect.RequireBlock (\x -> case x of Effect.RequireBlock y -> Just y; _ -> Nothing),
+      Arm.payload "RequireAttack" RequireAttack.codec Effect.RequireAttack (\x -> case x of Effect.RequireAttack y -> Just y; _ -> Nothing),
       Arm.payload "CreateEmblem" cardCodec Effect.CreateEmblem (\x -> case x of Effect.CreateEmblem y -> Just y; _ -> Nothing),
       Arm.payload "BecomeMonarch" MonarchTarget.codec Effect.BecomeMonarch (\x -> case x of Effect.BecomeMonarch y -> Just y; _ -> Nothing),
       Arm.payload "Designate" Designate.codec Effect.Designate (\x -> case x of Effect.Designate y -> Just y; _ -> Nothing),

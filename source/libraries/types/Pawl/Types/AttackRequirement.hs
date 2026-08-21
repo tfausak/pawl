@@ -9,10 +9,17 @@ import qualified Pawl.Types.Affected as Affected
 -- Pawl.Types.BlockRequirement, which argues why neither
 -- Pawl.Types.StaticAbility nor Pawl.Types.PlayerStaticAbility can hold a
 -- requirement. BlockRequirement carries BOTH of CR 509.1c's axes, because the
--- printings use both; this one carries only the subject, since no printing in
--- the pool narrows CR 508.1b's announcement of whom each attacker is attacking.
--- A requirement naming its object ("attacks a player other than you if able")
--- is unrepresentable (#461).
+-- printings use both; this one carries only the subject.
+--
+-- CR 508.1d's OBJECT axis -- "attacks a player other than you if able" -- lives
+-- on Pawl.Types.ActiveAttackRequirement instead, the resolution-created sibling.
+-- Nothing in data/cards/ states that axis as a static ability: the two printings
+-- that reach it CREATE the requirement on resolution instead (Alluring Siren,
+-- Kardur Doomscourge), and a card printing it statically is what would refute
+-- that. Pawl.Engine.AttackRequirement already instantiates this carrier as
+-- (creature, target) pairs, one per announcement CR 508.1b admits, so a
+-- requirement written here is unrestricted on that axis. Not implemented: a
+-- PRINTED requirement that narrows it (#2014).
 --
 -- Gathered LIVE from the battlefield on every read and never captured, so a
 -- Curse leaving the battlefield lifts its requirement with nothing to unwind.

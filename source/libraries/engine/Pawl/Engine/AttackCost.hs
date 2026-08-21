@@ -40,7 +40,9 @@ import qualified Pawl.Types.PerCreature as PerCreature
 -- The TARGET is an argument rather than derived from the combat record, because
 -- CR 508.1b's announcement is step (b) and the total cost is step (h). Combat
 -- asks this of a declaration not yet written to the record, and again of a
--- target no creature has been assigned to (attacksFreely below).
+-- target no creature has been assigned to -- Combat.attackCeilingGiven applies CR
+-- 508.1d's cost clause per (creature, target) pair, so it asks about
+-- announcements nobody has made.
 --
 -- The "you" -- where the printing has one -- is the source's controller (CR
 -- 109.5), asked of the TARGET rather than of the defending player. WHICH announcements that covers is the card's
@@ -144,14 +146,3 @@ totalCost :: Map ObjectId AttackTarget.AttackTarget -> GameState -> ManaCost.Man
 totalCost declaration gs =
   ManaCost.MkManaCost
     (concatMap ManaCost.unwrap (concatMap (\(oid, target) -> costsOn oid target gs) (Map.toList declaration)))
-
--- CR 508.1d's cost clause: a player is never required to pay a cost to attack.
--- True when SOME attack this creature could announce costs nothing, which is
--- when a requirement to attack still binds; false when every one of them costs.
---
--- ANY and not ALL, by Ghostly Prison's planeswalker ruling again: a creature
--- that could attack a planeswalker for free can attack without paying a cost,
--- so its requirement stands and the player's own CR 508.1b announcement decides
--- whether they end up paying.
-attacksFreely :: ObjectId -> [AttackTarget.AttackTarget] -> GameState -> Bool
-attacksFreely attacker targets gs = any (\target -> null (costsOn attacker target gs)) targets

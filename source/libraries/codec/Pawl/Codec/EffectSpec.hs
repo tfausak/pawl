@@ -98,6 +98,7 @@ import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
+import qualified Pawl.Types.RequireAttack as RequireAttack
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.Scope as Scope
@@ -1222,6 +1223,12 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.RequireBlock (RequireBlock.MkRequireBlock Duration.UntilEndOfCombat (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature))))
       " {\"type\":\"RequireBlock\",\"value\":{\"duration\":{\"type\":\"UntilEndOfCombat\"},\"blocker\":{\"type\":\"InSlot\",\"value\":\"target\"},\"attacker\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}}} "
+  Spec.it s "RequireAttack" $
+    Common.assertCodec
+      s
+      codec
+      (Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (PlayerRef.Relative PlayerRelation.You)))
+      " {\"type\":\"RequireAttack\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"attacker\":{\"type\":\"InSlot\",\"value\":\"target\"},\"defender\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}}} "
   Spec.it s "CreateEmblem" $
     Common.assertJsonCodec
       s

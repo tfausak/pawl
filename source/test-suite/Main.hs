@@ -217,6 +217,7 @@ import qualified Pawl.Codec.RemoveCountersSpec
 import qualified Pawl.Codec.ReplaceSpec
 import qualified Pawl.Codec.ReplacementEffectSpec
 import qualified Pawl.Codec.ReplacementOriginSpec
+import qualified Pawl.Codec.RequireAttackSpec
 import qualified Pawl.Codec.RequireBlockSpec
 import qualified Pawl.Codec.RevealCauseSpec
 import qualified Pawl.Codec.RevealSpec
@@ -644,6 +645,7 @@ spec s registry = do
   Pawl.Codec.ReplaceSpec.spec s
   Pawl.Codec.ReplacementEffectSpec.spec s
   Pawl.Codec.ReplacementOriginSpec.spec s
+  Pawl.Codec.RequireAttackSpec.spec s
   Pawl.Codec.RequireBlockSpec.spec s
   Pawl.Codec.RevealCauseSpec.spec s
   Pawl.Codec.RevealSpec.spec s

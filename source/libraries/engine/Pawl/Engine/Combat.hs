@@ -272,47 +272,66 @@ withinLimit limit size = case limit of
   Nothing -> True
   Just n -> toInteger size <= toInteger n
 
--- Every declaration CR 508.1a lets the active player write down: each candidate
--- independently attacks or does not. candidateBlockDeclarations' attacking twin,
--- and EXPONENTIAL for its reason -- O(2 ^ candidates), an attacker's only choice
--- being whether to attack. Set.empty comes FIRST and every declaration precedes
--- its own supersets, which attackCeiling's tie-breaking fold relies on: the winner
--- is one no PROPER SUBSET of which obeys as many requirements.
-candidateAttackDeclarations :: [ObjectId] -> [Set ObjectId]
-candidateAttackDeclarations candidates =
-  let extend acc oid = concatMap (\declaration -> [declaration, Set.insert oid declaration]) acc
-   in List.foldl' extend [Set.empty] candidates
+-- Every declaration CR 508.1a and CR 508.1b let the active player write down:
+-- each candidate either does not attack, or attacks one of the targets
+-- `announceable` admits for it. candidateBlockDeclarations' attacking twin, and
+-- EXPONENTIAL for its reason -- O((1 + targets) ^ candidates), where the blocking
+-- twin's base is the attackers a blocker may be assigned to.
+--
+-- Map.empty comes FIRST and every declaration precedes both its own supersets and
+-- the same declaration with a LATER target for the creature just added, which
+-- attackCeiling's tie-breaking fold relies on: the winner is one no proper
+-- sub-declaration of which obeys as many requirements, and its targets are the
+-- earliest that attain the maximum. Combat.attackTargets puts the defending
+-- player first, so a tie is broken towards attacking the player.
+candidateAttackDeclarations :: (ObjectId -> [AttackTarget.AttackTarget]) -> [ObjectId] -> [Map ObjectId AttackTarget.AttackTarget]
+candidateAttackDeclarations announceable candidates =
+  let extend acc oid = concatMap (\declaration -> declaration : fmap (\target -> Map.insert oid target declaration) (announceable oid)) acc
+   in List.foldl' extend [Map.empty] candidates
 
 -- CR 508.1d's two halves, computed together because neither is usable alone: the
 -- requirement instances in force, and a declaration obeying the maximum number of
 -- them that could be obeyed without disobeying any restriction. blockCeiling's
 -- twin, deliberately the same shape.
 --
--- TWO SEARCHES answering the same question. The CLOSED FORM is the required
--- creatures minus the ones CR 508.1d's cost clause excuses; it is exact only when
--- no set-shaped restriction (CR 508.1c) reaches a candidate, since canAttack has
--- already applied every per-creature one to `candidates`. Multiplicity leaves it
--- alone. Otherwise the ENUMERATION runs, at blockCeiling's exponential cost,
--- uncapped and unsampled (#714).
+-- A DECLARATION here is CR 508.1a's set and CR 508.1b's announcement together --
+-- Map ObjectId AttackTarget, the shape Combat.attackers itself takes -- because
+-- CR 508.1d's requirements name both axes: Alluring Siren's "attacks you if able"
+-- is obeyed by attacking that player and not by attacking their planeswalker.
+-- Nothing else in the maximization changed with that widening; a requirement that
+-- names no object mints a pair per target and is obeyed by any announcement.
 --
--- Both range over the creatures that attack FREELY, which is CR 508.1d's cost
--- clause: a player is never required to pay to attack, so `best` is drawn from the
--- untaxed creatures while `required` stays every instance in force.
--- AttackCost.attacksFreely is asked against CR 508.1b's whole target list.
-attackCeiling :: [ObjectId] -> GameState -> (Map ObjectId Natural, Set ObjectId)
+-- TWO SEARCHES answering the same question. The CLOSED FORM gives each required
+-- creature the target that obeys the most of its instances, taken independently
+-- per creature; it is exact only when no set-shaped restriction (CR 508.1c)
+-- reaches a candidate, since canAttack has already applied every per-creature one
+-- to `candidates` and nothing in pawl restricts WHICH target a creature may be
+-- announced against -- so with the per-creature choices independent, the
+-- per-creature maximum sums to the maximum. Multiplicity leaves it alone.
+-- Otherwise the ENUMERATION runs, at blockCeiling's exponential cost, uncapped
+-- and unsampled (#714).
+--
+-- Both range over the announcements that can be made FREELY, which is CR 508.1d's
+-- cost clause: a player is never required to pay to attack. The clause is applied
+-- per (creature, target) PAIR rather than per creature, which is what CR 508.1b's
+-- announcement makes of it -- a Ghostly Prison taxes attacking its controller and
+-- not attacking a planeswalker they control, so a requirement to attack the
+-- PLAYER is excused while a requirement to attack the planeswalker stands.
+attackCeiling :: [ObjectId] -> GameState -> (Map (ObjectId, AttackTarget.AttackTarget) Natural, Map ObjectId AttackTarget.AttackTarget)
 attackCeiling candidates gs =
   attackCeilingGiven (CombatRestriction.attackLimit gs) (CombatRestriction.cantAttackAlone candidates gs) candidates gs
 
 -- attackCeiling against the restrictions the caller already gathered: each caller
 -- also asks attackDeclarationAllowed of the player's own declaration, and the two
 -- must be judging the same board.
-attackCeilingGiven :: Maybe Natural -> Set ObjectId -> [ObjectId] -> GameState -> (Map ObjectId Natural, Set ObjectId)
+attackCeilingGiven :: Maybe Natural -> Set ObjectId -> [ObjectId] -> GameState -> (Map (ObjectId, AttackTarget.AttackTarget) Natural, Map ObjectId AttackTarget.AttackTarget)
 attackCeilingGiven limit alone candidates gs =
-  let required = AttackRequirement.instances candidates gs
-      targets = case Combat.defender (GameState.combat gs) of
-        Nothing -> []
-        Just defender -> NonEmpty.toList (attackTargets defender gs)
-      freely oid = AttackCost.attacksFreely oid targets gs
+  let targets = declarableTargets gs
+      required = AttackRequirement.instances candidates targets gs
+      -- CR 508.1d's cost clause. AttackCost.costsOn is asked of the ANNOUNCEMENT,
+      -- which is the question that rule's cards ask.
+      freely oid target = null (AttackCost.costsOn oid target gs)
+      announceable oid = filter (freely oid) targets
       better best declaration =
         if attackRequirementsMet required declaration > attackRequirementsMet required best
           then declaration
@@ -323,36 +342,49 @@ attackCeilingGiven limit alone candidates gs =
       enumerated =
         List.foldl'
           better
-          Set.empty
-          (filter (attackDeclarationAllowed limit alone) (candidateAttackDeclarations (filter freely candidates)))
-      -- CR 508.1d's cost clause is a filter on the CREATURE, never on its
-      -- requirements: a creature is excused wholly or not at all, so the test
-      -- reads the key and ignores the multiplicity.
-      closed = Map.filterWithKey (\oid _ -> freely oid) required
+          Map.empty
+          (filter (attackDeclarationAllowed limit alone . Map.keysSet) (candidateAttackDeclarations announceable candidates))
+      -- The best announcement for ONE creature, in `targets` order so a tie goes
+      -- to the defending player, and Nothing when no free announcement obeys
+      -- anything -- which is a creature the cost clause excuses entirely.
+      bestFor oid =
+        let scored = fmap (\target -> (target, Map.findWithDefault 0 (oid, target) required)) (announceable oid)
+            top = maximum (0 : fmap snd scored)
+         in if top == 0 then Nothing else fmap fst (List.find (\pair -> snd pair == top) scored)
+      closed = Map.fromList (Maybe.mapMaybe (\oid -> fmap ((,) oid) (bestFor oid)) (List.nub (fmap fst (Map.keys required))))
    in ( required,
         -- Map.size and not the multiplicity total, because what `limit` bounds is
         -- a declaration's SIZE (CR 508.1c counts creatures). No board tells the
         -- two apart, so this is argued from the rule rather than fenced by a test.
         if (Set.null alone && withinLimit limit (Map.size closed)) || Map.null required
-          then Map.keysSet closed
+          then closed
           else enumerated
       )
 
+-- CR 508.1b's announcement list for the combat in progress, empty when no
+-- defending player has been chosen -- which is a combat no creature may attack
+-- in, so no requirement can be instantiated and none can be disobeyed.
+declarableTargets :: GameState -> [AttackTarget.AttackTarget]
+declarableTargets gs = case Combat.defender (GameState.combat gs) of
+  Nothing -> []
+  Just defender -> NonEmpty.toList (attackTargets defender gs)
+
 -- How many of `required` this declaration obeys (CR 508.1d): a requirement
--- instance is obeyed exactly when the declaration attacks with its creature.
--- Summing multiplicities rather than counting keys, because CR 508.1d counts
--- REQUIREMENTS: two naming one creature are both obeyed by attacking with it.
-attackRequirementsMet :: Map ObjectId Natural -> Set ObjectId -> Natural
+-- instance is obeyed exactly when the declaration attacks with its creature AND
+-- announces its target for that creature. Summing multiplicities rather than
+-- counting keys, because CR 508.1d counts REQUIREMENTS: two naming one pair are
+-- both obeyed by making that announcement.
+attackRequirementsMet :: Map (ObjectId, AttackTarget.AttackTarget) Natural -> Map ObjectId AttackTarget.AttackTarget -> Natural
 attackRequirementsMet required declaration =
-  sum (Map.filterWithKey (\oid _ -> Set.member oid declaration) required)
+  sum (Map.filterWithKey (\(oid, target) _ -> Map.lookup oid declaration == Just target) required)
 
 -- CR 508.1d asked of a declaration that has already passed CR 508.1a and CR
 -- 508.1c: does it obey at least as many requirements as the maximum? Split out so
 -- declareAttackers can ask it against a ceiling it computed once, and so the two
 -- cannot drift.
-obeysAttackRequirements :: (Map ObjectId Natural, Set ObjectId) -> [ObjectId] -> Bool
+obeysAttackRequirements :: (Map (ObjectId, AttackTarget.AttackTarget) Natural, Map ObjectId AttackTarget.AttackTarget) -> Map ObjectId AttackTarget.AttackTarget -> Bool
 obeysAttackRequirements (required, best) chosen =
-  attackRequirementsMet required (Set.fromList chosen) >= attackRequirementsMet required best
+  attackRequirementsMet required chosen >= attackRequirementsMet required best
 
 -- CR 508.1: is this declaration one the active player may make? All three checks
 -- the rules ask for, in the order they ask them: CR 508.1a's chosen-from set, CR
@@ -362,27 +394,47 @@ obeysAttackRequirements (required, best) chosen =
 -- candidate IS obeying every restriction of that shape (canAttack). CR 508.1d is a
 -- MAXIMIZATION rather than a check, and is what makes declaring no attackers at
 -- all illegal under a Curse of the Nightly Hunt.
+--
+-- The creature list is CR 508.1b's announcement when the rule calls for none:
+-- every creature attacks the defending player, which is the announcement pawl
+-- makes without asking on a board with no planeswalker and no battle. A
+-- declaration that names its targets goes through legalAttackDeclarationAs.
 legalAttackDeclaration :: PlayerId -> [ObjectId] -> GameState -> Bool
-legalAttackDeclaration pid chosen gs = legalAttackDeclarationGiven (legalAttackers pid gs) chosen gs
+legalAttackDeclaration pid chosen gs = case declarableTargets gs of
+  -- No defending player: CR 508.1b has nothing to announce, so no creature can
+  -- attack and only the empty declaration is a declaration at all. Its
+  -- requirements are empty too, every instance being minted against a target.
+  [] -> null chosen
+  target : _ -> legalAttackDeclarationAs pid (fmap (\oid -> (oid, target)) chosen) gs
 
-legalAttackDeclarationGiven :: [ObjectId] -> [ObjectId] -> GameState -> Bool
+-- legalAttackDeclaration with CR 508.1b's announcement spelled out, which is the
+-- form a board with a planeswalker or a battle on it needs.
+legalAttackDeclarationAs :: PlayerId -> [(ObjectId, AttackTarget.AttackTarget)] -> GameState -> Bool
+legalAttackDeclarationAs pid chosen gs = legalAttackDeclarationGiven (legalAttackers pid gs) (Map.fromList chosen) gs
+
+legalAttackDeclarationGiven :: [ObjectId] -> Map ObjectId AttackTarget.AttackTarget -> GameState -> Bool
 legalAttackDeclarationGiven candidates chosen gs =
   -- Both gathered ONCE and shared with the ceiling: the restriction check and the
   -- maximization have to be judging one board.
   let alone = CombatRestriction.cantAttackAlone candidates gs
       limit = CombatRestriction.attackLimit gs
-   in all (\oid -> List.elem oid candidates) chosen
-        && attackDeclarationAllowed limit alone (Set.fromList chosen)
+   in all (\oid -> List.elem oid candidates) (Map.keys chosen)
+        -- CR 508.1b: an announcement outside the list is not a declaration at all.
+        -- Vacuous on the empty declaration, which is what keeps declining legal in
+        -- a combat with no defending player.
+        && all (\target -> List.elem target (declarableTargets gs)) (Map.elems chosen)
+        && attackDeclarationAllowed limit alone (Map.keysSet chosen)
         && obeysAttackRequirements (attackCeilingGiven limit alone candidates gs) chosen
 
 -- A declaration that is always legal: one attaining CR 508.1d's maximum, which
 -- with no requirement in force is the empty one (declining to attack). Reached
 -- only when an interpreter hands back a declaration the rules forbid. It obeys CR
--- 508.1c as well as CR 508.1d, on both of attackCeiling's paths. A filter over
--- `candidates` rather than Set.toList, so it comes back in the order the player
+-- 508.1c as well as CR 508.1d, on both of attackCeiling's paths. Ordered by
+-- `candidates` rather than by Map.toList, so it comes back in the order the player
 -- was offered its creatures.
-forcedAttackDeclaration :: (Map ObjectId Natural, Set ObjectId) -> [ObjectId] -> [ObjectId]
-forcedAttackDeclaration (_, best) = filter (\oid -> Set.member oid best)
+forcedAttackDeclaration :: (Map (ObjectId, AttackTarget.AttackTarget) Natural, Map ObjectId AttackTarget.AttackTarget) -> [ObjectId] -> [(ObjectId, AttackTarget.AttackTarget)]
+forcedAttackDeclaration (_, best) =
+  Maybe.mapMaybe (\oid -> fmap ((,) oid) (Map.lookup oid best))
 
 -- CR 509.1a: a blocking creature must be untapped and controlled by the
 -- defending player. Plus CR 509.1b's PER-CREATURE restrictions, which are the
@@ -971,7 +1023,18 @@ declareAttackers pid = do
             -- fold below would otherwise record a creature's declaration twice and
             -- make CR 506.5's count disagree with it.
             offered = List.nub (filter isCandidate chosen)
-            -- CR 508.1c's set-shaped restrictions and CR 508.1d's maximization,
+            -- CR 508.1b's candidates, taken ONCE and from the state the
+            -- declaration is judged against.
+            targets = attackTargets defender gs
+        -- CR 508.1b: the announcement, one question per chosen creature, in the
+        -- rule's own order -- BEFORE CR 508.1c's restrictions and CR 508.1d's
+        -- requirements, which is what a requirement naming its object (Alluring
+        -- Siren) forces: whether a declaration obeys the maximum is a question
+        -- about the announcements, so they have to exist before it can be asked.
+        -- The price is that a creature the CR 508.1d degradation below then drops
+        -- was asked about; only a broken interpreter reaches that path.
+        announced <- Monad.mapM (\oid -> fmap ((,) oid) (announceAttackTarget pid oid targets)) offered
+        let -- CR 508.1c's set-shaped restrictions and CR 508.1d's maximization,
             -- taken ONCE for all three questions below, so the ceiling and the
             -- check beside it cannot judge different boards.
             alone = CombatRestriction.cantAttackAlone candidates gs
@@ -986,10 +1049,18 @@ declareAttackers pid = do
             -- NOT CR 733's rewind. Where several declarations attain the maximum
             -- this takes the SMALLEST, a real choice among distinguishable
             -- declarations, which is why only a broken interpreter reaches it.
-            attacking =
-              if attackDeclarationAllowed limit alone (Set.fromList offered) && obeysAttackRequirements bound offered
-                then offered
+            --
+            -- The ANNOUNCEMENTS are replaced along with the creatures, and are not
+            -- re-asked: the ceiling's declaration already names a target per
+            -- creature, and re-prompting a player whose answer was just discarded
+            -- would ask CR 508.1b about a declaration they did not make. Only the
+            -- same broken interpreter reaches this.
+            settled =
+              if attackDeclarationAllowed limit alone (Set.fromList (fmap fst announced)) && obeysAttackRequirements bound (Map.fromList announced)
+                then announced
                 else forcedAttackDeclaration bound candidates
+            attacking = fmap fst settled
+            recorded = Map.fromList settled
             -- CR 508.1f: declaring an attacker taps it -- unless it has vigilance
             -- (CR 702.20b), which does not change WHETHER it attacks, only what
             -- attacking does to it.
@@ -1000,13 +1071,6 @@ declareAttackers pid = do
             -- CR 506.4's comparand, taken where the creature joins combat. `pid`
             -- and not a fresh controllerOf: canAttack already required it.
             joined = Map.fromList (fmap (\oid -> (oid, pid)) attacking)
-            -- CR 508.1b's candidates, taken ONCE and from the state the
-            -- declaration is judged against.
-            targets = attackTargets defender gs
-        -- CR 508.1b: the announcement, one question per chosen creature, in the
-        -- rule's own order and of `attacking` rather than `chosen` so a creature
-        -- the CR 508.1d degradation dropped is never announced.
-        recorded <- fmap Map.fromList (Monad.mapM (\oid -> fmap ((,) oid) (announceAttackTarget pid oid targets)) attacking)
         -- UNIONED into the record, not written over it: "the record is mine alone"
         -- is exactly the assumption CR 508.8's second clause breaks, and replacing
         -- the map would silently remove such a creature from combat.
