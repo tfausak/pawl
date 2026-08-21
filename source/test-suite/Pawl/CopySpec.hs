@@ -212,9 +212,17 @@ playsAndCopies wanted p = case p of
   Prompt.ChooseCopyTarget {} -> Just wanted
   _ -> S.playLandAnswer p
 
+-- playsAndCopies' opposite: play the land and DECLINE the copy, which is the
+-- other half of the printed "may".
+playsAndDeclines :: Prompt.Prompt r -> r
+playsAndDeclines p = case p of
+  Prompt.ChooseCopyTarget {} -> Nothing
+  _ -> S.playLandAnswer p
+
 -- Takes ONE named activated ability of ONE named permanent whenever the priority
--- loop offers it, and passes otherwise -- so the ability reaching the stack is
--- the engine's own CR 602.2 gate answering, not this answerer's.
+-- loop offers it, and passes otherwise -- so an ability that reaches the stack
+-- did so because the engine offered it, not because this answerer reached past a
+-- gate.
 activates :: ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card -> Prompt.Prompt r -> r
 activates srcId ability p = case p of
   Prompt.ChooseAction _ _ actions ->
@@ -816,13 +824,32 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
             -- copy.
             Spec.assertEqWith s "and it entered tapped, as the printed sentence says" (fmap Object.tapped (Game.lookupObject vesuvaId without)) $ Just TapState.Tapped
 
+  -- The declining half of the printed "may", which is what keeps `tapped` on the
+  -- AsCopy rewrite rather than in a second EntryRewrite.Tapped beside it: Vesuva's
+  -- own ruling (2021-03-19) says that a Vesuva which chooses no land "enters the
+  -- battlefield untapped as itself, and will not be able to tap for mana". Both
+  -- halves are asserted, and a second replacement would falsify the first.
+  Spec.it s "a Vesuva that declines the copy enters untapped and taps for nothing (CR 614.1c)" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    mutavault <- S.printingOf s registry "Mutavault"
+    vesuva <- S.printingOf s registry "Vesuva"
+    let (_, board) = vesuvaBoard mountain mutavault vesuva Nothing
+        played = S.runPure playsAndDeclines board Engine.priorityLoop
+        named = CardName.MkCardName . Text.pack
+    case newest (printedOnBattlefield "Vesuva" played) of
+      Nothing -> Spec.assertFailure s "Vesuva never reached the battlefield"
+      Just vesuvaId -> do
+        Spec.assertEqWith s "it taps for no mana at all -- Vesuva prints no mana ability" (Mana.manaTypesOf vesuvaId played) []
+        Spec.assertEqWith s "and it entered untapped, the tapping having gone with the declined copy" (fmap Object.tapped (Game.lookupObject vesuvaId played)) $ Just TapState.Untapped
+        Spec.assertEqWith s "and it is still itself by name" (Projection.namesOf vesuvaId played) $ Set.singleton (named "Vesuva")
+
   -- The OTHER order, and the reason the case above adds Blood Moon afterwards: CR
   -- 614.12 checks the entering permanent's characteristics "as it would exist on
   -- the battlefield, taking into account ... continuous effects that already exist
   -- and would apply to the permanent". A Blood Moon already out has stripped
   -- Vesuva's own copy ability by then (CR 305.7's FIRST clause), so there is no
-  -- copy to make -- Blood Moon's own ruling says as much of every ability that
-  -- applies as a land enters.
+  -- copy to make -- Blood Moon's own ruling (2020-08-07) says as much of every
+  -- ability that applies as a land enters.
   --
   -- The same answerer, which is what makes this a real refusal: it names
   -- Mutavault whenever a copy choice is raised, so a Vesuva that still had its
