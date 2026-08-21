@@ -218,6 +218,8 @@ library codec
     Pawl.Codec.CreateCopy
     Pawl.Codec.CreateCopySpec
     Pawl.Codec.CreateSpec
+    Pawl.Codec.CreatureBecomesBlockedByAtLeast
+    Pawl.Codec.CreatureBecomesBlockedByAtLeastSpec
     Pawl.Codec.Cycling
     Pawl.Codec.CyclingSpec
     Pawl.Codec.DamageDirection
@@ -1015,6 +1017,7 @@ library types
     Pawl.Types.CounterR
     Pawl.Types.Create
     Pawl.Types.CreateCopy
+    Pawl.Types.CreatureBecomesBlockedByAtLeast
     Pawl.Types.Cycling
     Pawl.Types.DamageDirection
     Pawl.Types.DamageEvent

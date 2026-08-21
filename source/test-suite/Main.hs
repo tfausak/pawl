@@ -85,6 +85,7 @@ import qualified Pawl.Codec.CounterabilitySpec
 import qualified Pawl.Codec.CounteringSpec
 import qualified Pawl.Codec.CreateCopySpec
 import qualified Pawl.Codec.CreateSpec
+import qualified Pawl.Codec.CreatureBecomesBlockedByAtLeastSpec
 import qualified Pawl.Codec.CyclingSpec
 import qualified Pawl.Codec.DamageDirectionSpec
 import qualified Pawl.Codec.DamageEventSpec
@@ -518,6 +519,7 @@ spec s registry = do
   Pawl.Codec.CounteringSpec.spec s
   Pawl.Codec.CreateCopySpec.spec s
   Pawl.Codec.CreateSpec.spec s
+  Pawl.Codec.CreatureBecomesBlockedByAtLeastSpec.spec s
   Pawl.Codec.CyclingSpec.spec s
   Pawl.Codec.DamageEventSpec.spec s
   Pawl.Codec.DamageDirectionSpec.spec s

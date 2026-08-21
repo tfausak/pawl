@@ -1692,6 +1692,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfBecomesBlocked -> condition
   TriggerCondition.SelfBecomesBlockedBy f -> TriggerCondition.SelfBecomesBlockedBy (Filter.rewrite pairs f)
   TriggerCondition.SelfBecomesBlockedByOneOrMore f -> TriggerCondition.SelfBecomesBlockedByOneOrMore (Filter.rewrite pairs f)
+  TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> condition
   TriggerCondition.SelfAttacksUnblocked -> condition
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> condition
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> condition

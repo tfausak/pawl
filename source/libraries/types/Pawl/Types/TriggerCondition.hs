@@ -5,6 +5,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ControllerBecomesTarget as ControllerBecomesTarget
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CreatureBecomesBlockedByAtLeast as CreatureBecomesBlockedByAtLeast
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
@@ -308,6 +309,34 @@ data TriggerCondition
     --
     -- Not implemented: rule 509.3e's other producers record no event (#1146).
     SelfBecomesBlockedByOneOrMore (Filter.Filter Keyword.Keyword)
+  | -- | CR 509.3e read by a BYSTANDER on the ATTACKING side: "whenever a
+    -- creature attacking one of your opponents becomes blocked by two or more
+    -- creatures" (Seifer, Balamb Rival, the one printing -- Scryfall
+    -- o:"becomes blocked by two or more", 2026-08-21). The arm above with the
+    -- number spent on the blockers' COUNT rather than on a quality, and the
+    -- subject moved off the bearer -- SelfBlocksAtLeast's floor read from the
+    -- other side of the same declaration, so it matches the grouped
+    -- GameEvent.AttackerBlocked and fires once for the attacker however many
+    -- creatures blocked it.
+    --
+    -- AT LEAST, never exactly, which is rule 509.3e's last sentence.
+    --
+    -- The PlayerRelation is whom the attacker was declared attacking, and only
+    -- Pawl.Types.AttackTarget.OfPlayer satisfies it: CR 508.1b lists player,
+    -- planeswalker and battle separately, so a creature sent at a planeswalker
+    -- an opponent controls is not attacking that opponent. That is why it is
+    -- read from Pawl.Types.Combat's declaration record rather than from CR
+    -- 508.5's defending player, which GameEvent.AttackerBlocked carries and
+    -- which a planeswalker resolves to -- SelfAttacksPlayerWithMostLife makes
+    -- the same distinction one rule over.
+    --
+    -- The attacker is bound under Pawl.Engine.Binding.attackingCreature, which
+    -- is Seifer's "that attacking creature". No blocker is bound: the form
+    -- names a number, not an object.
+    --
+    -- Not implemented: rule 509.3e's "effects that add or remove blockers",
+    -- which record no event (#1146).
+    CreatureBecomesBlockedByAtLeast CreatureBecomesBlockedByAtLeast.CreatureBecomesBlockedByAtLeast
   | -- | "Whenever this creature attacks and isn't blocked" -- Eternal of Harsh
     -- Truths', and CR 702.68a's frenzy, which Pawl.Engine.Keyword.frenzy mints.
     -- The glossary sends the phrase to CR 509.1h, so this matches

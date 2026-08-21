@@ -75,6 +75,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterR as CounterR
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Countering as Countering
+import qualified Pawl.Types.CreatureBecomesBlockedByAtLeast as CreatureBecomesBlockedByAtLeast
 import Pawl.Types.DamageEvent (DamageEvent)
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -5363,6 +5364,72 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
+  -- CR 509.3e read by a BYSTANDER on the attacking side: a creature attacking a
+  -- player the PlayerRelation admits became blocked by at least `n` creatures.
+  -- The arm above with its Filter traded for a count, and the identity check on
+  -- the bearer dropped -- Seifer, Balamb Rival watches everybody's attackers,
+  -- including its own controller's, so nothing here compares an id to the bearer.
+  --
+  -- The GROUPED event, so the whole declaration fires it once; the count comes
+  -- from Combat.blockers, which GameEvent.AttackerBlocked does not carry, and is
+  -- exact at this moment for the arm above's reason -- CR 509.2a puts these
+  -- triggers on the stack before any player gets priority, so the record still
+  -- holds the declaration that made the event.
+  --
+  -- `>=`, never `==`, which is rule 509.3e's last sentence.
+  --
+  -- Whom the attacker attacked comes from Combat.attackers and only
+  -- AttackTarget.OfPlayer answers: CR 508.1b lists player, planeswalker and
+  -- battle separately, so a creature sent at an opponent's planeswalker is not
+  -- attacking that opponent -- where CR 508.5's defending player, which the event
+  -- carries, would resolve to them. SelfAttacksPlayerWithMostLife reads the same
+  -- record for the same reason.
+  TriggerCondition.CreatureBecomesBlockedByAtLeast (CreatureBecomesBlockedByAtLeast.MkCreatureBecomesBlockedByAtLeast relation n) -> case event of
+    GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked attacker _) ->
+      let attacksAdmittedPlayer = case Map.lookup attacker (Combat.attackers (GameState.combat gs)) of
+            Just (AttackTarget.OfPlayer attacked) -> PlayerRelation.holds relation you attacked
+            _ -> False
+          blocked = Natural.length (Map.findWithDefault Set.empty attacker (Combat.blockers (GameState.combat gs)))
+       in attacksAdmittedPlayer && blocked >= n
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
   -- CR 509.1h: the bearer became an UNBLOCKED creature, which the glossary's
   -- "attacks and isn't blocked" entry sends here. SelfBecomesBlocked's arm above
   -- is the other branch of the same turn-based action, and no attacker can
@@ -7518,6 +7585,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.SelfBecomesBlocked -> False
   TriggerCondition.SelfBecomesBlockedBy _ -> False
   TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> False
+  TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> False
   TriggerCondition.SelfAttacksUnblocked -> False
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
@@ -7796,6 +7864,14 @@ eventBindings cond event = case (cond, event) of
   -- attacking that player" -- and Object.attachedTo is a Recipient.
   (TriggerCondition.AttachedPlayerIsAttacked, GameEvent.BecameAttacked (AttackTarget.OfPlayer attacked)) ->
     Binding.setTriggerPlayer attacked Map.empty
+  -- CR 509.3e's "that attacking creature", off the grouped blocking event: the
+  -- attacker the event names, and again not the bearer, which is a bystander.
+  -- CR 508.5's defending player rides that event too and goes unbound, the
+  -- CreatureAttacksYou arm above's reasoning -- matchesTrigger has already
+  -- required whom the attacker attacked to be a player the PlayerRelation
+  -- admits.
+  (TriggerCondition.CreatureBecomesBlockedByAtLeast {}, GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked attacker _)) ->
+    Binding.setAttackingCreature attacker Map.empty
   -- CR 702.130a's "defending player", the same phrase and the same reserved slot
   -- as the arm above -- CR 508.5 resolves it for an ability of an ATTACKING
   -- creature, which is what the bearer of this condition is. Read off the event
@@ -8199,6 +8275,9 @@ eventBindingSlots cond = case cond of
   -- CR 509.3e names a SET of blockers rather than one, and no reader in the
   -- pool reaches into it: Serra Inquisitors' payload names only itself.
   TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> Set.empty
+  -- Seifer, Balamb Rival's "that attacking creature", the same reserved slot
+  -- CreatureAttacksYou fills off its own event.
+  TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> Set.singleton Binding.attackingCreature
   -- CR 509.1h's unblocked branch names no second object at all -- no blocker,
   -- and no defending player on GameEvent.AttackerUnblocked to bind one from.
   -- eventBindings therefore has no arm and falls through to the empty map.
@@ -8548,6 +8627,7 @@ looksBack condition = case condition of
   TriggerCondition.SelfBecomesBlocked -> False
   TriggerCondition.SelfBecomesBlockedBy _ -> False
   TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> False
+  TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> False
   TriggerCondition.SelfAttacksUnblocked -> False
   TriggerCondition.SpellOrAbilityCounters _ -> False
   TriggerCondition.DamageToPlayerPrevented _ -> False
@@ -9562,6 +9642,7 @@ zonesTriggeredFrom cond = case cond of
   TriggerCondition.SelfBecomesBlocked -> battlefield
   TriggerCondition.SelfBecomesBlockedBy _ -> battlefield
   TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> battlefield
+  TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> battlefield
   TriggerCondition.SelfAttacksUnblocked -> battlefield
   -- CR 702.29c: a cycling ability triggers from whatever zone the card winds up
   -- in, the graveyard for every printing in this pool, and a cycled card cannot be
@@ -9799,6 +9880,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfBecomesBlocked -> False
   TriggerCondition.SelfBecomesBlockedBy _ -> False
   TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> False
+  TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> False
   TriggerCondition.SelfAttacksUnblocked -> False
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
@@ -9965,6 +10047,7 @@ stateTriggers gs
               TriggerCondition.SelfBecomesBlocked -> False
               TriggerCondition.SelfBecomesBlockedBy _ -> False
               TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> False
+              TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> False
               TriggerCondition.SelfAttacksUnblocked -> False
               TriggerCondition.SelfCycled -> False
               TriggerCondition.SelfRevealedForMiracle -> False
