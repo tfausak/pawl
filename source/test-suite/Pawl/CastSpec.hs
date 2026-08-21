@@ -2102,8 +2102,8 @@ jumpStartSpec s registry = Spec.describe s "JumpStart" $ do
 -- go green, which is how the set was shown to turn on the rule and not on mana.
 --
 -- The three permanents in play across these cases are what make the assertions
--- discriminating. Thalia, Guardian of Thraben is the pool's only legendary
--- CREATURE. Mindslaver is a legendary ARTIFACT -- the case that fails if the
+-- discriminating. Thalia, Guardian of Thraben is a legendary CREATURE, and
+-- Mindslaver a legendary ARTIFACT -- the case that fails if the
 -- check reads the supertype and forgets the card type. And Thalia under bob's
 -- control is the case that fails if the check forgets "that player controls".
 legendarySpellSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -2120,8 +2120,8 @@ legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
     Spec.assertBool s (S.castable S.alice oid board) "castable"
     Spec.assertBool s (elem (A.Cast oid (S.printingName sorcery) Facing.FaceUp) (Action.legalActions S.alice board)) "and offered as a legal action"
   -- Rule 205.4e's SECOND disjunct, "or a legendary planeswalker". Jace
-  -- Beleren is the pool's only one, and it is not a creature -- so this case
-  -- fails for any reading that collapsed the rule onto the creature limb.
+  -- Beleren is one, and it is not a creature -- so this case fails for any
+  -- reading that collapsed the rule onto the creature limb.
   Spec.it s "CR 205.4e castable while its caster controls a legendary planeswalker" $ do
     plains <- S.printingOf s registry "Plains"
     jace <- S.printingOf s registry "Jace Beleren"
