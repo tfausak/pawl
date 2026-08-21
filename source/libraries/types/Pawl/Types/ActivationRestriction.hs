@@ -8,8 +8,9 @@ import qualified Pawl.Types.DuringPhase as DuringPhase
 -- A LIST of them on the ability (Pawl.Types.ActivatedAbility.restrictions), and
 -- CR 602.5 -- "A player can't begin to activate an ability that's prohibited from
 -- being activated" -- is what makes the list a conjunction: every clause printed
--- must hold. The EMPTY list is CR 602.2's default, which gives an ability no
--- window beyond its controller having priority, so it needs no arm of its own.
+-- must hold. The EMPTY list is the default, which leaves the ability whatever
+-- window the rules already give it -- CR 602.2's priority for one on the stack,
+-- CR 605.3a's two for a mana ability -- so it needs no arm of its own.
 --
 -- A list rather than one total description of the window because Kongming's
 -- Contraptions prints two clauses at once -- "Activate only during the declare
@@ -24,8 +25,8 @@ import qualified Pawl.Types.DuringPhase as DuringPhase
 -- Deliberately NOT a synonym for Pawl.Types.CastingRestriction, which carries two
 -- arms spelled the same way. CR 307.5's last two sentences are the reason and
 -- they forbid the two READERS agreeing -- Pawl.Engine.Cast must consult casting
--- prohibitions and Pawl.Engine.Activate must not. The two vocabularies do not
--- coincide either: SorcerySpeed below is a clause only an ability can print,
+-- prohibitions and Pawl.Engine.ActivationRestriction must not. The two
+-- vocabularies do not coincide either: SorcerySpeed below is a clause only an ability can print,
 -- since for a spell CR 307.1 IS the window rather than a rider on it.
 data ActivationRestriction
   = -- | CR 602.5d's "Activate only as a sorcery" (CR 702.6a's equip is the
@@ -73,7 +74,7 @@ data ActivationRestriction
     -- defending player is, and CR 508.3b makes "attacked" a fact about a creature
     -- having been DECLARED attacking that player rather than one of their
     -- planeswalkers.
-    -- Pawl.Engine.Combat.attackedThisStep is the reader, shared verbatim with
+    -- Pawl.Engine.Turn.attackedThisStep is the reader, shared verbatim with
     -- Pawl.Types.CastingRestriction's arm of the same name: the clause is one
     -- question about the combat record, and the two gates differ in what ELSE
     -- they may read rather than in what this asks.
@@ -82,7 +83,7 @@ data ActivationRestriction
     -- blockers are declared" (Trap Runner). CR 506.7g is what makes this the
     -- same clause Pawl.Types.CastingRestriction prints under this name -- "rules
     -- 506.7 and 506.7a-f apply to abilities ... just as they apply to spells" --
-    -- so the two arms share Pawl.Engine.Combat.afterBlockersDeclared verbatim,
+    -- so the two arms share Pawl.Engine.Turn.afterBlockersDeclared verbatim,
     -- as AttackedThisStep above already does.
     --
     -- No TurnScope beside it, unlike DuringPhase: the printed clause names no

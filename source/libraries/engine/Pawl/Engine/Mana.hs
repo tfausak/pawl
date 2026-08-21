@@ -21,6 +21,7 @@ import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Activations as Activations
 import Pawl.Types.Claim (Claim)
 import qualified Pawl.Types.Color as Color
@@ -75,8 +76,10 @@ import qualified Pawl.Types.Supertype as Supertype
 --
 -- EVERY restriction on the activation rides here, not just CR 118.3's
 -- payability: CR 605.3b keeps a mana ability off the stack, so there is no other
--- window to apply one in. It takes the pre-projected board because CR 302.6's
--- reads want it (#200).
+-- window to apply one in. That is why the ability's printed "activate only ..."
+-- rider (CR 602.5) is an argument -- CR 605.1 keeps a timing rider from making an
+-- ability any less a mana ability, so the rider has to be asked HERE or nowhere.
+-- It takes the pre-projected board because CR 302.6's reads want it (#200).
 --
 -- And WHAT ONE ACTIVATION SPENDS besides, because the count is a fact about one
 -- source asked alone and the supply model has to add several of them up: two
@@ -88,7 +91,7 @@ import qualified Pawl.Types.Supertype as Supertype
 -- A CALLBACK rather than a call, for Pawl.Engine.Count.ViewOf's reason: those
 -- are Pawl.Engine.Cost's questions, and that module imports this one.
 -- Pawl.Engine.Cost.manaActivations is the only answer the engine passes.
-type Capacity = Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> Cost Keyword.Keyword -> GameState -> Activations.Activations
+type Capacity = Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> Cost Keyword.Keyword -> [ActivationRestriction.ActivationRestriction] -> GameState -> Activations.Activations
 
 -- | CR 305.6
 subtypeMana :: Subtype -> Maybe ManaType
@@ -146,7 +149,11 @@ producedTypes oid gs production = case production of
 --
 -- The nesting is the whole point. The OUTER list is the options -- which ability
 -- of this permanent, and which of its modes -- and each carries the COST CR
--- 602.2b makes that option's activation pay. The INNER list is that one
+-- 602.2b makes that option's activation pay, together with the ability's printed
+-- "activate only ..." rider (CR 602.5): CR 605.3b gives a mana ability no stack
+-- window to be gated in, so the rider has to travel with the route to the
+-- Capacity, which is where both of CR 605.3a's windows ask. CR 305.6's intrinsic
+-- ability is printed on no card and so carries none. The INNER list is that one
 -- activation's YIELD, its AddMana effects in printed order (CR 608.2c). Sol
 -- Ring's "{T}: Add {C}{C}" is one option adding two mana; an Urborg'd Mountain
 -- is two options of one mana each.
@@ -174,15 +181,15 @@ producedTypes oid gs production = case production of
 -- printed. Gemstone Caverns says that sentence as two abilities whose
 -- ActivatedAbility.conditions are complements instead -- a gate abilitiesGiven
 -- does apply, with the board in hand (#1924).
-manaRoutesOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [(Cost Keyword.Keyword, [ManaProduction])]
+manaRoutesOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [(Cost Keyword.Keyword, [ActivationRestriction.ActivationRestriction], [ManaProduction])]
 manaRoutesOfGiven pcs oid gs =
   let fromSubtypes =
         fmap
-          (\manaType -> (intrinsicManaCost, [ManaProduction.OfType manaType]))
+          (\manaType -> (intrinsicManaCost, [], [ManaProduction.OfType manaType]))
           (Maybe.mapMaybe subtypeMana (Set.toList (Projection.subtypesGiven pcs oid gs)))
       selectionRoutes ability =
         fmap
-          (\effects -> (ActivatedAbility.cost ability, Maybe.mapMaybe ManaAbility.manaProduced effects))
+          (\effects -> (ActivatedAbility.cost ability, ActivatedAbility.restrictions ability, Maybe.mapMaybe ManaAbility.manaProduced effects))
           (Modal.selectionEffects (ActivatedAbility.modal ability))
       fromAbilities = concatMap selectionRoutes (filter ManaAbility.isManaAbility (Projection.abilitiesGiven pcs oid gs))
    in fromSubtypes <> fromAbilities
@@ -247,7 +254,7 @@ manaSuppliesGiven :: Capacity -> Map.Map ObjectId PC.ProjectedCharacteristics ->
 manaSuppliesGiven capacity pcs pid oid gs =
   let counted =
         fmap
-          (\option -> (capacity pcs pid oid (ManaOption.cost option) gs, ManaOption.yield option))
+          (\option -> (capacity pcs pid oid (ManaOption.cost option) (ManaOption.restrictions option) gs, ManaOption.yield option))
           (manaOptionsOfGiven pcs oid gs)
       available = filter (\(activations, _) -> Activations.times activations > 0) counted
       timesOf (activations, _) = Activations.times activations
@@ -285,9 +292,9 @@ manaOptionsOfGiven pcs oid gs =
         -- mana would be paid unrestricted here (#1976). Exact for data/cards/,
         -- where Geosurge is the only restricting printing and it is a sorcery.
         Mana.MkMana (fmap (\manaType -> ManaUnit.MkManaUnit {ManaUnit.manaType = manaType, ManaUnit.tags = tags, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}) manaTypes)
-      expand (cost, productions) =
+      expand (cost, restrictions, productions) =
         fmap
-          (\manaTypes -> ManaOption.MkManaOption {ManaOption.cost = cost, ManaOption.yield = asMana manaTypes})
+          (\manaTypes -> ManaOption.MkManaOption {ManaOption.cost = cost, ManaOption.restrictions = restrictions, ManaOption.yield = asMana manaTypes})
           (traverse (producedTypes oid gs) productions)
    in List.nub (concatMap expand (manaRoutesOfGiven pcs oid gs))
 
@@ -441,7 +448,7 @@ manaSourcesGiven capacity grants pcs pid gs =
       -- the tap and sickness rules reach only such a cost. A Blood Pet is a
       -- black source while tapped and on the turn it arrives, because
       -- "Sacrifice this creature: Add {B}" is neither (#1116).
-      isSource oid = any (\(cost, _) -> Activations.times (capacity pcs pid oid cost gs) > 0) (manaRoutesOfGiven pcs oid gs)
+      isSource oid = any (\(cost, restrictions, _) -> Activations.times (capacity pcs pid oid cost restrictions gs) > 0) (manaRoutesOfGiven pcs oid gs)
    in filter isSource (Projection.controlsGiven grants pid gs)
 
 -- What ONE mana must be to satisfy one typed symbol of a cost: one of these mana

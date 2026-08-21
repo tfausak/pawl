@@ -637,6 +637,7 @@ library engine
   exposed-modules:
     Pawl.Engine.Action
     Pawl.Engine.Activate
+    Pawl.Engine.ActivationRestriction
     Pawl.Engine.Amass
     Pawl.Engine.Attach
     Pawl.Engine.AttackCost

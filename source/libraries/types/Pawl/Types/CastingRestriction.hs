@@ -49,7 +49,7 @@ data CastingRestriction
     -- fourteen cards carry on a CAST, Rally the Troops among them. (Kongming's
     -- Contraptions prints the same words on an activated ability, where the arm
     -- of this name lives on Pawl.Types.ActivationRestriction; the two share
-    -- Pawl.Engine.Combat.attackedThisStep as their reader.)
+    -- Pawl.Engine.Turn.attackedThisStep as their reader.)
     --
     -- Not a timing window at all, which is why it is its own arm rather than a
     -- field on DuringPhase: it is a question about what the combat record already
@@ -67,7 +67,7 @@ data CastingRestriction
     -- of combat step.
     --
     -- The mirror of Pawl.Types.ActivationRestriction's arm of this name, sharing
-    -- Pawl.Engine.Combat.afterBlockersDeclared as its reader -- which is CR
+    -- Pawl.Engine.Turn.afterBlockersDeclared as its reader -- which is CR
     -- 506.7g, the rule that says CR 506.7's points govern an activation exactly
     -- as they govern a cast.
     --

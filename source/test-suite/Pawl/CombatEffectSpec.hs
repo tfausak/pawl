@@ -29,6 +29,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -646,8 +647,8 @@ combatLegalitySpec s registry = Spec.describe s "CombatLegality" $ do
     Spec.assertEqWith s "clears" (Combat.Type.attackers (GameState.combat (Combat.clearCombat busy))) Map.empty
     -- CR 506.7c: the CR 511.3 reset re-arms CR 506.7b's boundary, so a CR 500.8
     -- second combat phase gets its own window rather than inheriting this one's.
-    Spec.assertBool s (Combat.afterBlockersDeclared busy) "CR 506.7b's boundary is up while combat is live"
-    Spec.assertBool s (not (Combat.afterBlockersDeclared (Combat.clearCombat busy))) "and down again once combat clears"
+    Spec.assertBool s (Turn.afterBlockersDeclared busy) "CR 506.7b's boundary is up while combat is live"
+    Spec.assertBool s (not (Turn.afterBlockersDeclared (Combat.clearCombat busy))) "and down again once combat clears"
 
 keywordSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 keywordSpec s registry = Spec.describe s "Keyword" $ do
@@ -3314,7 +3315,7 @@ blockerWasDeclared e = case e of
 -- becomes blocked. Draw a card."
 --
 -- Its window is CastingRestriction.AfterBlockersDeclared, read through
--- Combat.afterBlockersDeclared; castingWindowSpec below is where CR 506.7b's
+-- Turn.afterBlockersDeclared; castingWindowSpec below is where CR 506.7b's
 -- boundary is proved step by step.
 --
 -- Sacred Prey ("Whenever this creature becomes blocked, you gain 1 life") is the
@@ -3436,8 +3437,8 @@ castingWindowSpec s registry = Spec.describe s "CastingWindow" $ do
     -- Anti-vacuity: bob's unrestricted instant is castable on every one of these
     -- boards, so a leg that refuses the Curtain is refusing the Curtain.
     Spec.assertBool s (all (S.castable S.bob boltId) [beforeDeclaration, declared, inStep CombatStep.CombatDamage, inStep CombatStep.EndOfCombat, atAttackers]) "bob can pay for and legally cast an unrestricted instant on every leg"
-    Spec.assertBool s (not (Combat.afterBlockersDeclared beforeDeclaration)) "the declaration has not happened yet"
-    Spec.assertBool s (Combat.afterBlockersDeclared declared) "and it has after CR 509.1's turn-based action"
+    Spec.assertBool s (not (Turn.afterBlockersDeclared beforeDeclaration)) "the declaration has not happened yet"
+    Spec.assertBool s (Turn.afterBlockersDeclared declared) "and it has after CR 509.1's turn-based action"
     -- Before the point CR 506.7b names.
     Spec.assertBool s (not (S.castable S.bob curtainId atAttackers)) "refused in the declare attackers step"
     Spec.assertBool s (not (S.castable S.bob curtainId beforeDeclaration)) "refused in the declare blockers step before blockers are declared"

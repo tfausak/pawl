@@ -105,7 +105,7 @@ data Combat = MkCombat
     -- | CR 506.7b: has this combat phase's declare blockers step declared
     -- blockers? The boundary "only during combat after blockers are declared"
     -- names, and the sole reader is
-    -- Pawl.Engine.Combat.afterBlockersDeclared (Curtain of Light on the casting
+    -- Pawl.Engine.Turn.afterBlockersDeclared (Curtain of Light on the casting
     -- side, Trap Runner on the activation side).
     --
     -- CR 506.7b's own words are "after the declare blockers step begins", which
