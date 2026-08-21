@@ -17,6 +17,7 @@ import qualified Data.Set as Set
 import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Codec.AlternativeCost as AlternativeCost
+import qualified Pawl.Codec.AttachRestriction as AttachRestriction
 import qualified Pawl.Codec.AttackCost as AttackCost
 import qualified Pawl.Codec.AttackRequirement as AttackRequirement
 import qualified Pawl.Codec.BlockCost as BlockCost
@@ -99,6 +100,7 @@ codec cardCodec = Fields.object $ do
   combatRestrictions <- Fields.defaulted "combatRestrictions" [] (Common.list CombatRestriction.codec) Face.combatRestrictions
   sacrificeRestrictions <- Fields.defaulted "sacrificeRestrictions" [] (Common.list SacrificeRestriction.codec) Face.sacrificeRestrictions
   untapRestrictions <- Fields.defaulted "untapRestrictions" [] (Common.list UntapRestriction.codec) Face.untapRestrictions
+  attachRestrictions <- Fields.defaulted "attachRestrictions" [] (Common.list AttachRestriction.codec) Face.attachRestrictions
   attackCosts <- Fields.defaulted "attackCosts" [] (Common.list AttackCost.codec) Face.attackCosts
   blockCosts <- Fields.defaulted "blockCosts" [] (Common.list BlockCost.codec) Face.blockCosts
   additionalCosts <- Fields.defaulted "additionalCosts" [] (Common.list (CostComponent.codec Keyword.codec)) Face.additionalCosts
@@ -147,6 +149,7 @@ codec cardCodec = Fields.object $ do
         Face.combatRestrictions = combatRestrictions,
         Face.sacrificeRestrictions = sacrificeRestrictions,
         Face.untapRestrictions = untapRestrictions,
+        Face.attachRestrictions = attachRestrictions,
         Face.attackCosts = attackCosts,
         Face.blockCosts = blockCosts,
         Face.additionalCosts = additionalCosts,

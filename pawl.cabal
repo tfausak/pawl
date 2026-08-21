@@ -97,6 +97,8 @@ library codec
     Pawl.Codec.ArmDelayedTriggerSpec
     Pawl.Codec.AsCopy
     Pawl.Codec.AsCopySpec
+    Pawl.Codec.AttachRestriction
+    Pawl.Codec.AttachRestrictionSpec
     Pawl.Codec.AttachTarget
     Pawl.Codec.AttachTargetSpec
     Pawl.Codec.AttackCost
@@ -642,6 +644,7 @@ library engine
     Pawl.Engine.ActivationRestriction
     Pawl.Engine.Amass
     Pawl.Engine.Attach
+    Pawl.Engine.AttachRestriction
     Pawl.Engine.AttackCost
     Pawl.Engine.AttackRequirement
     Pawl.Engine.Battle
@@ -935,6 +938,7 @@ library types
     Pawl.Types.ArmDelayedTrigger
     Pawl.Types.AsCopy
     Pawl.Types.Asked
+    Pawl.Types.AttachRestriction
     Pawl.Types.AttachTarget
     Pawl.Types.AttackCost
     Pawl.Types.AttackCostScope

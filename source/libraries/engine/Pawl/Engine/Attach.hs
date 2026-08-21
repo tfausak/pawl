@@ -11,10 +11,11 @@
 -- Event imports this module and the edge cannot run both ways. Everything here is
 -- a question with no answer written back to the board.
 --
--- THE INVARIANT: nothing here asks which CARD is moving. It reads the
--- PROJECTION's subtypes (CR 205.3) and the enchant ability rule 702.5a gives an
--- Aura, both of which are classifications the rulebook itself makes -- the same
--- standing Pawl.Engine.Keyword has over rule 702.
+-- THE INVARIANT: nothing here asks which CARD is moving, or which card refuses
+-- it. It reads the PROJECTION's subtypes (CR 205.3), the enchant ability rule
+-- 702.5a gives an Aura, and the destination's own prohibition through
+-- Pawl.Engine.AttachRestriction, all of which are classifications the rulebook
+-- itself makes -- the same standing Pawl.Engine.Keyword has over rule 702.
 module Pawl.Engine.Attach where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -22,6 +23,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Pawl.Engine.AttachRestriction as AttachRestriction
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Filter as Filter
@@ -43,11 +45,13 @@ import qualified Pawl.Types.Subtype as Subtype
 
 -- CR 701.3a/701.3b: may `src` legally be attached to `destination` right now?
 --
--- CR 701.3a's last sentence is the whole rule -- an Aura, Equipment or
--- Fortification can't be attached to something it couldn't enchant, equip or
--- fortify -- so this dispatches on which `src` is, read through the PROJECTION, so
--- that an Equipment that lost the subtype (CR 301.5c) and a permanent animated
--- into a creature both answer correctly.
+-- CR 701.3a's last sentence is the MOVING permanent's half -- an Aura, Equipment
+-- or Fortification can't be attached to something it couldn't enchant, equip or
+-- fortify -- so the two guarded branches below dispatch on which `src` is, read
+-- through the PROJECTION, so that an Equipment that lost the subtype (CR 301.5c)
+-- and a permanent animated into a creature both answer correctly. CR 303.4's
+-- last sentence and CR 301.5 are the DESTINATION's half, and the guard above
+-- them is where the two meet.
 --
 -- Equipment is CR 301.5's creature test. Aura is CR 303.4's enchant ability, asked
 -- through Target.admittedRecipients rather than a hand-rolled creature test, which
@@ -82,6 +86,14 @@ import qualified Pawl.Types.Subtype as Subtype
 attachmentFor :: ObjectId -> Recipient -> GameState -> Maybe Recipient
 attachmentFor src destination gs
   | Recipient.objectOf destination == Just src = Nothing
+  -- CR 303.4's last sentence and CR 301.5 with CR 101.2: the DESTINATION's own
+  -- limit on what may become attached to it, which CR 101.2 makes beat rule
+  -- 701.3a's permission below. Asked before either branch, since Consecrate
+  -- Land's clause and Goblin Brawler's are one prohibition
+  -- (Pawl.Types.AttachRestriction), and only of an object destination -- CR
+  -- 702.5d's enchanted PLAYER is not a permanent, so nothing on the battlefield
+  -- can carry a limit about them.
+  | Maybe.maybe False (\oid -> AttachRestriction.refuses src oid gs) (Recipient.objectOf destination) = Nothing
   -- CR 301.5, "it can't legally be attached to anything that isn't a creature" --
   -- which is also why a player destination falls to Nothing here rather than
   -- getting a branch of its own.

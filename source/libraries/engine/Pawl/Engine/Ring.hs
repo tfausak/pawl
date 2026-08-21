@@ -152,6 +152,7 @@ theRingEmblem temptations =
               Face.combatRestrictions = [theRingCantBeBlockedByGreaterPower],
               Face.sacrificeRestrictions = [],
               Face.untapRestrictions = [],
+              Face.attachRestrictions = [],
               Face.attackCosts = [],
               Face.blockCosts = [],
               Face.mulliganActions = [],
