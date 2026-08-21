@@ -33,6 +33,7 @@ import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
+import qualified Pawl.Types.AppliedReduction as AppliedReduction
 import Pawl.Types.CardName (CardName)
 import Pawl.Types.CostAdjustments (CostAdjustments)
 import qualified Pawl.Types.CostAdjustments as CostAdjustments
@@ -373,7 +374,7 @@ rewritePlayerEffect pairs effect = case effect of
   -- Yawgmoth's Will's "spells" and Omniscience's "spells" name none today;
   -- Edgewalker's "Cleric spells" does, and Haakon's "Knight spells" would.
   PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f n) -> PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost (Filter.rewrite pairs f) n)
-  PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost f cost) -> PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost (Filter.rewrite pairs f) cost)
+  PlayerEffect.ReduceSpellCost x -> PlayerEffect.ReduceSpellCost x {ReduceSpellCost.whichSpells = Filter.rewrite pairs (ReduceSpellCost.whichSpells x)}
   PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f cost floor_) -> PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost (Filter.rewrite pairs f) cost floor_)
   -- The two arms with a word in TWO places: their own criterion ("nontoken
   -- Rebels"), and the criterion inside each component they add ("sacrifice a
@@ -858,7 +859,8 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
       reductionOf effect = case effect of
-        PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost criterion amount) -> matching criterion amount
+        PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost criterion amount coloredOnly) ->
+          fmap (\a -> (a, coloredOnly)) (matching criterion amount)
         PlayerEffect.IncreaseSpellCost {} -> Nothing
         -- The arms this whole split exists for: an ability's reduction is not a
         -- spell's, and neither is an ability's added component, so both are
@@ -924,10 +926,14 @@ spellCostAdjustments pid oid gs =
       effects = fmap snd (applying pid gs)
    in CostAdjustments.MkCostAdjustments
         { CostAdjustments.increases = Maybe.mapMaybe increaseOf effects,
-          -- Every spell-cost reduction is paired with a floor of ZERO, for the
-          -- reason the header gives: no printed spell-cost reducer states
-          -- Heartstone's sentence.
-          CostAdjustments.reductions = fmap (\amount -> (amount, 0)) (Maybe.mapMaybe reductionOf effects),
+          -- Every spell-cost reduction carries a floor of ZERO, for the reason
+          -- the header gives: no printed spell-cost reducer states Heartstone's
+          -- sentence. The coloured-mana confinement rides through from the card
+          -- (Edgewalker), CR 118.7b-d being the default it overrides.
+          CostAdjustments.reductions =
+            fmap
+              (\(amount, coloredOnly) -> AppliedReduction.MkAppliedReduction amount 0 coloredOnly)
+              (Maybe.mapMaybe reductionOf effects),
           -- A spell's own PRINTED additional costs are NOT among these: those are
           -- card text and arrive through Pawl.Engine.Cost.plus at CR 601.2b. What
           -- is gathered here is CR 118.8's other half, a cost applied to the
@@ -962,7 +968,11 @@ activationCostAdjustments :: PlayerId -> ObjectId -> GameState -> CostAdjustment
 activationCostAdjustments pid srcId gs =
   let reductionOf effect = case effect of
         PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost criterion amount floor_) ->
-          if matchesObject criterion srcId gs then Just (amount, floor_) else Nothing
+          -- Never confined to coloured mana: no printed activation-cost reducer
+          -- states Edgewalker's sentence, so CR 118.7b-d's spill stands.
+          if matchesObject criterion srcId gs
+            then Just (AppliedReduction.MkAppliedReduction amount floor_ False)
+            else Nothing
         -- The non-mana addition, gathered by `additionOf` below: CR 601.2f's
         -- arithmetic has nothing to do to a component, so it never joins the
         -- reductions.

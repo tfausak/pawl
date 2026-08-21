@@ -76,9 +76,9 @@ data PlayerEffect
     -- Edgewalker's {W}{B} are the same shape of thing.
     -- Pawl.Engine.Cost.applyAdjustments reads it component by component.
     --
-    -- An EXCESS typed symbol is dropped rather than spilling onto the generic
-    -- component, which is Edgewalker's "This effect reduces only the amount of
-    -- colored mana you pay" and not CR 118.7b-d (#309).
+    -- An EXCESS typed symbol comes off the generic component (CR 118.7b-d)
+    -- unless the payload's `coloredOnly` says otherwise, which is Edgewalker's
+    -- "This effect reduces only the amount of colored mana you pay".
     ReduceSpellCost ReduceSpellCost.ReduceSpellCost
   | -- | CR 613.11 / 601.2f / Heartstone, Training Grounds: the activated abilities
     -- of matching permanents cost this much less to activate, and this effect may

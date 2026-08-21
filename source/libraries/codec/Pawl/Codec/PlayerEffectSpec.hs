@@ -69,16 +69,17 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost (Filter.HasColor Color.Blue) (ManaCost.MkManaCost [ManaSymbol.Generic 1])))
+      (PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost (Filter.HasColor Color.Blue) (ManaCost.MkManaCost [ManaSymbol.Generic 1]) False))
       " {\"type\":\"ReduceSpellCost\",\"value\":{\"whichSpells\":{\"type\":\"HasColor\",\"value\":{\"type\":\"Blue\"}},\"reduction\":[{\"type\":\"Generic\",\"value\":1}]}} "
   -- The reduction that names a mana type, which the generic one above would not
-  -- catch a regression in.
+  -- catch a regression in -- Edgewalker's, so it also carries the one key CR
+  -- 101.1's coloured-mana confinement writes.
   Spec.it s "ReduceSpellCost, naming a mana type" $
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost (Filter.HasSubtype Subtype.Cleric) (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.White), ManaSymbol.OfType (ManaType.Colored Color.Black)])))
-      " {\"type\":\"ReduceSpellCost\",\"value\":{\"whichSpells\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Cleric\"}},\"reduction\":[{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"White\"}}},{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Black\"}}}]}} "
+      (PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost (Filter.HasSubtype Subtype.Cleric) (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.White), ManaSymbol.OfType (ManaType.Colored Color.Black)]) True))
+      " {\"type\":\"ReduceSpellCost\",\"value\":{\"whichSpells\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Cleric\"}},\"reduction\":[{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"White\"}}},{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Black\"}}}],\"coloredOnly\":true}} "
   -- CR 613.11 / 601.2f / Heartstone, floor and all.
   Spec.it s "ReduceActivationCost" $
     Common.assertCodec

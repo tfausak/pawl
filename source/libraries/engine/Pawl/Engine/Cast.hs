@@ -1490,11 +1490,14 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                       -- below answers with.
                       --
                       -- CR 601.2f's ORDER of the reductions is asked at the same
-                      -- seam, and asks a SPELL nothing: the order is observable
-                      -- only where two reductions state different floors, and
-                      -- Pawl.Types.PlayerEffect.ReduceSpellCost states none at
-                      -- all. `announcedCost` goes in because the order is chosen
-                      -- against the cost it will be applied to.
+                      -- seam. A SPELL can observe it: no ReduceSpellCost states
+                      -- a floor, but two of them can still disagree about CR
+                      -- 101.1's coloured-mana confinement, and Edgewalker beside
+                      -- an unconfined typed reducer reaches two totals on one
+                      -- Cleric spell (Pawl.PlayerEffectSpec's
+                      -- MixedConfinementReductions). `announcedCost` goes in
+                      -- because the order is chosen against the cost it will be
+                      -- applied to.
                       --
                       -- CR 601.2f's LOCK: `paidCost` is determined here, once,
                       -- and handed to Cost.pay as a VALUE -- so an effect that
