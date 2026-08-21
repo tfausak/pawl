@@ -2910,7 +2910,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
 playerEffectFilters :: PlayerEffect.PlayerEffect -> [Filter.Type.Filter Keyword.Keyword]
 playerEffectFilters playerEffect = case playerEffect of
   PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f _) -> [f]
-  PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost f _) -> [f]
+  PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost f _ _) -> [f]
   -- CR 601.2f's other moment: Heartstone's Filter narrows the ability's SOURCE
   -- PERMANENT rather than a spell, and is authored the same way.
   PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f _ _) -> [f]

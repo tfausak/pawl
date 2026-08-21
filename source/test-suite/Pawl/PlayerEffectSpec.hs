@@ -86,6 +86,7 @@ import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
+import qualified Pawl.Types.AppliedReduction as AppliedReduction
 import qualified Pawl.Types.BeginningStep as BeginningStep
 -- Aliased Card.Type, per the project-wide convention (CardSpec): the logic
 -- module Pawl.Engine.Card may later be imported and must not collide.
@@ -317,22 +318,38 @@ black = ManaSymbol.OfType (ManaType.Colored Color.Black)
 green :: ManaSymbol.ManaSymbol
 green = ManaSymbol.OfType (ManaType.Colored Color.Green)
 
+-- CR 107.4c's {C}, the mana type that is not a colour -- CR 118.7d's subject,
+-- where the three symbols above are CR 118.7b's and CR 118.7c's.
+colorless :: ManaSymbol.ManaSymbol
+colorless = ManaSymbol.OfType ManaType.Colorless
+
 -- CR 107.4f's {G/P}. A Color rather than a ManaType, since every Phyrexian
 -- symbol is coloured.
 phyrexianGreen :: ManaSymbol.ManaSymbol
 phyrexianGreen = ManaSymbol.Phyrexian Color.Green
 
 -- CR 601.2f's adjustments as this suite's assertions state them: the increases,
--- the reductions each floored at zero, and no added components -- the floor is
--- Heartstone's sentence and Pawl.Types.CostAdjustments.components is Brutal
--- Suppression's, and no spell-cost effect states either (the activation side of
--- both is proved against the card in Pawl.ActivateSpec).
+-- the reductions each floored at zero and each SPILLING what the cost cannot use
+-- (CR 118.7b-d), and no added components -- the floor is Heartstone's sentence
+-- and Pawl.Types.CostAdjustments.components is Brutal Suppression's, and no
+-- spell-cost effect states either (the activation side of both is proved against
+-- the card in Pawl.ActivateSpec).
 adjustments :: [Natural] -> [ManaCost.ManaCost] -> CostAdjustments.CostAdjustments
 adjustments increases reductions =
   CostAdjustments.MkCostAdjustments
     { CostAdjustments.increases = increases,
-      CostAdjustments.reductions = fmap (\reduction -> (reduction, 0)) reductions,
+      CostAdjustments.reductions = fmap (\reduction -> AppliedReduction.MkAppliedReduction reduction 0 False) reductions,
       CostAdjustments.components = []
+    }
+
+-- `adjustments` with every reduction CONFINED to the coloured mana paid, which
+-- is Edgewalker's "This effect reduces only the amount of colored mana you pay"
+-- (CR 101.1) and the one thing that stops CR 118.7b-d's spill. The pair of
+-- helpers is what lets a case assert the two readings against one cost.
+confinedAdjustments :: [ManaCost.ManaCost] -> CostAdjustments.CostAdjustments
+confinedAdjustments reductions =
+  (adjustments [] reductions)
+    { CostAdjustments.reductions = fmap (\reduction -> AppliedReduction.MkAppliedReduction reduction 0 True) reductions
     }
 
 -- A reduction by an amount of GENERIC mana (CR 118.7a) -- the Medallion's shape,
@@ -414,27 +431,83 @@ adjustmentSpec s =
         (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [white]]) (ManaCost.MkManaCost [white, white]))
         (ManaCost.MkManaCost [white])
 
-    -- THE HEADLINE FALSIFIER for the typed half, and the one place pawl
-    -- deliberately does not do what CR 118.7b-d would (#309). Edgewalker's own
-    -- reminder text is the assertion: "if you cast a Cleric spell with mana
-    -- cost {1}{W}, it costs {1} to cast" -- so the {B} half, which the cost
-    -- cannot satisfy, takes NOTHING rather than one generic mana.
-    Spec.it s "an excess typed reduction is dropped, not spilled onto generic" $
+    -- THE HEADLINE FALSIFIER for the typed half, in its two readings. CR 118.7b:
+    -- the {B} half is an amount of coloured mana this cost does not require, so
+    -- it comes off the generic component instead and {1}{W} pays nothing at all.
+    Spec.it s "CR 118.7b an excess typed reduction spills onto the generic component" $
       Spec.assertEqWith
         s
-        "{1}{W} reduced by {W}{B} is {1}"
+        "{1}{W} reduced by {W}{B} is {0}"
         (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [white, black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white]))
+        (ManaCost.MkManaCost [])
+
+    -- THE OTHER READING, on the same cost and the same reduction, which is what
+    -- makes the pair prove the flag rather than the arithmetic: Edgewalker's
+    -- "This effect reduces only the amount of colored mana you pay" is card text
+    -- CR 101.1 lets override CR 118.7b, and its own reminder text is the
+    -- assertion -- "if you cast a Cleric spell with mana cost {1}{W}, it costs
+    -- {1} to cast".
+    Spec.it s "CR 101.1 a reduction confined to coloured mana drops the excess instead" $
+      Spec.assertEqWith
+        s
+        "{1}{W} reduced by a confined {W}{B} is {1}"
+        (Cost.applyAdjustments (confinedAdjustments [ManaCost.MkManaCost [white, black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1])
 
     -- Ruling: "If you have more than one of these on the battlefield, the cost
     -- reduction is cumulative." Cumulative, and still bounded by what the cost
-    -- actually has to give.
-    Spec.it s "two typed reductions pool, and the second finds nothing left to take" $
+    -- actually has to give -- the second pair finds no white and no black left,
+    -- so CR 118.7c sends both symbols at the {1} and CR 601.2f floors the rest.
+    Spec.it s "CR 118.7c two typed reductions pool, and the second spills onto the generic component" $
       Spec.assertEqWith
         s
-        "{1}{W}{B} reduced by {W}{B} twice is {1}"
+        "{1}{W}{B} reduced by {W}{B} twice is {0}"
         (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [white, black], ManaCost.MkManaCost [white, black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
+        (ManaCost.MkManaCost [])
+
+    -- The same pooling under Edgewalker's own sentence, which is what two
+    -- Edgewalkers really do: the second pair strands with nothing to take and
+    -- nothing to spill onto.
+    Spec.it s "CR 101.1 two confined typed reductions leave the generic component alone" $
+      Spec.assertEqWith
+        s
+        "{1}{W}{B} reduced by a confined {W}{B} twice is {1}"
+        (Cost.applyAdjustments (confinedAdjustments [ManaCost.MkManaCost [white, black], ManaCost.MkManaCost [white, black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1])
+
+    -- CR 118.7c's own wording, which CR 118.7b's arm does not reach: the cost
+    -- HAS a mana component of that colour and the reduction EXCEEDS it, so the
+    -- colour goes to nothing and the DIFFERENCE comes off the generic component.
+    -- {2}{W} reduced by {W}{W} keeps one generic mana; dropping the excess would
+    -- leave {2}.
+    Spec.it s "CR 118.7c a reduction exceeding the cost's colour spills the difference" $
+      Spec.assertEqWith
+        s
+        "{2}{W} reduced by {W}{W} is {1}"
+        (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [white, white]]) (ManaCost.MkManaCost [ManaSymbol.Generic 2, white]))
+        (ManaCost.MkManaCost [ManaSymbol.Generic 1])
+
+    -- CR 118.7d, the colourless half of the same sentence, which is a DIFFERENT
+    -- mana type and not a colour: {2}{C} reduced by {C}{C} loses its {C} and one
+    -- generic mana. Nothing in Pawl.Engine.Cost reads the two arms apart -- both
+    -- are an OfType -- and this case is what says so.
+    Spec.it s "CR 118.7d the same holds of a colourless component" $
+      Spec.assertEqWith
+        s
+        "{2}{C} reduced by {C}{C} is {1}"
+        (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [colorless, colorless]]) (ManaCost.MkManaCost [ManaSymbol.Generic 2, colorless]))
+        (ManaCost.MkManaCost [ManaSymbol.Generic 1])
+
+    -- CR 118.7a is NOT the mirror image: a GENERIC reduction that exceeds the
+    -- generic component stops there rather than spilling the other way onto the
+    -- coloured symbols. The pair with the case above is what keeps the spill
+    -- one-directional.
+    Spec.it s "CR 118.7a a generic reduction never spills onto a coloured symbol" $
+      Spec.assertEqWith
+        s
+        "{1}{W} reduced by {2} is {W}"
+        (Cost.applyAdjustments (adjustments [] [generic 2]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white]))
+        (ManaCost.MkManaCost [white])
 
     -- CR 118.7f, in the small: the two SIDES of the cancellation read a
     -- Phyrexian symbol differently. A reduction written {G/P} names green, and
@@ -1084,8 +1157,9 @@ edgewalkerBoard plains edgewalker piker copies n =
 -- cost {W}{B} less to cast. This effect reduces only the amount of colored mana
 -- you pay."
 --
--- The card the typed half of a reduction exists for, and the one that pins the
--- excess as dropped rather than spilled (#309). Edgewalker is itself a Cleric,
+-- The card the typed half of a reduction exists for, and the pool's one printing
+-- of CR 101.1's confinement -- the excess dropped rather than spilled, against
+-- CR 118.7b-d's default. Edgewalker is itself a Cleric,
 -- so the spell it discounts is another copy of itself and the pool needs no
 -- second Cleric to make the point.
 edgewalkerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -1118,7 +1192,8 @@ edgewalkerSpec s registry =
     -- Edgewalkers really do offer {W}{B}{W}{B}. The cost has one white and one
     -- black to give, and the second pair strands: under CR 118.7b-d it would
     -- go on to eat the {1} and leave the spell free, and Edgewalker's card
-    -- text stops it (#309).
+    -- text stops it. The Adjustments group asserts both readings of exactly
+    -- this cost against each other.
     Spec.it s "a second Edgewalker's stranded halves leave the generic component alone" $ do
       plains <- S.printingOf s registry "Plains"
       edgewalker <- S.printingOf s registry "Edgewalker"
@@ -1239,11 +1314,11 @@ phyrexianDiscountSpec s registry =
     -- 601.2f), so there is no green mana in the cost for a green reduction to
     -- cancel -- Edgewalker's ruling read this way round, "if you choose to pay
     -- such a cost with {W} or {B}, Edgewalker can reduce that part of the
-    -- cost". The reduction here is spent by nothing and dropped (#309).
+    -- cost". The reduction here is spent by nothing.
     --
-    -- Not hostage to that gap: CR 118.7b would instead turn the unspent green
-    -- into one GENERIC mana, and this cost has no generic component for CR
-    -- 118.7a to take it off, so {G/P} is the answer under either reading.
+    -- CR 118.7b turns the unspent green into one GENERIC mana, and this cost has
+    -- no generic component for CR 118.7a to take it off, so {G/P} is the answer
+    -- whether the stranded symbol spills or not.
     Spec.it s "an unannounced Phyrexian symbol in the COST offers nothing to cancel" $ do
       forest <- S.printingOf s registry "Forest"
       discount <- S.printingOf s registry "Synthetic Phyrexian Discount"
@@ -1451,9 +1526,9 @@ hybridDiscountBoard land discount spell solRing copies n =
 -- tells the three readings apart: full price taps three, the {B} half taps two,
 -- the {2} half taps one.
 --
--- CR 118.7b-c cannot reach this group, so none of it is hostage to #309: the {2}
--- half is generic mana and the {B} half finds a black symbol waiting for it, so
--- neither half is ever the excess that pawl drops and the rule would spill.
+-- CR 118.7b-c cannot reach this group: the {2} half is generic mana and the {B}
+-- half finds a black symbol waiting for it, so neither half is ever the excess
+-- that rule spills onto the generic component.
 monocoloredHybridDiscountSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 monocoloredHybridDiscountSpec s registry =
   Spec.describe s "SyntheticMonocoloredHybridDiscount" $ do
@@ -1594,13 +1669,14 @@ monocoloredHybridDiscountSpec s registry =
 -- Aimed at Withered Wretch's {B}{B}, which prints one of the two colours and not
 -- the other, and NO GENERIC COMPONENT. Both of those are deliberate. Printing
 -- one colour is what lets the count tell the two answers apart -- a cost
--- printing both would take one mana either way. Printing no generic component is
--- what keeps the white-half case out of #309's way: CR 118.7b would turn a
--- stranded {W} into one generic mana and CR 118.7a says generic reductions reach
--- only the generic component, so pawl DROPPING it and the rule SPILLING it give
--- the same two Swamps here. Aim the same reduction at a cost with a generic
--- component and the two readings part company, which is the trap this group is
--- shaped to avoid.
+-- printing both would take one mana either way. Printing no generic component
+-- isolates CR 118.7e's choice from CR 118.7b's spill: a stranded {W} becomes one
+-- GENERIC mana, and this cost has none for CR 118.7a to take it off, so the
+-- white half leaves {B}{B} alone whichever way the spill is read.
+--
+-- The SPILL itself is the last case below, on Khabál Ghoul's {2}{B} instead --
+-- the same reduction and the same white half, aimed at a cost that does have a
+-- generic component for CR 118.7b to reach.
 hybridDiscountSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 hybridDiscountSpec s registry =
   Spec.describe s "SyntheticHybridDiscount" $ do
@@ -1641,6 +1717,35 @@ hybridDiscountSpec s registry =
       let (wretchId, _, gs) = hybridDiscountBoard swamp discount wretch solRing 0 2
           paid = S.runPure (takesHalf black) gs (S.cast S.alice wretchId)
       Spec.assertEqWith s "two Swamps tapped" (S.tappedCount S.alice paid) 2
+
+    -- CR 118.7b AT THE BOARD, and the file's proof of the spill. Khabál Ghoul
+    -- ({2}{B} Creature -- Zombie, "At the beginning of each end step, put a
+    -- +1/+1 counter on this creature for each creature that died this turn." --
+    -- checked against Scryfall, 2026-08-20) is black, so the same artifact
+    -- discounts it, and its {2} is the generic component Withered Wretch above
+    -- deliberately lacks. Taking the WHITE half leaves a reduction of one white
+    -- mana against a cost requiring none, which CR 118.7b turns into one generic
+    -- mana: {2}{B} becomes {1}{B} and two Swamps pay it. Dropping the stranded
+    -- half instead leaves {2}{B} and taps all three.
+    Spec.it s "CR 118.7b a stranded {W} half comes off the generic component" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      discount <- S.printingOf s registry "Synthetic Hybrid Discount"
+      ghoul <- S.printingOf s registry "Khabál Ghoul"
+      solRing <- S.printingOf s registry "Sol Ring"
+      let (ghoulId, _, gs) = hybridDiscountBoard swamp discount ghoul solRing 1 3
+          paid = S.runPure (takesHalf white) gs (S.cast S.alice ghoulId)
+      Spec.assertEqWith s "two Swamps tapped, not three" (S.tappedCount S.alice paid) 2
+
+    -- The control that case needs, the two boards differing only in whether the
+    -- reducer is out: the full {2}{B} taps all three Swamps.
+    Spec.it s "without the reducer the same Ghoul is full price" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      discount <- S.printingOf s registry "Synthetic Hybrid Discount"
+      ghoul <- S.printingOf s registry "Khabál Ghoul"
+      solRing <- S.printingOf s registry "Sol Ring"
+      let (ghoulId, _, gs) = hybridDiscountBoard swamp discount ghoul solRing 0 3
+          paid = S.runPure (takesHalf white) gs (S.cast S.alice ghoulId)
+      Spec.assertEqWith s "three Swamps tapped" (S.tappedCount S.alice paid) 3
 
 -- Aims the text changer's one target slot at `oid` -- the SpellsAndPermanents
 -- pool's recipient shape, which both changers below print -- and answers whichever
@@ -1709,8 +1814,9 @@ textChangedEdgewalkerBoard s registry changerName swap = do
 --
 -- Cleric -> Zombie rather than Cleric -> Wizard, which is the same swap with a
 -- word the discount cannot be seen through: Edgewalker reduces by {W}{B}, and
--- pawl drops a stranded coloured reduction rather than spilling it onto the
--- generic component (#309), so only a white or black spell shows the difference
+-- its own sentence confines that to the coloured mana paid (CR 101.1), so a
+-- stranded half never reaches the generic component and only a white or black
+-- spell shows the difference
 -- at all. Every Wizard in the pool is mono-blue; Whipstitched Zombie ({1}{B}
 -- Creature -- Zombie 2/2, "At the beginning of your upkeep, sacrifice this
 -- creature unless you pay {B}." -- checked against Scryfall, 2026-08-05) is the

@@ -31,6 +31,7 @@
           "effect": {
             "type": "ReduceSpellCost",
             "value": {
+              "coloredOnly": true,
               "reduction": [
                 {
                   "type": "OfType",

@@ -44,6 +44,7 @@ import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Activations as Activations
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
+import qualified Pawl.Types.AppliedReduction as AppliedReduction
 import qualified Pawl.Types.CandidateCost as CandidateCost
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -277,7 +278,11 @@ spellAdjustments pid oid gs =
       withSelf =
         adjustments
           { CostAdjustments.reductions =
-              CostAdjustments.reductions adjustments <> fmap (\amount -> (amount, 0)) (selfReductions pid oid gs)
+              -- Floored at zero and never confined to coloured mana: Thrasta's
+              -- sentence states neither restriction, so CR 601.2f's own {0} and
+              -- CR 118.7b-d's spill both stand.
+              CostAdjustments.reductions adjustments
+                <> fmap (\amount -> AppliedReduction.MkAppliedReduction amount 0 False) (selfReductions pid oid gs)
           }
       commanderTax = Commander.tax pid oid gs
    in if commanderTax == 0
@@ -331,7 +336,10 @@ adjustmentResolutions adjustments =
         Nothing -> [symbol]
         Just [] -> [symbol]
         Just halves -> halves
-      resolveAll (ManaCost.MkManaCost symbols, floor_) = fmap (\xs -> (ManaCost.MkManaCost xs, floor_)) (traverse resolveOne symbols)
+      resolveAll reduction =
+        fmap
+          (\xs -> reduction {AppliedReduction.amount = ManaCost.MkManaCost xs})
+          (traverse resolveOne (ManaCost.unwrap (AppliedReduction.amount reduction)))
    in fmap
         (\reductions -> adjustments {CostAdjustments.reductions = reductions})
         (traverse resolveAll (CostAdjustments.reductions adjustments))
@@ -346,22 +354,32 @@ adjustmentResolutions adjustments =
 -- outcome, and offering both would be a prompt with nothing to ask.
 --
 -- ONE entry, with no permutation enumerated at all, wherever every reduction states
--- the SAME floor: with one floor F a step is `\g -> if g >= F then max (g - a) F
--- else g`, and two of those commute -- max (max (g - b) F - a) F = max (g - a - b) F,
--- symmetric in a and b -- so the fold is order-free. That is every SPELL cost, since
--- Pawl.Types.PlayerEffect.ReduceSpellCost states no floor at all, and every
--- activation cost whose reducers agree on one.
+-- the SAME RESTRICTIONS -- the same floor and the same answer to CR 101.1's
+-- coloured-mana confinement. With one floor F a step is `\g -> if g >= F then
+-- max (g - a) F else g`, and two of those commute -- max (max (g - b) F - a) F =
+-- max (g - a - b) F, symmetric in a and b -- so the fold is order-free, and a
+-- uniform confinement leaves each reducing symbol taking one mana by the same
+-- rule wherever it sits in the order.
+--
+-- MIXED confinements genuinely do not commute, which is why the prune reads both
+-- fields: against {1}{W}, Edgewalker's confined {W} applied first takes the white
+-- symbol and leaves {1}, whereupon an unconfined {W} finds no white and CR 118.7b
+-- spills it onto the {1}, for {0} -- run the other way the unconfined one takes
+-- the white symbol and Edgewalker's half strands with nothing to do and nothing
+-- to spill onto, for {1}. CR 601.2f makes that difference the payer's to choose,
+-- so pruning it away would be the engine choosing.
 --
 -- The search branches over DISTINCT remaining reductions, so two copies of one
--- reducer cost nothing, and the equal-floor prune ends every tail; what is left to
--- enumerate is the interleaving of reductions whose floors genuinely differ.
+-- reducer cost nothing, and the uniform-restriction prune ends every tail; what is
+-- left to enumerate is the interleaving of reductions that genuinely differ.
 reductionOrders :: CostAdjustments.CostAdjustments -> ManaCost.ManaCost -> NonEmpty.NonEmpty (CostAdjustments.CostAdjustments, ManaCost.ManaCost)
 reductionOrders adjustments manaCost =
-  let sameFloor rs = case fmap snd rs of
+  let restrictionsOf r = (AppliedReduction.atLeast r, AppliedReduction.coloredOnly r)
+      uniform rs = case fmap restrictionsOf rs of
         [] -> True
-        floor_ : floors -> all (== floor_) floors
+        restrictions : rest -> all (== restrictions) rest
       orders rs =
-        if sameFloor rs
+        if uniform rs
           then [rs]
           else concatMap (\r -> fmap (r :) (orders (List.delete r rs))) (List.nub rs)
       withTotal order =
@@ -687,7 +705,10 @@ announceReductions pid oid gs cost adjustments =
           -- FILTERED, NOT TRUSTED, the Mana.announce posture: an answer that is
           -- not one of the offered halves falls back to the first.
           pure (if elem answer halves then answer else first)
-      chooseAll (ManaCost.MkManaCost symbols, floor_) = fmap (\xs -> (ManaCost.MkManaCost xs, floor_)) (traverse chooseOne symbols)
+      chooseAll reduction =
+        fmap
+          (\xs -> reduction {AppliedReduction.amount = ManaCost.MkManaCost xs})
+          (traverse chooseOne (ManaCost.unwrap (AppliedReduction.amount reduction)))
    in do
         halved <-
           fmap
@@ -2043,10 +2064,12 @@ payComponent pid oid component = case component of
 --    symbol on the typed side, and CR 118.7g sends a SNOW symbol the other way,
 --    where CR 107.4h keeps an {S} in a COST out of the generic component -- so
 --    each question below is asked by two functions, one per SIDE.
--- 3. An EXCESS typed symbol is DROPPED, not spilled onto the generic component:
---    card text CR 101.1 lets override the rules, Edgewalker's reminder text
---    making a {1}{W} Cleric spell cost {1}. Not implemented: CR 118.7b-d's
---    spill, which has no printed producer (#309).
+-- 3. An EXCESS typed symbol -- one the cost has no matching symbol for -- comes
+--    off the GENERIC component instead, one generic mana per symbol (CR
+--    118.7b-d). A reduction whose own text confines it to the coloured mana paid
+--    DROPS the excess rather than spilling it, which is card text CR 101.1 lets
+--    override the rules: Edgewalker's reminder text makes a {1}{W} Cleric spell
+--    cost {1}, not {0}.
 -- 4. CR 601.2f's floor at {0} needs no special case: the empty list IS {0}.
 -- 5. A REDUCING EFFECT'S OWN FLOOR is applied as that reduction lands, never as
 --    a clamp on the pooled result -- Heartstone's sentence says THIS EFFECT (CR
@@ -2095,7 +2118,9 @@ applyAdjustments adjustments cost =
       reducingGenericOf symbol = case symbol of
         -- CR 118.7a's amount of generic mana, which is what this side is.
         ManaSymbol.Generic n -> n
-        -- The typed side reads an OfType; CR 118.7b-d's spill is #309, above.
+        -- The typed side reads an OfType, and CR 118.7b-d spill what it strands
+        -- back here -- point 3 above, counted after the cancellation and not by
+        -- this function, which cannot see the cost.
         ManaSymbol.OfType _ -> 0
         -- CR 107.4e's colour/colour hybrid has no generic half at all, and a
         -- symbol still spelled {2/R} is one CR 118.7e's choice has not been made
@@ -2171,30 +2196,37 @@ applyAdjustments adjustments cost =
       raise (ManaCost.MkManaCost symbols) =
         canonical (sum (fmap costGenericOf symbols) + sum increases) (filter isTyped symbols)
       -- ONE reduction, with the floor its own effect states.
-      reduce (ManaCost.MkManaCost symbols) (ManaCost.MkManaCost reducingSymbols, floor_) =
-        let generic = sum (fmap costGenericOf symbols)
+      reduce (ManaCost.MkManaCost symbols) reduction =
+        let reducingSymbols = ManaCost.unwrap (AppliedReduction.amount reduction)
+            floor_ = AppliedReduction.atLeast reduction
+            generic = sum (fmap costGenericOf symbols)
             typed = filter isTyped symbols
-            taken = sum (fmap reducingGenericOf reducingSymbols)
+            (survivors, unspent) = cancel (Maybe.mapMaybe reducingManaTypeOf reducingSymbols) typed
+            -- Point 3: the typed reduction the cost had nothing to give to comes
+            -- off the GENERIC component instead, one generic mana per stranded
+            -- symbol (CR 118.7b-d), unless this effect's own text confines it to
+            -- the coloured mana paid (Edgewalker, CR 101.1).
+            spilled = if AppliedReduction.coloredOnly reduction then 0 else Natural.length unspent
+            taken = sum (fmap reducingGenericOf reducingSymbols) + spilled
             -- Natural subtraction is PARTIAL, so CR 601.2f's floor is also what
             -- keeps this total.
             lowered = if generic >= taken then generic - taken else 0
             -- Point 5 above. Every typed symbol is at least one mana (CR
             -- 107.4e/107.4f/107.4h), so the mana left in the cost is `lowered`
             -- plus how many survivors there are.
-            survivors = cancel (Maybe.mapMaybe reducingManaTypeOf reducingSymbols) typed
             typedCount = Natural.length survivors
             required = min floor_ (generic + Natural.length typed)
             floored = if lowered + typedCount >= required then lowered else required - typedCount
          in canonical floored survivors
       -- Each reducing symbol cancels ONE matching symbol in the cost, walking the
       -- printed order so the survivors keep it. `unspent` is the bag of reducing
-      -- types that have not found a match yet, and whatever is left when the walk
-      -- ends is point 3's dropped excess (#309).
+      -- types that have not found a match yet; the survivors come back beside
+      -- whatever is left of it when the walk ends, which is point 3's excess.
       cancel unspent remaining = case remaining of
-        [] -> []
+        [] -> ([], unspent)
         symbol : rest -> case costManaTypeOf symbol of
           Just manaType | elem manaType unspent -> cancel (List.delete manaType unspent) rest
-          _ -> symbol : cancel unspent rest
+          _ -> let (survivors, left) = cancel unspent rest in (symbol : survivors, left)
    in List.foldl' reduce (raise cost) reductions
 
 -- CR 107.14: how many energy counters this player has, which is CR 118.3's

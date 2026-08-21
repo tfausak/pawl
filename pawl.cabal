@@ -923,6 +923,7 @@ library types
     Pawl.Types.Aggregation
     Pawl.Types.AlternativeCost
     Pawl.Types.Amass
+    Pawl.Types.AppliedReduction
     Pawl.Types.ArmDelayedTrigger
     Pawl.Types.AsCopy
     Pawl.Types.Asked
