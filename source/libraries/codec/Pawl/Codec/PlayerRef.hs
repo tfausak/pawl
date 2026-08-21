@@ -1,5 +1,6 @@
 module Pawl.Codec.PlayerRef where
 
+import qualified Pawl.Codec.AttackingPlayers as AttackingPlayers
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.PlayerRelation as PlayerRelation
 import qualified Pawl.Codec.SlotName as SlotName
@@ -28,5 +29,8 @@ codec =
       Arm.nullary "Candidate" PlayerRef.Candidate,
       -- CR 608.2h's reference, which a card writes: Spikeshell Harrier names the
       -- controller of the permanent its trigger targeted.
-      Arm.payload "ControllerOfBound" SlotName.codec PlayerRef.ControllerOfBound (\x -> case x of PlayerRef.ControllerOfBound y -> Just y; _ -> Nothing)
+      Arm.payload "ControllerOfBound" SlotName.codec PlayerRef.ControllerOfBound (\x -> case x of PlayerRef.ControllerOfBound y -> Just y; _ -> Nothing),
+      -- CR 508.6's set, which a card writes: Curse of Vitality names "each
+      -- opponent attacking that player".
+      Arm.payload "Attacking" AttackingPlayers.codec PlayerRef.Attacking (\x -> case x of PlayerRef.Attacking y -> Just y; _ -> Nothing)
     ]

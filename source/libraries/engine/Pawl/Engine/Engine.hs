@@ -643,6 +643,7 @@ abilityTriggeredOf event = case event of
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
   GameEvent.Exerted _ -> Nothing
+  GameEvent.BecameAttacked _ -> Nothing
 
 -- CR 603.3b's record of one ability triggering: its source (CR 113.7), its
 -- controller as it triggered (CR 603.3a) and its trigger condition. Nothing for a

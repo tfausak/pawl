@@ -388,6 +388,10 @@ playersFor context gs ref =
         -- position that holds no view at all -- a Scope naming it, or a ManaCount
         -- -- and those go unanswered (#1441).
         PlayerRef.ControllerOfBound _ -> Nothing
+        -- CR 508.6's set, unanswerable here for ControllerOfBound's reason: the
+        -- rule asks who CONTROLS a creature that is attacking, and layer 2 decides
+        -- that off a view this function is handed none of (#1441).
+        PlayerRef.Attacking _ -> Nothing
 
 -- CR 608.2h: the view of a past event, built from the snapshot the event
 -- recorded rather than from any object that may no longer exist.
@@ -500,6 +504,7 @@ snapshotView gs shape event = case event of
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
   GameEvent.Exerted _ -> Nothing
+  GameEvent.BecameAttacked _ -> Nothing
 
 -- The Filter.View a recorded snapshot yields, shared by every arm of
 -- snapshotView above so that two shapes of event cannot disagree about what a

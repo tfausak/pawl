@@ -156,10 +156,10 @@ attackableBattles defender gs =
 -- attacking a planeswalker that is gone" from "was never attacking anything"
 -- (Thrasta, Tempest's Roar).
 --
--- Not implemented: a trigger reading WHICH PERMANENT was attacked, CR 508.3b's
--- planeswalker and battle forms, GameEvent.AttackerDeclared carrying no target
--- (#538). WHOM it attacked is answerable -- the event carries CR 508.5's
--- defending player.
+-- Not implemented: CR 508.3b's planeswalker and battle subjects. The event that
+-- would carry them is there -- GameEvent.BecameAttacked names the permanent --
+-- and no trigger condition asks; Pawl.Types.TriggerCondition's
+-- AttachedPlayerIsAttacked records the sweep behind that (#538).
 stillAttacked :: ObjectId -> GameState -> Bool
 stillAttacked oid gs = case Combat.defender (GameState.combat gs) of
   -- No defending player is no attack (see Pawl.Types.Combat's defender field).
@@ -1179,13 +1179,28 @@ declareAttackers pid = do
               -- fallback: every target here came from attackTargets, and each of
               -- the three arms answers a player for one of those.
               --
-              -- Not implemented: CR 508.3a's attacks-a-permanent form, CR 508.3b
-              -- and CR 508.3e, the event naming no target (#538).
+              -- Not implemented: CR 508.3a's attacks-a-permanent form and CR
+              -- 508.3e, neither of which the two events below can be matched on --
+              -- the first needs the target beside the ATTACKER's identity, the
+              -- second the attacking player beside the target (#538).
               State.modify'
                 ( \g ->
                     let defendingFor oid = Maybe.fromMaybe defender ((\t -> Defender.playerOf t g) =<< Map.lookup oid recorded)
                         declared = Natural.length attacking
                      in List.foldl' (\h oid -> Event.recordEvent (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid (defendingFor oid) declared)) h) g attacking
+                )
+              -- CR 508.3b's arity, which is the declaration's rather than the
+              -- creature's: one event per DISTINCT target, so a player five
+              -- creatures were sent at was attacked once. A Set is what makes that
+              -- structural, and it orders the batch deterministically besides.
+              --
+              -- After the per-creature batch above, since CR 508.2b puts every
+              -- trigger from this declaration on the stack together and the order
+              -- they triggered in does not matter.
+              State.modify'
+                ( \g ->
+                    let attacked = Set.fromList (Maybe.mapMaybe (\oid -> Map.lookup oid recorded) attacking)
+                     in List.foldl' (\h t -> Event.recordEvent (GameEvent.BecameAttacked t) h) g (Set.toList attacked)
                 )
 
 -- CR 508.4: a creature put onto the battlefield attacking has its controller
@@ -1193,8 +1208,10 @@ declareAttackers pid = do
 -- an effect's EntryRiders say is attacking.
 --
 -- The creature was never DECLARED, and this function's whole difference from
--- declareAttackers follows: no GameEvent.AttackerDeclared, so CR 508.3a's
--- exclusion holds by construction; no tapping, CR 508.1f tapping what is declared;
+-- declareAttackers follows: neither GameEvent.AttackerDeclared nor
+-- GameEvent.BecameAttacked, so CR 508.3a's exclusion and rule 508.3b's last
+-- sentence both hold by construction; no tapping, CR 508.1f tapping what is
+-- declared;
 -- and none of canAttack's questions, per CR 508.4c.
 --
 -- The guards are the ways the rules say the creature enters WITHOUT being an

@@ -34,6 +34,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecameAttached as BecameAttached
@@ -1571,6 +1572,11 @@ representativeEvents cond =
         -- an arm that bound that player instead would disagree with
         -- eventBindingSlots here.
         TriggerCondition.CreatureAttacksYou -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol 1))
+        -- The GROUPED declaration event instead, which is CR 508.3b's arity: one
+        -- per target the declaration named. carol again, and it is the PLAYER this
+        -- one binds -- the arm above binds the attacker off its own event, and the
+        -- pin is what keeps the two from drifting together.
+        TriggerCondition.AttachedPlayerIsAttacked -> one (GameEvent.BecameAttacked (AttackTarget.OfPlayer S.carol))
         -- The same declaration event once more. Rule 702.105a binds NOTHING off
         -- it, SelfAttacksWithAnother's case: the player it compares is read from
         -- Combat.attackers and then never named again.
@@ -1800,6 +1806,7 @@ everyTriggerCondition =
     TriggerCondition.SelfAttacksWithAnother (Filter.Type.And []),
     TriggerCondition.CreatureAttacksAlone (Filter.Type.And []),
     TriggerCondition.CreatureAttacksYou,
+    TriggerCondition.AttachedPlayerIsAttacked,
     TriggerCondition.SelfAttacksPlayerWithMostLife,
     TriggerCondition.SelfBlocks,
     TriggerCondition.SelfBlocksAtLeast 2,

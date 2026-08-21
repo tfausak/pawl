@@ -490,6 +490,12 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
       PlayerRef.Relative _ -> Count.playersFor context gs ref
       PlayerRef.InSlot _ -> Count.playersFor context gs ref
       PlayerRef.Specific _ -> Count.playersFor context gs ref
+      -- CR 508.6's set, left with Count.playersFor's Nothing even though the view
+      -- IS here: this reference names a set of players and every quantity that
+      -- reads one reads exactly one player (see the LifeTotal arm), so answering
+      -- it would need a fold this position does not supply. Its reader is
+      -- Pawl.Engine.Resolve.playerRefPlayers, which folds (#1441).
+      PlayerRef.Attacking _ -> Count.playersFor context gs ref
 
 -- Is this declared attack an attack on one of that player's OPPONENTS? CR 506.3
 -- gives three things a creature can attack and rule 702.121a counts only the
@@ -732,6 +738,8 @@ playerRefIsSlotless ref = case ref of
   -- Resolve.slotsOf is the half that reports -- and cannot see one buried in a
   -- quantity (#1079).
   PlayerRef.ControllerOfBound _ -> False
+  -- InSlot's answer again: the player attacked is named by a slot.
+  PlayerRef.Attacking _ -> False
 
 -- CR 611.2b: replace every PlayerRef.InSlot this quantity names with the baked
 -- PlayerRef.Specific arm, off the players the resolution's bindings name. What
@@ -795,6 +803,7 @@ forCandidate pid = mapPlayerRefs substitute (\c -> c {Count.Type.scope = mapScop
       PlayerRef.InSlot _ -> ref
       PlayerRef.Specific _ -> ref
       PlayerRef.ControllerOfBound _ -> ref
+      PlayerRef.Attacking _ -> ref
 
 -- Every PlayerRef this quantity names, rewritten -- the traversal bakeBound and
 -- forCandidate share, so the arm list is written once and a new arm carrying a
@@ -870,6 +879,10 @@ bakePlayerRef players ref = case ref of
   -- goes unanswered and ends, which is Pawl.Engine.Condition.holds' stated
   -- collapse; no card in the pool stores one (#1441).
   PlayerRef.ControllerOfBound _ -> ref
+  -- LEFT STANDING for ControllerOfBound's reason, plus one of its own: the slot
+  -- this names holds a PLAYER, but what the reference reads is the live combat
+  -- record, which no baking can fix in place.
+  PlayerRef.Attacking _ -> ref
 
 -- A scope's reference, rewritten. Both scopes that name players take one; CR
 -- 608.2i's look-back names none. Shared by bakeBound and forCandidate for

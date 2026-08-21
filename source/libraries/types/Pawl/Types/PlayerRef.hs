@@ -1,5 +1,6 @@
 module Pawl.Types.PlayerRef where
 
+import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.SlotName as SlotName
@@ -113,4 +114,21 @@ data PlayerRef
     -- so a Scope or a ManaCount naming this reference reads Nothing and its count
     -- is unanswered (#1441).
     ControllerOfBound SlotName.SlotName
+  | -- | CR 508.6: the players attacking the player a slot names, narrowed by
+    -- relation -- Curse of Vitality's "each opponent attacking that player".
+    --
+    -- A SET, like EachPlayer and Relative Opponent and unlike the two slot-reading
+    -- arms above, which name one seat each. The card text is a plural and the rule
+    -- it quotes is a predicate over the table, so the arm folds the roster rather
+    -- than indirecting through one player.
+    --
+    -- Not derivable from Relative plus a filter: pawl has no predicate over
+    -- players outside this type, and the fact being asked -- who controls a
+    -- creature attacking a given player -- is about the combat record rather than
+    -- about a characteristic.
+    --
+    -- Unanswerable where no projection is in hand: Pawl.Engine.Count.playersFor
+    -- reads no controller, so a Scope or a ManaCount naming this reference is
+    -- unanswered, which is ControllerOfBound's posture and for its reason (#1441).
+    Attacking AttackingPlayers.AttackingPlayers
   deriving (Eq, Ord, Show)

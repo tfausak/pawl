@@ -9,7 +9,9 @@ module Pawl.EventTriggerSpec where
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -33,9 +35,11 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.ControlChanged as ControlChanged
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -2760,6 +2764,130 @@ masterOfLaketownDeathSpec s registry =
 -- attackers never taps it); and bob's Piker is tapped and not her, so only its
 -- controller does. The Piker attacking beside her satisfies all three -- CR
 -- 508.1f taps a declared attacker -- and is the only legal target.
+-- CR 508.3b: the first trigger in the pool whose arity is the DECLARATION's
+-- rather than the attacking creature's.
+--
+-- Curse of Vitality {2}{W} Enchantment -- Aura Curse is the card: "enchant
+-- player / Whenever enchanted player is attacked, you gain 2 life. Each opponent
+-- attacking that player does the same." Rule 508.3b's "one or more creatures are
+-- declared as attackers attacking that player" is the whole trigger, so TWO
+-- attackers sent at one player is the case that separates it from CR 508.3a's
+-- per-creature form (Marchesa's Decree, Pawl.KeywordTriggerSpec): the Curse pays
+-- 2 life, never 4.
+--
+-- THREE SEATS, and load-bearing twice over. The enchanted player is bob, the
+-- Curse is CAROL's, and alice attacks -- so "you" (carol), the attacked player
+-- (bob) and the attacking player (alice) are three different seats, and the
+-- second sentence's "each opponent attacking that player" has somebody to name
+-- who is neither. At two seats every one of those collapses.
+--
+-- bob's Jace is what makes the OfPlayer test observable: CR 508.1b lists player
+-- and planeswalker separately, so the same two attackers sent at a planeswalker
+-- bob controls leave the Curse silent even though CR 508.5 still makes bob the
+-- defending player -- which is the leg a condition reading the defending player
+-- (CreatureAttacksYou's field) would get wrong.
+curseOfVitalitySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+curseOfVitalitySpec s registry =
+  let board = do
+        curse <- S.printingOf s registry "Curse of Vitality"
+        piker <- S.printingOf s registry "Goblin Piker"
+        jace <- S.printingOf s registry "Jace Beleren"
+        case S.threePlayerCombat [piker, piker] [jace] [curse] of
+          (gs0, ours, [walker], [aura]) ->
+            -- Loyalty so CR 704.5i does not bury the Jace before CR 508.1b can
+            -- offer it, and the Curse attached to BOB, which is what makes the
+            -- ability's subject a seat its controller does not hold.
+            pure (Just (ours, walker, S.attachTo aura (Recipient.ToPlayer S.bob) (S.addCounter CounterKind.Loyalty 3 walker gs0)))
+          _ -> pure Nothing
+      -- Attacks with everything, aims every attacker at `target`, and makes
+      -- `who` CR 507.1's defending player. The target is FILTERED out of the
+      -- offered set rather than built, so a leg whose announcement CR 508.1b
+      -- never offered falls back visibly and the record assertions catch it.
+      aimedAt :: AttackTarget.AttackTarget -> PlayerId.PlayerId -> Prompt.Prompt r -> r
+      aimedAt target who p = case p of
+        Prompt.ChooseAttackTarget _ _ _ options -> Maybe.fromMaybe (NonEmpty.head options) (List.find (== target) (NonEmpty.toList options))
+        _ -> S.attackTo who p
+      -- The same three seats with the attacking player and the Curse's controller
+      -- COLLAPSED onto carol, whose turn it now is. Everything else is the board
+      -- above: two Pikers, the Curse on bob.
+      ownTurnBoard = do
+        curse <- S.printingOf s registry "Curse of Vitality"
+        piker <- S.printingOf s registry "Goblin Piker"
+        case S.threePlayerCombat [] [] [piker, piker, curse] of
+          (gs0, [], [], [_, _, aura]) ->
+            pure (Just (S.attachTo aura (Recipient.ToPlayer S.bob) gs0 {GameState.activePlayer = S.carol}, aura))
+          _ -> pure Nothing
+      -- The same board with the declaration itself declined: the leg that parts
+      -- "the enchanted player was attacked" from "the step began".
+      standingStill :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+      standingStill who p = case p of
+        Prompt.DeclareAttackers {} -> []
+        _ -> aimedAt (AttackTarget.OfPlayer who) who p
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+      lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
+      sentAt gs = Map.elems (Combat.Type.attackers (GameState.combat gs))
+   in Spec.describe s "Curse of Vitality" $ do
+        -- The proving test. Both of alice's Pikers attack bob, and the Curse pays
+        -- ONCE: carol 2 for "you gain 2 life", alice 2 for "each opponent
+        -- attacking that player", bob nothing. A per-attacker arity would make
+        -- those 24s.
+        Spec.it s "CR 508.3b whole card: two creatures attacking the enchanted player pay the Curse once" $ do
+          built <- board
+          case built of
+            Just (_, _, gs) -> do
+              let after = atBlockers (aimedAt (AttackTarget.OfPlayer S.bob) S.bob) gs
+              Spec.assertEqWith s "carol gained 2 once and alice, attacking bob, gained 2 with her" (lives after) (Just 22, Just 20, Just 22)
+              Spec.assertEqWith s "CR 508.1b both Pikers really were declared attacking bob" (sentAt after) [AttackTarget.OfPlayer S.bob, AttackTarget.OfPlayer S.bob]
+            Nothing -> Spec.assertFailure s "fixture should give alice two Pikers, bob a Jace and carol the Curse"
+        -- The same two attackers sent at a planeswalker the enchanted player
+        -- controls. CR 508.5 still makes bob the defending player, so this is the
+        -- falsifier for a condition reading that field instead of CR 508.1b's
+        -- announcement.
+        Spec.it s "CR 508.3b a creature attacking the enchanted player's planeswalker does not attack the player" $ do
+          built <- board
+          case built of
+            Just (_, walker, gs) -> do
+              let after = atBlockers (aimedAt (AttackTarget.OfPlaneswalker walker) S.bob) gs
+              Spec.assertEqWith s "nobody gained life" (lives after) (Just 20, Just 20, Just 20)
+              Spec.assertEqWith s "CR 508.1b and the Jace really is what was attacked" (sentAt after) [AttackTarget.OfPlaneswalker walker, AttackTarget.OfPlaneswalker walker]
+            Nothing -> Spec.assertFailure s "fixture should give alice two Pikers, bob a Jace and carol the Curse"
+        -- The same declaration aimed at the OTHER opponent, whom the Curse does
+        -- not enchant: the falsifier for a condition that fired on any
+        -- declaration.
+        Spec.it s "CR 508.3b a declaration attacking the other player leaves the Curse silent" $ do
+          built <- board
+          case built of
+            Just (_, _, gs) -> do
+              let after = atBlockers (aimedAt (AttackTarget.OfPlayer S.carol) S.carol) gs
+              Spec.assertEqWith s "nobody gained life" (lives after) (Just 20, Just 20, Just 20)
+              Spec.assertEqWith s "CR 508.1b and carol really was the one attacked" (sentAt after) [AttackTarget.OfPlayer S.carol, AttackTarget.OfPlayer S.carol]
+            Nothing -> Spec.assertFailure s "fixture should give alice two Pikers, bob a Jace and carol the Curse"
+        -- The Curse's own controller doing the attacking, which is the only board
+        -- on which "each OPPONENT attacking that player" is observable: carol
+        -- attacks bob with her own creatures, so the one player attacking the
+        -- enchanted player is not an opponent of the Curse's controller and the
+        -- second sentence names nobody. carol gains 2 for the first sentence and
+        -- no more. Reachable because CR 508.1 lets only the active player declare,
+        -- so this needs carol's turn rather than a second attacker.
+        Spec.it s "CR 508.6 the Curse's own controller attacking pays only the first sentence" $ do
+          built <- ownTurnBoard
+          case built of
+            Just (gs, _) -> do
+              let after = atBlockers (aimedAt (AttackTarget.OfPlayer S.bob) S.bob) gs
+              Spec.assertEqWith s "carol gained 2 and nobody gained for the second sentence" (lives after) (Just 20, Just 20, Just 22)
+              Spec.assertEqWith s "CR 508.1b and both of carol's creatures really attacked bob" (sentAt after) [AttackTarget.OfPlayer S.bob, AttackTarget.OfPlayer S.bob]
+            Nothing -> Spec.assertFailure s "fixture should give carol two Pikers and the Curse"
+        -- No declaration at all, on the same board and against the same defending
+        -- player: the falsifier for a condition that fired on the STEP.
+        Spec.it s "CR 508.3b a declare attackers step with no attackers pays nothing" $ do
+          built <- board
+          case built of
+            Just (_, _, gs) -> do
+              let after = atBlockers (standingStill S.bob) gs
+              Spec.assertEqWith s "nobody gained life" (lives after) (Just 20, Just 20, Just 20)
+              Spec.assertEqWith s "and nothing was declared" (sentAt after) []
+            Nothing -> Spec.assertFailure s "fixture should give alice two Pikers, bob a Jace and carol the Curse"
+
 anafenzaAttackSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 anafenzaAttackSpec s registry =
   let countersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
@@ -3946,6 +4074,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   masterOfLaketownSpec s registry
   masterOfLaketownDeathSpec s registry
   anafenzaAttackSpec s registry
+  curseOfVitalitySpec s registry
   ezuriExperienceSpec s registry
   youngPyromancerSpec s registry
   whisperingWizardSpec s registry

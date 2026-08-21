@@ -106,8 +106,13 @@ you = SlotName.MkSlotName (Text.pack "you")
 -- this slot sits under a condition that binds it is enforced by
 -- Pawl.Engine.Event.eventBindingSlots: only the combat-damage-to-a-player, the
 -- CR 701.9a discard, the CR 119.3 life-loss, the CR 119.9 life-GAIN, the CR
--- 601.2i cast, the CR 508.3a attack and the CR 725.1 crowning conditions stamp
--- it, so reading it under any other is a failing test.
+-- 601.2i cast, the CR 508.3a attack, the CR 508.3b attack and the CR 725.1
+-- crowning conditions stamp it, so reading it under any other is a failing test.
+--
+-- The two attack conditions name DIFFERENT players under the one slot, and the
+-- slot is the printed PHRASE rather than the fact: CR 508.3a's is the defending
+-- player CR 508.5 resolves, and rule 508.3b's is the player attacked, which CR
+-- 508.1b announced. Each is what "that player" means on the card that reads it.
 triggerPlayer :: SlotName
 triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 
