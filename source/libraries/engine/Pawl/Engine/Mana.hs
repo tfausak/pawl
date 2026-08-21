@@ -149,7 +149,11 @@ producedTypes oid gs production = case production of
 --
 -- The nesting is the whole point. The OUTER list is the options -- which ability
 -- of this permanent, and which of its modes -- and each carries the COST CR
--- 602.2b makes that option's activation pay. The INNER list is that one
+-- 602.2b makes that option's activation pay, together with the ability's printed
+-- "activate only ..." rider (CR 602.5): CR 605.3b gives a mana ability no stack
+-- window to be gated in, so the rider has to travel with the route to the
+-- Capacity, which is where both of CR 605.3a's windows ask. CR 305.6's intrinsic
+-- ability is printed on no card and so carries none. The INNER list is that one
 -- activation's YIELD, its AddMana effects in printed order (CR 608.2c). Sol
 -- Ring's "{T}: Add {C}{C}" is one option adding two mana; an Urborg'd Mountain
 -- is two options of one mana each.

@@ -1105,7 +1105,7 @@ towerBoard tower victim =
 -- is the one printing whose mana ability carries a rider this vocabulary can say
 -- ("Activate only as a sorcery"), and its activation cost holds MANA, which the
 -- supply model does not model (#1120), plus a "return this to its owner's hand"
--- component the cost vocabulary lacks (#2005). Lavinia, Foil to Conspiracy and
+-- component the cost vocabulary lacks (#2004). Lavinia, Foil to Conspiracy and
 -- Vivi Ornitier name a turn with no phase (#520); every other hit rides on
 -- "only once each turn" or "only if <condition>", neither of which
 -- Pawl.Types.ActivationRestriction can say. Grinning Ignus replaces this card

@@ -72,7 +72,8 @@ import qualified Pawl.Types.Zone as Zone
 -- The window the CARD TYPE gets, which is not always the window the card gets:
 -- CR 702.8a's flash lifts a card out of it (instantSpeed below).
 --
--- Shared with the CR 307.5 window an ability can carry (Activate.restrictionsOk) --
+-- Shared with the CR 307.5 window an ability can carry
+-- (ActivationRestriction.restrictionsOk) --
 -- see Turn.sorcerySpeedWindow for why there is one copy.
 sorcerySpeed :: PlayerId -> GameState -> Bool
 sorcerySpeed = Turn.sorcerySpeedWindow
@@ -730,9 +731,10 @@ restrictionMet pid gs restriction = case restriction of
   -- attacker's turn), while Necrologia's "your end step" is alice's and not
   -- bob's. For a spell "you" is the would-be caster, which is `pid`.
   --
-  -- The same two conjuncts Pawl.Engine.Activate.restrictionMet reads off the
-  -- same Pawl.Types.DuringPhase bundle; deliberately duplicated rather than
-  -- shared, since the two gates differ in what else they may read (CR 307.5).
+  -- The same two conjuncts Pawl.Engine.ActivationRestriction.restrictionMet
+  -- reads off the same Pawl.Types.DuringPhase bundle; deliberately duplicated
+  -- rather than shared, since the two gates differ in what else they may read
+  -- (CR 307.5).
   CastingRestriction.DuringPhase (DuringPhase.MkDuringPhase window scope) ->
     Turn.inWindow window (GameState.phase gs)
       && Event.turnScopeAdmits scope (GameState.activePlayer gs) pid
@@ -743,8 +745,8 @@ restrictionMet pid gs restriction = case restriction of
   -- CR 506.7b, read off the combat record rather than off GameState.phase:
   -- Turn.afterBlockersDeclared says why the record answers CR 506.7c and CR
   -- 506.7f as well. Curtain of Light is the card; Trap Runner prints the same
-  -- clause on an activation, where CR 506.7g sends Pawl.Engine.Activate to this
-  -- same reader.
+  -- clause on an activation, where CR 506.7g sends
+  -- Pawl.Engine.ActivationRestriction to this same reader.
   CastingRestriction.AfterBlockersDeclared -> Turn.afterBlockersDeclared gs
 
 -- CR 709.3a / 715.3a: the half being cast, RECORDED ON THE OBJECT, so that every

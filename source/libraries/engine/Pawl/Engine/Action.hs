@@ -291,8 +291,10 @@ legalActions pid gs =
       -- controlled, and offering some route Cost.manaActivations admits
       -- -- CR 118.3's payability of the ability's own cost (CR 602.2b), which
       -- carries CR 107.5's tapped permanent and CR 302.6's sick creature with
-      -- it. ONE sweep for the whole enumeration rather than one per permanent,
-      -- on the board this function already walked.
+      -- it, plus CR 602.5's printed "activate only ..." rider, which CR 605.1
+      -- leaves on an ability a timing restriction cannot disqualify. ONE sweep
+      -- for the whole enumeration rather than one per permanent, on the board
+      -- this function already walked.
       --
       -- That gate is also what keeps the offer from being one a player could
       -- take forever: taking it spends what the cost charged, and the gate

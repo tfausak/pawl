@@ -210,7 +210,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
     Spec.assertBool s (not (any isActivate (Action.legalActions S.alice gs))) "no equip with a spell on the stack"
 
   -- CR 702.8a's window is the SPELL's, not an ability's. Rule 307.5's window is
-  -- shared between Pawl.Engine.Cast.sorcerySpeed and Activate.restrictionsOk, so
+  -- shared between Pawl.Engine.Cast.sorcerySpeed and
+  -- ActivationRestriction.restrictionsOk, so
   -- the way to lift it for a flash spell and not for an activated ability is to
   -- lift it in Cast's disjunction and leave Turn.sorcerySpeedWindow alone; this
   -- is the case that says the shared window really did stay put.

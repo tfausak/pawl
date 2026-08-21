@@ -252,9 +252,9 @@ activatorOfGiven grants oid gs = case Game.lookupObject oid gs of
 -- ability of that permanent this turn.
 --
 -- Vacuously true for every ability that is not a loyalty ability, which is what
--- makes this a conjunct rather than an arm of ActivationRestriction.restrictionsOk:
--- CR 606.3 is a rule
--- about what a COST contains (CR 606.2), not a clause a card prints, so it is
+-- makes this a conjunct rather than an arm of
+-- ActivationRestriction.restrictionsOk: CR 606.3 is a rule about what a COST
+-- contains (CR 606.2), not a clause a card prints, so it is
 -- derived through Pawl.Engine.Cost.isLoyaltyCost and never read off
 -- Pawl.Types.ActivationRestriction, whose arms are all printed text.
 --
@@ -402,8 +402,8 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
     -- CR 701.35a's third clause. UNLIKE split second one line up, this reaches a
     -- mana ability too -- rule 701.35a says "its activated abilities" with no
     -- carve-out where CR 702.61b writes one -- so Cost.manaActivations carries the
-    -- same conjunct for CR 605.3a's windows, exactly as sickness below is asked in
-    -- both places.
+    -- same conjunct for CR 605.3a's windows, exactly as sickness below and the
+    -- printed rider two lines down are asked in both places.
     && not (Detain.detained srcId gs)
     && sicknessOkGiven pcs pid srcId ability gs
     && ActivationRestriction.restrictionsOk pid (ActivatedAbility.restrictions ability) gs

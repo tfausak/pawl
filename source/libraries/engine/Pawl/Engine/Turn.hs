@@ -60,9 +60,9 @@ grantsPriority phase = case phase of
 -- the same conjuncts and a drifting second copy is what the CR-citation
 -- discipline exists to prevent: CR 307.1 gates casting a sorcery
 -- (Cast.castableSpells), CR 307.5 gates "Activate only as a sorcery"
--- (Activate.restrictionsOk), and CR 305.1 / 116.2a / 505.6b gate playing a land
--- (Action.legalActions). Every one of them names the same moment: a main phase
--- of the player's own turn with the stack empty.
+-- (ActivationRestriction.restrictionsOk), and CR 305.1 / 116.2a / 505.6b gate
+-- playing a land (Action.legalActions). Every one of them names the same
+-- moment: a main phase of the player's own turn with the stack empty.
 --
 -- The land caller asks it as one DISJUNCT rather than as the whole window: CR
 -- 702.8a's "you may play this card any time you could cast an instant" reaches a
@@ -282,7 +282,7 @@ attackedThisStep pid gs =
 --
 -- No conjunct about the current phase, which is CR 511.3 rather than an omission:
 -- Pawl.Engine.Combat.declareBlockers is the only writer and its clearCombat the
--- only clearer. A combat phase whose end of combat STEP alone is skipped never reaches
--- clearCombat (see Pawl.Engine.Engine.skipWholePhase).
+-- only clearer. A combat phase whose end of combat STEP alone is skipped never
+-- reaches clearCombat (see Pawl.Engine.Engine.skipWholePhase).
 afterBlockersDeclared :: GameState -> Bool
 afterBlockersDeclared = Combat.blockersDeclared . GameState.combat
