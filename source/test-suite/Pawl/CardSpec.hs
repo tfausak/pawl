@@ -76,6 +76,7 @@ import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackCostScope as AttackCostScope
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
+import qualified Pawl.Types.BlockCost as BlockCost
 import qualified Pawl.Types.BlockPermission as BlockPermission
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
@@ -163,7 +164,7 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PayGate as PayGate
-import qualified Pawl.Types.PerAttacker as PerAttacker
+import qualified Pawl.Types.PerCreature as PerCreature
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
@@ -277,6 +278,7 @@ vanillaFace name typeLine =
       Face.sacrificeRestrictions = [],
       Face.untapRestrictions = [],
       Face.attackCosts = [],
+      Face.blockCosts = [],
       Face.mulliganActions = [],
       Face.openingHandActions = [],
       Face.specialActions = [],
@@ -947,10 +949,10 @@ blockPermissionCounts permission =
 
 -- CR 508.1h's per-attacker share. Only the Counted arm holds anything: the Fixed
 -- arm is mana symbols.
-perAttackerCounts :: PerAttacker.PerAttacker -> [Count.Type.Count Quantity.Type.Quantity]
-perAttackerCounts perAttacker = case perAttacker of
-  PerAttacker.Fixed _ -> []
-  PerAttacker.Counted quantity -> quantityCounts quantity
+perCreatureCounts :: PerCreature.PerCreature -> [Count.Type.Count Quantity.Type.Quantity]
+perCreatureCounts perAttacker = case perAttacker of
+  PerCreature.Fixed _ -> []
+  PerCreature.Counted quantity -> quantityCounts quantity
 
 -- Every effect a card AUTHORS: the ones its carriers hold, plus everything
 -- nested inside one of those effects' own payloads, transitively. The nested
@@ -1158,7 +1160,9 @@ cardCounts card =
     -- CR 508.1h's counted share (Sphere of Safety's "the number of enchantments
     -- you control"), the one Count a cost to attack can hold: its subject is an
     -- Affected, which holds a Filter but no Count.
-    <> concatMap (perAttackerCounts . AttackCost.perAttacker) (Face.attackCosts card)
+    <> concatMap (perCreatureCounts . AttackCost.perAttacker) (Face.attackCosts card)
+    -- CR 509.1d's counted share, the same Count in the blocking carrier.
+    <> concatMap (perCreatureCounts . BlockCost.perBlocker) (Face.blockCosts card)
 
 -- CR 400.1: "each player has their own library, hand, and graveyard. The
 -- other zones are shared by all players." Battlefield/Stack/Exile/Command are
@@ -2635,10 +2639,10 @@ affectedFilters affected = case affected of
 -- CR 508.1h's per-attacker share. The Counted arm reaches a Filter through its
 -- Quantity -- Sphere of Safety counts "enchantments you control" -- where the
 -- Fixed arm is mana symbols and nothing else.
-perAttackerFilters :: PerAttacker.PerAttacker -> [Filter.Type.Filter Keyword.Keyword]
-perAttackerFilters perAttacker = case perAttacker of
-  PerAttacker.Fixed _ -> []
-  PerAttacker.Counted quantity -> quantityFilters quantity
+perCreatureFilters :: PerCreature.PerCreature -> [Filter.Type.Filter Keyword.Keyword]
+perCreatureFilters perAttacker = case perAttacker of
+  PerCreature.Fixed _ -> []
+  PerCreature.Counted quantity -> quantityFilters quantity
 
 objectRefFilters :: ObjectRef.ObjectRef -> [Filter.Type.Filter Keyword.Keyword]
 objectRefFilters ref = case ref of
@@ -3550,8 +3554,9 @@ activatedAbilityFilters ability =
 --   * `combatRestrictions` (CR 508.1c / 509.1b), `sacrificeRestrictions` (CR
 --     701.21a / 101.2), `untapRestrictions` (CR 502.3 / 101.2),
 --     `attackRequirements` (CR 508.1d), `blockRequirements`
---     (CR 509.1c) and `attackCosts` (CR 508.1h) -- six more affected sets, plus
---     a cost to attack's Counted share, which is a Quantity.
+--     (CR 509.1c), `attackCosts` (CR 508.1h) and `blockCosts` (CR 509.1d) --
+--     seven more affected sets, plus each combat cost's Counted share, which is a
+--     Quantity.
 --   * `spell`, `activatedAbilities`, `triggeredAbilities`, `delayedAbilities` --
 --     every mode's target slots and effects, plus an activation cost, a
 --     trigger's own condition and its intervening clause.
@@ -3593,7 +3598,9 @@ cardFilters card =
         <> concatMap blockPermissionFilters (Face.blockPermissions card)
         <> concatMap (affectedFilters . AttackRequirement.subject) (Face.attackRequirements card)
         <> concatMap (affectedFilters . AttackCost.subject) (Face.attackCosts card)
-        <> concatMap (perAttackerFilters . AttackCost.perAttacker) (Face.attackCosts card)
+        <> concatMap (perCreatureFilters . AttackCost.perAttacker) (Face.attackCosts card)
+        <> concatMap (affectedFilters . BlockCost.subject) (Face.blockCosts card)
+        <> concatMap (perCreatureFilters . BlockCost.perBlocker) (Face.blockCosts card)
         <> concatMap combatRestrictionFilters (Face.combatRestrictions card)
         <> concatMap (affectedFilters . SacrificeRestriction.affected) (Face.sacrificeRestrictions card)
         <> concatMap (affectedFilters . UntapRestriction.affected) (Face.untapRestrictions card)
@@ -5996,14 +6003,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               base {Face.combatRestrictions = [CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless (Affected.Matching buried) Nothing)]}
             ),
             ( "CR 508.1h's cost to attack",
-              base {Face.attackCosts = [AttackCost.MkAttackCost (Affected.Matching buried) (PerAttacker.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 2])) AttackCostScope.Controller]}
+              base {Face.attackCosts = [AttackCost.MkAttackCost (Affected.Matching buried) (PerCreature.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 2])) AttackCostScope.Controller]}
             ),
             ( "CR 508.1h's counted share",
               base
                 { Face.attackCosts =
                     [ AttackCost.MkAttackCost
                         (Affected.Matching (Filter.Type.HasCardType CardType.Creature))
-                        ( PerAttacker.Counted
+                        ( PerCreature.Counted
                             ( Quantity.Type.Count
                                 (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) buried Aggregation.Members)
                             )

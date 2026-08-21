@@ -20,6 +20,7 @@ import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackCostScope as AttackCostScope
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
+import qualified Pawl.Types.BlockCost as BlockCost
 import qualified Pawl.Types.BlockPermission as BlockPermission
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.Card as Card
@@ -47,7 +48,7 @@ import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
-import qualified Pawl.Types.PerAttacker as PerAttacker
+import qualified Pawl.Types.PerCreature as PerCreature
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
@@ -137,6 +138,7 @@ baseFace =
       Face.sacrificeRestrictions = [],
       Face.untapRestrictions = [],
       Face.attackCosts = [],
+      Face.blockCosts = [],
       Face.additionalCosts = [],
       Face.maximumX = Nothing,
       Face.alternativeCosts = [],
@@ -186,6 +188,7 @@ minimalFace =
       Face.sacrificeRestrictions = [],
       Face.untapRestrictions = [],
       Face.attackCosts = [],
+      Face.blockCosts = [],
       Face.mulliganActions = [],
       Face.openingHandActions = [],
       Face.specialActions = []
@@ -234,7 +237,8 @@ populatedFace =
       Face.combatRestrictions = [CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless Affected.Attached Nothing)],
       Face.sacrificeRestrictions = [SacrificeRestriction.MkSacrificeRestriction Affected.Attached],
       Face.untapRestrictions = [UntapRestriction.MkUntapRestriction Affected.Attached],
-      Face.attackCosts = [AttackCost.MkAttackCost Affected.Attached (PerAttacker.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 2])) AttackCostScope.Controller],
+      Face.attackCosts = [AttackCost.MkAttackCost Affected.Attached (PerCreature.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 2])) AttackCostScope.Controller],
+      Face.blockCosts = [BlockCost.MkBlockCost Affected.Attached (PerCreature.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 3]))],
       Face.additionalCosts = [CostComponent.TapThis],
       Face.maximumX = Just Quantity.ManaValue,
       Face.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing (Cost.MkCost (Just (ManaCost.MkManaCost [])) [])],
@@ -271,6 +275,7 @@ populatedFaceJson =
     <> "\"sacrificeRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}],"
     <> "\"untapRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}],"
     <> "\"attackCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perAttacker\":{\"type\":\"Fixed\",\"value\":[{\"type\":\"Generic\",\"value\":2}]},\"scope\":{\"type\":\"Controller\"}}],"
+    <> "\"blockCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perBlocker\":{\"type\":\"Fixed\",\"value\":[{\"type\":\"Generic\",\"value\":3}]}}],"
     <> "\"additionalCosts\":[{\"type\":\"TapThis\"}],"
     <> "\"maximumX\":{\"type\":\"ManaValue\"},"
     <> "\"alternativeCosts\":[{\"cost\":{\"mana\":[]}}],"
@@ -336,6 +341,9 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
     Spec.it s "attackCosts (CR 508.1c/508.1h) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.attackCosts <$> decodeFace v) (Right [])
+    Spec.it s "blockCosts (CR 509.1b/509.1d) defaults to the empty list" $ do
+      v <- Common.assertJson s baseFaceJson
+      Spec.assertEq s (Face.blockCosts <$> decodeFace v) (Right [])
     Spec.it s "additionalCosts (CR 118.8) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.additionalCosts <$> decodeFace v) (Right [])
@@ -454,8 +462,15 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         s
         encodeFace
         decodeFace
-        baseFace {Face.attackCosts = [AttackCost.MkAttackCost Affected.Attached (PerAttacker.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 2])) AttackCostScope.Controller]}
+        baseFace {Face.attackCosts = [AttackCost.MkAttackCost Affected.Attached (PerCreature.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 2])) AttackCostScope.Controller]}
         (init baseFaceJson <> ",\"attackCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perAttacker\":{\"type\":\"Fixed\",\"value\":[{\"type\":\"Generic\",\"value\":2}]},\"scope\":{\"type\":\"Controller\"}}]}")
+    Spec.it s "blockCosts" $
+      Common.assertJsonCodec
+        s
+        encodeFace
+        decodeFace
+        baseFace {Face.blockCosts = [BlockCost.MkBlockCost Affected.Attached (PerCreature.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 3]))]}
+        (init baseFaceJson <> ",\"blockCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perBlocker\":{\"type\":\"Fixed\",\"value\":[{\"type\":\"Generic\",\"value\":3}]}}]}")
     Spec.it s "additionalCosts" $
       Common.assertJsonCodec
         s

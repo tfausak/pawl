@@ -7,8 +7,9 @@
 -- assignment across planeswalkers and shared blockers, removal from combat (CR
 -- 506.4), and the continuous effects that change control, type or text mid-combat.
 -- The declaration and evasion half is Pawl.CombatSpec, which describes under the
--- same name. Also Pawl.Engine.AttackCost, whose only consumer is
--- Pawl.Engine.Combat's CR 508.1d cost clause and CR 508.1h total.
+-- same name. Also Pawl.Engine.AttackCost and Pawl.Engine.BlockCost, whose only
+-- consumer is Pawl.Engine.Combat's CR 508.1d / CR 509.1c cost clause and CR
+-- 508.1h / CR 509.1d total.
 module Pawl.CombatEffectSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -2887,6 +2888,188 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
     Spec.assertEqWith s "nothing attacked" (S.attackerDeclarationsOf taxedRun) []
     Spec.assertBool s (allUntapped forests taxedRun) "and no mana was spent"
 
+  Spec.it s "CR 508.1c an Oppressive Rays taxes the attack whoever it is aimed at" $ do
+    -- The third scope arm (Pawl.Types.AttackCostScope). Oppressive Rays enchants
+    -- the ATTACKING creature rather than protecting a player, so its {3} is owed
+    -- on an attack against bob and on an attack against bob's Jace Beleren alike
+    -- -- where Ghostly Prison's own ruling exempts the second, which is the pair
+    -- of lines above.
+    --
+    -- The Aura goes under BOB, whose creature it is not on: the taxed player is
+    -- the attacker's controller under this arm, never the source's.
+    rays <- S.printingOf s registry "Oppressive Rays"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    jace <- S.printingOf s registry "Jace Beleren"
+    let (gs, mine, jaceId) = jaceBoard jace [piker]
+    case mine of
+      [attacker] -> do
+        let (aura, withAura) = S.addCreature rays S.bob gs
+            (forests, board) = addForests forest 3 (S.attach aura attacker withAura)
+            atJace = S.runPure attackThePlaneswalker board (Combat.declareAttackers S.alice)
+            atBob = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
+        Spec.assertEqWith
+          s
+          "attacking Jace: the record names the planeswalker"
+          (Map.elems (Combat.Type.attackers (GameState.combat atJace)))
+          [AttackTarget.OfPlaneswalker jaceId]
+        Spec.assertBool s (allTapped forests atJace) "attacking Jace: the {3} was paid all the same"
+        Spec.assertEqWith s "attacking bob: the Piker was declared" (S.attackerDeclarationsOf atBob) mine
+        Spec.assertBool s (allTapped forests atBob) "attacking bob: the {3} was paid"
+      _ -> Spec.assertFailure s "fixture should have one attacker"
+
+-- `n` untapped Forests under `who`'s control, ids first. addForests with the
+-- payer as an argument: CR 509.1f's payer is the DEFENDING player, where CR
+-- 508.1j's is the active one, so a cost to block is paid out of bob's lands.
+addForestsFor :: PlayerId.PlayerId -> Printing.Printing -> Int -> GameState.GameState -> ([ObjectId.ObjectId], GameState.GameState)
+addForestsFor who forest n gs =
+  let add (ids, g) _ = let (oid, g1) = S.addCreature forest who g in (ids <> [oid], g1)
+   in List.foldl' add ([], gs) [1 .. n]
+
+-- An Oppressive Rays under ALICE's control attached to `victim`, which is bob's
+-- creature. The Aura's controller is deliberately not the payer: CR 509.1a makes
+-- every chosen blocker one the defending player controls, so "its controller
+-- pays" resolves to bob however the Aura got there.
+raying :: Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+raying rays victim gs =
+  let (aura, withAura) = S.addCreature rays S.alice gs
+   in S.attach aura victim withAura
+
+-- Who is blocking `attacker`, as CR 509.1g's record states it.
+blockersOf :: ObjectId.ObjectId -> GameState.GameState -> Set.Set ObjectId.ObjectId
+blockersOf attacker gs = Map.findWithDefault Set.empty attacker (Combat.Type.blockers (GameState.combat gs))
+
+-- CR 509.1c's cost clause and CR 509.1d-509.1f, proved by Oppressive Rays
+-- ("Enchanted creature can't attack or block unless its controller pays {3}") --
+-- the pool's first cost to block, and the first board on which a legal
+-- declaration can leave the defending player unable to comply with CR 509.1.
+--
+-- attackCostSpec's twin, and every case here reads the toll the same way: a
+-- Forest makes one mana, so "how many Forests were tapped" is the total cost read
+-- off the board.
+--
+-- Not implemented: Oppressive Rays' third line, "activated abilities of enchanted
+-- creature cost {3} more to activate", which the card's JSON omits -- nothing
+-- raises an activation cost (#1242). pawl's Oppressive Rays is WEAKER than
+-- printed there, and weaker against the Aura's own controller, which is why the
+-- card is still the right producer for the two combat lines.
+blockCostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+blockCostSpec s registry = Spec.describe s "BlockCosts" $ do
+  Spec.it s "CR 509.1d/509.1f blocking under an Oppressive Rays costs {3}, and the mana is paid" $ do
+    rays <- S.printingOf s registry "Oppressive Rays"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker] [piker]
+    case (mine, theirs) of
+      ([attacker], [blocker]) -> do
+        let (forests, board) = addForestsFor S.bob forest 3 (raying rays blocker gs)
+            after = S.runPure S.aggressiveAnswer board Combat.declareBlockers
+        Spec.assertEqWith s "the block really was declared" (blockersOf attacker after) (Set.singleton blocker)
+        Spec.assertBool s (allTapped forests after) "CR 509.1f: all three Forests paid for it"
+      _ -> Spec.assertFailure s "fixture should have one attacker and one blocker"
+  Spec.it s "CR 509.1 the same board WITHOUT the Aura pays nothing" $ do
+    -- The control for the case above, and the reason it is not vacuous: blocking
+    -- is free by default, so the Aura is what tapped the Forests.
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker] [piker]
+    case (mine, theirs) of
+      ([attacker], [blocker]) -> do
+        let (forests, board) = addForestsFor S.bob forest 3 gs
+            after = S.runPure S.aggressiveAnswer board Combat.declareBlockers
+        Spec.assertEqWith s "the same block was declared" (blockersOf attacker after) (Set.singleton blocker)
+        Spec.assertBool s (allUntapped forests after) "and no Forest was tapped"
+      _ -> Spec.assertFailure s "fixture should have one attacker and one blocker"
+  Spec.it s "CR 509.1f partial payments are not allowed: two Forests do not buy the block" $ do
+    -- The same board one Forest short. CR 509.1's preamble -- "the declaration is
+    -- illegal; the game returns to the moment before the declaration" -- so the
+    -- creature does not block at all, and the two Forests that could have paid
+    -- part of the toll are untapped.
+    rays <- S.printingOf s registry "Oppressive Rays"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker] [piker]
+    case (mine, theirs) of
+      ([attacker], [blocker]) -> do
+        let (forests, board) = addForestsFor S.bob forest 2 (raying rays blocker gs)
+            after = S.runPure S.aggressiveAnswer board Combat.declareBlockers
+        Spec.assertEqWith s "nothing is blocking the attacker" (blockersOf attacker after) Set.empty
+        Spec.assertBool s (allUntapped forests after) "and the Forests are untapped"
+      _ -> Spec.assertFailure s "fixture should have one attacker and one blocker"
+  Spec.it s "CR 509.1d the total is per CREATURE, not per pair: a Palace Guard blocking two owes {3} once" $ do
+    -- CR 509.1d totals the cost over the CHOSEN CREATURES, and Palace Guard blocks
+    -- any number of attackers -- so one taxed creature blocking two attackers owes
+    -- its share once. Three Forests are exactly {3}: an engine that charged per
+    -- PAIR would owe {6}, fail CR 509.1f and block nothing, which is what the
+    -- first assertion reads.
+    rays <- S.printingOf s registry "Oppressive Rays"
+    forest <- S.printingOf s registry "Forest"
+    palaceGuard <- S.printingOf s registry "Palace Guard"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker, piker] [palaceGuard]
+    case (mine, theirs) of
+      ([first, second], [guard]) -> do
+        let (forests, board) = addForestsFor S.bob forest 3 (raying rays guard gs)
+            blockBoth :: Prompt.Prompt r -> r
+            blockBoth p = case p of
+              Prompt.DeclareBlockers _ _ blockers attackers -> Map.fromList (fmap (\b -> (b, Set.fromList attackers)) blockers)
+              _ -> S.aggressiveAnswer p
+            after = S.runPure blockBoth board Combat.declareBlockers
+        Spec.assertEqWith
+          s
+          "the Guard is blocking both attackers"
+          (blockersOf first after, blockersOf second after)
+          (Set.singleton guard, Set.singleton guard)
+        Spec.assertBool s (allTapped forests after) "and the {3} was paid once"
+      _ -> Spec.assertFailure s "fixture should have two attackers and a Palace Guard"
+  Spec.it s "CR 509.1c a Prized Unicorn does not force a block an Oppressive Rays taxes" $ do
+    -- THE COST CLAUSE: "if a creature can't block unless a player pays a cost,
+    -- that player is not required to pay that cost, even if blocking with that
+    -- creature would increase the number of requirements being obeyed."
+    --
+    -- Both worlds on one line each. Without the Aura the Unicorn makes declining
+    -- illegal (that is BlockRequirements' own case); with it, declining is legal
+    -- again, and the requirement has not gone anywhere -- blocking with the taxed
+    -- creature is still a legal declaration, it is just no longer a forced one.
+    rays <- S.printingOf s registry "Oppressive Rays"
+    prizedUnicorn <- S.printingOf s registry "Prized Unicorn"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [prizedUnicorn] [piker]
+    case (mine, theirs) of
+      ([unicorn], [blocker]) -> do
+        let taxed = raying rays blocker gs
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty gs)) "without the Aura, declining is illegal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty taxed) "CR 509.1c: with the Aura, declining is legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton unicorn)) taxed) "and blocking anyway is still legal"
+      _ -> Spec.assertFailure s "fixture should have a Unicorn and a blocker"
+  Spec.it s "CR 509.1c whole cards: the Unicorn forces the block, and the Aura unforces it" $ do
+    -- The gameplay-level case, run through Engine.runStep -- the priority loop and
+    -- the CR 703.4j turn-based action, not a direct call -- with an interpreter
+    -- that declines to block. bob has the mana to pay twice over, so the Forests
+    -- are the discriminator rather than the affordability: WITH the Aura the
+    -- engine must not reach for them.
+    rays <- S.printingOf s registry "Oppressive Rays"
+    prizedUnicorn <- S.printingOf s registry "Prized Unicorn"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = S.combatBoardOf [prizedUnicorn] [piker]
+    case (mine, theirs) of
+      ([unicorn], [blocker]) -> do
+        let (forests, forced) = addForestsFor S.bob forest 6 gs
+            taxed = raying rays blocker forced
+            declining :: Prompt.Prompt r -> r
+            declining p = case p of
+              Prompt.DeclareBlockers {} -> Map.empty
+              _ -> S.aggressiveAnswer p
+            forcedRun = S.runCombat declining forced
+            taxedRun = S.runCombat declining taxed
+        Spec.assertEqWith s "without the Aura the Unicorn is blocked and bob takes nothing" (S.lifeOf S.bob forcedRun) (Just 20)
+        Spec.assertBool s (allUntapped forests forcedRun) "and the forced block cost nothing"
+        Spec.assertEqWith s "CR 509.1c: with the Aura, declining stands and bob takes two" (S.lifeOf S.bob taxedRun) (Just 18)
+        Spec.assertEqWith s "nothing blocked" (blockersOf unicorn taxedRun) Set.empty
+        Spec.assertBool s (allUntapped forests taxedRun) "and no mana was spent"
+      _ -> Spec.assertFailure s "fixture should have a Unicorn and a blocker"
+
 -- CR 305.7 as the FIVE readers in this module read it, which is one shared gate:
 -- Pawl.Engine.Projection.liveAfterLayers. Ashaya, Soul of the Wild makes its
 -- controller's nontoken creatures Forest LANDS at layer 4, and Blood Moon then
@@ -2910,6 +3093,10 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
 -- ONE CASE PER READER, named in the case's own comment, because each reader keeps
 -- its own copy of the `null setEffs || ...` guard: one case for the gate would
 -- leave a change to any single copy regressing silently.
+--
+-- Pawl.Engine.BlockCost is the reader with no case, and its own comment says why:
+-- discriminating it wants a cost to block printed on a nontoken creature, since
+-- Ashaya animates creatures and Oppressive Rays is an Aura (#1999).
 -- Pawl.Engine.PlayerEffect's share is pinned in Pawl.PlayerEffectSpec and
 -- Pawl.Engine.SacrificeRestriction's in Pawl.SacrificeRestrictionSpec.
 --
@@ -3391,4 +3578,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   sharedBlockerSpec s registry
   lastKnownDefendingPlayerSpec s registry
   attackCostSpec s registry
+  blockCostSpec s registry
   exertSpec s registry

@@ -14,6 +14,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.AttackCost as AttackCost
 import qualified Pawl.Engine.AttackRequirement as AttackRequirement
 import qualified Pawl.Engine.Battle as Battle
+import qualified Pawl.Engine.BlockCost as BlockCost
 import qualified Pawl.Engine.BlockPermission as BlockPermission
 import qualified Pawl.Engine.BlockRequirement as BlockRequirement
 import qualified Pawl.Engine.CombatRestriction as CombatRestriction
@@ -731,6 +732,13 @@ choicesUpTo n attackers =
 -- The fold's Map.empty seed is always legal under restrictions alone, which is
 -- what makes the answer total. blockCeilingGiven is the half legalBlockDeclaration
 -- reaches, so the two share one grant walk and one whole-board projection.
+--
+-- The enumeration ranges over the creatures that block FREELY, which is CR
+-- 509.1c's cost clause: a player is never required to pay to block, so `best` is
+-- drawn from the untaxed creatures while `requirements` stays every instance in
+-- force. attackCeilingGiven's twin, and the placement is the whole of the rule --
+-- a taxed creature is still a CANDIDATE and still a legal blocker, it is only
+-- never one the defending player must reach for.
 blockCeiling :: PlayerId -> GameState -> (Map (ObjectId, ObjectId) Natural, Map ObjectId (Set ObjectId))
 blockCeiling pid gs = blockCeilingGiven (Projection.controlGrants gs) (Projection.projectAll gs) pid gs
 
@@ -745,11 +753,15 @@ blockCeilingGiven grants pcs pid gs =
       limit = CombatRestriction.blockLimit gs
       arity = blockArityGiven candidates gs
       requirements = BlockRequirement.instances able candidates attackers gs
+      -- CR 509.1c's cost clause is a filter on the CREATURE, never on its
+      -- requirements: a creature is excused wholly or not at all, and what it
+      -- would have blocked never enters the question.
+      freely blocker = BlockCost.blocksFreely blocker gs
       better best declaration =
         if requirementsMet requirements declaration > requirementsMet requirements best
           then declaration
           else best
-      legal = filter (\declaration -> blockDeclarationAllowed limit arity pcs able declaration gs) (candidateBlockDeclarations arity able candidates attackers)
+      legal = filter (\declaration -> blockDeclarationAllowed limit arity pcs able declaration gs) (candidateBlockDeclarations arity able (filter freely candidates) attackers)
    in ( requirements,
         if Map.null requirements
           then Map.empty
@@ -761,8 +773,9 @@ blockCeilingGiven grants pcs pid gs =
 -- 509.1c's requirements -- a MAXIMIZATION rather than a check, which is what makes
 -- declaring no blockers at all illegal while a Lure is on the battlefield.
 --
--- CR 509.1c's cost clause and CR 509.1d's cost locking are not implemented: no
--- card in the pool makes blocking cost anything (#343).
+-- CR 509.1c's cost clause rides the ceiling rather than this function: a
+-- declaration that costs mana is legal, it is only never the one the maximization
+-- demands. CR 509.1d-509.1f's determination and payment are declareBlockers'.
 legalBlockDeclaration :: PlayerId -> Map ObjectId (Set ObjectId) -> GameState -> Bool
 legalBlockDeclaration pid declaration gs =
   let grants = Projection.controlGrants gs
@@ -1227,18 +1240,55 @@ declareBlockers = do
         -- no requirement is in force. Replay.defaultAnswer's "no blocks" for this
         -- prompt routes through here too, so the two cannot disagree.
         gs1 <- State.get
-        let declaration = if legalBlockDeclaration pid chosen gs1 then chosen else forcedBlockDeclaration pid gs1
+        let legal = if legalBlockDeclaration pid chosen gs1 then chosen else forcedBlockDeclaration pid gs1
+        -- CR 509.1d: the total cost to block is determined once and then LOCKED IN
+        -- -- this `let`. Asking BlockCost.totalCost a second time is what the rule
+        -- forbids, which is why that function leaves locking to its caller.
+        let owed = BlockCost.totalCost legal gs1
+        -- CR 509.1e's mana-ability window and CR 509.1f's all-costs-or-nothing
+        -- payment are both Cost.payMana, which restores the entry state rather
+        -- than spending half of it. Skipped outright at {0}, which is every board
+        -- with no cost to block on it.
+        --
+        -- NO "will you pay?" prompt, declareAttackers' reading of the same pair of
+        -- sentences: CR 509.1f is unconditional once the creatures are chosen, and
+        -- CR 509.1c's excuse from paying is exercised one step earlier, at the
+        -- Prompt.DeclareBlockers above, by NOT DECLARING the creature.
+        --
+        -- BEFORE the record is written, which is the rules' own order and the
+        -- reverse of declareAttackers': CR 508.1f taps the chosen creatures before
+        -- their cost is determined, while CR 509.1g makes the chosen creatures
+        -- blocking only after CR 509.1f's payment.
+        paid <-
+          if null (ManaCost.unwrap owed)
+            then pure True
+            -- Not a cast (`casting` is Nothing), so CR 106.6-restricted mana
+            -- cannot pay a cost to block. Exact: every restriction in the
+            -- vocabulary reads "only to cast".
+            else Cost.payMana Nothing ManaSpending.AsProduced pid owed
+        -- CR 509.1's preamble: a declaration the defending player cannot pay for
+        -- is illegal and the game returns to the moment before it. Nothing needs
+        -- undoing -- the record is written below, and Cost.payMana spends nothing
+        -- on failure -- so what is left is which declaration stands instead.
+        --
+        -- Not implemented: the fresh declaration the rules then expect, since a
+        -- pure `Prompt r -> r` returns the identical answer. forcedBlockDeclaration
+        -- stands in, as it does for an illegal declaration above, and it is free by
+        -- construction: blockCeiling draws it from the creatures that block freely
+        -- (#600).
+        gs2 <- State.get
+        let declaration = if paid then legal else forcedBlockDeclaration pid gs2
         -- The pairs the declaration states, blocker-major, which is the order
         -- CR 509.1a writes it in and the order the events below are recorded in.
         let pairs = [(blocker, attacker) | (blocker, attackers) <- Map.toList declaration, attacker <- Set.toList attackers]
         Monad.unless (null pairs) $ do
           let add m (b, a) = Map.insertWith Set.union a (Set.singleton b) m
-              merged = List.foldl' add (Combat.blockers (GameState.combat gs1)) pairs
+              merged = List.foldl' add (Combat.blockers (GameState.combat gs2)) pairs
               -- CR 506.4's comparand for the blockers, alongside the attackers'.
               -- `pid` for the same reason it is there: every blocker here is one
               -- legalBlockers offered, which is controllerOf == Just pid (CR
               -- 509.1a). Unioned, the attackers' entries being already in this map.
-              joined = Map.union (Map.fromList (fmap (\(b, _) -> (b, pid)) pairs)) (Combat.joinedUnder (GameState.combat gs1))
+              joined = Map.union (Map.fromList (fmap (\(b, _) -> (b, pid)) pairs)) (Combat.joinedUnder (GameState.combat gs2))
           State.modify' $ \g -> g {GameState.combat = (GameState.combat g) {Combat.blockers = merged, Combat.joinedUnder = joined}}
           -- CR 509.1i: the declaration is a trigger event, and CR 509.2a puts what
           -- it fires onto the stack before the active player gets priority.
@@ -1269,7 +1319,7 @@ declareBlockers = do
           --
           -- The defending player rides the event as it rides AttackerDeclared (CR
           -- 702.130a's afflict is the reader), with `pid` as the fallback.
-          let wasBlocked = Map.keysSet (Combat.blockers (GameState.combat gs1))
+          let wasBlocked = Map.keysSet (Combat.blockers (GameState.combat gs2))
               becameBlocked = Set.difference (Set.fromList (fmap snd pairs)) wasBlocked
           State.modify'
             ( \g ->

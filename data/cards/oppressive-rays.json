@@ -1,0 +1,72 @@
+{
+  "faces": [
+    {
+      "attackCosts": [
+        {
+          "perAttacker": {
+            "type": "Fixed",
+            "value": [
+              {
+                "type": "Generic",
+                "value": 3
+              }
+            ]
+          },
+          "scope": {
+            "type": "EveryAttack"
+          },
+          "subject": {
+            "type": "Attached"
+          }
+        }
+      ],
+      "blockCosts": [
+        {
+          "perBlocker": {
+            "type": "Fixed",
+            "value": [
+              {
+                "type": "Generic",
+                "value": 3
+              }
+            ]
+          },
+          "subject": {
+            "type": "Attached"
+          }
+        }
+      ],
+      "enchant": [
+        {
+          "pool": {
+            "type": "Creatures"
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Oppressive Rays",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Aura"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}

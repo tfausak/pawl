@@ -114,6 +114,7 @@ armyToken subtype =
               Face.sacrificeRestrictions = [],
               Face.untapRestrictions = [],
               Face.attackCosts = [],
+              Face.blockCosts = [],
               Face.mulliganActions = [],
               Face.openingHandActions = [],
               Face.specialActions = []

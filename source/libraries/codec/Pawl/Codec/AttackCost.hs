@@ -4,7 +4,7 @@ module Pawl.Codec.AttackCost where
 
 import qualified Pawl.Codec.Affected as Affected
 import qualified Pawl.Codec.AttackCostScope as AttackCostScope
-import qualified Pawl.Codec.PerAttacker as PerAttacker
+import qualified Pawl.Codec.PerCreature as PerCreature
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.AttackCost as AttackCost
@@ -23,7 +23,7 @@ import qualified Pawl.Types.AttackCost as AttackCost
 codec :: Codec.Codec AttackCost.AttackCost
 codec = Fields.object $ do
   subject <- Fields.required "subject" Affected.codec AttackCost.subject
-  perAttacker <- Fields.required "perAttacker" PerAttacker.codec AttackCost.perAttacker
+  perAttacker <- Fields.required "perAttacker" PerCreature.codec AttackCost.perAttacker
   scope <- Fields.required "scope" AttackCostScope.codec AttackCost.scope
   pure
     AttackCost.MkAttackCost
