@@ -1226,7 +1226,20 @@ setLandSubtypeEffectsGiven functioning gs =
 -- (#1489).
 liveGiven :: [(ObjectId, Affected.Affected)] -> ObjectId -> GameState -> Bool
 liveGiven setEffs oid gs =
-  not (any (\(src, aff) -> affectsBase src oid aff gs) (appliedSetEffects setEffs gs))
+  not
+    ( hasLandType (baseCharacteristics oid gs)
+        && any (\(src, aff) -> affectsBase src oid aff gs) (appliedSetEffects setEffs gs)
+    )
+
+-- CR 305.7's subject: only a LAND loses its rules text to a subtype set. CR 205.3d
+-- is what makes that a precondition rather than a description of every board a
+-- setter can reach -- a setter reaching an object with no Land card type sets no
+-- subtype there (setLandSubtypeTo), so it takes no abilities either. The three
+-- gates ask it of the characteristics each is judged against: base for liveGiven,
+-- the finished projection for liveAfterLayers, through layer 4 for
+-- setSubtypeStripped.
+hasLandType :: ProjectedCharacteristics -> Bool
+hasLandType = Set.member CardType.Land . PC.cardTypes
 
 -- The same CR 305.7 gate for a reader OUTSIDE the layer fold. CR 613.10 and CR
 -- 613.11 run such readers after the projection is finished, so this may read the
@@ -1237,7 +1250,10 @@ liveGiven setEffs oid gs =
 liveAfterLayers :: [(ObjectId, Affected.Affected)] -> ObjectId -> GameState -> Bool
 liveAfterLayers setEffs oid gs =
   let view = project oid gs
-   in not (any (\(src, aff) -> affects src oid aff view gs) (appliedSetEffects setEffs gs))
+   in not
+        ( hasLandType view
+            && any (\(src, aff) -> affects src oid aff view gs) (appliedSetEffects setEffs gs)
+        )
 
 -- CR 305.7's strip, asked of ONE ability rather than of the whole permanent: does
 -- a subtype-setting effect reach `oid` by the time layer 4 has finished? The
@@ -1267,7 +1283,13 @@ setSubtypeStripped cands setEffs gs = case appliedSetEffects setEffs gs of
         peers = viewUpTo Layer.Type cands gs
         -- Bound before `oid`, so the candidate-only work is shared across the walk.
         throughType = projectWith (<= Layer.Type) cands
-     in \oid -> any (\(src, aff) -> affectsGiven peers src oid aff (throughType oid gs) gs) applied
+     in \oid ->
+          let partial = throughType oid gs
+           in -- CR 305.7's subject, asked of the projection through layer 4 --
+              -- where the setter applies, and the state affectsGiven judges
+              -- membership against.
+              hasLandType partial
+                && any (\(src, aff) -> affectsGiven peers src oid aff partial gs) applied
 
 -- CR 613.8: which of the CR 305.7 subtype-setting effects actually apply, in the
 -- order the rule applies them. An effect that strips a land's rules-text abilities

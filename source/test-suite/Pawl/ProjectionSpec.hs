@@ -1592,6 +1592,30 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice green attached) "after: the Piker is a Forest land, so CR 305.6 gives it {T}: Add {G}"
     Spec.assertEqWith s "the Forest is the only subtype left" (Projection.subtypesOf pikerId attached) (Set.singleton Subtype.Type.Forest)
 
+  -- CR 205.3d over the SET rather than the add, and with it CR 305.7: both of
+  -- that rule's clauses are about what happens to a LAND, so an object the
+  -- correspondence check refuses keeps its rules text as well as its subtypes.
+  -- The card-type add is the only difference between the two boards, and it is
+  -- the OLDEST effect on both so that neither reading of CR 613.8 can move it.
+  --
+  -- The Seer's power is the gameplay reading: it is 3 only while the Lord's "other
+  -- Merfolk get +1/+1" is still there, so a set that stripped a nonland Lord would
+  -- report itself there rather than in the subtype assertions below. Raw
+  -- modifications, since no printing sets a land's subtype without naming lands in
+  -- its affected set (Blood Moon, Celestial Dawn, Conversion).
+  Spec.it s "CR 205.3d/305.7 a land-type SET refuses a nonland, rules text and all" $ do
+    seer <- S.printingOf s registry "Merfolk Seer"
+    lord <- S.printingOf s registry "Lord of Atlantis"
+    let base = Setup.emptyGame S.bothPlayers
+        (seerId, g1) = S.addCreature seer S.alice base
+        (lordId, g2) = S.addCreature lord S.alice g1
+        nonland = S.withEffectAt lordId (Timestamp.MkTimestamp 10) (Modification.SetLandSubtype Subtype.Type.Mountain) g2
+        land = S.withEffectAt lordId (Timestamp.MkTimestamp 5) (Modification.AddCardType CardType.Land) nonland
+    Spec.assertEqWith s "the Lord is no land, so CR 305.7 takes nothing and the Seer is still pumped" (Projection.powerOf seerId nonland) (Just 3)
+    Spec.assertEqWith s "made a land first, the same set strips the Lord's text and the Seer drops to its printed 2" (Projection.powerOf seerId land) (Just 2)
+    Spec.assertEqWith s "and the Lord gained no Mountain" (Projection.subtypesOf lordId nonland) (Set.singleton Subtype.Type.Merfolk)
+    Spec.assertEqWith s "where the land did (CR 305.7 keeps the creature types)" (Projection.subtypesOf lordId land) (Set.fromList [Subtype.Type.Merfolk, Subtype.Type.Mountain])
+
   -- CR 613.7's timestamp order over the add/set pair, which is the whole of what
   -- decides between them: neither modification moves the other's affected set, so
   -- CR 613.8 has nothing to reorder and the later one simply sees what the
