@@ -1245,9 +1245,9 @@ resolveSpellWith runSubgame oid = do
                         -- CR 603.5 / 608.2d: then the printed "may", against the
                         -- SAME live bindings CR 608.2b's filter is applied to, so
                         -- a clause whose every read is dead is not asked about.
-                        let legalNowForGate = Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
-                            boundNowForGate = Map.keysSet (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) gateBindings)
-                        taken <- if gated then exercises oid effectController idx cIdx boundNowForGate legalNowForGate clause else pure False
+                        let legalNowForMay = Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
+                            boundNowForMay = Map.keysSet (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) gateBindings)
+                        taken <- if gated then exercises oid effectController idx cIdx boundNowForMay legalNowForMay clause else pure False
                         -- CR 118.12: then the cost paid on resolution, against the
                         -- START-of-resolution targets to match CR 608.2b's single
                         -- re-validation. Both maps are projected into THIS
@@ -1386,9 +1386,9 @@ resolveModesWith runSubgame stackId srcId modes = do
                       -- CR 603.5 / 608.2d: then the printed "may", against the
                       -- SAME live bindings CR 608.2b's filter is applied to, so a
                       -- clause whose every read is dead is not asked about.
-                      let legalNowForGate = instanceView (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
-                          boundNowForGate = Map.keysSet (instanceView gateBindings)
-                      taken <- if gated then exercises stackId effectController idx cIdx boundNowForGate legalNowForGate clause else pure False
+                      let legalNowForMay = instanceView (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
+                          boundNowForMay = Map.keysSet (instanceView gateBindings)
+                      taken <- if gated then exercises stackId effectController idx cIdx boundNowForMay legalNowForMay clause else pure False
                       -- CR 118.12: then the cost paid on resolution, against the
                       -- START-of-resolution slots.
                       (admitted, answers') <- if taken then payGateAdmits stackId srcId effectController idx cIdx (instanceView legal) answers clause else pure (False, answers)
@@ -1462,7 +1462,10 @@ exercises resolving controller idx cIdx bound legal clause = case Clause.optiona
 -- A CLASSIFICATION and never an identity check: what an effect reads comes from
 -- slotsOf, and slotsAreExhaustive is what says slotsOf is the WHOLE of it -- an
 -- opcode that reads more than its slots (ArmDelayedTrigger, CR 725.2's
--- ControllerOfSource) answers False there and so is never called inert.
+-- ControllerOfSource) answers False there and so is never called inert. That
+-- conjunct is a REGRESSION FENCE rather than a proven behaviour: no optional
+-- clause in data/cards/ holds such an opcode, so dropping it leaves the suite
+-- green.
 --
 -- "Dead" is per SLOT and takes both maps, because a slot's binding need not be a
 -- target at all: a TARGET slot is dead once CR 608.2b has emptied it, and any

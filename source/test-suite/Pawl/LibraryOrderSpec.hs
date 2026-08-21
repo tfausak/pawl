@@ -2332,7 +2332,7 @@ optionalEffectSpec s registry =
         -- not simply refusing to ask: the same board, the same answer, the same
         -- two modes, differing only in whether mode 1's target is still there.
         -- With it there the "may" is a real question, is asked once, and taking
-        -- it removes CR 701.60b's designation.
+        -- it ends CR 701.60a's designation.
         Spec.it s "CR 603.5 whole card: Deadly Complication's optional clause is asked about while its target lives" $ do
           (gs, spellId, victim, poiId) <- deadlyComplicationBoard
           let cast = S.runPure (deadlyComplicationAnswer victim poiId) gs (S.cast S.alice spellId)
