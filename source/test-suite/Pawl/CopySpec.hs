@@ -179,17 +179,19 @@ mintedTokens gs = fmap (\oid -> (Projection.namesOf oid gs, S.powerToughnessOf o
 
 -- Vesuva Land: "You may have this land enter tapped as a copy of any land on the
 -- battlefield" (data/cards/vesuva.json; Oracle text checked against
--- api.scryfall.com, 2026-08-21). The pool's one copy of a LAND, and the whole of
--- its printed text.
+-- api.scryfall.com, 2026-08-21). The whole of its printed text, and what makes a
+-- copy of a LAND reachable at all in data/cards.
 --
 -- alice's board: two Mountains, Mutavault, `mMoon` when one is passed, and Vesuva
--- in her hand with the turn's land drop unspent. The pair the case below builds
--- differs in that Maybe and in nothing else -- same seats, same lands, same
--- priority -- so a difference in what the copy can do is Blood Moon's.
+-- in her hand with the turn's land drop unspent. `mMoon` puts Blood Moon there
+-- BEFORE Vesuva is played, which the CR 614.12 case wants; the CR 305.7 case
+-- passes Nothing and adds it after, since a Blood Moon already out leaves no copy
+-- ability to apply.
 --
 -- The Mountains are BASIC on purpose: Blood Moon's printed criterion is NONBASIC
--- lands, so the mana that pays Mutavault's animation is the same on both boards
--- and a refused activation is never a refusal to pay.
+-- lands, so the mana that pays Mutavault's animation is the same whether or not a
+-- Blood Moon is on the board, and a refused activation is never a refusal to
+-- pay.
 vesuvaBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Maybe Printing.Printing -> (ObjectId, GameState.GameState)
 vesuvaBoard mountain mutavault vesuva mMoon =
   let base = S.landsInPlay mountain 2
