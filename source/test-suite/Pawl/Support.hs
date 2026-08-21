@@ -1822,6 +1822,7 @@ stubView table oid =
                 Filter.attackedThisTurn = False,
                 Filter.milledThisTurn = False,
                 Filter.attachedToView = Nothing,
+                Filter.attachedViews = [],
                 Filter.attachedTo = Nothing,
                 Filter.canHostSubject = False,
                 Filter.canAttachToSubject = False,

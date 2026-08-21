@@ -410,7 +410,8 @@ affects :: ObjectId -> ObjectId -> Affected.Affected -> ProjectedCharacteristics
 affects source oid a partial gs = affectsGiven (fullView gs) source oid a partial gs
 
 -- affects with the reader for the objects a filter reaches past the candidate --
--- an ATTACHED candidate's host (CR 701.3a), the CR 702.178a gate's board -- which
+-- an ATTACHED candidate's host and the permanents attached TO a candidate (CR
+-- 701.3a, CR 303.4b), the CR 702.178a gate's board -- which
 -- every caller has to pick at the same depth as `partial`. See
 -- viewOfCharacteristics for why the depths must agree.
 affectsGiven :: Count.ViewOf -> ObjectId -> ObjectId -> Affected.Affected -> ProjectedCharacteristics -> GameState -> Bool
@@ -457,9 +458,10 @@ viewOfObject oid gs = viewOfObjectGiven Map.empty (controlGrants gs) oid gs
 -- projectGiven for what the board is and when it is valid.
 viewOfObjectGiven :: Map ObjectId ProjectedCharacteristics -> [ControlGrant] -> ObjectId -> GameState -> Filter.View
 viewOfObjectGiven pcs grants oid gs =
-  -- A host is read the same way this object is. Recursive, and safe for the
-  -- reason viewOfCharacteristics gives: the host view is lazy, so the recursion
-  -- is driven by a filter's own AttachedTo nesting, which is finite.
+  -- A host, and an attacher, are read the same way this object is. Recursive, and
+  -- safe for the reason viewOfCharacteristics gives: both attachment views are
+  -- lazy, so the recursion is driven by a filter's own AttachedTo / HasAttached
+  -- nesting, which is finite.
   viewOfCharacteristics (\host -> Just (viewOfObjectGiven pcs grants host gs)) oid (projectGiven pcs oid gs) (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs
 
 -- CR 112.2 / 601.2a: the view of a SPELL on the stack, whose controller is the
@@ -551,8 +553,9 @@ powerWithLastKnownGiven pcs oid gs = case lastKnownOf oid gs of
 -- one, and a caller handed a dead id wants the no-op an unevaluable quantity
 -- already gives. fullView answers Just there, which is why
 -- viewWithLastKnownAnywhere has to guard it. CR 701.3a: an attached candidate's
--- HOST is read at this same bound, which keeps a Filter.AttachedTo reached from
--- inside the fold out of a loop.
+-- HOST is read at this same bound, and so are the permanents attached TO it,
+-- which keeps a Filter.AttachedTo or Filter.HasAttached reached from inside the
+-- fold out of a loop.
 viewUpTo :: Layer -> [Gathered] -> GameState -> Count.ViewOf
 viewUpTo bound cands gs oid =
   if Map.member oid (GameState.objects gs)
@@ -617,6 +620,9 @@ viewOfCard face =
           -- viewOfCharacteristics is the view that holds an id and answers.
           Filter.milledThisTurn = False,
           Filter.attachedToView = Nothing,
+          -- CR 303.4b's mirror, and Nothing for the same reason: a printed face
+          -- is not an object, so no permanent's Object.attachedTo names it.
+          Filter.attachedViews = [],
           Filter.attachedTo = Nothing,
           -- CR 701.3a: only Pawl.Engine.Resolve's AttachTarget arm fills this
           -- field, and its candidates are battlefield permanents.
@@ -758,6 +764,22 @@ viewOfCharacteristics peers oid pc controller counters gs =
           >>= Object.attachedTo
           >>= Recipient.objectOf
           >>= \host -> if Set.member host (GameState.battlefield gs) then peers host else Nothing,
+      -- CR 303.4b / 301.5a with the arrow turned round: the permanents attached TO
+      -- this candidate. pawl keeps the attachment on the ATTACHED permanent, so
+      -- there is nothing to look up from this side and the index is built by
+      -- sweeping the battlefield -- which also supplies CR 110.1's narrowing for
+      -- free, `attachedToView` above having to state it. Each attacher's own
+      -- characteristics come through `peers`, at this caller's depth, which is
+      -- what keeps a HasAttached reached from inside the layer fold out of a loop.
+      -- The list must stay lazy in its spine: nothing forces the sweep unless a
+      -- Filter names the atom.
+      Filter.attachedViews =
+        Maybe.mapMaybe
+          peers
+          [ attacher
+          | attacher <- Set.toList (GameState.battlefield gs),
+            (Game.lookupObject attacher gs >>= Object.attachedTo >>= Recipient.objectOf) == Just oid
+          ],
       -- CR 701.3a / 301.5a: the same attachment as the HOST'S ID -- IsAttachedToSource
       -- compares it against the match's source, which this builder does not know.
       -- Not narrowed to the battlefield the way `attachedToView` is.
@@ -2597,6 +2619,11 @@ filterReads f = case f of
   -- characteristics, so no Modification writes Object.attachedTo, and CR 303.4's
   -- attaching runs between projections as CR 110.1's zone change does.
   Filter.Type.AttachedTo g -> filterReads g
+  -- The nest's own reads again, declared as if they were the CANDIDATE's even
+  -- though they are an ATTACHER's -- exactly right rather than merely safe, for
+  -- the atom above's reason. The attachment itself reads nothing, for that atom's
+  -- reason too: no Modification writes Object.attachedTo.
+  Filter.Type.HasAttached g -> filterReads g
   Filter.Type.IsAttachedToSource -> Set.empty
   Filter.Type.IsHostOfSource -> Set.empty
   -- Over-declared deliberately, per the note on Aspect above: the characteristics

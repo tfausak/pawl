@@ -516,6 +516,39 @@ data Filter keyword
     -- view is filled only for an object that is a permanent, which is the window
     -- CR 704.5m closes on the next state-based-action pass.
     AttachedTo (Filter keyword)
+  | -- | CR 303.4b's "enchanted" and CR 301.5a's "equipped", asked of the HOST:
+    -- something the nested Filter admits is attached TO the candidate -- A Tale
+    -- for the Ages' "enchanted creatures you control", whose affected set is `And
+    -- [HasCardType Creature, ControlledBy You, HasAttached (HasSubtype Aura)]`.
+    -- The subtype nest is the RULE's word and not a narrowing of ours: rule
+    -- 303.4b makes only an Aura's host enchanted, so an equipped creature is not
+    -- an enchanted one, and CR 301.5a's "equipped" is this same atom nested on
+    -- `HasSubtype Equipment` (Stone Haven Outfitter).
+    --
+    -- The MIRROR of AttachedTo above, the two roles swapped: that atom asks what
+    -- the candidate is attached to, this asks what is attached to the candidate.
+    -- Neither expresses the other, because attachment is DIRECTED and a Filter is
+    -- evaluated against one candidate -- there is nowhere inside the nest to turn
+    -- the arrow around.
+    --
+    -- ANY, not all, and CR 303.4b is what settles that: a creature is enchanted
+    -- once an Aura is attached to it, whatever else is attached alongside. So the
+    -- trivial nest `HasAttached (And [])` reads "has something attached to it",
+    -- and the atom is False for a candidate carrying nothing.
+    --
+    -- Uncharacteristic for AttachedTo's reason, and the nest reads the ATTACHER's
+    -- characteristics against the OUTER context: CR 109.5's "you" stays the
+    -- ability's controller, so `HasAttached (ControlledBy You)` is Archon of the
+    -- Wild Rose's "enchanted by Auras you control" rather than a question about
+    -- the attacher's own controller.
+    --
+    -- Narrowed to attachers ON THE BATTLEFIELD, exactly as AttachedTo's host is
+    -- and for CR 110.1's reason.
+    --
+    -- Not implemented: a PLAYER candidate, whom CR 303.4b does let an Aura
+    -- enchant -- the atom is False for one, since Pawl.Engine.Filter.playerView
+    -- holds no board to find the attachers on (#2030).
+    HasAttached (Filter keyword)
   | -- | CR 701.3a / 301.5a: the candidate is attached to the evaluation's SOURCE -- Kemba's
     -- Legion's "for each Equipment attached to this creature", where the Equipment
     -- is the candidate and the creature is the source. "Equipment attached to it"

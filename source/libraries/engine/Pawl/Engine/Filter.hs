@@ -176,6 +176,35 @@ data View = MkView
     -- them -- no type embeds a View, so no derived instance depended on them
     -- either.
     attachedToView :: Maybe View,
+    -- CR 303.4b / 301.5a read the other way: the permanents attached TO this
+    -- candidate, each viewed as a candidate in its own right, so that
+    -- HasAttached's nested Filter has something to be evaluated against. The
+    -- reverse of the index `attachedToView` above reads, and gathered by sweeping
+    -- the battlefield for the permanents whose Object.attachedTo names this one --
+    -- pawl stores the attachment on the ATTACHED permanent, so there is nothing to
+    -- look up from this side.
+    --
+    -- A LIST rather than a Set or a Seq. View has no Eq or Ord (see
+    -- `attachedToView`), so a Set is not available; and a list is lazy in its
+    -- SPINE as well as its elements, which is what keeps the battlefield sweep off
+    -- a filter that never names the atom. Order carries nothing -- HasAttached
+    -- asks CR 303.4b's existential and nothing indexes the field.
+    --
+    -- Empty where nothing is attached, and where the candidate is a player (CR
+    -- 303.4b's other enchantable, #2030). Narrowed to attachers on the
+    -- BATTLEFIELD, as `attachedToView` narrows its host and for CR 110.1's reason:
+    -- an object that has left is no longer a permanent and no longer attached to
+    -- anything, the stale window CR 704.5m closes on the next state-based-action
+    -- pass.
+    --
+    -- Recursive, and therefore LAZY, for `attachedToView`'s reason and with its
+    -- termination argument unchanged: the elements come from the same `peers`
+    -- reader, bounded at the caller's own depth
+    -- (Projection.viewOfCharacteristics' peers), so an attacher reached from
+    -- inside the layer fold is read through that fold's layers rather than by
+    -- re-entering `gather`. Descending into a nest descends the FILTER, which is
+    -- finite, so an attachment cycle terminates too.
+    attachedViews :: [View],
     -- CR 701.3a / 301.5a: WHICH object this candidate is attached to, for
     -- IsAttachedToSource to compare against Context.source -- the id and not a
     -- Bool, because the atom's answer depends on the match's source and this
@@ -403,6 +432,15 @@ playerView pid =
       -- no host to evaluate AttachedTo's nest against, and the atom is vacuously
       -- False for a player candidate however the nest is written.
       attachedToView = Nothing,
+      -- CR 303.4b lets an Aura enchant a PLAYER, so unlike the field above this
+      -- one asks a question a player candidate really can answer -- but not here:
+      -- this view is built from a PlayerId alone and holds no board to sweep for
+      -- the attachers.
+      --
+      -- Not implemented: an enchanted player, which wants baking against the game
+      -- state at Pawl.Engine.Count.bakePerspective the way ControlsMoreThanYou is
+      -- (#2030).
+      attachedViews = [],
       -- CR 303.4 again: a player is attached to nothing, so there is no host id
       -- for IsAttachedToSource to compare either.
       attachedTo = Nothing,
@@ -806,6 +844,15 @@ matches context view predicate = case predicate of
   -- (Miracle Worker). `And []` nests to "attached to a permanent" (CR 110.1),
   -- because the field is Just only for a host on the battlefield.
   Filter.AttachedTo f -> maybe False (\host -> matches context host f) (attachedToView view)
+  -- CR 303.4b / 301.5a with the arrow turned round: a live read of which
+  -- permanents name this candidate in their Object.attachedTo, and of each of
+  -- their own projections. EXISTENTIAL, which is rule 303.4b's own shape -- one
+  -- Aura attached to it makes a creature enchanted, whatever else is.
+  --
+  -- Each attacher's view is matched against the SAME context, for the reason
+  -- AttachedTo's arm gives: CR 109.5's "you" stays the ability's controller, so
+  -- `HasAttached (ControlledBy You)` asks after Auras YOU control.
+  Filter.HasAttached f -> any (\attacher -> matches context attacher f) (attachedViews view)
   -- CR 701.3a / 301.5a: IsSource's comparison in the other direction -- the
   -- candidate's HOST against the match's source, rather than the candidate itself.
   -- A live read of Object.attachedTo, so an Equipment unequipped by CR 704.5n
@@ -955,6 +1002,10 @@ rewrite pairs predicate = case predicate of
   -- the HOST ("attached to a Swamp"), so CR 612.1's word swap reaches it exactly
   -- as it reaches the same description written at the top level.
   Filter.AttachedTo f -> Filter.AttachedTo (rewrite pairs f)
+  -- DESCENT, for the atom above's reason one direction over: the nest describes
+  -- the ATTACHER ("enchanted by an Aura"), so CR 612.1's word swap reaches it as
+  -- it reaches the same description written at the top level.
+  Filter.HasAttached f -> Filter.HasAttached (rewrite pairs f)
   Filter.IsAttachedToSource -> predicate
   Filter.IsHostOfSource -> predicate
   Filter.CanHostSubject -> predicate
@@ -1290,6 +1341,10 @@ bakeBound players predicate = case predicate of
   -- top level would be. Pawl.Engine.Filter.boundSlots descends to match, which is
   -- the pairing that function's comment insists on.
   Filter.AttachedTo f -> Filter.AttachedTo (bakeBound players f)
+  -- DESCENT, for the atom above's reason: a ControlledByBound written into the
+  -- ATTACHER's description is baked exactly as the same atom at the top level
+  -- would be, and Pawl.Engine.Filter.boundSlots descends to match.
+  Filter.HasAttached f -> Filter.HasAttached (bakeBound players f)
   Filter.IsAttachedToSource -> predicate
   Filter.IsHostOfSource -> predicate
   Filter.CanHostSubject -> predicate
@@ -1367,6 +1422,10 @@ manaValueThresholds predicate = case predicate of
   -- literals inside bound the HOST's mana value and never the candidate's. Only
   -- widening CR 601.3a's sample is the safe direction.
   Filter.AttachedTo f -> manaValueThresholds f
+  -- Descended into, and OVER-reporting for the atom above's reason: the literals
+  -- inside bound an ATTACHER's mana value and never the candidate's. Only
+  -- widening CR 601.3a's sample is the safe direction.
+  Filter.HasAttached f -> manaValueThresholds f
   Filter.IsAttachedToSource -> []
   Filter.IsHostOfSource -> []
   Filter.CanHostSubject -> []
@@ -1454,6 +1513,10 @@ statesAQuality predicate = case predicate of
   -- something" is itself a stated quality under CR 701.23b, so even the trivial
   -- nest `And []` leaves this atom stating one and no descent could change it.
   Filter.AttachedTo _ -> True
+  -- True whatever the nest says, for the atom above's reason: CR 303.4b's
+  -- "enchanted" is a stated quality under CR 701.23b, and the trivial nest states
+  -- one too ("has something attached to it").
+  Filter.HasAttached _ -> True
   Filter.IsAttachedToSource -> True
   Filter.IsHostOfSource -> True
   Filter.CanHostSubject -> True
@@ -1503,4 +1566,8 @@ boundSlots predicate = case predicate of
   -- one: `bakeBound` descends into the host's description, so the catch-all below
   -- would silently bake a slot this function never reported.
   Filter.AttachedTo f -> boundSlots f
+  -- Descended into for the atom above's reason, and named explicitly for the same
+  -- one: `bakeBound` descends into the attacher's description, so the catch-all
+  -- below would silently bake a slot this function never reported.
+  Filter.HasAttached f -> boundSlots f
   _ -> Set.empty

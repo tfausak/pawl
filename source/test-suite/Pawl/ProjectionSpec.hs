@@ -2910,6 +2910,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "both colours with no face shown" (Projection.colorsOf oid gs0) (Set.fromList [Color.Green, Color.White])
 
   attachedHostSpec s registry
+  hasAttachedSpec s registry
   hostOfSourceSpec s registry
   conditionalAbilitySpec s registry
   hiddenZoneStaticSpec s registry
@@ -3275,6 +3276,50 @@ attachedHostSpec s registry = Spec.describe s "AttachedTo" $ do
       "not a creature below layer 4, a creature above it"
       (onto Layer.Type, onto Layer.ModifyPT)
       (Just False, Just True)
+
+-- CR 303.4b / 613.1: Filter.HasAttached inside a static ability's AFFECTED SET,
+-- which is AttachedTo's question with the arrow turned round -- what is attached
+-- to the candidate rather than what the candidate is attached to.
+--
+-- A Tale for the Ages ({1}{W} Enchantment, "Enchanted creatures you control get
+-- +2/+2.", checked against Scryfall 2026-08-21). Rule 303.4b is what makes the
+-- nest name an AURA: only an Aura's host is "enchanted", so an equipped creature
+-- is not one, and the board below holds an equipped creature to say so.
+--
+-- Pacifism ({1}{W} Aura, "Enchant creature / Enchanted creature can't attack or
+-- block.") is the Aura and Bonesplitter ({1} Equipment, "Equipped creature gets
+-- +2/+0. / Equip {1}") the Equipment, both chosen for what they do to the
+-- numbers: the Aura moves neither power nor toughness, so the +2/+2 read below is
+-- the Tale's alone, and the Equipment moves POWER only, so an equipped creature
+-- and an enchanted one are never the same pair of numbers.
+hasAttachedSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+hasAttachedSpec s registry = Spec.describe s "HasAttached" $ do
+  -- ONE board, four Goblin Pikers (2/1), so every reading below differs from its
+  -- neighbour in exactly one thing: what is attached, and who controls the
+  -- creature. Alice's enchanted Piker is 4/3; her EQUIPPED one is 4/1, which is
+  -- the Bonesplitter alone and says the nest's `HasSubtype Aura` is evaluated;
+  -- her bare one is 2/1; and Bob's enchanted one is 2/1, which is CR 109.5's "you"
+  -- in the affected set.
+  Spec.it s "CR 303.4b the affected set reads what is attached TO the candidate" $ do
+    tale <- S.printingOf s registry "A Tale for the Ages"
+    pacifism <- S.printingOf s registry "Pacifism"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (enchanted, g1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+        (equipped, g2) = S.addCreature piker S.alice g1
+        (bare, g3) = S.addCreature piker S.alice g2
+        (theirs, g4) = S.addCreature piker S.bob g3
+        (auraId, g5) = S.addCreature pacifism S.alice g4
+        (gearId, g6) = S.addCreature bonesplitter S.alice g5
+        (theirAura, g7) = S.addCreature pacifism S.bob g6
+        (_, g8) = S.addCreature tale S.alice g7
+        gs = S.attach theirAura theirs (S.attach gearId equipped (S.attach auraId enchanted g8))
+        reading oid = (Projection.powerOf oid gs, Projection.toughnessOf oid gs)
+    Spec.assertEqWith
+      s
+      "only the creature an Aura is attached to, and only its controller's, gets +2/+2"
+      (reading enchanted, reading equipped, reading bare, reading theirs)
+      ((Just 4, Just 3), (Just 4, Just 1), (Just 2, Just 1), (Just 2, Just 1))
 
 -- CR 303.4b / 604.2: Filter.IsHostOfSource inside a static ability's "as long as"
 -- clause, which is the position Pawl.Engine.Projection.conditionHolds answers.
