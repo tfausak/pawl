@@ -108,8 +108,12 @@ library codec
     Pawl.Codec.AttackerBlockedSpec
     Pawl.Codec.AttackerDeclared
     Pawl.Codec.AttackerDeclaredSpec
+    Pawl.Codec.AttackingPlayers
+    Pawl.Codec.AttackingPlayersSpec
     Pawl.Codec.AttackRequirement
     Pawl.Codec.AttackRequirementSpec
+    Pawl.Codec.AttackTarget
+    Pawl.Codec.AttackTargetSpec
     Pawl.Codec.BecameAttached
     Pawl.Codec.BecameDesignated
     Pawl.Codec.BecameDesignatedSpec
@@ -945,6 +949,7 @@ library types
     Pawl.Types.AttackCostScope
     Pawl.Types.AttackerBlocked
     Pawl.Types.AttackerDeclared
+    Pawl.Types.AttackingPlayers
     Pawl.Types.AttackRequirement
     Pawl.Types.AttackTarget
     Pawl.Types.BecameAttached

@@ -1,6 +1,7 @@
 module Pawl.Types.GameEvent where
 
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecameAttached as BecameAttached
@@ -220,9 +221,38 @@ data GameEvent
     -- in the second combat phase of an extra-combat turn not alone.
     --
     -- NOT the AttackTarget itself. That is a wider payload for a different
-    -- question -- CR 508.3a's attacks-a-permanent form, CR 508.3b and CR 508.3e,
-    -- which need trigger conditions no card in the pool declares (#538).
+    -- question, and a different ARITY: BecameAttacked below is where it rides.
     AttackerDeclared AttackerDeclared.AttackerDeclared
+  | -- | CR 508.3b: a player, planeswalker or battle WAS ATTACKED -- one event per
+    -- distinct target the CR 508.1 declaration named, appended by
+    -- Pawl.Engine.Combat.declareAttackers alone.
+    --
+    -- AttackerDeclared's grouping sibling, and the pair stands to each other as
+    -- BlockerDeclared and BlocksDeclared do: rule 508.3b triggers "if one or more
+    -- creatures are declared as attackers attacking that player or permanent", so
+    -- three creatures sent at one player are three of that event and ONE of this.
+    -- Pawl.Engine.Event.matchesTrigger sees one event at a time and so cannot do
+    -- the grouping itself, which is why the arity is built here.
+    --
+    -- DISTINCT targets: a declaration splitting five attackers across two
+    -- planeswalkers records two events, one per permanent attacked, and a target
+    -- named twice is still one event.
+    --
+    -- The AttackTarget and not CR 508.5's defending player, which is what
+    -- AttackerDeclared carries: rule 508.3b's subject is the player OR PERMANENT
+    -- attacked, and an attacked planeswalker resolves to its controller under CR
+    -- 508.5 -- so the defending player cannot tell "you were attacked" from "a
+    -- planeswalker you control was attacked", which is the very distinction the
+    -- rule draws.
+    --
+    -- Rule 508.3b's last sentence holds by construction: a creature put onto the
+    -- battlefield attacking goes through Combat.putOntoBattlefieldAttacking, which
+    -- records no event at all.
+    --
+    -- No attacking player is carried. CR 508.3e's "[a player] attacks [another
+    -- player]" is the shape that needs one, and no trigger condition writes it
+    -- (#538).
+    BecameAttacked AttackTarget.AttackTarget
   | -- | CR 509.1i: a blocker was DECLARED -- one entry per creature the defending
     -- player chose in CR 509.1's turn-based action, naming the blocker and one
     -- attacking creature chosen for it (CR 509.1a). AttackerDeclared's mirror,

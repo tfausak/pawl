@@ -6,6 +6,7 @@ import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -49,6 +50,12 @@ spec s = Spec.describe s "Pawl.Codec.PlayerRef" $ do
       PlayerRef.codec
       (PlayerRef.ControllerOfBound (SlotName.MkSlotName (Text.pack "permanent")))
       " {\"type\":\"ControllerOfBound\",\"value\":\"permanent\"} "
+  Spec.it s "Attacking" $
+    Common.assertCodec
+      s
+      PlayerRef.codec
+      (PlayerRef.Attacking (AttackingPlayers.MkAttackingPlayers PlayerRelation.Opponent (SlotName.MkSlotName (Text.pack "attackedPlayer"))))
+      " {\"type\":\"Attacking\",\"value\":{\"relation\":{\"type\":\"Opponent\"},\"attacked\":\"attackedPlayer\"}} "
   Spec.it s "an unknown tag is rejected" $
     Spec.assertBool
       s

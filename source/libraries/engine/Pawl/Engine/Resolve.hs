@@ -60,6 +60,8 @@ import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Amass as Amass.Type
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachTarget as AttachTarget
+import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Card as Card.Type
@@ -74,6 +76,7 @@ import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.Clause as Clause
 import Pawl.Types.ClauseIndex (ClauseIndex)
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
+import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
@@ -251,6 +254,9 @@ playerRefSlots ref = case ref of
   PlayerRef.Candidate -> Map.empty
   -- Read at arity one: a slot naming several objects names no one controller.
   PlayerRef.ControllerOfBound slot -> Map.singleton slot SlotArity.One
+  -- Read at arity one for that arm's reason: a slot naming several players names
+  -- no one player to have been attacked.
+  PlayerRef.Attacking (AttackingPlayers.MkAttackingPlayers _ slot) -> Map.singleton slot SlotArity.One
 
 -- The slots an AffectedPlayers reads. Only Named does, and only ever one player.
 affectedPlayersSlots :: AffectedPlayers.AffectedPlayers SlotName -> Map.Map SlotName SlotArity
@@ -1799,6 +1805,29 @@ playerRefPlayers legal controller gs ref = case ref of
       Just oid -> Maybe.maybeToList (Projection.controllerWithLastKnown oid gs)
       Nothing -> []
     Nothing -> []
+  -- CR 508.6: the players controlling a creature that is attacking the player the
+  -- slot names, narrowed by the relation the card printed -- Curse of Vitality's
+  -- "each opponent attacking that player".
+  --
+  -- The LIVE combat record, read as this effect applies (CR 608.2c): the sentence
+  -- is present tense, so a creature removed from combat (CR 506.4) since the
+  -- declaration has taken its controller out of the set. Not the event log, which
+  -- is Pawl.Engine.Turn.attackedThisStep's historical reading of the same rule.
+  --
+  -- AttackTarget.OfPlayer alone, CR 508.1b listing player, planeswalker and
+  -- battle separately: a creature attacking a planeswalker that player controls
+  -- is not attacking that player.
+  --
+  -- Filtered out of `everyone` rather than collected from the record, so the
+  -- roster order and the CR 102.1 exclusion of a departed seat are the ones every
+  -- other arm gives.
+  PlayerRef.Attacking (AttackingPlayers.MkAttackingPlayers relation slot) ->
+    case legalOne slot legal >>= Recipient.playerOf of
+      Nothing -> []
+      Just attacked ->
+        let sentAt = Map.keys (Map.filter (== AttackTarget.OfPlayer attacked) (Combat.attackers (GameState.combat gs)))
+            attackers = Maybe.mapMaybe (\oid -> Projection.controllerOf oid gs) sentAt
+         in filter (\pid -> PlayerRelation.holds relation controller pid && pid `elem` attackers) everyone
   where
     everyone = Game.stillPlaying gs
 

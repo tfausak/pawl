@@ -185,10 +185,33 @@ data TriggerCondition
     -- the field the event carries, so this reads the event and never the board.
     -- The attacker is bound under Pawl.Engine.Binding.attackingCreature.
     --
-    -- Not implemented: CR 508.3b's "[a player] is attacked", once per
-    -- DECLARATION rather than per attacker, needs a grouped event pawl does not
-    -- have (gap #538).
+    -- CR 508.3b's "[a player] is attacked" is the once-per-DECLARATION sibling,
+    -- AttachedPlayerIsAttacked below, and two creatures attacking one player tell
+    -- the two arities apart.
     CreatureAttacksYou
+  | -- | CR 508.3b: "whenever enchanted player is attacked" (Curse of Vitality).
+    -- CreatureAttacksYou's grouping sibling -- against
+    -- GameEvent.BecameAttacked, which Pawl.Engine.Combat.declareAttackers
+    -- records once per distinct target, so a declaration sending five creatures
+    -- at one player fires this ONCE. That arity is the whole difference between
+    -- the two arms, and it is structural rather than deduplicated: the condition
+    -- sees one event at a time.
+    --
+    -- The ATTACHED player and not CR 109.5's "you", where CreatureAttacksYou
+    -- takes the bearer's controller: the subject is whom the Aura enchants (CR
+    -- 303.4m), read off Object.attachedTo as AttachedCreatureDies reads it. That
+    -- is the only subject in print -- Scryfall o:"is attacked" o:"whenever",
+    -- 2026-08-21, matches five cards and all five are Curses enchanting a player.
+    --
+    -- Nullary: rule 508.3b's subject is named by the ability's own attachment,
+    -- so there is nothing left for a payload to say. The player is bound under
+    -- Pawl.Engine.Binding.attackedPlayer, which the second half of every one of
+    -- those five Curses needs ("each opponent attacking that player").
+    --
+    -- Not implemented: rule 508.3b's planeswalker and battle subjects, which no
+    -- printing states, and CR 508.3e's "[a player] attacks [another player]",
+    -- whose producers need capabilities pawl lacks (#538).
+    AttachedPlayerIsAttacked
   | -- | CR 702.105a: dethrone -- SelfAttacks narrowed by whom the bearer
     -- attacked. The attacked player comes from Combat.attackers rather than the
     -- event, and that is the whole narrowing: the event carries CR 508.5's

@@ -8,6 +8,7 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecameAttached as BecameAttached
@@ -138,6 +139,14 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared (ObjectId.MkObjectId 3) (PlayerId.MkPlayerId 1) 4))
       " {\"type\":\"AttackerDeclared\",\"value\":{\"attacker\":3,\"defender\":1,\"count\":4}} "
+  -- AttackerDeclared's grouping sibling: one target, no attacker and no count,
+  -- which is the whole of what CR 508.3b's subject is.
+  Spec.it s "BecameAttacked" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.BecameAttacked (AttackTarget.OfPlaneswalker (ObjectId.MkObjectId 6)))
+      " {\"type\":\"BecameAttacked\",\"value\":{\"type\":\"OfPlaneswalker\",\"value\":6}} "
   -- Two ObjectIds and not an object and a player, unlike the sibling above: CR
   -- 509.1a's declaration pairs a blocker with the creature it blocks. Distinct
   -- numbers, so a codec that swapped the pair would fail.

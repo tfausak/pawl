@@ -30,8 +30,10 @@ import qualified Pawl.Codec.AttachRestrictionSpec
 import qualified Pawl.Codec.AttachTargetSpec
 import qualified Pawl.Codec.AttackCostSpec
 import qualified Pawl.Codec.AttackRequirementSpec
+import qualified Pawl.Codec.AttackTargetSpec
 import qualified Pawl.Codec.AttackerBlockedSpec
 import qualified Pawl.Codec.AttackerDeclaredSpec
+import qualified Pawl.Codec.AttackingPlayersSpec
 import qualified Pawl.Codec.BecameDesignatedSpec
 import qualified Pawl.Codec.BecomeCopySpec
 import qualified Pawl.Codec.BeginningStepSpec
@@ -461,6 +463,8 @@ spec s registry = do
   Pawl.Codec.AttackCostSpec.spec s
   Pawl.Codec.AttackRequirementSpec.spec s
   Pawl.Codec.AttackerBlockedSpec.spec s
+  Pawl.Codec.AttackTargetSpec.spec s
+  Pawl.Codec.AttackingPlayersSpec.spec s
   Pawl.Codec.AttackerDeclaredSpec.spec s
   Pawl.Codec.BecameDesignatedSpec.spec s
   Pawl.Codec.BecomeCopySpec.spec s

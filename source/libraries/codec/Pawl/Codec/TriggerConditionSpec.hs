@@ -201,6 +201,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.CreatureAttacksYou
       " {\"type\":\"CreatureAttacksYou\"} "
+  -- CR 508.3b, nullary for the sibling above's reason and one of its own: the
+  -- subject is whom the ability's own source is attached to.
+  Spec.it s "AttachedPlayerIsAttacked" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.AttachedPlayerIsAttacked
+      " {\"type\":\"AttachedPlayerIsAttacked\"} "
   -- CR 702.105a, nullary: the comparison is over life totals, so there is nothing
   -- for a card to parameterize.
   Spec.it s "SelfAttacksPlayerWithMostLife" $

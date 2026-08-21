@@ -657,6 +657,9 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.CreatureAttacksAlone _ -> []
   -- Nullary, so no Count either.
   TriggerCondition.CreatureAttacksYou -> []
+  -- Nullary too, and rule 508.3b's "one or more" is the EVENT's grouping rather
+  -- than a number this condition counts.
+  TriggerCondition.AttachedPlayerIsAttacked -> []
   -- CR 702.105a compares life totals rather than counting objects, so no Count.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> []
   TriggerCondition.SelfBlocks -> []
@@ -2864,6 +2867,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 508.3a's second sentence names no quality of the attacker -- CR 508.1a has
   -- already made it a creature -- so this one carries no Filter to traverse.
   TriggerCondition.CreatureAttacksYou -> []
+  -- CR 508.3b names no quality of anything: its subject is the ability's own
+  -- attachment, so there is no Filter here either.
+  TriggerCondition.AttachedPlayerIsAttacked -> []
   -- CR 702.105a names no quality of the attacker, only a fact about whom it
   -- attacked, so no Filter.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> []
@@ -5167,6 +5173,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           PlayerRef.Candidate -> True
           -- One seat -- InSlot's answer, one indirection out.
           PlayerRef.ControllerOfBound _ -> True
+          -- A SET -- Relative Opponent's answer, and for its reason: CR 508.6 is
+          -- a predicate over the table rather than a name for one seat.
+          PlayerRef.Attacking _ -> False
         -- Every opcode that binds a batch under a name of the card's own: a
         -- move, CR 701.20e's look, CR 701.20a's reveal, CR 701.17c's mill and
         -- CR 701.8's two look-back slots. The first four dispatch on how many
