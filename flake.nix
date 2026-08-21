@@ -109,10 +109,7 @@
       devShells = forAllSystems (
         system:
         let
-          pkgs = import nixpkgs {
-            inherit system;
-            config.allowUnfreePredicate = pkg: nixpkgs.lib.getName pkg == "claude-code";
-          };
+          pkgs = nixpkgs.legacyPackages.${system};
         in
         {
           default = pkgs.mkShell {
@@ -121,7 +118,6 @@
               hooky.packages.${system}.default
               pkgs.bash
               pkgs.cabal-install
-              pkgs.claude-code
               pkgs.coreutils
               pkgs.fzf
               pkgs.gh
