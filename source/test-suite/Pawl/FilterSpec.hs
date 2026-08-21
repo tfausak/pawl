@@ -833,9 +833,10 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       let slot = SlotName.MkSlotName (Text.pack "victim")
       Spec.assertEqWith s "the slot the host's description names" (Filter.boundSlots (Filter.Type.AttachedTo (Filter.Type.ControlledByBound slot))) (Set.singleton slot)
 
-    -- CR 612.1's word swap reaches the host's description too, and for the same
-    -- reason nothing in the pool observes it: no card narrows an attachment by a
-    -- subtype. This is that arm's only observer.
+    -- CR 612.1's word swap reaches the host's description too, and nothing in
+    -- data/cards/ observes it: grep the corpus for ChangeSubtypeWord and it is
+    -- absent, so no card drives Filter.rewrite at all. This is that arm's only
+    -- observer.
     Spec.it s "CR 612.1 rewrites a subtype inside the nest" $ do
       let swapped = Filter.rewrite [(Subtype.Swamp, Subtype.Island)] (Filter.Type.AttachedTo (Filter.Type.HasSubtype Subtype.Swamp))
       Spec.assertEqWith s "the host's subtype word is swapped" swapped (Filter.Type.AttachedTo (Filter.Type.HasSubtype Subtype.Island))
@@ -914,8 +915,10 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       let slot = SlotName.MkSlotName (Text.pack "victim")
       Spec.assertEqWith s "the slot the attacher's description names" (Filter.boundSlots (Filter.Type.HasAttached (Filter.Type.ControlledByBound slot))) (Set.singleton slot)
 
-    -- CR 612.1's word swap reaches the attacher's description, and this is that
-    -- arm's only observer for AttachedTo's reason.
+    -- CR 612.1's word swap reaches the attacher's description, and A Tale for
+    -- the Ages does narrow the atom by a subtype for one to reach -- but this
+    -- stays the arm's only observer, for the reason the AttachedTo case above
+    -- gives.
     Spec.it s "CR 612.1 rewrites a subtype inside the nest" $ do
       let swapped = Filter.rewrite [(Subtype.Aura, Subtype.Equipment)] byAnAura
       Spec.assertEqWith s "the attacher's subtype word is swapped" swapped (Filter.Type.HasAttached (Filter.Type.HasSubtype Subtype.Equipment))

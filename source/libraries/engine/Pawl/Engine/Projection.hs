@@ -2992,8 +2992,13 @@ projectDeciding admits cands = forObject
                         -- Not implemented: an object off the running board is
                         -- projected but not scanned here, so a count reading a
                         -- same-layer effect on one still gets the bound (#1332).
-                        -- No card puts AttachedTo or the CR 702.178a gate in a
-                        -- CR 613.8-movable layer (gap #1757).
+                        -- A Tale for the Ages DOES put CR 303.4b's attachment
+                        -- atom in a CR 613.8-movable layer, its affected set
+                        -- being Matching -- but the reader is still unobserved:
+                        -- mutating it to `fullView` leaves the suite green,
+                        -- because no board in the pool makes a bounded view and
+                        -- a full one disagree here, and none loops. The CR
+                        -- 702.178a gate is not reached at all (gap #1757).
                         viewOfBoard board o = case Map.lookup o board of
                           Just (p, _) -> Just (viewOfCharacteristics (viewOfBoard board) o (noncreaturePT o gs p) (controllerOf o gs) (countersOf o gs) gs)
                           Nothing -> bounded o
