@@ -11,8 +11,9 @@ import qualified Pawl.Types.Color as Color
 -- stays unsayable rather than a case every reader has to rule out.
 --
 -- Named rather than positional, and ordered, for Pawl.Types.Hybrid's reason:
--- @{G/U/P}@ and @{U/G/P}@ are the same symbol to the rules (CR 202.2d) but not
--- the same text, so the printed order survives a round trip. The two are
+-- @{G/U/P}@ and @{U/G/P}@ say the same thing -- CR 107.4f names ten symbols, one
+-- per unordered pair -- but they are not the same printed text, so the order
+-- survives a round trip. The two are
 -- ALTERNATIVES, so the order carries no meaning beyond presentation, and
 -- @MkHybridPhyrexian c c@ is degenerate rather than illegal -- it simply means
 -- @Phyrexian c@, and no card prints one.

@@ -58,9 +58,9 @@ spec s = Spec.describe s "Pawl.Codec.ManaSymbol" $ do
       s
       (Codec.encode ManaSymbol.codec (ManaSymbol.HybridPhyrexian (HybridPhyrexian.MkHybridPhyrexian Color.Green Color.Blue)) /= Codec.encode ManaSymbol.codec (ManaSymbol.Phyrexian Color.Green))
       "a hybrid Phyrexian symbol and a plain one encode differently"
-    -- CR 202.2d makes {G/U/P} and {U/G/P} the same symbol, but they are not the
-    -- same printed text, which is what Pawl.Types.HybridPhyrexian's ordered pair
-    -- is for.
+    -- CR 107.4f names ten symbols, one per unordered pair, so {G/U/P} and
+    -- {U/G/P} say the same thing -- but they are not the same printed text,
+    -- which is what Pawl.Types.HybridPhyrexian's ordered pair is for.
     Spec.assertBool
       s
       (Codec.encode ManaSymbol.codec (ManaSymbol.HybridPhyrexian (HybridPhyrexian.MkHybridPhyrexian Color.Green Color.Blue)) /= Codec.encode ManaSymbol.codec (ManaSymbol.HybridPhyrexian (HybridPhyrexian.MkHybridPhyrexian Color.Blue Color.Green)))

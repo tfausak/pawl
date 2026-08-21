@@ -664,6 +664,8 @@ waysOf symbol = case symbol of
   -- because a demand is a SET of admissible types, or the same 2 life the
   -- Phyrexian arm offers. Three printed ways, two rows, because the two mana
   -- ways differ only in which member of one demand set pays.
+  --
+  -- The mana way is FIRST here too, for the arm above's reason.
   ManaSymbol.HybridPhyrexian (HybridPhyrexian.MkHybridPhyrexian l r) ->
     [(Just (ofTypes (Set.fromList [ManaType.Colored l, ManaType.Colored r])), 0, 0), (Nothing, 0, 2)]
   ManaSymbol.Generic n -> [(Nothing, n, 0)]
@@ -1134,8 +1136,8 @@ completions symbols = case symbols of
   -- here: deleting it leaves the whole suite green. Both of this function's
   -- callers reach `waysOf` for a symbol that rides through unexpanded, and
   -- waysOf's rows say the same three things, so the two agree on every board --
-  -- and the one cost in the pool that prints this symbol prints exactly one of
-  -- it, so `announce`'s tail is announcement-free by the time it asks. What the
+  -- and neither cost in `data/cards/` that prints this symbol prints two of
+  -- them, so `announce`'s tail is announcement-free by the time it asks. What the
   -- arm buys is the CONTRACT in the haddock above: a completion that still holds
   -- one is not a nonhybrid equivalent cost, which is what CR 601.2f is defined
   -- over. The card that would make it observable is one printing two

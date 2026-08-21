@@ -755,9 +755,12 @@ announceReductions pid oid gs cost adjustments =
 -- Not implemented: a reduction written with a HYBRID Phyrexian symbol, which CR
 -- 118.7e and CR 118.7f do not between them settle -- one names a half to choose
 -- and the other one colour to take, and rule 107.4f's symbol answers to both
--- descriptions. Scryfall `o:"cost {G/U/P} less"` and its nine siblings,
--- 2026-08-20, no hit; the card that would refute this is one printing a hybrid
--- Phyrexian symbol in a cost reduction rather than in a mana cost (#1995).
+-- descriptions. Scryfall `o:/\{[WUBRG]\/[WUBRG]\/P\}/` (rules text; that
+-- search excludes reminder text) and `mana:{G/U/P}` with its nine siblings,
+-- 2026-08-20: the second returns the four compleated planeswalkers and the first
+-- nothing, so every printing of the symbol is in a MANA COST. The card that
+-- would refute this is one printing a hybrid Phyrexian symbol in a cost
+-- reduction (#1995).
 reductionHalvesOf :: ManaSymbol.ManaSymbol -> Maybe [ManaSymbol.ManaSymbol]
 reductionHalvesOf symbol = case symbol of
   ManaSymbol.Generic _ -> Nothing

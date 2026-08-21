@@ -1270,8 +1270,8 @@ phyrexianDiscountBoard forest discount cub growth copies n =
 -- COST, never as the amount of a reduction, and none of the 539 cards saying
 -- "less to cast" names one.
 --
--- Green because Mutagenic Growth's {G/P} is the pool's one Phyrexian COST, and
--- the third case below aims this reduction straight at it: the two sides of the
+-- Green because Mutagenic Growth's whole cost is {G/P}, and the third case below
+-- aims this reduction straight at it: the two sides of the
 -- cancellation read the same symbol differently, and matching the colours is
 -- what makes that visible rather than merely stipulated.
 phyrexianDiscountSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

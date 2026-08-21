@@ -628,10 +628,10 @@ data Object = MkObject
     -- for EACH of those mana symbols", and a cost may print more than one
     -- (CR 107.4f's own {W/P}{W/P} example).
     --
-    -- Zero for every object no life-paid Phyrexian symbol cast, which is every
-    -- object but a handful -- a token, a permanent an effect put onto the
-    -- battlefield, and every spell whose cost printed no such symbol or whose
-    -- controller announced mana for all of them.
+    -- Zero for every object that was not cast for life this way: a token, a
+    -- permanent an effect put onto the battlefield, and every spell whose cost
+    -- printed no Phyrexian symbol or whose controller announced mana for all of
+    -- them.
     phyrexianLifePaid :: Natural.Natural,
     -- | CR 107.3m: the value of X chosen for the SPELL that became this
     -- permanent, which is the value of X for the permanent's
