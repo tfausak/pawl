@@ -1242,8 +1242,12 @@ resolveSpellWith runSubgame oid = do
                         -- mutating this half back leaves the suite green.
                         gateBindings <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject oid)
                         gated <- gateHolds effectController oid (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Binding.targetsOf gateBindings)) (Binding.groupsOf gateBindings) clause
-                        -- CR 603.5 / 608.2d: then the printed "may".
-                        taken <- if gated then exercises oid effectController idx cIdx clause else pure False
+                        -- CR 603.5 / 608.2d: then the printed "may", against the
+                        -- SAME live bindings CR 608.2b's filter is applied to, so
+                        -- a clause whose every read is dead is not asked about.
+                        let legalNowForMay = Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
+                            boundNowForMay = Map.keysSet (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) gateBindings)
+                        taken <- if gated then exercises oid effectController idx cIdx boundNowForMay legalNowForMay clause else pure False
                         -- CR 118.12: then the cost paid on resolution, against the
                         -- START-of-resolution targets to match CR 608.2b's single
                         -- re-validation. Both maps are projected into THIS
@@ -1379,8 +1383,12 @@ resolveModesWith runSubgame stackId srcId modes = do
                       -- slots are bound (see bindSlot).
                       gateBindings <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject stackId)
                       gated <- gateHolds effectController srcId (instanceView (Binding.targetsOf gateBindings)) (Binding.groupsOf gateBindings) clause
-                      -- CR 603.5 / 608.2d: then the printed "may".
-                      taken <- if gated then exercises stackId effectController idx cIdx clause else pure False
+                      -- CR 603.5 / 608.2d: then the printed "may", against the
+                      -- SAME live bindings CR 608.2b's filter is applied to, so a
+                      -- clause whose every read is dead is not asked about.
+                      let legalNowForMay = instanceView (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
+                          boundNowForMay = Map.keysSet (instanceView gateBindings)
+                      taken <- if gated then exercises stackId effectController idx cIdx boundNowForMay legalNowForMay clause else pure False
                       -- CR 118.12: then the cost paid on resolution, against the
                       -- START-of-resolution slots.
                       (admitted, answers') <- if taken then payGateAdmits stackId srcId effectController idx cIdx (instanceView legal) answers clause else pure (False, answers)
@@ -1427,16 +1435,58 @@ gateHolds controller source chosen groups clause = case Clause.condition clause 
 -- `controller` is who "you" means (CR 405.4 for a spell, CR 113.8 for an ability)
 -- and therefore who is asked, through Decide.deciderFor so a player controlled
 -- under CR 723.1 has their controller answer.
-exercises :: ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Clause.Clause Card.Type.Card -> Game Bool
-exercises resolving controller idx cIdx clause = case Clause.optionality clause of
+--
+-- `bound` is every slot the live bindings hold and `legal` is CR 608.2b's
+-- surviving recipients, both under the names this mode instance prints (CR
+-- 700.2d); an inert clause is not asked about at all -- see clauseIsInert.
+exercises :: ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Set SlotName -> Map.Map SlotName (Set Recipient) -> Clause.Clause Card.Type.Card -> Game Bool
+exercises resolving controller idx cIdx bound legal clause = case Clause.optionality clause of
   Optionality.Mandatory -> pure True
-  Optionality.Optional -> do
-    gs <- State.get
-    let decider = Decide.deciderFor controller gs
-    decision <- Game.choose (Prompt.ChooseOptional decider controller resolving idx cIdx)
-    pure $ case decision of
-      OptionalDecision.Exercises -> True
-      OptionalDecision.Declines -> False
+  Optionality.Optional
+    | clauseIsInert bound legal clause -> pure False
+    | otherwise -> do
+        gs <- State.get
+        let decider = Decide.deciderFor controller gs
+        decision <- Game.choose (Prompt.ChooseOptional decider controller resolving idx cIdx)
+        pure $ case decision of
+          OptionalDecision.Exercises -> True
+          OptionalDecision.Declines -> False
+
+-- CR 608.2b / 603.5: can this clause's answer not matter? Only when every one of
+-- its effects reads a slot and every slot it reads is illegal or unfilled, since
+-- each opcode's slot reads then name nothing and the clause does nothing either
+-- way. The engine never makes a player's choice, so this is the one elision the
+-- prompt admits and it is deliberately conservative: an effect reading NO slot,
+-- or reading one surviving recipient among several, keeps the prompt.
+--
+-- A CLASSIFICATION and never an identity check: what an effect reads comes from
+-- slotsOf, and slotsAreExhaustive is what says slotsOf is the WHOLE of it -- an
+-- opcode that reads more than its slots (ArmDelayedTrigger, CR 725.2's
+-- ControllerOfSource) answers False there and so is never called inert. That
+-- conjunct is a REGRESSION FENCE rather than a proven behaviour: no optional
+-- clause in data/cards/ holds such an opcode, so dropping it leaves the suite
+-- green.
+--
+-- "Dead" is per SLOT and takes both maps, because a slot's binding need not be a
+-- target at all: a TARGET slot is dead once CR 608.2b has emptied it, and any
+-- other slot -- a group an earlier clause revealed, X, a reserved binding -- is
+-- dead only when nothing has bound it. Reading `legal` alone would call a
+-- revealed-cards slot dead and silently decline Midnight Tilling's return.
+--
+-- An EMPTY clause is not inert: it has no effect to read a slot, so `all` would
+-- hold vacuously. Nothing in data/cards/ prints one, and reaching this ahead of
+-- CR 608.2b's fizzle needs a modal payload mixing a live mode with a dead one
+-- (Deadly Complication).
+clauseIsInert :: Set SlotName -> Map.Map SlotName (Set Recipient) -> Clause.Clause Card.Type.Card -> Bool
+clauseIsInert bound legal clause =
+  let effects = Foldable.toList (Clause.effects clause)
+      dead name = case Map.lookup name legal of
+        Just recipients -> Set.null recipients
+        Nothing -> not (Set.member name bound)
+      inert effect =
+        let names = Map.keysSet (slotsOf effect)
+         in slotsAreExhaustive effect && not (Set.null names) && all dead names
+   in not (null effects) && all inert effects
 
 -- CR 118.12: does this clause's instruction list happen, given the cost paid on
 -- resolution it may state? A clause stating none always does; one that states one

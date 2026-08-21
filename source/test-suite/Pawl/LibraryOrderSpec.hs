@@ -2133,6 +2133,7 @@ optionalEffectSpec s registry =
           | cIdx == ClauseIndex.MkClauseIndex 1 -> OptionalDecision.Exercises
         _ -> S.identityAnswer p
       churnName = CardName.MkCardName (Text.pack "Corpse Churn")
+      complicationName = CardName.MkCardName (Text.pack "Deadly Complication")
       forestName = CardName.MkCardName (Text.pack "Forest")
       pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
       aliceNamesIn zone gs = List.sort (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone S.alice gs))
@@ -2141,6 +2142,34 @@ optionalEffectSpec s registry =
       -- dropped, since CR 608.2n puts the finished instant in the very
       -- graveyard the mill fills.
       milledNames gs = filter (/= churnName) (aliceNamesIn Zone.Graveyard gs)
+      -- Deadly Complication {1}{B}{R} Sorcery, "Choose one or both -- * Destroy
+      -- target creature. * Put a +1/+1 counter on target suspected creature you
+      -- control. You may have it become no longer suspected." (name, cost, type
+      -- line and oracle text checked against Scryfall.) The shape CR 608.2b's
+      -- fizzle cannot remove: choosing BOTH modes means one live target keeps the
+      -- whole spell resolving, so the other mode's "may" is reached with every
+      -- slot it reads already dead.
+      --
+      -- alice: two Swamps and two Mountains for the cost, the spell in hand, and
+      -- a Person of Interest whose CR 603.6a enters trigger has resolved, so she
+      -- controls the board's one suspected creature. The Detective that trigger
+      -- also makes is a second creature she controls that is NOT suspected, so
+      -- the suspect slot's filter is doing work. bob's Goblin Piker is mode 0's
+      -- victim -- his, so its destruction is visible as a permanent alice never
+      -- controlled and cannot be confused with the Person mode 1 names.
+      deadlyComplicationBoard = do
+        swamp <- S.printingOf s registry "Swamp"
+        mountain <- S.printingOf s registry "Mountain"
+        complication <- S.printingOf s registry "Deadly Complication"
+        poi <- S.printingOf s registry "Person of Interest"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let base = S.landsFor mountain S.alice 2 (S.landsInPlay swamp 2)
+            (victim, g1) = S.addCreature piker S.bob base
+            (poiId, g2) = S.entersWithTrigger poi S.alice g1
+            settled = S.runPure S.identityAnswer g2 (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
+            (g3, spellId) = S.handOne complication settled
+        pure (g3 {GameState.priority = Just S.alice}, spellId, victim, poiId)
+      isSuspected oid gs = fmap (Set.member Designation.Suspected . Object.designations) (Game.lookupObject oid gs)
    in Spec.describe s "OptionalEffect" $ do
         Spec.it s "CR 603.5 declining the may gains nothing, and the ability still resolves" $ do
           (gs, faithId) <- handWithTwoLands "Renewed Faith" "Plains"
@@ -2299,6 +2328,58 @@ optionalEffectSpec s registry =
               after = S.runPure returnsChurn cast Stack.resolveTop
           Spec.assertEqWith s "taking the return leaves the other two milled cards in the graveyard" (milledNames after) [forestName, pikerName]
           Spec.assertEqWith s "and exactly the creature card is in the hand" (aliceNamesIn Zone.Hand after) [pikerName]
+        -- The live half of the pair below, and the control that says the guard is
+        -- not simply refusing to ask: the same board, the same answer, the same
+        -- two modes, differing only in whether mode 1's target is still there.
+        -- With it there the "may" is a real question, is asked once, and taking
+        -- it ends CR 701.60a's designation.
+        Spec.it s "CR 603.5 whole card: Deadly Complication's optional clause is asked about while its target lives" $ do
+          (gs, spellId, victim, poiId) <- deadlyComplicationBoard
+          let cast = S.runPure (deadlyComplicationAnswer victim poiId) gs (S.cast S.alice spellId)
+              ((_, after), transcript) = Replay.record (deadlyComplicationAnswer victim poiId) cast Stack.resolveTop
+          Spec.assertEqWith s "the may was asked exactly once, and taken" (filter isOptionalResponse transcript) [Response.ChoseOptional OptionalDecision.Exercises]
+          Spec.assertEqWith s "so the Person is no longer suspected" (isSuspected poiId after) (Just False)
+          Spec.assertEqWith s "the mandatory clause put its +1/+1 counter on" (plusOnePlusOnesOn (Just poiId) after) 1
+          Spec.assertEqWith s "and the other mode destroyed bob's Goblin Piker" (Game.lookupObject victim after) Nothing
+        -- CR 608.2b before CR 603.5, one mode over: with mode 1's only target
+        -- gone the spell does NOT fizzle -- mode 0's target is still legal, so CR
+        -- 608.2b's union survives -- and mode 1's clauses are reached anyway. Its
+        -- optional clause reads only the dead slot, so both answers leave the same
+        -- board and the prompt is not raised. The board differs from the case
+        -- above in exactly one thing: the Person is in the graveyard.
+        Spec.it s "CR 608.2b whole card: Deadly Complication's dead mode is not asked about" $ do
+          (gs, spellId, victim, poiId) <- deadlyComplicationBoard
+          let cast = S.runPure (deadlyComplicationAnswer victim poiId) gs (S.cast S.alice spellId)
+              gone = S.runPure (deadlyComplicationAnswer victim poiId) cast (Event.changeZone poiId Zone.Graveyard)
+              ((_, after), transcript) = Replay.record (deadlyComplicationAnswer victim poiId) gone Stack.resolveTop
+          Spec.assertEqWith s "no may was ever asked: every slot the clause reads is dead" (filter isOptionalResponse transcript) []
+          Spec.assertEqWith s "the spell did not fizzle: the live mode destroyed bob's Goblin Piker" (Game.lookupObject victim after) Nothing
+          Spec.assertEqWith s "and Deadly Complication resolved into alice's graveyard" (List.elem complicationName (aliceNamesIn Zone.Graveyard after)) True
+
+-- Chooses BOTH of Deadly Complication's modes, aims each slot at the permanent
+-- that slot's mode is about, and takes the "may" whenever one is offered. Rank-1
+-- for exerciseOptional's reason. The recipients are FILTERED out of the offered
+-- set rather than built, so a slot the engine offers under another recipient
+-- shape is not silently replaced by one CR 608.2b would drop. A slot named
+-- neither of the card's two gets the empty answer, which fails the target
+-- announcement rather than aiming somewhere plausible.
+deadlyComplicationAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+deadlyComplicationAnswer victim suspect p = case p of
+  Prompt.ChooseModes {} -> Seq.fromList (fmap ModeIndex.MkModeIndex [0, 1])
+  Prompt.ChooseTargets _ _ _ sets -> Map.mapWithKey aimAt sets
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  _ -> S.identityAnswer p
+  where
+    aimAt :: SlotName.SlotName -> (Natural, Set.Set Recipient.Recipient) -> Set.Set Recipient.Recipient
+    aimAt slot (_, offered)
+      | slot == creatureSlot = Set.filter ((== Just victim) . Recipient.objectOf) offered
+      | slot == suspectSlot = Set.filter ((== Just suspect) . Recipient.objectOf) offered
+      | otherwise = Set.empty
+
+-- Deadly Complication's two slot names (data/cards/deadly-complication.json).
+creatureSlot, suspectSlot :: SlotName.SlotName
+creatureSlot = SlotName.MkSlotName (Text.pack "creature")
+suspectSlot = SlotName.MkSlotName (Text.pack "suspect")
 
 -- Takes every printed "may" it is offered. Rank-1 like Pawl.Support.attackTo: the
 -- implicit forall is outermost, so this is the `forall r. Prompt r -> r` that
