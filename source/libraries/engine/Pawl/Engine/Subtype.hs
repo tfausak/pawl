@@ -400,10 +400,10 @@ everyCreatureType :: Set.Set Subtype.Subtype
 everyCreatureType = Set.fromList (filter isCreatureType [minBound ..])
 
 -- | CR 205.3: the card types whose subtype list this subtype belongs to. CR
--- 205.1a's removal clause is the caller -- a subtype stays with an object only
+-- 205.1a's removal clause is one caller -- a subtype stays with an object only
 -- while the object still has one of the card types its family correlates with
 -- -- and CR 205.3d's rejection clause is the other direction of the same
--- question (#530).
+-- question; Pawl.Engine.Projection.correspondsTo asks both through this.
 --
 -- A SET rather than one card type, because two families are shared: CR 205.3m
 -- gives the creature types to creatures and kindreds alike, and CR 205.3k the

@@ -245,23 +245,22 @@ applyModification viewOf src gs oid m pc =
             { PC.power = addPT (PC.power pc) (Quantity.evaluate viewOf context gs oid p),
               PC.toughness = addPT (PC.toughness pc) (Quantity.evaluate viewOf context gs oid t)
             }
-        Modification.AddLandSubtype s ->
-          pc {PC.subtypes = Set.insert s (PC.subtypes pc)}
+        Modification.AddLandSubtype s -> gainSubtype s pc
         -- CR 205.1a/205.1b: setting a subtype replaces only the creature types
-        -- (CR 205.3m), strips no abilities and touches no card type.
-        --
-        -- Not implemented: CR 205.3d, which none of the layer-4 subtype arms asks
-        -- (#530).
+        -- (CR 205.3m), strips no abilities and touches no card type. The strip
+        -- runs whether or not CR 205.3d then lets the new type in, which no board
+        -- can tell apart: a creature type is only ever present on an object one
+        -- of whose card types correlates with it, so an object this arm refuses
+        -- has none to strip.
         Modification.SetCreatureSubtype s ->
-          pc {PC.subtypes = Set.insert s (Set.filter (not . Subtype.isCreatureType) (PC.subtypes pc))}
+          gainSubtype s pc {PC.subtypes = Set.filter (not . Subtype.isCreatureType) (PC.subtypes pc)}
         -- CR 205.1b's add: every creature type already present is kept.
-        Modification.AddCreatureSubtype s ->
-          pc {PC.subtypes = Set.insert s (PC.subtypes pc)}
+        Modification.AddCreatureSubtype s -> gainSubtype s pc
         -- The same add over CR 205.3m's whole list (CR 702.73a).
         -- applySubtypeDefining writes the same thing at the start of this layer
         -- (CR 613.3); this runs in timestamp order (CR 613.7).
         Modification.AddEveryCreatureSubtype ->
-          pc {PC.subtypes = Set.union Subtype.everyCreatureType (PC.subtypes pc)}
+          pc {PC.subtypes = Set.union (gainableSubtypes pc Subtype.everyCreatureType) (PC.subtypes pc)}
         Modification.AddCardType t ->
           pc {PC.cardTypes = Set.insert t (PC.cardTypes pc)}
         -- CR 205.1a's set, and the whole of it: the new card type replaces the
@@ -273,12 +272,9 @@ applyModification viewOf src gs oid m pc =
         Modification.SetCardType t ->
           let kept = Set.filter retainedThroughCardTypeSet (PC.cardTypes pc)
               types = Set.insert t kept
-              correlated x =
-                let family = Subtype.correlatedCardTypes x
-                 in Set.null family || not (Set.disjoint family types)
            in pc
                 { PC.cardTypes = types,
-                  PC.subtypes = Set.filter correlated (PC.subtypes pc)
+                  PC.subtypes = Set.filter (correspondsTo types) (PC.subtypes pc)
                 }
         -- CR 205.4b: a gain inserts into the supertype set. CR 205.4 gives an
         -- object a SET of supertypes, so a second grant does not stack.
@@ -345,6 +341,34 @@ applyModification viewOf src gs oid m pc =
         Modification.SwitchPowerToughness ->
           pc {PC.power = PC.toughness pc, PC.toughness = PC.power pc}
 
+-- CR 205.3d: an object can't gain a subtype that doesn't correspond to one of
+-- its types. CR 205.1a's removal clause is the same question in the other
+-- direction, so the SetCardType arm asks this too -- one predicate, so a subtype
+-- a card-type set would strip is one a later grant cannot put back.
+--
+-- The card types are the ones the fold has produced SO FAR, which is what lets
+-- an effect grant the card type and the subtype together: Song of the Dryads,
+-- Ashaya, Grist and Life and Limb each list their card-type modifications ahead
+-- of the subtypes those types carry, and applyModification folds a static
+-- ability's modifications in that order. A card written the other way round
+-- would have its subtype refused, which is why data/cards is the place that
+-- ordering is fixed.
+correspondsTo :: Set CardType.CardType -> Subtype.Type.Subtype -> Bool
+correspondsTo types subtype =
+  let family = Subtype.correlatedCardTypes subtype
+   in Set.null family || not (Set.disjoint family types)
+
+-- One grant, dropped when CR 205.3d refuses it.
+gainSubtype :: Subtype.Type.Subtype -> ProjectedCharacteristics -> ProjectedCharacteristics
+gainSubtype s pc
+  | correspondsTo (PC.cardTypes pc) s = pc {PC.subtypes = Set.insert s (PC.subtypes pc)}
+  | otherwise = pc
+
+-- The same refusal over a whole set, for the two grants that write CR 205.3m's
+-- list at once.
+gainableSubtypes :: ProjectedCharacteristics -> Set Subtype.Type.Subtype -> Set Subtype.Type.Subtype
+gainableSubtypes pc = Set.filter (correspondsTo (PC.cardTypes pc))
+
 -- CR 205.1a's named exception to its own set: instant and sorcery are retained.
 retainedThroughCardTypeSet :: CardType.CardType -> Bool
 retainedThroughCardTypeSet t = t == CardType.Instant || t == CardType.Sorcery
@@ -361,16 +385,23 @@ retainedThroughCardTypeSet t = t == CardType.Instant || t == CardType.Sorcery
 -- copy effect gave the land is in these lists by the time layer 4 runs, and goes
 -- with the printed text rather than surviving it. Proved by Pawl.CopySpec's "CR
 -- 305.7 Blood Moon strips the abilities Vesuva copied from another land".
+--
+-- CR 205.3d gates the whole of it, strip included: both clauses of CR 305.7 are
+-- about what happens to a LAND, so an object with no Land card type is left
+-- exactly as it was rather than losing its abilities to a subtype it cannot
+-- gain.
 setLandSubtypeTo :: Subtype.Type.Subtype -> ProjectedCharacteristics -> ProjectedCharacteristics
-setLandSubtypeTo s pc =
-  pc
-    { PC.subtypes = Set.insert s (Set.filter (not . Subtype.isLandType) (PC.subtypes pc)),
-      PC.keywords = Map.empty,
-      PC.characteristicPT = Nothing,
-      PC.activatedAbilities = [],
-      PC.replacementEffects = [],
-      PC.triggeredAbilities = []
-    }
+setLandSubtypeTo s pc
+  | not (correspondsTo (PC.cardTypes pc) s) = pc
+  | otherwise =
+      pc
+        { PC.subtypes = Set.insert s (Set.filter (not . Subtype.isLandType) (PC.subtypes pc)),
+          PC.keywords = Map.empty,
+          PC.characteristicPT = Nothing,
+          PC.activatedAbilities = [],
+          PC.replacementEffects = [],
+          PC.triggeredAbilities = []
+        }
 
 -- CR 613.4b: layer 7b establishes base P/T, so an object with no printed P/T
 -- gains it. Contrast addPT (7c), which only modifies.
@@ -958,11 +989,14 @@ applyColorDefining pc =
 -- changeling, at the start of layer 4 -- applyColorDefining one layer down, and
 -- every reason in its header carries over. A UNION, since CR 205.1b keeps the
 -- subtypes of the object's other families. Being at the START of layer 4 is what
--- makes Turn to Frog's SetCreatureSubtype win over it.
+-- makes Turn to Frog's SetCreatureSubtype win over it. CR 205.3d gates it like
+-- any other grant, which on a printed changeling object refuses nothing: CR
+-- 702.73b puts the ability on creature and Kindred cards, and both correlate
+-- with CR 205.3m's list.
 applySubtypeDefining :: ProjectedCharacteristics -> ProjectedCharacteristics
 applySubtypeDefining pc =
   if definesEveryCreatureType (Map.keysSet (PC.keywords pc))
-    then pc {PC.subtypes = Set.union Subtype.everyCreatureType (PC.subtypes pc)}
+    then pc {PC.subtypes = Set.union (gainableSubtypes pc Subtype.everyCreatureType) (PC.subtypes pc)}
     else pc
 
 -- CR 202.1b: a land has no mana cost at all, so it contributes no colours.

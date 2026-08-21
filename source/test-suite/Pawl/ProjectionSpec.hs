@@ -21,9 +21,11 @@ import qualified Pawl.CardSpec as CardSpec
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Projection as Projection
 -- Pawl.Types.Filter aliased Filter.Type: the evaluator Pawl.Engine.Filter already claims
 -- the alias Filter above (documented phase exception). Pawl.Types.Subtype is
@@ -51,7 +53,7 @@ import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
-import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
@@ -1538,6 +1540,58 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "CR 205.1a: the creature types went with the Creature type, and only the granted Forest is left" (Projection.subtypesOf pikerId gs) (Set.singleton Subtype.Type.Forest)
     Spec.assertEqWith s "and it is colorless" (Projection.colorsOf pikerId gs) Set.empty
 
+  -- CR 205.3d: "An object can't gain a subtype that doesn't correspond to one of
+  -- that object's types." Synthetic Marsh Song enchants any permanent and grants
+  -- the Swamp land type WITHOUT granting the Land card type -- the shape no
+  -- printing has, because every printed grant of a land type either names lands
+  -- in its affected set (Urborg, Blood Moon, Celestial Dawn) or gives the card
+  -- type in the same breath (Song of the Dryads, Ashaya, Life and Limb).
+  --
+  -- The observable is CR 305.6's intrinsic mana ability, which Pawl.Engine.Mana
+  -- mints off the subtype alone: a Piker that had gained the Swamp would tap for
+  -- {B}. That the Piker is a mana source at all once it does gain it is what the
+  -- Forest leg holds fixed -- both boards carry the Forest, the Piker and the
+  -- Aura, and differ in exactly one thing, which of the two the Aura is on, so
+  -- the Forest's {G} is common to them and only a Swamp can pay the {B}.
+  Spec.it s "CR 205.3d a granted land type does not stick to a creature, and does to a land" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    marshSong <- S.printingOf s registry "Synthetic Marsh Song"
+    let base = Setup.emptyGame S.bothPlayers
+        (forestId, g1) = S.addCreature forest S.alice base
+        (pikerId, g2) = S.addCreature piker S.alice g1
+        (songId, g3) = S.addCreature marshSong S.alice g2
+        onPiker = S.attach songId pikerId g3
+        onForest = S.attach songId forestId g3
+        black = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Black)]
+    Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice black onPiker)) "the Piker is no land, so it gains no Swamp and nothing of alice's pays {B}"
+    Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice black onForest) "the same Aura on a land does grant it, and CR 305.6 mints the {B}"
+    Spec.assertEqWith s "the Piker keeps its printed types and gains nothing" (Projection.subtypesOf pikerId onPiker) (Set.fromList [Subtype.Type.Goblin, Subtype.Type.Warrior])
+    Spec.assertEqWith s "the Forest gains the Swamp in addition (CR 205.1b)" (Projection.subtypesOf forestId onForest) (Set.fromList [Subtype.Type.Forest, Subtype.Type.Swamp])
+
+  -- The other direction, and the reason CR 205.3d is asked against the card types
+  -- the fold has produced SO FAR rather than the ones the object started with:
+  -- Song of the Dryads' one static ability sets the card type to Land and then
+  -- grants the Forest, so by the time the grant is judged the object it is judged
+  -- against is a land. A check reading the object's base card types would refuse
+  -- the Forest and leave a colourless land that taps for nothing.
+  --
+  -- The Mountain is what makes the negative leg mean something: alice has a mana
+  -- source on both boards, and green is what only the enchanted Piker adds.
+  Spec.it s "CR 205.3d/305.6 Song of the Dryads' Forest lands on the creature the same effect makes a land" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    song <- S.printingOf s registry "Song of the Dryads"
+    let base = Setup.emptyGame S.bothPlayers
+        (_, g1) = S.addCreature mountain S.alice base
+        (pikerId, g2) = S.addCreature piker S.alice g1
+        (songId, unattached) = S.addCreature song S.alice g2
+        attached = S.attach songId pikerId unattached
+        green = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]
+    Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice green unattached)) "before: nothing alice controls makes green"
+    Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice green attached) "after: the Piker is a Forest land, so CR 305.6 gives it {T}: Add {G}"
+    Spec.assertEqWith s "the Forest is the only subtype left" (Projection.subtypesOf pikerId attached) (Set.singleton Subtype.Type.Forest)
+
   -- CR 613.7's timestamp order over the add/set pair, which is the whole of what
   -- decides between them: neither modification moves the other's affected set, so
   -- CR 613.8 has nothing to reorder and the later one simply sees what the
@@ -2381,11 +2435,17 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- Each SetLandSubtype retires the LAND type its predecessor left and no
   -- more (CR 305.7), so the Piker's printed creature types ride through both
   -- and the Swamp/Forest pair alone carries the ordering claim.
+  --
+  -- The oldest of the three effects makes the Piker a land, which CR 205.3d
+  -- requires before either land type can land on it at all; it is oldest so that
+  -- neither reading of CR 613.8 can move it, leaving the pair below to carry the
+  -- timestamp claim on its own.
   Spec.it s "CR 613.7 within layer 4, no dependency leaves timestamp order alone" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
     let (pikerId, gs0) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
-        gsA = S.withEffectAt pikerId (Timestamp.MkTimestamp 10) (Modification.SetLandSubtype Subtype.Type.Swamp) gs0
+        animated = S.withEffectAt pikerId (Timestamp.MkTimestamp 5) (Modification.AddCardType CardType.Land) gs0
+        gsA = S.withEffectAt pikerId (Timestamp.MkTimestamp 10) (Modification.SetLandSubtype Subtype.Type.Swamp) animated
         gs = S.withEffectAt pikerId (Timestamp.MkTimestamp 20) (Modification.SetLandSubtype Subtype.Type.Forest) gsA
     Spec.assertEqWith s "the later SetLandSubtype wins, and only the land types moved" (Projection.subtypesOf pikerId gs) (Set.fromList [Subtype.Type.Forest, Subtype.Type.Goblin, Subtype.Type.Warrior])
 
@@ -3015,8 +3075,8 @@ levelerSpec s registry = Spec.describe s "Leveler" $ do
     (oid, gs) <- studentBoard s registry 0
     let view = Projection.viewOfObject oid gs
         context = Filter.contextFor (Just S.alice) (Just oid)
-        white = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.White)])) []
-        blue = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Blue)])) []
+        white = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.White)])) []
+        blue = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Blue)])) []
     Spec.assertBool s (Filter.matches context view (Filter.Type.HasKeywordFamily KeywordFamily.LevelUp)) "the family reaches it"
     Spec.assertBool s (Filter.matches context view (Filter.Type.HasKeyword (Keyword.LevelUp white))) "so does the written {W} instance"
     Spec.assertBool s (not (Filter.matches context view (Filter.Type.HasKeyword (Keyword.LevelUp blue)))) "but level up {U} is a different instance"
