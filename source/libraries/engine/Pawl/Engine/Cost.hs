@@ -1566,9 +1566,10 @@ pay casting spending pid oid cost = do
 -- having nothing of its own to rewind.
 --
 -- The bound slots ride out unread. A component of a combat toll binds what
--- Pawl.Engine.Cost.payComponent binds it (Sacrifice reserves a name), and there is
--- no ability resolving for CR 608.2h to read it into -- CR 508.1j and CR 509.1f
--- name a payment and no effect.
+-- payComponent binds it (Sacrifice reserves a name), and there is no resolving
+-- ability holding a binding environment to write them into -- CR 508.1j and CR
+-- 509.1f name a payment and no effect, where CR 601.2f's components are paid for a
+-- spell that goes on to resolve.
 --
 -- Not implemented: CR 601.2h's order prompt ACROSS tags. Each tag's own components
 -- are ordered by payComponents below, but two taxing permanents are paid in
