@@ -32,6 +32,7 @@ import qualified Pawl.Types.PlayerCounterTally as PlayerCounterTally
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Plus as Plus
+import qualified Pawl.Types.ProductionTag as ProductionTag
 import Pawl.Types.Quantity (Quantity)
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Rounding as Rounding
@@ -331,6 +332,14 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- object it reads is the RESOLVING SPELL, which is still on the stack while its
   -- own clause conditions are gated (Pawl.Engine.Resolve.gateHolds).
   Quantity.WasKicked -> fmap (\view -> if Filter.kicked view then 1 else 0) mView
+  -- CR 107.4h's third sentence as a 0/1, WasKicked's arm in every respect --
+  -- including the object it reads, which for Berg Strider is the PERMANENT the
+  -- spell became (CR 400.7d).
+  --
+  -- A CLASSIFICATION of the mana and never an effect's identity: what the view
+  -- reports is Pawl.Types.ProductionTag, the closed half of what a unit carries,
+  -- and this arm asks it for one member.
+  Quantity.SnowWasSpent -> fmap (\view -> if Set.member ProductionTag.Snow (Filter.manaSpentTags view) then 1 else 0) mView
   -- CR 508.3b: how many of that player's opponents were declared attacked this
   -- combat phase. LifeTotal's arm in shape -- live, one player only, resolved
   -- through the same playersOf, and Nothing for a reference naming
@@ -557,6 +566,7 @@ substituteStar star quantity = case quantity of
   Quantity.HasDesignation _ -> quantity
   Quantity.ClassLevel -> quantity
   Quantity.WasKicked -> quantity
+  Quantity.SnowWasSpent -> quantity
   Quantity.OpponentsAttacked _ -> quantity
   Quantity.CardsDiscardedThisTurn _ -> quantity
   Quantity.PlayersDealtDamageThisTurn _ -> quantity
@@ -626,6 +636,7 @@ slots quantity = case quantity of
   Quantity.HasDesignation _ -> Set.empty
   Quantity.ClassLevel -> Set.empty
   Quantity.WasKicked -> Set.empty
+  Quantity.SnowWasSpent -> Set.empty
   -- And a seventh PlayerRef in that same position, CR 508.3b's record having
   -- nothing else on it.
   Quantity.OpponentsAttacked _ -> Set.empty
@@ -683,6 +694,7 @@ slotsAreExhaustive quantity = case quantity of
   Quantity.HasDesignation _ -> True
   Quantity.ClassLevel -> True
   Quantity.WasKicked -> True
+  Quantity.SnowWasSpent -> True
   Quantity.OpponentsAttacked ref -> playerRefIsSlotless ref
   Quantity.CardsDiscardedThisTurn ref -> playerRefIsSlotless ref
   Quantity.PlayersDealtDamageThisTurn ref -> playerRefIsSlotless ref
@@ -819,6 +831,7 @@ mapPlayerRefs f intoCount quantity = case quantity of
   Quantity.HasDesignation _ -> quantity
   Quantity.ClassLevel -> quantity
   Quantity.WasKicked -> quantity
+  Quantity.SnowWasSpent -> quantity
   Quantity.EnteredThisTurn -> quantity
   Quantity.BlockersBeyondFirst -> quantity
   where
@@ -921,6 +934,7 @@ readsX quantity = case quantity of
   Quantity.HasDesignation _ -> False
   Quantity.ClassLevel -> False
   Quantity.WasKicked -> False
+  Quantity.SnowWasSpent -> False
   Quantity.OpponentsAttacked _ -> False
   Quantity.CardsDiscardedThisTurn _ -> False
   Quantity.PlayersDealtDamageThisTurn _ -> False

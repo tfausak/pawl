@@ -34,6 +34,7 @@ import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
@@ -216,6 +217,7 @@ enter pid = do
                 Object.designations = Set.empty,
                 Object.kicked = False,
                 Object.phyrexianLifePaid = 0,
+                Object.manaSpent = Mana.MkMana [],
                 Object.announcedX = Nothing,
                 Object.detainedUntil = Set.empty,
                 Object.doesNotUntapNext = False,

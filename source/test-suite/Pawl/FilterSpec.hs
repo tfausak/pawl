@@ -61,6 +61,7 @@ blackCreature =
       Filter.designations = Set.empty,
       Filter.classLevel = Nothing,
       Filter.kicked = False,
+      Filter.manaSpentTags = Set.empty,
       -- CR 602.1 / 605.1a: a vanilla creature as far as this axis goes, so the
       -- atom's own cases below say which view they want rather than inheriting it.
       Filter.nonManaActivatedAbility = False
@@ -98,6 +99,7 @@ devoidBigCreature =
       Filter.designations = Set.empty,
       Filter.classLevel = Nothing,
       Filter.kicked = False,
+      Filter.manaSpentTags = Set.empty,
       Filter.nonManaActivatedAbility = False
     }
 

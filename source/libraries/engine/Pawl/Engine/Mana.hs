@@ -2,6 +2,7 @@ module Pawl.Engine.Mana where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Bifunctor as Bifunctor
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -852,15 +853,20 @@ plan clauses spending budget cost (Mana.MkMana units) =
 -- asks nothing.
 --
 -- FILTERED, NOT TRUSTED, the Pawl.Engine.Cost.chooseSource posture.
-spendChosen :: PlayerId -> [SpendManaAsThough.SpendManaAsThough] -> [Maybe Demand] -> Mana -> Game Mana
-spendChosen pid clauses steps0 (Mana.MkMana units0) = fmap Mana.MkMana (go steps0 units0)
+--
+-- BOTH HALVES come back: the pool that is left, and the units that went. CR
+-- 107.4h's third sentence asks about the second one after the fact, and the
+-- caller cannot recover it by subtraction -- two equal units are the same value,
+-- so a pool that shrank by one says nothing about which.
+spendChosen :: PlayerId -> [SpendManaAsThough.SpendManaAsThough] -> [Maybe Demand] -> Mana -> Game (Mana, Mana)
+spendChosen pid clauses steps0 (Mana.MkMana units0) = fmap (Bifunctor.bimap Mana.MkMana Mana.MkMana) (go steps0 units0)
   where
     go steps units = case steps of
-      [] -> pure units
+      [] -> pure (units, [])
       _ : rest -> case spendable clauses steps units of
         -- Unreachable from `plan`, which offers these steps only where some
         -- payment completes them.
-        [] -> pure units
+        [] -> pure (units, [])
         first : others -> do
           chosen <-
             if null others || Set.size (leftovers clauses steps units) < 2
@@ -869,7 +875,7 @@ spendChosen pid clauses steps0 (Mana.MkMana units0) = fmap Mana.MkMana (go steps
                 gs <- State.get
                 answer <- Game.choose (Prompt.ChooseManaToSpend (Decide.deciderFor pid gs) pid (first NonEmpty.:| others))
                 pure (if List.elem answer (first : others) then answer else first)
-          go rest (List.delete chosen units)
+          fmap (fmap (chosen :)) (go rest (List.delete chosen units))
 
 -- Spend a pool against a cost, within a budget of `budget` life. Nothing when no
 -- resolution fits; otherwise the pool that is left and the life to pay for it.

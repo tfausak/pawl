@@ -22,6 +22,7 @@ import qualified Pawl.Types.Morph as Morph
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.Reinforce as Reinforce
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SlotName as SlotName
@@ -293,6 +294,21 @@ data View = MkView
     -- for a permanent a kicked spell became, which is CR 400.7d's exception to
     -- the forgetting (see Pawl.Types.Object).
     kicked :: Bool,
+    -- CR 400.7d / CR 107.4h: the production tags of the mana that was spent to
+    -- cast the spell this candidate is, or was -- read off Object.manaSpent, and
+    -- empty where there is no object to read it off, both for the reasons
+    -- `designations` above gives. Its one reader is Pawl.Engine.Quantity's
+    -- SnowWasSpent arm, answering Berg Strider's clause condition.
+    --
+    -- The TAGS and not the units: Pawl.Types.ProductionTag is the closed half of
+    -- what a unit carries (see its header), so this field is a classification the
+    -- vocabulary can ask about rather than a pool to case over. A card asking
+    -- about the spent mana's COLOUR -- Boreal Outrider -- wants the types too,
+    -- and would widen this rather than read around it (#2008).
+    --
+    -- Non-empty for a permanent a spell paid with tagged mana became, which is CR
+    -- 400.7d's exception to the forgetting (see Pawl.Types.Object.manaSpent).
+    manaSpentTags :: Set.Set ProductionTag.ProductionTag,
     -- CR 602.1 / 605.1a: does the candidate have an activated ability that isn't
     -- a mana ability? A Bool and not the ability list, because that is the whole
     -- of what Filter.HasNonManaActivatedAbility asks and this module holds no
@@ -390,6 +406,9 @@ playerView pid =
       -- not one -- `designations` above, same sentence.
       classLevel = Nothing,
       kicked = False,
+      -- CR 202.1a's mana cost is spent to cast a CARD, and CR 109.1's list of
+      -- what an object is has no player in it -- `manaValue` above, same rule.
+      manaSpentTags = Set.empty,
       -- CR 602.1: an activated ability is an ability OF AN OBJECT, and CR 109.1's
       -- list of what an object is has no player in it -- `keywords` above, one
       -- rule over.

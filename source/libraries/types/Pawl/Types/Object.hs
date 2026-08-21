@@ -12,6 +12,7 @@ import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RoomIndex as RoomIndex
@@ -633,6 +634,36 @@ data Object = MkObject
     -- printed no Phyrexian symbol or whose controller announced mana for all of
     -- them.
     phyrexianLifePaid :: Natural.Natural,
+    -- | CR 107.4h with CR 601.2h: the mana that was SPENT to pay the cost of
+    -- casting the SPELL that became this object -- the record CR 107.4h's third
+    -- sentence needs, "the {S} symbol can also be used to refer to mana of any
+    -- type produced by a snow source spent to pay a cost". Berg Strider's "if
+    -- {S} was spent to cast this spell" is the one reader, through
+    -- Pawl.Engine.Filter.View's `manaSpentTags` and Quantity.SnowWasSpent.
+    --
+    -- THE UNITS and not the answer to one question. Pawl.Types.ManaUnit already
+    -- carries everything a card can ask about a mana it was paid with -- the
+    -- production tags, the type -- so recording the units leaves "was it snow?"
+    -- and "what colour was it?" (Boreal Outrider, #2008) as reads rather than as
+    -- fields.
+    --
+    -- Written by Pawl.Engine.Cost.payMana, which knows WHICH spell it is paying
+    -- for (its `casting` argument) and restores the whole state when the cost
+    -- goes unpaid, so a rejected cast records nothing.
+    --
+    -- `kicked` above's exception, and rule 400.7d names this field's contents
+    -- outright: an ability of a permanent may reference "what mana was spent to
+    -- pay those costs" to cast the spell it was. So
+    -- Pawl.Engine.Event.changeZoneAttaching carries it across that one move and
+    -- newIncarnation forgets it everywhere else -- which is what Berg Strider
+    -- needs, its clause being an ability of the PERMANENT.
+    --
+    -- Not implemented: an ACTIVATION cost's mana is not recorded, since
+    -- Pawl.Engine.Activate pays with no object to record against (#2007).
+    --
+    -- Empty for every object nothing was spent on: a token, a permanent an
+    -- effect put onto the battlefield, and every spell whose cost was free.
+    manaSpent :: Mana.Mana,
     -- | CR 107.3m: the value of X chosen for the SPELL that became this
     -- permanent, which is the value of X for the permanent's
     -- enters-the-battlefield replacement effects -- Nissa, Steward of Elements'
@@ -811,6 +842,10 @@ newIncarnation object =
       -- CR 400.7 forgets the announcement, `kicked` above's route; CR 601.2b's
       -- record is written back by Pawl.Engine.Event.changeZoneAttaching's mkObj.
       phyrexianLifePaid = 0,
+      -- CR 400.7 forgets the payment with the announcement, `kicked` above's
+      -- route; CR 400.7d's exception is written back by
+      -- Pawl.Engine.Event.changeZoneAttaching's mkObj.
+      manaSpent = Mana.MkMana [],
       -- CR 400.7 forgets the announcement like everything else; CR 107.3m's
       -- exception is written back by the move that carries it, in
       -- Pawl.Engine.Event.changeZoneAttaching's mkObj.

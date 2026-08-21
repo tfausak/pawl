@@ -87,9 +87,11 @@ import Pawl.Types.Layer (Layer)
 import qualified Pawl.Types.Layer as Layer
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.Loyalty as Loyalty
+import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Milled as Milled
@@ -629,6 +631,9 @@ viewOfCard face =
           -- printed face.
           Filter.classLevel = Nothing,
           Filter.kicked = False,
+          -- CR 601.2h pays the cost of a SPELL, and this builder describes a
+          -- printed face.
+          Filter.manaSpentTags = Set.empty,
           -- CR 602.1 / 605.1a off the PRINTED face: the card's printed abilities
           -- plus rule 702's HAND ones (CR 702.29b, CR 702.77b), not the
           -- battlefield ones, which are minted from the post-layer keyword map.
@@ -766,6 +771,10 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- CR 702.33d: read live off the object, so the CR 608.2h path answers False
       -- for a spell that has left the stack.
       Filter.kicked = maybe False Object.kicked (Game.lookupObject oid gs),
+      -- CR 400.7d / CR 107.4h: read live off the object like `kicked`, and
+      -- flattened to the tags here because that is the whole of what the
+      -- vocabulary asks (see the field's own comment in Pawl.Engine.Filter).
+      Filter.manaSpentTags = foldMap (foldMap ManaUnit.tags . Mana.unwrap . Object.manaSpent) (Game.lookupObject oid gs),
       -- CR 602.1 / 605.1a off the PROJECTION like `keywords`: abilities are
       -- characteristics (CR 109.3) written by layer 6. The whole list the object
       -- HAS, not the list it can activate here. LAZY -- see the field's own comment
@@ -1667,6 +1676,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.HasDesignation _ -> quantity
   Quantity.Type.ClassLevel -> quantity
   Quantity.Type.WasKicked -> quantity
+  Quantity.Type.SnowWasSpent -> quantity
   Quantity.Type.PlayerCounters {} -> quantity
   Quantity.Type.ObjectCounters _ -> quantity
   Quantity.Type.OpponentsAttacked _ -> quantity
@@ -2617,6 +2627,7 @@ quantityReads q = case q of
   Quantity.Type.HasDesignation _ -> Set.empty
   Quantity.Type.ClassLevel -> Set.empty
   Quantity.Type.WasKicked -> Set.empty
+  Quantity.Type.SnowWasSpent -> Set.empty
   Quantity.Type.OpponentsAttacked _ -> Set.empty
   Quantity.Type.CardsDiscardedThisTurn _ -> Set.empty
   Quantity.Type.PlayersDealtDamageThisTurn _ -> Set.empty

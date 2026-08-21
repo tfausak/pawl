@@ -1713,9 +1713,26 @@ payMana casting spending pid cost = do
       case Mana.plan (PlayerEffect.spendManaAsThough pid gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded casting manaActivations spending pid cost gs)) cost (Mana.Type.MkMana available) of
         Nothing -> pure False
         Just (steps, life) -> do
-          Mana.Type.MkMana left <- Mana.spendChosen pid (PlayerEffect.spendManaAsThough pid gs) steps (Mana.Type.MkMana available)
-          State.modify' (Event.payLife pid life . Mana.setPool pid (Mana.Type.MkMana (withheld <> left)))
+          (Mana.Type.MkMana left, spent) <- Mana.spendChosen pid (PlayerEffect.spendManaAsThough pid gs) steps (Mana.Type.MkMana available)
+          State.modify' (recordSpent spent . Event.payLife pid life . Mana.setPool pid (Mana.Type.MkMana (withheld <> left)))
           pure True
+    -- CR 400.7d's cost record for the MANA, kept where CR 107.4h's third
+    -- sentence can be asked about it afterwards -- "the {S} symbol can also be
+    -- used to refer to mana of any type produced by a snow source spent to pay a
+    -- cost". Berg Strider is the reader.
+    --
+    -- `casting` is the object it goes on, and it is Just only where the payment
+    -- is for a spell being cast (see `pay`), which is the whole of what any
+    -- printed card asks about ("if {S} was spent to CAST this spell"). An
+    -- activation's mana is not recorded (#2007).
+    --
+    -- Written HERE rather than by the caller because this is the one place that
+    -- knows which units went. An unpaid cost writes nothing: `payMana` restores
+    -- the state it entered with, and this line is only reached once the payment
+    -- has settled.
+    recordSpent spent gs = case casting of
+      Nothing -> gs
+      Just sid -> gs {GameState.objects = Map.adjust (\o -> o {Object.manaSpent = spent}) sid (GameState.objects gs)}
 
 -- Which source to tap next, or none. `covered` says whether the pool already
 -- pays the cost, which picks between CR 118.3c's question and CR 601.2g's.

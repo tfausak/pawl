@@ -64,6 +64,10 @@ codec =
       -- at, so only the designation is on the wire.
       Arm.payload "HasDesignation" Designation.codec Quantity.HasDesignation (\x -> case x of Quantity.HasDesignation y -> Just y; _ -> Nothing),
       Arm.nullary "WasKicked" Quantity.WasKicked,
+      -- CR 107.4h's third sentence, with nothing on the wire either: which tag is
+      -- asked about is the constructor (Pawl.Types.Quantity), and the object is
+      -- whichever one the quantity is evaluated against.
+      Arm.nullary "SnowWasSpent" Quantity.SnowWasSpent,
       Arm.nullary "ClassLevel" Quantity.ClassLevel,
       -- CR 508.3b's record, with only a PlayerRef on the wire: what is counted
       -- comes from the combat record rather than from anything the card names.

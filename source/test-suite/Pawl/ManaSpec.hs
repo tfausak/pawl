@@ -2993,6 +2993,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   celestialDawnSpec s registry
   spendChoiceSpec s registry
   interchangeableSourcesSpec s registry
+  bergStriderSpec s registry
 
 -- One mana of one type carrying no production tag: what a basic land really puts
 -- in a pool, and the unit the Celestial Dawn cases below seat directly.
@@ -4907,3 +4908,98 @@ redOnly = ManaCost.MkManaCost [redSymbol]
 
 greenOnly :: ManaCost.ManaCost
 greenOnly = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]
+
+-- CR 107.4h's THIRD sentence: "The {S} symbol can also be used to refer to mana
+-- of any type produced by a snow source spent to pay a cost." A retrospective
+-- reading, where the first sentence's is a payability one -- so what it needs is
+-- a record of the payment, which is Pawl.Types.Object.manaSpent, written by
+-- Pawl.Engine.Cost's mana window and read back through
+-- Pawl.Engine.Filter.View.manaSpentTags by Quantity.SnowWasSpent.
+--
+-- Berg Strider is the card: "When this creature enters, tap target artifact or
+-- creature an opponent controls. If {S} was spent to cast this spell, that
+-- permanent doesn't untap during its controller's next untap step." Two clauses,
+-- and only the second is conditioned -- so the tap happens on both boards and
+-- the untap step is where they part.
+--
+-- CR 400.7d is load-bearing here and not incidental: the clause is an ability of
+-- the PERMANENT, and what it asks about is the spell that became it, so the
+-- record has to survive the one zone change CR 400.7 otherwise forgets
+-- everything across.
+bergStriderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+bergStriderSpec s registry = Spec.describe s "BergStrider" $ do
+  -- The unit's whole claim, on a PAIR of boards that differ in one thing: the
+  -- four lands paying the {4} are Snow-Covered Mountains on one and Mountains on
+  -- the other. Same seats, same Island paying the {U}, same Berg Strider, same
+  -- target, same untap step -- so a permanent that stays tapped on one board and
+  -- untaps on the other did so because of where its payment's mana came from.
+  --
+  -- The two behavioural assertions come first, and both can differ: an
+  -- implementation that never records the payment unt-taps the first board's
+  -- victim, and one that always reports snow leaves the second's tapped.
+  Spec.it s "CR 107.4h whole card: Berg Strider's victim does not untap when snow mana paid for it, and does when it did not" $ do
+    (snowVictim, snowBoard) <- bergBoard s registry True
+    (plainVictim, plainBoard) <- bergBoard s registry False
+    Spec.assertBool s (Game.isTapped snowVictim (bergUntapStep snowBoard)) "{S} was spent, so the permanent does not untap during its controller's untap step"
+    Spec.assertBool s (not (Game.isTapped plainVictim (bergUntapStep plainBoard))) "and off the nonsnow board, which is the same board otherwise, it untaps"
+    -- The supporting checks, and they are insensitive to the record by
+    -- construction: the tap is the trigger's FIRST clause, which carries no
+    -- condition at all. They are here so the assertion above cannot pass on a
+    -- board where nothing was ever tapped, or where the spell never resolved.
+    Spec.assertBool s (Game.isTapped snowVictim snowBoard && Game.isTapped plainVictim plainBoard) "both triggers tapped their target before either untap step"
+    Spec.assertEqWith s "and both Berg Striders resolved" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Berg Strider") S.alice snowBoard, S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Berg Strider") S.alice plainBoard) (1, 1)
+
+  -- The record itself, off the PERMANENT rather than off the spell -- CR 400.7d's
+  -- exception, which the case above reads only through its consequence. The
+  -- nonsnow board is the control: it spends five mana too, so a non-empty record
+  -- carrying no snow tag is what says the tags come from the sources and not from
+  -- the fact that something was spent.
+  Spec.it s "CR 400.7d the permanent carries the mana its spell was paid with" $ do
+    (_, snowBoard) <- bergBoard s registry True
+    (_, plainBoard) <- bergBoard s registry False
+    Spec.assertEqWith s "the snow board's Berg Strider remembers a snow tag" (bergSpentTags snowBoard) (Set.singleton ProductionTag.Snow)
+    Spec.assertEqWith s "the nonsnow board's remembers the payment with no tag on it" (bergSpentTags plainBoard) Set.empty
+    Spec.assertEqWith s "and both spent five mana" (bergSpentCount snowBoard, bergSpentCount plainBoard) (5, 5)
+
+-- Alice casts Berg Strider off five untapped lands and its CR 603.6a trigger
+-- resolves against bob's Goblin Piker, the only artifact or creature an opponent
+-- controls. `snowy` picks what the four lands paying the {4} are and decides
+-- NOTHING else; the Island paying the {U} is on both boards.
+--
+-- Returns bob's Piker and the board with bob made active, which is whose untap
+-- step the card's second clause speaks about.
+bergBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (ObjectId.ObjectId, GameState.GameState)
+bergBoard s registry snowy = do
+  island <- S.printingOf s registry "Island"
+  filler <- S.printingOf s registry (if snowy then "Snow-Covered Mountain" else "Mountain")
+  strider <- S.printingOf s registry "Berg Strider"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let (victim, board) = S.addCreature piker S.bob (S.landsFor filler S.alice 4 (S.landsInPlay island 1))
+      (gs, spellId) = S.handOne strider board
+      resolved = S.runPure S.identityAnswer gs (S.cast S.alice spellId *> Stack.resolveTop *> Engine.placePendingTriggers *> Stack.resolveTop)
+  pure (victim, resolved {GameState.activePlayer = S.bob})
+
+-- The untap step's turn-based actions, run for whoever the state says is active
+-- (CR 502.3) -- Pawl.UntapRestrictionSpec's `untapStep`, kept here rather than
+-- shared, since Pawl.Support rebuilds every spec in the tree.
+bergUntapStep :: GameState.GameState -> GameState.GameState
+bergUntapStep gs = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
+
+-- Alice's Berg Strider on the battlefield, or a placeholder id that reads as
+-- nothing -- so a board where the spell never resolved answers empty rather than
+-- throwing.
+bergStriderOn :: GameState.GameState -> ObjectId.ObjectId
+bergStriderOn gs =
+  let isBerg oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName $ Text.pack "Berg Strider")
+   in case filter isBerg (Set.toAscList (GameState.battlefield gs)) of
+        oid : _ -> oid
+        [] -> ObjectId.MkObjectId 0
+
+bergSpent :: GameState.GameState -> [ManaUnit.ManaUnit]
+bergSpent gs = foldMap (Mana.Type.unwrap . Object.manaSpent) (Game.lookupObject (bergStriderOn gs) gs)
+
+bergSpentTags :: GameState.GameState -> Set.Set ProductionTag.ProductionTag
+bergSpentTags = foldMap ManaUnit.tags . bergSpent
+
+bergSpentCount :: GameState.GameState -> Int
+bergSpentCount = length . bergSpent

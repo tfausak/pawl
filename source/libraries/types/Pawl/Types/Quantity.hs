@@ -360,6 +360,26 @@ data Quantity
     --
     -- A LEAF: it holds no Quantity.
     WasKicked
+  | -- | CR 107.4h's third sentence: was any mana produced by a snow source spent
+    -- to cast the spell this quantity is evaluated against? 1 if so and 0 if not
+    -- -- Berg Strider's "if {S} was spent to cast this spell".
+    --
+    -- WasKicked above in every structural respect, CR 400.7d included: what the
+    -- permanent's own triggered ability asks about is the spell that became it,
+    -- and Pawl.Types.Object's `manaSpent` is where that record is kept.
+    --
+    -- CARRIES NOTHING, rather than naming which production tag it asks about:
+    -- Pawl.Types.ProductionTag has one constructor, so the payload would be a
+    -- choice with a single member. It grows into one when a second tag gets a
+    -- retrospective reading of its own.
+    --
+    -- Not the spent mana's COLOUR. Boreal Outrider's "if {S} of any of that
+    -- spell's colors was spent to cast it" does ask that, and it asks it about
+    -- ANOTHER spell rather than about itself, so it wants two things this atom
+    -- has not got (#2008).
+    --
+    -- A LEAF: it holds no Quantity.
+    SnowWasSpent
   | -- | CR 508.3b: how many of that player's opponents were DECLARED attacked
     -- this combat phase -- rule 702.121a's "for each opponent you attacked with a
     -- creature this combat".
