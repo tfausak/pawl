@@ -1104,6 +1104,103 @@ selfBlocksOneOrMoreSpec s registry =
                 (Just (3, 3))
             _ -> Spec.assertFailure s "fixture should give bob an Inquisitors and a Piker"
 
+-- CR 509.3e read by a BYSTANDER on the ATTACKING side: "whenever a creature
+-- attacking one of your opponents becomes blocked by two or more creatures".
+-- The rule's last sentence makes the number a floor rather than an exact count,
+-- and two is the number the one attacking-side printing states.
+--
+-- Seifer, Balamb Rival {2}{B}{R} Legendary Creature -- Human Mercenary 4/3,
+-- "First strike / Whenever a creature attacking one of your opponents becomes
+-- blocked by two or more creatures, that attacking creature gains deathtouch
+-- until end of turn", is the card.
+--
+-- Not implemented, so the card file omits it: Seifer's second line, "Whenever
+-- you attack a player, goad target creature that player controls" -- CR 508.3e's
+-- "[a player] attacks [another player]" has no TriggerCondition (#538). That
+-- leaves pawl's Seifer STRICTER than printed, doing less for its controller
+-- rather than more; goad itself (CR 701.15) is there.
+--
+-- Llanowar Elves 1/1 attacks and Hill Giant 3/3 blocks, which is what makes the
+-- grant observable without depending on how a damage assignment is split: one
+-- power kills a 3/3 only under CR 704.5h. Seifer never joins the combat on
+-- either side, the condition being a bystander's.
+creatureBecomesBlockedByAtLeastSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+creatureBecomesBlockedByAtLeastSpec s registry =
+  let board mine theirs = do
+        ours <- mapM (S.printingOf s registry) mine
+        yours <- mapM (S.printingOf s registry) theirs
+        pure (S.combatBoardOf ours yours)
+      -- Attacks with `attacker` alone and blocks it with `blockers` alone, which
+      -- neither S.aggressiveAnswer nor selfBlocksOneOrMoreSpec's blockEverything
+      -- can express: both send everything the seat has into combat, and Seifer
+      -- has to stay out of it on whichever seat it sits.
+      declaring :: ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+      declaring attacker blockers p = case p of
+        Prompt.DeclareAttackers _ _ ids -> filter (== attacker) ids
+        Prompt.DeclareBlockers _ _ _ attackers -> case attackers of
+          [] -> Map.empty
+          a : _ -> Map.fromList (fmap (\b -> (b, Set.singleton a)) blockers)
+        _ -> S.aggressiveAnswer p
+      afterCombat :: ObjectId.ObjectId -> [ObjectId.ObjectId] -> GameState.GameState -> GameState.GameState
+      afterCombat attacker blockers = S.runToStep (Phase.Combat CombatStep.EndOfCombat) (declaring attacker blockers)
+      giants :: GameState.GameState -> Int
+      giants = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Hill Giant")) S.bob
+      firedBy :: ObjectId.ObjectId -> GameState.GameState -> Int
+      firedBy oid gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, AbilityTriggered.source record == oid]
+   in Spec.describe s "CreatureBecomesBlockedByAtLeast" $ do
+        -- The proving test and its control on ONE board: the same Elves, the same
+        -- two Giants, the same Seifer, and only the size of the block differs. Two
+        -- blockers clear rule 509.3e's floor and the Elves' one damage destroys a
+        -- 3/3; one blocker does not, and nothing dies.
+        Spec.it s "CR 509.3e whole card: blocked by two grants deathtouch, blocked by one does not" $ do
+          (gs, mine, theirs) <- board ["Llanowar Elves", "Seifer, Balamb Rival"] ["Hill Giant", "Hill Giant"]
+          case (mine, theirs) of
+            ([elves, _], [first, second]) -> do
+              Spec.assertEqWith
+                s
+                "a Giant dies to the 1/1 when two blocked, and none dies when one did"
+                (giants (afterCombat elves [first, second] gs), giants (afterCombat elves [first] gs))
+                (1, 2)
+              -- The control leg really fought: the lone blocker took the Elves'
+              -- damage and lived through it, so the leg above differs in CR
+              -- 704.5h and not in whether combat happened.
+              Spec.assertEqWith
+                s
+                "and the lone blocker was damaged rather than untouched"
+                (S.damageOf first (afterCombat elves [first] gs))
+                (Just 1)
+            _ -> Spec.assertFailure s "fixture should give alice an Elves and a Seifer, and bob two Giants"
+        -- CR 109.5's "you": the PlayerRelation is read against the ability's
+        -- CONTROLLER, so a Seifer that bob controls watches creatures attacking
+        -- ALICE. This board is the case above's firing leg with Seifer moved one
+        -- seat, and nothing else changed.
+        Spec.it s "CR 603.3a a Seifer the defending player controls is silent" $ do
+          (gs, mine, theirs) <- board ["Llanowar Elves"] ["Hill Giant", "Hill Giant", "Seifer, Balamb Rival"]
+          case (mine, theirs) of
+            ([elves], [first, second, _]) ->
+              Spec.assertEqWith
+                s
+                "the Elves attacks Seifer's own controller, so both Giants live"
+                (giants (afterCombat elves [first, second] gs))
+                2
+            _ -> Spec.assertFailure s "fixture should give alice an Elves, and bob two Giants and a Seifer"
+        -- Rule 509.3e's arity: ONE trigger for the declaration, not one per
+        -- blocker. Deliberately counted off the event log rather than read at
+        -- gameplay level, because this card cannot show the difference -- a
+        -- second grant of deathtouch to the same creature is indistinguishable
+        -- from the first. The falsifier is a match on the pairwise
+        -- GameEvent.BlockerDeclared, which is CR 509.3d's arity: that fires twice.
+        Spec.it s "CR 509.3e two blockers fire it once, not once each" $ do
+          (gs, mine, theirs) <- board ["Llanowar Elves", "Seifer, Balamb Rival"] ["Hill Giant", "Hill Giant"]
+          case (mine, theirs) of
+            ([elves, seifer], [first, second]) ->
+              Spec.assertEqWith
+                s
+                "one trigger from Seifer"
+                (firedBy seifer (afterCombat elves [first, second] gs))
+                1
+            _ -> Spec.assertFailure s "fixture should give alice an Elves and a Seifer, and bob two Giants"
+
 -- CR 509.3c: "Whenever [a creature] becomes blocked, . . ." -- the ATTACKING
 -- side of the same declaration selfBlocksSpec reads, matched against
 -- GameEvent.AttackerBlocked.
@@ -4328,6 +4425,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   selfBlocksSpec s registry
   selfBlocksAtLeastSpec s registry
   selfBlocksOneOrMoreSpec s registry
+  creatureBecomesBlockedByAtLeastSpec s registry
   selfBlocksCreatureSpec s registry
   selfBecomesBlockedSpec s registry
   selfAttacksUnblockedSpec s registry

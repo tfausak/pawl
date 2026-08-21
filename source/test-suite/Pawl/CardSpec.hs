@@ -675,6 +675,9 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- PermanentEnters' reason.
   TriggerCondition.SelfBecomesBlockedBy _ -> []
   TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> []
+  -- CR 509.3e's bystander form counts BLOCKERS rather than objects a Count
+  -- names, and its PlayerRelation is no Count either.
+  TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> []
   TriggerCondition.SelfAttacksUnblocked -> []
   TriggerCondition.SelfCycled -> []
   TriggerCondition.SelfRevealedForMiracle -> []
@@ -2898,6 +2901,10 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- The same rule's attacking-side form, whose Filter is a predicate over the
   -- blockers -- Serra Inquisitors' "black".
   TriggerCondition.SelfBecomesBlockedByOneOrMore f -> [f]
+  -- The same rule read by a bystander names a quality of nothing: whom the
+  -- attacker attacked is a PlayerRelation and the blockers are only counted, so
+  -- there is no Filter here.
+  TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> []
   TriggerCondition.SelfAttacksUnblocked -> []
   TriggerCondition.SelfCycled -> []
   TriggerCondition.SelfRevealedForMiracle -> []

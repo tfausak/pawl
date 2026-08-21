@@ -60,6 +60,7 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Countering as Countering
+import qualified Pawl.Types.CreatureBecomesBlockedByAtLeast as CreatureBecomesBlockedByAtLeast
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePrevented as DamagePrevented
@@ -1605,6 +1606,11 @@ representativeEvents cond =
         -- reasoning -- and this one binds that player nothing, which is the
         -- difference the pin catches.
         TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> one (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked departed S.carol))
+        -- The same grouped event once more, with the ids read the other way from
+        -- every arm above it: the bearer is a BYSTANDER, so `departed` sits in
+        -- the attacker position and is what this one binds -- an arm that bound
+        -- the bearer instead would pin the empty set here.
+        TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> one (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked departed S.carol))
         -- The same declaration's unblocked branch, which carries the attacker
         -- and nothing else -- so the floor it pins is the empty set.
         TriggerCondition.SelfAttacksUnblocked -> one (GameEvent.AttackerUnblocked departed)
@@ -1815,6 +1821,7 @@ everyTriggerCondition =
     TriggerCondition.SelfBlocksOneOrMore (Filter.Type.And []),
     TriggerCondition.SelfBecomesBlockedBy (Filter.Type.And []),
     TriggerCondition.SelfBecomesBlockedByOneOrMore (Filter.Type.And []),
+    TriggerCondition.CreatureBecomesBlockedByAtLeast (CreatureBecomesBlockedByAtLeast.MkCreatureBecomesBlockedByAtLeast PlayerRelation.Opponent 2),
     TriggerCondition.SelfAttacksUnblocked,
     TriggerCondition.SelfPutIntoGraveyardFromLibrary,
     TriggerCondition.SelfPutIntoGraveyardFromAnywhere,

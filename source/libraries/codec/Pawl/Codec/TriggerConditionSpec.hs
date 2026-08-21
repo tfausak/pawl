@@ -12,6 +12,7 @@ import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ControllerBecomesTarget as ControllerBecomesTarget
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CreatureBecomesBlockedByAtLeast as CreatureBecomesBlockedByAtLeast
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Filter as Filter
@@ -274,6 +275,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.SelfBecomesBlockedByOneOrMore (Filter.HasColor Color.Black))
       " {\"type\":\"SelfBecomesBlockedByOneOrMore\",\"value\":{\"type\":\"HasColor\",\"value\":{\"type\":\"Black\"}}} "
+  -- The same rule read by a bystander: a PAYLOAD OBJECT rather than a bare
+  -- Filter, since this form carries both whom the attacker attacked and the
+  -- floor on the blockers.
+  Spec.it s "CreatureBecomesBlockedByAtLeast" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.CreatureBecomesBlockedByAtLeast (CreatureBecomesBlockedByAtLeast.MkCreatureBecomesBlockedByAtLeast PlayerRelation.Opponent 2))
+      " {\"type\":\"CreatureBecomesBlockedByAtLeast\",\"value\":{\"attacked\":{\"type\":\"Opponent\"},\"blockers\":2}} "
   -- CR 509.1h's unblocked branch, nullary like the blocked one: "attacks and
   -- isn't blocked" has no per-blocker reading to carry a Filter for.
   Spec.it s "SelfAttacksUnblocked" $
