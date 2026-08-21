@@ -639,6 +639,10 @@ combatLegalitySpec s registry = Spec.describe s "CombatLegality" $ do
                       Combat.Type.joinedUnder = Map.singleton oid S.alice,
                       Combat.Type.attacked = Set.singleton (AttackTarget.OfPlayer S.bob),
                       Combat.Type.declaredAttacked = Set.singleton (AttackTarget.OfPlayer S.bob),
+                      -- Empty, because this board stands after the declare attackers
+                      -- step ended: CR 500.1 scopes this half to the step, and
+                      -- Combat.clearAttackedThisStep empties it as one ends.
+                      Combat.Type.declaredAttackedThisStep = Set.empty,
                       Combat.Type.blockersDeclared = True,
                       Combat.Type.defender = Just S.bob
                     }

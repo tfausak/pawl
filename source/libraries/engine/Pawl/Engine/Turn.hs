@@ -263,17 +263,20 @@ combatAndMainPhase = foldMap expandExtraPhase [ExtraPhase.ExtraCombat, ExtraPhas
 -- the same two riders ask about, and conjoined by both
 -- CastingRestriction.AttackedThisStep and ActivationRestriction.AttackedThisStep.
 --
--- Combat.declaredAttacked and NOT Combat.attacked, CR 508.8's wider set: CR 508.4
--- says a creature put onto the battlefield attacking never "attacked" (CR 508.3b
--- for the player side). Membership in that HISTORICAL set, since CR 506.4's
--- removal does not un-attack anybody.
+-- CR 508.6 defines the fact: a player "has attacked" another if they declared
+-- one or more creatures as attackers attacking them. So NOT Combat.attacked, CR
+-- 508.8's wider set -- CR 508.4 says a creature put onto the battlefield
+-- attacking never "attacked" (CR 508.3b for the player side). Membership in a
+-- HISTORICAL set, since CR 506.4's removal does not un-attack anybody.
 --
--- "THIS STEP" is read off a record CR 511.3 scopes to the whole combat PHASE. Not
--- implemented: a second declaration inside one phase, which would tell the two
--- spans apart (#447).
+-- "THIS STEP" is Combat.declaredAttackedThisStep and not its phase-scoped twin
+-- Combat.declaredAttacked: CR 500.1's step is the span the clause names, and CR
+-- 511.3 scopes the twin to the phase. Pawl.CastSpec's "CR 508.6 / 500.1 the
+-- record is empty in the declare blockers step" case is the proof the two are
+-- told apart.
 attackedThisStep :: PlayerId -> GameState -> Bool
 attackedThisStep pid gs =
-  Set.member (AttackTarget.OfPlayer pid) (Combat.declaredAttacked (GameState.combat gs))
+  Set.member (AttackTarget.OfPlayer pid) (Combat.declaredAttackedThisStep (GameState.combat gs))
 
 -- CR 506.7b: is the game past the point "only during combat after blockers are
 -- declared" names? Shared by CastingRestriction.AfterBlockersDeclared and
@@ -282,7 +285,8 @@ attackedThisStep pid gs =
 --
 -- No conjunct about the current phase, which is CR 511.3 rather than an omission:
 -- Pawl.Engine.Combat.declareBlockers is the only writer and its clearCombat the
--- only clearer. A combat phase whose end of combat STEP alone is skipped never
--- reaches clearCombat (see Pawl.Engine.Engine.skipWholePhase).
+-- only clearer. Not implemented: a combat phase whose end of combat step alone is
+-- skipped never reaches clearCombat, so this answers True into the next turn
+-- (#2010).
 afterBlockersDeclared :: GameState -> Bool
 afterBlockersDeclared = Combat.blockersDeclared . GameState.combat

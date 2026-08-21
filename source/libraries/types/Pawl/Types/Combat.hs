@@ -95,13 +95,28 @@ data Combat = MkCombat
     -- same principle worked out for the trigger case only, so it is
     -- corroboration rather than authority.
     --
-    -- So anything asking whether a PLAYER was attacked reads this one:
-    -- Pawl.Engine.Cast.attackedThisStep, for Rally the Troops' "only if you've
-    -- been attacked this step".
+    -- So anything asking whether a PLAYER was attacked THIS COMBAT PHASE reads
+    -- this one: Pawl.Engine.Quantity's OpponentsAttacked arm, rule 702.121a's
+    -- "for each opponent you attacked with a creature this combat".
     --
     -- Same lifetime and same never-cleared posture as `attacked`, for that
-    -- field's reasons.
+    -- field's reasons. A reader wanting one STEP wants the field below.
     declaredAttacked :: Set.Set AttackTarget.AttackTarget,
+    -- | CR 508.6: the targets a creature was declared attacking THIS STEP --
+    -- "you've been attacked this step" (Rally the Troops on the casting side,
+    -- Kongming's Contraptions on the activation side), read by
+    -- Pawl.Engine.Turn.attackedThisStep.
+    --
+    -- Written by declareAttackers in the same update as `declaredAttacked`, so
+    -- CR 508.4's exclusion of a creature put onto the battlefield attacking
+    -- carries over verbatim; what differs is only the lifetime.
+    --
+    -- CLEARED AS EVERY STEP ENDS, in Pawl.Engine.Engine.runStepThatBegan, and
+    -- not by clearCombat: CR 500.1's step is the span the clause names, and CR
+    -- 511.3's is a phase. Every step and not just combat's, because CR 500.11
+    -- lets any step be skipped, and a reset sitting on one step's path outlives
+    -- the turn in which that step never happens.
+    declaredAttackedThisStep :: Set.Set AttackTarget.AttackTarget,
     -- | CR 506.7b: has this combat phase's declare blockers step declared
     -- blockers? The boundary "only during combat after blockers are declared"
     -- names, and the sole reader is

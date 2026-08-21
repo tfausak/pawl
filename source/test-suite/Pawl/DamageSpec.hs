@@ -2139,6 +2139,10 @@ departedAttackerSpec s registry =
                       Combat.Type.joinedUnder = Map.fromList [(attacker, S.alice), (blocker, S.bob)],
                       Combat.Type.attacked = Set.singleton (AttackTarget.OfPlayer S.bob),
                       Combat.Type.declaredAttacked = Set.singleton (AttackTarget.OfPlayer S.bob),
+                      -- Empty, because this board stands after the declare attackers
+                      -- step ended: CR 500.1 scopes this half to the step, and
+                      -- Combat.clearAttackedThisStep empties it as one ends.
+                      Combat.Type.declaredAttackedThisStep = Set.empty,
                       -- CR 506.7b: the fixture stands after CR 509.1's
                       -- declaration, which is what put the entry in
                       -- Combat.blockers above.
@@ -2206,6 +2210,10 @@ departedDefenderSpec s registry =
                       Combat.Type.joinedUnder = Map.singleton attacker S.alice,
                       Combat.Type.attacked = Set.singleton (AttackTarget.OfPlayer S.bob),
                       Combat.Type.declaredAttacked = Set.singleton (AttackTarget.OfPlayer S.bob),
+                      -- Empty, because this board stands after the declare attackers
+                      -- step ended: CR 500.1 scopes this half to the step, and
+                      -- Combat.clearAttackedThisStep empties it as one ends.
+                      Combat.Type.declaredAttackedThisStep = Set.empty,
                       -- CR 506.7b: attackers are declared and blockers are not,
                       -- which is the moment the comment above describes.
                       Combat.Type.blockersDeclared = False,
@@ -2251,6 +2259,10 @@ departedDefenderSpec s registry =
                       Combat.Type.joinedUnder = Map.fromList [(attacker, S.alice), (blocker, S.bob)],
                       Combat.Type.attacked = Set.singleton (AttackTarget.OfPlayer S.carol),
                       Combat.Type.declaredAttacked = Set.singleton (AttackTarget.OfPlayer S.carol),
+                      -- Empty, because this board stands after the declare attackers
+                      -- step ended: CR 500.1 scopes this half to the step, and
+                      -- Combat.clearAttackedThisStep empties it as one ends.
+                      Combat.Type.declaredAttackedThisStep = Set.empty,
                       Combat.Type.blockersDeclared = True,
                       Combat.Type.defender = Just S.carol
                     }

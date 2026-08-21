@@ -121,6 +121,7 @@ noCombat =
       Combat.joinedUnder = Map.empty,
       Combat.attacked = Set.empty,
       Combat.declaredAttacked = Set.empty,
+      Combat.declaredAttackedThisStep = Set.empty,
       Combat.blockersDeclared = False,
       Combat.defender = Nothing
     }

@@ -2299,12 +2299,15 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
         attacked = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
     Spec.assertBool s (not (S.castable S.alice alicesRally attacked)) "not castable"
     Spec.assertBool s (not (any (S.isCastOf alicesRally) (Action.legalActions S.alice attacked))) "and not offered"
-  -- The "only during the declare attackers step" clause, isolated: bob HAS
-  -- been attacked -- CR 511.3 keeps the combat record live until the end of
-  -- combat step ends -- and the window has passed.
+  -- Both of Rally's clauses fail in the declare blockers step, and this case
+  -- pins the wider one: CR 511.3 keeps the PHASE-scoped record live until the
+  -- end of combat step ends, so bob is still on it, and the window has passed.
+  -- (The step-scoped record is already empty by then -- the case below is what
+  -- proves that -- so this is a conjunction failing rather than one clause
+  -- isolated.)
   --
   -- Carries its own control, in the same step and for the same player: bob's
-  -- Bolt is still offered, so what stops the Rally is the clause and not the
+  -- Bolt is still offered, so what stops the Rally is the clauses and not the
   -- step being closed to bob altogether.
   Spec.it s "CR 601.3 not castable in the declare blockers step, though bob was attacked" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -2320,6 +2323,41 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
     Spec.assertBool s (not (S.castable S.bob bobsRally later)) "not castable"
     Spec.assertBool s (not (any (S.isCastOf bobsRally) (Action.legalActions S.bob later))) "and not offered"
     Spec.assertBool s (elem (A.Cast boltId (S.printingName bolt) Facing.FaceUp) (Action.legalActions S.bob later)) "bob's unrestricted instant still is"
+  -- CR 508.6 on CR 500.1's span: "you've been attacked this step" asks about ONE
+  -- STEP, and no printed card tells that from "this combat phase" -- Scryfall
+  -- `o:"been attacked this step"`, 2026-08-21, returns fifteen cards and every
+  -- one of them also prints "only during the declare attackers step", where the
+  -- two spans coincide. So the discriminating card is Synthetic Belated Rally,
+  -- Rally the Troops with the DuringPhase clause removed and nothing else
+  -- changed; a printing that drops that clause would refute this and replace it.
+  --
+  -- The boundary is crossed by RUNNING the engine rather than by writing
+  -- GameState.phase, as the case above does: what makes the answer flip is a
+  -- reset at the end of every step (Pawl.Engine.Combat.clearAttackedThisStep),
+  -- which a hand-set phase never reaches.
+  Spec.it s "CR 508.6 / 500.1 the record is empty in the declare blockers step" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    rally <- S.printingOf s registry "Rally the Troops"
+    belated <- S.printingOf s registry "Synthetic Belated Rally"
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (_, _, _, board) = rallyBoard piker plains rally
+        (bobsBelated, withBelated) = S.addHandCard belated S.bob board
+        (boltId, withBolt) = S.addHandCard bolt S.bob (snd (S.addCreature mountain S.bob withBelated))
+        attacked = S.runPure S.aggressiveAnswer withBolt (Combat.declareAttackers S.alice)
+        later = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer withBolt
+    Spec.assertBool s (S.castable S.bob bobsBelated attacked) "castable in the step the attack was declared"
+    Spec.assertEqWith s "the engine reached the next step" (GameState.phase later) (Phase.Combat CombatStep.DeclareBlockers)
+    Spec.assertBool s (not (S.castable S.bob bobsBelated later)) "not castable once that step has ended"
+    Spec.assertBool s (not (any (S.isCastOf bobsBelated) (Action.legalActions S.bob later))) "and not offered"
+    -- What separates "the step ended" from "combat ended": the phase-scoped
+    -- record still names bob, CR 511.3 emptying it only as the end of combat step
+    -- ends, so the answer changed because of the step and nothing else.
+    Spec.assertBool s (Set.member (AttackTarget.OfPlayer S.bob) (Combat.Type.declaredAttacked (GameState.combat later))) "bob is still on the phase-scoped record"
+    Spec.assertBool s (Set.null (Combat.Type.declaredAttackedThisStep (GameState.combat later))) "and off the step-scoped one"
+    -- CR 117.1a, as for Rally above: the step is not closed to bob.
+    Spec.assertBool s (elem (A.Cast boltId (S.printingName bolt) Facing.FaceUp) (Action.legalActions S.bob later)) "bob's unrestricted instant is castable there"
   -- CR 508.4's last-but-one sentence: "Such creatures are 'attacking' but, for
   -- the purposes of trigger events and effects, they never 'attacked.'" The
   -- words that reach a printed casting restriction are "AND EFFECTS" -- a
