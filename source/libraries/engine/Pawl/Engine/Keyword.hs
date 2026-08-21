@@ -197,6 +197,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Fabricate n -> List.genericReplicate count (fabricate n)
   Keyword.Provoke -> List.genericReplicate count provoke
   Keyword.Rampage n -> List.genericReplicate count (rampage n)
+  Keyword.Compleated -> []
   Keyword.Training -> List.genericReplicate count training
   Keyword.Renown n -> List.genericReplicate count (renown n)
   Keyword.Persist -> List.genericReplicate count persist
@@ -353,6 +354,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
+  Keyword.Compleated -> []
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.Plot _ -> []
@@ -541,6 +543,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
+  Keyword.Compleated -> []
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.Plot _ -> []
@@ -779,6 +782,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
+  Keyword.Compleated -> []
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   -- CR 702.170a is a static ability functioning in a HAND, and what it grants is
@@ -1110,6 +1114,11 @@ mintedReplacementsFor keyword count = case keyword of
   -- an entry: the enters-transformed half is daybound's alone.
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
+  -- CR 702.150a is a replacement effect and is NOT minted here: it changes
+  -- how many counters CR 306.5b's intrinsic row places rather than placing
+  -- its own, so Pawl.Engine.Projection.intrinsicReplacementsOf reads it off
+  -- the same projection this list is minted from.
+  Keyword.Compleated -> []
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.Plot _ -> []
@@ -1238,6 +1247,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   -- CR 702.147a's static half: "This creature can't block." Unleash's row with the
   -- counter clause removed, rule 702.147a stating the restriction flat.
   Keyword.Decayed -> [CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless (Affected.Matching Filter.IsSource) Nothing)]
+  Keyword.Compleated -> []
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.Plot _ -> []
@@ -1348,6 +1358,7 @@ familyOf keyword = case keyword of
   Keyword.Daybound -> Nothing
   Keyword.Nightbound -> Nothing
   Keyword.Decayed -> Nothing
+  Keyword.Compleated -> Nothing
   Keyword.Training -> Nothing
   Keyword.StartYourEngines -> Nothing
   Keyword.Exert -> Nothing

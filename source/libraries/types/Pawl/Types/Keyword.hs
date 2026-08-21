@@ -1073,6 +1073,33 @@ data Keyword
     -- by a plain Effect.PutCounters: the rule needs that placement told apart from
     -- any other +1/+1 counter arriving. Savior of Ollenbock is the printing.
     Training
+  | -- | 702.150a: compleated. A static ability of some planeswalker cards: "If
+    -- this permanent would enter with one or more loyalty counters on it and the
+    -- player who cast it chose to pay life for any part of its cost represented
+    -- by Phyrexian mana symbols, it instead enters the battlefield with that
+    -- many loyalty counters minus two for each of those mana symbols."
+    --
+    -- Nullary: rule 702.150a takes no parameter -- the two is the rule's, not the
+    -- card's -- so no KeywordFamily is owed. Read as MEMBERSHIP rather than as a
+    -- count: rule 702.150 states no "each instance" sentence, and a second copy
+    -- of "it enters with that many minus two" applied to the same entry would
+    -- subtract twice for one symbol, which the rule's own "for each of those mana
+    -- symbols" already counts.
+    --
+    -- NOT a minted EntryRewrite row, where riot and unleash are. A second row
+    -- alongside CR 306.5b's intrinsic loyalty would place its own counters rather
+    -- than change how many that row places, so this is read inside
+    -- Pawl.Engine.Projection.intrinsicReplacementsOf, off the same finished
+    -- projection -- which keeps it inside the CR 613 layer fold, where a keyword
+    -- belongs and where LoseAllAbilities can reach it.
+    --
+    -- The COST RECORD it reads is Object.phyrexianLifePaid, CR 400.7d's
+    -- exception carried onto the permanent exactly as Object.kicked is.
+    --
+    -- Not implemented: CR 616.1's choice of order between this and another
+    -- replacement modifying the same entry -- Doubling Season's is the one that
+    -- would differ, and no counter-multiplying card is in `data/cards/` (#1996).
+    Compleated
   | -- | 702.164a: toxic N. N rides the constructor, so `Toxic 1` and `Toxic 2` are
     -- distinct keywords, and CR 702.164b's total toxic value is the sum over every
     -- toxic ability the creature has (Pawl.Engine.Projection.totalToxic) --

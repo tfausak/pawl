@@ -189,6 +189,7 @@ createCard pid printing = do
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
             Object.kicked = False,
+            Object.phyrexianLifePaid = 0,
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
             Object.doesNotUntapNext = False,

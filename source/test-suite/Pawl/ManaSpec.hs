@@ -34,6 +34,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -61,6 +62,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.HybridPayment as HybridPayment
+import qualified Pawl.Types.HybridPhyrexian as HybridPhyrexian
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaAddition as ManaAddition
@@ -2898,6 +2900,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   dismemberSpec s registry
   phyrexianTollSpec s registry
   moltensteelSpec s registry
+  tamiyoSpec s registry
+  sigilSpec s registry
   upwellingSpec s registry
   omnathSpec s registry
   priorityWindowSpec s registry
@@ -4494,6 +4498,236 @@ activateAndResolve ::
 activateAndResolve answer gs oid ability =
   let ((_, activated), asked) = Replay.record answer gs (Activate.activateAbility S.alice oid ability)
    in (asked, snd (S.runPureWith answer activated Stack.resolveTop))
+
+-- CR 107.4f's second half: "There are also ten hybrid Phyrexian mana symbols. A
+-- hybrid Phyrexian mana symbol represents a cost that can be paid with one mana
+-- of either of its component colors or by paying 2 life. A hybrid Phyrexian mana
+-- symbol is both of its component colors."
+--
+-- Tamiyo, Compleated Sage ({2}{G}{G/U/P}{U} Legendary Planeswalker) is the
+-- producer, and the pool's only kind: every printed hybrid Phyrexian symbol is on
+-- one of the four compleated planeswalkers (Scryfall `mana:{G/U/P}` and its nine
+-- siblings, 2026-08-20 -- Ajani, Sleeper Agent, Lukka, Bound to Ruin and Nahiri,
+-- the Unforgiving are the other three, and any of them would refute a claim that
+-- this symbol reaches some other card type).
+--
+-- THREE WAYS, so two prompts: Prompt.AnnouncePhyrexianPayment settles mana
+-- against life and Prompt.AnnounceHybridHalf then settles which colour, each
+-- elided where the board leaves one answer. The pair is what
+-- Pawl.Engine.Mana.announce's HybridPhyrexian arm builds; before it existed the
+-- symbol would have ridden that function's `other` catch-all straight into
+-- Pawl.Engine.Cost.payMana and been resolved by the least-life rule with no
+-- prompt at all -- the behaviour #361 removed for the monocoloured symbol.
+--
+-- The loyalty assertions are CR 702.150a's compleated, which is why this group
+-- and not a spec of its own carries them: the keyword reads what CR 601.2b
+-- announced about this symbol, so the two rules are only observable together.
+--
+-- Not implemented: her second and third loyalty abilities, which
+-- data/cards/tamiyo-compleated-sage.json omits -- a loyalty cost of -X, and a
+-- token minted from a card's own text (#1997). Stricter than printed, and no
+-- clause below rests on either.
+tamiyoSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tamiyoSpec s registry = Spec.describe s "Tamiyo, Compleated Sage" $ do
+  -- Off the card and off no board at all: CR 202.2d's colours and CR 202.3g's
+  -- mana value, both of which a single-colour Phyrexian constructor could not
+  -- have said.
+  Spec.it s "CR 107.4f/202.2d a hybrid Phyrexian symbol is BOTH of its colours" $ do
+    tamiyo <- S.printingOf s registry "Tamiyo, Compleated Sage"
+    let (oid, gs) = S.addCreature tamiyo S.alice (Setup.emptyGame S.bothPlayers)
+    Spec.assertEqWith
+      s
+      "green AND blue, not one or the other"
+      (Projection.colorsOf oid gs)
+      (Set.fromList [Color.Green, Color.Blue])
+    Spec.assertEqWith s "CR 202.3g: the symbol contributes 1, so {2}{G}{G/U/P}{U} is 5" (fmap Quantity.manaValueOf (Game.manaCostFaceOf oid gs)) (Just 5)
+
+  -- The gameplay-level pair, one board and two answers. Five lands pay the whole
+  -- cost, so BOTH routes are live and the prompt is a real question; the answer
+  -- moves three things at once -- the life total, how many lands were needed,
+  -- and rule 702.150a's loyalty.
+  Spec.it s "CR 107.4f/702.150a the mana route costs a fifth land and leaves loyalty at 5" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    tamiyo <- S.printingOf s registry "Tamiyo, Compleated Sage"
+    let (gs, tamiyoId) = S.handOne tamiyo (mixedLands forest island 3 2)
+        (asked, resolved) = castAndResolve (announcesBoth PhyrexianPayment.PaysMana greenMana) gs tamiyoId
+    Spec.assertEqWith s "CR 702.150a: no life was paid, so she enters with her printed 5" (S.counterOf CounterKind.Loyalty (tamiyoOn resolved) resolved) 5
+    Spec.assertEqWith s "the engine asked which way rather than deciding" (phyrexianAnnouncements asked) [PhyrexianPayment.PaysMana]
+    Spec.assertEqWith s "and asked which half, both being payable here" (halfAnnouncements asked) [greenMana]
+    Spec.assertEqWith s "all five lands paid {2}{G}{G}{U}" (S.tappedCount S.alice resolved) 5
+    Spec.assertEqWith s "and no life did" (S.lifeOf S.alice resolved) (Just 20)
+    Spec.assertEqWith s "she resolved" (length (GameState.stack resolved)) 0
+
+  -- The same board, one answer different. This is the case rule 702.150a exists
+  -- for, and the loyalty assertion is the one that can DIFFER: an engine that
+  -- forgot the keyword, or forgot which way the symbol was paid, leaves 5 here.
+  Spec.it s "CR 107.4f/702.150a the life route spares a land and takes two loyalty counters" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    tamiyo <- S.printingOf s registry "Tamiyo, Compleated Sage"
+    let (gs, tamiyoId) = S.handOne tamiyo (mixedLands forest island 3 2)
+        (asked, resolved) = castAndResolve (announcesBoth PhyrexianPayment.PaysLife greenMana) gs tamiyoId
+    Spec.assertEqWith s "CR 702.150a: 5 minus two for the one symbol life paid for" (S.counterOf CounterKind.Loyalty (tamiyoOn resolved) resolved) 3
+    Spec.assertEqWith s "the engine asked here too" (phyrexianAnnouncements asked) [PhyrexianPayment.PaysLife]
+    Spec.assertEqWith s "and never asked which half, life naming no colour" (halfAnnouncements asked) []
+    Spec.assertEqWith s "four lands paid {2}{G}{U}, the fifth is up" (S.tappedCount S.alice resolved) 4
+    Spec.assertEqWith s "and CR 107.4f's 2 life paid the symbol" (S.lifeOf S.alice resolved) (Just 18)
+    Spec.assertEqWith s "she resolved all the same" (length (GameState.stack resolved)) 0
+
+  -- The blue half, on the board that admits it: two Islands pay the {U} and the
+  -- symbol, and the three Forests cover {G} and the {2}. Same total, other
+  -- colour -- which is what makes the half a choice rather than a label.
+  Spec.it s "CR 107.4f the OTHER component colour pays it just as well" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    tamiyo <- S.printingOf s registry "Tamiyo, Compleated Sage"
+    let (gs, tamiyoId) = S.handOne tamiyo (mixedLands forest island 3 2)
+        (asked, resolved) = castAndResolve (announcesBoth PhyrexianPayment.PaysMana blueMana) gs tamiyoId
+    Spec.assertEqWith s "the blue half was announced" (halfAnnouncements asked) [blueMana]
+    Spec.assertEqWith s "CR 702.150a: still no life, still 5" (S.counterOf CounterKind.Loyalty (tamiyoOn resolved) resolved) 5
+    Spec.assertEqWith s "five lands again" (S.tappedCount S.alice resolved) 5
+    Spec.assertEqWith s "and no life" (S.lifeOf S.alice resolved) (Just 20)
+
+  -- The elision, and it DISCRIMINATES: one Forest and four Islands leave the
+  -- green half unpayable -- {G} takes the Forest and there is no second one --
+  -- so the half prompt is not raised at all and the blue half is forced. An
+  -- offer built from the printed symbol rather than from the board would ask.
+  Spec.it s "CR 601.2b a half the board cannot pay is not offered" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    tamiyo <- S.printingOf s registry "Tamiyo, Compleated Sage"
+    let (gs, tamiyoId) = S.handOne tamiyo (mixedLands forest island 1 4)
+        (asked, resolved) = castAndResolve (announcesBoth PhyrexianPayment.PaysMana greenMana) gs tamiyoId
+    Spec.assertEqWith s "no half was a choice, so none was asked" (halfAnnouncements asked) []
+    Spec.assertEqWith s "the cast completed off the blue one anyway" (length (GameState.stack resolved)) 0
+    Spec.assertEqWith s "five lands paid it" (S.tappedCount S.alice resolved) 5
+    Spec.assertEqWith s "and no life" (S.lifeOf S.alice resolved) (Just 20)
+
+  -- The other elision: four lands cannot reach {2}{G}{G/U/P}{U} through any
+  -- mana route, so CR 107.4f's life route is forced and neither prompt is
+  -- raised. Rule 702.150a still applies -- the reduction is not a consequence of
+  -- being ASKED.
+  Spec.it s "CR 107.4f/702.150a with no mana route the life route is forced, and still compleats her" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    tamiyo <- S.printingOf s registry "Tamiyo, Compleated Sage"
+    let (gs, tamiyoId) = S.handOne tamiyo (mixedLands forest island 2 2)
+        (asked, resolved) = castAndResolve (announcesBoth PhyrexianPayment.PaysMana greenMana) gs tamiyoId
+    Spec.assertEqWith s "CR 702.150a: 3, life having paid the symbol" (S.counterOf CounterKind.Loyalty (tamiyoOn resolved) resolved) 3
+    Spec.assertEqWith s "no route existed, so nothing was asked" (phyrexianAnnouncements asked) []
+    Spec.assertEqWith s "nor about a half" (halfAnnouncements asked) []
+    Spec.assertEqWith s "all four lands paid {2}{G}{U}" (S.tappedCount S.alice resolved) 4
+    Spec.assertEqWith s "and 2 life paid the symbol" (S.lifeOf S.alice resolved) (Just 18)
+
+-- Answers BOTH of a hybrid Phyrexian symbol's announcements -- `way` for
+-- Prompt.AnnouncePhyrexianPayment and `half` for Prompt.AnnounceHybridHalf --
+-- whenever each is on offer, deferring everything else to S.identityAnswer.
+-- `announces` and `announcesHalf` composed, and the "whenever it is on offer"
+-- half of each is what makes the elision cases above discriminating.
+announcesBoth :: PhyrexianPayment.PhyrexianPayment -> ManaType.ManaType -> Prompt.Prompt r -> r
+announcesBoth way half p = case p of
+  Prompt.AnnouncePhyrexianPayment {} -> announces way p
+  Prompt.AnnounceHybridHalf {} -> announcesHalf half p
+  _ -> S.identityAnswer p
+
+-- Synthetic Hybrid Phyrexian Sigil ({G/U/P} Instant, "Target creature gets +1/+1
+-- until end of turn") -- a card whose WHOLE mana cost is one hybrid Phyrexian
+-- symbol, which no printing is.
+--
+-- SYNTHETIC because the rule is otherwise unobservable, not because no card
+-- prints the symbol. All four printings are compleated planeswalkers and every
+-- one of them prints BOTH of its symbol's colours elsewhere in the same cost
+-- ({2}{G}{G/U/P}{U}, {1}{G}{G/W/P}{W}, {2}{R}{R/G/P}{G}, {1}{R}{R/W/P}{W}), so
+-- CR 202.2d's clause about the SYMBOL cannot be told apart from the printed
+-- coloured symbols beside it -- Tamiyo is green and blue either way. The same
+-- goes for CR 202.3g's contribution of 1, which on a five-symbol cost is one
+-- fifth of the answer. Mutagenic Growth plays exactly this role for the
+-- monocoloured symbol one group up.
+--
+-- It also makes the half a BOARD fact rather than a transcript one: a Gyre
+-- Engineer's "{T}: Add {G}{U}" oversupplies the cost, and which of the two
+-- floats afterwards is which half was announced.
+sigilSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+sigilSpec s registry = Spec.describe s "SyntheticHybridPhyrexianSigil" $ do
+  Spec.it s "CR 107.4f/202.2d a hybrid Phyrexian symbol makes its object BOTH colours" $ do
+    sigil <- S.printingOf s registry "Synthetic Hybrid Phyrexian Sigil"
+    let (oid, gs) = S.addCreature sigil S.alice (Setup.emptyGame S.bothPlayers)
+    Spec.assertEqWith
+      s
+      "green AND blue, from the one symbol"
+      (Projection.colorsOf oid gs)
+      (Set.fromList [Color.Green, Color.Blue])
+    Spec.assertEqWith s "CR 202.3g: one symbol, mana value 1" (fmap Quantity.manaValueOf (Game.manaCostFaceOf oid gs)) (Just 1)
+
+  -- The half, at board level. Gyre Engineer ("{T}: Add {G}{U}") is the
+  -- oversupply the Slippery Bogle case one group up uses for CR 107.4e's
+  -- hybrid: one activation puts BOTH halves in the pool, the Sigil spends one,
+  -- and WHICH ONE FLOATS is the announcement. An assertion that could not
+  -- differ on Tamiyo's board, where every route taps all five lands.
+  Spec.it s "CR 601.2b whichever half of {G/U/P} is announced, the OTHER floats" $ do
+    gyreEngineer <- S.printingOf s registry "Gyre Engineer"
+    piker <- S.printingOf s registry "Goblin Piker"
+    sigil <- S.printingOf s registry "Synthetic Hybrid Phyrexian Sigil"
+    let (_, withEngineer) = S.addCreature gyreEngineer S.alice (Setup.emptyGame S.bothPlayers)
+        (_, withPiker) = S.addCreature piker S.alice withEngineer
+        (gs, sigilId) = S.handOne sigil withPiker
+        castWith half = castAndResolve (announcesBoth PhyrexianPayment.PaysMana half) gs sigilId
+        (askedGreen, afterGreen) = castWith greenMana
+        (askedBlue, afterBlue) = castWith blueMana
+    Spec.assertEqWith s "green paid, so BLUE floats" (poolTypes S.alice afterGreen) [blueMana]
+    Spec.assertEqWith s "blue paid, so GREEN floats" (poolTypes S.alice afterBlue) [greenMana]
+    Spec.assertEqWith s "and both halves were really asked" (halfAnnouncements askedGreen, halfAnnouncements askedBlue) ([greenMana], [blueMana])
+    Spec.assertEqWith s "neither cost life" (S.lifeOf S.alice afterGreen, S.lifeOf S.alice afterBlue) (Just 20, Just 20)
+
+  -- Pawl.Engine.Mana.waysOf's three rows, read directly off an UNANNOUNCED
+  -- cost -- the path a special action's cost and a cost to attack still take
+  -- (#1990, #1991), and the only one that asks this function what the symbol
+  -- costs rather than what CR 601.2b left behind. The Phyrexian group's
+  -- least-life case one group up is the same reading for the monocoloured
+  -- symbol.
+  --
+  -- Three boards, and the answers differ on all three: either component colour
+  -- pays it for nothing, and with neither in play CR 107.4f's 2 life is what is
+  -- left.
+  Spec.it s "CR 107.4f an unannounced {G/U/P} costs no life off EITHER colour, and 2 off neither" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    let lifeOff = Mana.lifeNeeded Nothing Cost.manaActivations ManaSpending.AsProduced S.alice hybridPhyrexianCost
+    Spec.assertEqWith s "a Forest pays the green half" (lifeOff (S.landsInPlay forest 1)) (Just 0)
+    Spec.assertEqWith s "an Island pays the blue half" (lifeOff (S.landsInPlay island 1)) (Just 0)
+    Spec.assertEqWith s "a Mountain pays neither, so 2 life" (lifeOff (S.landsInPlay mountain 1)) (Just 2)
+    Spec.assertEqWith s "and off an empty board it is 2 as well" (lifeOff (Setup.emptyGame S.bothPlayers)) (Just 2)
+    Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice hybridPhyrexianCost (S.landsInPlay mountain 1)) "and the life route is payable at 20"
+
+  -- CR 107.4f's third way, and the whole cost is it: no land at all, so the
+  -- mana route is unpayable, nothing is asked, and 2 life casts the spell.
+  Spec.it s "CR 107.4f off no land at all, 2 life pays the whole cost" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    sigil <- S.printingOf s registry "Synthetic Hybrid Phyrexian Sigil"
+    let (_, withPiker) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+        (gs, sigilId) = S.handOne sigil withPiker
+        (asked, resolved) = castAndResolve (announcesBoth PhyrexianPayment.PaysMana greenMana) gs sigilId
+    Spec.assertEqWith s "CR 107.4f: 2 life" (S.lifeOf S.alice resolved) (Just 18)
+    Spec.assertEqWith s "no mana route existed, so nothing was asked" (phyrexianAnnouncements asked) []
+    Spec.assertEqWith s "nor about a half" (halfAnnouncements asked) []
+    Spec.assertEqWith s "and the Sigil resolved" (length (GameState.stack resolved)) 0
+
+-- The Sigil's printed cost, restated rather than read off the card -- the
+-- phyrexianCost posture, and Pawl.CardSpec pins it against
+-- data/cards/synthetic-hybrid-phyrexian-sigil.json.
+hybridPhyrexianCost :: ManaCost.ManaCost
+hybridPhyrexianCost = ManaCost.MkManaCost [ManaSymbol.HybridPhyrexian (HybridPhyrexian.MkHybridPhyrexian Color.Green Color.Blue)]
+
+-- Tamiyo on the battlefield, `dragonOn`'s shape: the permanent the resolved
+-- spell became, which is a fresh object and so not the id that was cast.
+tamiyoOn :: GameState.GameState -> ObjectId.ObjectId
+tamiyoOn gs =
+  let isTamiyo oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName $ Text.pack "Tamiyo, Compleated Sage")
+   in case filter isTamiyo (Set.toAscList (GameState.battlefield gs)) of
+        oid : _ -> oid
+        [] -> ObjectId.MkObjectId 0
 
 -- CR 601.2h: "The player pays the total cost." Which mana leaves their pool is
 -- part of that payment, and CR 107.4b makes a generic symbol one of the same

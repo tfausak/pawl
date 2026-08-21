@@ -32,6 +32,7 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.HybridPayment as HybridPayment
+import qualified Pawl.Types.HybridPhyrexian as HybridPhyrexian
 import qualified Pawl.Types.Keyword as Keyword
 import Pawl.Types.Mana (Mana)
 import qualified Pawl.Types.Mana as Mana
@@ -658,6 +659,15 @@ waysOf symbol = case symbol of
   --
   -- The mana way is FIRST, which resolutions' sort then keeps -- see there.
   ManaSymbol.Phyrexian c -> [(Just (ofTypes (Set.singleton (ManaType.Colored c))), 0, 0), (Nothing, 0, 2)]
+  -- CR 107.4f's hybrid Phyrexian symbol, and the union of the two arms around
+  -- it: ONE mana of either component colour, which is the Hybrid arm's shape
+  -- because a demand is a SET of admissible types, or the same 2 life the
+  -- Phyrexian arm offers. Three printed ways, two rows, because the two mana
+  -- ways differ only in which member of one demand set pays.
+  --
+  -- The mana way is FIRST here too, for the arm above's reason.
+  ManaSymbol.HybridPhyrexian (HybridPhyrexian.MkHybridPhyrexian l r) ->
+    [(Just (ofTypes (Set.fromList [ManaType.Colored l, ManaType.Colored r])), 0, 0), (Nothing, 0, 2)]
   ManaSymbol.Generic n -> [(Nothing, n, 0)]
   -- CR 107.4h: one mana of any type produced by a snow source. ONE way, and a
   -- typed demand rather than a generic count -- the same rule's next sentence
@@ -914,8 +924,12 @@ monocoloredHybridGeneric = 2
 -- this function through the same Pawl.Engine.Cost.announce seam.
 --
 -- Returns CR 601.2b's own phrase -- the "nonhybrid equivalent cost", a mana cost
--- with no Phyrexian symbol and neither of CR 107.4e's hybrids left in it -- and
--- the life the announcement committed. Pawl.Engine.Cost.announce turns that life
+-- with no Phyrexian symbol and neither of CR 107.4e's hybrids left in it -- the
+-- life the announcement committed, and HOW MANY of CR 107.4f's symbols committed
+-- it. The last is not the first divided by two even though it always equals it:
+-- rule 702.150a counts SYMBOLS, and deriving that from an amount of life would
+-- make a rule about compleated planeswalkers depend on nothing recording the
+-- number. Pawl.Engine.Cost.announce turns that life
 -- into CR 119.4's payment, so nothing below this function ever sees a mana symbol
 -- that spends no mana.
 --
@@ -972,8 +986,8 @@ monocoloredHybridGeneric = 2
 -- permission to spend mana of any type the off-colour route is a real one.
 --
 -- FILTERED, NOT TRUSTED, the chooseSource posture.
-announce :: Maybe ObjectId -> Capacity -> ManaSpending -> PlayerId -> ObjectId -> (ManaCost -> [ManaCost]) -> Natural -> [Claim] -> ManaCost -> Game (ManaCost, Natural)
-announce casting capacity spending pid oid total outside claimed (ManaCost.MkManaCost symbols) = go [] 0 symbols
+announce :: Maybe ObjectId -> Capacity -> ManaSpending -> PlayerId -> ObjectId -> (ManaCost -> [ManaCost]) -> Natural -> [Claim] -> ManaCost -> Game (ManaCost, Natural, Natural)
+announce casting capacity spending pid oid total outside claimed (ManaCost.MkManaCost symbols) = go [] 0 0 symbols
   where
     -- "Payable" here means SOME completion of the remaining announcements pays
     -- it, which is what CR 601.2b's last sentence makes the question. Enumerated
@@ -1018,9 +1032,12 @@ announce casting capacity spending pid oid total outside claimed (ManaCost.MkMan
       first : others -> do
         answer <- Game.choose (mkPrompt (first NonEmpty.:| others))
         pure (if List.elem answer offers then answer else first)
-    go done committed remaining = case remaining of
-      [] -> pure (ManaCost.MkManaCost (reverse done), committed)
-      ManaSymbol.Phyrexian color : rest -> do
+    -- `paidWithLife` counts the symbols the third accumulator's haddock
+    -- describes; it moves in lockstep with `committed` and is carried separately
+    -- for the reason given there.
+    go done committed paidWithLife remaining = case remaining of
+      [] -> pure (ManaCost.MkManaCost (reverse done), committed, paidWithLife)
+      symbol@(ManaSymbol.Phyrexian color) : rest -> do
         gs <- State.get
         let asMana = ManaSymbol.OfType (ManaType.Colored color)
             offers =
@@ -1028,10 +1045,38 @@ announce casting capacity spending pid oid total outside claimed (ManaCost.MkMan
                 <> [PhyrexianPayment.PaysLife | stillPayable done rest gs (committed + phyrexianLife) []]
         announced <-
           choose PhyrexianPayment.PaysMana offers $
-            Prompt.AnnouncePhyrexianPayment (Decide.deciderFor pid gs) pid oid color
+            Prompt.AnnouncePhyrexianPayment (Decide.deciderFor pid gs) pid oid symbol
         case announced of
-          PhyrexianPayment.PaysMana -> go (asMana : done) committed rest
-          PhyrexianPayment.PaysLife -> go done (committed + phyrexianLife) rest
+          PhyrexianPayment.PaysMana -> go (asMana : done) committed paidWithLife rest
+          PhyrexianPayment.PaysLife -> go done (committed + phyrexianLife) (paidWithLife + 1) rest
+      -- CR 107.4f's hybrid Phyrexian symbol, whose three ways are the arm above's
+      -- two with the mana one split in half. TWO PROMPTS, in that order: mana or
+      -- life, then which colour -- and the second is asked only of the mana
+      -- route, so the pair reaches exactly rule 107.4f's three announcements.
+      --
+      -- Both prompts are FILTERED BY PAYABILITY on the same `stillPayable` the
+      -- arms around them use, which is what keeps the split from offering a
+      -- colour the board cannot produce, and what elides the second prompt
+      -- outright where one colour is payable. The mana route is offered at all
+      -- only where some colour is: a PaysMana with no payable half would strand
+      -- the payment CR 601.2b's last sentence promises.
+      symbol@(ManaSymbol.HybridPhyrexian (HybridPhyrexian.MkHybridPhyrexian l r)) : rest -> do
+        gs <- State.get
+        let halves = hybridHalves (ManaType.Colored l) (ManaType.Colored r)
+            payableHalves = filter (\half -> stillPayable done rest gs committed [ManaSymbol.OfType half]) halves
+            offers =
+              [PhyrexianPayment.PaysMana | not (null payableHalves)]
+                <> [PhyrexianPayment.PaysLife | stillPayable done rest gs (committed + phyrexianLife) []]
+        announced <-
+          choose PhyrexianPayment.PaysMana offers $
+            Prompt.AnnouncePhyrexianPayment (Decide.deciderFor pid gs) pid oid symbol
+        case announced of
+          PhyrexianPayment.PaysLife -> go done (committed + phyrexianLife) (paidWithLife + 1) rest
+          PhyrexianPayment.PaysMana -> do
+            half <-
+              choose (ManaType.Colored l) payableHalves $
+                Prompt.AnnounceHybridHalf (Decide.deciderFor pid gs) pid oid symbol
+            go (ManaSymbol.OfType half : done) committed paidWithLife rest
       -- CR 107.4e: "a monocolored hybrid symbol such as {2/B} can be paid with
       -- either one black mana or two mana of any type." Neither way commits life,
       -- so both are measured at the life already committed; what they differ in is
@@ -1048,8 +1093,8 @@ announce casting capacity spending pid oid total outside claimed (ManaCost.MkMan
           choose HybridPayment.PaysTyped offers $
             Prompt.AnnounceHybridPayment (Decide.deciderFor pid gs) pid oid manaType
         case announced of
-          HybridPayment.PaysTyped -> go (asTyped : done) committed rest
-          HybridPayment.PaysGeneric -> go (asGeneric : done) committed rest
+          HybridPayment.PaysTyped -> go (asTyped : done) committed paidWithLife rest
+          HybridPayment.PaysGeneric -> go (asGeneric : done) committed paidWithLife rest
       -- CR 107.4e: "a hybrid symbol such as {W/U} can be paid with either white
       -- or blue mana." Both ways spend ONE mana and commit no life, so this
       -- announcement moves neither CR 601.2f's total nor any reduction -- which
@@ -1062,8 +1107,8 @@ announce casting capacity spending pid oid total outside claimed (ManaCost.MkMan
         announced <-
           choose a offers $
             Prompt.AnnounceHybridHalf (Decide.deciderFor pid gs) pid oid symbol
-        go (ManaSymbol.OfType announced : done) committed rest
-      other : rest -> go (other : done) committed rest
+        go (ManaSymbol.OfType announced : done) committed paidWithLife rest
+      other : rest -> go (other : done) committed paidWithLife rest
 
 -- Every way the announcements of a cost's UNANNOUNCED tail could go, as the
 -- symbols that leaves and the life those choices commit -- CR 601.2b's own
@@ -1083,6 +1128,25 @@ completions symbols = case symbols of
     let asMana = ManaSymbol.OfType (ManaType.Colored color)
      in [(asMana : tail_, life) | (tail_, life) <- completions rest]
           <> [(tail_, life + phyrexianLife) | (tail_, life) <- completions rest]
+  -- CR 107.4f's hybrid Phyrexian symbol: three ways rather than two, the arm
+  -- above's life route beside one nonhybrid equivalent per component colour.
+  -- `hybridHalves` collapses the degenerate pair for the reason it does above.
+  --
+  -- A REGRESSION FENCE rather than proven behaviour, unlike every other arm
+  -- here: deleting it leaves the whole suite green. Both of this function's
+  -- callers reach `waysOf` for a symbol that rides through unexpanded, and
+  -- waysOf's rows say the same three things, so the two agree on every board --
+  -- and neither cost in `data/cards/` that prints this symbol prints two of
+  -- them, so `announce`'s tail is announcement-free by the time it asks. What the
+  -- arm buys is the CONTRACT in the haddock above: a completion that still holds
+  -- one is not a nonhybrid equivalent cost, which is what CR 601.2f is defined
+  -- over. The card that would make it observable is one printing two
+  -- announceable symbols with a hybrid Phyrexian symbol among them; none does.
+  ManaSymbol.HybridPhyrexian (HybridPhyrexian.MkHybridPhyrexian l r) : rest ->
+    concatMap
+      (\half -> [(ManaSymbol.OfType half : tail_, life) | (tail_, life) <- completions rest])
+      (hybridHalves (ManaType.Colored l) (ManaType.Colored r))
+      <> [(tail_, life + phyrexianLife) | (tail_, life) <- completions rest]
   -- CR 107.4e's two ways, neither of which commits life. The {2} is a Generic
   -- symbol and not a demand for two mana of the stated type: CR 107.4e says "two
   -- mana of any type", and CR 107.4b says a numerical symbol represents generic

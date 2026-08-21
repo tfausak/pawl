@@ -1084,6 +1084,9 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Fabricate _ -> keyword
   Keyword.Type.Riot -> keyword
   Keyword.Type.Unleash -> keyword
+  -- CR 702.150a names no word CR 612.2 can swap: it is written about loyalty
+  -- counters and Phyrexian mana symbols, both the rules' own vocabulary.
+  Keyword.Type.Compleated -> keyword
   Keyword.Type.Daybound -> keyword
   Keyword.Type.Nightbound -> keyword
   -- CR 702.147a names no word CR 612.2 can swap: "end of combat" is the rules'

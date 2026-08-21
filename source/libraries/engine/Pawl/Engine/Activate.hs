@@ -562,6 +562,7 @@ activateAbility pid srcId ability = do
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
             Object.kicked = False,
+            Object.phyrexianLifePaid = 0,
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
             Object.doesNotUntapNext = False,
@@ -656,7 +657,10 @@ activateAbility pid srcId ability = do
           -- so a Phyrexian symbol offered without the added "Sacrifice a land"
           -- in view would be offered against a board that has one land too many.
           let gathered = Cost.activationAdjustments pid srcId gs
-          announcedCost <- Cost.announce Nothing ManaSpending.AsProduced pid srcId (Cost.totalManas gathered) (Cost.plusComponents gathered announcedAtX)
+          -- The Phyrexian life record is DISCARDED here: CR 702.150a reads what
+          -- the player who CAST a spell announced, and no rule asks the same of
+          -- an activation cost.
+          (announcedCost, _) <- Cost.announce Nothing ManaSpending.AsProduced pid srcId (Cost.totalManas gathered) (Cost.plusComponents gathered announcedAtX)
           let slots = Modal.modesTargetSlots chosenModes (ActivatedAbility.modal ability)
               sets = Target.legalSets (Just pid) Map.empty srcId slots gs
           chosen <- Target.chooseTargets decider pid abilId slots sets

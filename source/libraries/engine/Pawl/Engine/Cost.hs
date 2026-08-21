@@ -635,7 +635,12 @@ maximumX pid oid face gs =
 --
 -- The life the announcement committed becomes a CostComponent.PayLife, making
 -- the returned cost CR 601.2b's "nonhybrid equivalent cost" in full (CR 107.4f,
--- CR 119.4). `lifeOwedBy`'s sum also goes IN, as the life this cost owes OUTSIDE
+-- CR 119.4). The Natural returned beside it is how many of CR 107.4f's symbols
+-- took that route -- CR 400.7d's cost record, which rule 702.150a's compleated
+-- reads off the permanent (Pawl.Types.Object.phyrexianLifePaid). Only
+-- Pawl.Engine.Cast stores it: rule 702.150a asks about "the player who CAST it",
+-- so an activation's and a resolution-time payment's answers are discarded by
+-- their callers. `lifeOwedBy`'s sum also goes IN, as the life this cost owes OUTSIDE
 -- its mana part -- without it a route the player cannot afford gets offered.
 --
 -- `total` is CR 601.2f's totalling, the CALLER's to supply, and it must be the
@@ -643,21 +648,23 @@ maximumX pid oid face gs =
 -- could hide a route and this function elide the prompt. It answers a LIST
 -- because CR 118.7e's choice of half is not made until CR 601.2f. `spending` is
 -- CR 118.14's permission, here for the same reason.
-announce :: Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword)
+announce :: Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, Natural)
 announce casting spending pid oid total_ cost = case Cost.mana cost of
   -- CR 118.6: an object with no mana cost has no mana symbols to announce.
-  Nothing -> pure cost
+  Nothing -> pure (cost, 0)
   Just manaCost -> do
     -- The claims are read here rather than inside Mana.announce, which cannot
     -- reach claimOf -- this module imports that one, not the other way about.
     gs <- State.get
-    (announced, life) <- Mana.announce casting manaActivations spending pid oid total_ (lifeOwedBy (Cost.components cost)) (claimsOf pid oid (Cost.components cost) gs) manaCost
+    (announced, life, paidWithLife) <- Mana.announce casting manaActivations spending pid oid total_ (lifeOwedBy (Cost.components cost)) (claimsOf pid oid (Cost.components cost) gs) manaCost
     pure
-      cost
-        { Cost.mana = Just announced,
-          Cost.components =
-            Cost.components cost <> (if life > 0 then [CostComponent.PayLife life] else [])
-        }
+      ( cost
+          { Cost.mana = Just announced,
+            Cost.components =
+              Cost.components cost <> (if life > 0 then [CostComponent.PayLife life] else [])
+          },
+        paidWithLife
+      )
 
 -- CR 118.7e: the payer chooses one half of each hybrid symbol in a reduction, as
 -- the reduction is applied, and the answers come back as the adjustments
@@ -743,8 +750,17 @@ announceReductions pid oid gs cost adjustments =
 --
 -- CR 107.4f's Phyrexian symbol is NOT here: CR 118.7f gives such a reduction one
 -- mana of the symbol's colour with no choice, which reducingManaTypeOf reads
--- directly. That rule's ten HYBRID Phyrexian symbols would have a half to
--- choose, and Pawl.Types.ManaSymbol's Phyrexian carries a single Color.
+-- directly.
+--
+-- Not implemented: a reduction written with a HYBRID Phyrexian symbol, which CR
+-- 118.7e and CR 118.7f do not between them settle -- one names a half to choose
+-- and the other one colour to take, and rule 107.4f's symbol answers to both
+-- descriptions. Scryfall `o:/\{[WUBRG]\/[WUBRG]\/P\}/` (rules text; that
+-- search excludes reminder text) and `mana:{G/U/P}` with its nine siblings,
+-- 2026-08-20: the second returns the four compleated planeswalkers and the first
+-- nothing, so every printing of the symbol is in a MANA COST. The card that
+-- would refute this is one printing a hybrid Phyrexian symbol in a cost
+-- reduction (#1995).
 reductionHalvesOf :: ManaSymbol.ManaSymbol -> Maybe [ManaSymbol.ManaSymbol]
 reductionHalvesOf symbol = case symbol of
   ManaSymbol.Generic _ -> Nothing
@@ -753,6 +769,7 @@ reductionHalvesOf symbol = case symbol of
   ManaSymbol.MonocoloredHybrid manaType ->
     Just [ManaSymbol.OfType manaType, ManaSymbol.Generic Mana.monocoloredHybridGeneric]
   ManaSymbol.Phyrexian _ -> Nothing
+  ManaSymbol.HybridPhyrexian _ -> Nothing
   ManaSymbol.Snow -> Nothing
   -- Unreachable, applyAdjustments' Variable arms: CR 601.2b precedes CR 601.2f,
   -- so no {X} survives into a total cost.
@@ -2111,6 +2128,9 @@ applyAdjustments adjustments cost =
         ManaSymbol.MonocoloredHybrid _ -> 0
         -- CR 107.4f makes this a COLOURED symbol whose other half is life.
         ManaSymbol.Phyrexian _ -> 0
+        -- CR 107.4f's hybrid Phyrexian symbol is coloured twice over and generic
+        -- not at all: neither of its three ways is generic mana.
+        ManaSymbol.HybridPhyrexian _ -> 0
         -- CR 107.4h: generic reductions don't affect {S} costs, which is why it
         -- is not spelled Generic 1. The one arm where this function and
         -- reducingGenericOf part company; the Adjustments case "CR 107.4h a
@@ -2137,6 +2157,10 @@ applyAdjustments adjustments cost =
         ManaSymbol.MonocoloredHybrid _ -> 0
         -- CR 118.7f gives a Phyrexian reduction to the typed side whole.
         ManaSymbol.Phyrexian _ -> 0
+        -- Nothing generic here either, for reductionHalvesOf's reason: rule
+        -- 118.7e's and rule 118.7f's readings of this symbol disagree, and
+        -- neither of them makes it generic mana.
+        ManaSymbol.HybridPhyrexian _ -> 0
         -- CR 118.7g: a snow-symbol reduction is that much GENERIC mana. THE arm
         -- this side exists for; CR 107.4h is about the other side.
         ManaSymbol.Snow -> 1
@@ -2151,6 +2175,7 @@ applyAdjustments adjustments cost =
         ManaSymbol.Hybrid {} -> True
         ManaSymbol.MonocoloredHybrid _ -> True
         ManaSymbol.Phyrexian _ -> True
+        ManaSymbol.HybridPhyrexian _ -> True
         ManaSymbol.Snow -> True
         ManaSymbol.Variable -> True
       -- The two SIDES of the cancellation, two functions because CR 118.7f makes
@@ -2173,6 +2198,9 @@ applyAdjustments adjustments cost =
         -- life, so no caller reaching this arm has established that there is a
         -- green mana here to cancel. Edgewalker's ruling says so outright.
         ManaSymbol.Phyrexian _ -> Nothing
+        -- Nothing, the arm above's reason twice over: unannounced, and naming
+        -- two colours rather than one even once it is.
+        ManaSymbol.HybridPhyrexian _ -> Nothing
         -- CR 107.4h: {S} is paid with one mana of ANY type, so it names none, and
         -- a reduction of one white mana cannot single it out.
         ManaSymbol.Snow -> Nothing
@@ -2192,6 +2220,11 @@ applyAdjustments adjustments cost =
         -- where the two sides part company -- unlike CR 118.7e's hybrid this asks
         -- the player nothing, the symbol naming exactly one colour.
         ManaSymbol.Phyrexian color -> Just (ManaType.Colored color)
+        -- Nothing, reductionHalvesOf's arm: rule 118.7f's "that symbol's color"
+        -- is singular and this symbol has two, so answering either would be the
+        -- engine choosing. Stricter than a settled reading -- such a reduction
+        -- reduces nothing -- and no card prints one (#1995).
+        ManaSymbol.HybridPhyrexian _ -> Nothing
         -- CR 118.7g makes an {S} reduction GENERIC mana, so reducingGenericOf's
         -- Snow arm is where it lands.
         ManaSymbol.Snow -> Nothing

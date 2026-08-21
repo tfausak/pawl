@@ -4082,8 +4082,8 @@ dethroneSpec s registry =
         rev <- S.printingOf s registry "Enraged Revolutionary"
         piker <- S.printingOf s registry "Goblin Piker"
         pure (S.threePlayerCombat [rev] [piker] [piker])
-      -- The same with bob fielding Jace Beleren at loyalty 3, the pool's one
-      -- planeswalker and so the only attackable permanent that is not a player.
+      -- The same with bob fielding Jace Beleren at loyalty 3, so that the only
+      -- attackable permanent on his side is not a player.
       jaceBoard = do
         rev <- S.printingOf s registry "Enraged Revolutionary"
         piker <- S.printingOf s registry "Goblin Piker"

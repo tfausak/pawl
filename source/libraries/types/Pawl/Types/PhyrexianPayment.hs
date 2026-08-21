@@ -9,8 +9,10 @@ module Pawl.Types.PhyrexianPayment where
 -- engine takes, so a transcript reads as the decision it records.
 --
 -- Neither way needs a payload: the colour is the symbol's own and the 2 life is
--- fixed by CR 107.4f. Hybrid Phyrexian symbols would break that, naming two
--- colours, and have no ManaSymbol constructor either (#364).
+-- fixed by CR 107.4f. CR 107.4f's HYBRID Phyrexian symbol
+-- (Pawl.Types.ManaSymbol.HybridPhyrexian) names two colours rather than one, and
+-- reuses this type unchanged: its mana way is announced a second time, with
+-- Prompt.AnnounceHybridHalf, which is what says WHICH colour.
 data PhyrexianPayment
   = -- | CR 107.4f: one mana of the symbol's colour.
     PaysMana

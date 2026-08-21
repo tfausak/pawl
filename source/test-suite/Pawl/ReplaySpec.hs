@@ -1067,7 +1067,7 @@ combatReplaySpec s =
                   decider
                   S.alice
                   oid
-                  Color.Green
+                  (ManaSymbol.Phyrexian Color.Green)
                   (PhyrexianPayment.PaysMana NonEmpty.:| [PhyrexianPayment.PaysLife])
           Spec.assertEqWith
             s
@@ -1091,7 +1091,7 @@ combatReplaySpec s =
                   decider
                   S.alice
                   oid
-                  Color.Green
+                  (ManaSymbol.Phyrexian Color.Green)
                   (PhyrexianPayment.PaysMana NonEmpty.:| [PhyrexianPayment.PaysLife])
           Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseOptional OptionalDecision.Exercises)) Nothing
         -- CR 118.13a again, for CR 107.4e's monocolored hybrid: which half a
@@ -1257,7 +1257,7 @@ combatReplaySpec s =
                   decider
                   S.alice
                   oid
-                  Color.Green
+                  (ManaSymbol.Phyrexian Color.Green)
                   (PhyrexianPayment.PaysMana NonEmpty.:| [PhyrexianPayment.PaysLife])
           Spec.assertEqWith s "mismatch" (Replay.decode p (Replay.encode phyrexian PhyrexianPayment.PaysMana)) Nothing
           Spec.assertEqWith s "nor the other way round" (Replay.decode phyrexian (Replay.encode p HybridPayment.PaysTyped)) Nothing
@@ -1288,7 +1288,7 @@ combatReplaySpec s =
                     decider
                     S.alice
                     oid
-                    Color.Green
+                    (ManaSymbol.Phyrexian Color.Green)
                     (PhyrexianPayment.PaysLife NonEmpty.:| [PhyrexianPayment.PaysMana])
                 )
             )

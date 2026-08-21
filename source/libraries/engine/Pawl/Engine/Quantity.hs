@@ -953,6 +953,11 @@ symbolValue symbol = case symbol of
   -- other half is 2 LIFE, not 2 mana, so there is no larger component to take.
   -- Mutagenic Growth ({G/P}) is 1, not 2.
   ManaSymbol.Phyrexian _ -> 1
+  -- CR 202.3g again: rule 202.3g says "each Phyrexian mana symbol", and CR
+  -- 107.4f's hybrid Phyrexian symbols are Phyrexian mana symbols. One, the same
+  -- as the arm above and for the same reason -- the symbol is one mana however
+  -- it is paid.
+  ManaSymbol.HybridPhyrexian _ -> 1
   -- CR 202.3's own sentence, with no subrule: CR 107.4h makes {S} payable with
   -- one mana from a snow source, so Icehide Golem's mana value is 1.
   ManaSymbol.Snow -> 1

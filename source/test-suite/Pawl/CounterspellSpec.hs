@@ -135,6 +135,7 @@ twoBoltState piker mountain lightningBolt =
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
             Object.kicked = False,
+            Object.phyrexianLifePaid = 0,
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
             Object.doesNotUntapNext = False,
@@ -162,7 +163,7 @@ cancelVictim island cancel victim =
 handAppend :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 handAppend printing pid gs =
   let (oid, gs1) = Game.freshObjectId gs
-      obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped Facing.FaceUp False 0 (Sickness.Settled pid) Map.empty Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty False Nothing Set.empty False Set.empty
+      obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped Facing.FaceUp False 0 (Sickness.Settled pid) Map.empty Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty False 0 Nothing Set.empty False Set.empty
    in ( oid,
         gs1
           { GameState.objects = Map.insert oid obj (GameState.objects gs1),
