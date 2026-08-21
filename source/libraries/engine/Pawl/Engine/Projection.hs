@@ -2604,9 +2604,10 @@ filterReads f = case f of
   -- 702.5a), and nothing distinguishes the two here.
   Filter.Type.CanHostSubject -> Set.fromList [Types, Subtypes, Colors, Keywords, PowerA, Controller]
   -- Over-declared for CanHostSubject's reason, one direction over: the
-  -- characteristics behind this atom are the candidate's enchant ability (CR
-  -- 702.5a) and the fixed host's (CR 301.5), and nothing here distinguishes the
-  -- two either.
+  -- characteristics behind this atom are the CANDIDATE's -- its subtypes (CR
+  -- 303.4, CR 301.5) and its enchant ability (CR 702.5a) -- and the fixed host's,
+  -- which that ability is read against, and nothing here distinguishes the two
+  -- either.
   Filter.Type.CanAttachToSubject -> Set.fromList [Types, Subtypes, Colors, Keywords, PowerA, Controller]
   -- Reads nothing: no Modification writes Object.source.
   Filter.Type.IsToken -> Set.empty

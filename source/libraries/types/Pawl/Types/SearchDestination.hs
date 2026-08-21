@@ -26,9 +26,10 @@ data SearchDestination
   | -- | Auratouched Mage's "put that Aura card onto the battlefield attached to
     -- it", where "it" is the searching ability's own source.
     --
-    -- CR 303.4i's entry-attached move rather than a plain battlefield entry
-    -- followed by CR 701.3's attach: the card enters ALREADY attached, so CR
-    -- 303.4f never asks its controller to choose a host. A search whose filter
+    -- CR 303.4's entry-attached move rather than a plain battlefield entry
+    -- followed by CR 701.3's attach: the card enters ALREADY attached, and
+    -- because the effect SPECIFIES what it will enchant, CR 303.4f never asks its
+    -- controller to choose a host. A search whose filter
     -- does not name Filter.CanAttachToSubject can still reach this arm and find a
     -- card the fixed host can't legally hold; CR 303.4i then leaves it in the
     -- library, which is what Pawl.Engine.Resolve.putFound does.

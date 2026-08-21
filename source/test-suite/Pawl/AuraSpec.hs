@@ -2057,8 +2057,9 @@ couldEnchantSpec s registry = Spec.describe s "CouldEnchant" $ do
         -- MAGE alone, so a run that put no Aura on the battlefield at all still
         -- reaches it rather than tripping a structural check ahead of it.
         Spec.assertEqWith s "CR 701.3a: the Mage is a 5/4, wearing the Aura it could host" (S.powerToughnessOf mageId after) (Just (5, 4))
-        -- CR 303.4i's entry-attached move, and the seed: the Aura is on the MAGE
-        -- and not on the other creature the answerer would have chosen.
+        -- The seed, and CR 303.4f's prompt not being raised with it: the effect
+        -- specified the host, so the Aura is on the MAGE rather than on the other
+        -- creature the answerer stands ready to choose.
         Spec.assertEqWith
           s
           "and it entered attached to the Mage rather than to the other creature"
