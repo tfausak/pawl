@@ -1547,9 +1547,13 @@ payGatePaidBy resolving source idx cIdx payer gate = do
           -- "may" above, since what is announced is how to pay a cost already
           -- chosen, and before the mana window Cost.pay opens.
           --
-          -- CR 601.2f's totalling is `pure`: rule 601.2f is a casting rule, and
-          -- nothing reduces a cost paid during a resolution, so the announced
-          -- cost IS the cost that will be paid. That also keeps the offer
+          -- CR 601.2f's totalling is `pure`, which is the identity in the list
+          -- applicative `Cost.announce` measures through: pawl gathers cost
+          -- adjustments for a SPELL (Cast.castSpell) and for an ACTIVATION
+          -- (Activate.activateAbility) and nowhere else, and `Cost.pay` below
+          -- applies none of its own, so the announced cost IS the cost that will
+          -- be paid. A card that reduced a CR 118.12 cost would be the one to
+          -- refute that, and `data/cards/` prints none. That also keeps the offer
           -- exactly as permissive as `Cost.canPay` above, which enumerates the
           -- same CR 601.2b nonhybrid equivalents through Mana.resolutions --
           -- so no route Mana.announce offers is one the gate refused, and its

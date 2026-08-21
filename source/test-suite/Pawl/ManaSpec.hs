@@ -3439,9 +3439,9 @@ poolTypes pid gs = case Game.poolOf pid gs of
 -- it: with every land tapped, the floating red is the only thing that could pay
 -- for it.
 --
--- Unannounced -- what the engine did before CR 118.13b was implemented -- the
--- cost stays {R/W}{R/W}, which the two Mountains cover on either leg, so the
--- pool is empty both times and the Bolt is castable neither time.
+-- Mutate the announcement away and the cost stays {R/W}{R/W}, which the two
+-- Mountains cover on either leg: the pool is empty both times and the Bolt is
+-- castable neither time, so the first assertion below is the one that reddens.
 shuYunSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 shuYunSpec s registry = Spec.describe s "Shu Yun, the Silent Tempest" $ do
   Spec.it s "CR 118.13b the half announced as the trigger resolves is the mana that resolution spends" $ do
@@ -3471,8 +3471,8 @@ shuYunSpec s registry = Spec.describe s "Shu Yun, the Silent Tempest" $ do
           Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter ((== Just shuYunId) . Recipient.objectOf) legal) sets
           _ -> S.identityAnswer p
         -- Cast, then let the step's priority round put both triggers on the
-        -- stack and resolve them. NOT a step advance: CR 500.4 would empty the
-        -- pool, which is the thing under test.
+        -- stack and resolve them. NOT a step advance: CR 500.5 empties the pool
+        -- as a step ends, and the pool is what the assertions read.
         legOf half = S.runPure (answering half) (S.runPure (answering half) board (S.cast S.alice boostId)) Engine.priorityLoop
         redLeg = legOf redMana
         whiteLeg = legOf whiteMana
@@ -3591,8 +3591,8 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
 
   -- What CR 118.13a's announcement leaves behind. Both halves are payable
   -- out of this pool and they leave DIFFERENT pools behind, so the choice
-  -- is observable and `spend` makes it: it takes the fewest units. A cast
-  -- A cast, an activation and a CR 118.12 pay gate no longer reach this,
+  -- is observable and `spend` makes it: it takes the fewest units. A cast,
+  -- an activation and a CR 118.12 pay gate no longer reach this,
   -- because `announce` has settled every {2/X} before payment -- what still
   -- does is a special action's cost (#1990) and a cost to attack (#1991),
   -- which is why this calls `spend` directly.
