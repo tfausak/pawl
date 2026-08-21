@@ -183,6 +183,12 @@ data ObjectRef
     -- counting "each spell and ability countered this way" would have two counts
     -- to read rather than one.
     --
+    -- SAYABLE ONLY WHERE THE CARD SAYS ABILITIES, which CR 113.9 makes a rule
+    -- rather than a transcription preference: an ability on the stack "can be
+    -- countered by effects that specifically counter abilities", so a sentence
+    -- naming spells alone is the arm above and writing it here would counter
+    -- objects the card never named.
+    --
     -- NO KIND TEST at the sweep, which is the difference from the arm above
     -- rather than an omission. CR 701.6a's ending still differs per victim -- a
     -- countered spell reaches a graveyard and a countered ability ceases (CR
