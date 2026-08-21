@@ -12,10 +12,7 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- you this turn if able".
 --
 -- Pawl.Types.AttackRequirement, the PRINTED carrier, states only CR 508.1d's
--- subject. That is not a shortcut either: the object axis is printed only by
--- cards that CREATE the requirement on resolution -- Alluring Siren and Kardur,
--- Doomscourge -- so a printed static ability naming what to attack has no
--- producer to model it on.
+-- subject, and says there why the object axis lives here instead (#2014).
 --
 -- Both axes are bare, one ObjectId and one PlayerId, for
 -- ActiveBlockRequirement's reason: rule 508.1d's producer here names its

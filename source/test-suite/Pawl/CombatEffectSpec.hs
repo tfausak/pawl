@@ -3667,7 +3667,9 @@ aimingAt oid p = case p of
 
 -- alice's two creatures against bob's Jace and bob's Siren, returned twice: once
 -- untouched, and once with the Siren's ability resolved on alice's FIRST creature.
--- The two boards differ in that resolution and nothing else.
+-- The two differ in that resolution and what paying for it did to bob's own side
+-- (the Siren is tapped); nothing on alice's side of the board moves, which is
+-- what every paired assertion below rests on.
 sirenBoard ::
   Printing.Printing ->
   Printing.Printing ->

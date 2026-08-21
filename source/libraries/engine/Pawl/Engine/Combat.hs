@@ -1049,6 +1049,12 @@ declareAttackers pid = do
             -- NOT CR 733's rewind. Where several declarations attain the maximum
             -- this takes the SMALLEST, a real choice among distinguishable
             -- declarations, which is why only a broken interpreter reaches it.
+            --
+            -- The ANNOUNCEMENTS are replaced along with the creatures, and are not
+            -- re-asked: the ceiling's declaration already names a target per
+            -- creature, and re-prompting a player whose answer was just discarded
+            -- would ask CR 508.1b about a declaration they did not make. Only the
+            -- same broken interpreter reaches this.
             settled =
               if attackDeclarationAllowed limit alone (Set.fromList (fmap fst announced)) && obeysAttackRequirements bound (Map.fromList announced)
                 then announced
