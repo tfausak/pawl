@@ -391,7 +391,8 @@ slotsOf effect = case effect of
   -- CR 727.5's exemption is an ObjectRef like any other.
   Effect.RestartGame exempt -> foldMap objectRefSlots exempt
   Effect.ControlPlayerNextTurn slot -> oneSlot slot
-  -- The third field is a DEFINITION, not a read; it belongs to boundSlots below.
+  -- The three slot fields are DEFINITIONS, not reads; they belong to boundSlots
+  -- below.
   Effect.Destroy (Destroy.MkDestroy ref _ _ _ _) -> objectRefSlots ref
   Effect.Sacrifice slot -> oneSlot slot
   Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown slot _) -> oneSlot slot
@@ -993,9 +994,11 @@ boundSlots effect = case effect of
   Effect.PlaySubgame slot -> Set.singleton slot
   -- CR 608.2d: the opponent this effect chose.
   Effect.ChooseOpponent slot -> Set.singleton slot
-  -- How many permanents this destruction ACTUALLY destroyed, for a later "for
-  -- each ... destroyed this way", and the cards it put into a graveyard, for a
-  -- later clause that NAMES them (CR 400.7's incarnations).
+  -- Three slots CR 701.8's destruction may define: how many permanents it
+  -- ACTUALLY destroyed, for a later "for each ... destroyed this way"; the cards
+  -- it put into a graveyard, for a later clause that NAMES them (CR 400.7's
+  -- incarnations); and the PERMANENTS it destroyed, for a later clause that
+  -- walks them one at a time.
   Effect.Destroy (Destroy.MkDestroy _ _ mSlot mBuried mPermanents) -> foldMap Set.singleton mSlot <> foldMap Set.singleton mBuried <> foldMap Set.singleton mPermanents
   -- How many milled cards matched the tally's filter (CR 728.1), and WHICH cards
   -- the mill put in the graveyard, for a later clause that names them (CR
@@ -1560,7 +1563,7 @@ branchTaken branch wasPaid = case branch of
 -- unpayable one takes the "can't" branch with no prompt either.
 --
 -- CR 101.4's APNAP order over the players the reference names, which is what
--- `payersOf` imposes: rule 101.4b lets a later payer answer knowing what an
+-- `apnapPlayersOf` imposes: rule 101.4b lets a later payer answer knowing what an
 -- earlier one did. The board is re-read for each of them (payGatePaidBy's own
 -- State.get) rather than measured once, so a cost that changes the board -- CR
 -- 118.12's own "sacrifice this enchantment" -- is affordable to the next payer
@@ -1575,7 +1578,7 @@ payGatePaid resolving source controller idx cIdx legal gate = do
         pure (Map.insert payer paid acc)
     )
     Map.empty
-    (payersOf (PayGate.payer gate) legal controller gs)
+    (apnapPlayersOf (PayGate.payer gate) legal controller gs)
 
 -- One player's answer to one gate. The cost is the PRINTED one with CR 107.3's X
 -- resolved (`announcedXOn`), and that substitution is what every reader below
@@ -1645,12 +1648,14 @@ announcedXOn oid gs =
     0
     (Game.lookupObject oid gs >>= Binding.amountOf Binding.variableX . Object.bindings)
 
--- Which players a resolution cost is offered to, in CR 101.4's APNAP order --
--- playerRefPlayers answers in PlayerId order and says so, leaving the ordering
--- rule to its caller. Mana Leak's reference names one seat and Rishadan
--- Cutpurse's names every opponent; the order is only observable for the second.
-payersOf :: PlayerRef -> Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> [PlayerId]
-payersOf ref legal controller gs =
+-- The players a PlayerRef names, in CR 101.4's APNAP order -- playerRefPlayers
+-- answers in PlayerId order and says so, leaving the ordering rule to its
+-- caller. Two callers ask, and for the same reason: the seats a resolution cost
+-- is offered to (CR 118.12a) and the seats CR 111.2 has creating tokens. Mana
+-- Leak's reference names one and Rishadan Cutpurse's names every opponent; the
+-- order is only observable for the second.
+apnapPlayersOf :: PlayerRef -> Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> [PlayerId]
+apnapPlayersOf ref legal controller gs =
   let named = playerRefPlayers legal controller gs ref
    in filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
 
@@ -3080,9 +3085,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- Effect.ForEach to walk one at a time -- Rampage of the Clans' "for each
     -- permanent destroyed this way, its controller creates a 3/3 green Centaur
     -- creature token". `fst`, not `snd`: the incarnation the graveyard move
-    -- minted is a different object (CR 400.7) and a card in a graveyard has no
-    -- controller at all (CR 108.4), so only these ids answer "its controller",
-    -- and they answer it through CR 608.2h's last known information.
+    -- minted is a different object (CR 400.7), and a card in a graveyard has no
+    -- controller (CR 108.4) so CR 108.4a would answer with its OWNER -- a
+    -- different player for anything that was stolen. Only these ids answer "its
+    -- controller", through CR 608.2h's last known information.
     --
     -- The funnel's own answer and not the sweep (CR 701.8b): an indestructible
     -- permanent (CR 702.12b) and a regenerated one (CR 701.8c) were not
@@ -3940,9 +3946,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- CR 111.2: WHOSE tokens. CR 109.5's "you" is the default reference, and
         -- every other one is somebody the sentence identified -- Rampage of the
         -- Clans' "its controller", read off the loop's member through CR 608.2h.
-        -- APNAP (CR 608.2f) for a reference naming several, payersOf's own
+        -- APNAP (CR 608.2f) for a reference naming several, apnapPlayersOf's own
         -- intersection so a reference naming a departed seat mints nothing.
-        creators = payersOf creator legal controller gs
+        creators = apnapPlayersOf creator legal controller gs
     -- PER CREATOR, every amount off the same pre-effect `gs` (CR 608.2f), so one
     -- seat's tokens cannot change how many the next seat gets.
     minted <- fmap concat . Monad.forM creators $ \creating ->
