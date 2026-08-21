@@ -637,9 +637,10 @@ everyManaType =
 -- because it consumes no supply. Zero for every other symbol.
 --
 -- CR 107.4f's ways, and BOTH of CR 107.4e's hybrids' ways, are collapsed to ONE
--- before payment by `announce`, which is what CR 118.13a and CR 601.2b call for --
--- so those enumerations reach payment only where nothing announced (a cost paid
--- during a resolution or for a special action, CR 118.13b/c, #373). The
+-- before payment by `announce`, which is what CR 601.2b calls for at CR 118.13a's
+-- moment and Pawl.Engine.Resolve.payGatePaidBy at CR 118.13b's -- so those
+-- enumerations reach payment only where nothing announced: a special action's
+-- cost (CR 118.13c, #1990) and a cost to attack (CR 508.1j, #1991). The
 -- colour/colour hybrid still gets a single way here rather than two, because both
 -- halves are one mana of a stated type: unannounced, they are one demand over two
 -- types, which is exactly the permission the symbol grants.
@@ -698,15 +699,16 @@ waysOf symbol = case symbol of
 --
 --   1. LEAST LIFE first, by the sort. CR 107.4f's life is the resource that does
 --      not come back: an unspent pool empties every step (CR 500.5) and a land
---      untaps. Conservative, and still pawl choosing -- which is why a cast or an
---      activation announces first (`announce`, CR 118.13a) and reaches this sort
---      with no Phyrexian symbol left to order. A cost paid during a resolution or
---      for a special action has no such announcement (#373).
+--      untaps. Conservative, and still pawl choosing -- which is why a cast, an
+--      activation (`announce`, CR 118.13a) and a cost paid on resolution
+--      (Pawl.Engine.Resolve.payGatePaidBy, CR 118.13b) all announce first and
+--      reach this sort with no Phyrexian symbol left to order. A special action's
+--      cost (#1990) and a cost to attack (#1991) have no such announcement.
 --   2. Among equal life, FEWEST UNITS, which waysOf's per-symbol order already
 --      gives and a STABLE sort preserves. Pawl choosing again, and reached on the
---      same terms: a cast or an activation announces its monocolored hybrids away
---      first, so only CR 118.13b/c's costs arrive here with a {2/X} to order
---      (#373).
+--      same terms: every announcing site above clears its monocolored hybrids
+--      first, so only those same two unannounced costs arrive here with a {2/X}
+--      to order (#1990, #1991).
 --
 -- The sort is what makes rule 1 hold across symbols rather than within one: for
 -- {2/R}{G/P} the product alone would offer a 2-life way before a 0-life one.
@@ -907,7 +909,9 @@ monocoloredHybridGeneric = 2
 -- and "the player announces the nonhybrid equivalent cost they intend to pay" for
 -- CR 107.4e's. CR 118.13a places both announcements as the controller PROPOSES
 -- the spell or ability, NOT when the cost is paid; CR 602.2b sends an activated
--- ability's cost through the same rule.
+-- ability's cost through the same rule. CR 118.13b asks the same two questions of
+-- a cost paid during a resolution, immediately before that payment, and reaches
+-- this function through the same Pawl.Engine.Cost.announce seam.
 --
 -- Returns CR 601.2b's own phrase -- the "nonhybrid equivalent cost", a mana cost
 -- with no Phyrexian symbol and neither of CR 107.4e's hybrids left in it -- and
@@ -1427,10 +1431,10 @@ payableResolutionsGiven casting capacity spending sources pcs pid committed clai
 -- is payable. `resolutions` is sorted by life ascending and payableResolutions
 -- keeps that order, so the head is the minimum.
 --
--- This is the budget Pawl.Engine.Cost.payMana pays under. A cast or an
--- activation has already announced its Phyrexian symbols away (`announce`,
--- CR 118.13a), so this answers 0 for them; it decides anything only where
--- nothing announced (#373).
+-- This is the budget Pawl.Engine.Cost.payMana pays under. A cast, an activation
+-- (`announce`, CR 118.13a) and a cost paid on resolution (CR 118.13b) have all
+-- announced their Phyrexian symbols away by now, so this answers 0 for them; it
+-- decides anything only where nothing announced (#1990, #1991).
 --
 -- Nothing committed and nothing claimed, unlike the gates: this runs DURING the
 -- payment, where the cost's components may already have been paid, so the whole

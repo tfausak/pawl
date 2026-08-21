@@ -9,11 +9,11 @@
 -- ability activated with priority and no payment in flight -- is here too, and
 -- is reached through Pawl.Engine.Action and Pawl.Engine.Engine.
 --
--- CR 118.13a's announcement lives
+-- CR 118.13's announcement lives
 -- here too (Mana.announce), so the cases that reach it through
--- Cast.castSpell and Activate.activateAbility are in this spec rather than in
--- CastSpec or ActivateSpec -- the module under test is this one, and the two entry
--- points are how the rule is reached.
+-- Cast.castSpell, Activate.activateAbility and Resolve.payGatePaidBy are in this
+-- spec rather than in CastSpec, ActivateSpec or ResolveSpec -- the module under
+-- test is this one, and the three entry points are how the rule is reached.
 module Pawl.ManaSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -3592,11 +3592,11 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
   -- What CR 118.13a's announcement leaves behind. Both halves are payable
   -- out of this pool and they leave DIFFERENT pools behind, so the choice
   -- is observable and `spend` makes it: it takes the fewest units. A cast
-  -- and an activation no longer reach this, because `announce` has settled
-  -- every {2/X} before payment -- what still does is CR 118.13b/c, a cost
-  -- paid during a resolution or for a special action (#373), which is why
-  -- this calls `spend` directly.
-  Spec.it s "CR 118.13b with nothing announced, spend takes a {2/R}'s one-mana half (#373)" $
+  -- A cast, an activation and a CR 118.12 pay gate no longer reach this,
+  -- because `announce` has settled every {2/X} before payment -- what still
+  -- does is a special action's cost (#1990) and a cost to attack (#1991),
+  -- which is why this calls `spend` directly.
+  Spec.it s "CR 118.13c with nothing announced, spend takes a {2/R}'s one-mana half (#1990)" $
     let red = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
         colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
      in Spec.assertEqWith
@@ -3824,7 +3824,8 @@ atLife n gs = gs {GameState.players = Map.adjust (\p -> p {Player.life = n}) S.a
 --
 -- TWO PATHS, and which one a case takes decides who chooses. A case calling
 -- Cost.payMana directly pays an UNANNOUNCED cost, where the least-life rule still
--- decides (#373); a case going through Cast.castSpell announces first, under CR
+-- decides -- what the engine's own remaining unannounced payments look like
+-- (#1990, #1991); a case going through Cast.castSpell announces first, under CR
 -- 118.13a, and the player decides. The CR 118.13a cases at the end of this group
 -- are the second path.
 phyrexianSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -3835,8 +3836,8 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   --
   -- It also pins what Cost.payMana does with an UNANNOUNCED cost, which is
   -- what this and the four cases after it exercise: they call Cost.payMana
-  -- directly, so no CR 118.13a announcement has happened and the least-life
-  -- rule still decides, which here means none (#373). A cast goes through
+  -- directly, so no announcement has happened and the least-life
+  -- rule still decides, which here means none (#1990, #1991). A cast goes through
   -- Cast.castSpell instead and asks -- see the CR 118.13a cases at the end of
   -- this group.
   Spec.it s "CR 107.4f one {G/P} is paid with one green mana and no life" $ do
@@ -3999,7 +4000,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- is gone and CR 107.4f's 2 life is all that is left. pawl pays it rather
   -- than failing the payment, which is the same MORE PERMISSIVE posture
   -- Cost.payMana's haddock takes towards a mis-tapped colour. Reached only
-  -- because this calls Cost.payMana directly, with nothing announced (#373).
+  -- because this calls Cost.payMana directly, with nothing announced (#1990, #1991).
   Spec.it s "CR 107.4f a Birds tapped for blue still pays a {G/P}, out of life" $ do
     birds <- S.printingOf s registry "Birds of Paradise"
     let (_, gs) = S.addCreature birds S.alice (Setup.emptyGame S.bothPlayers)
@@ -4395,7 +4396,9 @@ moltensteelSpec s registry = Spec.describe s "Moltensteel" $ do
   -- The activation cost's symbol IS a choice off a Mountain, and answering
   -- mana taps it. CR 118.13b/c are not what governs this -- the cost is an
   -- activation cost, so CR 118.13a is, and the choice belongs at proposal
-  -- rather than at payment (#373 is the other two clauses).
+  -- rather than at payment. Rule 118.13b announces at its own site
+  -- (Pawl.Engine.Resolve.payGatePaidBy, the Shu Yun group above); rule
+  -- 118.13c's special action is still unreached (#1990).
   Spec.it s "CR 118.13a/602.2b an activation cost's {R/P} is asked, and mana taps the Mountain" $ do
     mountain <- S.printingOf s registry "Mountain"
     dragon <- S.printingOf s registry "Moltensteel Dragon"

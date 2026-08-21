@@ -635,9 +635,10 @@ activateAbility pid srcId ability = do
         else do
           -- CR 118.13a's announcement, which names an activated ability's
           -- activation cost, happens here at 601.2b's position and not when the
-          -- cost is paid. Moltensteel Dragon exercises it; the rule's other two
-          -- clauses -- a cost paid during a resolution, or for a special action --
-          -- are still unreached (#373).
+          -- cost is paid. Moltensteel Dragon exercises it; rule 118.13b's cost
+          -- paid during a resolution announces at its own site
+          -- (Pawl.Engine.Resolve.payGatePaidBy), and rule 118.13c's special
+          -- action is still unreached (#1990).
           --
           -- Measured through the SAME totalling payableCost gated on, off the
           -- same adjustments -- against the printed cost instead, a reduction
