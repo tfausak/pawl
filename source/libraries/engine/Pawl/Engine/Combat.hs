@@ -1026,8 +1026,8 @@ declareAttackers pid = do
 -- `rejected` is the set of declarations already rewound, and is what bounds the
 -- recursion: a pure `Prompt r -> r` returns the identical answer, so a repeat is
 -- not rewound a second time but degrades to forcedAttackDeclaration. Such an
--- interpreter therefore costs exactly one extra prompt and reaches the same final
--- state as before. An interpreter that keeps proposing FRESH failing declarations
+-- interpreter therefore costs exactly one extra prompt and ends on the ceiling's
+-- declaration. An interpreter that keeps proposing FRESH failing declarations
 -- terminates on the finite set of declarations over `candidates`.
 --
 -- No legal attackers means no prompt: declining is then the only legal answer, CR
@@ -1076,6 +1076,8 @@ attemptAttackDeclaration pid defender rejected = do
         -- for. False once this exact declaration has already been rewound,
         -- which is what makes the recursion terminate.
         again = not (Set.member proposal rejected)
+    -- CombatEffectSpec's "CR 508.1d an illegal declaration is rewound and asked
+    -- again, not replaced by the ceiling's" is the proof.
     if not allowed && again
       then attemptAttackDeclaration pid defender (Set.insert proposal rejected)
       else do
@@ -1328,7 +1330,9 @@ declareBlockers = do
     -- UNBLOCKED creature. TriggerCondition.SelfAttacksUnblocked is the reader.
     --
     -- OUTSIDE the loop above, and the placement is the point: that loop is guarded
-    -- three times over, and a board where nobody can block trips all three --
+    -- three times over -- `attacking`, the defending player, and
+    -- attemptBlockDeclaration's own candidate check -- and a board where nobody
+    -- can block trips all three --
     -- exactly the board on which every attacker is unblocked. Rule 509.1h carries
     -- no such condition.
     --
@@ -1354,9 +1358,6 @@ declareBlockers = do
 -- step here, so the interpreter's own map IS the declaration -- and bounds the
 -- recursion exactly as it does for attackers: a repeat degrades to
 -- forcedBlockDeclaration rather than being rewound a second time.
---
--- Replay.defaultAnswer's "no blocks" for this prompt routes through here too, so
--- the two cannot disagree.
 attemptBlockDeclaration :: PlayerId -> [ObjectId] -> Set (Map ObjectId (Set ObjectId)) -> Game ()
 attemptBlockDeclaration pid attacking rejected = do
   gs <- State.get
@@ -1376,12 +1377,15 @@ attemptBlockDeclaration pid attacking rejected = do
     let allowed = legalBlockDeclaration pid chosen gs1
         -- Whether the preamble's rewind still has a fresh declaration to ask for.
         again = not (Set.member chosen rejected)
+    -- CombatEffectSpec's "CR 509.1c an illegal declaration is rewound and asked
+    -- again, not replaced by the ceiling's" is the proof.
     if not allowed && again
       then attemptBlockDeclaration pid attacking (Set.insert chosen rejected)
       else do
         -- A declaration already rewound once and offered again degrades to
         -- forcedBlockDeclaration -- always legal, and equal to "no blocks"
-        -- whenever no requirement is in force.
+        -- whenever no requirement is in force. Replay.defaultAnswer's "no blocks"
+        -- for this prompt routes through here too, so the two cannot disagree.
         let legal = if allowed then chosen else forcedBlockDeclaration pid gs1
         -- CR 509.1d: the total cost to block is determined once and then LOCKED IN
         -- -- this `let`. Asking BlockCost.totalCost a second time is what the rule

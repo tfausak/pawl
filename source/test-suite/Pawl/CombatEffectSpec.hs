@@ -3900,6 +3900,67 @@ conditionalAttackRequirementSpec s registry = Spec.describe s "ConditionalAttack
         Spec.assertBool s (Combat.legalAttackDeclaration S.alice [required] under) "and attacking with it is legal either way"
       _ -> Spec.assertFailure s "fixture should have one Juggernaut"
 
+-- Declines CR 508.1a's declaration the first time and declares everything the
+-- second, counting the asks. The first answer is ILLEGAL rather than
+-- unaffordable, which is CR 508.1's preamble reached through CR 508.1d instead of
+-- through CR 508.1j.
+declineThenAttackAnswer :: Prompt.Prompt r -> State.State Natural r
+declineThenAttackAnswer p = case p of
+  Prompt.DeclareAttackers _ _ candidates -> do
+    asked <- State.get
+    State.put (asked + 1)
+    pure (if asked == 0 then [] else candidates)
+  _ -> pure (S.identityAnswer p)
+
+-- declineThenAttackAnswer's twin for CR 509.1a: no blocks the first time, every
+-- candidate on the first attacker the second.
+declineThenBlockAnswer :: Prompt.Prompt r -> State.State Natural r
+declineThenBlockAnswer p = case p of
+  Prompt.DeclareBlockers _ _ mine attackers -> do
+    asked <- State.get
+    State.put (asked + 1)
+    pure $ case attackers of
+      [] -> Map.empty
+      a : _ ->
+        if asked == 0
+          then Map.empty
+          else Map.fromList (fmap (\b -> (b, Set.singleton a)) mine)
+  _ -> pure (S.identityAnswer p)
+
+-- CR 508.1's and CR 509.1's preambles reached through the ILLEGAL-declaration
+-- clauses (CR 508.1c/508.1d, CR 509.1b/509.1c) rather than through the payment
+-- clauses -- both end "the declaration ... is illegal", so both take the same
+-- rewind, and attackCostSpec's and blockCostSpec's retry cases are the payment
+-- half of the same behaviour.
+--
+-- Each board is chosen so the ceiling's own declaration is SMALLER than the one
+-- the player then makes: a requirement over one creature leaves several
+-- declarations attaining CR 508.1d's maximum, and forcedAttackDeclaration takes
+-- the smallest. An engine that substituted the ceiling rather than asking again
+-- would send one creature where two were declared.
+declarationRetrySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+declarationRetrySpec s registry = Spec.describe s "DeclarationRetry" $ do
+  Spec.it s "CR 508.1d an illegal declaration is rewound and asked again, not replaced by the ceiling's" $ do
+    berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [berserkers, piker] []
+        ((_, after), asked) = State.runState (Engine.runGame declineThenAttackAnswer gs (Combat.declareAttackers S.alice)) 0
+    Spec.assertEqWith s "CR 508.1: both creatures attack, where the ceiling's declaration sends the Berserkers alone" (Set.fromList (S.attackerDeclarationsOf after)) (Set.fromList mine)
+    Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] gs)) "declining really is illegal, so the first answer really was rewound"
+    Spec.assertBool s (all (\oid -> Combat.legalAttackDeclaration S.alice [oid] gs) (take 1 mine)) "and the Berserkers alone attains the maximum, so the ceiling stops there"
+    Spec.assertEqWith s "CR 508.1's preamble asked for a fresh declaration" asked 2
+  Spec.it s "CR 509.1c an illegal declaration is rewound and asked again, not replaced by the ceiling's" $ do
+    screen <- S.printingOf s registry "Razorgrass Screen"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker] [screen, piker]
+    case mine of
+      [attacker] -> do
+        let ((_, after), asked) = State.runState (Engine.runGame declineThenBlockAnswer gs Combat.declareBlockers) 0
+        Spec.assertEqWith s "CR 509.1: both creatures block, where the ceiling's declaration sends the Screen alone" (blockersOf attacker after) (Set.fromList theirs)
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty gs)) "declining really is illegal, so the first answer really was rewound"
+        Spec.assertEqWith s "CR 509.1's preamble asked for a fresh declaration" asked 2
+      _ -> Spec.assertFailure s "fixture should have one attacker"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   combatLegalitySpec s registry
@@ -3926,5 +3987,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   attackCostSpec s registry
   alluringSirenSpec s registry
   conditionalAttackRequirementSpec s registry
+  declarationRetrySpec s registry
   blockCostSpec s registry
   exertSpec s registry
