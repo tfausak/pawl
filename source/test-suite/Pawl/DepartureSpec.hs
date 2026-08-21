@@ -12,6 +12,7 @@ import qualified Pawl.CastSpec as CastSpec
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.Projection as Projection
@@ -22,6 +23,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -44,6 +46,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -729,3 +732,73 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
       "and its counters, which CR 122.2 makes this the last moment to record"
       (fmap LastKnown.counters (Map.lookup tusk (GameState.lastKnown gone)))
       (Just (Map.singleton CounterKind.PlusOnePlusOne 1))
+
+  -- CR 603.3a / CR 113.8: a triggered ability belongs to whoever controlled its
+  -- source AT THE TIME IT TRIGGERED, and CR 800.4d's second sentence then keeps
+  -- it off the stack if that player has left. The pair below is the board that
+  -- tells that reading from the one that asks who controls the source at the CR
+  -- 117.5 scan instead -- by which time CR 800.4a has already handed the source
+  -- back and the ability would be placed under a player it was never controlled
+  -- by.
+  --
+  -- Three seats, because CR 800.1/104.2a end a two-player game at the departure
+  -- rather than running CR 800.4a at all -- stolenTowershellBoard's reason.
+  --
+  -- Bitterblossom is the pool's one resolution that both takes its controller to
+  -- 0 life and records an entry event in doing so, and the Faerie enters while
+  -- bob is at 0 but still in the game, so the Soul Warden really does trigger.
+  -- The Warden is CAROL's, lent to bob by a layer-2 effect: clause 1 of CR 800.4a
+  -- passes it over (she owns it) and clause 2 ends the loan, so it is hers again
+  -- before the scan -- which is exactly what the two readings disagree about.
+  --
+  -- The upkeep is stamped with Event.recordEvent rather than S.withEvents on
+  -- purpose: rewriting the log clears GameState.battlefieldWhenTriggered, which
+  -- sends Event.eventTriggers to its live reading and collapses the distinction
+  -- this pair exists to draw.
+  Spec.it s "CR 603.3a/800.4d a borrowed permanent's trigger is the departing player's, so it is never put on the stack" $ do
+    (wardenId, board) <- blossomDepartureBoard s registry True
+    let after = S.runPure S.identityAnswer board Engine.priorityLoop
+    Spec.assertEqWith s "carol owns the Soul Warden and bob controls it as the upkeep begins" (fmap Object.owner (Game.lookupObject wardenId board), Projection.controllerOf wardenId board) (Just S.carol, Just S.bob)
+    -- The rule under test: the Warden's trigger was bob's when it triggered, so
+    -- carol -- who has it back by the time the scan runs -- gains nothing.
+    Spec.assertEqWith s "carol gains no life: the trigger was bob's (CR 603.3a), and CR 800.4d drops it" (S.lifeOf S.carol after) (Just 20)
+    Spec.assertEqWith s "bob's own life loss took him out of the game" (statusOf S.bob after) (Just (Status.Departed Departure.Type.Lost))
+    Spec.assertEqWith s "and the loan ended with him, so the Warden is carol's again (CR 800.4a)" (Projection.controllerOf wardenId after) (Just S.carol)
+    Spec.assertEqWith s "the game goes on -- three seats, so CR 800.4a runs rather than CR 104.2a ending it" (GameState.result after) Nothing
+    Spec.assertEqWith s "the Faerie left with its owner, so nothing is on the battlefield to have triggered anything else" (S.tokensOf after) []
+
+  -- The control for the case above, differing from it in exactly one line: carol
+  -- keeps her own Soul Warden, so CR 603.3a makes the trigger HERS and CR 800.4d
+  -- has nothing to say. Without this the 20 above is unfalsifiable -- an entrant
+  -- the scan could not see at all would produce the same number.
+  --
+  -- It is also what proves the departing player's Faerie is visible to the scan:
+  -- the token leaves the game with bob before the CR 117.5 scan reaches it, so
+  -- the only reading of it left is the CR 608.2h last known information
+  -- Departure.objectsLeaveWith files as it goes.
+  Spec.it s "CR 603.3a a Soul Warden its own controller kept sees the departing player's token enter" $ do
+    (wardenId, board) <- blossomDepartureBoard s registry False
+    let after = S.runPure S.identityAnswer board Engine.priorityLoop
+    Spec.assertEqWith s "carol both owns and controls the Soul Warden" (fmap Object.owner (Game.lookupObject wardenId board), Projection.controllerOf wardenId board) (Just S.carol, Just S.carol)
+    Spec.assertEqWith s "carol gains 1 life: the trigger was hers all along" (S.lifeOf S.carol after) (Just 21)
+    Spec.assertEqWith s "bob left the game just the same" (statusOf S.bob after) (Just (Status.Departed Departure.Type.Lost))
+
+-- bob at 1 life, active, with a Bitterblossom of his own and carol's Soul Warden
+-- either lent to him or not. Returns the Warden's id and the board with bob's
+-- upkeep already stamped into the log, ready for Engine.priorityLoop.
+blossomDepartureBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (ObjectId, GameState.GameState)
+blossomDepartureBoard s registry lent = do
+  bitterblossom <- S.printingOf s registry "Bitterblossom"
+  soulWarden <- S.printingOf s registry "Soul Warden"
+  let (_, g1) = S.addCreature bitterblossom S.bob S.threePlayerGame
+      (wardenId, g2) = S.addCreature soulWarden S.carol g1
+      borrowed = if lent then S.giveControl wardenId S.bob g2 else g2
+      upkeep = Phase.Beginning BeginningStep.Upkeep
+      dying =
+        borrowed
+          { GameState.phase = upkeep,
+            GameState.activePlayer = S.bob,
+            GameState.priority = Just S.bob,
+            GameState.players = Map.adjust (\pl -> pl {Player.life = 1}) S.bob (GameState.players borrowed)
+          }
+  pure (wardenId, Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.bob)) dying)
