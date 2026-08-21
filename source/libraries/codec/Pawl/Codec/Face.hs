@@ -19,6 +19,7 @@ import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Codec.AlternativeCost as AlternativeCost
 import qualified Pawl.Codec.AttackCost as AttackCost
 import qualified Pawl.Codec.AttackRequirement as AttackRequirement
+import qualified Pawl.Codec.BlockCost as BlockCost
 import qualified Pawl.Codec.BlockPermission as BlockPermission
 import qualified Pawl.Codec.BlockRequirement as BlockRequirement
 import qualified Pawl.Codec.CardName as CardName
@@ -99,6 +100,7 @@ codec cardCodec = Fields.object $ do
   sacrificeRestrictions <- Fields.defaulted "sacrificeRestrictions" [] (Common.list SacrificeRestriction.codec) Face.sacrificeRestrictions
   untapRestrictions <- Fields.defaulted "untapRestrictions" [] (Common.list UntapRestriction.codec) Face.untapRestrictions
   attackCosts <- Fields.defaulted "attackCosts" [] (Common.list AttackCost.codec) Face.attackCosts
+  blockCosts <- Fields.defaulted "blockCosts" [] (Common.list BlockCost.codec) Face.blockCosts
   additionalCosts <- Fields.defaulted "additionalCosts" [] (Common.list (CostComponent.codec Keyword.codec)) Face.additionalCosts
   -- CR 101.1: the ceiling this face's own words put on CR 601.2b's announced X
   -- (Pawl.Types.Face).
@@ -146,6 +148,7 @@ codec cardCodec = Fields.object $ do
         Face.sacrificeRestrictions = sacrificeRestrictions,
         Face.untapRestrictions = untapRestrictions,
         Face.attackCosts = attackCosts,
+        Face.blockCosts = blockCosts,
         Face.additionalCosts = additionalCosts,
         Face.maximumX = maximumX,
         Face.alternativeCosts = alternativeCosts,

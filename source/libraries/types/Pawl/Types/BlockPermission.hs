@@ -10,10 +10,11 @@ import qualified Pawl.Types.Quantity as Quantity
 -- with no number at all, Kemba's Legion with a number it counts off the
 -- battlefield.
 --
--- The SEVENTH carrier of a printed static ability, alongside
+-- The EIGHTH carrier of a printed static ability, alongside
 -- Pawl.Types.StaticAbility, Pawl.Types.PlayerStaticAbility,
 -- Pawl.Types.BlockRequirement, Pawl.Types.AttackRequirement,
--- Pawl.Types.CombatRestriction and Pawl.Types.AttackCost. CR 613.11 puts it
+-- Pawl.Types.CombatRestriction, Pawl.Types.AttackCost and
+-- Pawl.Types.BlockCost. CR 613.11 puts it
 -- after the layer system for Pawl.Types.BlockRequirement's reasons, which hold
 -- here unchanged: how many creatures a creature may block is not a
 -- characteristic, and the subject is an object rather than a player.

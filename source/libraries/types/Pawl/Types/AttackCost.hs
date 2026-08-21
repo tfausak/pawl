@@ -2,7 +2,7 @@ module Pawl.Types.AttackCost where
 
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AttackCostScope as AttackCostScope
-import qualified Pawl.Types.PerAttacker as PerAttacker
+import qualified Pawl.Types.PerCreature as PerCreature
 
 -- | CR 508.1c / CR 508.1h: one printed COST TO ATTACK (Ghostly Prison). CR 508.1c
 -- classifies it as a RESTRICTION -- the second arm of its parenthetical, whose
@@ -64,7 +64,7 @@ data AttackCost = MkAttackCost
     -- 508.1h's list is wider than mana, but a cost to attack that is not mana has
     -- no printing here (gap #599). Mana alone is also what makes CR 508.1i's
     -- window plus CR 508.1j the whole payment, which Pawl.Engine.Cost.payMana is.
-    perAttacker :: PerAttacker.PerAttacker,
+    perAttacker :: PerCreature.PerCreature,
     -- | Which attacks the cost is on -- CR 508.1b's announcement judged against
     -- the source's controller. Ghostly Prison's family protects that player
     -- alone; Sphere of Safety's protects their planeswalkers too. See

@@ -7,10 +7,11 @@ import qualified Pawl.Types.Affected as Affected
 -- ("creatures you control but don't own get +2/+2 and can't be sacrificed") is
 -- the pool's printing.
 --
--- The SEVENTH carrier of a printed static ability, alongside
+-- The NINTH carrier of a printed static ability, alongside
 -- Pawl.Types.StaticAbility, Pawl.Types.PlayerStaticAbility,
 -- Pawl.Types.BlockRequirement, Pawl.Types.AttackRequirement,
--- Pawl.Types.CombatRestriction and Pawl.Types.AttackCost. The FIRST of them
+-- Pawl.Types.CombatRestriction, Pawl.Types.AttackCost, Pawl.Types.BlockCost and
+-- Pawl.Types.BlockPermission. The FIRST of them
 -- that is not about combat, which is why its reader is not a combat module:
 -- Pawl.Types.BlockRequirement's header argues why neither of the first two can
 -- hold one of these, and every step of that argument holds here unchanged.

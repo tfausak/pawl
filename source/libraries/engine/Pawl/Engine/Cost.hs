@@ -1649,8 +1649,8 @@ orderSensitive component = case component of
 --
 -- The life budget only ever binds a cost NOTHING ANNOUNCED for, since a cast, an
 -- activation and a CR 118.12 pay gate all run `announce` first; what is left is a
--- special action's cost (#1990) and a cost to attack (#1991), where pawl still
--- chooses. Recomputed on EVERY pass, a tap being able to change
+-- special action's cost (#1990) and a cost to attack or to block (#1991), where
+-- pawl still chooses. Recomputed on EVERY pass, a tap being able to change
 -- it -- a Birds of Paradise tapped for blue takes the mana way to an unannounced
 -- {G/P} off the board, leaving CR 107.4f's 2 life.
 payMana :: Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
@@ -2124,7 +2124,7 @@ applyAdjustments adjustments cost =
         -- nonhybrid equivalent names it, and a symbol still spelled {2/R} is one
         -- CR 601.2b has NOT named -- Flame Javelin's own ruling. What still
         -- arrives unannounced is a special action's cost (#1990) and a cost to
-        -- attack (#1991).
+        -- attack or to block (#1991).
         ManaSymbol.MonocoloredHybrid _ -> 0
         -- CR 107.4f makes this a COLOURED symbol whose other half is life.
         ManaSymbol.Phyrexian _ -> 0
@@ -2190,7 +2190,7 @@ applyAdjustments adjustments cost =
         -- CR 107.4e names TWO types, and a symbol still spelled {G/U} here is one
         -- CR 601.2b has not named -- Mana.announce leaves an OfType behind when
         -- it does. What still arrives unannounced is a special action's cost
-        -- (#1990) and a cost to attack (#1991).
+        -- (#1990) and a cost to attack or to block (#1991).
         ManaSymbol.Hybrid {} -> Nothing
         ManaSymbol.MonocoloredHybrid _ -> Nothing
         -- EXACT rather than an elision: the symbol is necessarily UNANNOUNCED, CR

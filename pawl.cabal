@@ -118,6 +118,8 @@ library codec
     Pawl.Codec.BeginningStepSpec
     Pawl.Codec.Binding
     Pawl.Codec.BindingSpec
+    Pawl.Codec.BlockCost
+    Pawl.Codec.BlockCostSpec
     Pawl.Codec.BlockerDeclared
     Pawl.Codec.BlockerDeclaredSpec
     Pawl.Codec.BlockPermission
@@ -407,7 +409,7 @@ library codec
     Pawl.Codec.PayGateSpec
     Pawl.Codec.PayObligation
     Pawl.Codec.PayObligationSpec
-    Pawl.Codec.PerAttacker
+    Pawl.Codec.PerCreature
     Pawl.Codec.PermanentBecomesDesignated
     Pawl.Codec.PermanentBecomesDesignatedSpec
     Pawl.Codec.PermanentSacrificed
@@ -642,6 +644,7 @@ library engine
     Pawl.Engine.Battle
     Pawl.Engine.Binding
     Pawl.Engine.Blight
+    Pawl.Engine.BlockCost
     Pawl.Engine.BlockPermission
     Pawl.Engine.BlockRequirement
     Pawl.Engine.Card
@@ -941,6 +944,7 @@ library types
     Pawl.Types.BecomeCopy
     Pawl.Types.BeginningStep
     Pawl.Types.Binding
+    Pawl.Types.BlockCost
     Pawl.Types.BlockerDeclared
     Pawl.Types.BlockPermission
     Pawl.Types.BlockRequirement
@@ -1131,7 +1135,7 @@ library types
     Pawl.Types.PayObligation
     Pawl.Types.PendingEntryEffect
     Pawl.Types.PendingTrigger
-    Pawl.Types.PerAttacker
+    Pawl.Types.PerCreature
     Pawl.Types.PermanentBecomesDesignated
     Pawl.Types.PermanentSacrificed
     Pawl.Types.Phase

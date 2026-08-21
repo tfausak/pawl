@@ -1,5 +1,5 @@
 -- Covers Pawl.Codec.AttackCost and the two codecs only it dispatches to,
--- Pawl.Codec.AttackCostScope and Pawl.Codec.PerAttacker. They share a spec
+-- Pawl.Codec.AttackCostScope and Pawl.Codec.PerCreature. They share a spec
 -- rather than taking one each because neither is reachable on the wire except
 -- through the object below, so the pair of round trips here is the whole of
 -- what a card can say.
@@ -7,7 +7,7 @@ module Pawl.Codec.AttackCostSpec where
 
 import qualified Pawl.Codec.AttackCost as AttackCost
 import qualified Pawl.Codec.AttackCostScope as AttackCostScope
-import qualified Pawl.Codec.PerAttacker as PerAttacker
+import qualified Pawl.Codec.PerCreature as PerCreature
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Affected as Affected
@@ -20,7 +20,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
-import qualified Pawl.Types.PerAttacker as PerAttacker
+import qualified Pawl.Types.PerCreature as PerCreature
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
@@ -37,7 +37,7 @@ spec s = Spec.describe s "Pawl.Codec.AttackCost" $ do
       AttackCost.codec
       ( AttackCost.MkAttackCost
           (Affected.Matching (Filter.HasCardType CardType.Creature))
-          (PerAttacker.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 2]))
+          (PerCreature.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 2]))
           AttackCostScope.Controller
       )
       " {\"perAttacker\":{\"type\":\"Fixed\",\"value\":[{\"type\":\"Generic\",\"value\":2}]},\"scope\":{\"type\":\"Controller\"},\"subject\":{\"type\":\"Matching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
@@ -49,7 +49,7 @@ spec s = Spec.describe s "Pawl.Codec.AttackCost" $ do
       AttackCost.codec
       ( AttackCost.MkAttackCost
           (Affected.Matching (Filter.HasCardType CardType.Creature))
-          ( PerAttacker.Counted
+          ( PerCreature.Counted
               ( Quantity.Count
                   ( Count.MkCount
                       (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
@@ -67,4 +67,4 @@ spec s = Spec.describe s "Pawl.Codec.AttackCost" $ do
   Spec.it s "the scope round trips every constructor" $ Common.assertEnumCodec s AttackCostScope.codec
   Spec.it s "has a schema" $ Common.assertHasSchema s AttackCost.codec
   Spec.it s "the scope has a schema" $ Common.assertHasSchema s AttackCostScope.codec
-  Spec.it s "the share has a schema" $ Common.assertHasSchema s PerAttacker.codec
+  Spec.it s "the share has a schema" $ Common.assertHasSchema s PerCreature.codec

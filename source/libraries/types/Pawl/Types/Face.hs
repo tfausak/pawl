@@ -19,6 +19,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
+import qualified Pawl.Types.BlockCost as BlockCost
 import qualified Pawl.Types.BlockPermission as BlockPermission
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.CardName as CardName
@@ -363,6 +364,16 @@ data Face card = MkFace
     -- attack, so it must stay on CR 508.1a's candidate list, where a
     -- CombatRestriction takes its subject off.
     attackCosts :: [AttackCost.AttackCost],
+    -- | CR 604.1/604.2 / 509.1b / 509.1d: this face's printed COSTS TO BLOCK --
+    -- Oppressive Rays' {3} per blocking creature; read by Pawl.Engine.BlockCost,
+    -- never by Pawl.Engine.Projection, for blockRequirements' CR 613.11 reason.
+    --
+    -- attackCosts' twin, its own field for that field's reason with CR 509.1a's
+    -- candidate list substituted for CR 508.1a's, and separate from it because one
+    -- printed sentence can tax one action without the other: Ghostly Prison taxes
+    -- only attacking, and a card taxing only blocking would fill only this.
+    -- Oppressive Rays fills both, which is what its "can't attack or block" says.
+    blockCosts :: [BlockCost.BlockCost],
     -- | CR 103.5b: this face's "any time you could mulligan" actions, in printed
     -- order, each one a Pawl.Types.HandAction -- its effects in written order,
     -- and the clause gating whether it may be taken (Serum Powder writes none).

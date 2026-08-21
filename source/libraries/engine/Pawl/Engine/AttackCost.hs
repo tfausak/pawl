@@ -31,7 +31,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import Pawl.Types.ObjectId (ObjectId)
-import qualified Pawl.Types.PerAttacker as PerAttacker
+import qualified Pawl.Types.PerCreature as PerCreature
 
 -- CR 508.1h read for ONE announced attack: what must this creature's controller
 -- pay for it to attack THAT target? One entry per printed cost in force,
@@ -42,8 +42,8 @@ import qualified Pawl.Types.PerAttacker as PerAttacker
 -- asks this of a declaration not yet written to the record, and again of a
 -- target no creature has been assigned to (attacksFreely below).
 --
--- The "you" is the source's controller (CR 109.5), asked of the TARGET rather
--- than of the defending player. WHICH announcements that covers is the card's
+-- The "you" -- where the printing has one -- is the source's controller (CR
+-- 109.5), asked of the TARGET rather than of the defending player. WHICH announcements that covers is the card's
 -- own Pawl.Types.AttackCostScope: Ghostly Prison's ruling is that a creature
 -- that can't attack you can still attack a planeswalker you control, so under
 -- the narrow arm an AttackTarget.OfPlaneswalker is untaxed even when the
@@ -52,9 +52,10 @@ import qualified Pawl.Types.PerAttacker as PerAttacker
 -- matters as much as the exemption under both arms: a Prison its own controller
 -- is attacking WITH taxes nothing.
 --
--- AttackTarget.OfBattle is untaxed under BOTH arms, and that is a rule rather
--- than an omission: attacking a battle someone protects is not attacking that
--- player at all (CR 310.9b), and no printing of this family mentions battles.
+-- AttackTarget.OfBattle is untaxed under both PROTECTING arms, and that is a rule
+-- rather than an omission: attacking a battle someone protects is not attacking
+-- that player at all (CR 310.9b). Under EveryAttack it is taxed like any other
+-- announcement, Oppressive Rays' sentence naming no player to be protected.
 --
 -- Empty for the board almost every game is played on: the battlefield walk
 -- stops at `Face.attackCosts face` for every permanent that prints none, so no
@@ -90,11 +91,20 @@ costsOn attacker target gs =
       -- guard is deliberately `Just c ==` on a controller that must EXIST, since
       -- two Nothings would otherwise tax an attack on a planeswalker nobody
       -- controls.
-      protects source ac = case Projection.controllerOf source gs of
-        Nothing -> False
-        Just owner -> case AttackCost.scope ac of
-          AttackCostScope.Controller -> target == AttackTarget.OfPlayer owner
-          AttackCostScope.ControllerAndPlaneswalkers -> case target of
+      --
+      -- EveryAttack is the arm that reads NEITHER the target nor the controller:
+      -- Oppressive Rays taxes the creature and not a player, so it covers an
+      -- attack on a battle (CR 310.9b) as readily as one on its own controller.
+      -- Ordered ahead of the controller lookup for that reason -- a taxing
+      -- permanent nobody controls would otherwise stop taxing.
+      protects source ac = case AttackCost.scope ac of
+        AttackCostScope.EveryAttack -> True
+        AttackCostScope.Controller -> case Projection.controllerOf source gs of
+          Nothing -> False
+          Just owner -> target == AttackTarget.OfPlayer owner
+        AttackCostScope.ControllerAndPlaneswalkers -> case Projection.controllerOf source gs of
+          Nothing -> False
+          Just owner -> case target of
             AttackTarget.OfPlayer pid -> pid == owner
             AttackTarget.OfPlaneswalker pw -> Projection.controllerOf pw gs == Just owner
             AttackTarget.OfBattle _ -> False
@@ -110,8 +120,8 @@ costsOn attacker target gs =
       -- has not said "many". No printed counted share can reach it: every one
       -- counts permanents in a zone, which always answers.
       shareOf source ac = case AttackCost.perAttacker ac of
-        PerAttacker.Fixed cost -> [cost]
-        PerAttacker.Counted quantity ->
+        PerCreature.Fixed cost -> [cost]
+        PerCreature.Counted quantity ->
           let context = Filter.contextFor (Projection.controllerOf source gs) (Just source)
               generic n = ManaCost.MkManaCost [ManaSymbol.Generic (Integer.toNaturalSaturating n)]
            in Maybe.maybeToList (fmap generic (Quantity.evaluate (Projection.fullView gs) context gs source quantity))
