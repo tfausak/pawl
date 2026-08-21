@@ -6,24 +6,30 @@
           "perAttacker": {
             "type": "Fixed",
             "value": {
-              "mana": [
+              "components": [
                 {
-                  "type": "Generic",
-                  "value": 2
+                  "type": "Sacrifice",
+                  "value": {
+                    "count": 1,
+                    "whichPermanents": {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Land"
+                      }
+                    }
+                  }
                 }
-              ]
+              ],
+              "mana": []
             }
           },
           "scope": {
-            "type": "Controller"
+            "type": "EveryAttack"
           },
           "subject": {
             "type": "Matching",
             "value": {
-              "type": "HasCardType",
-              "value": {
-                "type": "Creature"
-              }
+              "type": "IsSource"
             }
           }
         }
@@ -36,7 +42,16 @@
       "manaCost": [
         {
           "type": "Generic",
-          "value": 3
+          "value": 4
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
         },
         {
           "type": "OfType",
@@ -48,19 +63,19 @@
           }
         }
       ],
-      "name": "Windborn Muse",
+      "name": "Exalted Dragon",
       "power": {
         "type": "Literal",
-        "value": 2
+        "value": 5
       },
       "toughness": {
         "type": "Literal",
-        "value": 3
+        "value": 5
       },
       "typeLine": {
         "subtypes": [
           {
-            "type": "Spirit"
+            "type": "Dragon"
           }
         ],
         "types": [

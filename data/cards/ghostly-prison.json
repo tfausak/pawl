@@ -5,12 +5,14 @@
         {
           "perAttacker": {
             "type": "Fixed",
-            "value": [
-              {
-                "type": "Generic",
-                "value": 2
-              }
-            ]
+            "value": {
+              "mana": [
+                {
+                  "type": "Generic",
+                  "value": 2
+                }
+              ]
+            }
           },
           "scope": {
             "type": "Controller"

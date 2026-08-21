@@ -9,6 +9,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.BlockCost as BlockCost
+import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.PerCreature as PerCreature
@@ -23,7 +24,7 @@ spec s = Spec.describe s "Pawl.Codec.BlockCost" $ do
       BlockCost.codec
       ( BlockCost.MkBlockCost
           Affected.Attached
-          (PerCreature.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 3]))
+          (PerCreature.Fixed (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []))
       )
-      " {\"perBlocker\":{\"type\":\"Fixed\",\"value\":[{\"type\":\"Generic\",\"value\":3}]},\"subject\":{\"type\":\"Attached\"}} "
+      " {\"perBlocker\":{\"type\":\"Fixed\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}},\"subject\":{\"type\":\"Attached\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s BlockCost.codec

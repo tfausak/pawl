@@ -47,10 +47,10 @@ data BlockCost = MkBlockCost
     -- (CR 509.1a plus Pawl.Engine.BlockPermission): the rule totals over the
     -- creatures, not over the pairs.
     --
-    -- Mana only, and not a Pawl.Types.Cost, so it carries no components. CR
-    -- 509.1d's list is wider than mana, but a cost to block that is not mana has
-    -- no printing here (gap #599). Mana alone is also what makes CR 509.1e's
-    -- window plus CR 509.1f the whole payment, which Pawl.Engine.Cost.payMana is.
+    -- A whole cost and not only mana, which is CR 509.1d's own width, and CR
+    -- 509.1e's window plus CR 509.1f's payment are together
+    -- Pawl.Engine.Cost.payToll -- Pawl.Types.AttackCost's field for both, its
+    -- reasons unchanged.
     perBlocker :: PerCreature.PerCreature
   }
   deriving (Eq, Ord, Show)

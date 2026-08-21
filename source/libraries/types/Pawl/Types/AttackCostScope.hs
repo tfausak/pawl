@@ -19,8 +19,9 @@ module Pawl.Types.AttackCostScope where
 -- as a candidate to be matched.
 --
 -- The third arm protects nothing at all. Oppressive Rays taxes the creature it
--- enchants rather than a player it is pointed at, so its sentence has no "you" to
--- resolve and no announcement it lets through. That is a different KIND of
+-- enchants and Exalted Dragon taxes itself, rather than either of them protecting
+-- a player it is pointed at, so such a sentence has no "you" to resolve and no
+-- announcement it lets through. That is a different KIND of
 -- printing rather than a wider protection, which is why it cannot be spelled as
 -- either arm above: under both of those the cost is judged against the source's
 -- controller, and an Oppressive Rays taxes an attack on anyone, its own
@@ -39,8 +40,8 @@ data AttackCostScope
   | -- | Baird, Steward of Argive, Norn's Annex, Sphere of Safety, Archangel of
     -- Tithes.
     ControllerAndPlaneswalkers
-  | -- | Oppressive Rays. Every announcement is taxed, whatever CR 508.1b named
-    -- and whoever controls the taxing permanent -- so this arm reads no
-    -- controller, where both arms above must have one.
+  | -- | Oppressive Rays, Exalted Dragon. Every announcement is taxed, whatever
+    -- CR 508.1b named and whoever controls the taxing permanent -- so this arm
+    -- reads no controller, where both arms above must have one.
     EveryAttack
   deriving (Bounded, Enum, Eq, Ord, Show)

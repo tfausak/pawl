@@ -60,10 +60,11 @@ data AttackCost = MkAttackCost
     -- owes {6}; that rule only TOTALS, and the multiplying is the card's own "for
     -- each".
     --
-    -- Mana only, and not a Pawl.Types.Cost, so it carries no components. CR
-    -- 508.1h's list is wider than mana, but a cost to attack that is not mana has
-    -- no printing here (gap #599). Mana alone is also what makes CR 508.1i's
-    -- window plus CR 508.1j the whole payment, which Pawl.Engine.Cost.payMana is.
+    -- A whole cost and not only mana, which is CR 508.1h's own width: Ghostly
+    -- Prison's {2} and Exalted Dragon's "you sacrifice a land" are both shares.
+    -- CR 508.1i's window plus CR 508.1j's payment are together
+    -- Pawl.Engine.Cost.payToll, which pools the mana halves and pays each other
+    -- half against the permanent that printed it.
     perAttacker :: PerCreature.PerCreature,
     -- | Which attacks the cost is on -- CR 508.1b's announcement judged against
     -- the source's controller. Ghostly Prison's family protects that player

@@ -1545,6 +1545,73 @@ pay casting spending pid oid cost = do
               State.put before
               pure Payment.Unpaid
 
+-- CR 508.1h-508.1j and CR 509.1d-509.1f: pay a COMBAT TOLL -- the costs to attack
+-- or to block that one declaration incurred, each tagged with the permanent that
+-- printed it (Pawl.Engine.AttackCost.totalCost).
+--
+-- The mana halves are ADDED and the non-mana halves are not, which is what "the
+-- total cost" means once CR 508.1h's list is read past its first item: two
+-- Ghostly Prisons owe {4} in one payment, and two Exalted Dragons owe two
+-- sacrifices that each keep the permanent that demanded them. So CR 508.1i and CR
+-- 509.1e open ONE mana window, here, and the components follow it.
+--
+-- Skipped at {0}, so a toll of components alone never opens a window: both rules
+-- say "if any of the costs require mana".
+--
+-- ALL OR NOTHING (CR 508.1j, CR 509.1f: "partial payments are not allowed"). The
+-- entry state is captured and restored on any refusal, so a payer who sacrifices
+-- the first land and then cannot find a second ends up having sacrificed nothing.
+-- `pay` above rests on the same capture for CR 601.2h; what is different here is
+-- that the caller cannot stand in for it, Pawl.Engine.Combat.declareBlockers
+-- having nothing of its own to rewind.
+--
+-- The bound slots ride out unread. A component of a combat toll binds what
+-- payComponent binds it (Sacrifice reserves a name), and there is no resolving
+-- ability holding a binding environment to write them into -- CR 508.1j and CR
+-- 509.1f name a payment and no effect, where CR 601.2f's components are paid for a
+-- spell that goes on to resolve.
+--
+-- Not implemented: CR 601.2h's order prompt ACROSS tags. Each tag's own components
+-- are ordered by payComponents below, but two taxing permanents are paid in
+-- battlefield order rather than the payer's. Exact for one taxing permanent, which
+-- is every board `data/cards/` can build (#2023).
+payToll :: PlayerId -> [(ObjectId, Cost Keyword.Type.Keyword)] -> Game Bool
+payToll pid charges = do
+  before <- State.get
+  -- CR 118.6: a toll one of whose parts is unpayable is unpayable whole.
+  case traverse (Cost.mana . snd) charges of
+    Nothing -> pure False
+    Just manaCosts -> do
+      let pooled = ManaCost.MkManaCost (concatMap ManaCost.unwrap manaCosts)
+      paidMana <-
+        if null (ManaCost.unwrap pooled)
+          then pure True
+          -- Not a cast (`casting` is Nothing), so CR 106.6-restricted mana cannot
+          -- pay a combat toll. Exact: every restriction in the vocabulary reads
+          -- "only to cast".
+          else payMana Nothing ManaSpending.AsProduced pid pooled
+      if not paidMana
+        then pure False
+        else do
+          outcome <- payTagged pid (fmap (fmap Cost.components) charges)
+          case outcome of
+            Payment.Paid _ -> pure True
+            Payment.Unpaid -> do
+              State.put before
+              pure False
+
+-- payToll's fold: each tag's components against the permanent that printed them,
+-- stopping at the first refusal. payInOrder's shape one level up, and the merge is
+-- that function's for its reason.
+payTagged :: PlayerId -> [(ObjectId, [CostComponent.CostComponent Keyword.Type.Keyword])] -> Game Payment.Payment
+payTagged pid charges = case charges of
+  [] -> pure bindsNothing
+  (oid, components) : rest -> do
+    outcome <- payComponents pid oid components
+    case outcome of
+      Payment.Unpaid -> pure Payment.Unpaid
+      Payment.Paid bound -> fmap (mergeBound bound) (payTagged pid rest)
+
 -- CR 601.2h: the parts are paid "in any order", and the ORDER IS THE PAYER'S.
 -- Observable: Jarad, Golgari Lich Lord's "Sacrifice a Swamp and a Forest" beside
 -- one Bayou and one plain Swamp is payable, and a payer who spends the Bayou on
