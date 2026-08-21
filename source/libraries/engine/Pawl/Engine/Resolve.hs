@@ -294,11 +294,11 @@ objectRefSlots ref = case ref of
   -- The seat comes from the source's own entry choice (CR 614.12a), not a slot.
   ObjectRef.ChosenPlayer -> Map.empty
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player count) -> joinTwo (playerRefSlots player) (quantitySlots count)
-  -- The seat half of the arm above, and no more: what ends the walk is a Filter,
-  -- and no arm here reports the slots a Filter reads -- EachMatching's and the
-  -- two chosen arms' each answer for their PLAYER side alone, for the reason the
-  -- header states.
-  ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil player _) -> playerRefSlots player
+  -- The arm above's two reads, and no more: the seat and the count. What a
+  -- MATCH is is a Filter, and no arm here reports the slots a Filter reads --
+  -- EachMatching's and the two chosen arms' each answer for their PLAYER side
+  -- alone, for the reason the header states.
+  ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil player _ count) -> joinTwo (playerRefSlots player) (quantitySlots count)
   -- CR 109.5: whose graveyards names no slot; who CHOOSES may.
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser _ _) -> chooserSlots chooser
   -- CR 402.3: the choosers own the hands, so the PlayerRef is the whole read.
@@ -317,7 +317,7 @@ objectRefSlots ref = case ref of
   -- The seats whose hands randomness reads: the arm above's read.
   ObjectRef.RandomCardInHand player -> playerRefSlots player
 
--- The Quantities an ObjectRef carries. Only TopOfLibrary's depth. Exhaustive, no
+-- The Quantities an ObjectRef carries: the two library walks' counts. Exhaustive, no
 -- wildcard: slotsAreExhaustive, readsX and Pawl.CardSpec's Count traversal all
 -- reach a nested Quantity through this, and their own ObjectRef-taking arms are
 -- written `{}` and answer a constant.
@@ -333,8 +333,8 @@ objectRefQuantities ref = case ref of
   ObjectRef.EachOpponent -> []
   ObjectRef.ChosenPlayer -> []
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary _ count) -> [count]
-  -- A Filter ends this walk, so there is no depth to carry.
-  ObjectRef.TopOfLibraryUntil {} -> []
+  -- The arm above's count, measured in MATCHES rather than in cards.
+  ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil _ _ count) -> [count]
   ObjectRef.ChosenCardInGraveyard {} -> []
   ObjectRef.ChosenCardInHand {} -> []
   ObjectRef.ChosenCardFromAmong {} -> []
@@ -1842,28 +1842,37 @@ objectRefObjects legal resolving controller source gs ref = case ref of
      in concatMap
           (\pid -> List.genericTake depth (Game.zoneMembers Zone.Library pid gs))
           (filter (`elem` named) (Game.apnapOrder gs))
-  -- The arm above's walk with a MATCH where its Quantity is: the same prefix of
-  -- CR 401.2's ordered pile taken from its head (CR 121.1), ended by the first
-  -- card the Filter matches instead of by a counted depth. The matching card is
-  -- IN the prefix, which is what Treasure Hunt's "until you reveal a nonland
-  -- card" says -- the walk stops having reached it, not before it.
+  -- The arm above's walk with its Quantity counting MATCHES rather than cards:
+  -- the same prefix of CR 401.2's ordered pile taken from its head (CR 121.1),
+  -- ended by the card whose match brings the tally up to the count instead of by
+  -- a counted depth. That card is IN the prefix, which is what Treasure Hunt's
+  -- "until you reveal a nonland card" and Open the Way's "until you reveal X land
+  -- cards" both say -- the walk stops having reached it, not before it.
   --
-  -- A library holding no match is given up whole (CR 609.3), which `break` does
-  -- by leaving the second list empty; the rest of the instruction is then
-  -- performed on all of it (CR 101.3). An empty library names nothing, for the
-  -- same reason.
+  -- A library holding fewer matches than the count is given up whole (CR 609.3),
+  -- which `walkDown` does by running out of cards; the rest of the instruction is
+  -- then performed on all of it (CR 101.3). An empty library names nothing, for
+  -- the same reason, and so does a count of zero -- an unevaluable or negative
+  -- one being clamped to zero here (CR 107.1b), the arm above's clamp.
   --
   -- Per named library and in APNAP order, the arm above's fold, so "each
   -- player's" walks each pile separately rather than one across the table. The
   -- Filter is matched against each card's own projection as the walk reaches it
   -- (CR 608.2c) -- the context is this resolution's, so a filter reading a slot
   -- this resolution bound sees it.
-  ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil player filter_) ->
+  ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil player filter_ count) ->
     let named = playerRefPlayers legal controller gs player
+        viewOf = effectViewOf source legal gs
         context = effectContext controller source legal (slotGroups resolving gs)
-        walk pid =
-          let (before, after) = List.break (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_) (Game.zoneMembers Zone.Library pid gs)
-           in before <> take 1 after
+        wanted = maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf context gs resolving source count)
+        matches oid = Filter.matches context (Projection.viewOfObject oid gs) filter_
+        walkDown remaining oids =
+          if remaining <= (0 :: Natural)
+            then []
+            else case oids of
+              [] -> []
+              oid : rest -> oid : walkDown (if matches oid then remaining - 1 else remaining) rest
+        walk pid = walkDown wanted (Game.zoneMembers Zone.Library pid gs)
      in concatMap walk (filter (`elem` named) (Game.apnapOrder gs))
   -- A card somebody CHOOSES is a QUESTION, and this function cannot ask one; the
   -- MoveToZone arm's own gather does. Under any other opcode this empty answer is

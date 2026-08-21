@@ -29,6 +29,10 @@
                       "ref": {
                         "type": "TopOfLibraryUntil",
                         "value": {
+                          "count": {
+                            "type": "Literal",
+                            "value": 1
+                          },
                           "filter": {
                             "type": "Not",
                             "value": {

@@ -45,6 +45,7 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Countering as Countering
+import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
@@ -56,6 +57,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -69,6 +71,7 @@ import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotArity as SlotArity
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
@@ -79,6 +82,11 @@ import qualified Pawl.Types.Zone as Zone
 -- move, so an id taken before a zone change never matches the one after it.
 namesIn :: Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> [Maybe CardName.CardName]
 namesIn zone pid gs = fmap (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs)
+
+-- Whether a seat is still playing, and if not why it left (CR 800.4a). Nothing
+-- for a PlayerId no roster holds.
+statusOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Status.Status
+statusOf pid gs = fmap Player.status (Map.lookup pid (GameState.players gs))
 
 -- The one activated ability of a printing that declares exactly one -- Prodigal
 -- Sorcerer's {T}, which is all these fixtures reach for. Nothing for any other
@@ -1205,6 +1213,221 @@ mulchSpec s registry =
           Spec.assertEqWith s "the one card came to hand" (namesIn Zone.Hand S.alice after) [named "Swamp"]
           Spec.assertEqWith s "her library is empty" (namesIn Zone.Library S.alice after) []
           Spec.assertEqWith s "and only the spell is in her graveyard" (namesIn Zone.Graveyard S.alice after) [named "Mulch"]
+
+-- The counted reveal-until walk: ObjectRef.TopOfLibraryUntil's Quantity counting
+-- MATCHES, where treasureHuntSpec above pins the same walk at one match and
+-- mulchSpec pins the split of what it bound. The three halves of Open the Way's
+-- sentence are those two arms plus CR 401.4's random bottoming enduranceSpec
+-- pins, and the card is the pool's only printing that writes all three at once.
+--
+-- Open the Way {X}{G}{G} Sorcery, "X can't be greater than the number of players
+-- in the game. / Reveal cards from the top of your library until you reveal X
+-- land cards. Put those land cards onto the battlefield tapped and the rest on
+-- the bottom of your library in a random order." (name, cost, type line and
+-- Oracle text checked against api.scryfall.com, 2026-08-20). The whole card is
+-- transcribed: the first sentence is Face.maximumX, and the second is three
+-- clauses -- CR 701.20a's reveal binding the walked cards as a group, the
+-- matching half moved to the battlefield tapped, and "the rest" as
+-- ObjectRef.InSlot over the SAME slot, which finds the lands gone because CR
+-- 400.7 minted new objects for them on the battlefield.
+--
+-- THREE SEATS, and they are load-bearing twice over. CR 101.1's ceiling IS the
+-- seat count, so a two-seat board could not tell an X of 3 that the card refuses
+-- from one it permits; and "your library" must not collapse onto the table's, so
+-- bob's library is stocked with cards that would all have matched.
+--
+-- THE CEILING IS READ ONCE, at CR 601.2b's announcement, and never again --
+-- Face.maximumX has no resolution-time reader at all. The departure pair below
+-- is what makes that observable: carol leaving with the spell already on the
+-- stack does not shrink the X alice announced, where carol leaving BEFORE the
+-- cast refuses that same X.
+--
+-- THE RANDOMNESS IS THE ANSWERER'S, as it is for Endurance above: the engine
+-- rolls nothing, it asks Prompt.Shuffle, so the fixture's permutation names the
+-- resulting library. The answer ROTATES the batch, so it is neither the batch's
+-- own order nor its reverse -- an engine that ignored the answer, and one that
+-- handed CR 401.4's arrangement to the owner, each leave a different library.
+openTheWaySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+openTheWaySpec s registry =
+  let -- alice: seven Forests, so {4}{G}{G} is as affordable as {3}{G}{G} and
+      -- nothing below turns on mana; `stock` into her library BOTTOM FIRST
+      -- (S.addLibraryCard puts each new card on top), Open the Way in hand.
+      -- `decoy` goes into BOB's library, which alice's "your library" must not
+      -- reach.
+      board forest openTheWay stock decoy =
+        let mana = S.landsFor forest S.alice 7 S.threePlayerGame
+            withStock = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.alice g)) mana stock
+            withDecoy = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.bob g)) withStock decoy
+            (withSpell, spellId) = S.handOne openTheWay withDecoy
+         in (spellId, withSpell {GameState.priority = Just S.alice})
+      named = Just . CardName.MkCardName . Text.pack
+      -- Announces this X, and rotates whatever batch the bottoming offers.
+      answering :: Natural -> Prompt.Prompt r -> r
+      answering x p = case p of
+        Prompt.ChooseX {} -> x
+        Prompt.Shuffle batch -> case batch of
+          a : rest -> rest <> [a]
+          [] -> []
+        _ -> S.identityAnswer p
+      -- Cast with this X, let anything in `between` happen while the spell sits
+      -- on the stack, then resolve it.
+      cast x between (spellId, gs) =
+        let announced = S.runPure (answering x) gs (S.cast S.alice spellId)
+         in S.runPure (answering x) (between announced) Stack.resolveTop
+      -- The tap state of every battlefield object alice owns that carries this
+      -- name. Empty where nothing of that name is there, which is how a card the
+      -- walk revealed but did NOT match is told from one it did.
+      tapOf name pid gs =
+        [ Object.tapped o
+        | oid <- Game.zoneMembers Zone.Battlefield pid gs,
+          fmap S.nameOf (Game.cardOf oid gs) == named name,
+          o <- Maybe.maybeToList (Game.lookupObject oid gs)
+        ]
+   in Spec.describe s "Open the Way" $ do
+        -- The headline, and the case the counted walk exists for. Top to bottom
+        -- alice's library is Island, Murder, Swamp, Bird Maiden, Goblin Piker,
+        -- Mountain, Plains, Ogre Sentry, and X is 3: the walk reveals SIX cards,
+        -- stopping on the Mountain that completes the count. Every other reading
+        -- of the sentence names a different set -- one match (Treasure Hunt's
+        -- walk) stops at the Island, three CARDS stops at the Swamp, and a walk
+        -- with no count at all takes the whole library.
+        Spec.it s "CR 401.2 the walk takes the top cards down to and including the Xth match" $ do
+          forest <- S.printingOf s registry "Forest"
+          openTheWay <- S.printingOf s registry "Open the Way"
+          island <- S.printingOf s registry "Island"
+          swamp <- S.printingOf s registry "Swamp"
+          mountain <- S.printingOf s registry "Mountain"
+          plains <- S.printingOf s registry "Plains"
+          murder <- S.printingOf s registry "Murder"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          piker <- S.printingOf s registry "Goblin Piker"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          let after = cast 3 id (board forest openTheWay [sentry, plains, mountain, piker, maiden, swamp, murder, island] [island, swamp])
+          Spec.assertEqWith
+            s
+            "the three land cards the walk matched are on the battlefield tapped, and the nonland cards it passed are not there at all"
+            (tapOf "Island" S.alice after, tapOf "Swamp" S.alice after, tapOf "Mountain" S.alice after, tapOf "Murder" S.alice after, tapOf "Bird Maiden" S.alice after, tapOf "Goblin Piker" S.alice after)
+            ([TapState.Tapped], [TapState.Tapped], [TapState.Tapped], [], [], [])
+          -- CR 401.4 through LibraryPlacement.RandomOrder: the three nonland
+          -- cards go under the two the walk never reached, in the order the
+          -- answerer named, from the BOTTOM inward -- so the Bird Maiden the
+          -- rotation named first ends up deepest. Neither the batch's own order
+          -- (which would deepen the Murder) nor its reverse (which would put the
+          -- Bird Maiden second), so an engine that ignored the answer and one
+          -- that reversed it are both excluded.
+          Spec.assertEqWith
+            s
+            "her library is the two cards under the walk, then the three the rest clause bottomed in the named order"
+            (namesIn Zone.Library S.alice after)
+            [named "Plains", named "Ogre Sentry", named "Murder", named "Goblin Piker", named "Bird Maiden"]
+          Spec.assertEqWith s "only the spell is in her graveyard (CR 608.2n)" (namesIn Zone.Graveyard S.alice after) [named "Open the Way"]
+          Spec.assertEqWith s "and nothing reached her hand" (namesIn Zone.Hand S.alice after) []
+          -- CR 400.1: "your library" is one player's. bob's holds two cards that
+          -- would both have matched, and the walk never looked at them.
+          Spec.assertEqWith s "bob's library is untouched" (namesIn Zone.Library S.bob after) [named "Swamp", named "Island"]
+          Spec.assertEqWith s "and nothing arrived on bob's battlefield" (namesIn Zone.Battlefield S.bob after) []
+        -- CR 609.3: a library holding fewer than X matches is walked to the
+        -- bottom and given up whole. Pairs with the case above on one changed
+        -- thing -- the stock holds two lands where it held three.
+        Spec.it s "CR 609.3 a library with fewer than X matches is walked to the bottom" $ do
+          forest <- S.printingOf s registry "Forest"
+          openTheWay <- S.printingOf s registry "Open the Way"
+          island <- S.printingOf s registry "Island"
+          swamp <- S.printingOf s registry "Swamp"
+          murder <- S.printingOf s registry "Murder"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          let after = cast 3 id (board forest openTheWay [maiden, swamp, murder, island] [])
+          Spec.assertEqWith
+            s
+            "both land cards in the library are on the battlefield tapped"
+            (tapOf "Island" S.alice after, tapOf "Swamp" S.alice after)
+            ([TapState.Tapped], [TapState.Tapped])
+          Spec.assertEqWith
+            s
+            "and the two nonland cards were bottomed into an otherwise empty library"
+            (namesIn Zone.Library S.alice after)
+            [named "Murder", named "Bird Maiden"]
+        -- CR 101.1 read against CR 601.2b, on a board where the ONLY thing that
+        -- can refuse the announcement is the card's own sentence: {4}{G}{G} is
+        -- affordable off seven Forests, so an X of 4 in a three-player game is
+        -- refused for the ceiling and nothing else, and CR 601.2 returns the game
+        -- to before the casting was proposed.
+        Spec.it s "CR 101.1 an X above the number of players reverses the cast" $ do
+          forest <- S.printingOf s registry "Forest"
+          openTheWay <- S.printingOf s registry "Open the Way"
+          island <- S.printingOf s registry "Island"
+          swamp <- S.printingOf s registry "Swamp"
+          mountain <- S.printingOf s registry "Mountain"
+          murder <- S.printingOf s registry "Murder"
+          let stock = [murder, mountain, murder, swamp, murder, island]
+              after = cast 4 id (board forest openTheWay stock [])
+          Spec.assertEqWith
+            s
+            "no land arrived on the battlefield"
+            (tapOf "Island" S.alice after, tapOf "Swamp" S.alice after, tapOf "Mountain" S.alice after)
+            ([], [], [])
+          Spec.assertEqWith
+            s
+            "the library is exactly as it was stocked"
+            (namesIn Zone.Library S.alice after)
+            [named "Island", named "Murder", named "Swamp", named "Murder", named "Mountain", named "Murder"]
+          Spec.assertEqWith s "and the card is still in alice's hand" (namesIn Zone.Hand S.alice after) [named "Open the Way"]
+        -- The CONTROL, and the same board with one thing changed: the answer.
+        -- Three IS the number of players, so CR 101.1 permits it and the walk
+        -- runs.
+        Spec.it s "CR 101.1 an X equal to the number of players is announced and resolved" $ do
+          forest <- S.printingOf s registry "Forest"
+          openTheWay <- S.printingOf s registry "Open the Way"
+          island <- S.printingOf s registry "Island"
+          swamp <- S.printingOf s registry "Swamp"
+          mountain <- S.printingOf s registry "Mountain"
+          murder <- S.printingOf s registry "Murder"
+          let stock = [murder, mountain, murder, swamp, murder, island]
+              after = cast 3 id (board forest openTheWay stock [])
+          Spec.assertEqWith
+            s
+            "all three land cards arrived tapped"
+            (tapOf "Island" S.alice after, tapOf "Swamp" S.alice after, tapOf "Mountain" S.alice after)
+            ([TapState.Tapped], [TapState.Tapped], [TapState.Tapped])
+          Spec.assertEqWith s "and the card left alice's hand" (namesIn Zone.Hand S.alice after) []
+        -- CR 601.2b's ceiling is read ONCE, at the announcement: carol leaves the
+        -- game (CR 800.4a) with the spell already on the stack, and the X alice
+        -- announced is still 3, so three lands are still found. An engine that
+        -- re-read Face.maximumX at resolution would have two players to count.
+        Spec.it s "CR 601.2b a player leaving in response does not shrink an X already announced" $ do
+          forest <- S.printingOf s registry "Forest"
+          openTheWay <- S.printingOf s registry "Open the Way"
+          island <- S.printingOf s registry "Island"
+          swamp <- S.printingOf s registry "Swamp"
+          mountain <- S.printingOf s registry "Mountain"
+          murder <- S.printingOf s registry "Murder"
+          let stock = [murder, mountain, murder, swamp, murder, island]
+              after = cast 3 (S.departs Departure.Type.Conceded S.carol) (board forest openTheWay stock [])
+          Spec.assertEqWith
+            s
+            "all three land cards still arrived tapped"
+            (tapOf "Island" S.alice after, tapOf "Swamp" S.alice after, tapOf "Mountain" S.alice after)
+            ([TapState.Tapped], [TapState.Tapped], [TapState.Tapped])
+          Spec.assertEqWith s "carol really did leave, so the ceiling a resolution-time read would have found is 2" (statusOf S.carol after) (Just (Status.Departed Departure.Type.Conceded))
+        -- The discriminating twin, differing in exactly one thing: carol leaves
+        -- BEFORE the cast rather than after it, so the ceiling she is counted in
+        -- is 2 and CR 101.1 refuses the same X of 3 the case above honoured.
+        Spec.it s "CR 101.1 the same X is refused where the departure came first" $ do
+          forest <- S.printingOf s registry "Forest"
+          openTheWay <- S.printingOf s registry "Open the Way"
+          island <- S.printingOf s registry "Island"
+          swamp <- S.printingOf s registry "Swamp"
+          mountain <- S.printingOf s registry "Mountain"
+          murder <- S.printingOf s registry "Murder"
+          let stock = [murder, mountain, murder, swamp, murder, island]
+              (spellId, gs) = board forest openTheWay stock []
+              after = cast 3 id (spellId, S.departs Departure.Type.Conceded S.carol gs)
+          Spec.assertEqWith
+            s
+            "no land arrived on the battlefield"
+            (tapOf "Island" S.alice after, tapOf "Swamp" S.alice after, tapOf "Mountain" S.alice after)
+            ([], [], [])
+          Spec.assertEqWith s "and the card is still in alice's hand" (namesIn Zone.Hand S.alice after) [named "Open the Way"]
 
 -- CR 701.20e's look, CR 701.20a's reveal of ONE card chosen from among what it
 -- showed, and CR 401.4's arrangement handed to randomness -- the three halves
@@ -3259,6 +3482,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   communeWithTheGodsSpec s registry
   treasureHuntSpec s registry
   mulchSpec s registry
+  openTheWaySpec s registry
   carthTheLionSpec s registry
   blossomingTortoiseSpec s registry
   exhumeSpec s registry

@@ -41,8 +41,8 @@ data ObjectRef
     -- the arm for that zone: the battlefield's is here, and a graveyard's, the
     -- stack's and the linked exile set's are on their own arms. A hand and a
     -- library still have none (#1309) -- TopOfLibraryUntil below is not one, since
-    -- it names a PREFIX of a library that a match ends rather than the cards in it
-    -- that match, and EachCardFromAmong is not one either, since it names the
+    -- it names a PREFIX of a library that a count of matches ends rather than the
+    -- cards in it that match, and EachCardFromAmong is not one either, since it names the
     -- matches in a GROUP an earlier clause bound rather than the matches in
     -- whatever zone those cards happen to sit in.
     --
@@ -270,12 +270,13 @@ data ObjectRef
     -- executes (CR 608.2c), which is what makes an empty library a no-op rather
     -- than an error: there is no top card, so the arm names nothing.
     TopOfLibrary TopOfLibrary.TopOfLibrary
-  | -- | The cards on top of a library down to and INCLUDING the first one the
-    -- Filter matches -- Treasure Hunt's "reveal cards from the top of your
-    -- library until you reveal a nonland card". TopOfLibrary's sibling, and a
-    -- second way to say HOW DEEP rather than a second way to reveal: both name a
-    -- prefix of CR 401.2's ordered pile taken from its head (CR 121.1), and they
-    -- differ only in what ends it -- a Quantity there, a match here.
+  | -- | The cards on top of a library down to and INCLUDING the one whose match
+    -- ends the walk -- Treasure Hunt's "reveal cards from the top of your library
+    -- until you reveal a nonland card", Open the Way's "until you reveal X land
+    -- cards". TopOfLibrary's sibling, and a second way to say HOW DEEP rather
+    -- than a second way to reveal: both name a prefix of CR 401.2's ordered pile
+    -- taken from its head (CR 121.1) and both carry a Quantity, and they differ
+    -- only in what that Quantity counts -- cards there, MATCHES here.
     --
     -- NOT the filtered sweep of a library the arms above still lack (#1309), and
     -- the difference is the one that issue turns on. A sweep would have to read
@@ -285,11 +286,12 @@ data ObjectRef
     -- is then shown by the effect reading it (CR 701.20a), where the cards a
     -- sweep passed over would not be.
     --
-    -- The MATCHING card is in the set, which is what "until you reveal a nonland
-    -- card" says: the walk stops having revealed it, not before it. A library
-    -- holding no match at all gives up the whole of itself and stops at the
-    -- bottom (CR 609.3), and the rest of the instruction is then performed on all
-    -- of it.
+    -- The card that completes the count is in the set, which is what "until you
+    -- reveal a nonland card" says: the walk stops having revealed it, not before
+    -- it. A library holding fewer matches than the count gives up the whole of
+    -- itself and stops at the bottom (CR 609.3), and the rest of the instruction
+    -- is then performed on all of it. A count of zero names nothing, the walk
+    -- being over before it starts.
     --
     -- No rule of the CR governs "until": the stopping condition is the card's own
     -- text, and what the walk owes the rulebook is CR 401.2's order, CR 121.1's
@@ -411,8 +413,8 @@ data ObjectRef
     -- it sits wherever that effect left it -- which for a look or a reveal is the
     -- LIBRARY, since neither moves anything (CR 701.20b). No zone-keyed arm can
     -- offer a choice there: a library still has no filtered sweep (#1309), and
-    -- TopOfLibraryUntil's walk is not one either -- it names a prefix and cannot
-    -- reach past the first match. Where the batch DID move to a graveyard,
+    -- TopOfLibraryUntil's walk is not one either -- it names a prefix, which stops
+    -- at the match that completes its count rather than at the deepest one. Where the batch DID move to a graveyard,
     -- Midnight Tilling writes the same sentence as ChosenCardInGraveyard narrowed
     -- by Filter.IsBound; this
     -- arm reads the slot directly instead, so it needs no such sweep.

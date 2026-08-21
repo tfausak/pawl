@@ -2672,9 +2672,10 @@ objectRefFilters ref = case ref of
   -- Effect.DealDamage's quantity does.
   ObjectRef.TopOfLibrary {} -> countFilters (refCounts ref)
   -- Treasure Hunt's "until you reveal a nonland card" states its Filter directly
-  -- rather than through a depth, so both are linted: the walk-ending Filter here,
-  -- and whatever a Count under it would hold via the arm above's route.
-  ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil _ f) -> f : countFilters (refCounts ref)
+  -- as well as carrying the arm above's count, so both are linted: the
+  -- match-defining Filter here, and whatever a Count under the count would hold
+  -- via the arm above's route.
+  ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil _ f _) -> f : countFilters (refCounts ref)
   -- Port of Karfell's "a creature card from your graveyard"; its PlayerScope and
   -- its Chooser name players, so the Filter is the whole of what there is to
   -- lint, exactly as for the graveyard sweep above.
@@ -5067,10 +5068,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player depth) -> case depth of
             Quantity.Type.Literal n -> n <= 1 && namesOneSeat player
             _ -> False
-          -- FALSE however narrow the seat: a walk ends where a card matches, and
-          -- nothing about the ref bounds how many cards it passes first. The same
-          -- reading the computed depth above gets -- this lint asks what a card
-          -- may be written as.
+          -- FALSE however narrow the seat and however small the count: a walk
+          -- ends where the count of matches is met, and nothing about the ref
+          -- bounds how many cards it passes first. The same reading the computed
+          -- depth above gets -- this lint asks what a card may be written as.
           ObjectRef.TopOfLibraryUntil {} -> False
           -- One card per CHOOSER: the resolving controller chooses once however
           -- many graveyards the scope draws candidates from, where Exhume's
