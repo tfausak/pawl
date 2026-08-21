@@ -3,6 +3,7 @@ module Pawl.Codec.ObjectRef where
 import qualified Pawl.Codec.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Codec.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Codec.ChosenCardInHand as ChosenCardInHand
+import qualified Pawl.Codec.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Codec.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
@@ -26,7 +27,7 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- tags, emitted identically -- and what it adds is the schema.
 --
 -- 'EachCardInGraveyard', 'TopOfLibrary', 'TopOfLibraryUntil', 'ChosenCardInGraveyard',
--- 'ChosenCardInHand' and 'ChosenCardFromAmong' each carry a payload record of
+-- 'ChosenCardInHand', 'ChosenCardFromAmong' and 'EachCardFromAmong' each carry a payload record of
 -- their own (#1464), so no arm here writes a positional array.
 -- 'RandomCardInHand' carries a bare PlayerRef instead, since it holds only the
 -- one field.
@@ -52,6 +53,7 @@ codec =
       Arm.payload "ChosenCardInGraveyard" ChosenCardInGraveyard.codec ObjectRef.ChosenCardInGraveyard (\x -> case x of ObjectRef.ChosenCardInGraveyard y -> Just y; _ -> Nothing),
       Arm.payload "ChosenCardInHand" ChosenCardInHand.codec ObjectRef.ChosenCardInHand (\x -> case x of ObjectRef.ChosenCardInHand y -> Just y; _ -> Nothing),
       Arm.payload "ChosenCardFromAmong" ChosenCardFromAmong.codec ObjectRef.ChosenCardFromAmong (\x -> case x of ObjectRef.ChosenCardFromAmong y -> Just y; _ -> Nothing),
+      Arm.payload "EachCardFromAmong" EachCardFromAmong.codec ObjectRef.EachCardFromAmong (\x -> case x of ObjectRef.EachCardFromAmong y -> Just y; _ -> Nothing),
       Arm.payload "RandomCardInHand" PlayerRef.codec ObjectRef.RandomCardInHand (\x -> case x of ObjectRef.RandomCardInHand y -> Just y; _ -> Nothing)
     ]
   where

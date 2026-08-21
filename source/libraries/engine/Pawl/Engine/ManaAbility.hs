@@ -277,6 +277,10 @@ movesLibraryCard effect = case effect of
       -- MAY do rather than where one board's group happens to sit, and a group
       -- bound by a mill -- already in a graveyard -- cannot make the answer No.
       ObjectRef.ChosenCardFromAmong {} -> True
+      -- TRUE for the arm above's reason, unchanged by taking every match
+      -- instead of one: the group a look or a reveal bound is still in the
+      -- library it was shown from (CR 701.20b).
+      ObjectRef.EachCardFromAmong {} -> True
       ObjectRef.RandomCardInHand _ -> False
   Effect.AddMana _ -> False
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> False
