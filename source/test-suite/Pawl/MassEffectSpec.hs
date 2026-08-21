@@ -38,6 +38,7 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
@@ -3229,6 +3230,158 @@ baneOfProgressSpec s registry = Spec.describe s "BaneOfProgress" $ do
     Spec.assertEqWith s "no counters" (plusOnePlusOnesOn entered resolved) 0
     Spec.assertEqWith s "so Bane is the printed 2/2" (entered >>= \oid -> Projection.powerOf oid resolved) (Just 2)
 
+-- Rampage of the Clans {3}{G} Instant: "Destroy all artifacts and enchantments.
+-- For each permanent destroyed this way, its controller creates a 3/3 green
+-- Centaur creature token." Oracle text checked against api.scryfall.com,
+-- 2026-08-21.
+--
+-- Bane of Progress' sweep with the OTHER rider: the count half above reads how
+-- many died, and this reads WHICH -- Destroy's `permanents` slot, walked by
+-- Effect.ForEach with each member's controller supplying CR 111.2's creator
+-- through CR 608.2h last known information.
+--
+-- THREE SEATS, and the destroyed permanents are split between two of them:
+-- alice's artifact and bob's enchantment. A rider keyed to the CASTER rather
+-- than to each permanent's controller would put both Centaurs under alice, so
+-- the split is what makes the reading observable. carol holds the controls.
+--
+-- Cast off four Forests through the PRIORITY LOOP, castBaneOfProgress' posture:
+-- the spell resolves inside the loop and the tokens are on the board when it
+-- settles. Answers the finished board and the TRANSCRIPT, since what CR 608.2f
+-- did or did not ask alice is half of what these cases claim.
+castRampage :: Printing.Printing -> Printing.Printing -> GameState.GameState -> (GameState.GameState, [Response.Response])
+castRampage forest rampage board =
+  let (withSpell, spell) = S.handOne rampage (S.landsFor forest S.alice 4 board)
+      ((_, resolved), transcript) = Replay.record S.identityAnswer withSpell (S.cast S.alice spell >> Engine.priorityLoop)
+   in (resolved, transcript)
+
+-- The CR 608.2f intra-seat orderings alice was asked for, in order. VariableEffectSpec's
+-- own reader, one spec over.
+orderAnswersIn :: [Response.Response] -> [[Natural]]
+orderAnswersIn = Maybe.mapMaybe (\r -> case r of Response.OrderedForEach o -> Just o; _ -> Nothing)
+
+-- The permanents on the battlefield named "Centaur Token" that this player
+-- CONTROLS. Projection.controllerOf and not Support.countOnBattlefieldByName,
+-- which indexes the battlefield by OWNER (CR 108.3) and so cannot see control at
+-- all -- and CR 111.2 makes the creator both here, which is exactly why the
+-- weaker question would pass under either reading.
+centaursControlledBy :: PlayerId.PlayerId -> GameState.GameState -> [ObjectId.ObjectId]
+centaursControlledBy pid gs =
+  filter
+    ( \oid ->
+        fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack "Centaur Token"))
+          && Projection.controllerOf oid gs == Just pid
+    )
+    (Set.toList (GameState.battlefield gs))
+
+-- The card names in a player's graveyard, sorted. CR 701.8a moves a destroyed
+-- permanent to its OWNER's graveyard, which is the half of "its controller" this
+-- group has to tell apart.
+graveyardNames :: PlayerId.PlayerId -> GameState.GameState -> [String]
+graveyardNames pid gs =
+  List.sort
+    (Maybe.mapMaybe (\oid -> fmap (Text.unpack . CardName.unwrap . Face.name) (Game.faceOf oid gs)) (Game.zoneMembers Zone.Graveyard pid gs))
+
+rampageOfTheClansSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+rampageOfTheClansSpec s registry = Spec.describe s "RampageOfTheClans" $ do
+  -- The proving case for #463: a mass destruction whose rider acts on EACH
+  -- permanent it destroyed rather than on how many there were.
+  --
+  -- The board separates every reading that could be taken:
+  --
+  --   * alice's Bonesplitter and bob's Bad Moon are destroyed, one per seat, so
+  --     "its controller" and "you" give different answers;
+  --   * carol's Darksteel Myr is an artifact the filter MATCHES and CR 702.12b
+  --     will not let be destroyed, so a rider walking the swept set rather than
+  --     the destroyed set would hand carol a Centaur;
+  --   * carol's Goblin Piker is neither, and is the control.
+  Spec.it s "CR 111.2 each destroyed permanent's own controller creates its Centaur" $ do
+    forest <- S.printingOf s registry "Forest"
+    rampage <- S.printingOf s registry "Rampage of the Clans"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    badMoon <- S.printingOf s registry "Bad Moon"
+    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (equipment, g1) = S.addCreature bonesplitter S.alice (Setup.emptyGame S.threePlayers)
+        (moon, g2) = S.addCreature badMoon S.bob g1
+        (myr, g3) = S.addCreature darksteelMyr S.carol g2
+        (bystander, board) = S.addCreature piker S.carol g3
+        (resolved, transcript) = castRampage forest rampage board
+    -- The gameplay-level assertion, and FIRST: a rider keyed to the caster puts
+    -- this at 0 and alice's at 2, so neither reading is vacuous here.
+    Spec.assertEqWith s "bob controlled the destroyed enchantment, so bob controls a Centaur" (length (centaursControlledBy S.bob resolved)) 1
+    Spec.assertEqWith s "alice controlled the destroyed artifact, so alice controls one and not two" (length (centaursControlledBy S.alice resolved)) 1
+    Spec.assertEqWith s "CR 702.12b carol's indestructible artifact was matched and not destroyed, so carol gets nothing" (length (centaursControlledBy S.carol resolved)) 0
+    Spec.assertEqWith s "stack empty: the spell resolved" (length (GameState.stack resolved)) 0
+    Spec.assertBool s (not (S.onBattlefield equipment resolved)) "the artifact died"
+    Spec.assertBool s (not (S.onBattlefield moon resolved)) "the enchantment died"
+    Spec.assertBool s (S.onBattlefield myr resolved) "the indestructible artifact creature stands"
+    -- CR 608.2f's secondary sentence gives away a relative order only "on
+    -- multiple objects controlled by the same player", and these two are not --
+    -- so each seat is a group of one, APNAP settles the whole order, and there
+    -- is nothing to ask. Read off the destroyed PERMANENTS through CR 608.2h,
+    -- since neither is on the battlefield by the time the loop runs.
+    Spec.assertEqWith s "and no order was asked for: the two dead permanents were two seats' " (orderAnswersIn transcript) []
+    Spec.assertBool s (S.onBattlefield bystander resolved) "the creature that is neither was never named"
+    -- CR 111.1: the token is what the card says it is, not a blank permanent.
+    case centaursControlledBy S.bob resolved of
+      [centaur] -> do
+        Spec.assertEqWith s "a 3/3" (Projection.powerOf centaur resolved) (Just 3)
+        Spec.assertEqWith s "with 3 toughness" (Projection.toughnessOf centaur resolved) (Just 3)
+        Spec.assertEqWith s "and green" (Set.toList (Projection.colorsOf centaur resolved)) [Color.Green]
+      other -> Spec.assertEqWith s "exactly one Centaur under bob" (length other) 1
+  -- The discriminating twin: the SAME spell over a board where ONE seat holds
+  -- both doomed permanents. Two Centaurs, both under bob -- so the case above's
+  -- one-each is the rider following each permanent rather than dealing one token
+  -- per seat that lost anything.
+  Spec.it s "two permanents of one player's make two Centaurs for that player" $ do
+    forest <- S.printingOf s registry "Forest"
+    rampage <- S.printingOf s registry "Rampage of the Clans"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    badMoon <- S.printingOf s registry "Bad Moon"
+    let (_, g1) = S.addCreature bonesplitter S.bob (Setup.emptyGame S.threePlayers)
+        (_, board) = S.addCreature badMoon S.bob g1
+        (resolved, transcript) = castRampage forest rampage board
+    Spec.assertEqWith s "both destroyed permanents were bob's, so bob makes two Centaurs" (length (centaursControlledBy S.bob resolved)) 2
+    Spec.assertEqWith s "and the caster, who lost nothing, makes none" (length (centaursControlledBy S.alice resolved)) 0
+    -- The case above's negative from the other side: two objects of ONE seat's
+    -- are what CR 608.2f's secondary sentence is about, so alice is asked once.
+    Spec.assertEqWith s "alice ordered bob's two, having none of her own" (orderAnswersIn transcript) [[0, 1]]
+  -- CR 608.2h with CR 701.8a: "its controller" is the permanent's LAST KNOWN
+  -- controller, and CR 701.8a moves the card to its OWNER's graveyard. The two
+  -- differ here and nowhere else in this group, which is what makes this the
+  -- case that says which of them the rider reads: bob's Control Magic has taken
+  -- alice's Bonded Construct, and the sweep destroys the Construct and the Aura
+  -- both. bob controlled each of them, so bob makes both Centaurs -- while the
+  -- Construct's card lands in alice's graveyard, where a rider reading the
+  -- CARDS rather than the permanents would have found it.
+  Spec.it s "CR 608.2h the Centaur goes to the permanent's last controller, not to its owner" $ do
+    forest <- S.printingOf s registry "Forest"
+    rampage <- S.printingOf s registry "Rampage of the Clans"
+    bondedConstruct <- S.printingOf s registry "Bonded Construct"
+    controlMagic <- S.printingOf s registry "Control Magic"
+    let (construct, g1) = S.addCreature bondedConstruct S.alice (Setup.emptyGame S.threePlayers)
+        (aura, g2) = S.addCreature controlMagic S.bob g1
+        board = S.attach aura construct g2
+        (resolved, transcript) = castRampage forest rampage board
+    Spec.assertEqWith s "setup: bob's Control Magic has taken alice's artifact creature" (Projection.controllerOf construct board) (Just S.bob)
+    Spec.assertEqWith s "bob controlled both destroyed permanents, so bob makes both Centaurs" (length (centaursControlledBy S.bob resolved)) 2
+    Spec.assertEqWith s "and its OWNER makes none" (length (centaursControlledBy S.alice resolved)) 0
+    Spec.assertEqWith s "CR 701.8a while the Construct's card went to alice's graveyard, next to the spell itself" (graveyardNames S.alice resolved) ["Bonded Construct", "Rampage of the Clans"]
+    Spec.assertEqWith s "and the Aura's card to bob's" (graveyardNames S.bob resolved) ["Control Magic"]
+    Spec.assertEqWith s "alice ordered the two, both being bob's" (orderAnswersIn transcript) [[0, 1]]
+  -- CR 608.2c with CR 101.3: the sweep destroys nothing, so the slot is unbound,
+  -- the loop has no members and nobody creates anything.
+  Spec.it s "an empty sweep leaves the loop no members, so no Centaur is created" $ do
+    forest <- S.printingOf s registry "Forest"
+    rampage <- S.printingOf s registry "Rampage of the Clans"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (bystander, board) = S.addCreature piker S.bob (Setup.emptyGame S.threePlayers)
+        (resolved, _) = castRampage forest rampage board
+    Spec.assertEqWith s "no Centaur for the caster" (length (centaursControlledBy S.alice resolved)) 0
+    Spec.assertEqWith s "none for bob either" (length (centaursControlledBy S.bob resolved)) 0
+    Spec.assertBool s (S.onBattlefield bystander resolved) "the creature that is neither an artifact nor an enchantment stands"
+
 -- Plummet ({1}{G} Instant, "Destroy target creature with flying"), the pool's
 -- first card whose Filter names a KEYWORD (Filter.HasKeyword, CR 702.9).
 --
@@ -3492,6 +3645,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   trumpetBlastSpec s registry
   auraThiefSpec s registry
   baneOfProgressSpec s registry
+  rampageOfTheClansSpec s registry
   comeBackWrongSpec s registry
   swiftSilenceSpec s registry
   countOnLuckSpec s registry

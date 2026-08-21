@@ -165,13 +165,14 @@ data Effect card
     -- destruction rather than the victim -- Terror has it and CR 704.5g's
     -- state-based action does not, for the same creature.
     --
-    -- The Maybe SlotName BINDS how many permanents this destruction ACTUALLY
-    -- destroyed, for a later effect to read as Quantity.InSlot (Bane of
-    -- Progress) -- not "matched by the ObjectRef", so the number comes out of
-    -- Event.destroyReturning. A definition, never a target.
-    --
-    -- Not implemented: a rider acting on each destroyed permanent, the slot
-    -- holding a COUNT rather than the set (#463).
+    -- Three optional slots BIND what this destruction leaves a later effect of
+    -- the same resolution to look back at: how many permanents it ACTUALLY
+    -- destroyed (Bane of Progress, read as Quantity.InSlot), the cards it put
+    -- into a graveyard (Come Back Wrong) and the PERMANENTS it destroyed
+    -- (Rampage of the Clans' "for each permanent destroyed this way, its
+    -- controller ...", walked by ForEach below). None of them is "matched by the
+    -- ObjectRef": all three come out of Event.destroyReturning. Definitions,
+    -- never targets. Pawl.Types.Destroy is where each is spelled out.
     Destroy Destroy.Destroy
   | -- | CR 701.21/701.21a: the slot's target permanent is sacrificed -- its
     -- CONTROLLER moves it to its OWNER's graveyard. NOT a destruction, which CR
@@ -1044,10 +1045,14 @@ data Effect card
     -- time and run the BODY for each, with that member bound under the payload's
     -- slot for that iteration.
     --
-    -- The ONE arm that runs a sequence per member, needed only where a
-    -- per-object step acts on what that same step produced (Soulfire Eruption,
-    -- rule 608.2f's own second example). Every other set-naming opcode applies
-    -- ITSELF across the swept set and needs no binding -- reach for those first.
+    -- The ONE arm that runs a sequence per member. Two things need it: a
+    -- per-object step acting on what that same step produced (Soulfire Eruption,
+    -- rule 608.2f's own second example), and a body whose payload is keyed to
+    -- the MEMBER rather than applied to it -- Rampage of the Clans' "its
+    -- controller creates a 3/3 green Centaur creature token", which no opcode
+    -- can spread across a set because the token is not aimed at the member at
+    -- all. Every other set-naming opcode applies ITSELF across the swept set and
+    -- needs no binding -- reach for those first.
     --
     -- NOT the control flow design.md section 1 keeps out of the ISA: the bound is
     -- the SWEPT SET, read once before the first iteration and fixed (CR 608.2c),

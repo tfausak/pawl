@@ -2075,7 +2075,7 @@ enchantedHostTriggerSpec s registry =
 zombieTokenOf :: Printing.Printing -> Printing.Printing -> Card.Type.Card
 zombieTokenOf sarcomancy pikerFallback =
   let created effect = case effect of
-        Effect.Create (Create.MkCreate _ card _ _) -> Just card
+        Effect.Create (Create.MkCreate _ card _ _ _) -> Just card
         _ -> Nothing
       abilityEffects = concatMap (Modal.allEffects . TriggeredAbility.modal) (Face.triggeredAbilities (S.combinedFace sarcomancy))
    in case Maybe.mapMaybe created abilityEffects of

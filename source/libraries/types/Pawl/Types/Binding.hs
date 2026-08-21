@@ -46,11 +46,14 @@ data Binding = MkBinding
     -- ENTERS. Stored only under Pawl.Engine.Binding.copySource; the layer fold
     -- reads it as the layer-1 seed. Nothing for a non-copy object.
     copy :: Maybe ProjectedCharacteristics.ProjectedCharacteristics,
-    -- | EVERY object one instruction produced, for a card that refers back to all
-    -- of them at once -- CR 111.1's minted tokens under Thatcher Revolt's "those
-    -- tokens", and the incarnations CR 400.7 mints in a public zone under Act on
-    -- Impulse's "those cards" (CR 400.7j). A field of its own rather than more
-    -- members of `targets` above, because such a slot is a definition, never a
+    -- | EVERY object one instruction produced or acted on, for a card that refers
+    -- back to all of them at once -- CR 111.1's minted tokens under Thatcher
+    -- Revolt's "those tokens", the incarnations CR 400.7 mints in a public zone
+    -- under Act on Impulse's "those cards" (CR 400.7j), and the permanents a
+    -- destruction destroyed under Rampage of the Clans' "each permanent
+    -- destroyed this way", which are gone by the time anything reads them.
+    --
+    -- A field of its own rather than more members of `targets` above, because such a slot is a definition, never a
     -- target (CR 115.10a), so nothing here is subject to CR 608.2b's
     -- illegal-target check. Nothing for every other slot.
     --
@@ -62,7 +65,7 @@ data Binding = MkBinding
     -- Pawl.Engine.Resolve.slotGroup records which way it would fail anyway.
     --
     -- A Seq and not a Set: the order is the one the objects were produced in --
-    -- mint order for tokens, the batch's own order for a move -- and it is not an
+    -- mint order for tokens, the batch's own order for a move or a destruction -- and it is not an
     -- ObjectId ordering. Effect.Sacrifice acts in it. The ObjectRef readers do
     -- not depend on it -- CR 611.2c's continuous effects freeze a SET
     -- and the one-shots are CR 608.2f-simultaneous batches -- but ordering the

@@ -1,0 +1,127 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Rampage of the Clans",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "Destroy",
+                    "value": {
+                      "permanents": "destroyed",
+                      "ref": {
+                        "type": "EachMatching",
+                        "value": {
+                          "type": "Or",
+                          "value": [
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Artifact"
+                              }
+                            },
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Enchantment"
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      "regenerability": {
+                        "type": "Regenerable"
+                      }
+                    }
+                  },
+                  {
+                    "type": "ForEach",
+                    "value": {
+                      "body": [
+                        {
+                          "type": "Create",
+                          "value": {
+                            "card": {
+                              "faces": [
+                                {
+                                  "colorIndicator": [
+                                    {
+                                      "type": "Green"
+                                    }
+                                  ],
+                                  "name": "Centaur Token",
+                                  "power": {
+                                    "type": "Literal",
+                                    "value": 3
+                                  },
+                                  "toughness": {
+                                    "type": "Literal",
+                                    "value": 3
+                                  },
+                                  "typeLine": {
+                                    "subtypes": [
+                                      {
+                                        "type": "Centaur"
+                                      }
+                                    ],
+                                    "types": [
+                                      {
+                                        "type": "Creature"
+                                      }
+                                    ]
+                                  }
+                                }
+                              ]
+                            },
+                            "creator": {
+                              "type": "ControllerOfBound",
+                              "value": "victim"
+                            },
+                            "quantity": {
+                              "type": "Literal",
+                              "value": 1
+                            }
+                          }
+                        }
+                      ],
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "destroyed"
+                      },
+                      "slot": "victim"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}
