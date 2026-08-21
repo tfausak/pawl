@@ -291,7 +291,13 @@ applyModification viewOf src gs oid m pc =
         -- CR 305.7's set, with the type written into card data.
         Modification.SetLandSubtype s -> setLandSubtypeTo s pc
         -- CR 305.7's set again, with the type read off the source's own entry
-        -- choice (CR 614.1c). An unchosen source sets and strips nothing (#391).
+        -- choice (CR 614.1c). An unchosen source sets and strips nothing rather
+        -- than guessing a type, the posture AddChosenColor takes toward an
+        -- unchosen colour. That leaves this arm disagreeing with setsLandSubtype,
+        -- which classifies by CONSTRUCTOR and so would still strip the land's
+        -- abilities; unreachable, since the only producer is an entry replacement
+        -- whose rewrite writes the field before the permanent is on the
+        -- battlefield to be projected.
         Modification.SetLandSubtypeToChosen ->
           case Game.lookupObject src gs >>= Object.chosenSubtype of
             Nothing -> pc
@@ -346,9 +352,9 @@ retainedThroughCardTypeSet t = t == CardType.Instant || t == CardType.Sorcery
 -- CR 305.7's strip, shared by both modifications that set a land's subtype. It
 -- does the subtype and ability clauses; the new basic type's mana ability rides
 -- the subtype and is read at the mana call site (CR 305.6). An ability landing on
--- OTHER objects is gated instead, and gather's liveGiven still reads base where
--- this reads the projection, so the halves disagree on an object that became a
--- land at layer 4 (#391).
+-- OTHER objects is gated instead: setSubtypeStripped for an ability whose effect
+-- had not started applying by the end of layer 4, which is where an object that
+-- became a land AT layer 4 is caught, and liveGiven for the rest.
 --
 -- Not stripped: CR 305.7's copiable-effects clause, a layer-1 question this
 -- layer-4 strip cannot answer (#406).
@@ -1138,11 +1144,18 @@ setLandSubtypeEffectsGiven functioning gs =
 --
 -- The INSIDE-THE-FOLD gate, and gather (via permanentParts) is its one caller.
 -- "Applies to" reads BASE characteristics so nothing recurses into the projection
--- being built. A permanent that becomes a land only through a layer-4 type change
--- is therefore not implemented here, so the two halves of CR 305.7 still disagree
--- about its STATIC abilities (#391). Readers outside the fold use liveAfterLayers,
--- which has no such disagreement. The layer-2 control fold asks NEITHER gate --
--- see controlGrants.
+-- being built -- which is also CR 613.8's own answer for an ability deciding AT
+-- layer 4, base being the state as that layer begins: a setter that already
+-- reaches the permanent there is one the ability's effect depends on, so the
+-- setter applies first and CR 613.6 rescues nothing. An ability deciding LATER is
+-- setSubtypeStripped's, judged against the projection through layer 4. Readers
+-- outside the fold use liveAfterLayers. The layer-2 control fold asks NEITHER
+-- gate -- see controlGrants.
+--
+-- Not implemented: a layer-4 ability whose OWN effect would take its source out
+-- of the setter's affected set makes the setter depend on it (CR 613.8a), so it
+-- applies first and keeps its text; base cannot see that, and it is stripped
+-- (#1489).
 liveGiven :: [(ObjectId, Affected.Affected)] -> ObjectId -> GameState -> Bool
 liveGiven setEffs oid gs =
   not (any (\(src, aff) -> affectsBase src oid aff gs) (appliedSetEffects setEffs gs))
@@ -1782,9 +1795,9 @@ rewriteCharacteristicPT pairs cda =
 gather :: GameState -> [Gathered]
 gather gs =
   let ungated = gatherGiven (const False) alwaysFunctioning Nothing gs
-   in -- Almost every board has neither an ability-removing effect nor a
-      -- conditional static ability, and then the gathered list IS the ungated
-      -- one.
+   in -- Almost every board has no ability-removing effect, no conditional static
+      -- ability and nothing setting a land's subtype, and then the gathered list
+      -- IS the ungated one.
       if any (removesAbilities . gModification) ungated || anyConditional gs || any (setsLandSubtype . gModification) ungated
         then gatherGiven (abilitiesRemoved ungated gs) (conditionHolds ungated gs) (Just ungated) gs
         else ungated
@@ -2204,9 +2217,10 @@ abilityRemoval gs =
 
 -- gather's candidate list with CR 604.2's gate asked and CR 613.1f's layer-6 gate
 -- left open -- what the two outside-the-fold removal readers below share. The
--- layer-6 gate stays open for abilityRemoval's stated reason; the CR 604.2 gate
--- is answered against the seed list, well-founded for gather's reason, since the
--- seed is built with every gate open.
+-- layer-6 gate stays open for abilityRemoval's stated reason; CR 305.7's
+-- post-layer-4 gate stays open beside it, this list being what such a gate would
+-- have to project against. The CR 604.2 gate is answered against the seed list,
+-- well-founded for gather's reason, since the seed is built with every gate open.
 gatedGather :: GameState -> [Gathered]
 gatedGather gs =
   let ungated = gatherGiven (const False) alwaysFunctioning Nothing gs
@@ -2251,7 +2265,8 @@ removesAbilities m = case m of
   -- green.
   Modification.GainAbility _ -> False
   -- CR 305.7 strips a land's rules text, but as a layer-4 type change performed
-  -- by setLandSubtypeTo and liveGiven, never a layer-6 removal.
+  -- by setLandSubtypeTo and the two gates beside it, never a layer-6 removal.
+  -- setsLandSubtype is the classification; this one answers CR 613.1f.
   Modification.SetLandSubtype _ -> False
   Modification.SetLandSubtypeToChosen -> False
   Modification.SetCreatureSubtype _ -> False
