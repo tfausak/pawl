@@ -1180,6 +1180,11 @@ cardCounts card =
     <> concatMap (quantityCounts . CostReduction.perEach) (Face.costReductions card)
     <> concatMap combatRestrictionCounts (Face.combatRestrictions card)
     <> concatMap blockPermissionCounts (Face.blockPermissions card)
+    -- CR 508.1d's "or that it attacks if some condition is met", the same CR
+    -- 604.2 clause blockPermissionCounts reads one field over (Otarian
+    -- Juggernaut counts its controller's graveyard). The requirement's SUBJECT
+    -- is an Affected, which holds a Filter but no Count.
+    <> concatMap (concatMap conditionCounts . Maybe.maybeToList . AttackRequirement.while) (Face.attackRequirements card)
     -- CR 508.1h's counted share (Sphere of Safety's "the number of enchantments
     -- you control"), the one Count a cost to attack can hold: its subject is an
     -- Affected, which holds a Filter but no Count.
@@ -3284,6 +3289,13 @@ attachRestrictionFilters restriction =
   affectedFilters (AttachRestriction.affected restriction)
     <> [AttachRestriction.attachers restriction]
 
+-- CR 508.1d's subject, plus the CR 604.2 clause the second reading of that rule
+-- rides on (Otarian Juggernaut's threshold), whose Count holds a Filter.
+attackRequirementFilters :: AttackRequirement.AttackRequirement -> [Filter.Type.Filter Keyword.Keyword]
+attackRequirementFilters requirement =
+  affectedFilters (AttackRequirement.subject requirement)
+    <> foldMap conditionFilters (AttackRequirement.while requirement)
+
 combatRestrictionFilters :: CombatRestriction.CombatRestriction -> [Filter.Type.Filter Keyword.Keyword]
 combatRestrictionFilters restriction = case restriction of
   CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless affected condition) -> affectedFilters affected <> foldMap conditionFilters condition
@@ -3635,7 +3647,8 @@ activatedAbilityFilters ability =
 --     `attackRequirements` (CR 508.1d), `blockRequirements`
 --     (CR 509.1c), `attackCosts` (CR 508.1h) and `blockCosts` (CR 509.1d) --
 --     seven more affected sets, plus each combat cost's Counted share, which is a
---     Quantity.
+--     Quantity, plus the CR 604.2 "as long as" clause an attacking requirement
+--     may carry (CR 508.1d's second reading).
 --   * `spell`, `activatedAbilities`, `triggeredAbilities`, `delayedAbilities` --
 --     every mode's target slots and effects, plus an activation cost, a
 --     trigger's own condition and its intervening clause.
@@ -3675,7 +3688,7 @@ cardFilters card =
         <> concatMap (playerEffectFilters . PlayerStaticAbility.effect) (Face.playerAbilities card)
         <> concatMap blockRequirementFilters (Face.blockRequirements card)
         <> concatMap blockPermissionFilters (Face.blockPermissions card)
-        <> concatMap (affectedFilters . AttackRequirement.subject) (Face.attackRequirements card)
+        <> concatMap attackRequirementFilters (Face.attackRequirements card)
         <> concatMap (affectedFilters . AttackCost.subject) (Face.attackCosts card)
         <> concatMap (perCreatureFilters . AttackCost.perAttacker) (Face.attackCosts card)
         <> concatMap (affectedFilters . BlockCost.subject) (Face.blockCosts card)

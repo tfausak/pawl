@@ -15,6 +15,8 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Condition as Condition
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Goad as Goad
 import qualified Pawl.Engine.Projection as Projection
@@ -129,9 +131,36 @@ instances candidates targets gs =
       fromRequirement source changes requirement =
         let subject = AttackRequirement.subject requirement
          in [ (creature, target)
-            | creature <- filter (named source (if null changes then subject else Projection.rewriteAffected changes subject)) candidates,
+            | inForce source changes requirement,
+              creature <- filter (named source (if null changes then subject else Projection.rewriteAffected changes subject)) candidates,
               target <- targets
             ]
+      -- CR 508.1d's second shape -- "or that it attacks if some condition is
+      -- met" -- read as CR 604.2's "as long as" clause and asked exactly as
+      -- BlockPermission.instances asks its own `while`: a gate that does not
+      -- hold mints nothing. The opposite polarity to
+      -- CombatRestriction.inForce's "unless", where a gate that holds lifts the
+      -- restriction.
+      --
+      -- Projection.fullView and not a bounded one, because CR 613.11 puts this
+      -- effect after every layer, so there is no layer to bound against -- the
+      -- answer Projection.abilitiesGiven gives CR 702.178a's gate for the same
+      -- reason, and the reason CR 604.7's ban on last known information costs
+      -- nothing here.
+      --
+      -- Asked once per REQUIREMENT rather than per candidate: CR 109.5 fixes the
+      -- "you" inside it as the source's controller, so no candidate could change
+      -- the answer. The CR 612.1 rewrite is the same one the subject gets, since
+      -- both clauses are printed on the source.
+      inForce source changes requirement = case AttackRequirement.while requirement of
+        Nothing -> True
+        Just condition ->
+          Condition.holds
+            (Projection.fullView gs)
+            (Filter.contextFor (Projection.controllerOf source gs) (Just source))
+            gs
+            source
+            (if null changes then condition else Projection.rewriteCondition changes condition)
       -- CR 508.1d again, off the STORED carrier. No CR 305.7 or CR 604.2 gate and
       -- no CR 612.1 rewrite, which is the posture BlockRequirement.instances takes
       -- for its stored rows: those three ask what a permanent's TEXT still says,
