@@ -715,6 +715,30 @@ data Object = MkObject
     -- outlast the earlier. Two detains by the SAME player collapse for free,
     -- which is right: rule 701.35a states a duration and not a count.
     detainedUntil :: Set.Set PlayerId.PlayerId,
+    -- | CR 701.15b: the players who have goaded this permanent, each entry
+    -- running until that player's next turn (CR 701.15a). Read by
+    -- Pawl.Engine.Goad, and turned into CR 508.1d requirements by
+    -- Pawl.Engine.AttackRequirement.
+    --
+    -- detainedUntil's shape exactly, and for its reasons: rule 701.15a fixes the
+    -- duration ("until the next turn of the controller of that spell or
+    -- ability"), so the only thing to remember is WHOSE next turn, and
+    -- Pawl.Engine.Expiry.dropAtTurnOf is the one sweep that reaches it. A SET
+    -- because CR 701.15c lets several players goad one creature and the later
+    -- turn has to outlast the earlier, and because CR 701.15d says a second goad
+    -- by the SAME player creates no additional requirement -- which a set
+    -- collapses for free, where a list would count it twice and CR 508.1d counts
+    -- requirements.
+    --
+    -- CR 701.15b calls goaded a designation, but it is not a
+    -- Pawl.Types.Designation: that type's marks are per-permanent and permanent,
+    -- where this one is per-PLAYER and expires. Object.ringBearerFor is the
+    -- sibling that argument already excluded.
+    --
+    -- Per-incarnation like everything around it (CR 400.7): the goaded permanent
+    -- that leaves the battlefield and comes back is a new object, and nobody
+    -- goaded that one.
+    goadedBy :: Set.Set PlayerId.PlayerId,
     -- | CR 502.3 / CR 611.2: a ONE-SHOT untap prohibition standing over this
     -- permanent, said of ITS CONTROLLER's next untap step -- "that creature
     -- doesn't untap during its controller's next untap step" (Elvish Hunter).
@@ -854,6 +878,9 @@ newIncarnation object =
       -- leaves the battlefield and comes back is a new object, and nothing
       -- detained that one.
       detainedUntil = Set.empty,
+      -- CR 400.7 with CR 701.15b: goaded is a designation A PERMANENT has, and
+      -- the object that returns to the battlefield is a different permanent.
+      goadedBy = Set.empty,
       -- CR 400.7 forgets the prohibition with everything else, and no rule
       -- writes it back: the effect named a permanent, and the object that
       -- returns to the battlefield is not that permanent.

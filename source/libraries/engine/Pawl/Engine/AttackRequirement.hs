@@ -3,9 +3,10 @@
 -- one of the modules on the axis CR 613.11 reaches past the layer system. None
 -- is a layer, and Pawl.Engine.Projection sees none of them.
 --
--- The only reader of Pawl.Types.AttackRequirement and of
--- Pawl.Types.ActiveAttackRequirement -- the printed carrier and the stored one,
--- as Pawl.Engine.BlockRequirement reads its own pair. Pawl.Engine.Combat asks
+-- The only reader of Pawl.Types.AttackRequirement, of
+-- Pawl.Types.ActiveAttackRequirement and of Object.goadedBy -- the printed
+-- carrier, the stored one and CR 701.15b's designation, where
+-- Pawl.Engine.BlockRequirement has only the first two. Pawl.Engine.Combat asks
 -- for requirement INSTANCES -- bare (attacker, target) pairs -- and never learns
 -- which card produced one, nor which carrier.
 module Pawl.Engine.AttackRequirement where
@@ -15,6 +16,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Goad as Goad
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
@@ -147,11 +149,49 @@ instances candidates targets gs =
             | creature `elem` candidates,
               target `elem` targets
             ]
+      -- CR 701.15b, off the THIRD carrier (Object.goadedBy): a goaded creature
+      -- "attacks each combat if able and attacks a player other than the
+      -- controller of the permanent, spell, or ability that caused it to be
+      -- goaded if able". TWO requirements per goader and not one, which is what
+      -- CR 701.15c counts ("doing so creates additional combat requirements"),
+      -- and neither of them is a CR 508.1c restriction: both say "if able", so
+      -- CR 508.1's maximization is what decides them, and a board admitting no
+      -- announcement that obeys the second leaves it unmet rather than making
+      -- the declaration illegal.
+      --
+      -- The first mints a pair per target, the posture a requirement naming no
+      -- object takes above. The second mints one per target that IS another
+      -- player: attacking a planeswalker or a battle is not attacking a player
+      -- (CR 508.1b lists the three separately), so it obeys the first
+      -- requirement and not the second -- which is the only thing that makes the
+      -- second observable, pawl choosing ONE defending player per combat (#175).
+      --
+      -- Per GOADER, since CR 701.15b names "the controller of the permanent,
+      -- spell, or ability that caused it to be goaded" and two goaders exclude
+      -- two different seats. Deduplication is Object.goadedBy's, by CR 701.15d.
+      --
+      -- No CR 305.7 or CR 604.2 gate and no CR 612.1 rewrite, fromStored's
+      -- reasons: goad is a designation the game remembers rather than text a
+      -- permanent still prints. Walks `candidates` rather than the battlefield
+      -- because that is the pruning fromStored gets from membership -- only a
+      -- creature that can attack can obey either requirement.
+      fromGoad creature =
+        [ pair
+        | goader <- Set.toList (Goad.goadedBy creature gs),
+          pair <-
+            [(creature, target) | target <- targets]
+              <> [(creature, target) | target <- targets, target /= AttackTarget.OfPlayer goader, isPlayer target]
+        ]
+      isPlayer target = case target of
+        AttackTarget.OfPlayer _ -> True
+        AttackTarget.OfPlaneswalker _ -> False
+        AttackTarget.OfBattle _ -> False
    in Map.fromListWith
         (+)
         ( fmap
             (\pair -> (pair, 1))
             ( concatMap fromPermanent (Set.toList (GameState.battlefield gs))
                 <> concatMap fromStored (GameState.attackRequirements gs)
+                <> concatMap fromGoad candidates
             )
         )

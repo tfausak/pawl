@@ -631,6 +631,16 @@ data Effect card
     -- limbs (can't attack, can't block, activated abilities can't be activated),
     -- which Pawl.Engine.Detain reads apart.
     Detain ObjectRef.ObjectRef
+  | -- | CR 701.15a: goad the permanents the ObjectRef names, until the next turn
+    -- of this resolution's controller.
+    --
+    -- NO DURATION and no goader beside it, Detain's reasons unchanged: rule
+    -- 701.15a fixes the duration, and the goader is CR 109.5's "you". ONE opcode
+    -- for CR 701.15b's two requirements (attacks each combat if able, attacks a
+    -- player other than the goader if able), which
+    -- Pawl.Engine.AttackRequirement reads apart -- so no card file states either
+    -- half and no card file can state one without the other.
+    Goad ObjectRef.ObjectRef
   | -- | CR 502.3 / 611.2: the permanents the ObjectRef names don't untap during
     -- their controller's NEXT untap step (Elvish Hunter). CR 701.43a's exert is
     -- NOT this opcode: it names the exerting player's own next untap step rather

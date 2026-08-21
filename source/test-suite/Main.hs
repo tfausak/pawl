@@ -318,6 +318,7 @@ import qualified Pawl.Extra.Word8Spec
 import qualified Pawl.FaceDownSpec
 import qualified Pawl.FilterSpec
 import qualified Pawl.GameSpec
+import qualified Pawl.GoadSpec
 import qualified Pawl.InvestigateSpec
 import qualified Pawl.Json.ArraySpec
 import qualified Pawl.Json.BooleanSpec
@@ -746,6 +747,7 @@ spec s registry = do
   Pawl.FaceDownSpec.spec s registry
   Pawl.FilterSpec.spec s
   Pawl.GameSpec.spec s registry
+  Pawl.GoadSpec.spec s registry
   Pawl.Json.ArraySpec.spec s
   Pawl.Json.BooleanSpec.spec s
   Pawl.Json.NullSpec.spec s

@@ -740,6 +740,7 @@ placeBorne srcId pending = do
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
+            Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
             Object.exertedBy = Set.empty
           }

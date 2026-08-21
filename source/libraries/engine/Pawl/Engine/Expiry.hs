@@ -13,10 +13,11 @@
 -- One of them, CR 116.2d's ignore, is the one that SUPPRESSES rather than adds;
 -- its duration is a duration all the same, and it is swept as one.
 --
--- An EIGHTH carrier holds no Expiry at all and is swept here anyway: rule 701.35a
--- fixes a detain's duration, so Object.detainedUntil is a set of seats rather
--- than a vocabulary of durations, and dropAtTurnOf is the only sweep it can
--- reach. See clearedDetentions.
+-- TWO MORE carriers hold no Expiry at all and are swept here anyway: rule
+-- 701.35a fixes a detain's duration and rule 701.15a fixes a goad's, so
+-- Object.detainedUntil and Object.goadedBy are sets of seats rather than
+-- vocabularies of durations, and dropAtTurnOf is the only sweep either can
+-- reach. See clearedDetentions and clearedGoads.
 module Pawl.Engine.Expiry where
 
 import qualified Control.Monad as Monad
@@ -252,6 +253,18 @@ clearedDetentions pid objects =
     then Map.map (\o -> o {Object.detainedUntil = Set.delete pid (Object.detainedUntil o)}) objects
     else objects
 
+-- CR 701.15a's duration, ended: a goad lasts "until the next turn of the
+-- controller of that spell or ability", which is dropAtTurnOf's own moment, so
+-- that seat is dropped from every permanent goaded by it. clearedDetentions'
+-- shape and every one of its reasons, down to the scan before the rebuild -- CR
+-- 701.15c is why a permanent two players goaded loses one seat here and stays
+-- goaded by the other.
+clearedGoads :: PlayerId -> Map.Map ObjectId Object.Object -> Map.Map ObjectId Object.Object
+clearedGoads pid objects =
+  if any (Set.member pid . Object.goadedBy) objects
+    then Map.map (\o -> o {Object.goadedBy = Set.delete pid (Object.goadedBy o)}) objects
+    else objects
+
 -- CR 611.2a: a duration a spell or ability states lasts as long as it says, so
 -- an until-your-next-turn duration ends as that player's turn begins.
 --
@@ -295,7 +308,7 @@ dropAtTurnOf pid gs =
           GameState.attackRequirements = filter keepAttackRequirement (GameState.attackRequirements gs),
           GameState.ignoredAbilities = filter keepIgnored (GameState.ignoredAbilities gs),
           GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),
-          GameState.objects = clearedDetentions pid (clearedPermissions (survives . ExilePlayPermission.expiry) gs)
+          GameState.objects = clearedGoads pid (clearedDetentions pid (clearedPermissions (survives . ExilePlayPermission.expiry) gs))
         }
 
 -- CR 500.5's first clause: effects lasting until the end of a step or phase
