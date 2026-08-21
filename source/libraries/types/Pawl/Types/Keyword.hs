@@ -118,8 +118,8 @@ data Keyword
     --
     -- The filter carries the QUALIFICATION only, never the land-ness: every clause
     -- of CR 702.14c is about a LAND with or without something, so that conjunct is
-    -- the rule's own and landwalkAllowsGiven asks it separately, which also keeps
-    -- the CR 205.3d guard. A card cannot forget it.
+    -- the rule's own and landwalkAllowsGiven asks it separately. A card cannot
+    -- forget it.
     --
     -- CR 702.14e makes instances of the same kind redundant, which is why that
     -- reader takes membership rather than a count. "The same kind" is filter

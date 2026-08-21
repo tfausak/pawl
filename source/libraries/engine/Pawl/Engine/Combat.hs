@@ -622,8 +622,10 @@ landwalkAllowsGiven grants pcs attacker gs =
       -- Hoisted, since it does not vary per candidate.
       context = Filter.contextFor (Projection.controllerOfGiven grants Set.empty attacker gs) (Just attacker)
       -- The land-ness is asked HERE and never by the criterion: every clause of CR
-      -- 702.14c reads "at least one LAND". Still asked even where the criterion
-      -- names a land type, since nothing in the projection enforces CR 205.3d.
+      -- 702.14c reads "at least one LAND". Load-bearing where the criterion names
+      -- no land type at all -- Vectis Gloves' artifact landwalk, Dryad
+      -- Sophisticate's nonbasic landwalk -- and redundant where it names one,
+      -- since CR 205.3d is enforced at the grant (Pawl.Engine.Projection).
       -- ONE projection per candidate: Filter.cardTypes is the very set
       -- Projection.cardTypesGiven would rebuild.
       matchesCriterion criterion oid =
