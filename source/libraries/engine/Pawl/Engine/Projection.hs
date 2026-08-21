@@ -291,7 +291,13 @@ applyModification viewOf src gs oid m pc =
         -- CR 305.7's set, with the type written into card data.
         Modification.SetLandSubtype s -> setLandSubtypeTo s pc
         -- CR 305.7's set again, with the type read off the source's own entry
-        -- choice (CR 614.1c). An unchosen source sets and strips nothing (#391).
+        -- choice (CR 614.1c). An unchosen source sets and strips nothing rather
+        -- than guessing a type, the posture AddChosenColor takes toward an
+        -- unchosen colour. That leaves this arm disagreeing with setsLandSubtype,
+        -- which classifies by CONSTRUCTOR and so would still strip the land's
+        -- abilities; unreachable, since the only producer is an entry replacement
+        -- whose rewrite writes the field before the permanent is on the
+        -- battlefield to be projected.
         Modification.SetLandSubtypeToChosen ->
           case Game.lookupObject src gs >>= Object.chosenSubtype of
             Nothing -> pc
@@ -346,9 +352,9 @@ retainedThroughCardTypeSet t = t == CardType.Instant || t == CardType.Sorcery
 -- CR 305.7's strip, shared by both modifications that set a land's subtype. It
 -- does the subtype and ability clauses; the new basic type's mana ability rides
 -- the subtype and is read at the mana call site (CR 305.6). An ability landing on
--- OTHER objects is gated instead, and gather's liveGiven still reads base where
--- this reads the projection, so the halves disagree on an object that became a
--- land at layer 4 (#391).
+-- OTHER objects is gated instead: setSubtypeStripped for an ability whose effect
+-- had not started applying by the end of layer 4, which is where an object that
+-- became a land AT layer 4 is caught, and liveGiven for the rest.
 --
 -- Not stripped: CR 305.7's copiable-effects clause, a layer-1 question this
 -- layer-4 strip cannot answer (#406).
@@ -1045,6 +1051,46 @@ quantitiesOf m = case m of
   Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
 
+-- CR 305.7: does this modification SET a land's subtype, and so strip the land's
+-- rules text? Total, like removesAbilities: a new subtype-setting Modification
+-- must break this build rather than silently answer False.
+setsLandSubtype :: Modification.Modification ability -> Bool
+setsLandSubtype m = case m of
+  Modification.SetLandSubtype _ -> True
+  -- CR 305.7 does not care where the type came from: a type chosen as the source
+  -- entered (CR 614.1c) strips rules text as a printed one does.
+  Modification.SetLandSubtypeToChosen -> True
+  -- The OTHER direction of CR 305.7's last sentence: a land that GAINS a type in
+  -- addition to its own keeps its rules text.
+  Modification.AddLandSubtype _ -> False
+  -- An ability grant is layer 6 and sets no subtype at all.
+  Modification.GainAbility _ -> False
+  Modification.GainKeyword _ -> False
+  -- A control op, not a type change.
+  Modification.SetController _ -> False
+  Modification.SetControllerToSource -> False
+  -- The OTHER subtype set: CR 305.7's strip is about a LAND whose subtype is set,
+  -- and CR 205.1a/205.1b's creature-type set carries no such clause.
+  Modification.SetCreatureSubtype _ -> False
+  Modification.AddCreatureSubtype _ -> False
+  Modification.AddEveryCreatureSubtype -> False
+  -- The CARD-TYPE set: CR 305.7 fires on setting a land's SUBTYPE, so making an
+  -- object a land does not strip its rules text.
+  Modification.SetCardType _ -> False
+  Modification.AddCardType _ -> False
+  -- CR 205.4b changes a supertype and says nothing about subtypes.
+  Modification.AddSupertype _ -> False
+  Modification.RemoveSupertype _ -> False
+  -- CR 612 swaps one word for another inside rules text; it sets no subtype.
+  Modification.ChangeSubtypeWord {} -> False
+  Modification.LoseAllAbilities -> False
+  Modification.SetBasePowerToughness {} -> False
+  Modification.ModifyPowerToughness {} -> False
+  Modification.SwitchPowerToughness -> False
+  Modification.SetColor _ -> False
+  Modification.AddColor _ -> False
+  Modification.AddChosenColor -> False
+
 -- Every SetLandSubtype and SetLandSubtypeToChosen effect in the game, each with
 -- its source and affected set, for a reader OUTSIDE the layer fold. A legitimate
 -- case-on-Modification -- Projection is its sole home. CR 604.2's "as long as"
@@ -1056,7 +1102,7 @@ setLandSubtypeEffects :: GameState -> [(ObjectId, Affected.Affected)]
 setLandSubtypeEffects gs =
   let functioning =
         if anyConditional gs
-          then conditionHolds (gatherGiven (const False) alwaysFunctioning gs) gs
+          then conditionHolds (gatherGiven (const False) alwaysFunctioning Nothing gs) gs
           else alwaysFunctioning
    in setLandSubtypeEffectsGiven functioning gs
 
@@ -1065,25 +1111,7 @@ setLandSubtypeEffects gs =
 -- can reach.
 setLandSubtypeEffectsGiven :: (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> GameState -> [(ObjectId, Affected.Affected)]
 setLandSubtypeEffectsGiven functioning gs =
-  let isSet m = case m of
-        Modification.SetLandSubtype _ -> True
-        -- CR 305.7 does not care where the type came from: a type chosen as the
-        -- source entered (CR 614.1c) strips rules text as a printed one does.
-        Modification.SetLandSubtypeToChosen -> True
-        -- An ability grant is layer 6 and sets no subtype at all.
-        Modification.GainAbility _ -> False
-        -- A control op, not a type change.
-        Modification.SetController _ -> False
-        Modification.SetControllerToSource -> False
-        -- The OTHER subtype set: CR 305.7's strip is about a LAND whose subtype is
-        -- set, and CR 205.1a/205.1b's creature-type set carries no such clause.
-        Modification.SetCreatureSubtype _ -> False
-        Modification.AddCreatureSubtype _ -> False
-        Modification.AddEveryCreatureSubtype -> False
-        -- The CARD-TYPE set: CR 305.7 fires on setting a land's SUBTYPE, so making
-        -- an object a land does not strip its rules text.
-        Modification.SetCardType _ -> False
-        _ -> False
+  let isSet = setsLandSubtype
       fromStored eff =
         if isSet (ContinuousEffect.modification eff)
           then [(ContinuousEffect.source eff, ContinuousEffect.affected eff)]
@@ -1116,11 +1144,18 @@ setLandSubtypeEffectsGiven functioning gs =
 --
 -- The INSIDE-THE-FOLD gate, and gather (via permanentParts) is its one caller.
 -- "Applies to" reads BASE characteristics so nothing recurses into the projection
--- being built. A permanent that becomes a land only through a layer-4 type change
--- is therefore not implemented here, so the two halves of CR 305.7 still disagree
--- about its STATIC abilities (#391). Readers outside the fold use liveAfterLayers,
--- which has no such disagreement. The layer-2 control fold asks NEITHER gate --
--- see controlGrants.
+-- being built -- which is also CR 613.8's own answer for an ability deciding AT
+-- layer 4, base being the state as that layer begins: a setter that already
+-- reaches the permanent there is one the ability's effect depends on, so the
+-- setter applies first and CR 613.6 rescues nothing. An ability deciding LATER is
+-- setSubtypeStripped's, judged against the projection through layer 4. Readers
+-- outside the fold use liveAfterLayers. The layer-2 control fold asks NEITHER
+-- gate -- see controlGrants.
+--
+-- Not implemented: a layer-4 ability whose OWN effect would take its source out
+-- of the setter's affected set makes the setter depend on it (CR 613.8a), so it
+-- applies first and keeps its text; base cannot see that, and it is stripped
+-- (#1489).
 liveGiven :: [(ObjectId, Affected.Affected)] -> ObjectId -> GameState -> Bool
 liveGiven setEffs oid gs =
   not (any (\(src, aff) -> affectsBase src oid aff gs) (appliedSetEffects setEffs gs))
@@ -1135,6 +1170,36 @@ liveAfterLayers :: [(ObjectId, Affected.Affected)] -> ObjectId -> GameState -> B
 liveAfterLayers setEffs oid gs =
   let view = project oid gs
    in not (any (\(src, aff) -> affects src oid aff view gs) (appliedSetEffects setEffs gs))
+
+-- CR 305.7's strip, asked of ONE ability rather than of the whole permanent: does
+-- a subtype-setting effect reach `oid` by the time layer 4 has finished? The
+-- caller pairs it with CR 613.6 -- see permanentParts' `removed` -- so only an
+-- ability whose effect had not yet started applying is stripped by this.
+--
+-- The membership test reads the projection THROUGH layer 4 (inclusive), which is
+-- the whole point: a permanent another effect animated into a land is one CR
+-- 305.7 reaches, and base characteristics cannot see that. Bounded there rather
+-- than at the finished projection because CR 613.1d is where a setter applies;
+-- WHICH setters apply is still appliedSetEffects's question, judged against base.
+--
+-- Not a fixpoint: the candidate list is gather's SEED pass, built with every
+-- ability gate wired open, so the projection behind this gate never re-enters it.
+-- The seed can only over-project (gather says why), and here that can only widen
+-- the set a setter reaches.
+--
+-- Not implemented: CR 613.8a's dependency is decided at `oid` alone rather than
+-- over the setter's whole affected set (#236).
+setSubtypeStripped :: [Gathered] -> [(ObjectId, Affected.Affected)] -> GameState -> ObjectId -> Bool
+setSubtypeStripped cands setEffs gs = case appliedSetEffects setEffs gs of
+  -- Almost every board sets no land's subtype, and then no projection is spent on
+  -- the question.
+  [] -> const False
+  applied ->
+    let -- The peers a setter's own filter reaches, at the setter's decision point.
+        peers = viewUpTo Layer.Type cands gs
+        -- Bound before `oid`, so the candidate-only work is shared across the walk.
+        throughType = projectWith (<= Layer.Type) cands
+     in \oid -> any (\(src, aff) -> affectsGiven peers src oid aff (throughType oid gs) gs) applied
 
 -- CR 613.8: which of the CR 305.7 subtype-setting effects actually apply, in the
 -- order the rule applies them. An effect that strips a land's rules-text abilities
@@ -1729,12 +1794,12 @@ rewriteCharacteristicPT pairs cda =
 -- built with every gate open -- nothing here re-enters gather.
 gather :: GameState -> [Gathered]
 gather gs =
-  let ungated = gatherGiven (const False) alwaysFunctioning gs
-   in -- Almost every board has neither an ability-removing effect nor a
-      -- conditional static ability, and then the gathered list IS the ungated
-      -- one.
-      if any (removesAbilities . gModification) ungated || anyConditional gs
-        then gatherGiven (abilitiesRemoved ungated gs) (conditionHolds ungated gs) gs
+  let ungated = gatherGiven (const False) alwaysFunctioning Nothing gs
+   in -- Almost every board has no ability-removing effect, no conditional static
+      -- ability and nothing setting a land's subtype, and then the gathered list
+      -- IS the ungated one.
+      if any (removesAbilities . gModification) ungated || anyConditional gs || any (setsLandSubtype . gModification) ungated
+        then gatherGiven (abilitiesRemoved ungated gs) (conditionHolds ungated gs) (Just ungated) gs
         else ungated
 
 -- The open CR 604.2 gate: every "as long as" clause answered true without being
@@ -1825,9 +1890,14 @@ abilitySources gs = Set.toList (Set.difference (GameState.battlefield gs) (GameS
 
 -- gather's body with both ability gates left open. Called twice by gather --
 -- once wired shut to build the list the gates read, once with the real answers.
-gatherGiven :: (ObjectId -> Bool) -> (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> GameState -> [Gathered]
-gatherGiven stripped functioning gs =
+gatherGiven :: (ObjectId -> Bool) -> (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> Maybe [Gathered] -> GameState -> [Gathered]
+gatherGiven stripped functioning seed gs =
   let setEffs = setLandSubtypeEffectsGiven functioning gs
+      -- CR 305.7's post-layer-4 half, wired open in the seed pass for the reason
+      -- `stripped` is: the list this gate projects against is the seed itself.
+      setStripped = case seed of
+        Nothing -> const False
+        Just cands -> setSubtypeStripped cands setEffs gs
       -- A stored effect carries exactly one modification, so CR 613.6 has
       -- nothing to hold together, and its set is CR 611.2c's TheseObjects,
       -- locked when the effect began.
@@ -1842,7 +1912,7 @@ gatherGiven stripped functioning gs =
             gModification = ContinuousEffect.modification eff
           }
       stored = fmap fromStored (GameState.continuousEffects gs)
-      static = concatMap (fmap snd . permanentParts stripped functioning setEffs gs) (abilitySources gs)
+      static = concatMap (fmap snd . permanentParts stripped functioning setEffs setStripped gs) (abilitySources gs)
       fromEmblem emblemId = case Game.lookupObject emblemId gs of
         Nothing -> []
         Just emblemObj -> case Game.faceOfObject emblemObj of
@@ -1851,7 +1921,7 @@ gatherGiven stripped functioning gs =
             -- CR 114.4 / 113.6: an emblem's abilities function in the command
             -- zone, sharing the emblem's timestamp (CR 613.7a). Never stripped:
             -- the pool's CR 613.1f removers reach creatures (CR 114.5).
-            concat [gatherStatic (functioning emblemId) emblemId (Object.timestamp emblemObj) [] False n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), functionsFromZone Zone.Command sa]
+            concat [gatherStatic (functioning emblemId) emblemId (Object.timestamp emblemObj) [] (const False) n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), functionsFromZone Zone.Command sa]
       emblems = concatMap fromEmblem (Set.toList (GameState.command gs))
       fromSpell spellId = case Game.lookupObject spellId gs of
         Nothing -> []
@@ -1875,7 +1945,7 @@ gatherGiven stripped functioning gs =
                   if Set.null (StaticAbility.functionsFrom sa)
                     then isSpellStatic
                     else statesZone Zone.Stack sa
-             in concat [gatherStatic (functioning spellId) spellId (Object.timestamp spellObj) [] False n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), keeps sa]
+             in concat [gatherStatic (functioning spellId) spellId (Object.timestamp spellObj) [] (const False) n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), keeps sa]
       spells = concatMap fromSpell (GameState.stack gs)
       fromGraveyardCard cardId = case Game.lookupObject cardId gs of
         Nothing -> []
@@ -1907,7 +1977,7 @@ gatherGiven stripped functioning gs =
                     then qualifies sa
                     else statesZone Zone.Graveyard sa
                 indexed = zip [0 :: Natural ..] (Face.staticAbilities face)
-             in concat [gatherStatic (functioning cardId) cardId (Object.timestamp cardObj) [] False n sa | (n, sa) <- indexed, keeps sa]
+             in concat [gatherStatic (functioning cardId) cardId (Object.timestamp cardObj) [] (const False) n sa | (n, sa) <- indexed, keeps sa]
       graveyards = concatMap fromGraveyardCard (graveyardCards gs)
       -- CR 113.6b/c: the two HIDDEN zones (CR 400.2), which no default in CR
       -- 113.6 ever reaches -- a card in a hand or a library has its abilities
@@ -1934,7 +2004,7 @@ gatherGiven stripped functioning gs =
         Just cardObj -> case Game.faceOfObject cardObj of
           Nothing -> []
           Just face ->
-            concat [gatherStatic (functioning cardId) cardId (Object.timestamp cardObj) [] False n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), statesZone zone sa]
+            concat [gatherStatic (functioning cardId) cardId (Object.timestamp cardObj) [] (const False) n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), statesZone zone sa]
       hands = foldZoneCards GameState.hand (fromHiddenCard Zone.Hand) gs
       libraries = foldZoneCards GameState.library (fromHiddenCard Zone.Library) gs
       counters = counterGathered gs
@@ -2035,8 +2105,8 @@ spellStaticTypes = Set.fromList [CardType.Instant, CardType.Sorcery]
 -- frozenStaticParts gathers a permanent's parts by exactly the walk the fold
 -- uses, gates and CR 612 rewrite included; a second copy of this body would
 -- freeze a set the fold never applied.
-permanentParts :: (ObjectId -> Bool) -> (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> [(ObjectId, Affected.Affected)] -> GameState -> ObjectId -> [(Natural, Gathered)]
-permanentParts stripped functioning setEffs gs permId = case Game.lookupObject permId gs of
+permanentParts :: (ObjectId -> Bool) -> (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> [(ObjectId, Affected.Affected)] -> (ObjectId -> Bool) -> GameState -> ObjectId -> [(Natural, Gathered)]
+permanentParts stripped functioning setEffs setStripped gs permId = case Game.lookupObject permId gs of
   Nothing -> []
   Just permObj -> case Game.faceOf permId gs of
     Nothing -> []
@@ -2046,9 +2116,18 @@ permanentParts stripped functioning setEffs gs permId = case Game.lookupObject p
           -- CR 612: rewrite each static ability's subtype words by the text
           -- changes affecting THIS source, before its effect is folded on.
           let changes = textChangesAffecting permId gs
+              -- CR 613.1f's layer-6 removal and CR 305.7's layer-4 strip, asked
+              -- of ONE ability at CR 613.6's decision point rather than of the
+              -- permanent as a whole. Each spares an ability whose effect had
+              -- ALREADY started applying when the stripper did: rule 613.6 keeps
+              -- such an effect applying even though the ability generating it is
+              -- gone. An ability deciding AT layer 4 is spared here and left to
+              -- the base-characteristics gate above, which is CR 613.8's order
+              -- for it -- see liveGiven.
+              removed lowest = (lowest > Layer.Ability && stripped permId) || (lowest > Layer.Type && setStripped permId)
               -- One thunk per permanent, shared by all its abilities. Bound
               -- here, OUTSIDE the zipWith, which is what shares it.
-              partsOf = gatherStatic (functioning permId) permId (Object.timestamp permObj) changes (stripped permId)
+              partsOf = gatherStatic (functioning permId) permId (Object.timestamp permObj) changes removed
               -- CR 113.6b, applied WITHOUT disturbing the index: `n` is the key
               -- half of CR 613.6's decision memo and Pawl.Engine.Event's
               -- departure handover indexes Face.staticAbilities by it, so an
@@ -2075,10 +2154,11 @@ frozenStaticParts :: ObjectId -> GameState -> [(Natural, Timestamp, Modification
 frozenStaticParts src gs =
   let cands = gather gs
       -- gather's own seed list, and the same one it feeds its two gates.
-      ungated = gatherGiven (const False) alwaysFunctioning gs
+      ungated = gatherGiven (const False) alwaysFunctioning Nothing gs
       -- gather's CR 604.2 gate, shared by the two readers that must agree on it.
       functioning = conditionHolds ungated gs
-      parts = permanentParts (abilitiesRemoved ungated gs) functioning (setLandSubtypeEffectsGiven functioning gs) gs src
+      setEffs = setLandSubtypeEffectsGiven functioning gs
+      parts = permanentParts (abilitiesRemoved ungated gs) functioning setEffs (setSubtypeStripped ungated setEffs gs) gs src
       applies c oid =
         let lyr = gLowest c
             partial = projectUpTo lyr cands oid gs
@@ -2138,14 +2218,15 @@ abilityRemoval gs =
 
 -- gather's candidate list with CR 604.2's gate asked and CR 613.1f's layer-6 gate
 -- left open -- what the two outside-the-fold removal readers below share. The
--- layer-6 gate stays open for abilityRemoval's stated reason; the CR 604.2 gate
--- is answered against the seed list, well-founded for gather's reason, since the
--- seed is built with every gate open.
+-- layer-6 gate stays open for abilityRemoval's stated reason; CR 305.7's
+-- post-layer-4 gate stays open beside it, this list being what such a gate would
+-- have to project against. The CR 604.2 gate is answered against the seed list,
+-- well-founded for gather's reason, since the seed is built with every gate open.
 gatedGather :: GameState -> [Gathered]
 gatedGather gs =
-  let ungated = gatherGiven (const False) alwaysFunctioning gs
+  let ungated = gatherGiven (const False) alwaysFunctioning Nothing gs
    in if anyConditional gs
-        then gatherGiven (const False) (conditionHolds ungated gs) gs
+        then gatherGiven (const False) (conditionHolds ungated gs) Nothing gs
         else ungated
 
 -- abilityRemoval asked AT A TIMESTAMP: "were this object's abilities removed by a
@@ -2185,7 +2266,8 @@ removesAbilities m = case m of
   -- green.
   Modification.GainAbility _ -> False
   -- CR 305.7 strips a land's rules text, but as a layer-4 type change performed
-  -- by setLandSubtypeTo and liveGiven, never a layer-6 removal.
+  -- by setLandSubtypeTo and the two gates beside it, never a layer-6 removal.
+  -- setsLandSubtype is the classification; this one answers CR 613.1f.
   Modification.SetLandSubtype _ -> False
   Modification.SetLandSubtypeToChosen -> False
   Modification.SetCreatureSubtype _ -> False
@@ -2282,8 +2364,8 @@ grantedDefiningParts m = case m of
 -- `functioning` is CR 604.2's "as long as" gate, answered by conditionHolds at
 -- the ability's lowest layer, and costs the ability all its parts
 -- unconditionally: a clause that is false never let the effect start to apply.
-gatherStatic :: (Layer -> Condition.Type.Condition -> Bool) -> ObjectId -> Timestamp -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Bool -> Natural -> StaticAbility.StaticAbility Card.Type.Card -> [Gathered]
-gatherStatic functioning src ts changes stripped n sa =
+gatherStatic :: (Layer -> Condition.Type.Condition -> Bool) -> ObjectId -> Timestamp -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> (Layer -> Bool) -> Natural -> StaticAbility.StaticAbility Card.Type.Card -> [Gathered]
+gatherStatic functioning src ts changes removed n sa =
   let ms = staticParts changes sa
       key = case ms of
         _ NonEmpty.:| (_ : _) -> Just (src, n)
@@ -2311,8 +2393,8 @@ gatherStatic functioning src ts changes stripped n sa =
       parts = fmap one (NonEmpty.toList ms)
       -- CR 604.2's clause, shared with setLandSubtypeEffects -- see staticLives.
       lives = staticLives functioning changes lowest sa
-   in -- Cheap test first: `stripped`'s projection is forced only if it matters.
-      if (lowest > Layer.Ability && stripped) || not lives then [] else parts
+   in -- Cheap test first: `removed`'s projection is forced only if it matters.
+      if not lives || removed lowest then [] else parts
 
 -- The parts one printed static ability contributes. CR 612 rewrites each printed
 -- modification first, since grantedDefiningParts then emits engine-minted parts

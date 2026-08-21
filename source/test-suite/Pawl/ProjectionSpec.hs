@@ -360,6 +360,21 @@ ashayaBloodMoon forest piker ashaya bloodMoon ashayaFirst =
       (ashayaId, gs) = place g3
    in (forestId, pikerId, tokenId, ashayaId, gs)
 
+-- A basic Forest, a Merfolk Seer, a Lord of Atlantis and Ashaya, all alice's,
+-- built twice: once as-is and once with a Blood Moon added last. Returns the
+-- Seer's id and the two boards.
+--
+-- The Forest is BASIC, so Blood Moon never names it; it is there to give Ashaya's
+-- CDA something to count. The Seer is the victim rather than the Lord itself,
+-- since the Lord's own ability excludes its source ("other Merfolk").
+animatedLord :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState, GameState.GameState)
+animatedLord forest seer lord ashaya bloodMoon =
+  let (_, g1) = S.addCreature forest S.alice (Setup.emptyGame S.bothPlayers)
+      (seerId, g2) = S.addCreature seer S.alice g1
+      (_, g3) = S.addCreature lord S.alice g2
+      (_, without) = S.addCreature ashaya S.alice g3
+   in (seerId, without, snd (S.addCreature bloodMoon S.alice without))
+
 -- Life and Limb, Blood Moon, a Bayou and a Shroofus Sproutsire, all under alice.
 -- `limbFirst` controls the timestamp order (fresh timestamps ascend with
 -- placement).
@@ -1574,6 +1589,34 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     let (_, _, _, ashayaId, gs) = ashayaBloodMoon forest piker ashaya bloodMoon True
     Spec.assertBool s (Set.member CardType.Land (Projection.cardTypesOf ashayaId gs)) "Ashaya is a land"
     Spec.assertBool s (Set.member Subtype.Type.Mountain (Projection.subtypesOf ashayaId gs)) "Ashaya is a Mountain"
+
+  -- CR 305.7's strip reaching an ability whose lowest layer is AFTER layer 4, on
+  -- a permanent that is a land only because a layer-4 effect made it one.
+  --
+  -- Ashaya animates alice's nontoken creatures into Forest lands at layer 4, Blood
+  -- Moon depends on that (CR 613.8a) and applies second, so the Lord is a nonbasic
+  -- land whose subtype gets set -- and CR 305.7 takes its rules text with it. CR
+  -- 613.6 does not rescue the Lord's ability: its parts are layer 6 (islandwalk)
+  -- and layer 7c (the pump), neither of which had started applying when layer 4
+  -- stripped it. Ashaya's own ability decides AT layer 4 and is spared, which is
+  -- what keeps the animation standing (the case above).
+  --
+  -- The pair of boards differs in exactly one thing, Blood Moon's presence, so the
+  -- 3/3 reading is what proves the Lord was pumping before it.
+  Spec.it s "CR 305.7/613.6 Blood Moon strips an Ashaya-animated Lord of Atlantis, so other Merfolk stop growing" $ do
+    forest <- S.printingOf s registry "Forest"
+    seer <- S.printingOf s registry "Merfolk Seer"
+    lord <- S.printingOf s registry "Lord of Atlantis"
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
+    let (seerId, without, with) = animatedLord forest seer lord ashaya bloodMoon
+        islandwalk = Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Island)
+    Spec.assertEqWith s "without Blood Moon the Lord pumps the Seer" (Projection.powerOf seerId without) (Just 3)
+    Spec.assertEqWith s "with Blood Moon the Lord's rules text is gone, so the Seer is its printed 2" (Projection.powerOf seerId with) (Just 2)
+    Spec.assertEqWith s "and its toughness with it" (Projection.toughnessOf seerId with) (Just 2)
+    Spec.assertBool s (Projection.hasKeyword islandwalk seerId without) "without Blood Moon the Seer has islandwalk"
+    Spec.assertBool s (not (Projection.hasKeyword islandwalk seerId with)) "with Blood Moon it does not"
+    Spec.assertBool s (Set.member Subtype.Type.Mountain (Projection.subtypesOf seerId with)) "the Seer is itself a Mountain, so the strip is not about it being missed"
 
   -- CR 613.8a clause (b)'s last limb -- "what it does to any of the things it
   -- applies to" -- reached without moving any affected set. See chorusBadMoon for
