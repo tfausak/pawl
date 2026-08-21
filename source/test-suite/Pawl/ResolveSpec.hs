@@ -2100,6 +2100,7 @@ subgameSpellOn borrowed name effects gs0 =
             Face.combatRestrictions = [],
             Face.sacrificeRestrictions = [],
             Face.untapRestrictions = [],
+            Face.attachRestrictions = [],
             Face.attackCosts = [],
             Face.blockCosts = [],
             Face.mulliganActions = [],

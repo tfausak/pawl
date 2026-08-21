@@ -21,10 +21,12 @@
 -- proving it needs a real cast through this file's machinery.
 module Pawl.AuraSpec where
 
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Activate as Activate
@@ -803,6 +805,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   chosenLandTypeSpec s registry
   twoEnchantSpec s registry
   replenishSpec s registry
+  attachRestrictionSpec s registry
 
 -- Both of Convincing Mirage's prompts at once: its CR 303.4a enchant slot
 -- (Pool.Permanents narrowed to lands, so the recipient is tagged ToObject) and
@@ -816,10 +819,11 @@ mirageOn landId subtype p = case p of
 
 -- CR 614.1c's as-enters choice, whose value is a SUBTYPE rather than a colour,
 -- and CR 305.7's set reading it back off the Aura. Convincing Mirage is the
--- pool's only producer of either, and the only Aura in the pool that enchants a
--- non-creature OBJECT -- the two Curses (enchantPlayerSpec below) enchant
--- players, which is CR 702.5d's other shape and reaches the battlefield through
--- Affected.AttachedPlayerControls rather than Affected.Attached.
+-- pool's only producer of either. It enchants a non-creature OBJECT, which
+-- Song of the Dryads and Consecrate Land also do -- where the two Curses
+-- (enchantPlayerSpec below) enchant players, CR 702.5d's other shape, reaching
+-- the battlefield through Affected.AttachedPlayerControls rather than
+-- Affected.Attached.
 chosenLandTypeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 chosenLandTypeSpec s registry = Spec.describe s "ChosenLandType" $ do
   -- The gameplay-level proof design.md section 4 asks for: cast the Aura, answer
@@ -1853,3 +1857,120 @@ auraSpec s registry = Spec.describe s "Aura" $ do
     Spec.assertEqWith s "alice controls it" (Projection.controllerOf creature stolen) (Just S.alice)
     Spec.assertBool s (not (Combat.canAttack S.alice creature stolen)) "the turn she steals it, it cannot attack"
     Spec.assertBool s (Combat.canAttack S.alice creature settled) "and it has settled under her control, so it can attack"
+
+-- CR 303.4's last sentence -- "other effects can limit what a permanent can be
+-- enchanted by" -- and CR 301.5's equivalent for an Equipment, which
+-- Pawl.Types.AttachRestriction carries and Pawl.Engine.AttachRestriction reads.
+-- Consecrate Land ("enchanted land ... can't be enchanted by other Auras") and
+-- Goblin Brawler ("this creature can't be equipped") are the pool's two printings
+-- of it, and between them they reach both places the answer is asked: CR 701.3a's
+-- move and destination offer (Pawl.Engine.Attach.attachmentFor) and CR
+-- 704.5m/303.4c's re-check (Pawl.Engine.Sba.fallsOff).
+--
+-- TARGETING is deliberately absent, and both cards' Gatherer rulings say so --
+-- Goblin Brawler's outright ("you can activate an equip ability that targets
+-- Goblin Brawler, but the Equipment will fail to move onto it"). CR 702.5a gives
+-- the enchant ability the targeting job and this restriction is not it; only
+-- protection also forbids the targeting, in a clause of its own (CR 702.16b),
+-- which pawl has no keyword for (#1731).
+attachRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+attachRestrictionSpec s registry = Spec.describe s "AttachRestriction" $ do
+  -- CR 301.5b's last sentence, at the MOVE: "if an effect attempts to attach an
+  -- Equipment to an object that can't be equipped by it, the Equipment doesn't
+  -- move." The equip ability targets legally either way, so the two runs differ
+  -- in exactly one thing -- which creature the target slot names -- and the
+  -- Piker run is the positive control that says the board, the mana and the
+  -- ability all work.
+  Spec.it s "CR 301.5b whole cards: Bonesplitter equips the Piker and fails to move onto Goblin Brawler" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    brawler <- S.printingOf s registry "Goblin Brawler"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    let base0 = S.landsInPlay island 1
+        (pikerId, base1) = S.addCreature piker S.alice base0
+        (brawlerId, base2) = S.addCreature brawler S.alice base1
+        (splitterId, base3) = S.addCreature bonesplitter S.alice base2
+        ready = base3 {GameState.priority = Just S.alice}
+        equip = case Face.activatedAbilities (S.combinedFace bonesplitter) of
+          ability : _ -> Just ability
+          [] -> Nothing
+    case equip of
+      Nothing -> Spec.assertFailure s "Bonesplitter should print one activated ability"
+      Just ability -> do
+        let run victim =
+              snd
+                ( Engine.runGamePure
+                    (aimRecipient (Recipient.ToCreature victim))
+                    (snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature victim)) ready (Activate.activateAbility S.alice splitterId ability)))
+                    Stack.resolveTop
+                )
+            ontoPiker = run pikerId
+            ontoBrawler = run brawlerId
+        Spec.assertEqWith s "before: a plain 2/1 Piker" (S.powerToughnessOf pikerId ready) (Just (2, 1))
+        Spec.assertEqWith s "before: a plain 2/2 Brawler" (S.powerToughnessOf brawlerId ready) (Just (2, 2))
+        -- CR 303.4/301.5's destination limit, at gameplay level: the +2/+0 never
+        -- arrives, because the Equipment never moved.
+        Spec.assertEqWith s "CR 301.5b: the Brawler is still a 2/2" (S.powerToughnessOf brawlerId ontoBrawler) (Just (2, 2))
+        Spec.assertEqWith s "and the Bonesplitter is still unattached" (fmap Object.attachedTo (Game.lookupObject splitterId ontoBrawler)) (Just Nothing)
+        -- The positive control on the same board: nothing about the equip
+        -- ability, the mana or the target slot is broken.
+        Spec.assertEqWith s "the Piker it CAN equip is a 4/1" (S.powerToughnessOf pikerId ontoPiker) (Just (4, 1))
+        Spec.assertEqWith s "with the Bonesplitter on it (CR 701.3a)" (fmap Object.attachedTo (Game.lookupObject splitterId ontoPiker)) (Just (Just (Recipient.ToCreature pikerId)))
+  -- CR 704.5m with CR 303.4c's "and other applicable effects": the Aura already
+  -- on the land is not refused retroactively -- it is buried, on the state-based
+  -- pass after Consecrate Land arrives. That is Consecrate Land's own Gatherer
+  -- ruling, in one board.
+  Spec.it s "CR 704.5m whole card: Consecrate Land buries the Aura already on the land" $ do
+    plains <- S.printingOf s registry "Plains"
+    mountain <- S.printingOf s registry "Mountain"
+    song <- S.printingOf s registry "Song of the Dryads"
+    consecrate <- S.printingOf s registry "Consecrate Land"
+    let base0 = S.landsInPlay plains 1
+        (landId, base1) = S.addCreature mountain S.alice base0
+        (songId, base2) = S.addCreature song S.alice base1
+        occupied = S.attachTo songId (Recipient.ToObject landId) base2
+        (gs, spell) = S.handOne consecrate occupied
+        cast = snd (Engine.runGamePure (aimRecipient (Recipient.ToObject landId)) gs (S.cast S.alice spell))
+        resolved = snd (Engine.runGamePure (aimRecipient (Recipient.ToObject landId)) cast Stack.resolveTop)
+        settled = S.settleSba (S.settleSba resolved)
+        arrived = filter (/= songId) (attachedTo landId resolved)
+    Spec.assertBool s (Set.member songId (GameState.battlefield occupied)) "before: the Song of the Dryads is on the land"
+    Spec.assertEqWith s "and Consecrate Land entered attached to that same land" (length arrived) 1
+    -- The gameplay-level assertion this case exists for.
+    Spec.assertBool s (not (Set.member songId (GameState.battlefield settled))) "CR 704.5m: the other Aura is put into its owner's graveyard"
+    -- CR 400.7 minted a fresh id at the destination, so the Aura is counted by
+    -- CARD in its owner's graveyard rather than looked up by the id it held on
+    -- the battlefield.
+    Spec.assertEqWith s "and it went to its owner's graveyard rather than anywhere else" (length (filter (\oid -> Game.cardOf oid settled == Just (Printing.card song)) (Foldable.toList (Map.findWithDefault Seq.empty S.alice (GameState.graveyard settled))))) 1
+    -- CR 303.4d's "other": Consecrate Land is an Aura on the land it protects,
+    -- and its own filter's Not IsSource is what leaves it standing.
+    Spec.assertEqWith s "Consecrate Land itself survives" (filter (/= songId) (attachedTo landId settled)) arrived
+  -- The DESTINATION OFFER, which is the same answer read through
+  -- Filter.CanHostSubject: Aura Graft's "attach it to another permanent it can
+  -- enchant" never offers the protected land, so the answerer's demand for it is
+  -- discarded and the Aura lands on the first permanent that will have it.
+  --
+  -- Also where Consecrate Land's FIRST clause is proved, on the same board: the
+  -- land it protects has indestructible.
+  Spec.it s "CR 303.4/701.3a whole cards: Aura Graft will not move an Aura onto a land Consecrate Land protects" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    song <- S.printingOf s registry "Song of the Dryads"
+    consecrate <- S.printingOf s registry "Consecrate Land"
+    graft <- S.printingOf s registry "Aura Graft"
+    let base0 = S.landsInPlay island 2
+        (protectedLand, base1) = S.addCreature mountain S.alice base0
+        (hostLand, base2) = S.addCreature mountain S.alice base1
+        (consecrateId, base3) = S.addCreature consecrate S.alice base2
+        guarded = S.attachTo consecrateId (Recipient.ToObject protectedLand) base3
+        (songId, base4) = S.addCreature song S.alice guarded
+        board = S.attachTo songId (Recipient.ToObject hostLand) base4
+        (gs, spell) = S.handOne graft board
+        cast = snd (Engine.runGamePure (moveAura songId protectedLand) gs (S.cast S.alice spell))
+        after = snd (Engine.runGamePure (moveAura songId protectedLand) cast Stack.resolveTop)
+    Spec.assertBool s (Projection.hasKeyword Keyword.Indestructible protectedLand board) "Consecrate Land's first clause: the land has indestructible"
+    Spec.assertEqWith s "before: the Song of the Dryads sits on the other land" (fmap Object.attachedTo (Game.lookupObject songId board)) (Just (Just (Recipient.ToObject hostLand)))
+    -- The gameplay-level assertion: the answerer asked for the protected land
+    -- and did not get it, because CR 303.4's limit kept it out of the offer.
+    Spec.assertBool s (notElem songId (attachedTo protectedLand after)) "CR 303.4: the protected land is not a destination"
+    Spec.assertBool s (Maybe.isJust (Game.lookupObject songId after >>= Object.attachedTo)) "and the Aura did move, onto a permanent that will have it"

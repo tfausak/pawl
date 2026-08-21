@@ -1,0 +1,82 @@
+{
+  "faces": [
+    {
+      "attachRestrictions": [
+        {
+          "affected": {
+            "type": "Attached"
+          },
+          "attachers": {
+            "type": "And",
+            "value": [
+              {
+                "type": "HasSubtype",
+                "value": {
+                  "type": "Aura"
+                }
+              },
+              {
+                "type": "Not",
+                "value": {
+                  "type": "IsSource"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "enchant": [
+        {
+          "filter": {
+            "type": "HasCardType",
+            "value": {
+              "type": "Land"
+            }
+          },
+          "pool": {
+            "type": "Permanents"
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Consecrate Land",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Attached"
+          },
+          "modifications": [
+            {
+              "type": "GainKeyword",
+              "value": {
+                "type": "Indestructible"
+              }
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Aura"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -17,6 +17,7 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.AsCopy as AsCopy
+import qualified Pawl.Types.AttachRestriction as AttachRestriction
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackCostScope as AttackCostScope
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
@@ -137,6 +138,7 @@ baseFace =
       Face.combatRestrictions = [],
       Face.sacrificeRestrictions = [],
       Face.untapRestrictions = [],
+      Face.attachRestrictions = [],
       Face.attackCosts = [],
       Face.blockCosts = [],
       Face.additionalCosts = [],
@@ -187,6 +189,7 @@ minimalFace =
       Face.combatRestrictions = [],
       Face.sacrificeRestrictions = [],
       Face.untapRestrictions = [],
+      Face.attachRestrictions = [],
       Face.attackCosts = [],
       Face.blockCosts = [],
       Face.mulliganActions = [],
@@ -237,6 +240,7 @@ populatedFace =
       Face.combatRestrictions = [CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless Affected.Attached Nothing)],
       Face.sacrificeRestrictions = [SacrificeRestriction.MkSacrificeRestriction Affected.Attached],
       Face.untapRestrictions = [UntapRestriction.MkUntapRestriction Affected.Attached],
+      Face.attachRestrictions = [AttachRestriction.MkAttachRestriction Affected.Attached (Filter.HasSubtype Subtype.Aura)],
       Face.attackCosts = [AttackCost.MkAttackCost Affected.Attached (PerCreature.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 2])) AttackCostScope.Controller],
       Face.blockCosts = [BlockCost.MkBlockCost Affected.Attached (PerCreature.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 3]))],
       Face.additionalCosts = [CostComponent.TapThis],
@@ -274,6 +278,7 @@ populatedFaceJson =
     <> "\"combatRestrictions\":[{\"type\":\"CantAttack\",\"value\":{\"affected\":{\"type\":\"Attached\"}}}],"
     <> "\"sacrificeRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}],"
     <> "\"untapRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}],"
+    <> "\"attachRestrictions\":[{\"affected\":{\"type\":\"Attached\"},\"attachers\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Aura\"}}}],"
     <> "\"attackCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perAttacker\":{\"type\":\"Fixed\",\"value\":[{\"type\":\"Generic\",\"value\":2}]},\"scope\":{\"type\":\"Controller\"}}],"
     <> "\"blockCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perBlocker\":{\"type\":\"Fixed\",\"value\":[{\"type\":\"Generic\",\"value\":3}]}}],"
     <> "\"additionalCosts\":[{\"type\":\"TapThis\"}],"
@@ -338,6 +343,9 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
     Spec.it s "untapRestrictions (CR 502.3/101.2) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.untapRestrictions <$> decodeFace v) (Right [])
+    Spec.it s "attachRestrictions (CR 303.4/301.5/101.2) defaults to the empty list" $ do
+      v <- Common.assertJson s baseFaceJson
+      Spec.assertEq s (Face.attachRestrictions <$> decodeFace v) (Right [])
     Spec.it s "attackCosts (CR 508.1c/508.1h) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.attackCosts <$> decodeFace v) (Right [])
@@ -457,6 +465,13 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         decodeFace
         baseFace {Face.untapRestrictions = [UntapRestriction.MkUntapRestriction Affected.Attached]}
         (init baseFaceJson <> ",\"untapRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}]}")
+    Spec.it s "attachRestrictions" $
+      Common.assertJsonCodec
+        s
+        encodeFace
+        decodeFace
+        baseFace {Face.attachRestrictions = [AttachRestriction.MkAttachRestriction Affected.Attached (Filter.HasSubtype Subtype.Aura)]}
+        (init baseFaceJson <> ",\"attachRestrictions\":[{\"affected\":{\"type\":\"Attached\"},\"attachers\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Aura\"}}}]}")
     Spec.it s "attackCosts" $
       Common.assertJsonCodec
         s

@@ -71,6 +71,7 @@ import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AsCopy as AsCopy
+import qualified Pawl.Types.AttachRestriction as AttachRestriction
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackCostScope as AttackCostScope
@@ -278,6 +279,7 @@ vanillaFace name typeLine =
       Face.combatRestrictions = [],
       Face.sacrificeRestrictions = [],
       Face.untapRestrictions = [],
+      Face.attachRestrictions = [],
       Face.attackCosts = [],
       Face.blockCosts = [],
       Face.mulliganActions = [],
@@ -3237,6 +3239,14 @@ printedReplacementFilters printedReplacement =
 -- The SIZE-BOUNDING arms have no subject, so they contribute only their gate.
 -- Nothing stands in for the missing Affected on purpose: a `Matching Anything`
 -- there would report a filter Silent Arbiter does not print.
+-- BOTH of an attachment prohibition's Filter positions -- CR 303.4's restricted
+-- permanents and the attachers barred from them -- the pairing
+-- combatRestrictionFilters' CantBeBlockedBy arm takes over its own two.
+attachRestrictionFilters :: AttachRestriction.AttachRestriction -> [Filter.Type.Filter Keyword.Keyword]
+attachRestrictionFilters restriction =
+  affectedFilters (AttachRestriction.affected restriction)
+    <> [AttachRestriction.attachers restriction]
+
 combatRestrictionFilters :: CombatRestriction.CombatRestriction -> [Filter.Type.Filter Keyword.Keyword]
 combatRestrictionFilters restriction = case restriction of
   CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless affected condition) -> affectedFilters affected <> foldMap conditionFilters condition
@@ -3616,6 +3626,7 @@ cardFilters card =
         <> concatMap combatRestrictionFilters (Face.combatRestrictions card)
         <> concatMap (affectedFilters . SacrificeRestriction.affected) (Face.sacrificeRestrictions card)
         <> concatMap (affectedFilters . UntapRestriction.affected) (Face.untapRestrictions card)
+        <> concatMap attachRestrictionFilters (Face.attachRestrictions card)
     )
     <> concatMap staticAbilityFilters (Face.staticAbilities card)
     <> modalFilters (Face.spell card)

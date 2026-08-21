@@ -17,6 +17,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
+import qualified Pawl.Types.AttachRestriction as AttachRestriction
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BlockCost as BlockCost
@@ -355,6 +356,16 @@ data Face card = MkFace
     -- Object.doesNotUntapNext and Object.exertedBy, and neither reaches this
     -- field.
     untapRestrictions :: [UntapRestriction.UntapRestriction],
+    -- | CR 604.1/604.2 / 303.4 / 301.5 / 101.2: this face's printed ATTACHMENT
+    -- PROHIBITIONS -- "enchanted land ... can't be enchanted by other Auras"
+    -- (Consecrate Land), "this creature can't be equipped" (Goblin Brawler);
+    -- read by Pawl.Engine.AttachRestriction, never by Pawl.Engine.Projection,
+    -- for blockRequirements' CR 613.11 reason.
+    --
+    -- Its own field rather than an arm of untapRestrictions above, for the reason
+    -- that field gives: the two forbid unrelated game actions, and this one is
+    -- read wherever CR 701.3a's attach is judged.
+    attachRestrictions :: [AttachRestriction.AttachRestriction],
     -- | CR 604.1/604.2 / 508.1c / 508.1h: this face's printed COSTS TO ATTACK --
     -- Ghostly Prison's {2} per attacking creature; read by Pawl.Engine.AttackCost,
     -- never by Pawl.Engine.Projection, for blockRequirements' CR 613.11 reason.

@@ -9,6 +9,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.AttachRestriction as AttachRestriction
 import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Commander as Commander
@@ -247,9 +248,11 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
             isBattle || isCreature || (not isBattle && not isCreature && not isAura && not isEquipment)
 
 -- CR 704.5m: an Aura attached to an illegal object or player, or attached to
--- nothing, is put into its owner's graveyard. Three clauses: unattached, attached
--- to an id that is no longer a permanent, and attached to one its own enchant
--- ability no longer admits (CR 303.4c).
+-- nothing, is put into its owner's graveyard. Four clauses: unattached, attached
+-- to an id that is no longer a permanent, attached to one its own enchant
+-- ability no longer admits, and attached to one that refuses it -- CR 303.4c's
+-- "as defined by its enchant ability AND OTHER APPLICABLE EFFECTS", whose second
+-- half is Pawl.Engine.AttachRestriction.
 --
 -- ABILITIES, plural, where CR 702.5c applies: Card.enchantTargetSlot is the
 -- conjunction of every instance, so the third clause fires when the host stops
@@ -291,6 +294,15 @@ fallsOff pcs gs oid = case Game.faceOf oid gs of
         Just recipient ->
           Recipient.objectOf recipient == Just oid
             || not (stillLegalEnchant pcs gs oid slot recipient)
+            -- CR 303.4c's "and other applicable effects", which the enchant
+            -- slot above cannot see: the HOST's own prohibition on what may
+            -- enchant it (CR 303.4's last sentence, CR 101.2), read through
+            -- Pawl.Engine.AttachRestriction -- the same answer
+            -- Attach.attachmentFor refuses a move by, so an Aura that CR 608.3c
+            -- put here anyway is buried on this pass. Consecrate Land's Gatherer
+            -- ruling is this clause: an Aura already on the land goes to its
+            -- owner's graveyard when Consecrate Land arrives.
+            || Maybe.maybe False (\host -> AttachRestriction.refuses oid host gs) (Recipient.objectOf recipient)
 
 -- CR 303.4c: is `recipient` still one the enchanting Aura `source`'s enchant
 -- slot ADMITS?
