@@ -1,6 +1,7 @@
 module Pawl.Types.ActivationRestriction where
 
 import qualified Pawl.Types.DuringPhase as DuringPhase
+import qualified Pawl.Types.TurnScope as TurnScope
 
 -- | CR 602.5: ONE clause of the "activate only ..." rider an activated ability
 -- prints about itself -- CR 602.5b's "a restriction on its use".
@@ -62,10 +63,27 @@ data ActivationRestriction
     -- ability's controller, which for an activated ability is the player CR 602.2
     -- already restricts activation to.
     --
-    -- "An opponent's turn" (Trade Caravan, Nettling Imp) is now sayable --
-    -- TurnScope.OpponentsTurn -- but a turn named with no phase at all (Lavinia,
-    -- Foil to Conspiracy) still is not: this arm requires a window (#520).
+    -- "An opponent's turn" (Trade Caravan, Nettling Imp) is sayable here --
+    -- TurnScope.OpponentsTurn -- beside the window this arm requires. A rider
+    -- that names a turn and NO window is DuringTurn below.
     DuringPhase DuringPhase.DuringPhase
+  | -- | CR 102.1 alone: activatable only on a turn the scope admits, in any phase
+    -- or step of it. Lavinia, Foil to Conspiracy prints the whole rider as
+    -- "Activate only during an opponent's turn"; Disrupting Scepter and
+    -- Gwendlyn Di Corci print the ControllersTurn half.
+    --
+    -- A SIBLING ARM rather than a Maybe PhaseSelector inside DuringPhase. CR
+    -- 500.1's windows and CR 102.1's turn are separate facts, and an arm meaning
+    -- "no window at all" is a different thing from one naming a step: an
+    -- optional field makes every reader of DuringPhase rule out an absence that
+    -- Pawl.Types.DuringPhase deliberately has no form for on its other axis
+    -- either.
+    --
+    -- Not expressible as DuringPhase over a "whole turn" PhaseSelector: CR 500.1
+    -- breaks the turn into five phases and a PhaseSelector value names one
+    -- schedule entry, so the turn as a whole is outside that type's vocabulary
+    -- by construction.
+    DuringTurn TurnScope.TurnScope
   | -- | "Activate only if you've been attacked this step", asked of the player
     -- activating the ability. Kongming's Contraptions prints it alongside
     -- DuringPhase, which is what made this type a list.

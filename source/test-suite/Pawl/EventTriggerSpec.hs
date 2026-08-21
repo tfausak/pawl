@@ -1300,9 +1300,10 @@ whisperingWizardSpec s registry =
 -- spell each turn, create a 1/1 white Spirit creature token with flying."
 -- Nothing of this card is omitted, and nothing of it is anything but the
 -- ordinal -- so these cases cannot be passing on some other clause. Chosen over
--- Lavinia, Foil to Conspiracy, whose printed mana ability wants an activation
--- rider naming a turn with no phase, which is not implemented (#520) and does
--- not bear on the ordinal either way.
+-- Lavinia, Foil to Conspiracy, who prints the same ordinal beside a mana ability
+-- and an activation rider naming a turn with no phase (Pawl.ManaSpec's
+-- laviniaTurnRiderSpec) -- two more clauses, neither bearing on the ordinal
+-- either way.
 --
 -- The spells cast are Boil, {3}{R} Instant "Destroy all Islands", for
 -- youngPyromancerSpec's reasons: it targets nothing, so no answerer choice

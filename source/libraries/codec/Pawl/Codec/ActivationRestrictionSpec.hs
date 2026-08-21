@@ -45,8 +45,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivationRestriction" $ do
             }
       )
       " {\"type\":\"DuringPhase\",\"value\":{\"window\":{\"type\":\"Step\",\"value\":{\"type\":\"Beginning\",\"value\":{\"type\":\"Upkeep\"}}},\"scope\":{\"type\":\"ControllersTurn\"}}} "
-  -- The PhaseSelector's stepless arm, with one printed producer in the pool
-  -- (#520).
+  -- The PhaseSelector's stepless arm: a phase that HAS steps, named whole.
   Spec.it s "DuringPhase, Jade Statue's combat-phase rider" $
     Common.assertCodec
       s
@@ -58,6 +57,16 @@ spec s = Spec.describe s "Pawl.Codec.ActivationRestriction" $ do
             }
       )
       " {\"type\":\"DuringPhase\",\"value\":{\"window\":{\"type\":\"CombatPhase\"},\"scope\":{\"type\":\"EachTurn\"}}} "
+  -- CR 102.1 with no window beside it, which is the arm DuringPhase above cannot
+  -- reach: Lavinia, Foil to Conspiracy's "Activate only during an opponent's
+  -- turn". Rendered payload-tagged, so a decoder cannot confuse it with the
+  -- windowed arm.
+  Spec.it s "DuringTurn, Lavinia's opponent's-turn rider" $
+    Common.assertCodec
+      s
+      ActivationRestriction.codec
+      (ActivationRestriction.DuringTurn TurnScope.OpponentsTurn)
+      " {\"type\":\"DuringTurn\",\"value\":{\"type\":\"OpponentsTurn\"}} "
   -- CR 602.5's second clause, and the arm that made this type a list: Kongming's
   -- Contraptions prints it beside the DuringPhase above.
   Spec.it s "AttackedThisStep" $

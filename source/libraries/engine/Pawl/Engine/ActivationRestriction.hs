@@ -83,6 +83,12 @@ restrictionMet pid gs restriction = case restriction of
   ActivationRestriction.DuringPhase (DuringPhase.MkDuringPhase window scope) ->
     Turn.inWindow window (GameState.phase gs)
       && Event.turnScopeAdmits scope (GameState.activePlayer gs) pid
+  -- CR 102.1 alone, with no window beside it: the rider names a turn and every
+  -- phase and step of that turn is inside it. The same second conjunct
+  -- DuringPhase reads above, standing on its own -- so this is not DuringPhase
+  -- with a wildcard window but the absence of that axis.
+  ActivationRestriction.DuringTurn scope ->
+    Event.turnScopeAdmits scope (GameState.activePlayer gs) pid
   -- CR 508.3b's question, asked of the ACTIVATING player, and the same reader the
   -- casting side's clause of this name uses -- see Turn.attackedThisStep for
   -- why it is the declaration record and not Combat.attacked.
