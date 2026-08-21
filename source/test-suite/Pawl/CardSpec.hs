@@ -3192,7 +3192,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   -- "except ..." clause states values, never a criterion over objects
   -- (Pawl.Types.CopyException imports no Filter, which is what keeps that
   -- honest).
-  EntryRewrite.AsCopy (AsCopy.MkAsCopy f _) -> [f]
+  EntryRewrite.AsCopy (AsCopy.MkAsCopy f _ _) -> [f]
   EntryRewrite.ChoiceOf _ -> []
   EntryRewrite.ChooseColor -> []
   EntryRewrite.ChooseBasicLandType -> []

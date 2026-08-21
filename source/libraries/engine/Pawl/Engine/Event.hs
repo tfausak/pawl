@@ -334,10 +334,11 @@ payLife pid n gs =
       }
 
 -- CR 110.5b: stamp the tapped status onto an entering permanent, the write shared
--- by EntryRewrite.Tapped (CR 614.1d) and by the declining half of both
--- EntryRewrite.PayLifeOrTapped and EntryRewrite.RevealOrTapped (CR 614.1c) --
--- which is why it is one function: those sentences differ in what they charge and
--- not in what they leave on the board.
+-- by EntryRewrite.Tapped (CR 614.1d), by the declining half of both
+-- EntryRewrite.PayLifeOrTapped and EntryRewrite.RevealOrTapped (CR 614.1c), and
+-- by the taking half of EntryRewrite.AsCopy's `tapped` (Vesuva) -- which is why
+-- it is one function: those sentences differ in what they charge and not in what
+-- they leave on the board.
 --
 -- ENTERS TAPPED, not "enters, then is tapped". The status goes straight onto the
 -- object rather than through the tap funnel, so the permanent never transitions
@@ -964,6 +965,11 @@ apply batch candidate event =
                   let stamped = Replacement.applyCopyExceptions (AsCopy.exceptions asCopy) (copiedSnapshot src2 g)
                       stamp o = o {Object.bindings = Binding.setCopy stamped (Object.bindings o)}
                    in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
+                -- CR 614.1d, inside the same sentence: Vesuva enters TAPPED as a
+                -- copy. On this branch alone -- a declined copy is a Vesuva that
+                -- entered untapped, since the printed "may" governs both halves
+                -- at once.
+                Monad.when (AsCopy.tapped asCopy) (enterTapped oid)
                 pure (Just event)
       -- CR 614.1c / 208.2b: Primal Plasma's choice of which printed
       -- power/toughness-and-keywords option to become. Written into the COPIABLE

@@ -10,8 +10,8 @@ import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 import qualified Pawl.Types.WithCounters as WithCounters
 
 -- | CR 614.1c-d: how an entry replacement modifies the entry. AsCopy is Clone
--- (CR 707.5, and a real "may" -- declining is legal) and, with CR 707.9's
--- exceptions attached, Quicksilver Gargantuan; ChoiceOf is Primal Plasma
+-- (CR 707.5, and a real "may" -- declining is legal), with CR 707.9's
+-- exceptions attached Quicksilver Gargantuan, and with its `tapped` set Vesuva; ChoiceOf is Primal Plasma
 -- (CR 208.2b); ChooseColor is Painter's Servant (CR 614.1c);
 -- ChooseBasicLandType is Convincing Mirage (CR 614.1c); ChoosePlayer is Stuffy
 -- Doll (CR 614.1c); ChooseCardNames is Null
