@@ -739,13 +739,15 @@ data Prompt r where
   -- Resolution-time and not cast-time: CR 603.5 puts an optional ability on the
   -- stack regardless, and CR 608.2d places the choice.
   --
-  -- Never elided -- "you may gain 2 life" reaches two distinguishable boards.
-  -- Whether the clause's effects can accomplish anything is deliberately not
-  -- consulted, which would make the prompt depend on which effects a clause
-  -- holds.
+  -- Never elided for what the clause's effects would ACCOMPLISH -- "you may gain
+  -- 2 life" reaches two distinguishable boards, and consulting the outcome would
+  -- make the prompt depend on which effects a clause holds.
   --
-  -- Not implemented: a modal payload mixing a live mode with a dead optional
-  -- one would reach this prompt with nothing to decide (#336).
+  -- The one exception is a clause whose every effect reads a slot and every slot
+  -- it reads is illegal or unfilled (CR 608.2b): both answers are then the same
+  -- board. Pawl.Engine.Resolve.clauseIsInert is the test, off the effects'
+  -- CLASSIFICATION rather than their identity; a modal payload mixing a live mode
+  -- with a dead one is what reaches it ahead of CR 608.2b's fizzle.
   ChooseOptional :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> ClauseIndex.ClauseIndex -> Prompt OptionalDecision.OptionalDecision
   -- | CR 608.2g: a cast a RESOLVING effect specifically allows. CR 310.12b's
   -- "then you may cast it transformed without paying its mana cost" is the
