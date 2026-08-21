@@ -311,11 +311,13 @@ data TriggerCondition
     SelfBecomesBlockedByOneOrMore (Filter.Filter Keyword.Keyword)
   | -- | CR 509.3e read by a BYSTANDER on the ATTACKING side: "whenever a
     -- creature attacking one of your opponents becomes blocked by two or more
-    -- creatures" (Seifer, Balamb Rival). The arm above with the number spent on
-    -- the blockers' COUNT rather than on a quality, and the subject moved off
-    -- the bearer -- SelfBlocksAtLeast's floor read from the other side of the
-    -- same declaration, so it matches the grouped GameEvent.AttackerBlocked and
-    -- fires once for the attacker however many creatures blocked it.
+    -- creatures" (Seifer, Balamb Rival, the one printing -- Scryfall
+    -- o:"becomes blocked by two or more", 2026-08-21). The arm above with the
+    -- number spent on the blockers' COUNT rather than on a quality, and the
+    -- subject moved off the bearer -- SelfBlocksAtLeast's floor read from the
+    -- other side of the same declaration, so it matches the grouped
+    -- GameEvent.AttackerBlocked and fires once for the attacker however many
+    -- creatures blocked it.
     --
     -- AT LEAST, never exactly, which is rule 509.3e's last sentence.
     --

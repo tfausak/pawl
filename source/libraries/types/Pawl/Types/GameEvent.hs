@@ -287,7 +287,11 @@ data GameEvent
     --
     -- The BLOCKERS are not carried. CR 509.3d's "becomes blocked by a creature"
     -- is the condition that names one, and it reads BlockerDeclared's pair
-    -- instead -- this event exists to be the once-per-combat one (#1146).
+    -- instead -- this event exists to be the once-per-combat one (#1146). The
+    -- conditions that ask about the blockers as a GROUP -- their quality, or how
+    -- many there were -- read Combat.blockers off this event instead, which is
+    -- exact because CR 509.2a puts these triggers on the stack before any player
+    -- gets priority.
     --
     -- CR 509.3c's third producer is missing: an attacker whose only blocker is
     -- one put onto the battlefield blocking becomes blocked too (CR 509.4 denies

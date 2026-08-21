@@ -1143,6 +1143,17 @@ creatureBecomesBlockedByAtLeastSpec s registry =
         _ -> S.aggressiveAnswer p
       afterCombat :: ObjectId.ObjectId -> [ObjectId.ObjectId] -> GameState.GameState -> GameState.GameState
       afterCombat attacker blockers = S.runToStep (Phase.Combat CombatStep.EndOfCombat) (declaring attacker blockers)
+      -- The same declaration aimed at a PLANESWALKER instead (CR 508.1b), which
+      -- is the one prompt `declaring` never sees: combatBoardOf's boards offer
+      -- the defending player alone.
+      declaringAt :: ObjectId.ObjectId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+      declaringAt walker attacker blockers p = case p of
+        Prompt.ChooseAttackTarget _ _ _ options -> case filter (== AttackTarget.OfPlaneswalker walker) (NonEmpty.toList options) of
+          target : _ -> target
+          [] -> NonEmpty.head options
+        _ -> declaring attacker blockers p
+      afterCombatAt :: ObjectId.ObjectId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> GameState.GameState -> GameState.GameState
+      afterCombatAt walker attacker blockers = S.runToStep (Phase.Combat CombatStep.EndOfCombat) (declaringAt walker attacker blockers)
       giants :: GameState.GameState -> Int
       giants = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Hill Giant")) S.bob
       firedBy :: ObjectId.ObjectId -> GameState.GameState -> Int
@@ -1184,6 +1195,35 @@ creatureBecomesBlockedByAtLeastSpec s registry =
                 (giants (afterCombat elves [first, second] gs))
                 2
             _ -> Spec.assertFailure s "fixture should give alice an Elves, and bob two Giants and a Seifer"
+        -- CR 508.1b: a creature attacking a PLANESWALKER an opponent controls is
+        -- not attacking that opponent, so Seifer stays silent -- which is why the
+        -- arm reads Combat.attackers rather than CR 508.5's defending player,
+        -- whom an attacked planeswalker resolves to. The firing board with a Jace
+        -- added and the attack aimed at him, and nothing else changed.
+        --
+        -- Jace Beleren is stocked with loyalty by hand: S.addCreature puts a
+        -- printing onto the battlefield with no counters, and CR 704.5i would
+        -- take a loyalty-0 planeswalker away before attackers are declared.
+        Spec.it s "CR 508.1b attacking an opponent's planeswalker is not attacking the opponent" $ do
+          (gs, mine, theirs) <- board ["Llanowar Elves", "Seifer, Balamb Rival"] ["Hill Giant", "Hill Giant", "Jace Beleren"]
+          case (mine, theirs) of
+            ([elves, _], [first, second, jace]) -> do
+              let ready = S.addCounter CounterKind.Loyalty 3 jace gs
+                  after = afterCombatAt jace elves [first, second] ready
+              Spec.assertEqWith
+                s
+                "the Elves is aimed at Jace, so both Giants live"
+                (giants after)
+                2
+              -- The leg is not vacuous: the declaration really did name the
+              -- planeswalker, so the silence above is CR 508.1b's and not a
+              -- declaration that never happened.
+              Spec.assertEqWith
+                s
+                "and the attack really was declared at Jace"
+                (Map.lookup elves (Combat.Type.attackers (GameState.combat after)))
+                (Just (AttackTarget.OfPlaneswalker jace))
+            _ -> Spec.assertFailure s "fixture should give alice an Elves and a Seifer, and bob two Giants and a Jace"
         -- Rule 509.3e's arity: ONE trigger for the declaration, not one per
         -- blocker. Deliberately counted off the event log rather than read at
         -- gameplay level, because this card cannot show the difference -- a
