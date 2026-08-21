@@ -425,8 +425,9 @@ legalAttackDeclarationGiven candidates chosen gs =
         && obeysAttackRequirements (attackCeilingGiven limit alone candidates gs) chosen
 
 -- A declaration that is always legal: one attaining CR 508.1d's maximum, which
--- with no requirement in force is the empty one (declining to attack). Reached
--- only when an interpreter hands back a declaration the rules forbid. It obeys CR
+-- with no requirement in force is the empty one (declining to attack). CR 508.1's
+-- preamble asks for a fresh declaration instead, so this is reached only when an
+-- interpreter REPEATS a declaration that was already rewound. It obeys CR
 -- 508.1c as well as CR 508.1d, on both of attackCeiling's paths. Ordered by
 -- `candidates` rather than by Map.toList, so it comes back in the order the player
 -- was offered its creatures.
@@ -621,8 +622,10 @@ landwalkAllowsGiven grants pcs attacker gs =
       -- Hoisted, since it does not vary per candidate.
       context = Filter.contextFor (Projection.controllerOfGiven grants Set.empty attacker gs) (Just attacker)
       -- The land-ness is asked HERE and never by the criterion: every clause of CR
-      -- 702.14c reads "at least one LAND". Still asked even where the criterion
-      -- names a land type, since nothing in the projection enforces CR 205.3d.
+      -- 702.14c reads "at least one LAND". Load-bearing where the criterion names
+      -- no land type at all -- Vectis Gloves' artifact landwalk, Dryad
+      -- Sophisticate's nonbasic landwalk -- and redundant where it names one,
+      -- since CR 205.3d is enforced at the grant (Pawl.Engine.Projection).
       -- ONE projection per candidate: Filter.cardTypes is the very set
       -- Projection.cardTypesGiven would rebuild.
       matchesCriterion criterion oid =
@@ -835,8 +838,9 @@ blockArityGiven candidates gs =
    in \blocker -> fmap (1 +) (Map.findWithDefault (Just 0) blocker extra)
 
 -- A declaration that is always legal: one attaining CR 509.1c's maximum, which
--- with no requirement in force is the empty one (declining to block). Reached only
--- when an interpreter hands back a declaration the rules forbid.
+-- with no requirement in force is the empty one (declining to block). CR 509.1's
+-- preamble asks for a fresh declaration instead, so this is reached only when an
+-- interpreter REPEATS a declaration that was already rewound.
 forcedBlockDeclaration :: PlayerId -> GameState -> Map ObjectId (Set ObjectId)
 forcedBlockDeclaration pid gs = snd (blockCeiling pid gs)
 
@@ -999,64 +1003,98 @@ announceAttackTarget pid oid options = case options of
 --
 -- CR 508.1's preamble costs this function its shape: a declaration the active
 -- player cannot comply with is illegal and the game returns to the moment before
--- it. A cost to attack is the first step that can fail AFTER the board has been
--- written to, so the entry state is captured and restored.
+-- it, and the declaration is still owed -- so it is made again, which is
+-- attemptAttackDeclaration's recursion.
 declareAttackers :: PlayerId -> Game ()
 declareAttackers pid = do
   gs <- State.get
-  let candidates = legalAttackers pid gs
   case Combat.defender (GameState.combat gs) of
     -- Nothing means no attack is possible: either the beginning of combat step's
     -- turn-based action has not run, or it ran on a turn with no active player
     -- (CR 800.4j), or it found no opponents. Never a place to recompute one.
     Nothing -> pure ()
-    Just defender ->
-      Monad.unless (null candidates) $ do
-        let decider = Decide.deciderFor pid gs
-        chosen <- Game.choose (Prompt.DeclareAttackers decider pid candidates)
-        -- Filtered, not trusted: an interpreter cannot attack with a creature
-        -- that is not legally an attacker.
-        let isCandidate oid = List.elem oid candidates
-            -- Deduplicated too: CR 508.1a's declaration is a SET, and the event
-            -- fold below would otherwise record a creature's declaration twice and
-            -- make CR 506.5's count disagree with it.
-            offered = List.nub (filter isCandidate chosen)
-            -- CR 508.1b's candidates, taken ONCE and from the state the
-            -- declaration is judged against.
-            targets = attackTargets defender gs
-        -- CR 508.1b: the announcement, one question per chosen creature, in the
-        -- rule's own order -- BEFORE CR 508.1c's restrictions and CR 508.1d's
-        -- requirements, which is what a requirement naming its object (Alluring
-        -- Siren) forces: whether a declaration obeys the maximum is a question
-        -- about the announcements, so they have to exist before it can be asked.
-        -- The price is that a creature the CR 508.1d degradation below then drops
-        -- was asked about; only a broken interpreter reaches that path.
-        announced <- Monad.mapM (\oid -> fmap ((,) oid) (announceAttackTarget pid oid targets)) offered
-        let -- CR 508.1c's set-shaped restrictions and CR 508.1d's maximization,
-            -- taken ONCE for all three questions below, so the ceiling and the
-            -- check beside it cannot judge different boards.
-            alone = CombatRestriction.cantAttackAlone candidates gs
-            limit = CombatRestriction.attackLimit gs
-            bound = attackCeilingGiven limit alone candidates gs
-            -- Declining to attack is NOT always legal: under a CR 508.1d
-            -- requirement (Curse of the Nightly Hunt) "no attacks" can itself be
-            -- the illegal answer, so an illegal answer degrades to
-            -- forcedAttackDeclaration. The whole answer is replaced rather than
-            -- repaired, declareBlockers' posture: unioning the missing creatures in
-            -- could manufacture an attacks-alone illegality. Not re-prompted, and
-            -- NOT CR 733's rewind. Where several declarations attain the maximum
-            -- this takes the SMALLEST, a real choice among distinguishable
-            -- declarations, which is why only a broken interpreter reaches it.
-            --
-            -- The ANNOUNCEMENTS are replaced along with the creatures, and are not
-            -- re-asked: the ceiling's declaration already names a target per
-            -- creature, and re-prompting a player whose answer was just discarded
-            -- would ask CR 508.1b about a declaration they did not make. Only the
-            -- same broken interpreter reaches this.
-            settled =
-              if attackDeclarationAllowed limit alone (Set.fromList (fmap fst announced)) && obeysAttackRequirements bound (Map.fromList announced)
-                then announced
-                else forcedAttackDeclaration bound candidates
+    Just defender -> attemptAttackDeclaration pid defender Set.empty
+
+-- One attempt at CR 508.1's declaration, plus the preamble's retry. Two steps can
+-- make the attempt fail: CR 508.1c/508.1d judge the declaration illegal, and CR
+-- 508.1j's payment cannot be made. The preamble treats them the same way -- both
+-- clauses end "the declaration ... is illegal" -- so one loop covers both, and the
+-- rewind that CR 733.1 spells out is followed by a fresh declaration.
+--
+-- NOT CR 733.2, which is written for spells and abilities: it hands the redo to
+-- the player who had priority, and a turn-based action has no priority holder. The
+-- authority for asking again is CR 508.1's own preamble.
+--
+-- `rejected` is the set of declarations already rewound, and is what bounds the
+-- recursion: a pure `Prompt r -> r` returns the identical answer, so a repeat is
+-- not rewound a second time but degrades to forcedAttackDeclaration. Such an
+-- interpreter therefore costs exactly one extra prompt and ends on the ceiling's
+-- declaration. An interpreter that keeps proposing FRESH failing declarations
+-- terminates on the finite set of declarations over `candidates`.
+--
+-- No legal attackers means no prompt: declining is then the only legal answer, CR
+-- 508.1d's instances being minted from the candidate list.
+attemptAttackDeclaration :: PlayerId -> PlayerId -> Set (Map ObjectId AttackTarget.AttackTarget) -> Game ()
+attemptAttackDeclaration pid defender rejected = do
+  gs <- State.get
+  let candidates = legalAttackers pid gs
+  Monad.unless (null candidates) $ do
+    let decider = Decide.deciderFor pid gs
+    chosen <- Game.choose (Prompt.DeclareAttackers decider pid candidates)
+    -- Filtered, not trusted: an interpreter cannot attack with a creature
+    -- that is not legally an attacker.
+    let isCandidate oid = List.elem oid candidates
+        -- Deduplicated too: CR 508.1a's declaration is a SET, and the event
+        -- fold below would otherwise record a creature's declaration twice and
+        -- make CR 506.5's count disagree with it.
+        offered = List.nub (filter isCandidate chosen)
+        -- CR 508.1b's candidates, taken ONCE and from the state the
+        -- declaration is judged against.
+        targets = attackTargets defender gs
+    -- CR 508.1b: the announcement, one question per chosen creature, in the
+    -- rule's own order -- BEFORE CR 508.1c's restrictions and CR 508.1d's
+    -- requirements, which is what a requirement naming its object (Alluring
+    -- Siren) forces: whether a declaration obeys the maximum is a question
+    -- about the announcements, so they have to exist before it can be asked.
+    -- The price is that a creature the CR 508.1d degradation below then drops
+    -- was asked about; only an interpreter that repeats a rewound declaration
+    -- reaches that path.
+    announced <- Monad.mapM (\oid -> fmap ((,) oid) (announceAttackTarget pid oid targets)) offered
+    let -- CR 508.1c's set-shaped restrictions and CR 508.1d's maximization,
+        -- taken ONCE for all three questions below, so the ceiling and the
+        -- check beside it cannot judge different boards.
+        alone = CombatRestriction.cantAttackAlone candidates gs
+        limit = CombatRestriction.attackLimit gs
+        bound = attackCeilingGiven limit alone candidates gs
+        -- CR 508.1a-d's declaration, announcements included, as a map -- the
+        -- key `rejected` is taken on, since it is the declaration the preamble
+        -- rewinds rather than the interpreter's raw answer.
+        proposal = Map.fromList announced
+        -- Declining to attack is NOT always legal: under a CR 508.1d
+        -- requirement (Curse of the Nightly Hunt) "no attacks" can itself be
+        -- the illegal answer.
+        allowed = attackDeclarationAllowed limit alone (Map.keysSet proposal) && obeysAttackRequirements bound proposal
+        -- Whether the preamble's rewind still has a fresh declaration to ask
+        -- for. False once this exact declaration has already been rewound,
+        -- which is what makes the recursion terminate.
+        again = not (Set.member proposal rejected)
+    -- CombatEffectSpec's "CR 508.1d an illegal declaration is rewound and asked
+    -- again, not replaced by the ceiling's" is the proof.
+    if not allowed && again
+      then attemptAttackDeclaration pid defender (Set.insert proposal rejected)
+      else do
+        -- A declaration already rewound once and offered again degrades to
+        -- forcedAttackDeclaration. The whole answer is replaced rather than
+        -- repaired, declareBlockers' posture: unioning the missing creatures in
+        -- could manufacture an attacks-alone illegality. Where several
+        -- declarations attain the maximum this takes the SMALLEST, a real
+        -- choice among distinguishable declarations.
+        --
+        -- The ANNOUNCEMENTS are replaced along with the creatures, and are not
+        -- re-asked: the ceiling's declaration already names a target per
+        -- creature, and re-prompting a player whose answer was just discarded
+        -- would ask CR 508.1b about a declaration they did not make.
+        let settled = if allowed then announced else forcedAttackDeclaration bound candidates
             attacking = fmap fst settled
             recorded = Map.fromList settled
             -- CR 508.1f: declaring an attacker taps it -- unless it has vigilance
@@ -1150,16 +1188,17 @@ declareAttackers pid = do
             then pure True
             else Cost.payToll pid owed
         if not paid
-          then
+          then do
             -- CR 508.1's preamble: the declaration is illegal and the game returns
             -- to the moment before it. Reachable by an ordinary player who
             -- declares more attackers than they can pay for.
-            --
-            -- Not implemented: the fresh declaration the rules then expect, since a
-            -- pure `Prompt r -> r` returns the identical answer. The active player
-            -- attacks with nothing, which can leave a CR 508.1d requirement
-            -- unobeyed that a smaller declaration would have obeyed (#600).
             State.put before
+            -- And then the declaration is made again, normally a smaller attack
+            -- the player can afford. CombatEffectSpec's "CR 508.1 the rewound
+            -- declaration is made again: two Pikers under a Ghostly Prison
+            -- become one" is the proof; the case beside it is what a repeated
+            -- answer does instead.
+            Monad.when again (attemptAttackDeclaration pid defender (Set.insert proposal rejected))
           else
             -- CR 508.1k: each chosen creature becomes an attacking creature. After
             -- the payment, which is the rules' own order.
@@ -1286,26 +1325,70 @@ declareBlockers = do
   start <- State.get
   let attacking = Map.keys (Combat.attackers (GameState.combat start))
   Monad.unless (null attacking) $ do
-    Monad.forM_ (Maybe.maybeToList (Combat.defender (GameState.combat start))) $ \pid -> do
-      gs <- State.get
-      let candidates = legalBlockers pid gs
-      Monad.unless (null candidates) $ do
-        let decider = Decide.deciderFor pid gs
-        chosen <- Game.choose (Prompt.DeclareBlockers decider pid candidates attacking)
-        -- CR 509.1b: an illegal declaration is illegal AS A WHOLE. NOT filtered
-        -- down to its legal entries, which is unsound rather than merely inelegant
-        -- -- under menace, dropping one blocker from a pair leaves an illegal
-        -- single block, so the filter would manufacture the illegality it was meant
-        -- to remove. NOT CR 733's rewind, and never re-prompted, a pure
-        -- `Prompt r -> r` returning the identical wrong answer.
-        --
-        -- Declining to block is NOT always legal: under a CR 509.1c requirement
-        -- (Lure) "no blocks" can itself be the illegal answer, so this degrades to
-        -- forcedBlockDeclaration -- always legal, and equal to "no blocks" whenever
-        -- no requirement is in force. Replay.defaultAnswer's "no blocks" for this
-        -- prompt routes through here too, so the two cannot disagree.
-        gs1 <- State.get
-        let legal = if legalBlockDeclaration pid chosen gs1 then chosen else forcedBlockDeclaration pid gs1
+    Monad.forM_ (Maybe.maybeToList (Combat.defender (GameState.combat start))) $ \pid ->
+      attemptBlockDeclaration pid attacking Set.empty
+    -- CR 509.1h's other half, performed once CR 509.1g has assigned the blockers:
+    -- every attacking creature the declaration named no blockers for became an
+    -- UNBLOCKED creature. TriggerCondition.SelfAttacksUnblocked is the reader.
+    --
+    -- OUTSIDE the loop above, and the placement is the point: that loop is guarded
+    -- three times over -- `attacking`, the defending player, and
+    -- attemptBlockDeclaration's own candidate check -- and a board where nobody
+    -- can block trips all three --
+    -- exactly the board on which every attacker is unblocked. Rule 509.1h carries
+    -- no such condition.
+    --
+    -- Recorded ONCE and never sampled again -- the rule's last sentence keeps an
+    -- attacker blocked after every creature blocking it leaves combat, and
+    -- TriggerSpec's "losing every blocker does not make the Eternal unblocked"
+    -- proves that timing. Testing the KEY rather than the set is isBlocked's own
+    -- reading, but a regression fence here: swapping the two leaves the suite
+    -- green.
+    State.modify' $ \g ->
+      let c = GameState.combat g
+          unblocked = filter (\oid -> not (Map.member oid (Combat.blockers c))) (Map.keys (Combat.attackers c))
+       in List.foldl' (\h oid -> Event.recordEvent (GameEvent.AttackerUnblocked oid) h) g unblocked
+
+-- One attempt at CR 509.1's declaration, plus the preamble's retry --
+-- attemptAttackDeclaration's twin, and for the same reason: CR 509.1's preamble
+-- is word for word CR 508.1's, and CR 509.1b/509.1c both end "the declaration of
+-- blockers is illegal", so an illegal declaration and one CR 509.1f cannot pay for
+-- take the same rewind. The game returns to the moment before the declaration and
+-- the defending player declares again.
+--
+-- `rejected` holds the raw answers already rewound -- there is no announcement
+-- step here, so the interpreter's own map IS the declaration -- and bounds the
+-- recursion exactly as it does for attackers: a repeat degrades to
+-- forcedBlockDeclaration rather than being rewound a second time.
+attemptBlockDeclaration :: PlayerId -> [ObjectId] -> Set (Map ObjectId (Set ObjectId)) -> Game ()
+attemptBlockDeclaration pid attacking rejected = do
+  gs <- State.get
+  let candidates = legalBlockers pid gs
+  Monad.unless (null candidates) $ do
+    let decider = Decide.deciderFor pid gs
+    chosen <- Game.choose (Prompt.DeclareBlockers decider pid candidates attacking)
+    -- CR 509.1b: an illegal declaration is illegal AS A WHOLE. NOT filtered
+    -- down to its legal entries, which is unsound rather than merely inelegant
+    -- -- under menace, dropping one blocker from a pair leaves an illegal
+    -- single block, so the filter would manufacture the illegality it was meant
+    -- to remove.
+    --
+    -- Declining to block is NOT always legal: under a CR 509.1c requirement
+    -- (Lure) "no blocks" can itself be the illegal answer.
+    gs1 <- State.get
+    let allowed = legalBlockDeclaration pid chosen gs1
+        -- Whether the preamble's rewind still has a fresh declaration to ask for.
+        again = not (Set.member chosen rejected)
+    -- CombatEffectSpec's "CR 509.1c an illegal declaration is rewound and asked
+    -- again, not replaced by the ceiling's" is the proof.
+    if not allowed && again
+      then attemptBlockDeclaration pid attacking (Set.insert chosen rejected)
+      else do
+        -- A declaration already rewound once and offered again degrades to
+        -- forcedBlockDeclaration -- always legal, and equal to "no blocks"
+        -- whenever no requirement is in force. Replay.defaultAnswer's "no blocks"
+        -- for this prompt routes through here too, so the two cannot disagree.
+        let legal = if allowed then chosen else forcedBlockDeclaration pid gs1
         -- CR 509.1d: the total cost to block is determined once and then LOCKED IN
         -- -- this `let`. Asking BlockCost.totalCost a second time is what the rule
         -- forbids, which is why that function leaves locking to its caller.
@@ -1331,80 +1414,60 @@ declareBlockers = do
         -- CR 509.1's preamble: a declaration the defending player cannot pay for
         -- is illegal and the game returns to the moment before it. Nothing needs
         -- undoing -- the record is written below, and Cost.payToll restores what a
-        -- half-paid toll spent -- so what is left is which declaration stands
-        -- instead.
-        --
-        -- Not implemented: the fresh declaration the rules then expect, since a
-        -- pure `Prompt r -> r` returns the identical answer. forcedBlockDeclaration
-        -- stands in, as it does for an illegal declaration above, and it is free by
-        -- construction: blockCeiling draws it from the creatures that block freely
-        -- (#600).
+        -- half-paid toll spent -- so the rewind is the declaration being made
+        -- again. CombatEffectSpec's "CR 509.1 the rewound declaration is made
+        -- again: the taxed blocker is dropped and the free one blocks" is the
+        -- proof; the case beside it is what a repeated answer does instead.
         gs2 <- State.get
-        let declaration = if paid then legal else forcedBlockDeclaration pid gs2
-        -- The pairs the declaration states, blocker-major, which is the order
-        -- CR 509.1a writes it in and the order the events below are recorded in.
-        let pairs = [(blocker, attacker) | (blocker, attackers) <- Map.toList declaration, attacker <- Set.toList attackers]
-        Monad.unless (null pairs) $ do
-          let add m (b, a) = Map.insertWith Set.union a (Set.singleton b) m
-              merged = List.foldl' add (Combat.blockers (GameState.combat gs2)) pairs
-              -- CR 506.4's comparand for the blockers, alongside the attackers'.
-              -- `pid` for the same reason it is there: every blocker here is one
-              -- legalBlockers offered, which is controllerOf == Just pid (CR
-              -- 509.1a). Unioned, the attackers' entries being already in this map.
-              joined = Map.union (Map.fromList (fmap (\(b, _) -> (b, pid)) pairs)) (Combat.joinedUnder (GameState.combat gs2))
-          State.modify' $ \g -> g {GameState.combat = (GameState.combat g) {Combat.blockers = merged, Combat.joinedUnder = joined}}
-          -- CR 509.1i: the declaration is a trigger event, and CR 509.2a puts what
-          -- it fires onto the stack before the active player gets priority.
-          -- Recorded AFTER the state is written, and over `declaration` rather
-          -- than `merged`, since CR 509.4 makes a creature put onto the
-          -- battlefield blocking never "blocked".
-          --
-          -- TWO events per declaration, split by CR 509.3a against CR 509.3b: one
-          -- BlockerDeclared per PAIR, and one BlocksDeclared per BLOCKING CREATURE.
-          -- The count it carries is CR 509.3e's.
-          State.modify' $ \g -> List.foldl' (\h (blocker, attacker) -> Event.recordEvent (GameEvent.BlockerDeclared (BlockerDeclared.MkBlockerDeclared blocker attacker)) h) g pairs
-          State.modify' $ \g -> List.foldl' (\h (blocker, attackers) -> Event.recordEvent (GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared blocker (Natural.length attackers))) h) g (filter (not . Set.null . snd) (Map.toList declaration))
-          -- CR 509.1h: the same declaration makes each attacker it named a BLOCKED
-          -- creature. One event per attacker rather than per pair, which is CR
-          -- 509.3c's "only once each combat for that creature" -- a real dedup,
-          -- since the defending player can put two blockers on one attacker.
-          --
-          -- CR 509.3c's "only if the attacking creature was an unblocked creature
-          -- at that time" is the difference: an attacker already in Combat.blockers
-          -- does not become blocked a second time. A regression fence rather than a
-          -- proof, Engine running this once per combat.
-          --
-          -- Over `declaration` and not `merged`, which is STRICTER than rule 509.3c
-          -- on the attacking side: an attacker whose only blocker was put onto the
-          -- battlefield blocking really does become blocked, and this misses it.
-          -- Not implemented: any producer that puts a creature onto the battlefield
-          -- blocking (#1387).
-          --
-          -- The defending player rides the event as it rides AttackerDeclared (CR
-          -- 702.130a's afflict is the reader), with `pid` as the fallback.
-          let wasBlocked = Map.keysSet (Combat.blockers (GameState.combat gs2))
-              becameBlocked = Set.difference (Set.fromList (fmap snd pairs)) wasBlocked
-          State.modify'
-            ( \g ->
-                let defendingFor oid = Maybe.fromMaybe pid (Defender.playerOfAttacker oid g)
-                 in List.foldl' (\h attacker -> Event.recordEvent (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked attacker (defendingFor attacker))) h) g (Set.toList becameBlocked)
-            )
-    -- CR 509.1h's other half, performed once CR 509.1g has assigned the blockers:
-    -- every attacking creature the declaration named no blockers for became an
-    -- UNBLOCKED creature. TriggerCondition.SelfAttacksUnblocked is the reader.
-    --
-    -- OUTSIDE the loop above, and the placement is the point: that loop is guarded
-    -- three times over, and a board where nobody can block trips all three --
-    -- exactly the board on which every attacker is unblocked. Rule 509.1h carries
-    -- no such condition.
-    --
-    -- Recorded ONCE and never sampled again -- the rule's last sentence keeps an
-    -- attacker blocked after every creature blocking it leaves combat, and
-    -- TriggerSpec's "losing every blocker does not make the Eternal unblocked"
-    -- proves that timing. Testing the KEY rather than the set is isBlocked's own
-    -- reading, but a regression fence here: swapping the two leaves the suite
-    -- green.
-    State.modify' $ \g ->
-      let c = GameState.combat g
-          unblocked = filter (\oid -> not (Map.member oid (Combat.blockers c))) (Map.keys (Combat.attackers c))
-       in List.foldl' (\h oid -> Event.recordEvent (GameEvent.AttackerUnblocked oid) h) g unblocked
+        if not paid && again
+          then attemptBlockDeclaration pid attacking (Set.insert chosen rejected)
+          else do
+            let declaration = if paid then legal else forcedBlockDeclaration pid gs2
+            -- The pairs the declaration states, blocker-major, which is the order
+            -- CR 509.1a writes it in and the order the events below are recorded in.
+            let pairs = [(blocker, attacker) | (blocker, attackers) <- Map.toList declaration, attacker <- Set.toList attackers]
+            Monad.unless (null pairs) $ do
+              let add m (b, a) = Map.insertWith Set.union a (Set.singleton b) m
+                  merged = List.foldl' add (Combat.blockers (GameState.combat gs2)) pairs
+                  -- CR 506.4's comparand for the blockers, alongside the attackers'.
+                  -- `pid` for the same reason it is there: every blocker here is one
+                  -- legalBlockers offered, which is controllerOf == Just pid (CR
+                  -- 509.1a). Unioned, the attackers' entries being already in this map.
+                  joined = Map.union (Map.fromList (fmap (\(b, _) -> (b, pid)) pairs)) (Combat.joinedUnder (GameState.combat gs2))
+              State.modify' $ \g -> g {GameState.combat = (GameState.combat g) {Combat.blockers = merged, Combat.joinedUnder = joined}}
+              -- CR 509.1i: the declaration is a trigger event, and CR 509.2a puts what
+              -- it fires onto the stack before the active player gets priority.
+              -- Recorded AFTER the state is written, and over `declaration` rather
+              -- than `merged`, since CR 509.4 makes a creature put onto the
+              -- battlefield blocking never "blocked".
+              --
+              -- TWO events per declaration, split by CR 509.3a against CR 509.3b: one
+              -- BlockerDeclared per PAIR, and one BlocksDeclared per BLOCKING CREATURE.
+              -- The count it carries is CR 509.3e's.
+              State.modify' $ \g -> List.foldl' (\h (blocker, attacker) -> Event.recordEvent (GameEvent.BlockerDeclared (BlockerDeclared.MkBlockerDeclared blocker attacker)) h) g pairs
+              State.modify' $ \g -> List.foldl' (\h (blocker, attackers) -> Event.recordEvent (GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared blocker (Natural.length attackers))) h) g (filter (not . Set.null . snd) (Map.toList declaration))
+              -- CR 509.1h: the same declaration makes each attacker it named a BLOCKED
+              -- creature. One event per attacker rather than per pair, which is CR
+              -- 509.3c's "only once each combat for that creature" -- a real dedup,
+              -- since the defending player can put two blockers on one attacker.
+              --
+              -- CR 509.3c's "only if the attacking creature was an unblocked creature
+              -- at that time" is the difference: an attacker already in Combat.blockers
+              -- does not become blocked a second time. A regression fence rather than a
+              -- proof, Engine running this once per combat.
+              --
+              -- Over `declaration` and not `merged`, which is STRICTER than rule 509.3c
+              -- on the attacking side: an attacker whose only blocker was put onto the
+              -- battlefield blocking really does become blocked, and this misses it.
+              -- Not implemented: any producer that puts a creature onto the battlefield
+              -- blocking (#1387).
+              --
+              -- The defending player rides the event as it rides AttackerDeclared (CR
+              -- 702.130a's afflict is the reader), with `pid` as the fallback.
+              let wasBlocked = Map.keysSet (Combat.blockers (GameState.combat gs2))
+                  becameBlocked = Set.difference (Set.fromList (fmap snd pairs)) wasBlocked
+              State.modify'
+                ( \g ->
+                    let defendingFor oid = Maybe.fromMaybe pid (Defender.playerOfAttacker oid g)
+                     in List.foldl' (\h attacker -> Event.recordEvent (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked attacker (defendingFor attacker))) h) g (Set.toList becameBlocked)
+                )

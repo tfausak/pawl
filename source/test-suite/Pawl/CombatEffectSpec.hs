@@ -2758,6 +2758,27 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
     Spec.assertEqWith s "and nothing is attacking" (Combat.Type.attackers (GameState.combat after)) Map.empty
     Spec.assertBool s (allUntapped forests after) "the Forests are untapped again"
     Spec.assertBool s (allUntapped mine after) "CR 508.1f's tapping was undone too"
+  Spec.it s "CR 508.1 the rewound declaration is made again: two Pikers under a Ghostly Prison become one" $ do
+    -- The case directly above's board, answered by a player rather than by a
+    -- machine that repeats itself. CR 508.1's preamble returns the game to the
+    -- moment before the declaration, and the declaration is still owed -- so the
+    -- active player declares again, normally the smaller attack they can afford.
+    -- Where the case above ends with nothing attacking, this one ends with one
+    -- Piker attacking and one Forest to spare.
+    --
+    -- THREE Forests is load-bearing: at two the leftover Forest cannot be read,
+    -- and at four the first declaration is affordable and the two readings of the
+    -- preamble agree.
+    prison <- S.printingOf s registry "Ghostly Prison"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, forests) = imprisoning prison forest S.bob [piker, piker] 3
+        ((_, after), asked) = State.runState (Engine.runGame retryAttackAnswer gs (Combat.declareAttackers S.alice)) 0
+        declared = S.attackerDeclarationsOf after
+    Spec.assertEqWith s "CR 508.1: exactly one Piker attacks, where the rewind alone left none" (length declared) 1
+    Spec.assertBool s (all (\oid -> List.elem oid mine) declared) "and it is one of alice's two"
+    Spec.assertEqWith s "CR 508.1j: the second declaration owes {2}, so one Forest is left" (length (filter (\oid -> tapStateOf oid after == Just TapState.Untapped) forests)) 1
+    Spec.assertEqWith s "CR 508.1's preamble asked for a fresh declaration" asked 2
   Spec.it s "CR 109.5 a Ghostly Prison its own controller is attacking WITH taxes nothing" $ do
     -- The direction, which is the whole of the "you": alice controls the Prison
     -- and attacks bob, so nothing is attacking alice and no cost is owed. An
@@ -2978,6 +2999,34 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
     Spec.assertEqWith s "and nothing is attacking" (Combat.Type.attackers (GameState.combat after)) Map.empty
     Spec.assertBool s (allUntapped mine after) "CR 508.1f's tapping was undone too"
 
+-- Declares every candidate the FIRST time CR 508.1a is asked and the first
+-- candidate alone the second, counting the asks in its state. Stateful because a
+-- pure `Prompt r -> r` cannot tell the two asks apart: it repeats the answer CR
+-- 508.1's preamble just rewound, which is the path the case beside this one's
+-- covers. Pinned by position rather than by affordability, so a mutation that
+-- breaks the retry cannot be repaired by the answerer looking for a legal answer.
+retryAttackAnswer :: Prompt.Prompt r -> State.State Natural r
+retryAttackAnswer p = case p of
+  Prompt.DeclareAttackers _ _ candidates -> do
+    asked <- State.get
+    State.put (asked + 1)
+    pure (if asked == 0 then candidates else take 1 candidates)
+  _ -> pure (S.identityAnswer p)
+
+-- retryAttackAnswer's twin for CR 509.1a: every candidate blocks the first
+-- attacker on the first ask, and only `keep` does on the second.
+retryBlockAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State Natural r
+retryBlockAnswer keep p = case p of
+  Prompt.DeclareBlockers _ _ mine attackers -> do
+    asked <- State.get
+    State.put (asked + 1)
+    pure $ case attackers of
+      [] -> Map.empty
+      a : _ ->
+        let blocking = if asked == 0 then mine else filter (\oid -> oid == keep) mine
+         in Map.fromList (fmap (\b -> (b, Set.singleton a)) blocking)
+  _ -> pure (S.identityAnswer p)
+
 -- `n` untapped Forests under `who`'s control, ids first. addForests with the
 -- payer as an argument: CR 509.1f's payer is the DEFENDING player, where CR
 -- 508.1j's is the active one, so a cost to block is paid out of bob's lands.
@@ -3057,6 +3106,27 @@ blockCostSpec s registry = Spec.describe s "BlockCosts" $ do
         Spec.assertEqWith s "nothing is blocking the attacker" (blockersOf attacker after) Set.empty
         Spec.assertBool s (allUntapped forests after) "and the Forests are untapped"
       _ -> Spec.assertFailure s "fixture should have one attacker and one blocker"
+  Spec.it s "CR 509.1 the rewound declaration is made again: the taxed blocker is dropped and the free one blocks" $ do
+    -- attackCostSpec's retry case on the blocking side, CR 509.1's preamble being
+    -- word for word CR 508.1's. Two blockers, exactly one of them enchanted, and
+    -- two Forests -- so the pair costs {3} and cannot be paid, while the untaxed
+    -- blocker alone costs nothing.
+    --
+    -- TWO blockers, one untaxed, is load-bearing: with a single taxed blocker
+    -- there is no smaller legal declaration and both readings of the preamble
+    -- agree on Set.empty.
+    rays <- S.printingOf s registry "Oppressive Rays"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker] [piker, piker]
+    case (mine, theirs) of
+      ([attacker], [taxed, free]) -> do
+        let (forests, board) = addForestsFor S.bob forest 2 (raying rays taxed gs)
+            ((_, after), asked) = State.runState (Engine.runGame (retryBlockAnswer free) board Combat.declareBlockers) 0
+        Spec.assertEqWith s "CR 509.1: the untaxed blocker blocks, where the rewind alone left the attacker unblocked" (blockersOf attacker after) (Set.singleton free)
+        Spec.assertBool s (allUntapped forests after) "CR 509.1f: the second declaration owes nothing, so no Forest was tapped"
+        Spec.assertEqWith s "CR 509.1's preamble asked for a fresh declaration" asked 2
+      _ -> Spec.assertFailure s "fixture should have one attacker and two blockers"
   Spec.it s "CR 509.1d the total is per CREATURE, not per pair: a Palace Guard blocking two owes {3} once" $ do
     -- CR 509.1d totals the cost over the CHOSEN CREATURES, and Palace Guard blocks
     -- any number of attackers -- so one taxed creature blocking two attackers owes
@@ -3830,6 +3900,67 @@ conditionalAttackRequirementSpec s registry = Spec.describe s "ConditionalAttack
         Spec.assertBool s (Combat.legalAttackDeclaration S.alice [required] under) "and attacking with it is legal either way"
       _ -> Spec.assertFailure s "fixture should have one Juggernaut"
 
+-- Declines CR 508.1a's declaration the first time and declares everything the
+-- second, counting the asks. The first answer is ILLEGAL rather than
+-- unaffordable, which is CR 508.1's preamble reached through CR 508.1d instead of
+-- through CR 508.1j.
+declineThenAttackAnswer :: Prompt.Prompt r -> State.State Natural r
+declineThenAttackAnswer p = case p of
+  Prompt.DeclareAttackers _ _ candidates -> do
+    asked <- State.get
+    State.put (asked + 1)
+    pure (if asked == 0 then [] else candidates)
+  _ -> pure (S.identityAnswer p)
+
+-- declineThenAttackAnswer's twin for CR 509.1a: no blocks the first time, every
+-- candidate on the first attacker the second.
+declineThenBlockAnswer :: Prompt.Prompt r -> State.State Natural r
+declineThenBlockAnswer p = case p of
+  Prompt.DeclareBlockers _ _ mine attackers -> do
+    asked <- State.get
+    State.put (asked + 1)
+    pure $ case attackers of
+      [] -> Map.empty
+      a : _ ->
+        if asked == 0
+          then Map.empty
+          else Map.fromList (fmap (\b -> (b, Set.singleton a)) mine)
+  _ -> pure (S.identityAnswer p)
+
+-- CR 508.1's and CR 509.1's preambles reached through the ILLEGAL-declaration
+-- clauses (CR 508.1c/508.1d, CR 509.1b/509.1c) rather than through the payment
+-- clauses -- both end "the declaration ... is illegal", so both take the same
+-- rewind, and attackCostSpec's and blockCostSpec's retry cases are the payment
+-- half of the same behaviour.
+--
+-- Each board is chosen so the ceiling's own declaration is SMALLER than the one
+-- the player then makes: a requirement over one creature leaves several
+-- declarations attaining CR 508.1d's maximum, and forcedAttackDeclaration takes
+-- the smallest. An engine that substituted the ceiling rather than asking again
+-- would send one creature where two were declared.
+declarationRetrySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+declarationRetrySpec s registry = Spec.describe s "DeclarationRetry" $ do
+  Spec.it s "CR 508.1d an illegal declaration is rewound and asked again, not replaced by the ceiling's" $ do
+    berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [berserkers, piker] []
+        ((_, after), asked) = State.runState (Engine.runGame declineThenAttackAnswer gs (Combat.declareAttackers S.alice)) 0
+    Spec.assertEqWith s "CR 508.1: both creatures attack, where the ceiling's declaration sends the Berserkers alone" (Set.fromList (S.attackerDeclarationsOf after)) (Set.fromList mine)
+    Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] gs)) "declining really is illegal, so the first answer really was rewound"
+    Spec.assertBool s (all (\oid -> Combat.legalAttackDeclaration S.alice [oid] gs) (take 1 mine)) "and the Berserkers alone attains the maximum, so the ceiling stops there"
+    Spec.assertEqWith s "CR 508.1's preamble asked for a fresh declaration" asked 2
+  Spec.it s "CR 509.1c an illegal declaration is rewound and asked again, not replaced by the ceiling's" $ do
+    screen <- S.printingOf s registry "Razorgrass Screen"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker] [screen, piker]
+    case mine of
+      [attacker] -> do
+        let ((_, after), asked) = State.runState (Engine.runGame declineThenBlockAnswer gs Combat.declareBlockers) 0
+        Spec.assertEqWith s "CR 509.1: both creatures block, where the ceiling's declaration sends the Screen alone" (blockersOf attacker after) (Set.fromList theirs)
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty gs)) "declining really is illegal, so the first answer really was rewound"
+        Spec.assertEqWith s "CR 509.1's preamble asked for a fresh declaration" asked 2
+      _ -> Spec.assertFailure s "fixture should have one attacker"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   combatLegalitySpec s registry
@@ -3856,5 +3987,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   attackCostSpec s registry
   alluringSirenSpec s registry
   conditionalAttackRequirementSpec s registry
+  declarationRetrySpec s registry
   blockCostSpec s registry
   exertSpec s registry
