@@ -266,6 +266,7 @@ leylineShape src ts =
       ActiveReplacement.expiry = Expiry.Never,
       ActiveReplacement.uses = Uses.Unlimited,
       ActiveReplacement.origin = ReplacementOrigin.Other,
+      ActiveReplacement.condition = Nothing,
       ActiveReplacement.rider = Nothing,
       ActiveReplacement.slots = Map.empty
     }
@@ -3419,6 +3420,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
               ActiveReplacement.expiry = Expiry.AtCleanup,
               ActiveReplacement.uses = Uses.Once,
               ActiveReplacement.origin = ReplacementOrigin.Other,
+              ActiveReplacement.condition = Nothing,
               ActiveReplacement.rider = Nothing,
               ActiveReplacement.slots = Map.empty
             }
@@ -3494,6 +3496,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   fatigueSpec s registry
   stonehornSpec s registry
   galvanicBlastSpec s registry
+  voltaicSurgeSpec s registry
   mendingHandsSpec s registry
   healingGraceSpec s registry
   testOfFaithSpec s registry
@@ -3689,9 +3692,10 @@ galvanicBlastSpec s registry =
       let (gs, spellId) = metalcraftBoard mountain myr galvanicBlast 2 []
           after = castAndResolve atBob gs spellId
       Spec.assertEqWith s "bob takes 2" (S.lifeOf S.bob after) (Just 18)
-      -- The condition was false, so the clause created NOTHING -- not a floating
-      -- row that failed to apply. An unspent row would be the visible difference.
-      Spec.assertEqWith s "and no replacement was installed at all" (GameState.replacements after) []
+      -- CR 614.1: the row IS installed and simply does not apply, its clause
+      -- being false when the damage would happen (voltaicSurgeSpec below is
+      -- where that separation is observable). Unspent, since it never applied.
+      Spec.assertEqWith s "the row is installed but unapplied" (length (GameState.replacements after)) 1
     -- The discriminating twin: one more artifact, everything else identical.
     --
     -- The FOUR-artifact leg is what makes this a Comparison.AtLeast test rather
@@ -3787,6 +3791,99 @@ galvanicBlastSpec s registry =
           hit src = S.runPure S.identityAnswer armed (Damage.applyDamage [DamageEvent.MkDamageEvent src (Recipient.ToCreature victim) 2 False False False 0 Nothing DamageKind.Noncombat])
       Spec.assertEqWith s "its own source's 2 becomes 4" (S.damageOf victim (hit mine)) (Just 4)
       Spec.assertEqWith s "another source's 2 stays 2" (S.damageOf victim (hit theirs)) (Just 2)
+
+-- Synthetic Voltaic Surge {1}{R} Instant: "Until end of turn, if a source you
+-- control would deal damage to a permanent or player and you control three or
+-- more artifacts, it deals double that damage to that permanent or player
+-- instead." A floating (CR 614.3) row with a stated duration whose printed "if"
+-- is separated from the resolution that installed it, which is what makes CR
+-- 614.1's "they aren't locked in ahead of time" observable: the clause is asked
+-- as the damage would happen, not when the row was created.
+--
+-- SYNTHETIC because the shape has no printing. The clause and the rewrite are
+-- both taken from cards that do print them -- Anthem of Rakdos ("if a source you
+-- control would deal damage to a permanent or player, it deals double that
+-- damage . . . instead") and Galvanic Blast's metalcraft count -- and what no
+-- card puts together is that pair with a DURATION. Scryfall, 2026-08-21:
+-- `(t:instant or t:sorcery) o:"this turn" o:"instead" o:"if you"`,
+-- `o:"this turn" o:"would" o:"instead" o:"as long as"`,
+-- `o:"this turn" o:"would" o:"instead" (o:"only while" or o:"only as long as" or
+-- o:"only if you")` and `o:"the next time" o:"would" o:"instead" o:"if"` return
+-- only two families: one-shot spells whose "if" is settled inside their own
+-- resolution (Galvanic Blast, Cackling Flames, Twinstrike, Winds of Qal Sisma)
+-- and permanents whose "as long as" rides a static ability (Anthem of Rakdos,
+-- Aether Revolt, Jared Carthalion). A printing of either family with a stated
+-- duration would refute this and replace the synthetic.
+--
+-- Bonesplitter is the artifact, NOT Darksteel Myr: the case below destroys one to
+-- turn the clause off, and rule 702.12b would refuse. Unattached it modifies
+-- nothing, so the board reads only its count.
+--
+-- Firebolt deals 2, so bob's life tells the two readings apart at every step: 20,
+-- then 18 (printed) or 16 (doubled), then 14 either way is the coincidence this
+-- avoids by asserting the intermediate.
+surgeBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (GameState.GameState, ObjectId.ObjectId, [ObjectId.ObjectId], [ObjectId.ObjectId])
+surgeBoard mountain splitter surge firebolt artifacts =
+  let base = S.landsFor mountain S.alice 5 (Setup.emptyGame S.bothPlayers)
+      addArtifact (ids, g) _ = let (oid, g') = S.addCreature splitter S.alice g in (ids <> [oid], g')
+      (splitters, g1) = List.foldl' addArtifact ([], base) [1 .. artifacts]
+      (surgeId, g2) = S.addHandCard surge S.alice g1
+      addBolt (ids, g) _ = let (oid, g') = S.addHandCard firebolt S.alice g in (ids <> [oid], g')
+      (bolts, g3) = List.foldl' addBolt ([], g2) [1 :: Int, 2]
+   in ( g3
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          },
+        surgeId,
+        bolts,
+        splitters
+      )
+
+voltaicSurgeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+voltaicSurgeSpec s registry =
+  Spec.describe s "Synthetic Voltaic Surge (CR 614.1)" $ do
+    let board artifacts = do
+          mountain <- S.printingOf s registry "Mountain"
+          splitter <- S.printingOf s registry "Bonesplitter"
+          surge <- S.printingOf s registry "Synthetic Voltaic Surge"
+          firebolt <- S.printingOf s registry "Firebolt"
+          pure (splitter, surgeBoard mountain splitter surge firebolt artifacts)
+    -- THE PROVING TEST. The clause is true when the row is installed and false
+    -- when the second Firebolt would be doubled, and NOTHING removed the row: a
+    -- gate read at installation doubles both, and a row that was swept would
+    -- leave GameState.replacements empty.
+    Spec.it s "CR 614.1 the clause is re-asked, so losing an artifact turns the row off without removing it" $ do
+      (_, (gs, surgeId, bolts, splitters)) <- board 3
+      case (bolts, splitters) of
+        ([first_, second], doomed : _) -> do
+          let armed = castAndResolve atBob gs surgeId
+              doubled = castAndResolve atBob armed first_
+              shrunk = S.runPure S.identityAnswer doubled (Event.destroy Regenerability.Regenerable [doomed])
+              after = castAndResolve atBob shrunk second
+          Spec.assertEqWith s "the first Firebolt is doubled while alice controls three artifacts" (S.lifeOf S.bob doubled) (Just 16)
+          Spec.assertEqWith s "the second lands at its printed 2 once one artifact is gone" (S.lifeOf S.bob after) (Just 14)
+          -- By NAME rather than by a controls-count: alice owns every artifact
+          -- on this board, so S.countOnBattlefieldByName's owner index answers
+          -- the control question too (see Pawl.Support).
+          Spec.assertEqWith s "setup: alice is down to two artifacts" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Bonesplitter")) S.alice shrunk) 2
+          Spec.assertEqWith s "and the row is still installed -- it stopped applying, it was not removed" (length (GameState.replacements after)) 1
+        _ -> Spec.assertFailure s "fixture should hold two Firebolts and three artifacts"
+    -- The other direction, and the one a gate read at installation cannot reach
+    -- at all: the clause is FALSE as the spell resolves, so the old reading
+    -- installed nothing and no later board could turn it on.
+    Spec.it s "CR 614.1 a row installed while its clause was false applies once the clause turns true" $ do
+      (splitter, (gs, surgeId, bolts, _)) <- board 2
+      case bolts of
+        [first_, second] -> do
+          let armed = castAndResolve atBob gs surgeId
+              printed = castAndResolve atBob armed first_
+              grown = snd (S.addCreature splitter S.alice printed)
+              after = castAndResolve atBob grown second
+          Spec.assertEqWith s "the first Firebolt lands at its printed 2" (S.lifeOf S.bob printed) (Just 18)
+          Spec.assertEqWith s "the third artifact turns the clause on, so the second is doubled" (S.lifeOf S.bob after) (Just 14)
+          Spec.assertEqWith s "setup: the row was installed though its clause was false" (length (GameState.replacements armed)) 1
+        _ -> Spec.assertFailure s "fixture should hold two Firebolts"
 
 -- How many battlefield permanents `pid` CONTROLS are printed with this name. NOT
 -- S.countOnBattlefieldByName, which counts by OWNER (Game.zoneMembers filters the
@@ -4277,6 +4374,7 @@ blastShape src ts =
       ActiveReplacement.expiry = Expiry.Never,
       ActiveReplacement.uses = Uses.Unlimited,
       ActiveReplacement.origin = ReplacementOrigin.SelfReplacement,
+      ActiveReplacement.condition = Nothing,
       ActiveReplacement.rider = Nothing,
       ActiveReplacement.slots = Map.empty
     }

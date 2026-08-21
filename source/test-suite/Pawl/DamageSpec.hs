@@ -321,6 +321,7 @@ damageSpec s registry =
                 ActiveReplacement.expiry = Expiry.Type.AtCleanup,
                 ActiveReplacement.uses = Uses.Unlimited,
                 ActiveReplacement.origin = ReplacementOrigin.Other,
+                ActiveReplacement.condition = Nothing,
                 ActiveReplacement.rider = Nothing,
                 ActiveReplacement.slots = Map.empty
               }
@@ -342,6 +343,7 @@ damageSpec s registry =
                 ActiveReplacement.expiry = Expiry.Type.AtCleanup,
                 ActiveReplacement.uses = Uses.Unlimited,
                 ActiveReplacement.origin = ReplacementOrigin.Other,
+                ActiveReplacement.condition = Nothing,
                 ActiveReplacement.rider = Nothing,
                 ActiveReplacement.slots = Map.empty
               }
@@ -577,6 +579,7 @@ toxicSpec s registry =
                 ActiveReplacement.expiry = Expiry.Type.AtCleanup,
                 ActiveReplacement.uses = Uses.Unlimited,
                 ActiveReplacement.origin = ReplacementOrigin.Other,
+                ActiveReplacement.condition = Nothing,
                 ActiveReplacement.rider = Nothing,
                 ActiveReplacement.slots = Map.empty
               }
@@ -706,6 +709,7 @@ lifelinkSpec s registry =
                 ActiveReplacement.expiry = Expiry.Type.AtCleanup,
                 ActiveReplacement.uses = Uses.Unlimited,
                 ActiveReplacement.origin = ReplacementOrigin.Other,
+                ActiveReplacement.condition = Nothing,
                 ActiveReplacement.rider = Nothing,
                 ActiveReplacement.slots = Map.empty
               }
@@ -2800,6 +2804,7 @@ fightSpec s registry = Spec.describe s "Fight (CR 701.14)" $ do
               ActiveReplacement.expiry = Expiry.Type.AtCleanup,
               ActiveReplacement.uses = Uses.Unlimited,
               ActiveReplacement.origin = ReplacementOrigin.Other,
+              ActiveReplacement.condition = Nothing,
               ActiveReplacement.rider = Nothing,
               ActiveReplacement.slots = Map.empty
             }

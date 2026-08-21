@@ -33,7 +33,8 @@ spec s = Spec.describe s "Pawl.Codec.Replace" $ do
           }
       )
       " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"uses\":{\"type\":\"Once\"},\"origin\":{\"type\":\"Other\"},\"effect\":{\"type\":\"DestructionR\",\"value\":{\"type\":\"Regenerate\"}}} "
-  -- CR 614.15: Galvanic Blast's metalcraft gate, the case that writes the key.
+  -- CR 614.15 / 614.1: Galvanic Blast's metalcraft clause, the case that writes
+  -- the key.
   Spec.it s "MkReplace, condition written" $
     Common.assertCodec
       s

@@ -3,6 +3,7 @@ module Pawl.Types.ActiveReplacement where
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -71,6 +72,23 @@ data ActiveReplacement = MkActiveReplacement
     expiry :: Expiry.Expiry,
     uses :: Uses.Uses,
     origin :: ReplacementOrigin.ReplacementOrigin,
+    -- | The printed "if" the installing clause carried (Pawl.Types.Replace's own
+    -- field), travelling with the row rather than gating whether it was
+    -- installed. CR 614.1: a replacement effect is not locked in ahead of time,
+    -- so its applicability is asked as the event would happen --
+    -- Pawl.Engine.Replacement.collect drops a row whose clause is false, and the
+    -- row stays in GameState.replacements to be asked again.
+    --
+    -- The SAME posture Pawl.Types.PrintedReplacement.condition takes on a
+    -- permanent's static ability, and asked against the same board
+    -- (Pawl.Engine.Projection.replacementsOf). What differs is CR 109.5's "you":
+    -- `controller` above is baked, so a floating clause's "you" survives the
+    -- resolution that is about to end.
+    --
+    -- Nothing on every row the engine bakes: only Pawl.Types.Effect's Replace
+    -- opcode carries a printed clause, and every other installer here writes its
+    -- pattern out in full.
+    condition :: Maybe Condition.Condition,
     -- | CR 615.5's additional effect for a FLOATING row: Nothing on every row
     -- but a shield installed by one of the two prevention opcodes whose rider is
     -- non-empty. Copied forward to Pawl.Types.ReplacementCandidate and then to
