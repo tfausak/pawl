@@ -1173,14 +1173,14 @@ liveAfterLayers setEffs oid gs =
 
 -- CR 305.7's strip, asked of ONE ability rather than of the whole permanent: does
 -- a subtype-setting effect reach `oid` by the time layer 4 has finished? The
--- caller pairs it with CR 613.6 -- see permanentParts -- so only an ability whose
--- effect had not yet started applying is stripped by this.
+-- caller pairs it with CR 613.6 -- see permanentParts' `removed` -- so only an
+-- ability whose effect had not yet started applying is stripped by this.
 --
 -- The membership test reads the projection THROUGH layer 4 (inclusive), which is
 -- the whole point: a permanent another effect animated into a land is one CR
 -- 305.7 reaches, and base characteristics cannot see that. Bounded there rather
 -- than at the finished projection because CR 613.1d is where a setter applies;
--- WHICH setters apply is still appliedSetEffects', judged against base.
+-- WHICH setters apply is still appliedSetEffects's question, judged against base.
 --
 -- Not a fixpoint: the candidate list is gather's SEED pass, built with every
 -- ability gate wired open, so the projection behind this gate never re-enters it.
@@ -2116,16 +2116,17 @@ permanentParts stripped functioning setEffs setStripped gs permId = case Game.lo
           -- CR 612: rewrite each static ability's subtype words by the text
           -- changes affecting THIS source, before its effect is folded on.
           let changes = textChangesAffecting permId gs
+              -- CR 613.1f's layer-6 removal and CR 305.7's layer-4 strip, asked
+              -- of ONE ability at CR 613.6's decision point rather than of the
+              -- permanent as a whole. Each spares an ability whose effect had
+              -- ALREADY started applying when the stripper did: rule 613.6 keeps
+              -- such an effect applying even though the ability generating it is
+              -- gone. An ability deciding AT layer 4 is spared here and left to
+              -- the base-characteristics gate above, which is CR 613.8's order
+              -- for it -- see liveGiven.
+              removed lowest = (lowest > Layer.Ability && stripped permId) || (lowest > Layer.Type && setStripped permId)
               -- One thunk per permanent, shared by all its abilities. Bound
               -- here, OUTSIDE the zipWith, which is what shares it.
-              -- CR 613.1f's layer-6 removal and CR 305.7's layer-4 strip, asked
-              -- of one ability at CR 613.6's decision point. Each spares an
-              -- ability whose effect had ALREADY started applying when the
-              -- stripper did: rule 613.6 keeps such an effect applying even
-              -- though the ability generating it is gone. An ability deciding AT
-              -- layer 4 is spared here and left to the base-characteristics gate
-              -- above, which is CR 613.8's order for it -- see setSubtypeStripped.
-              removed lowest = (lowest > Layer.Ability && stripped permId) || (lowest > Layer.Type && setStripped permId)
               partsOf = gatherStatic (functioning permId) permId (Object.timestamp permObj) changes removed
               -- CR 113.6b, applied WITHOUT disturbing the index: `n` is the key
               -- half of CR 613.6's decision memo and Pawl.Engine.Event's
