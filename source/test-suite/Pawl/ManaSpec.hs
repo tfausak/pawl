@@ -1094,6 +1094,71 @@ towerBoard tower victim =
         Just printing -> snd (S.addCreature printing S.alice g1)
    in g2 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
 
+-- CR 605.3a's two windows, gated by the "activate only ..." rider CR 602.5 makes
+-- a prohibition. Synthetic Ember Spring is the producer -- "{T}: Add {R}.
+-- Activate only during your upkeep", CR 500.1's window under CR 102.1's scope --
+-- and CR 605.1's own sentence is why a rider leaves it a mana ability: an
+-- ability is one "regardless of ... what timing restrictions ... they may have".
+--
+-- SYNTHETIC because no printing reaches the rule today, not because none prints
+-- the rider. Scryfall `o:"Activate only" o:"Add {"`, 2026-08-21: Grinning Ignus
+-- is the one printing whose mana ability carries a rider this vocabulary can say
+-- ("Activate only as a sorcery"), and its activation cost holds MANA, which the
+-- supply model does not model (#1120), plus a "return this to its owner's hand"
+-- component the cost vocabulary lacks (#2005). Lavinia, Foil to Conspiracy and
+-- Vivi Ornitier name a turn with no phase (#520); every other hit rides on
+-- "only once each turn" or "only if <condition>", neither of which
+-- Pawl.Types.ActivationRestriction can say. Grinning Ignus replaces this card
+-- when the first two land.
+--
+-- The two cases below are the SAME board at two moments, and the phase is the
+-- one thing that differs. That is what makes the pair a proof about the rider
+-- rather than about the fixture -- and the phase, unlike CR 307.5's sorcery
+-- window, cannot change under a caster's feet between the offer and the payment
+-- (CR 500.12).
+riderWindowSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+riderWindowSpec s registry = Spec.describe s "CR 605.3a a printed rider gates both windows" $ do
+  Spec.it s "CR 500.1 the priority window offers the source only inside the rider's step" $ do
+    spring <- S.printingOf s registry "Synthetic Ember Spring"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (inUpkeep, _) = springBoard spring bolt
+        inMain = inUpkeep {GameState.phase = Phase.PrecombatMain}
+        floated gs = poolTypes S.alice (S.runPure tapEverything gs Engine.priorityLoop)
+        offers gs = filter isManaActivation (Action.legalActions S.alice gs)
+    Spec.assertEqWith s "in her upkeep the rider admits it and {R} floats" (floated inUpkeep) [ManaType.Colored Color.Red]
+    Spec.assertEqWith s "in her main phase the same board floats nothing" (floated inMain) []
+    Spec.assertEqWith s "the menu it was taken from carries the one offer" (length (offers inUpkeep)) 1
+    Spec.assertEqWith s "and carries none outside the window" (length (offers inMain)) 0
+
+  -- CR 605.3a's other window: the same rider asked while a payment is in flight,
+  -- reached through Cast.castSpell rather than through the action menu, so
+  -- neither assertion here can be passing on the offer above.
+  Spec.it s "CR 605.3a the payment window refuses the same source outside the rider's step" $ do
+    spring <- S.printingOf s registry "Synthetic Ember Spring"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (inUpkeep, boltId) = springBoard spring bolt
+        inMain = inUpkeep {GameState.phase = Phase.PrecombatMain}
+        afterCast gs = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice boltId))
+        inHand gs = elem boltId (Game.zoneMembers Zone.Hand S.alice gs)
+    Spec.assertBool s (not (inHand (afterCast inUpkeep))) "CR 601.2a inside the window the Bolt is cast, leaving her hand"
+    Spec.assertBool s (inHand (afterCast inMain)) "CR 601.2h outside it the payment fails and the Bolt stays in her hand"
+    Spec.assertEqWith s "the Spring paid inside the window" (S.tappedCount S.alice (afterCast inUpkeep)) 1
+    Spec.assertEqWith s "and paid nothing outside it" (S.tappedCount S.alice (afterCast inMain)) 0
+    Spec.assertEqWith s "nothing reached the stack outside it" (length (GameState.stack (afterCast inMain))) 0
+    -- The OFFER, asked of the same two boards: a cast the payment window cannot
+    -- pay for is one the gate does not offer either. Both windows read
+    -- Cost.manaActivations, so a divergence here would be a divergence in one
+    -- predicate.
+    Spec.assertEqWith s "CR 118.3 the cast gate agrees with the payment at both moments" (fmap (S.castable S.alice boltId) [inUpkeep, inMain]) [True, False]
+
+-- alice, active, with one Synthetic Ember Spring untapped and one Lightning Bolt
+-- in hand, in her upkeep and going nowhere -- an empty `remaining` pins the
+-- phase, so the loop above cannot wander into a step the rider admits.
+springBoard :: Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId)
+springBoard spring bolt =
+  let (gs, oid) = S.boltInHand spring bolt 1 (Phase.Beginning BeginningStep.Upkeep)
+   in (gs {GameState.remaining = Seq.empty}, oid)
+
 isManaActivation :: Action.Type.Action -> Bool
 isManaActivation action = case action of
   Action.Type.ActivateManaAbility _ -> True
@@ -2905,6 +2970,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   upwellingSpec s registry
   omnathSpec s registry
   priorityWindowSpec s registry
+  riderWindowSpec s registry
   snowSpec s registry
   snowSymbolSpec s registry
   wellspringSpec s registry
