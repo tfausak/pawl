@@ -2045,6 +2045,10 @@ couldEnchantSpec s registry = Spec.describe s "CouldEnchant" $ do
             []
         strengthName = S.nameOf (Printing.card strength)
         consecrateName = S.nameOf (Printing.card consecrate)
+        -- Read off `gs`, the PRE-run board: every candidate a library search
+        -- offers is an object that was already there and has not moved, so its
+        -- id still names it -- which the found card's would not, CR 400.7 having
+        -- minted a fresh one.
         named = fmap (Maybe.mapMaybe (fmap Face.name . flip Game.faceOf gs))
     Spec.assertEqWith s "before: nothing of alice's is enchanted" (S.countOnBattlefieldByName strengthName S.alice gs) 0
     case battlefieldNamed (S.nameOf (Printing.card mage)) after of

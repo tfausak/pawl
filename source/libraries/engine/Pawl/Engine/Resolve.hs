@@ -2913,6 +2913,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     --
     -- The context has no perspective (CR 109.5): a search filter never
     -- references a player, so ControlledBy is vacuously False.
+    --
     -- CR 701.3a: one candidate's VIEW carries the field no projection can fill --
     -- whether the CANDIDATE could legally be attached to the object this
     -- instruction fixes (Auratouched Mage's "an Aura card that could enchant
@@ -5206,6 +5207,11 @@ putFound searcher source destination cardId = case destination of
   -- Supplying a seed at all is what keeps CR 303.4f's host prompt out of this
   -- move: the effect DOES specify what the Aura will enchant, so its controller
   -- chooses nothing.
+  --
+  -- CR 110.2a: it enters under the SEARCHER, the player whose effect is putting
+  -- it there -- not under its owner, which is what the other arms' Event.changeZone
+  -- leaves it to, since none of them puts anything onto the battlefield for
+  -- someone other than its owner.
   --
   -- Nothing is CR 303.4i's "the Aura remains in its current zone" -- unreachable
   -- from a filter naming Filter.CanAttachToSubject, since that atom is this same
