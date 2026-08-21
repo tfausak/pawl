@@ -87,9 +87,11 @@ data ManaSymbol
     -- the first symbol whose payability turns on how a mana was PRODUCED rather
     -- than on what it is -- Pawl.Types.ProductionTag.Snow is that fact.
     --
-    -- ONE neighbouring rule is not implemented: CR 107.4h's third sentence, {S}
-    -- referring to snow-produced mana SPENT to pay a cost. Real cards do state
-    -- this, none of them in the pool (#515).
+    -- CR 107.4h's third sentence -- {S} referring to snow-produced mana SPENT to
+    -- pay a cost -- is a different reading of the same symbol and lives
+    -- elsewhere: the record is Pawl.Types.Object.manaSpent, and Berg Strider asks
+    -- about it through Pawl.Types.Quantity.SnowWasSpent. Nothing in a COST
+    -- expresses it, which is why this constructor is untouched by it.
     --
     -- The other two neighbours are done, and both are elsewhere. CR 106.11 --
     -- adding mana represented by {S} -- is Pawl.Types.ManaProduction.SnowSymbol,

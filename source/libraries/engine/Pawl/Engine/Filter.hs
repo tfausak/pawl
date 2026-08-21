@@ -304,7 +304,7 @@ data View = MkView
     -- what a unit carries (see its header), so this field is a classification the
     -- vocabulary can ask about rather than a pool to case over. A card asking
     -- about the spent mana's COLOUR -- Boreal Outrider -- wants the types too,
-    -- and would widen this rather than read around it (#2011).
+    -- and would widen this rather than read around it (#2008).
     --
     -- Non-empty for a permanent a spell paid with tagged mana became, which is CR
     -- 400.7d's exception to the forgetting (see Pawl.Types.Object.manaSpent).
@@ -406,8 +406,8 @@ playerView pid =
       -- not one -- `designations` above, same sentence.
       classLevel = Nothing,
       kicked = False,
-      -- CR 601.2a: only a SPELL has a cost that was paid, and a player is not
-      -- one -- `kicked` above, same sentence.
+      -- CR 202.1a's mana cost is spent to cast a CARD, and CR 109.1's list of
+      -- what an object is has no player in it -- `manaValue` above, same rule.
       manaSpentTags = Set.empty,
       -- CR 602.1: an activated ability is an ability OF AN OBJECT, and CR 109.1's
       -- list of what an object is has no player in it -- `keywords` above, one

@@ -644,21 +644,22 @@ data Object = MkObject
     -- THE UNITS and not the answer to one question. Pawl.Types.ManaUnit already
     -- carries everything a card can ask about a mana it was paid with -- the
     -- production tags, the type -- so recording the units leaves "was it snow?"
-    -- and "what colour was it?" (Boreal Outrider, #2011) as reads rather than as
+    -- and "what colour was it?" (Boreal Outrider, #2008) as reads rather than as
     -- fields.
     --
     -- Written by Pawl.Engine.Cost.payMana, which knows WHICH spell it is paying
     -- for (its `casting` argument) and restores the whole state when the cost
     -- goes unpaid, so a rejected cast records nothing.
     --
-    -- `kicked` above's exception, verbatim: CR 400.7d lets an ability of a
-    -- permanent reference "what costs were paid" to cast the spell it was, so
+    -- `kicked` above's exception, and rule 400.7d names this field's contents
+    -- outright: an ability of a permanent may reference "what mana was spent to
+    -- pay those costs" to cast the spell it was. So
     -- Pawl.Engine.Event.changeZoneAttaching carries it across that one move and
     -- newIncarnation forgets it everywhere else -- which is what Berg Strider
     -- needs, its clause being an ability of the PERMANENT.
     --
     -- Not implemented: an ACTIVATION cost's mana is not recorded, since
-    -- Pawl.Engine.Activate pays with no object to record against (#2010).
+    -- Pawl.Engine.Activate pays with no object to record against (#2007).
     --
     -- Empty for every object nothing was spent on: a token, a permanent an
     -- effect put onto the battlefield, and every spell whose cost was free.

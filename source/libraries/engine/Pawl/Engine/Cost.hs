@@ -1724,7 +1724,7 @@ payMana casting spending pid cost = do
     -- `casting` is the object it goes on, and it is Just only where the payment
     -- is for a spell being cast (see `pay`), which is the whole of what any
     -- printed card asks about ("if {S} was spent to CAST this spell"). An
-    -- activation's mana is not recorded (#2010).
+    -- activation's mana is not recorded (#2007).
     --
     -- Written HERE rather than by the caller because this is the one place that
     -- knows which units went. An unpaid cost writes nothing: `payMana` restores

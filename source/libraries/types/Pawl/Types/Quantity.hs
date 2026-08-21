@@ -368,15 +368,15 @@ data Quantity
     -- permanent's own triggered ability asks about is the spell that became it,
     -- and Pawl.Types.Object's `manaSpent` is where that record is kept.
     --
-    -- CARRIES NOTHING, where the tag it tests is one of several a unit may have.
-    -- {S} is the only production tag any printed card looks back at (CR 107.4h is
-    -- the only rule that gives one a retrospective reading), so a payload naming
-    -- which tag would be a choice with one member.
+    -- CARRIES NOTHING, rather than naming which production tag it asks about:
+    -- Pawl.Types.ProductionTag has one constructor, so the payload would be a
+    -- choice with a single member. It grows into one when a second tag gets a
+    -- retrospective reading of its own.
     --
     -- Not the spent mana's COLOUR. Boreal Outrider's "if {S} of any of that
     -- spell's colors was spent to cast it" does ask that, and it asks it about
     -- ANOTHER spell rather than about itself, so it wants two things this atom
-    -- has not got (#2011).
+    -- has not got (#2008).
     --
     -- A LEAF: it holds no Quantity.
     SnowWasSpent

@@ -2803,10 +2803,11 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                     -- spell on its way to a graveyard becomes a card no compleated
                     -- ability can be on.
                     Object.phyrexianLifePaid = if dest == Zone.Battlefield then Object.phyrexianLifePaid obj else 0,
-                    -- CR 400.7d a fourth time, and CR 107.4h's third sentence is
-                    -- what references it: WHICH MANA paid to cast the spell, so
-                    -- Berg Strider's "if {S} was spent to cast this spell" is
-                    -- asked of the permanent that spell became.
+                    -- CR 400.7d a fourth time, and this is the clause the rule
+                    -- names last: "what mana was spent to pay those costs". CR
+                    -- 107.4h's third sentence is what references it, so Berg
+                    -- Strider's "if {S} was spent to cast this spell" is asked of
+                    -- the permanent that spell became.
                     --
                     -- BATTLEFIELD ONLY, `kicked`'s gate and for its reason: rule
                     -- 400.7d speaks about a permanent, and a countered spell
