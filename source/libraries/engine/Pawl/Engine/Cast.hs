@@ -11,7 +11,6 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
-import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Decide as Decide
@@ -737,16 +736,16 @@ restrictionMet pid gs restriction = case restriction of
   CastingRestriction.DuringPhase (DuringPhase.MkDuringPhase window scope) ->
     Turn.inWindow window (GameState.phase gs)
       && Event.turnScopeAdmits scope (GameState.activePlayer gs) pid
-  -- CR 508.3b's question, and it lives in Pawl.Engine.Combat because the ability
+  -- CR 508.3b's question, and it lives in Pawl.Engine.Turn because the ability
   -- side's clause of the same name asks exactly it: one question about the combat
   -- record, two gates that differ in what ELSE they may read (CR 307.5).
-  CastingRestriction.AttackedThisStep -> Combat.attackedThisStep pid gs
+  CastingRestriction.AttackedThisStep -> Turn.attackedThisStep pid gs
   -- CR 506.7b, read off the combat record rather than off GameState.phase:
-  -- Combat.afterBlockersDeclared says why the record answers CR 506.7c and CR
+  -- Turn.afterBlockersDeclared says why the record answers CR 506.7c and CR
   -- 506.7f as well. Curtain of Light is the card; Trap Runner prints the same
   -- clause on an activation, where CR 506.7g sends Pawl.Engine.Activate to this
   -- same reader.
-  CastingRestriction.AfterBlockersDeclared -> Combat.afterBlockersDeclared gs
+  CastingRestriction.AfterBlockersDeclared -> Turn.afterBlockersDeclared gs
 
 -- CR 709.3a / 715.3a: the half being cast, RECORDED ON THE OBJECT, so that every
 -- characteristic read of it resolves through Game.resolveFace to that half alone

@@ -7,8 +7,8 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Engine.Binding as Binding
-import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Decide as Decide
@@ -25,10 +25,8 @@ import qualified Pawl.Engine.SplitSecond as SplitSecond
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Card as Card
 import Pawl.Types.Cost (Cost)
-import qualified Pawl.Types.DuringPhase as DuringPhase
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
@@ -248,73 +246,14 @@ activatorOfGiven grants oid gs = case Game.lookupObject oid gs of
     Zone.Graveyard -> Just (Object.owner obj)
     _ -> Nothing
 
--- CR 602.5: does every clause of this ability's printed "activate only ..."
--- rider permit activating it right now?
---
--- ALL of them, which is what CR 602.5's "prohibited from being activated" means:
--- one clause failing is a prohibition in force, and a card printing two joins
--- them with "and". The empty list is CR 602.2's default and passes vacuously.
---
--- Priority is not re-checked here: the only caller is Action.legalActions, which
--- the priority loop asks only of the player who has priority.
---
--- CASTING PROHIBITIONS ARE NOT CONSULTED, by any clause. CR 307.5 says so for the
--- sorcery-speed rider, and no rule extends Pawl.Engine.Cast's CR 601.3 list to
--- an activation either, since CR 601.3 is about beginning to CAST a spell. That
--- is why this reads the game state directly rather than reaching for
--- Pawl.Types.CastingRestriction, whose arms are spelled the same way and answer
--- a different question.
---
--- This gate makes the ability un-OFFERED. Engine.priorityLoop is what makes that
--- binding: it rejects an action the interpreter was not offered (#219).
-restrictionsOk :: PlayerId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
-restrictionsOk pid ability gs = all (restrictionMet pid gs) (ActivatedAbility.restrictions ability)
-
--- Does the game state satisfy this one printed clause?
---
--- Casing on the arms is a classification, not an effect's identity:
--- Pawl.Engine.Activate is the sole reader of Pawl.Types.ActivationRestriction,
--- exactly as Pawl.Engine.Cast is of Pawl.Types.CastingRestriction.
-restrictionMet :: PlayerId -> GameState -> ActivationRestriction.ActivationRestriction -> Bool
-restrictionMet pid gs restriction = case restriction of
-  -- CR 307.5's three conjuncts, and Turn.sorcerySpeedWindow is that window shared
-  -- with CR 307.1's casting gate: two rules, the same three facts, one copy.
-  ActivationRestriction.SorcerySpeed -> Turn.sorcerySpeedWindow pid gs
-  -- CR 500.1's phases and steps: Turn.inWindow asks whether GameState.phase
-  -- falls inside the window the rider names. CONTAINMENT rather than equality,
-  -- because a rider may name a phase that has steps -- Jade Statue's "only
-  -- during combat" is live in all five of CR 506.1's combat steps, while
-  -- Desert's names one of them. Pawl.Engine.Cast reads the same
-  -- Pawl.Types.DuringPhase bundle off CastingRestriction.DuringPhase;
-  -- deliberately duplicated rather than shared, since the two gates differ in
-  -- what else they may read.
-  --
-  -- CR 102.1 supplies the second conjunct, a genuinely separate fact: Desert's
-  -- rider names no turn (EachTurn, and the step alone decides), while Llanowar
-  -- Augur's "only during your upkeep" names alice's upkeep and not bob's. CR
-  -- 109.5 is why `pid` answers "your" -- for an activated ability that is the
-  -- player who activated it, which `activatable` has already pinned to
-  -- activatorOf -- so a stolen permanent's rider follows the thief.
-  ActivationRestriction.DuringPhase (DuringPhase.MkDuringPhase window scope) ->
-    Turn.inWindow window (GameState.phase gs)
-      && Event.turnScopeAdmits scope (GameState.activePlayer gs) pid
-  -- CR 508.3b's question, asked of the ACTIVATING player, and the same reader the
-  -- casting side's clause of this name uses -- see Combat.attackedThisStep for
-  -- why it is the declaration record and not Combat.attacked.
-  ActivationRestriction.AttackedThisStep -> Combat.attackedThisStep pid gs
-  -- CR 506.7b through CR 506.7g, which says an "activate only" rider naming one
-  -- of CR 506.7's points is governed exactly as the same words on a cast are --
-  -- so this is Combat.afterBlockersDeclared verbatim, the reader
-  -- Pawl.Engine.Cast's arm of this name uses. Trap Runner is the card.
-  ActivationRestriction.AfterBlockersDeclared -> Combat.afterBlockersDeclared gs
-
 -- CR 606.3 (CR 306.5d says the same for planeswalkers): a loyalty ability may be
 -- activated only with priority and an empty stack during a main phase of its
 -- controller's turn, and only if no player has already activated a loyalty
 -- ability of that permanent this turn.
 --
 -- Vacuously true for every ability that is not a loyalty ability, which is what
--- makes this a conjunct rather than an arm of restrictionsOk: CR 606.3 is a rule
+-- makes this a conjunct rather than an arm of ActivationRestriction.restrictionsOk:
+-- CR 606.3 is a rule
 -- about what a COST contains (CR 606.2), not a clause a card prints, so it is
 -- derived through Pawl.Engine.Cost.isLoyaltyCost and never read off
 -- Pawl.Types.ActivationRestriction, whose arms are all printed text.
@@ -467,7 +406,7 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
     -- both places.
     && not (Detain.detained srcId gs)
     && sicknessOkGiven pcs pid srcId ability gs
-    && restrictionsOk pid ability gs
+    && ActivationRestriction.restrictionsOk pid (ActivatedAbility.restrictions ability) gs
     && loyaltyOk pid srcId ability gs
     && Modal.selectionPossible
       (Target.fillableModesGiven pcs grants pools (Just pid) Map.empty srcId Map.empty (ActivatedAbility.modal ability) gs)

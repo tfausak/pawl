@@ -78,6 +78,7 @@ oneMana :: Color.Color -> ManaOption.ManaOption
 oneMana color =
   ManaOption.MkManaOption
     { ManaOption.cost = Mana.intrinsicManaCost,
+      ManaOption.restrictions = [],
       ManaOption.yield = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}]
     }
 

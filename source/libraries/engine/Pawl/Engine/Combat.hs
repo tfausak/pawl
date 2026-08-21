@@ -135,34 +135,6 @@ attackableBattles defender gs =
       isOne oid = Battle.isBattle (Projection.project oid gs)
    in filter (\oid -> protects oid && isOne oid) (Set.toAscList (GameState.battlefield gs))
 
--- "only if you've been attacked this step", asked of the player a printed clause
--- says "you" about -- read once here, and conjoined by both
--- CastingRestriction.AttackedThisStep and ActivationRestriction.AttackedThisStep.
---
--- Combat.declaredAttacked and NOT Combat.attacked, CR 508.8's wider set: CR 508.4
--- says a creature put onto the battlefield attacking never "attacked" (CR 508.3b
--- for the player side). Membership in that HISTORICAL set, since CR 506.4's
--- removal does not un-attack anybody.
---
--- "THIS STEP" is read off a record CR 511.3 scopes to the whole combat PHASE. Not
--- implemented: a second declaration inside one phase, which would tell the two
--- spans apart (#447).
-attackedThisStep :: PlayerId -> GameState -> Bool
-attackedThisStep pid gs =
-  Set.member (AttackTarget.OfPlayer pid) (Combat.declaredAttacked (GameState.combat gs))
-
--- CR 506.7b: is the game past the point "only during combat after blockers are
--- declared" names? Shared by CastingRestriction.AfterBlockersDeclared and
--- ActivationRestriction.AfterBlockersDeclared, which CR 506.7g makes one rule.
--- Asked of the game and not of a player, CR 506.7 describing a point in the turn.
---
--- No conjunct about the current phase, which is CR 511.3 rather than an omission:
--- declareBlockers is the only writer and clearCombat the only clearer. A combat
--- phase whose end of combat STEP alone is skipped never reaches clearCombat (see
--- Pawl.Engine.Engine.skipWholePhase).
-afterBlockersDeclared :: GameState -> Bool
-afterBlockersDeclared = Combat.blockersDeclared . GameState.combat
-
 -- CR 506.4: is this planeswalker still one that is being attacked -- or has it
 -- been removed from combat since the declaration?
 --
@@ -1212,7 +1184,8 @@ declareBlockers :: Game ()
 declareBlockers = do
   -- CR 506.7b's boundary, raised BEFORE the short-circuit below and before any
   -- prompt, the rule opening the window "regardless of whether any blockers are
-  -- actually declared". afterBlockersDeclared is the reader.
+  -- actually declared". ActivationRestriction.afterBlockersDeclared is the
+  -- reader.
   --
   -- The PLACEMENT is a regression fence rather than proved behaviour: moving this
   -- line inside the guard below leaves the suite green, no board in the pool

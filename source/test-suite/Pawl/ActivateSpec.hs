@@ -27,6 +27,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -3177,7 +3178,7 @@ lifeGainAbility p = case Face.activatedAbilities (S.combinedFace p) of
 -- Activate only during combat after blockers are declared." -- and it prints the
 -- clause Curtain of Light prints on a cast, word for word. That is why
 -- ActivationRestriction.AfterBlockersDeclared and its casting twin share
--- Combat.afterBlockersDeclared instead of each deriving the window.
+-- Turn.afterBlockersDeclared instead of each deriving the window.
 --
 -- alice attacks with one Goblin Piker; bob holds priority and controls the Trap
 -- Runner plus a Prodigal Sorcerer, the unrestricted {T} this module's other
@@ -3236,8 +3237,8 @@ printedActivationCombatPointSpec s registry = Spec.describe s "PrintedActivation
     Spec.assertBool s (Map.member attackerId (Combat.Type.attackers (GameState.combat declared))) "the Piker is attacking"
     Spec.assertBool s (not (Combat.isBlocked attackerId declared)) "and unblocked, so the ability has a legal target"
     Spec.assertBool s (not (any (null . activationsOf sorcererId . offeredOn) [atAttackers, beforeDeclaration, declared, inStep CombatStep.CombatDamage, inStep CombatStep.EndOfCombat])) "bob's unrestricted {T} is offered on every leg"
-    Spec.assertBool s (not (Combat.afterBlockersDeclared beforeDeclaration)) "the declaration has not happened yet"
-    Spec.assertBool s (Combat.afterBlockersDeclared declared) "and it has after CR 509.1's turn-based action"
+    Spec.assertBool s (not (Turn.afterBlockersDeclared beforeDeclaration)) "the declaration has not happened yet"
+    Spec.assertBool s (Turn.afterBlockersDeclared declared) "and it has after CR 509.1's turn-based action"
     -- Before the point CR 506.7b names.
     Spec.assertEqWith s "not offered in the declare attackers step" (activationsOf runnerId (offeredOn atAttackers)) []
     Spec.assertEqWith s "nor in the declare blockers step before blockers are declared" (activationsOf runnerId (offeredOn beforeDeclaration)) []

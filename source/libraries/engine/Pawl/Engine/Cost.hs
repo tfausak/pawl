@@ -21,6 +21,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Blight as Blight
 import qualified Pawl.Engine.Claim as Claim
@@ -42,6 +43,7 @@ import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Types.ActivationRestriction as ActivationRestriction.Type
 import qualified Pawl.Types.Activations as Activations
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.AppliedReduction as AppliedReduction
@@ -1180,7 +1182,7 @@ canPay pid oid cost gs = case Cost.mana cost of
 -- nothing here comes from Activate.activatable and every restriction that window
 -- applies has to be applied here instead.
 --
--- Two restrictions, both read off the ability's OWN activation cost (CR 602.2b):
+-- Two of them are read off the ability's OWN activation cost (CR 602.2b):
 -- CR 118.3's payability and CR 302.6's settle. NEITHER is a fact about the
 -- permanent alone -- CR 107.5 bars a tapped permanent from paying {T} and says
 -- nothing about a cost without one, and CR 302.6 gates only a cost holding {T}
@@ -1193,8 +1195,8 @@ canPay pid oid cost gs = case Cost.mana cost of
 -- The CLAIMS and the LIFE ride along with the count, which alone is a fact about
 -- this source in isolation: two sources whose costs both sacrifice a creature
 -- each answer 1 beside one creature. Both are ONE activation's, unscaled.
-manaActivations :: Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Activations.Activations
-manaActivations pcs pid oid cost gs =
+manaActivations :: Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> [ActivationRestriction.Type.ActivationRestriction] -> GameState -> Activations.Activations
+manaActivations pcs pid oid cost restrictions gs =
   if Maybe.isJust (Cost.mana cost)
     && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
     && jointlyPayable pid oid (Cost.components cost) gs
@@ -1203,6 +1205,17 @@ manaActivations pcs pid oid cost gs =
     -- mana ability too. Here rather than in Mana.manaSourcesGiven, because this
     -- is what BOTH of CR 605.3a's windows consult -- sickness's position above.
     && not (Detain.detained oid gs)
+    -- CR 602.5's printed "activate only ..." rider, which CR 605.1's own sentence
+    -- keeps on a mana ability -- a timing restriction does not stop an ability
+    -- being one. Here for sickness's and detain's reason, and it is the reason
+    -- this argument is threaded from the ABILITY all the way down (CR 605.3a):
+    -- Pawl.Engine.Activate refuses a mana ability one conjunct before it reads
+    -- the rider, so a rider read only there is a rider nothing reads.
+    --
+    -- CR 109.4a makes `pid` the rider's "you": a mana ability's controller is
+    -- the permanent's controller (CR 110.2), which is who Mana.manaSourcesGiven
+    -- and Cost.tapForMana each ask about.
+    && ActivationRestriction.restrictionsOk pid restrictions gs
     then
       Activations.MkActivations
         { Activations.times = repeatsOf pid oid cost gs,
@@ -1764,7 +1777,7 @@ tapForMana oid = do
       -- This path adds the whole yield to `controller`; a resolving ability
       -- reads the reference instead (#1673).
       let controller = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
-      case filter (\option -> Activations.times (manaActivations Map.empty controller oid (ManaOption.cost option) gs) > 0) (Mana.manaOptionsOf oid gs) of
+      case filter (\option -> Activations.times (manaActivations Map.empty controller oid (ManaOption.cost option) (ManaOption.restrictions option) gs) > 0) (Mana.manaOptionsOf oid gs) of
         [] -> pure False
         first : rest -> do
           chosen <- chooseManaYield controller oid (first NonEmpty.:| rest) gs
