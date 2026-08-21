@@ -1100,16 +1100,18 @@ towerBoard tower victim =
 -- and CR 605.1's own sentence is why a rider leaves it a mana ability: an
 -- ability is one "regardless of ... what timing restrictions ... they may have".
 --
--- SYNTHETIC because no printing reaches the rule today, not because none prints
--- the rider. Scryfall `o:"Activate only" o:"Add {"`, 2026-08-21: Grinning Ignus
--- is the one printing whose mana ability carries a rider this vocabulary can say
--- ("Activate only as a sorcery"), and its activation cost holds MANA, which the
--- supply model does not model (#1120), plus a "return this to its owner's hand"
--- component the cost vocabulary lacks (#2004). Lavinia, Foil to Conspiracy and
--- Vivi Ornitier name a turn with no phase (#520); every other hit rides on
--- "only once each turn" or "only if <condition>", neither of which
--- Pawl.Types.ActivationRestriction can say. Grinning Ignus replaces this card
--- when #1120 and #2004 land.
+-- SYNTHETIC because no printing reaches CR 500.1's window on the mana path, not
+-- because none prints a rider there. Scryfall `o:"Activate only" o:"Add {"`,
+-- 2026-08-21: Grinning Ignus is the one printing whose mana ability names a
+-- STEP-or-phase window this vocabulary can say ("Activate only as a sorcery"),
+-- and its activation cost holds MANA, which the supply model does not model
+-- (#1120), plus a "return this to its owner's hand" component the cost
+-- vocabulary lacks (#2004). Lavinia, Foil to Conspiracy is in the pool and gates
+-- these same two windows, but through CR 102.1's turn axis alone
+-- (laviniaTurnRiderSpec below), so she leaves the phase axis unexercised. Vivi
+-- Ornitier and every other hit ride on "only once each turn" or "only if
+-- <condition>", neither of which Pawl.Types.ActivationRestriction can say.
+-- Grinning Ignus replaces this card when #1120 and #2004 land.
 --
 -- The two cases below are the SAME board at two moments, and the phase is the
 -- one thing that differs. That is what makes the pair a proof about the rider
@@ -1158,6 +1160,87 @@ springBoard :: Printing.Printing -> Printing.Printing -> (GameState.GameState, O
 springBoard spring bolt =
   let (gs, oid) = S.boltInHand spring bolt 1 (Phase.Beginning BeginningStep.Upkeep)
    in (gs {GameState.remaining = Seq.empty}, oid)
+
+-- CR 102.1's axis with no CR 500.1 window beside it:
+-- ActivationRestriction.DuringTurn, the arm a rider naming a turn and no phase
+-- needs. Lavinia, Foil to Conspiracy is the producer -- "{T}: Add {C}{C}.
+-- Activate only during an opponent's turn" -- and her ability being a MANA
+-- ability is why this group sits beside riderWindowSpec above rather than in
+-- Pawl.ActivateSpec: CR 605.3b keeps it off the stack, so both of CR 605.3a's
+-- windows are where the rider is asked.
+--
+-- THREE SEATS, and both opponents exercised. At two seats TurnScope.OpponentsTurn
+-- and "not the controller's turn" are the same predicate (CR 102.2); at three
+-- they are still the same predicate but the board can now tell an enumeration of
+-- ONE opponent from "every seat that is not yours" (CR 806.1), which is what
+-- carol's turn asserts.
+--
+-- The Withered Wretch below is the payment window's door: "{1}: Exile target
+-- card from a graveyard" is activatable whenever its controller has priority, so
+-- the SAME activation is legal on all three turns and Lavinia's rider is the one
+-- thing that changes whether it can be paid for. A spell would not do: CR 307.1
+-- keeps a sorcery off an opponent's turn, and walking data/cards/ on 2026-08-21
+-- for a single-faced Instant whose printed cost is generic-only -- the only
+-- shape two colorless mana pay -- turned up none, Lightning Bolt's {R} being
+-- the shape every instant in the corpus has. Any generic-only instant added
+-- later would serve as the door instead.
+laviniaTurnRiderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+laviniaTurnRiderSpec s registry = Spec.describe s "CR 102.1 a rider naming a turn and no phase" $ do
+  Spec.it s "CR 605.3a the priority window offers her mana ability on either opponent's turn and not on hers" $ do
+    lavinia <- S.printingOf s registry "Lavinia, Foil to Conspiracy"
+    wretch <- S.printingOf s registry "Withered Wretch"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let boardOn active = snd (laviniaBoard lavinia wretch piker active)
+        floated active = poolTypes S.alice (S.runPure tapEverything (boardOn active) Engine.priorityLoop)
+        offers active = length (filter isManaActivation (Action.legalActions S.alice (boardOn active)))
+        colorless = [ManaType.Colorless, ManaType.Colorless]
+    -- The gameplay-level assertion, and the whole point of three seats: the mana
+    -- exists on BOTH opponents' turns and on neither reading of "an opponent" is
+    -- alice's own turn one.
+    Spec.assertEqWith s "CR 102.2 on bob's turn the rider admits it and {C}{C} floats" (floated S.bob) colorless
+    Spec.assertEqWith s "CR 806.1 on carol's turn too, so this is not an enumeration of one opponent" (floated S.carol) colorless
+    Spec.assertEqWith s "CR 109.5 on her own turn the same board floats nothing" (floated S.alice) []
+    -- The menu those activations were taken from, as a supporting check.
+    Spec.assertEqWith s "the offer follows the pool at all three seats" (fmap offers [S.bob, S.carol, S.alice]) [1, 1, 0]
+
+  -- CR 605.3a's other window, reached through Activate.activateAbility rather
+  -- than the action menu, so neither assertion here can be passing on the offer
+  -- above. Only Lavinia can pay the Wretch's {1}, so the payment is her rider's
+  -- answer and nothing else's.
+  Spec.it s "CR 605.3a the payment window pays a Wretch's cost from her on either opponent's turn" $ do
+    lavinia <- S.printingOf s registry "Lavinia, Foil to Conspiracy"
+    wretch <- S.printingOf s registry "Withered Wretch"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let ability = theAbility wretch
+        activated active =
+          let (wretchId, gs) = laviniaBoard lavinia wretch piker active
+           in S.runPure S.identityAnswer gs (Activate.activateAbility S.alice wretchId ability)
+        onStack active = length (GameState.stack (activated active))
+        paid active = S.tappedCount S.alice (activated active)
+        gate active =
+          let (wretchId, gs) = laviniaBoard lavinia wretch piker active
+           in Activate.activatable S.alice wretchId ability gs
+    -- The gameplay-level assertion: CR 602.2a's activation happened, which it
+    -- cannot without CR 601.2h's payment.
+    Spec.assertEqWith s "CR 602.2a the Wretch's ability reaches the stack on both opponents' turns and not on hers" (fmap onStack [S.bob, S.carol, S.alice]) [1, 1, 0]
+    Spec.assertEqWith s "CR 601.2h and Lavinia is what paid for it" (fmap paid [S.bob, S.carol, S.alice]) [1, 1, 0]
+    -- The gate the menu reads, on the same three boards: a payment window that
+    -- disagreed with the offer would show up as these two lists disagreeing.
+    Spec.assertEqWith s "CR 118.3 the offer gate agrees with the payment at all three seats" (fmap gate [S.bob, S.carol, S.alice]) [True, True, False]
+
+-- alice, at three seats, controlling one Lavinia and one Withered Wretch, with a
+-- Goblin Piker in bob's graveyard for the Wretch's ability to aim at. `active` is
+-- whose turn it is and is the ONE thing the three boards differ in; an empty
+-- `remaining` pins the phase, so a priority loop cannot wander out of the turn
+-- the rider is being asked about. Both permanents arrive Settled and untapped
+-- (S.addCreature), which is the precondition CR 302.6 and CR 107.5 put on
+-- Lavinia's {T}.
+laviniaBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> (ObjectId.ObjectId, GameState.GameState)
+laviniaBoard lavinia wretch piker active =
+  let (_, g1) = S.addCreature lavinia S.alice S.threePlayerGame
+      (wretchId, g2) = S.addCreature wretch S.alice g1
+      (_, g3) = S.addGraveyardCard piker S.bob g2
+   in (wretchId, g3 {GameState.activePlayer = active, GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
 
 isManaActivation :: Action.Type.Action -> Bool
 isManaActivation action = case action of
@@ -2971,6 +3054,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   omnathSpec s registry
   priorityWindowSpec s registry
   riderWindowSpec s registry
+  laviniaTurnRiderSpec s registry
   snowSpec s registry
   snowSymbolSpec s registry
   wellspringSpec s registry

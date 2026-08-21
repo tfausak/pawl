@@ -222,6 +222,11 @@ to agents as written. What it doesn't say:
     every hit, and record in the PR which ones you read and why each is right as
     it stands.
 
+    A NEW FIELD has its own invisible site: positional record construction in
+    the test suite absorbs it in argument order, and `-Werror` names it only
+    when the neighbouring argument's type happens to clash. It has bitten twice
+    (PRs #2009 and #2021). Grep every construction site of the type by hand.
+
 5.  Closing #N means moving every census row that cites it. #875, #876 and #877
     annotate implemented rows with the issue numbers of what those rows still
     don't do, and nothing checks the three bodies against anything. Read them
