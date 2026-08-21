@@ -3274,6 +3274,13 @@ centaursControlledBy pid gs =
     )
     (Set.toList (GameState.battlefield gs))
 
+-- The card names in a player's graveyard, sorted. CR 108.3 puts a card in its
+-- OWNER's, which is the half of "its controller" this group has to tell apart.
+graveyardNames :: PlayerId.PlayerId -> GameState.GameState -> [String]
+graveyardNames pid gs =
+  List.sort
+    (Maybe.mapMaybe (\oid -> fmap (Text.unpack . CardName.unwrap . Face.name) (Game.faceOf oid gs)) (Game.zoneMembers Zone.Graveyard pid gs))
+
 rampageOfTheClansSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 rampageOfTheClansSpec s registry = Spec.describe s "RampageOfTheClans" $ do
   -- The proving case for #463: a mass destruction whose rider acts on EACH
@@ -3339,6 +3346,29 @@ rampageOfTheClansSpec s registry = Spec.describe s "RampageOfTheClans" $ do
     -- The case above's negative from the other side: two objects of ONE seat's
     -- are what CR 608.2f's secondary sentence is about, so alice is asked once.
     Spec.assertEqWith s "alice ordered bob's two, having none of her own" (orderAnswersIn transcript) [[0, 1]]
+  -- CR 608.2h with CR 108.3: "its controller" is the permanent's LAST KNOWN
+  -- controller, and a card put into a graveyard goes to its OWNER's. The two
+  -- differ here and nowhere else in this group, which is what makes this the
+  -- case that says which of them the rider reads: bob's Control Magic has taken
+  -- alice's Bonded Construct, and the sweep destroys the Construct and the Aura
+  -- both. bob controlled each of them, so bob makes both Centaurs -- while the
+  -- Construct's card lands in alice's graveyard, where a rider reading the
+  -- CARDS rather than the permanents would have found it.
+  Spec.it s "CR 608.2h the Centaur goes to the permanent's last controller, not to its owner" $ do
+    forest <- S.printingOf s registry "Forest"
+    rampage <- S.printingOf s registry "Rampage of the Clans"
+    bondedConstruct <- S.printingOf s registry "Bonded Construct"
+    controlMagic <- S.printingOf s registry "Control Magic"
+    let (construct, g1) = S.addCreature bondedConstruct S.alice (Setup.emptyGame S.threePlayers)
+        (aura, g2) = S.addCreature controlMagic S.bob g1
+        board = S.attach aura construct g2
+        (resolved, transcript) = castRampage forest rampage board
+    Spec.assertEqWith s "setup: bob's Control Magic has taken alice's artifact creature" (Projection.controllerOf construct board) (Just S.bob)
+    Spec.assertEqWith s "bob controlled both destroyed permanents, so bob makes both Centaurs" (length (centaursControlledBy S.bob resolved)) 2
+    Spec.assertEqWith s "and its OWNER makes none" (length (centaursControlledBy S.alice resolved)) 0
+    Spec.assertEqWith s "CR 108.3 while the Construct's card went to alice's graveyard, next to the spell itself" (graveyardNames S.alice resolved) ["Bonded Construct", "Rampage of the Clans"]
+    Spec.assertEqWith s "and the Aura's card to bob's" (graveyardNames S.bob resolved) ["Control Magic"]
+    Spec.assertEqWith s "alice ordered the two, both being bob's" (orderAnswersIn transcript) [[0, 1]]
   -- CR 608.2c with CR 101.3: the sweep destroys nothing, so the slot is unbound,
   -- the loop has no members and nobody creates anything.
   Spec.it s "an empty sweep leaves the loop no members, so no Centaur is created" $ do
