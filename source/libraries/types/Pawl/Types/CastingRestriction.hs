@@ -45,11 +45,18 @@ data CastingRestriction
     -- during combat before blockers are declared", Blaze of Glory and eight
     -- others) do not want this arm at all: their window is not a phase.
     DuringPhase DuringPhase.DuringPhase
-  | -- | "and only if you've been attacked this step" -- the second clause
-    -- fourteen cards carry on a CAST, Rally the Troops among them. (Kongming's
-    -- Contraptions prints the same words on an activated ability, where the arm
-    -- of this name lives on Pawl.Types.ActivationRestriction; the two share
+  | -- | "and only if you've been attacked this step" -- the second clause every
+    -- printed instant carrying these words puts on a CAST, Rally the Troops
+    -- among them (Scryfall `o:"been attacked this step"`, 2026-08-21: fourteen
+    -- instants, and all fourteen also print "only during the declare attackers
+    -- step"). (Kongming's Contraptions prints the same words on an activated
+    -- ability, where the arm of this name lives on
+    -- Pawl.Types.ActivationRestriction; the two share
     -- Pawl.Engine.Turn.attackedThisStep as their reader.)
+    --
+    -- data/cards/synthetic-belated-rally.json is the one card without the
+    -- step clause beside it, which is what lets a test tell CR 508.6's step from
+    -- the combat phase.
     --
     -- Not a timing window at all, which is why it is its own arm rather than a
     -- field on DuringPhase: it is a question about what the combat record already

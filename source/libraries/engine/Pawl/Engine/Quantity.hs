@@ -350,6 +350,13 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- battlefield attacking never "attacked", for trigger events AND effects, and
   -- rule 702.121a's is an effect.
   --
+  -- Nor Combat.declaredAttackedThisStep, its step-scoped twin: melee's words are
+  -- "this combat", which CR 511.3's span matches and CR 500.1's does not. The two
+  -- coincide for every melee trigger printed -- CR 508.1m puts the trigger on the
+  -- stack in the step the declaration happened in -- so the fields are apart
+  -- because the two rules ask different questions, not because a card tells them
+  -- apart today.
+  --
   -- NO liveness test on the players counted, deliberately: the record is what the
   -- rule asks about, so an opponent who has since left the game (CR 800.4) still
   -- counts, as does one whose attacker is no longer in combat. That is why this

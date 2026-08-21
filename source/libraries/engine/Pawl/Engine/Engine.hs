@@ -1325,10 +1325,12 @@ runStep = do
 -- is announced -- CR 614.6 makes a replaced event one that never happens, and CR
 -- 500.6's triggers hang off the CR 603.2b step records this path never reaches.
 --
--- GameState.combat is left ALONE and does not go stale for it: every writer of
--- that record runs inside a combat step, so a phase whose steps never begin
--- writes nothing. Not implemented: skipping the end of combat STEP on its own,
--- which would strand the record and which no card names (#447).
+-- GameState.combat is left ALONE and does not go stale for it: every writer that
+-- ADDS to that record runs inside a combat step, so a phase whose steps never
+-- begin writes nothing. (Combat.clearAttackedThisStep does run outside one, at
+-- every step's end, but a clearer cannot strand anything.) Not implemented:
+-- skipping the end of combat step on its own, which strands the phase-scoped
+-- half of the record and which no card names (#2010).
 skipWholePhase :: Phase.Phase -> Game ()
 skipWholePhase phase = do
   State.modify' (\gs -> gs {GameState.remaining = Turn.dropRestOfPhase phase (GameState.remaining gs)})
@@ -1390,6 +1392,11 @@ runStepThatBegan phase = do
         -- attacking for the whole step, including the priority round where an
         -- instant may still read them (Kill Shot).
         Monad.when (phase == Phase.Combat CombatStep.EndOfCombat) (State.modify' Combat.clearCombat)
+        -- CR 508.6 read on CR 500.1's span: the step-scoped half of the attack
+        -- record ends with the step, so this runs at EVERY step's end and not
+        -- just at combat's. See Pawl.Engine.Combat.clearAttackedThisStep for why
+        -- the wider reach is the point rather than laziness.
+        State.modify' Combat.clearAttackedThisStep
         -- CR 508.8: drop the two combat steps that have nothing to do if nobody
         -- attacked. Asked as the declare attackers step ENDS, not when its
         -- turn-based action finishes, because the rule's second clause -- put onto

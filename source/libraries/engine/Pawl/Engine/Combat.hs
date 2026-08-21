@@ -61,6 +61,7 @@ emptyCombat =
       Combat.joinedUnder = Map.empty,
       Combat.attacked = Set.empty,
       Combat.declaredAttacked = Set.empty,
+      Combat.declaredAttackedThisStep = Set.empty,
       Combat.blockersDeclared = False,
       Combat.defender = Nothing
     }
@@ -74,6 +75,17 @@ emptyCombat =
 -- 511.1 gives this step no turn-based action.
 clearCombat :: GameState -> GameState
 clearCombat gs = gs {GameState.combat = emptyCombat}
+
+-- CR 508.6 on CR 500.1's span: "you've been attacked this step" is a question
+-- about one step, so the record answering it ends with the step. Engine.runStep
+-- calls this as EVERY step ends, clearCombat's sibling in placement and its
+-- opposite in reach -- CR 500.11 lets any step be skipped, so a reset that ran
+-- only in the combat steps (or only in the end of combat step, where CR 511.3
+-- puts clearCombat) would strand the record into a later turn whenever the step
+-- carrying it never happened.
+clearAttackedThisStep :: GameState -> GameState
+clearAttackedThisStep gs =
+  gs {GameState.combat = (GameState.combat gs) {Combat.declaredAttackedThisStep = Set.empty}}
 
 -- CR 508.8: if no creatures were declared as attackers or put onto the
 -- battlefield attacking, skip the declare blockers and combat damage steps.
@@ -1015,7 +1027,12 @@ declareAttackers pid = do
                         -- those rules distinguish from being put onto the
                         -- battlefield attacking.
                         Combat.declaredAttacked =
-                          Set.union (Set.fromList (Map.elems recorded)) (Combat.declaredAttacked (GameState.combat g))
+                          Set.union (Set.fromList (Map.elems recorded)) (Combat.declaredAttacked (GameState.combat g)),
+                        -- CR 508.6's same record on CR 500.1's narrower span,
+                        -- written here for the reason above and emptied as the
+                        -- step ends (Pawl.Engine.Engine.runStepThatBegan).
+                        Combat.declaredAttackedThisStep =
+                          Set.union (Set.fromList (Map.elems recorded)) (Combat.declaredAttackedThisStep (GameState.combat g))
                       }
                 }
         -- CR 508.1's preamble, captured here: everything from this line on is
