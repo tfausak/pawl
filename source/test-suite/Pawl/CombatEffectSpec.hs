@@ -3293,10 +3293,12 @@ landSubtypeStripSpec s registry = Spec.describe s "LandSubtypeStrip" $ do
       _ -> Spec.assertFailure s "fixture should have one Construct"
   Spec.it s "CR 305.7 animated Berserkers of Blood Ridge set to Mountain need not attack" $ do
     -- Pawl.Engine.AttackRequirement.instances. Berserkers of Blood Ridge {4}{R}
-    -- 4/4 says nothing but "this creature attacks each combat if able", and it is
-    -- the pool's only attacking requirement printed on a CREATURE: Curse of the
-    -- Nightly Hunt is an Aura, and Ashaya animates nontoken creatures, so the
-    -- Curse can never reach this gate.
+    -- 4/4 says nothing but "this creature attacks each combat if able", and the
+    -- gate needs the requirement printed on a CREATURE: Curse of the Nightly Hunt
+    -- is an Aura, and Ashaya animates nontoken creatures, so the Curse can never
+    -- reach this gate. Otarian Juggernaut prints the requirement on a creature
+    -- too (conditionalAttackRequirementSpec below), but gates it on a threshold,
+    -- so the Berserkers is still the one that isolates the strip.
     ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
     bloodMoon <- S.printingOf s registry "Blood Moon"
     berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
@@ -3783,6 +3785,51 @@ sirenBoard siren jace piker centaur =
            in Just (control, lured, free, jaceId, snd (Engine.runGamePure (aimingAt lured) activated Stack.resolveTop))
         _ -> Nothing
 
+-- CR 508.1d's second shape -- "or that it attacks if some condition is met" --
+-- proved by Otarian Juggernaut, whose whole threshold line is one CR 604.2 "as
+-- long as" clause: "as long as there are seven or more cards in your graveyard,
+-- this creature gets +3/+0 and attacks each combat if able". The unconditional
+-- shape is Berserkers of Blood Ridge's, in boundedDeclarationSpec above.
+--
+-- The two boards differ in ONE thing, the number of cards in alice's graveyard,
+-- and the threshold falls between them. The +3/+0 rides the same clause, so the
+-- damage a forced attack deals is 5 rather than 2 and the two readings of the
+-- rule cannot reach the same life total.
+conditionalAttackRequirementSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+conditionalAttackRequirementSpec s registry = Spec.describe s "ConditionalAttackRequirement" $ do
+  Spec.it s "CR 508.1d a threshold requirement forces the attack only once the condition holds" $ do
+    juggernaut <- S.printingOf s registry "Otarian Juggernaut"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (base, mine, _) = S.combatBoardOf [juggernaut] []
+        filling n gs = List.foldl' (\g _ -> snd (S.addGraveyardCard piker S.alice g)) gs [1 .. n :: Int]
+        under = filling 6 base
+        over = filling 7 base
+        declining :: Prompt.Prompt r -> r
+        declining p = case p of
+          Prompt.DeclareAttackers {} -> []
+          _ -> S.aggressiveAnswer p
+    case mine of
+      [required] -> do
+        -- The gameplay-level assertions, through Engine.runStep's declare
+        -- attackers step with an interpreter that declines to attack: over the
+        -- threshold the rules force the 2/3 through as a 5/3, under it the
+        -- declination stands.
+        let forced = S.runCombat declining over
+            declined = S.runCombat declining under
+        Spec.assertEqWith s "seven cards in the graveyard: the requirement forces the attack and bob takes five" (S.lifeOf S.bob forced) (Just 15)
+        Spec.assertEqWith s "six cards: the declination stands and bob takes nothing" (S.lifeOf S.bob declined) (Just 20)
+        Spec.assertEqWith s "and the Juggernaut really was declared over the threshold" (S.attackerDeclarationsOf forced) mine
+        Spec.assertEqWith s "and really was not under it" (S.attackerDeclarationsOf declined) []
+        -- The same two answers off Combat.legalAttackDeclaration directly, which
+        -- is the narrowest path to CR 508.1d's maximization.
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] under) "under the threshold declining obeys everything there is to obey"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] over)) "over it declining obeys nothing"
+        -- Anti-vacuity: the Juggernaut is an able attacker on BOTH boards, so the
+        -- six-card board's legal declination is the condition being false rather
+        -- than a CR 508.1a or CR 508.1c refusal in disguise.
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [required] under) "and attacking with it is legal either way"
+      _ -> Spec.assertFailure s "fixture should have one Juggernaut"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   combatLegalitySpec s registry
@@ -3808,5 +3855,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   lastKnownDefendingPlayerSpec s registry
   attackCostSpec s registry
   alluringSirenSpec s registry
+  conditionalAttackRequirementSpec s registry
   blockCostSpec s registry
   exertSpec s registry
