@@ -3145,6 +3145,185 @@ swiftSilenceSpec s registry = Spec.describe s "SwiftSilence" $ do
         Spec.assertEqWith s "and only the untouched ability is left on the stack" (GameState.stack resolved) abilityIds
         Spec.assertEqWith s "still two cards drawn" (S.handSize S.bob resolved) 2
 
+-- The Faerie tokens ONE player controls, by name and by CR 108.4's controller
+-- rather than by Support.countOnBattlefieldByName, which slices the battlefield
+-- by OWNER (CR 108.3) and so cannot say who controls anything.
+faerieTokensUnder :: PlayerId.PlayerId -> GameState.GameState -> Int
+faerieTokensUnder pid gs =
+  length
+    ( filter
+        ( \oid ->
+            fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack "Faerie Token"))
+              && Projection.controllerOf oid gs == Just pid
+        )
+        (Set.toList (GameState.battlefield gs))
+    )
+
+-- ONE board for Glen Elendra's Answer, built once and branched, and
+-- swiftSilenceBoard's with a third seat and both stack populations. THREE SEATS,
+-- because "your opponents control" and "you don't control" are the same set at
+-- two: carol holds the second opponent's ability, so a sweep keyed to CR 102.1
+-- and one keyed to "not mine" still agree, while a sweep keyed to the ACTIVE
+-- player would not.
+--
+-- bob casts, and waiting under his spell are five objects, each on the stack for
+-- a reason:
+--
+--   * alice's Divination is the counterable opponent SPELL, present only when
+--     `mCounterable` is;
+--   * alice's Blurred Mongoose prints "can't be countered" (CR 113.6g), which is
+--     what tells the swept set apart from the countered one;
+--   * alice's and carol's Prodigal Sorcerer activations are the opponent
+--     ABILITIES (CR 113.9), which is what this card reaches and Swift Silence's
+--     "all other spells" does not;
+--   * bob's own Sorcerer activation and his own Goblin Piker are the controls:
+--     one ability and one spell that "your opponents control" must spare.
+--
+-- bob also has a Baral, Chief of Compliance, whose "whenever a spell or ability
+-- you control counters A SPELL" is the fence on #541: countering an ability
+-- records nothing for Baral to read, so it must fire once here and not three
+-- times.
+--
+-- Four Islands, one more than Baral's CR 601.2f reduction leaves {1}{U}{U}
+-- needing, so no assertion below turns on the reduction having applied. Every
+-- library is stocked, since a Baral trigger that resolves draws and CR 104.3c
+-- would otherwise decide the game.
+--
+-- Glen Elendra's Answer is CAST rather than placed, swiftSilenceBoard's reason:
+-- CR 601.2b's mode choice is a binding only a cast writes. The victims are
+-- placed, since none of them resolves.
+--
+-- Nothing where the Sorcerer stopped declaring exactly one activated ability.
+--
+-- Returns the counterable opponent spell, the uncounterable one, the two
+-- opponent abilities, bob's own two objects, the Answer in hand, and the board.
+glenElendraBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Maybe Printing.Printing ->
+  Maybe (Maybe ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId], [ObjectId.ObjectId], ObjectId.ObjectId, GameState.GameState)
+glenElendraBoard island glenElendra baral piker mongoose sorcerer mCounterable = case soleActivatedAbility sorcerer of
+  Nothing -> Nothing
+  Just ability ->
+    let lands = S.landsFor island S.bob 4 S.threePlayerGame
+        stock pid gs = List.foldl' (\g _ -> snd (S.addLibraryCard island pid g)) gs [1 :: Int .. 5]
+        stocked = List.foldl' (flip stock) lands [S.alice, S.bob, S.carol]
+        (_, withBaral) = S.addCreature baral S.bob stocked
+        -- CR 302.6: each Sorcerer must have settled under its own controller
+        -- before its {T} may be activated at all.
+        addSorcerer pid (ids, gs) = let (oid, g) = S.addCreature sorcerer pid gs in (ids <> [(pid, oid)], g)
+        (sorcerers, withSorcerers) = List.foldl' (flip addSorcerer) ([], withBaral) [S.alice, S.bob, S.carol]
+        settled = List.foldl' (\g pid -> S.runPure S.identityAnswer g (Engine.settleAll pid)) withSorcerers [S.alice, S.bob, S.carol]
+        (mHers, withHers) = case mCounterable of
+          Nothing -> (Nothing, settled)
+          Just counterable -> let (oid, g) = S.spellOnStack counterable S.alice settled in (Just oid, g)
+        (uncounterable, withMongoose) = S.spellOnStack mongoose S.alice withHers
+        (his, withHis) = S.spellOnStack piker S.bob withMongoose
+        -- Each activation names its own controller as the damage recipient (CR
+        -- 120.3a), which no assertion reads: none of these abilities resolves.
+        atSelf :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+        atSelf pid p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer pid))) sets
+          _ -> S.identityAnswer p
+        activate (ids, gs) (pid, oid) =
+          let before = GameState.stack gs
+              after = S.runPure (atSelf pid) (gs {GameState.priority = Just pid}) (Activate.activateAbility pid oid ability)
+           in (ids <> fmap ((,) pid) (filter (`notElem` before) (GameState.stack after)), after)
+        (abilityIds, activated) = List.foldl' activate ([], withHis) sorcerers
+        (answer, board) = S.addHandCard glenElendra S.bob activated
+        theirs = fmap snd (filter ((/= S.bob) . fst) abilityIds)
+        mine = fmap snd (filter ((== S.bob) . fst) abilityIds) <> [his]
+     in Just (mHers, uncounterable, theirs, mine, answer, board)
+
+-- bob casts his Glen Elendra's Answer over the waiting stack, lets it resolve,
+-- and settles so CR 603.3's triggers reach the stack. Answers the board and the
+-- objects the settle ADDED, which is how many times Baral fired.
+glenElendraRun :: ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, [ObjectId.ObjectId])
+glenElendraRun answer gs =
+  let cast = S.runPure S.identityAnswer gs (S.cast S.bob answer)
+      resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+      settled = S.runPure S.identityAnswer resolved Engine.settleForPriority
+   in (settled, filter (`notElem` GameState.stack resolved) (GameState.stack settled))
+
+-- Glen Elendra's Answer {2}{U}{U} Instant: "This spell can't be countered. /
+-- Counter all spells your opponents control and all abilities your opponents
+-- control. Create a 1/1 blue and black Faerie creature token with flying for
+-- each spell and ability countered this way." Oracle text checked against
+-- api.scryfall.com, 2026-08-21.
+--
+-- The proving case for ObjectRef.EachOnStack: Swift Silence's sweep with CR
+-- 109.2b's word "spell" switched off, so CR 405.1's whole zone is in and the
+-- Filter alone narrows it. CR 115.10a keeps the set off the target list, so
+-- nothing is announced at CR 601.2c and CR 608.2b has nothing to fizzle.
+glenElendrasAnswerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+glenElendrasAnswerSpec s registry = Spec.describe s "GlenElendrasAnswer" $ do
+  -- Six objects wait on the stack, and each reading of the sentence makes a
+  -- different number of Faeries, so the board tells them apart:
+  --
+  --   * "all other SPELLS", CR 109.2b's reading, makes 1;
+  --   * everything the sweep NAMED, counting the Mongoose CR 113.6g spared,
+  --     makes 4;
+  --   * everything on the stack, with CR 102.1's relation dropped, makes 5 --
+  --     bob's own ability and his own spell as well;
+  --   * what was actually countered this way is 3.
+  Spec.it s "CR 405.1/701.6a counters an opponent's abilities beside their spells, and makes a Faerie for each" $ do
+    island <- S.printingOf s registry "Island"
+    glenElendra <- S.printingOf s registry "Glen Elendra's Answer"
+    baral <- S.printingOf s registry "Baral, Chief of Compliance"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mongoose <- S.printingOf s registry "Blurred Mongoose"
+    divination <- S.printingOf s registry "Divination"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    case glenElendraBoard island glenElendra baral piker mongoose sorcerer (Just divination) of
+      Nothing -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
+      Just (mHers, uncounterable, theirs, mine, answer, board) -> do
+        Spec.assertEqWith s "setup: the two opponents each activated one ability" (length theirs) 2
+        let (resolved, triggers) = glenElendraRun answer board
+        -- THE gameplay assertion, and it comes first: three objects were
+        -- countered this way -- one spell and two abilities -- so three Faeries.
+        Spec.assertEqWith s "one spell and two abilities countered this way, so three Faeries under bob" (faerieTokensUnder S.bob resolved) 3
+        -- #541's fence. Baral's "counters A SPELL" saw one countering, not
+        -- three: CR 608.2n's ceasing ability leaves no record for it to read.
+        Spec.assertEqWith s "CR 113.9 Baral fired once, for the spell alone" (length triggers) 1
+        -- CR 608.2n: a countered ability ceases to exist, so a live object is
+        -- one the sweep spared.
+        Spec.assertBool s (all (\oid -> Maybe.isNothing (Game.lookupObject oid resolved)) theirs) "CR 608.2n both opponent abilities ceased to exist"
+        Spec.assertBool s (all (\oid -> Maybe.isJust (Game.lookupObject oid resolved)) mine) "bob's own ability and his own spell were spared"
+        Spec.assertEqWith
+          s
+          "what is left on the stack is bob's own two objects and CR 113.6g's uncounterable spell, under their original ids"
+          (List.sort (filter (`notElem` triggers) (GameState.stack resolved)))
+          (List.sort (uncounterable : mine))
+        Spec.assertEqWith s "CR 701.6a alice's countered spell reached her graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
+        Spec.assertBool s (all (\oid -> not (S.onBattlefield oid resolved)) (Maybe.maybeToList mHers)) "the countered spell never resolved"
+        -- CR 608.2n again, from the other side: the Answer put ITSELF into bob's
+        -- graveyard as the last part of its own resolution, and nothing
+        -- countered it (CR 113.6g).
+        Spec.assertEqWith s "bob's graveyard holds the spent Answer alone" (length (Game.zoneMembers Zone.Graveyard S.bob resolved)) 1
+  -- The discriminating twin: the SAME board with the counterable opponent SPELL
+  -- removed and nothing else changed. Two Faeries rather than three, and Baral
+  -- goes silent -- so the third Faerie above was that spell and the two here are
+  -- the abilities, which is the whole of what this unit adds.
+  Spec.it s "CR 113.9 with only abilities countered, the Faeries still come and Baral stays silent" $ do
+    island <- S.printingOf s registry "Island"
+    glenElendra <- S.printingOf s registry "Glen Elendra's Answer"
+    baral <- S.printingOf s registry "Baral, Chief of Compliance"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mongoose <- S.printingOf s registry "Blurred Mongoose"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    case glenElendraBoard island glenElendra baral piker mongoose sorcerer Nothing of
+      Nothing -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
+      Just (_, _, theirs, _, answer, board) -> do
+        let (resolved, triggers) = glenElendraRun answer board
+        Spec.assertEqWith s "two abilities countered this way, so two Faeries" (faerieTokensUnder S.bob resolved) 2
+        Spec.assertEqWith s "and Baral, whose trigger says A SPELL, did not fire at all" (length triggers) 0
+        Spec.assertBool s (all (\oid -> Maybe.isNothing (Game.lookupObject oid resolved)) theirs) "CR 608.2n both opponent abilities ceased to exist"
+        Spec.assertEqWith s "and nothing reached alice's graveyard: an ability has none to reach (CR 608.2n)" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 0
+
 baneOfProgressSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 baneOfProgressSpec s registry = Spec.describe s "BaneOfProgress" $ do
   -- The proving case for #380: a mass effect whose RIDER reads the sweep back.
@@ -3648,6 +3827,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   rampageOfTheClansSpec s registry
   comeBackWrongSpec s registry
   swiftSilenceSpec s registry
+  glenElendrasAnswerSpec s registry
   countOnLuckSpec s registry
   actOnImpulseSpec s registry
   communeWithLavaSpec s registry

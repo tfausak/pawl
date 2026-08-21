@@ -298,6 +298,7 @@ objectRefSlots ref = case ref of
   ObjectRef.EachCardInYourHand -> Map.empty
   ObjectRef.EachCardExiledWithSource {} -> Map.empty
   ObjectRef.EachSpell _ -> Map.empty
+  ObjectRef.EachOnStack _ -> Map.empty
   ObjectRef.EachPlayer -> Map.empty
   ObjectRef.EachOpponent -> Map.empty
   -- The seat comes from the source's own entry choice (CR 614.12a), not a slot.
@@ -338,6 +339,7 @@ objectRefQuantities ref = case ref of
   ObjectRef.EachCardInYourHand -> []
   ObjectRef.EachCardExiledWithSource {} -> []
   ObjectRef.EachSpell _ -> []
+  ObjectRef.EachOnStack _ -> []
   ObjectRef.EachPlayer -> []
   ObjectRef.EachOpponent -> []
   ObjectRef.ChosenPlayer -> []
@@ -1922,6 +1924,14 @@ objectRefObjects legal resolving controller source gs ref = case ref of
      in filter
           (\oid -> Game.isSpell oid gs && Filter.matches context (Projection.viewOfObject oid gs) filter_)
           (GameState.stack gs)
+  -- CR 405.1's whole zone: the arm above without Game.isSpell, since a sentence
+  -- naming spells AND abilities names everything the stack holds. Same order,
+  -- top first (CR 405.2), and read LIVE (CR 608.2c).
+  ObjectRef.EachOnStack filter_ ->
+    let context = effectContext controller source legal (slotGroups resolving gs)
+     in filter
+          (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_)
+          (GameState.stack gs)
   -- Names players and so no objects at all.
   ObjectRef.EachPlayer -> []
   ObjectRef.EachOpponent -> []
@@ -2142,6 +2152,7 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.TopOfLibrary {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.TopOfLibraryUntil {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachSpell _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
+  ObjectRef.EachOnStack _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   -- CR 120.3a: a player is a damage recipient. APNAP (CR 608.2f) via
   -- Game.apnapOrder.
   ObjectRef.EachPlayer -> fmap Recipient.ToPlayer (Game.apnapOrder gs)
@@ -3350,6 +3361,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               gs <- State.get
               pure (objectRefObjects legal resolving controller source gs ref)
             ObjectRef.EachSpell _ -> do
+              gs <- State.get
+              pure (objectRefObjects legal resolving controller source gs ref)
+            ObjectRef.EachOnStack _ -> do
               gs <- State.get
               pure (objectRefObjects legal resolving controller source gs ref)
             ObjectRef.EachPlayer -> pure []

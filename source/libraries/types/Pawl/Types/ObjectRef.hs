@@ -147,8 +147,9 @@ data ObjectRef
     -- narrowing this arm chose: rule 109.2b's word is "spell", and CR 112.1
     -- makes a spell a CARD on the stack, so an activated or triggered ability is
     -- not one. The test is Pawl.Engine.Game.isSpell, a classification of the
-    -- object's kind and never of the card's identity. A swept set of ABILITIES
-    -- would be this arm's sibling and is not this arm: CR 113.9 keeps the two
+    -- object's kind and never of the card's identity. A set holding BOTH
+    -- populations is EachOnStack below; a set holding the ABILITIES alone is a
+    -- third arm nothing has needed yet (gap #2032). CR 113.9 keeps the two
     -- populations apart wherever countering reads them, and pawl already draws
     -- the same line at the target pool (Cancel's Pool.Spells against Stifle's
     -- Pool.Abilities).
@@ -169,6 +170,30 @@ data ObjectRef
     -- that has already left the stack is not in the set and one put there since
     -- the countering spell was cast is.
     EachSpell (Filter.Filter Keyword.Keyword)
+  | -- | Every OBJECT ON THE STACK matching the Filter, spells and abilities
+    -- alike -- Glen Elendra's Answer's "all spells your opponents control and
+    -- all abilities your opponents control". The arm above with CR 109.2b's word
+    -- "spell" switched off: CR 405.1 puts spells and abilities on the stack and
+    -- nothing else there, so a sentence naming both kinds names the zone and the
+    -- Filter is the whole narrowing.
+    --
+    -- ONE arm rather than the arm above plus #2032's abilities-only sibling,
+    -- because the printed sentence is ONE instruction and CR 608.2f processes
+    -- its objects simultaneously: two refs would be two batches, and a rider
+    -- counting "each spell and ability countered this way" would have two counts
+    -- to read rather than one.
+    --
+    -- NO KIND TEST at the sweep, which is the difference from the arm above
+    -- rather than an omission. CR 701.6a's ending still differs per victim -- a
+    -- countered spell reaches a graveyard and a countered ability ceases (CR
+    -- 608.2n) -- and Pawl.Engine.Event.counterOne picks between them off
+    -- Pawl.Engine.Game.isAbility, a classification of the object's kind.
+    --
+    -- Not a target and never one (CR 115.10a), so CR 608.2b has nothing to
+    -- fizzle. Swept when the effect executes (CR 608.2c), the arm above's
+    -- timing, so an object put on the stack since the sweeping spell was cast is
+    -- in the set.
+    EachOnStack (Filter.Filter Keyword.Keyword)
   | -- | Every PLAYER in the game -- Molten Disaster's "and each player". The
     -- first of the three arms that name no object at all (EachOpponent and
     -- ChosenPlayer below are the others), and it is here rather than on
