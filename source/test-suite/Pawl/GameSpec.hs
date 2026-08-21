@@ -202,6 +202,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
               Object.manaSpent = Mana.MkMana [],
               Object.announcedX = Nothing,
               Object.detainedUntil = Set.empty,
+              Object.goadedBy = Set.empty,
               Object.doesNotUntapNext = False,
               Object.exertedBy = Set.empty
             }
@@ -2074,6 +2075,7 @@ handBobBolt lightningBolt gs =
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
+            Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
             Object.exertedBy = Set.empty
           }
@@ -2428,6 +2430,7 @@ restartOnStack mountain =
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
+            Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
             Object.exertedBy = Set.empty
           }

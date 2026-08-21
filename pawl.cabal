@@ -677,6 +677,7 @@ library engine
     Pawl.Engine.Filter
     Pawl.Engine.Foretell
     Pawl.Engine.Game
+    Pawl.Engine.Goad
     Pawl.Engine.Ignore
     Pawl.Engine.Interchangeable
     Pawl.Engine.Keyword
@@ -1362,6 +1363,7 @@ test-suite pawl-test-suite
     Pawl.FaceDownSpec
     Pawl.FilterSpec
     Pawl.GameSpec
+    Pawl.GoadSpec
     Pawl.InvestigateSpec
     Pawl.KeywordTriggerSpec
     Pawl.LibraryOrderSpec

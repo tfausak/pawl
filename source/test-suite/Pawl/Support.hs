@@ -391,6 +391,7 @@ addCreature printing pid gs =
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
+            Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
             Object.exertedBy = Set.empty
           }
@@ -621,6 +622,7 @@ addToken card pid gs =
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
+            Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
             Object.exertedBy = Set.empty
           }
@@ -673,6 +675,7 @@ addLibraryCard printing pid gs =
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
+            Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
             Object.exertedBy = Set.empty
           }
@@ -729,6 +732,7 @@ addGraveyardCard printing pid gs =
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
+            Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
             Object.exertedBy = Set.empty
           }
@@ -790,6 +794,7 @@ addExiledCard printing pid gs =
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
+            Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
             Object.exertedBy = Set.empty
           }
@@ -856,6 +861,7 @@ addHandCard printing pid gs =
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
+            Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
             Object.exertedBy = Set.empty
           }
@@ -931,6 +937,7 @@ landsFor land pid n base =
                   Object.manaSpent = Mana.MkMana [],
                   Object.announcedX = Nothing,
                   Object.detainedUntil = Set.empty,
+                  Object.goadedBy = Set.empty,
                   Object.doesNotUntapNext = False,
                   Object.exertedBy = Set.empty
                 }
@@ -982,6 +989,7 @@ handOne printing base =
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
+            Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
             Object.exertedBy = Set.empty
           }
@@ -1039,6 +1047,7 @@ pikerInHand land piker n ph =
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
+            Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
             Object.exertedBy = Set.empty
           }
@@ -1563,6 +1572,7 @@ oneMountainState mountain ph =
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
+            Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
             Object.exertedBy = Set.empty
           }
@@ -1742,6 +1752,7 @@ spellOnStack printing pid gs =
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
             Object.detainedUntil = Set.empty,
+            Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
             Object.exertedBy = Set.empty
           }

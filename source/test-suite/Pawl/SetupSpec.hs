@@ -268,6 +268,7 @@ dirtied pid object =
       Object.unlockedHalves = Set.singleton (CardName.MkCardName (Text.pack "Steaming Sauna")),
       Object.designations = Set.singleton Designation.Renowned,
       Object.detainedUntil = Set.singleton pid,
+      Object.goadedBy = Set.empty,
       Object.doesNotUntapNext = True,
       Object.exertedBy = Set.singleton pid
     }

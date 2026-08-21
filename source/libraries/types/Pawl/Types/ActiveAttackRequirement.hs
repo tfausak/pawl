@@ -25,7 +25,10 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- attack YOU, so "attacks you" is obeyed by exactly one of CR 508.1b's
 -- announcements. Goad (CR 701.15b) wants the COMPLEMENT of a seat instead --
 -- "a player other than the controller of the permanent that caused it to be
--- goaded" -- which this field cannot say (#1388).
+-- goaded" -- which this field still cannot say: it rides Object.goadedBy, whose
+-- seats Pawl.Engine.AttackRequirement instantiates against CR 508.1b's list
+-- directly. Rule 701.15a fixes goad's duration and CR 701.15d deduplicates its
+-- goaders, neither of which a row here could state.
 --
 -- `expiry` decides when a Pawl.Engine.Expiry sweep drops it (CR 514.2, 611.2a,
 -- 611.2b); Alluring Siren's "this turn" arms Expiry.AtCleanup.

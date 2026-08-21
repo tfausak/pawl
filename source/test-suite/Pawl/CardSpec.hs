@@ -824,6 +824,7 @@ effectCounts effect = case effect of
   Effect.Tap _ -> []
   Effect.Untap _ -> []
   Effect.Detain _ -> []
+  Effect.Goad _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
   Effect.PhaseOut _ -> []
@@ -1066,6 +1067,7 @@ effectNestedEffects effect = case effect of
   Effect.Tap {} -> []
   Effect.Untap {} -> []
   Effect.Detain {} -> []
+  Effect.Goad {} -> []
   Effect.DoesNotUntapNext {} -> []
   Effect.Transform {} -> []
   Effect.PhaseOut {} -> []
@@ -1495,6 +1497,7 @@ effectReplacements effect = case effect of
   Effect.Tap _ -> []
   Effect.Untap _ -> []
   Effect.Detain _ -> []
+  Effect.Goad _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
   Effect.PhaseOut _ -> []
@@ -2112,6 +2115,7 @@ effectMintedFaces effect = case effect of
   Effect.Tap _ -> []
   Effect.Untap _ -> []
   Effect.Detain _ -> []
+  Effect.Goad _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
   Effect.PhaseOut _ -> []
@@ -3459,6 +3463,7 @@ effectFilters effect = case effect of
   Effect.Tap ref -> sourceHosted (objectRefFilters ref)
   Effect.Untap ref -> sourceHosted (objectRefFilters ref)
   Effect.Detain ref -> sourceHosted (objectRefFilters ref)
+  Effect.Goad ref -> sourceHosted (objectRefFilters ref)
   Effect.DoesNotUntapNext ref -> sourceHosted (objectRefFilters ref)
   Effect.Transform ref -> sourceHosted (objectRefFilters ref)
   Effect.PhaseOut ref -> sourceHosted (objectRefFilters ref)

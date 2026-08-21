@@ -31,6 +31,7 @@ import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Goad as Goad
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
@@ -468,6 +469,7 @@ slotsOf effect = case effect of
   Effect.Tap ref -> objectRefSlots ref
   Effect.Untap ref -> objectRefSlots ref
   Effect.Detain ref -> objectRefSlots ref
+  Effect.Goad ref -> objectRefSlots ref
   Effect.DoesNotUntapNext ref -> objectRefSlots ref
   Effect.Transform ref -> objectRefSlots ref
   Effect.PhaseOut ref -> objectRefSlots ref
@@ -681,6 +683,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Tap _ -> True
   Effect.Untap _ -> True
   Effect.Detain _ -> True
+  Effect.Goad _ -> True
   Effect.DoesNotUntapNext _ -> True
   Effect.Transform _ -> True
   Effect.PhaseOut _ -> True
@@ -822,6 +825,7 @@ readsX = any effectReadsX
       Effect.Tap _ -> False
       Effect.Untap _ -> False
       Effect.Detain _ -> False
+      Effect.Goad _ -> False
       Effect.DoesNotUntapNext _ -> False
       Effect.Transform _ -> False
       Effect.PhaseOut _ -> False
@@ -919,6 +923,7 @@ searchesLibrary effect = case effect of
   Effect.Tap _ -> False
   Effect.Untap _ -> False
   Effect.Detain _ -> False
+  Effect.Goad _ -> False
   Effect.DoesNotUntapNext _ -> False
   Effect.Transform _ -> False
   Effect.PhaseOut _ -> False
@@ -1072,6 +1077,7 @@ boundSlots effect = case effect of
   Effect.Tap _ -> Set.empty
   Effect.Untap _ -> Set.empty
   Effect.Detain _ -> Set.empty
+  Effect.Goad _ -> Set.empty
   Effect.DoesNotUntapNext _ -> Set.empty
   Effect.Transform _ -> Set.empty
   Effect.PhaseOut _ -> Set.empty
@@ -4812,6 +4818,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- stored anywhere but on the victim, so an already-detained permanent is
       -- detained again with no count kept -- see Object.detainedUntil.
       foldr (Detain.detain controller) gs (objectRefObjects legal resolving controller source gs ref)
+  Effect.Goad ref ->
+    State.modify' $ \gs ->
+      -- CR 701.15a: goad each named permanent until the next turn of this
+      -- resolution's `controller` (CR 109.5), sampled once, for the reason
+      -- Effect.Detain samples it. The victims are enumerated ONCE (CR 608.2f).
+      -- An already-goaded permanent goaded again by the same player keeps one
+      -- entry, which is CR 701.15d -- see Object.goadedBy.
+      foldr (Goad.goad controller) gs (objectRefObjects legal resolving controller source gs ref)
   Effect.DoesNotUntapNext ref ->
     State.modify' $ \gs ->
       -- CR 502.3's untap prohibition, as a one-shot; the victims are enumerated
