@@ -1107,7 +1107,10 @@ selfBlocksOneOrMoreSpec s registry =
 -- CR 509.3e read by a BYSTANDER on the ATTACKING side: "whenever a creature
 -- attacking one of your opponents becomes blocked by two or more creatures".
 -- The rule's last sentence makes the number a floor rather than an exact count,
--- and two is the number the one attacking-side printing states.
+-- and two is the only floor above one that a printing states on this side --
+-- Scryfall o:"becomes blocked by two or more", 2026-08-21, matches Seifer alone,
+-- o:"becomes blocked by three or more" matches nothing, and o:"becomes blocked
+-- by" o:"or more creatures" adds only Godsend, whose number is one.
 --
 -- Seifer, Balamb Rival {2}{B}{R} Legendary Creature -- Human Mercenary 4/3,
 -- "First strike / Whenever a creature attacking one of your opponents becomes
