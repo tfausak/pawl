@@ -2705,8 +2705,12 @@ stillThere oids gs = length (filter (\oid -> Set.member oid (GameState.battlefie
 -- widened to the planeswalkers its controller controls and with a {X} that counts
 -- the board where the Prison has a constant.
 --
--- Every case here is arithmetic rather than a threshold: a Forest makes one mana,
--- so "how many Forests were tapped" reads the total cost off the board directly.
+-- Every MANA case here is arithmetic rather than a threshold: a Forest makes one
+-- mana, so "how many Forests were tapped" reads the total cost off the board
+-- directly. The non-mana cases at the end of the group read the same lands the
+-- other way -- Exalted Dragon sacrifices one rather than tapping it (CR 508.1h),
+-- so a land that is GONE is that toll's trace and a land that is TAPPED is the
+-- other's.
 attackCostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
   Spec.it s "CR 508.1h/508.1j attacking under a Ghostly Prison costs {2}, and the mana is paid" $ do
@@ -3000,9 +3004,10 @@ blockersOf attacker gs = Map.findWithDefault Set.empty attacker (Combat.Type.blo
 -- the pool's first cost to block, and the first board on which a legal
 -- declaration can leave the defending player unable to comply with CR 509.1.
 --
--- attackCostSpec's twin, and every case here reads the toll the same way: a
+-- attackCostSpec's twin, and every mana case here reads the toll the same way: a
 -- Forest makes one mana, so "how many Forests were tapped" is the total cost read
--- off the board.
+-- off the board. The non-mana cases at the end of the group read a land that is
+-- GONE instead, CR 509.1d's list being as wide as CR 508.1h's.
 --
 -- Not implemented: Oppressive Rays' third line, "activated abilities of enchanted
 -- creature cost {3} more to activate", which the card's JSON omits -- nothing
@@ -3134,7 +3139,7 @@ blockCostSpec s registry = Spec.describe s "BlockCosts" $ do
     -- its criterion asks which creatures were DECLARED this combat, which no
     -- Pawl.Types.Filter says -- Not IsAttacking admits a creature removed from
     -- combat, and a fellow chosen blocker is not blocking yet when CR 509.1f pays
-    -- (#2025). Transcribing it that way would make pawl's card WEAKER than
+    -- (#2024). Transcribing it that way would make pawl's card WEAKER than
     -- printed, so the toll is proved on a card that owes nothing to that criterion.
     --
     -- bob pays, and bob's lands are the ones that go: CR 509.1a makes every chosen

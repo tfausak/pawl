@@ -1573,7 +1573,7 @@ pay casting spending pid oid cost = do
 -- Not implemented: CR 601.2h's order prompt ACROSS tags. Each tag's own components
 -- are ordered by payComponents below, but two taxing permanents are paid in
 -- battlefield order rather than the payer's. Exact for one taxing permanent, which
--- is every board `data/cards/` can build (#2024).
+-- is every board `data/cards/` can build (#2023).
 payToll :: PlayerId -> [(ObjectId, Cost Keyword.Type.Keyword)] -> Game Bool
 payToll pid charges = do
   before <- State.get
