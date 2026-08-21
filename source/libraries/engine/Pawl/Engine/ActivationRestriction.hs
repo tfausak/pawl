@@ -29,7 +29,9 @@ import Pawl.Types.PlayerId (PlayerId)
 --
 -- ALL of them, which is what CR 602.5's "prohibited from being activated" means:
 -- one clause failing is a prohibition in force, and a card printing two joins
--- them with "and". The empty list is CR 602.2's default and passes vacuously.
+-- them with "and". The empty list leaves the ability whatever window the rules
+-- already give it -- CR 602.2's priority, CR 605.3a's two for a mana ability --
+-- and passes vacuously.
 --
 -- Priority is not re-checked here. Pawl.Engine.Activate's caller is
 -- Action.legalActions, which the priority loop asks only of the player who has
@@ -43,8 +45,10 @@ import Pawl.Types.PlayerId (PlayerId)
 -- Pawl.Types.CastingRestriction, whose arms are spelled the same way and answer
 -- a different question.
 --
--- This gate makes the ability un-OFFERED. Engine.priorityLoop is what makes that
--- binding: it rejects an action the interpreter was not offered (#219).
+-- This gate makes the ability un-OFFERED, and Engine.priorityLoop is what makes
+-- that binding: it rejects an action the interpreter was not offered (#219). On
+-- the mana path it also makes the source unpayable, Cost.manaActivations being
+-- asked at both of CR 605.3a's windows.
 restrictionsOk :: PlayerId -> [ActivationRestriction.ActivationRestriction] -> GameState -> Bool
 restrictionsOk pid restrictions gs = all (restrictionMet pid gs) restrictions
 
@@ -53,6 +57,12 @@ restrictionMet :: PlayerId -> GameState -> ActivationRestriction.ActivationRestr
 restrictionMet pid gs restriction = case restriction of
   -- CR 307.5's three conjuncts, and Turn.sorcerySpeedWindow is that window shared
   -- with CR 307.1's casting gate: two rules, the same three facts, one copy.
+  --
+  -- CR 307.5's empty-stack conjunct is the one window that can change under a
+  -- caster between the offer and the payment, since CR 601.2a puts the spell on
+  -- the stack in between. Not implemented: the cast gate agreeing with the
+  -- payment for this arm on the mana path (#2005). Vacuous for data/cards/,
+  -- where no mana ability prints this rider.
   ActivationRestriction.SorcerySpeed -> Turn.sorcerySpeedWindow pid gs
   -- CR 500.1's phases and steps: Turn.inWindow asks whether GameState.phase
   -- falls inside the window the rider names. CONTAINMENT rather than equality,

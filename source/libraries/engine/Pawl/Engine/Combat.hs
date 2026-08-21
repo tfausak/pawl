@@ -1184,8 +1184,7 @@ declareBlockers :: Game ()
 declareBlockers = do
   -- CR 506.7b's boundary, raised BEFORE the short-circuit below and before any
   -- prompt, the rule opening the window "regardless of whether any blockers are
-  -- actually declared". ActivationRestriction.afterBlockersDeclared is the
-  -- reader.
+  -- actually declared". Turn.afterBlockersDeclared is the reader.
   --
   -- The PLACEMENT is a regression fence rather than proved behaviour: moving this
   -- line inside the guard below leaves the suite green, no board in the pool

@@ -1109,13 +1109,13 @@ towerBoard tower victim =
 -- Vivi Ornitier name a turn with no phase (#520); every other hit rides on
 -- "only once each turn" or "only if <condition>", neither of which
 -- Pawl.Types.ActivationRestriction can say. Grinning Ignus replaces this card
--- when the first two land.
+-- when #1120 and #2004 land.
 --
 -- The two cases below are the SAME board at two moments, and the phase is the
 -- one thing that differs. That is what makes the pair a proof about the rider
 -- rather than about the fixture -- and the phase, unlike CR 307.5's sorcery
 -- window, cannot change under a caster's feet between the offer and the payment
--- (CR 500.12).
+-- (CR 500.12). SorcerySpeed is the arm that can, and is unexercised (#2005).
 riderWindowSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 riderWindowSpec s registry = Spec.describe s "CR 605.3a a printed rider gates both windows" $ do
   Spec.it s "CR 500.1 the priority window offers the source only inside the rider's step" $ do
