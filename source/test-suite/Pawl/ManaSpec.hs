@@ -1178,9 +1178,12 @@ springBoard spring bolt =
 -- The Withered Wretch below is the payment window's door: "{1}: Exile target
 -- card from a graveyard" is activatable whenever its controller has priority, so
 -- the SAME activation is legal on all three turns and Lavinia's rider is the one
--- thing that changes whether it can be paid for. A spell would not do -- CR
--- 307.1 keeps a sorcery off an opponent's turn, and the pool holds no instant
--- whose cost colorless mana pays.
+-- thing that changes whether it can be paid for. A spell would not do: CR 307.1
+-- keeps a sorcery off an opponent's turn, and walking data/cards/ on 2026-08-21
+-- for a single-faced Instant whose printed cost is generic-only -- the only
+-- shape two colorless mana pay -- turned up none, Lightning Bolt's {R} being
+-- the shape every instant in the corpus has. Any generic-only instant added
+-- later would serve as the door instead.
 laviniaTurnRiderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 laviniaTurnRiderSpec s registry = Spec.describe s "CR 102.1 a rider naming a turn and no phase" $ do
   Spec.it s "CR 605.3a the priority window offers her mana ability on either opponent's turn and not on hers" $ do
