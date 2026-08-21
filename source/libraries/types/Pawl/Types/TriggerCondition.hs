@@ -205,12 +205,14 @@ data TriggerCondition
     --
     -- Nullary: rule 508.3b's subject is named by the ability's own attachment,
     -- so there is nothing left for a payload to say. The player is bound under
-    -- Pawl.Engine.Binding.attackedPlayer, which the second half of every one of
-    -- those five Curses needs ("each opponent attacking that player").
+    -- the reserved Pawl.Engine.Binding.triggerPlayer slot, which the second half
+    -- of every one of those five Curses needs ("each opponent attacking that
+    -- player").
     --
-    -- Not implemented: rule 508.3b's planeswalker and battle subjects, which no
-    -- printing states, and CR 508.3e's "[a player] attacks [another player]",
-    -- whose producers need capabilities pawl lacks (#538).
+    -- Not implemented: rule 508.3b's planeswalker and battle subjects -- the
+    -- sweep above turned up no card writing one, and GameEvent.BecameAttacked
+    -- already carries the permanent an arm for them would read -- and CR 508.3e's
+    -- "[a player] attacks [another player]" (#538).
     AttachedPlayerIsAttacked
   | -- | CR 702.105a: dethrone -- SelfAttacks narrowed by whom the bearer
     -- attacked. The attacked player comes from Combat.attackers rather than the

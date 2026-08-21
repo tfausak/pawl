@@ -156,10 +156,10 @@ attackableBattles defender gs =
 -- attacking a planeswalker that is gone" from "was never attacking anything"
 -- (Thrasta, Tempest's Roar).
 --
--- Not implemented: a trigger reading WHICH PERMANENT was attacked, CR 508.3b's
--- planeswalker and battle forms, GameEvent.AttackerDeclared carrying no target
--- (#538). WHOM it attacked is answerable -- the event carries CR 508.5's
--- defending player.
+-- Not implemented: CR 508.3b's planeswalker and battle subjects. The event that
+-- would carry them is there -- GameEvent.BecameAttacked names the permanent --
+-- and no trigger condition asks; Pawl.Types.TriggerCondition's
+-- AttachedPlayerIsAttacked records the sweep behind that (#538).
 stillAttacked :: ObjectId -> GameState -> Bool
 stillAttacked oid gs = case Combat.defender (GameState.combat gs) of
   -- No defending player is no attack (see Pawl.Types.Combat's defender field).
@@ -1208,8 +1208,10 @@ declareAttackers pid = do
 -- an effect's EntryRiders say is attacking.
 --
 -- The creature was never DECLARED, and this function's whole difference from
--- declareAttackers follows: no GameEvent.AttackerDeclared, so CR 508.3a's
--- exclusion holds by construction; no tapping, CR 508.1f tapping what is declared;
+-- declareAttackers follows: neither GameEvent.AttackerDeclared nor
+-- GameEvent.BecameAttacked, so CR 508.3a's exclusion and rule 508.3b's last
+-- sentence both hold by construction; no tapping, CR 508.1f tapping what is
+-- declared;
 -- and none of canAttack's questions, per CR 508.4c.
 --
 -- The guards are the ways the rules say the creature enters WITHOUT being an

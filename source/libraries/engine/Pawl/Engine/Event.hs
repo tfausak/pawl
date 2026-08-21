@@ -4795,8 +4795,8 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- condition wants exactly the field the event carries.
   --
   -- No Filter over the attacker and no count: CR 508.1a admits only creatures, and
-  -- this fires once per declared attacker (CR 508.3a), not once per declaration
-  -- (CR 508.3b, gap #538).
+  -- this fires once per declared attacker (CR 508.3a), not once per declaration --
+  -- which is AttachedPlayerIsAttacked below, against a different event.
   TriggerCondition.CreatureAttacksYou -> case event of
     GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared _ defending _) -> defending == you
     GameEvent.BlockerDeclared {} -> False

@@ -2807,6 +2807,16 @@ curseOfVitalitySpec s registry =
       aimedAt target who p = case p of
         Prompt.ChooseAttackTarget _ _ _ options -> Maybe.fromMaybe (NonEmpty.head options) (List.find (== target) (NonEmpty.toList options))
         _ -> S.attackTo who p
+      -- The same three seats with the attacking player and the Curse's controller
+      -- COLLAPSED onto carol, whose turn it now is. Everything else is the board
+      -- above: two Pikers, the Curse on bob.
+      ownTurnBoard = do
+        curse <- S.printingOf s registry "Curse of Vitality"
+        piker <- S.printingOf s registry "Goblin Piker"
+        case S.threePlayerCombat [] [] [piker, piker, curse] of
+          (gs0, [], [], [_, _, aura]) ->
+            pure (Just (S.attachTo aura (Recipient.ToPlayer S.bob) gs0 {GameState.activePlayer = S.carol}, aura))
+          _ -> pure Nothing
       -- The same board with the declaration itself declined: the leg that parts
       -- "the enchanted player was attacked" from "the step began".
       standingStill :: PlayerId.PlayerId -> Prompt.Prompt r -> r
@@ -2852,6 +2862,21 @@ curseOfVitalitySpec s registry =
               Spec.assertEqWith s "nobody gained life" (lives after) (Just 20, Just 20, Just 20)
               Spec.assertEqWith s "CR 508.1b and carol really was the one attacked" (sentAt after) [AttackTarget.OfPlayer S.carol, AttackTarget.OfPlayer S.carol]
             Nothing -> Spec.assertFailure s "fixture should give alice two Pikers, bob a Jace and carol the Curse"
+        -- The Curse's own controller doing the attacking, which is the only board
+        -- on which "each OPPONENT attacking that player" is observable: carol
+        -- attacks bob with her own creatures, so the one player attacking the
+        -- enchanted player is not an opponent of the Curse's controller and the
+        -- second sentence names nobody. carol gains 2 for the first sentence and
+        -- no more. Reachable because CR 508.1 lets only the active player declare,
+        -- so this needs carol's turn rather than a second attacker.
+        Spec.it s "CR 508.6 the Curse's own controller attacking pays only the first sentence" $ do
+          built <- ownTurnBoard
+          case built of
+            Just (gs, _) -> do
+              let after = atBlockers (aimedAt (AttackTarget.OfPlayer S.bob) S.bob) gs
+              Spec.assertEqWith s "carol gained 2 and nobody gained for the second sentence" (lives after) (Just 20, Just 20, Just 22)
+              Spec.assertEqWith s "CR 508.1b and both of carol's creatures really attacked bob" (sentAt after) [AttackTarget.OfPlayer S.bob, AttackTarget.OfPlayer S.bob]
+            Nothing -> Spec.assertFailure s "fixture should give carol two Pikers and the Curse"
         -- No declaration at all, on the same board and against the same defending
         -- player: the falsifier for a condition that fired on the STEP.
         Spec.it s "CR 508.3b a declare attackers step with no attackers pays nothing" $ do

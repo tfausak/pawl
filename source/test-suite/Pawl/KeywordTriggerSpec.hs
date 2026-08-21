@@ -4179,7 +4179,8 @@ dethroneSpec s registry =
 -- (alice) and CR 109.5's "you" (bob) are different seats on this board.
 --
 -- TWO attackers, because CR 508.3a's arity is per declared attacker: one life per
--- creature, not one per declaration (CR 508.3b, gap #538).
+-- creature, not one per declaration -- which is CR 508.3b's arity, and
+-- Pawl.EventTriggerSpec's Curse of Vitality group is the same board proving it.
 marchesasDecreeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 marchesasDecreeSpec s registry =
   let board = do
