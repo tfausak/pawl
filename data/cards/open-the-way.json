@@ -1,0 +1,145 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Variable"
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "maximumX": {
+        "type": "Count",
+        "value": {
+          "aggregation": {
+            "type": "Members"
+          },
+          "filter": {
+            "type": "And",
+            "value": []
+          },
+          "scope": {
+            "type": "OverPlayers",
+            "value": {
+              "type": "EachPlayer"
+            }
+          }
+        }
+      },
+      "name": "Open the Way",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "Reveal",
+                    "value": {
+                      "ref": {
+                        "type": "TopOfLibraryUntil",
+                        "value": {
+                          "count": {
+                            "type": "InSlot",
+                            "value": "X"
+                          },
+                          "filter": {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Land"
+                            }
+                          },
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          }
+                        }
+                      },
+                      "slot": "revealed"
+                    }
+                  }
+                ]
+              },
+              {
+                "effects": [
+                  {
+                    "type": "MoveToZone",
+                    "value": {
+                      "ref": {
+                        "type": "EachCardFromAmong",
+                        "value": {
+                          "filter": {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Land"
+                            }
+                          },
+                          "slot": "revealed"
+                        }
+                      },
+                      "riders": {
+                        "tapped": {
+                          "type": "Tapped"
+                        }
+                      },
+                      "zone": {
+                        "type": "Battlefield"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "effects": [
+                  {
+                    "type": "MoveToZone",
+                    "value": {
+                      "placement": {
+                        "type": "RandomOrder",
+                        "value": {
+                          "type": "Bottom"
+                        }
+                      },
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "revealed"
+                      },
+                      "zone": {
+                        "type": "Library"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

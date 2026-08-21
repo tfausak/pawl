@@ -137,14 +137,15 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.codec
       (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) (Quantity.InSlot (SlotName.MkSlotName (Text.pack "X")))))
       " {\"type\":\"TopOfLibrary\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"count\":{\"type\":\"InSlot\",\"value\":\"X\"}}} "
-  -- The walk-terminated sibling: a Filter where the arm above takes a Quantity,
-  -- which is the whole difference between them on the wire too.
+  -- The walk-terminated sibling: the arm above's keys plus a Filter, which is
+  -- the whole difference between them on the wire too -- the shared @count@
+  -- counting matches here where it counts cards there.
   Spec.it s "TopOfLibraryUntil" $
     Common.assertCodec
       s
       ObjectRef.codec
-      (ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil (PlayerRef.Relative PlayerRelation.You) (Filter.Not (Filter.HasCardType CardType.Land))))
-      " {\"type\":\"TopOfLibraryUntil\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"filter\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}} "
+      (ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil (PlayerRef.Relative PlayerRelation.You) (Filter.Not (Filter.HasCardType CardType.Land)) (Quantity.Literal 1)))
+      " {\"type\":\"TopOfLibraryUntil\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"filter\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}},\"count\":{\"type\":\"Literal\",\"value\":1}}} "
   Spec.it s "TopOfLibrary rejects a bare player reference with no depth" $
     Spec.assertBool
       s
@@ -280,7 +281,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec ObjectRef.EachOpponent,
                 Codec.encode ObjectRef.codec ObjectRef.ChosenPlayer,
                 Codec.encode ObjectRef.codec (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 3))),
-                Codec.encode ObjectRef.codec (ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil (PlayerRef.Relative PlayerRelation.You) (Filter.Not (Filter.HasCardType CardType.Land)))),
+                Codec.encode ObjectRef.codec (ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil (PlayerRef.Relative PlayerRelation.You) (Filter.Not (Filter.HasCardType CardType.Land)) (Quantity.Literal 1))),
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature))),
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (PlayerRef.Relative PlayerRelation.You) (Filter.HasCardType CardType.Creature))),
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong (SlotName.MkSlotName (Text.pack "revealed")) (Filter.HasCardType CardType.Creature))),

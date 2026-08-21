@@ -15,7 +15,7 @@ import qualified Pawl.Types.SlotName as SlotName
 -- bound them left them. A library batch is the case no zone-keyed arm can reach,
 -- a library still having no filtered sweep (#1309) -- and
 -- Pawl.Types.ObjectRef.TopOfLibraryUntil's walk is not one, since it stops at the
--- first match rather than collecting every one of them.
+-- match that completes its count rather than collecting every one of them.
 --
 -- No chooser field: CR 608.2d hands the choice to the player applying the effect,
 -- and a group bound by a look is shown to that player alone (CR 701.20e), so the

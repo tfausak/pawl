@@ -3656,8 +3656,8 @@ drawCard pid = do
 -- reads that event and nothing else knows a miracle happened.
 --
 -- Not implemented: CR 702.94b's LASTING reveal -- the card stays revealed until it
--- leaves the hand or the ability leaves the stack -- which needs the per-object
--- flag #282 is about (#1408). Nor CR 121.8's face-down drawn card
+-- leaves the hand or the ability leaves the stack -- which needs a per-object
+-- revealed flag (#1408). Nor CR 121.8's face-down drawn card
 -- (#1409).
 offerMiracleReveal :: PlayerId -> ObjectId -> Game ()
 offerMiracleReveal pid drawn = do
