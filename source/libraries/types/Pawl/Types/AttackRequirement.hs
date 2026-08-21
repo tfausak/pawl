@@ -14,17 +14,17 @@ import qualified Pawl.Types.Condition as Condition
 --
 -- CR 508.1d's OBJECT axis -- "attacks a player other than you if able" -- lives
 -- on Pawl.Types.ActiveAttackRequirement instead, the resolution-created sibling.
--- Nothing in data/cards/ states that axis as a static ability, and the two
--- printings there that reach it CREATE the requirement on resolution (Alluring
--- Siren, Kardur Doomscourge). Printings that would refute that DO exist and are
--- simply not transcribed yet: Public Enemy's "all creatures attack enchanted
--- creature's controller each combat if able" is an Aura's static ability, and
--- Trove of Temptation and Galactus, Devourer of Worlds print the axis statically
--- too (Scryfall @c:"attacks a player other than", @o:"if able" @o:"other than
--- you", 2026-08-21). Pawl.Engine.AttackRequirement instantiates this carrier as
--- (creature, target) pairs, one per announcement CR 508.1b admits, so a
--- requirement written here is unrestricted on that axis. Not implemented: a
--- PRINTED requirement that narrows it (#2014).
+-- Nothing in data/cards/ states that axis as a static ability: the one card
+-- there that reaches it CREATES the requirement on resolution (Alluring Siren),
+-- as does Kardur, Doomscourge, untranscribed. Printings that state it STATICALLY
+-- do exist and are untranscribed too, so the gap is a transcription away from
+-- being observable: Public Enemy is an Aura reading "all creatures attack
+-- enchanted creature's controller each combat if able", and Galactus, Devourer
+-- of Worlds prints it on a creature, gated (Scryfall o:"if able" o:"other than
+-- you" and the o:"if able" sweep, 2026-08-21). Pawl.Engine.AttackRequirement
+-- instantiates this carrier as (creature, target) pairs, one per announcement
+-- CR 508.1b admits, so a requirement written here is unrestricted on that axis.
+-- Not implemented: a PRINTED requirement that narrows it (#2014).
 --
 -- Gathered LIVE from the battlefield on every read and never captured, so a
 -- Curse leaving the battlefield lifts its requirement with nothing to unwind.
@@ -51,7 +51,9 @@ data AttackRequirement = MkAttackRequirement
     --
     -- Pawl.Types.BlockRequirement is the twin that does not carry this yet: CR
     -- 509.1c words the shape the same way, and nothing in data/cards/ prints a
-    -- conditional BLOCKING requirement. Not implemented: that half (#2013).
+    -- conditional BLOCKING requirement -- Enkira, Hostile Scavenger and Frodo
+    -- Baggins are printings that would, untranscribed. Not implemented: that
+    -- half (#2036).
     while :: Maybe Condition.Condition
   }
   deriving (Eq, Ord, Show)
