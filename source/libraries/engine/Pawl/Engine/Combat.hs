@@ -42,8 +42,6 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.ManaCost as ManaCost
-import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -1140,20 +1138,17 @@ declareAttackers pid = do
         -- rule forbids, which is why that function leaves locking to its caller.
         let owed = AttackCost.totalCost recorded gs1
         -- CR 508.1i's mana-ability window and CR 508.1j's all-costs-or-nothing
-        -- payment are both Cost.payMana, which restores the entry state rather than
-        -- spending half of it. Skipped outright at {0}.
+        -- payment are both Cost.payToll, which restores the entry state rather than
+        -- spending half of it. Skipped outright when nothing is owed.
         --
         -- NO "will you pay?" prompt, and that is a rules reading rather than an
         -- elision: CR 508.1j is unconditional once the creatures are chosen, and CR
         -- 508.1d's excuse from paying is exercised one step earlier, by NOT
         -- DECLARING the creature.
         paid <-
-          if null (ManaCost.unwrap owed)
+          if null owed
             then pure True
-            -- Not a cast (`casting` is Nothing), so CR 106.6-restricted mana
-            -- cannot pay an attack cost. Exact: every restriction in the
-            -- vocabulary reads "only to cast".
-            else Cost.payMana Nothing ManaSpending.AsProduced pid owed
+            else Cost.payToll pid owed
         if not paid
           then
             -- CR 508.1's preamble: the declaration is illegal and the game returns
@@ -1299,9 +1294,9 @@ declareBlockers = do
         -- forbids, which is why that function leaves locking to its caller.
         let owed = BlockCost.totalCost legal gs1
         -- CR 509.1e's mana-ability window and CR 509.1f's all-costs-or-nothing
-        -- payment are both Cost.payMana, which restores the entry state rather
-        -- than spending half of it. Skipped outright at {0}, which is every board
-        -- with no cost to block on it.
+        -- payment are both Cost.payToll, which restores the entry state rather
+        -- than spending half of it. Skipped outright when nothing is owed, which
+        -- is every board with no cost to block on it.
         --
         -- NO "will you pay?" prompt, declareAttackers' reading of the same pair of
         -- sentences: CR 509.1f is unconditional once the creatures are chosen, and
@@ -1313,16 +1308,14 @@ declareBlockers = do
         -- their cost is determined, while CR 509.1g makes the chosen creatures
         -- blocking only after CR 509.1f's payment.
         paid <-
-          if null (ManaCost.unwrap owed)
+          if null owed
             then pure True
-            -- Not a cast (`casting` is Nothing), so CR 106.6-restricted mana
-            -- cannot pay a cost to block. Exact: every restriction in the
-            -- vocabulary reads "only to cast".
-            else Cost.payMana Nothing ManaSpending.AsProduced pid owed
+            else Cost.payToll pid owed
         -- CR 509.1's preamble: a declaration the defending player cannot pay for
         -- is illegal and the game returns to the moment before it. Nothing needs
-        -- undoing -- the record is written below, and Cost.payMana spends nothing
-        -- on failure -- so what is left is which declaration stands instead.
+        -- undoing -- the record is written below, and Cost.payToll restores what a
+        -- half-paid toll spent -- so what is left is which declaration stands
+        -- instead.
         --
         -- Not implemented: the fresh declaration the rules then expect, since a
         -- pure `Prompt r -> r` returns the identical answer. forcedBlockDeclaration

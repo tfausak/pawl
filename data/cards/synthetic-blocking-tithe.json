@@ -1,38 +1,26 @@
 {
   "faces": [
     {
-      "attackCosts": [
-        {
-          "perAttacker": {
-            "type": "Fixed",
-            "value": {
-              "mana": [
-                {
-                  "type": "Generic",
-                  "value": 3
-                }
-              ]
-            }
-          },
-          "scope": {
-            "type": "EveryAttack"
-          },
-          "subject": {
-            "type": "Attached"
-          }
-        }
-      ],
       "blockCosts": [
         {
           "perBlocker": {
             "type": "Fixed",
             "value": {
-              "mana": [
+              "components": [
                 {
-                  "type": "Generic",
-                  "value": 3
+                  "type": "Sacrifice",
+                  "value": {
+                    "count": 1,
+                    "whichPermanents": {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Land"
+                      }
+                    }
+                  }
                 }
-              ]
+              ],
+              "mana": []
             }
           },
           "subject": {
@@ -49,6 +37,10 @@
       ],
       "manaCost": [
         {
+          "type": "Generic",
+          "value": 1
+        },
+        {
           "type": "OfType",
           "value": {
             "type": "Colored",
@@ -58,7 +50,7 @@
           }
         }
       ],
-      "name": "Oppressive Rays",
+      "name": "Synthetic Blocking Tithe",
       "typeLine": {
         "subtypes": [
           {

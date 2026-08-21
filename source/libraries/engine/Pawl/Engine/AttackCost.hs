@@ -9,8 +9,10 @@
 -- Prison says "attacking YOU", Sphere of Safety "attacking you or planeswalkers
 -- you control" -- rather than from any rule about costs.
 --
--- The only reader of Pawl.Types.AttackCost. Pawl.Engine.Combat asks for an
--- AMOUNT OF MANA and never learns which card produced one.
+-- The only reader of Pawl.Types.AttackCost. Pawl.Engine.Combat asks for COSTS
+-- and never learns which card wrote one -- each cost is tagged with the
+-- PERMANENT it is printed on (costsOn below), which is an id and not an
+-- identity: Combat pays what the tag names and never reads its text.
 module Pawl.Engine.AttackCost where
 
 import Data.Map.Strict (Map)
@@ -25,9 +27,11 @@ import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackCostScope as AttackCostScope
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import Pawl.Types.ObjectId (ObjectId)
@@ -59,10 +63,18 @@ import qualified Pawl.Types.PerCreature as PerCreature
 -- that player at all (CR 310.9b). Under EveryAttack it is taxed like any other
 -- announcement, Oppressive Rays' sentence naming no player to be protected.
 --
+-- Each share is TAGGED with the permanent that printed it, and that pairing is
+-- the answer to "what object is a cost to attack on?". CR 508.1h adds several
+-- printed costs into one total, so the total itself is on no object at all;
+-- each PART is on the permanent whose text states it, which is what a component
+-- naming "this" (Pawl.Types.CostComponent's SacrificeThis, TapThis) would have
+-- to mean, and what a criterion's `Not IsSource` frames. Pawl.Engine.Cost.payToll
+-- is what keeps the tags apart while adding the mana halves together.
+--
 -- Empty for the board almost every game is played on: the battlefield walk
 -- stops at `Face.attackCosts face` for every permanent that prints none, so no
 -- projection is forced (#200).
-costsOn :: ObjectId -> AttackTarget.AttackTarget -> GameState -> [ManaCost.ManaCost]
+costsOn :: ObjectId -> AttackTarget.AttackTarget -> GameState -> [(ObjectId, Cost.Cost Keyword.Keyword)]
 costsOn attacker target gs =
   let -- Hoisted out of the walk as CombatRestriction.restricted hoists them, and
       -- both unforced until some permanent actually declares a cost.
@@ -125,24 +137,29 @@ costsOn attacker target gs =
         PerCreature.Fixed cost -> [cost]
         PerCreature.Counted quantity ->
           let context = Filter.contextFor (Projection.controllerOf source gs) (Just source)
-              generic n = ManaCost.MkManaCost [ManaSymbol.Generic (Integer.toNaturalSaturating n)]
+              generic n = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic (Integer.toNaturalSaturating n)])) []
            in Maybe.maybeToList (fmap generic (Quantity.evaluate (Projection.fullView gs) context gs source quantity))
       fromCost source ac =
         if protects source ac
           && Projection.affects source attacker (AttackCost.subject ac) view gs
-          then shareOf source ac
+          then fmap ((,) source) (shareOf source ac)
           else []
    in concatMap fromPermanent (Set.toList (GameState.battlefield gs))
 
--- CR 508.1h: every printed cost in force on every announced attack, pooled into
--- one mana cost. Ghostly Prison's "{2} for each creature" is performed rather
--- than restated -- the multiplication is the fold, so three taxed attackers owe
--- {2}{2}{2} and Pawl.Engine.Mana.spend sums the generic symbols.
+-- CR 508.1h: every printed cost in force on every announced attack, determined
+-- together. Ghostly Prison's "{2} for each creature" is performed rather than
+-- restated -- the multiplication is the fold, so three taxed attackers owe three
+-- shares.
+--
+-- A LIST and not one added-up cost, which is CR 508.1h read past its mana half:
+-- adding {2} to {2} is {4}, and adding "sacrifice a land" to "sacrifice a land"
+-- is two sacrifices that keep the permanents that demanded them. The adding is
+-- Pawl.Engine.Cost.payToll's, which pools the mana so CR 508.1i opens ONE window
+-- and pays each non-mana half against its own tag.
 --
 -- CR 508.1h then locks the total in, which is the CALLER's to honour and cannot
 -- be honoured here: this is a pure function of a game state.
 -- Combat.declareAttackers calls it once, binds the result, and pays THAT.
-totalCost :: Map ObjectId AttackTarget.AttackTarget -> GameState -> ManaCost.ManaCost
+totalCost :: Map ObjectId AttackTarget.AttackTarget -> GameState -> [(ObjectId, Cost.Cost Keyword.Keyword)]
 totalCost declaration gs =
-  ManaCost.MkManaCost
-    (concatMap ManaCost.unwrap (concatMap (\(oid, target) -> costsOn oid target gs) (Map.toList declaration)))
+  concatMap (\(oid, target) -> costsOn oid target gs) (Map.toList declaration)

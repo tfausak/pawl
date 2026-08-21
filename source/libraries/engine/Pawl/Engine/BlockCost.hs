@@ -11,8 +11,10 @@
 -- CREATURES. So this module's question is about the blocker alone, and what it
 -- is blocking never reaches it.
 --
--- The only reader of Pawl.Types.BlockCost. Pawl.Engine.Combat asks for an AMOUNT
--- OF MANA and never learns which card produced one.
+-- The only reader of Pawl.Types.BlockCost. Pawl.Engine.Combat asks for COSTS and
+-- never learns which card wrote one -- each cost is tagged with the PERMANENT it
+-- is printed on (costsOn below), which is an id and not an identity: Combat pays
+-- what the tag names and never reads its text.
 module Pawl.Engine.BlockCost where
 
 import Data.Map.Strict (Map)
@@ -25,9 +27,11 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Types.BlockCost as BlockCost
+import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import Pawl.Types.ObjectId (ObjectId)
@@ -41,10 +45,15 @@ import qualified Pawl.Types.PerCreature as PerCreature
 -- A creature blocking two attackers under a Palace Guard therefore owes its share
 -- ONCE, which is CR 509.1d totalling over the chosen creatures.
 --
+-- Each share is TAGGED with the permanent that printed it, AttackCost.costsOn's
+-- pairing and its reason: CR 509.1d adds several printed costs into one total, so
+-- the total is on no object, while each PART is on the permanent whose text
+-- states it.
+--
 -- Empty for the board almost every game is played on: the battlefield walk stops
 -- at `Face.blockCosts face` for every permanent that prints none, so no projection
 -- is forced (#200).
-costsOn :: ObjectId -> GameState -> [ManaCost.ManaCost]
+costsOn :: ObjectId -> GameState -> [(ObjectId, Cost.Cost Keyword.Keyword)]
 costsOn blocker gs =
   let -- Hoisted out of the walk as AttackCost.costsOn hoists them, and both
       -- unforced until some permanent actually declares a cost.
@@ -86,18 +95,22 @@ costsOn blocker gs =
         PerCreature.Fixed cost -> [cost]
         PerCreature.Counted quantity ->
           let context = Filter.contextFor (Projection.controllerOf source gs) (Just source)
-              generic n = ManaCost.MkManaCost [ManaSymbol.Generic (Integer.toNaturalSaturating n)]
+              generic n = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic (Integer.toNaturalSaturating n)])) []
            in Maybe.maybeToList (fmap generic (Quantity.evaluate (Projection.fullView gs) context gs source quantity))
       fromCost source bc =
         if Projection.affects source blocker (BlockCost.subject bc) view gs
-          then shareOf source bc
+          then fmap ((,) source) (shareOf source bc)
           else []
    in concatMap fromPermanent (Set.toList (GameState.battlefield gs))
 
 -- CR 509.1d: every printed cost in force on every creature this declaration
--- chooses as a blocker, pooled into one mana cost. Charged once per CREATURE and
--- not once per pair, which is the rule's own unit -- a blocker assigned to two
+-- chooses as a blocker, determined together. Charged once per CREATURE and not
+-- once per pair, which is the rule's own unit -- a blocker assigned to two
 -- attackers pays its share once.
+--
+-- A LIST and not one added-up cost, AttackCost.totalCost's shape and its reason:
+-- the adding is Pawl.Engine.Cost.payToll's, which pools the mana so CR 509.1e
+-- opens ONE window and pays each non-mana half against its own tag.
 --
 -- An entry naming NO attacker is not a chosen creature: CR 509.1a chooses a
 -- creature by choosing something for it to block, and Pawl.Engine.Combat's
@@ -106,10 +119,9 @@ costsOn blocker gs =
 -- CR 509.1d then locks the total in, which is the CALLER's to honour and cannot be
 -- honoured here: this is a pure function of a game state.
 -- Combat.declareBlockers calls it once, binds the result, and pays THAT.
-totalCost :: Map ObjectId (Set.Set ObjectId) -> GameState -> ManaCost.ManaCost
+totalCost :: Map ObjectId (Set.Set ObjectId) -> GameState -> [(ObjectId, Cost.Cost Keyword.Keyword)]
 totalCost declaration gs =
-  ManaCost.MkManaCost
-    (concatMap (\blocker -> concatMap ManaCost.unwrap (costsOn blocker gs)) (Map.keys (Map.filter (not . Set.null) declaration)))
+  concatMap (\blocker -> costsOn blocker gs) (Map.keys (Map.filter (not . Set.null) declaration))
 
 -- CR 509.1c's cost clause: a player is never required to pay a cost to block.
 -- True when this creature can be declared as a blocker for nothing.

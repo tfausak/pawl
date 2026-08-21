@@ -241,8 +241,8 @@ populatedFace =
       Face.sacrificeRestrictions = [SacrificeRestriction.MkSacrificeRestriction Affected.Attached],
       Face.untapRestrictions = [UntapRestriction.MkUntapRestriction Affected.Attached],
       Face.attachRestrictions = [AttachRestriction.MkAttachRestriction Affected.Attached (Filter.HasSubtype Subtype.Aura)],
-      Face.attackCosts = [AttackCost.MkAttackCost Affected.Attached (PerCreature.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 2])) AttackCostScope.Controller],
-      Face.blockCosts = [BlockCost.MkBlockCost Affected.Attached (PerCreature.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 3]))],
+      Face.attackCosts = [AttackCost.MkAttackCost Affected.Attached (PerCreature.Fixed (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])) AttackCostScope.Controller],
+      Face.blockCosts = [BlockCost.MkBlockCost Affected.Attached (PerCreature.Fixed (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []))],
       Face.additionalCosts = [CostComponent.TapThis],
       Face.maximumX = Just Quantity.ManaValue,
       Face.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing (Cost.MkCost (Just (ManaCost.MkManaCost [])) [])],
@@ -279,8 +279,8 @@ populatedFaceJson =
     <> "\"sacrificeRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}],"
     <> "\"untapRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}],"
     <> "\"attachRestrictions\":[{\"affected\":{\"type\":\"Attached\"},\"attachers\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Aura\"}}}],"
-    <> "\"attackCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perAttacker\":{\"type\":\"Fixed\",\"value\":[{\"type\":\"Generic\",\"value\":2}]},\"scope\":{\"type\":\"Controller\"}}],"
-    <> "\"blockCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perBlocker\":{\"type\":\"Fixed\",\"value\":[{\"type\":\"Generic\",\"value\":3}]}}],"
+    <> "\"attackCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perAttacker\":{\"type\":\"Fixed\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}},\"scope\":{\"type\":\"Controller\"}}],"
+    <> "\"blockCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perBlocker\":{\"type\":\"Fixed\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}}}],"
     <> "\"additionalCosts\":[{\"type\":\"TapThis\"}],"
     <> "\"maximumX\":{\"type\":\"ManaValue\"},"
     <> "\"alternativeCosts\":[{\"cost\":{\"mana\":[]}}],"
@@ -477,15 +477,15 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         s
         encodeFace
         decodeFace
-        baseFace {Face.attackCosts = [AttackCost.MkAttackCost Affected.Attached (PerCreature.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 2])) AttackCostScope.Controller]}
-        (init baseFaceJson <> ",\"attackCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perAttacker\":{\"type\":\"Fixed\",\"value\":[{\"type\":\"Generic\",\"value\":2}]},\"scope\":{\"type\":\"Controller\"}}]}")
+        baseFace {Face.attackCosts = [AttackCost.MkAttackCost Affected.Attached (PerCreature.Fixed (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])) AttackCostScope.Controller]}
+        (init baseFaceJson <> ",\"attackCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perAttacker\":{\"type\":\"Fixed\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}},\"scope\":{\"type\":\"Controller\"}}]}")
     Spec.it s "blockCosts" $
       Common.assertJsonCodec
         s
         encodeFace
         decodeFace
-        baseFace {Face.blockCosts = [BlockCost.MkBlockCost Affected.Attached (PerCreature.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 3]))]}
-        (init baseFaceJson <> ",\"blockCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perBlocker\":{\"type\":\"Fixed\",\"value\":[{\"type\":\"Generic\",\"value\":3}]}}]}")
+        baseFace {Face.blockCosts = [BlockCost.MkBlockCost Affected.Attached (PerCreature.Fixed (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []))]}
+        (init baseFaceJson <> ",\"blockCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perBlocker\":{\"type\":\"Fixed\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}}}]}")
     Spec.it s "additionalCosts" $
       Common.assertJsonCodec
         s

@@ -961,7 +961,9 @@ blockPermissionCounts permission =
     <> foldMap conditionCounts (BlockPermission.while permission)
 
 -- CR 508.1h's per-attacker share. Only the Counted arm holds anything: the Fixed
--- arm is mana symbols.
+-- arm is a Pawl.Types.Cost, whose components carry Naturals rather than
+-- Quantities (CR 601.2b's X is a constructor of its own) and Filters rather than
+-- Counts.
 perCreatureCounts :: PerCreature.PerCreature -> [Count.Type.Count Quantity.Type.Quantity]
 perCreatureCounts perCreature = case perCreature of
   PerCreature.Fixed _ -> []
@@ -2659,12 +2661,13 @@ affectedFilters affected = case affected of
   Affected.Attached -> []
   Affected.AttachedPlayerControls f -> [f]
 
--- CR 508.1h's per-attacker share. The Counted arm reaches a Filter through its
--- Quantity -- Sphere of Safety counts "enchantments you control" -- where the
--- Fixed arm is mana symbols and nothing else.
+-- CR 508.1h's per-attacker share. Both arms reach a Filter: the Counted arm
+-- through its Quantity (Sphere of Safety counts "enchantments you control"), and
+-- the Fixed arm through its cost's components (Exalted Dragon sacrifices "a
+-- land").
 perCreatureFilters :: PerCreature.PerCreature -> [Filter.Type.Filter Keyword.Keyword]
 perCreatureFilters perCreature = case perCreature of
-  PerCreature.Fixed _ -> []
+  PerCreature.Fixed cost -> costFilters cost
   PerCreature.Counted quantity -> quantityFilters quantity
 
 objectRefFilters :: ObjectRef.ObjectRef -> [Filter.Type.Filter Keyword.Keyword]
@@ -6045,7 +6048,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               base {Face.combatRestrictions = [CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless (Affected.Matching buried) Nothing)]}
             ),
             ( "CR 508.1h's cost to attack",
-              base {Face.attackCosts = [AttackCost.MkAttackCost (Affected.Matching buried) (PerCreature.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 2])) AttackCostScope.Controller]}
+              base {Face.attackCosts = [AttackCost.MkAttackCost (Affected.Matching buried) (PerCreature.Fixed (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])) AttackCostScope.Controller]}
             ),
             ( "CR 508.1h's counted share",
               base
@@ -6062,7 +6065,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "CR 509.1d's cost to block",
-              base {Face.blockCosts = [BlockCost.MkBlockCost (Affected.Matching buried) (PerCreature.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 3]))]}
+              base {Face.blockCosts = [BlockCost.MkBlockCost (Affected.Matching buried) (PerCreature.Fixed (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []))]}
             ),
             ( "CR 509.1d's counted share",
               base

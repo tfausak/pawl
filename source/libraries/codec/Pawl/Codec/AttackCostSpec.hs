@@ -15,6 +15,8 @@ import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackCostScope as AttackCostScope
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.InZone as InZone
@@ -24,6 +26,7 @@ import qualified Pawl.Types.PerCreature as PerCreature
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Zone as Zone
 
@@ -37,10 +40,10 @@ spec s = Spec.describe s "Pawl.Codec.AttackCost" $ do
       AttackCost.codec
       ( AttackCost.MkAttackCost
           (Affected.Matching (Filter.HasCardType CardType.Creature))
-          (PerCreature.Fixed (ManaCost.MkManaCost [ManaSymbol.Generic 2]))
+          (PerCreature.Fixed (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) []))
           AttackCostScope.Controller
       )
-      " {\"perAttacker\":{\"type\":\"Fixed\",\"value\":[{\"type\":\"Generic\",\"value\":2}]},\"scope\":{\"type\":\"Controller\"},\"subject\":{\"type\":\"Matching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+      " {\"perAttacker\":{\"type\":\"Fixed\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}},\"scope\":{\"type\":\"Controller\"},\"subject\":{\"type\":\"Matching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   -- Sphere of Safety's half of the type: the wide scope and a counted share, the
   -- two arms Ghostly Prison's literal above does not reach.
   Spec.it s "MkAttackCost with a counted share and the wider scope" $
@@ -61,6 +64,23 @@ spec s = Spec.describe s "Pawl.Codec.AttackCost" $ do
           AttackCostScope.ControllerAndPlaneswalkers
       )
       " {\"perAttacker\":{\"type\":\"Counted\",\"value\":{\"type\":\"Count\",\"value\":{\"aggregation\":{\"type\":\"Members\"},\"filter\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Enchantment\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]},\"scope\":{\"type\":\"InZone\",\"value\":{\"player\":{\"type\":\"EachPlayer\"},\"zone\":{\"type\":\"Battlefield\"}}}}}},\"scope\":{\"type\":\"ControllerAndPlaneswalkers\"},\"subject\":{\"type\":\"Matching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+  -- Exalted Dragon's half: a share with no mana and a component, which is CR
+  -- 508.1h's list past "paying mana". The subject is the Dragon itself.
+  Spec.it s "MkAttackCost with a non-mana share" $
+    Common.assertCodec
+      s
+      AttackCost.codec
+      ( AttackCost.MkAttackCost
+          (Affected.Matching Filter.IsSource)
+          ( PerCreature.Fixed
+              ( Cost.MkCost
+                  (Just (ManaCost.MkManaCost []))
+                  [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.HasCardType CardType.Land))]
+              )
+          )
+          AttackCostScope.EveryAttack
+      )
+      " {\"perAttacker\":{\"type\":\"Fixed\",\"value\":{\"components\":[{\"type\":\"Sacrifice\",\"value\":{\"count\":1,\"whichPermanents\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}],\"mana\":[]}},\"scope\":{\"type\":\"EveryAttack\"},\"subject\":{\"type\":\"Matching\",\"value\":{\"type\":\"IsSource\"}}} "
   -- Exhaustive where the two literals above are representative: Arm.enum derives
   -- the scope's arm list from the type, so this is what would catch an arm the
   -- derivation missed or two that encode alike.

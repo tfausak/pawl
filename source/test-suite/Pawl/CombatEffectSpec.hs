@@ -2691,6 +2691,12 @@ allTapped oids gs = all (\oid -> tapStateOf oid gs == Just TapState.Tapped) oids
 allUntapped :: [ObjectId.ObjectId] -> GameState.GameState -> Bool
 allUntapped oids gs = all (\oid -> tapStateOf oid gs == Just TapState.Untapped) oids
 
+-- How many of these permanents are still on the battlefield. What a test asks of
+-- the lands to see a NON-MANA payment: a sacrificed land is gone (CR 701.21a),
+-- where a spent Forest is merely tapped, so the two tolls leave different traces.
+stillThere :: [ObjectId.ObjectId] -> GameState.GameState -> Int
+stillThere oids gs = length (filter (\oid -> Set.member oid (GameState.battlefield gs)) oids)
+
 -- CR 508.1d's cost clause and CR 508.1h-508.1j, proved by Ghostly Prison
 -- ("Creatures can't attack you unless their controller pays {2} for each creature
 -- they control that's attacking you") -- the pool's first cost to attack, and the
@@ -2925,6 +2931,49 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
         Spec.assertBool s (allTapped forests atBob) "attacking bob: the {3} was paid"
       _ -> Spec.assertFailure s "fixture should have one attacker"
 
+  Spec.it s "CR 508.1h a cost to attack that is not mana: an Exalted Dragon sacrifices a land" $ do
+    -- CR 508.1h's list past its first item -- "costs may include paying mana,
+    -- tapping permanents, sacrificing permanents, discarding cards, and so on" --
+    -- proved by Exalted Dragon ("This creature can't attack unless you sacrifice a
+    -- land"), the pool's first cost to attack that is not mana.
+    --
+    -- The lands are Forests and are UNTAPPED throughout, which is what separates
+    -- the two kinds of toll on one board: an engine that charged mana here would
+    -- tap one, and an engine that charged nothing would leave both standing.
+    dragon <- S.printingOf s registry "Exalted Dragon"
+    forest <- S.printingOf s registry "Forest"
+    let (gs, mine, _) = S.combatBoardOf [dragon] []
+        (forests, board) = addForests forest 2 gs
+        after = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
+    Spec.assertEqWith s "CR 508.1j: one of the two lands was sacrificed" (stillThere forests after) 1
+    Spec.assertEqWith s "and the Dragon really was declared" (S.attackerDeclarationsOf after) mine
+    Spec.assertBool s (allUntapped (filter (\oid -> Set.member oid (GameState.battlefield after)) forests) after) "the surviving land was not tapped: this toll is not mana"
+  Spec.it s "CR 508.1 the same board with an untaxed attacker sacrifices nothing" $ do
+    -- The control for the case above, differing in the attacking creature alone:
+    -- Exalted Dragon's subject is ITSELF, so a Goblin Piker on the same two-Forest
+    -- board attacks for free.
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [piker] []
+        (forests, board) = addForests forest 2 gs
+        after = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
+    Spec.assertEqWith s "both lands are still there" (stillThere forests after) 2
+    Spec.assertEqWith s "and the Piker attacked all the same" (S.attackerDeclarationsOf after) mine
+  Spec.it s "CR 508.1j partial payments are not allowed: two Dragons and one land sacrifice nothing" $ do
+    -- CR 508.1h totals the whole declaration, so two Dragons owe two lands. One
+    -- land cannot pay for both, and CR 508.1j's "partial payments are not allowed"
+    -- is what makes the answer NEITHER attacks rather than one of them does: the
+    -- land that was already sacrificed while the toll was being paid comes back.
+    dragon <- S.printingOf s registry "Exalted Dragon"
+    forest <- S.printingOf s registry "Forest"
+    let (gs, mine, _) = S.combatBoardOf [dragon, dragon] []
+        (forests, board) = addForests forest 1 gs
+        after = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
+    Spec.assertEqWith s "the land is still on the battlefield" (stillThere forests after) 1
+    Spec.assertEqWith s "nothing was declared" (S.attackerDeclarationsOf after) []
+    Spec.assertEqWith s "and nothing is attacking" (Combat.Type.attackers (GameState.combat after)) Map.empty
+    Spec.assertBool s (allUntapped mine after) "CR 508.1f's tapping was undone too"
+
 -- `n` untapped Forests under `who`'s control, ids first. addForests with the
 -- payer as an argument: CR 509.1f's payer is the DEFENDING player, where CR
 -- 508.1j's is the active one, so a cost to block is paid out of bob's lands.
@@ -3076,6 +3125,49 @@ blockCostSpec s registry = Spec.describe s "BlockCosts" $ do
         Spec.assertEqWith s "nothing blocked" (blockersOf unicorn taxedRun) Set.empty
         Spec.assertBool s (allUntapped forests taxedRun) "and no mana was spent"
       _ -> Spec.assertFailure s "fixture should have a Unicorn and a blocker"
+
+  Spec.it s "CR 509.1d a cost to block that is not mana sacrifices a land" $ do
+    -- CR 509.1d's list past its first item, attackCostSpec's Exalted Dragon case
+    -- on the blocking side. SYNTHETIC, and legitimately so: Hollow Warrior is the
+    -- printing ("can't attack or block unless you tap an untapped creature you
+    -- control not declared as an attacking or blocking creature this combat"), and
+    -- its criterion asks which creatures were DECLARED this combat, which no
+    -- Pawl.Types.Filter says -- Not IsAttacking admits a creature removed from
+    -- combat, and a fellow chosen blocker is not blocking yet when CR 509.1f pays
+    -- (#2025). Transcribing it that way would make pawl's card WEAKER than
+    -- printed, so the toll is proved on a card that owes nothing to that criterion.
+    --
+    -- bob pays, and bob's lands are the ones that go: CR 509.1a makes every chosen
+    -- blocker one the defending player controls.
+    tithe <- S.printingOf s registry "Synthetic Blocking Tithe"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker] [piker]
+    case (mine, theirs) of
+      ([attacker], [blocker]) -> do
+        let (forests, board) = addForestsFor S.bob forest 2 (raying tithe blocker gs)
+            after = S.runPure S.aggressiveAnswer board Combat.declareBlockers
+        Spec.assertEqWith s "CR 509.1f: one of the two lands was sacrificed" (stillThere forests after) 1
+        Spec.assertEqWith s "and the block really was declared" (blockersOf attacker after) (Set.singleton blocker)
+        Spec.assertBool s (allUntapped (filter (\oid -> Set.member oid (GameState.battlefield after)) forests) after) "the surviving land was not tapped: this toll is not mana"
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+  Spec.it s "CR 509.1f partial payments are not allowed: two taxed blockers and one land sacrifice nothing" $ do
+    -- CR 509.1d totals over the chosen creatures, so two taxed blockers owe two
+    -- lands and one land cannot pay. The land sacrificed while the toll was being
+    -- paid comes back, which on THIS side is the payment's own doing: CR 509.1's
+    -- preamble leaves declareBlockers nothing of its own to rewind, the record not
+    -- being written until the toll is paid.
+    tithe <- S.printingOf s registry "Synthetic Blocking Tithe"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker] [piker, piker]
+    case (mine, theirs) of
+      ([attacker], [one, two]) -> do
+        let (forests, board) = addForestsFor S.bob forest 1 (raying tithe two (raying tithe one gs))
+            after = S.runPure S.aggressiveAnswer board Combat.declareBlockers
+        Spec.assertEqWith s "the land is still on the battlefield" (stillThere forests after) 1
+        Spec.assertEqWith s "and nothing blocked" (blockersOf attacker after) Set.empty
+      _ -> Spec.assertFailure s "fixture should have an attacker and two blockers"
 
 -- CR 305.7 as the FIVE readers in this module read it, which is one shared gate:
 -- Pawl.Engine.Projection.liveAfterLayers. Ashaya, Soul of the Wild makes its
