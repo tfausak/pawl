@@ -392,7 +392,7 @@ slotsOf effect = case effect of
   Effect.RestartGame exempt -> foldMap objectRefSlots exempt
   Effect.ControlPlayerNextTurn slot -> oneSlot slot
   -- The third field is a DEFINITION, not a read; it belongs to boundSlots below.
-  Effect.Destroy (Destroy.MkDestroy ref _ _ _) -> objectRefSlots ref
+  Effect.Destroy (Destroy.MkDestroy ref _ _ _ _) -> objectRefSlots ref
   Effect.Sacrifice slot -> oneSlot slot
   Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown slot _) -> oneSlot slot
   Effect.TurnFaceUp slot -> oneSlot slot
@@ -420,7 +420,9 @@ slotsOf effect = case effect of
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.DecreaseSpeed d -> joinTwo (playerRefSlots (SpeedDecrease.player d)) (quantitySlots (SpeedDecrease.quantity d))
   -- Create's slot is a DEFINITION, not a read, so the lint must not see it here.
-  Effect.Create (Create.MkCreate quantity _ _ _) -> quantitySlots quantity
+  -- CR 111.2's creator is a READ: Rampage of the Clans names the controller of
+  -- the permanent the loop around it bound.
+  Effect.Create (Create.MkCreate quantity _ _ _ creator) -> joinTwo (quantitySlots quantity) (playerRefSlots creator)
   -- A READ, unlike Create's slot: the ref names the permanent being copied.
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> joinTwo (quantitySlots quantity) (objectRefSlots ref)
   -- Both refs: either may name a slot.
@@ -649,7 +651,7 @@ slotsAreExhaustive effect = case effect of
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.DecreaseSpeed d -> Quantity.slotsAreExhaustive (SpeedDecrease.quantity d)
   -- CR 111.1's token is minted with empty bindings, so its card is literal text.
-  Effect.Create (Create.MkCreate quantity _ _ _) -> Quantity.slotsAreExhaustive quantity
+  Effect.Create (Create.MkCreate quantity _ _ _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.BecomeCopy {} -> True
   -- The ReplacementEffect holds no Quantity, and the one reference it can hold --
@@ -793,7 +795,7 @@ readsX = any effectReadsX
       Effect.RedistributeLifeTotals -> False
       Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.DecreaseSpeed d -> Quantity.readsX (SpeedDecrease.quantity d)
-      Effect.Create (Create.MkCreate quantity _ _ _) -> Quantity.readsX quantity
+      Effect.Create (Create.MkCreate quantity _ _ _ _) -> Quantity.readsX quantity
       Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> Quantity.readsX quantity
       Effect.BecomeCopy {} -> False
       Effect.Replace {} -> False
@@ -983,7 +985,7 @@ boundSlots effect = case effect of
   -- CR 400.7: the incarnation minted at the destination.
   Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ _ mSlot _ _) -> foldMap Set.singleton mSlot
   -- The tokens this Create minted, for CR 603.7c's delayed trigger to name.
-  Effect.Create (Create.MkCreate _ _ _ mSlot) -> foldMap Set.singleton mSlot
+  Effect.Create (Create.MkCreate _ _ _ mSlot _) -> foldMap Set.singleton mSlot
   Effect.CreateCopy {} -> Set.empty
   -- Binds nothing: no new object comes into existence.
   Effect.BecomeCopy {} -> Set.empty
@@ -994,7 +996,7 @@ boundSlots effect = case effect of
   -- How many permanents this destruction ACTUALLY destroyed, for a later "for
   -- each ... destroyed this way", and the cards it put into a graveyard, for a
   -- later clause that NAMES them (CR 400.7's incarnations).
-  Effect.Destroy (Destroy.MkDestroy _ _ mSlot mBuried) -> foldMap Set.singleton mSlot <> foldMap Set.singleton mBuried
+  Effect.Destroy (Destroy.MkDestroy _ _ mSlot mBuried mPermanents) -> foldMap Set.singleton mSlot <> foldMap Set.singleton mBuried <> foldMap Set.singleton mPermanents
   -- How many milled cards matched the tally's filter (CR 728.1), and WHICH cards
   -- the mill put in the graveyard, for a later clause that names them (CR
   -- 701.17c). Two slots and not one: a card may write either without the other.
@@ -2142,13 +2144,15 @@ forEachOrder resolving controller recipients = do
   fmap concat (traverse pick groups)
 
 -- WHOSE a recipient is: a player recipient is that seat, an object's is its
--- controller (CR 110.2). Nothing where the board no longer holds the object,
--- which is reachable rather than defensive (CR 400.7); each caller says what it
--- does with that.
+-- controller (CR 110.2) -- and CR 608.2h's last known information for an object
+-- the board no longer holds, which is reachable rather than defensive (CR
+-- 400.7): Effect.ForEach walks the permanents a destruction already removed.
+-- Nothing only where neither answer exists; each caller says what it does with
+-- that.
 recipientSeat :: GameState -> Recipient -> Maybe PlayerId
 recipientSeat gs recipient = case recipient of
   Recipient.ToPlayer pid -> Just pid
-  _ -> Recipient.objectOf recipient >>= \oid -> Projection.controllerOf oid gs
+  _ -> Recipient.objectOf recipient >>= \oid -> Projection.controllerWithLastKnown oid gs
 
 -- The objects a Create bound into `slot` as a GROUP, read off the RESOLVING
 -- stack object's live bindings rather than out of `chosen`, which projects CR
@@ -3025,7 +3029,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           gs {GameState.pendingControl = Map.insert target (Decider.MkDecider controller) (GameState.pendingControl gs)}
         -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
         _ -> gs
-  Effect.Destroy (Destroy.MkDestroy ref regenerability mSlot mBuried) -> do
+  Effect.Destroy (Destroy.MkDestroy ref regenerability mSlot mBuried mPermanents) -> do
     gs <- State.get
     -- CR 701.8: destroy them through the single funnel -- indestructible (CR
     -- 702.12b) and regeneration (CR 701.19a) are Event.destroy's to decide, and
@@ -3071,6 +3075,27 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       after <- State.get
       let buriedCards = filter (\oid -> isCardInAGraveyard oid after) (Maybe.mapMaybe snd destroyed)
       Monad.unless (null buriedCards) (State.modify' (bindObjectsSlot resolving slot (Seq.fromList buriedCards)))
+    -- The THIRD reading, and the only one that keeps a controller: the PERMANENTS
+    -- CR 701.8 destroyed, under the ids they held on the battlefield, for
+    -- Effect.ForEach to walk one at a time -- Rampage of the Clans' "for each
+    -- permanent destroyed this way, its controller creates a 3/3 green Centaur
+    -- creature token". `fst`, not `snd`: the incarnation the graveyard move
+    -- minted is a different object (CR 400.7) and a card in a graveyard has no
+    -- controller at all (CR 108.4), so only these ids answer "its controller",
+    -- and they answer it through CR 608.2h's last known information.
+    --
+    -- The funnel's own answer and not the sweep (CR 701.8b): an indestructible
+    -- permanent (CR 702.12b) and a regenerated one (CR 701.8c) were not
+    -- destroyed, so neither is walked. No board filter of `buried`'s kind: what
+    -- the rider asks about is the destruction, not where the remains landed, so a
+    -- CR 614 replacement sending the card to exile changes nothing here.
+    --
+    -- Bound onto `resolving` as a GROUP, `buried`'s shape and for its reason:
+    -- slotGroup reads live GameState unconditionally. Nothing is bound when
+    -- nothing was destroyed, so the loop finds an unbound slot and runs no
+    -- iterations (CR 101.3).
+    Monad.forM_ mPermanents $ \slot ->
+      Monad.unless (null destroyed) (State.modify' (bindObjectsSlot resolving slot (Seq.fromList (fmap fst destroyed))))
   Effect.Sacrifice slot -> do
     -- A slot a Create bound to a GROUP names every token at once, so all of them
     -- are sacrificed, in mint order. Read off the resolving object's live
@@ -3908,48 +3933,59 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             _ -> pure (victim, [])
     doomed <- traverse pickFor victims
     Monad.forM_ doomed (\(victim, oids) -> Monad.mapM_ (Event.sacrifice victim) oids)
-  Effect.Create (Create.MkCreate quantity card entry mSlot) -> do
+  Effect.Create (Create.MkCreate quantity card entry mSlot creator) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal (slotGroups resolving gs)
-    case Quantity.evaluateFor viewOf context gs resolving source quantity of
-      Just n
-        | n > 0 -> do
-            -- CR 111: create n tokens under the effect's controller (CR 111.2)
-            -- through the single funnel, so CR 614's token replacements get their
-            -- opportunity. CR 110.5b: the funnel is handed the entry's tap state.
-            -- CR 122.6a's counters ride along through CR 122.6's own door, so a
-            -- counter replacement reaches them.
-            minted <- Event.createTokens controller (bakeTokenCharacteristics (Quantity.evaluateFor viewOf context gs resolving source) card) Nothing (Integer.toNaturalSaturating n) (EntryRiders.tapped entry) (EntryRiders.counters entry)
-            -- CR 508.4: a creature put onto the battlefield attacking has its
-            -- defending player chosen in Pawl.Engine.Combat, and CR 508.3a's
-            -- attack triggers see nothing. After the entry loops rather than
-            -- inside them: CR 614.16's replacement settles the COUNT first.
-            Monad.when (EntryRiders.attacking entry) (Monad.mapM_ Combat.putOntoBattlefieldAttacking minted)
-            case (mSlot, namesEveryToken quantity, minted) of
-              (Nothing, _, _) -> pure ()
-              -- Unreachable: createTokens places every token onto the battlefield
-              -- (CR 111.2). Total rather than partial.
-              (Just _, _, []) -> pure ()
-              -- The card says "those tokens", so the slot holds EVERY token this
-              -- Create minted (CR 111.1) and there is nothing to ask.
-              (Just slot, True, _) -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList minted))
-              -- CR 603.7c: bind the minted token so a delayed ability this same
-              -- resolution arms can name it. One token is the whole candidate
-              -- list, so there is nothing to ask.
-              (Just slot, False, [only]) -> State.modify' (bindSlot resolving slot only)
-              -- CR 614.16 got there first: a replacement multiplied the count, so
-              -- several tokens stand where CR 603.7c's "it" names one. CR 707.10e
-              -- is the codified analogue, so this asks. FILTERED, NOT TRUSTED: an
-              -- answer naming something not minted falls back to the first.
-              (Just slot, False, first : second : rest) -> do
-                gs1 <- State.get
-                let candidates = first NonEmpty.:| (second : rest)
-                    decider = Decide.deciderFor controller gs1
-                answer <- Game.choose (Prompt.ChooseBoundToken decider controller source candidates)
-                let named = if List.elem answer (NonEmpty.toList candidates) then answer else first
-                State.modify' (bindSlot resolving slot named)
-      _ -> pure ()
+        -- CR 111.2: WHOSE tokens. CR 109.5's "you" is the default reference, and
+        -- every other one is somebody the sentence identified -- Rampage of the
+        -- Clans' "its controller", read off the loop's member through CR 608.2h.
+        -- APNAP (CR 608.2f) for a reference naming several, payersOf's own
+        -- intersection so a reference naming a departed seat mints nothing.
+        creators = payersOf creator legal controller gs
+    -- PER CREATOR, every amount off the same pre-effect `gs` (CR 608.2f), so one
+    -- seat's tokens cannot change how many the next seat gets.
+    minted <- fmap concat . Monad.forM creators $ \creating ->
+      case evaluateForRecipient viewOf context gs resolving source creating quantity of
+        Just n
+          | n > 0 -> do
+              -- CR 111: create n tokens under that player's control (CR 111.2)
+              -- through the single funnel, so CR 614's token replacements get their
+              -- opportunity. CR 110.5b: the funnel is handed the entry's tap state.
+              -- CR 122.6a's counters ride along through CR 122.6's own door, so a
+              -- counter replacement reaches them.
+              made <- Event.createTokens creating (bakeTokenCharacteristics (Quantity.evaluateFor viewOf context gs resolving source) card) Nothing (Integer.toNaturalSaturating n) (EntryRiders.tapped entry) (EntryRiders.counters entry)
+              -- CR 508.4: a creature put onto the battlefield attacking has its
+              -- defending player chosen in Pawl.Engine.Combat, and CR 508.3a's
+              -- attack triggers see nothing. After the entry loops rather than
+              -- inside them: CR 614.16's replacement settles the COUNT first.
+              Monad.when (EntryRiders.attacking entry) (Monad.mapM_ Combat.putOntoBattlefieldAttacking made)
+              pure made
+        _ -> pure []
+    case (mSlot, namesEveryToken quantity, minted) of
+      (Nothing, _, _) -> pure ()
+      -- Nothing was minted, so no slot names anything: an unevaluable or
+      -- non-positive count, or a creator reference naming nobody (CR 101.3).
+      -- createTokens itself always places what it is asked for (CR 111.2).
+      (Just _, _, []) -> pure ()
+      -- The card says "those tokens", so the slot holds EVERY token this
+      -- Create minted (CR 111.1) and there is nothing to ask.
+      (Just slot, True, _) -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList minted))
+      -- CR 603.7c: bind the minted token so a delayed ability this same
+      -- resolution arms can name it. One token is the whole candidate
+      -- list, so there is nothing to ask.
+      (Just slot, False, [only]) -> State.modify' (bindSlot resolving slot only)
+      -- CR 614.16 got there first: a replacement multiplied the count, so
+      -- several tokens stand where CR 603.7c's "it" names one. CR 707.10e
+      -- is the codified analogue, so this asks. FILTERED, NOT TRUSTED: an
+      -- answer naming something not minted falls back to the first.
+      (Just slot, False, first : second : rest) -> do
+        gs1 <- State.get
+        let candidates = first NonEmpty.:| (second : rest)
+            decider = Decide.deciderFor controller gs1
+        answer <- Game.choose (Prompt.ChooseBoundToken decider controller source candidates)
+        let named = if List.elem answer (NonEmpty.toList candidates) then answer else first
+        State.modify' (bindSlot resolving slot named)
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> do
     gs <- State.get
     -- CR 707.2 / 111.3: this many tokens per named permanent, minted through the

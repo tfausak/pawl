@@ -269,19 +269,19 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.Regenerable Nothing Nothing))
+      (Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.Regenerable Nothing Nothing Nothing))
       " {\"type\":\"Destroy\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"t\"},\"regenerability\":{\"type\":\"Regenerable\"}}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.CantBeRegenerated Nothing Nothing))
+      (Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.CantBeRegenerated Nothing Nothing Nothing))
       " {\"type\":\"Destroy\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"t\"},\"regenerability\":{\"type\":\"CantBeRegenerated\"}}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)) Regenerability.Regenerable Nothing Nothing))
+      (Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)) Regenerability.Regenerable Nothing Nothing Nothing))
       " {\"type\":\"Destroy\",\"value\":{\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"regenerability\":{\"type\":\"Regenerable\"}}} "
   -- The slot the sweep binds its count into is ELIDED when absent, so the case
   -- above writes two keys and this one writes three. Since #1305 that is
@@ -292,7 +292,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.HasCardType CardType.Artifact)) Regenerability.Regenerable (Just (SlotName.MkSlotName (Text.pack "destroyed"))) Nothing))
+      (Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.HasCardType CardType.Artifact)) Regenerability.Regenerable (Just (SlotName.MkSlotName (Text.pack "destroyed"))) Nothing Nothing))
       " {\"type\":\"Destroy\",\"value\":{\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}}},\"regenerability\":{\"type\":\"Regenerable\"},\"slot\":\"destroyed\"}} "
   Spec.it s "PayAnyEnergy" $
     Common.assertJsonCodec
@@ -589,38 +589,49 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       Effect.RedistributeLifeTotals
       " {\"type\":\"RedistributeLifeTotals\"} "
-  -- Create's EntryRiders and bound slot are each ELIDED when they are the
-  -- default, exactly like MoveToZone above: four emitted forms, the middle two
-  -- told apart at decode by JSON TYPE.
-  Spec.it s "Create round-trips all four shapes, and elides the defaults" $ do
+  -- Create's EntryRiders, bound slot and CR 111.2 creator are each ELIDED when
+  -- they are the default, exactly like MoveToZone above; the riders and the slot
+  -- were once the middle two of four emitted forms, told apart at decode by JSON
+  -- TYPE.
+  Spec.it s "Create round-trips every combination of its three elided keys" $ do
     let attacking = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = True, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
         plain = EntryRiders.defaultValue
         slot = SlotName.MkSlotName (Text.pack "token")
         card = Text.pack "Goblin Piker"
+        you = PlayerRef.Relative PlayerRelation.You
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.Create (Create.MkCreate (Quantity.Literal 2) card plain Nothing))
+      (Effect.Create (Create.MkCreate (Quantity.Literal 2) card plain Nothing you))
       " {\"type\":\"Create\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":2},\"card\":\"Goblin Piker\"}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.Create (Create.MkCreate (Quantity.Literal 1) card plain (Just slot)))
+      (Effect.Create (Create.MkCreate (Quantity.Literal 1) card plain (Just slot) you))
       " {\"type\":\"Create\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":1},\"card\":\"Goblin Piker\",\"slot\":\"token\"}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.Create (Create.MkCreate (Quantity.Literal 2) card attacking Nothing))
+      (Effect.Create (Create.MkCreate (Quantity.Literal 2) card attacking Nothing you))
       " {\"type\":\"Create\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":2},\"card\":\"Goblin Piker\",\"riders\":{\"tapped\":{\"type\":\"Tapped\"},\"attacking\":true}}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.Create (Create.MkCreate (Quantity.Literal 1) card attacking (Just slot)))
+      (Effect.Create (Create.MkCreate (Quantity.Literal 1) card attacking (Just slot) you))
       " {\"type\":\"Create\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":1},\"card\":\"Goblin Piker\",\"riders\":{\"tapped\":{\"type\":\"Tapped\"},\"attacking\":true},\"slot\":\"token\"}} "
+    -- CR 111.2's creator, the one key of the three that is not a card's own
+    -- name: Rampage of the Clans writes the controller of the permanent the
+    -- loop around it bound.
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Create (Create.MkCreate (Quantity.Literal 1) card plain Nothing (PlayerRef.ControllerOfBound (SlotName.MkSlotName (Text.pack "victim")))))
+      " {\"type\":\"Create\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":1},\"card\":\"Goblin Piker\",\"creator\":{\"type\":\"ControllerOfBound\",\"value\":\"victim\"}}} "
   -- Both ObjectRef arms have to survive. A count of one is elided, so both of
   -- these write the ref alone.
   Spec.it s "CreateCopy round-trips both ObjectRef arms" $ do

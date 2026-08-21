@@ -6,8 +6,9 @@ import qualified Pawl.Types.SlotName as SlotName
 
 -- | The payload of Pawl.Types.Effect's Destroy arm (#1305).
 --
--- Two independent back-references, because the printed phrase "put into a
--- graveyard this way" is read two ways and the two answers are different kinds.
+-- Three independent back-references, because "destroyed this way" and "put into
+-- a graveyard this way" are read three ways and the three answers are different
+-- kinds.
 --
 -- `slot` is where the count of what CR 701.8 actually destroyed is written, for
 -- a later effect of the same resolution to read as Quantity.InSlot -- Builder's
@@ -21,12 +22,23 @@ import qualified Pawl.Types.SlotName as SlotName
 -- the permanent is gone by the time the naming clause runs, and CR 400.7 gives
 -- the card in the graveyard a fresh id.
 --
--- Either is absent for a destruction that is not looked back at, which is every
--- destruction in the pool but the two that are.
+-- `permanents` is where the PERMANENTS CR 701.8 destroyed are written, under the
+-- ids they held while they were on the battlefield, for a later effect to walk
+-- one at a time -- Rampage of the Clans' "for each permanent destroyed this way,
+-- ITS CONTROLLER creates a 3/3 green Centaur creature token". Neither of the
+-- other two answers that question: a count has no controller to read, and the CR
+-- 400.7 incarnation `buried` names is a card in a graveyard, which CR 108.4
+-- leaves with no controller at all. What a reader of this slot gets is CR
+-- 608.2h's last known information, which is what the rule asks for -- the
+-- permanent is gone by the time the rider runs.
+--
+-- Any of the three is absent for a destruction that is not looked back at in
+-- that way, which is every destruction in the pool but the three that are.
 data Destroy = MkDestroy
   { ref :: ObjectRef.ObjectRef,
     regenerability :: Regenerability.Regenerability,
     slot :: Maybe SlotName.SlotName,
-    buried :: Maybe SlotName.SlotName
+    buried :: Maybe SlotName.SlotName,
+    permanents :: Maybe SlotName.SlotName
   }
   deriving (Eq, Ord, Show)

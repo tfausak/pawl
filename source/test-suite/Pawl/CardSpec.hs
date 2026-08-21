@@ -776,7 +776,7 @@ effectCounts effect = case effect of
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   -- The floor beside it is a printed literal and holds no Count.
   Effect.DecreaseSpeed d -> quantityCounts (SpeedDecrease.quantity d)
-  Effect.Create (Create.MkCreate quantity card _ _) -> quantityCounts quantity <> overFaces cardCounts card
+  Effect.Create (Create.MkCreate quantity card _ _ _) -> quantityCounts quantity <> overFaces cardCounts card
   -- No embedded card -- the copied permanent supplies the text -- but the count
   -- is card data like Create's.
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> quantityCounts quantity
@@ -1423,7 +1423,7 @@ replacementEffectRiders replacement = case replacement of
 effectReplacements :: Effect.Effect Card.Type.Card -> [ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card)]
 effectReplacements effect = case effect of
   Effect.Replace (Replace.MkReplace _ _ _ _ replacement) -> replacement : concatMap effectReplacements (replacementPrintedEffects replacement)
-  Effect.Create (Create.MkCreate _ token _ _) -> overFaces cardReplacementEffects token
+  Effect.Create (Create.MkCreate _ token _ _ _) -> overFaces cardReplacementEffects token
   Effect.CreateCopy {} -> []
   Effect.BecomeCopy {} -> []
   Effect.CreateEmblem emblem -> overFaces cardReplacementEffects emblem
@@ -2032,7 +2032,7 @@ data MintedKind
 -- too, and the build breaks until it is.
 effectMintedFaces :: Effect.Effect Card.Type.Card -> [(MintedKind, Face.Face Card.Type.Card)]
 effectMintedFaces effect = case effect of
-  Effect.Create (Create.MkCreate _ token _ _) -> fmap ((,) MintedToken) (NonEmpty.toList (Card.Type.faces token))
+  Effect.Create (Create.MkCreate _ token _ _ _) -> fmap ((,) MintedToken) (NonEmpty.toList (Card.Type.faces token))
   -- Mints no face of its own: the token's text is the copied permanent's.
   Effect.CreateCopy {} -> []
   -- Mints nothing at all: it rewrites an existing permanent's copiable values.
@@ -3363,7 +3363,7 @@ effectFilters effect = case effect of
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ f quantity) -> unframed (f : quantityFilters quantity)
   Effect.RestartGame _ -> []
   Effect.ControlPlayerNextTurn _ -> []
-  Effect.Destroy (Destroy.MkDestroy ref _ _ _) -> sourceHosted (objectRefFilters ref)
+  Effect.Destroy (Destroy.MkDestroy ref _ _ _ _) -> sourceHosted (objectRefFilters ref)
   Effect.Sacrifice _ -> []
   -- The riders reach a Filter one level further down than the ObjectRef: CR
   -- 122.6a's counters are keyed by CounterKind, and CR 122.1b's keyword counter
@@ -3395,7 +3395,7 @@ effectFilters effect = case effect of
   Effect.DecreaseSpeed d -> unframed (quantityFilters (SpeedDecrease.quantity d))
   -- CR 111.1's token is a whole card, and every Filter position it has is one a
   -- card author can write -- the same nesting Pawl.Codec's round trip walks.
-  Effect.Create (Create.MkCreate quantity card riders _) -> unframed (quantityFilters quantity <> concatMap counterKindFilters (Map.keys (EntryRiders.counters riders))) <> overFaces cardFilters card
+  Effect.Create (Create.MkCreate quantity card riders _ _) -> unframed (quantityFilters quantity <> concatMap counterKindFilters (Map.keys (EntryRiders.counters riders))) <> overFaces cardFilters card
   -- An EachMatching ref's Filter is card text like RequireBlock's below, and the
   -- count's Filters are as much card text as Create's.
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> unframed (quantityFilters quantity) <> sourceHosted (objectRefFilters ref)
@@ -4114,7 +4114,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "CR 111.4 every token a card creates is named its subtypes plus \"Token\"" $ do
     ps <- S.allPrintings s
     -- Every FACE of every token, since CR 707.8a's double-faced token names two.
-    let tokensOf face = concatMap (NonEmpty.toList . Card.Type.faces) [token | Effect.Create (Create.MkCreate _ token _ _) <- cardResolutionEffects face]
+    let tokensOf face = concatMap (NonEmpty.toList . Card.Type.faces) [token | Effect.Create (Create.MkCreate _ token _ _ _) <- cardResolutionEffects face]
         tokens = concatMap (overFaces tokensOf . Printing.card) ps
     -- Guards the sweep against passing vacuously if Create ever moves out
     -- from under cardResolutionEffects.
@@ -4122,7 +4122,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "no token is misnamed" (fmap Face.name (filter tokenNameOffends tokens)) []
   Spec.it s "the lint itself catches a token named without the suffix" $ do
     doomedTraveler <- S.printingOf s registry "Doomed Traveler"
-    case concatMap (NonEmpty.toList . Card.Type.faces) [token | Effect.Create (Create.MkCreate _ token _ _) <- cardResolutionEffects (S.combinedFace doomedTraveler)] of
+    case concatMap (NonEmpty.toList . Card.Type.faces) [token | Effect.Create (Create.MkCreate _ token _ _ _) <- cardResolutionEffects (S.combinedFace doomedTraveler)] of
       [token] -> do
         Spec.assertBool s (not (tokenNameOffends token)) "the real token passes"
         -- The exact misauthoring CR 111.4 forbids: the bare subtype, with
@@ -4137,7 +4137,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- green and only a gameplay assertion in Pawl.ReplacementSpec objected.
   Spec.it s "CR 111.4 the sweep reaches a token nested in a prevention rider" $ do
     inkshield <- S.printingOf s registry "Inkshield"
-    case concatMap (NonEmpty.toList . Card.Type.faces) [token | Effect.Create (Create.MkCreate _ token _ _) <- cardResolutionEffects (S.combinedFace inkshield)] of
+    case concatMap (NonEmpty.toList . Card.Type.faces) [token | Effect.Create (Create.MkCreate _ token _ _ _) <- cardResolutionEffects (S.combinedFace inkshield)] of
       [token] -> do
         Spec.assertBool s (not (tokenNameOffends token)) "the real token passes"
         Spec.assertBool s (tokenNameOffends token {Face.name = CardName.MkCardName $ Text.pack "Inkling"}) "misnamed token detected"
@@ -4246,7 +4246,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "the lint itself catches an effect that binds a reserved slot" $ do
     baneOfProgress <- S.printingOf s registry "Bane of Progress"
     let rebind slot effect = case effect of
-          Effect.Destroy (Destroy.MkDestroy ref regenerability (Just _) mBuried) -> Effect.Destroy (Destroy.MkDestroy ref regenerability (Just slot) mBuried)
+          Effect.Destroy (Destroy.MkDestroy ref regenerability (Just _) mBuried mPermanents) -> Effect.Destroy (Destroy.MkDestroy ref regenerability (Just slot) mBuried mPermanents)
           other -> other
         overModal f modal =
           modal {Modal.modes = fmap (\m -> m {Mode.clauses = fmap (\c -> c {Clause.effects = fmap f (Clause.effects c)}) (Mode.clauses m)}) (Modal.modes modal)}
@@ -4295,7 +4295,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 Modal.MkModal
                   ( Seq.singleton
                       ( Mode.MkMode
-                          (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot Binding.you) Regenerability.Regenerable (Just Binding.eventAmount) Nothing)))))
+                          (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot Binding.you) Regenerability.Regenerable (Just Binding.eventAmount) Nothing Nothing)))))
                           (Map.singleton Binding.you (TargetSlot.required Pool.AnyTarget Nothing))
                       )
                   )
@@ -4321,13 +4321,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         onEveryFace f card = card {Card.Type.faces = fmap f (Card.Type.faces card)}
         -- The graft on the minted TOKEN, on every face of it.
         armToken effect = case effect of
-          Effect.Create (Create.MkCreate quantity token riders slot) -> Effect.Create (Create.MkCreate quantity (onEveryFace arm token) riders slot)
+          Effect.Create (Create.MkCreate quantity token riders slot creator) -> Effect.Create (Create.MkCreate quantity (onEveryFace arm token) riders slot creator)
           other -> other
         -- The same, on the BACK face of a two-faced token whose front is clean.
         armBackFace effect = case effect of
-          Effect.Create (Create.MkCreate quantity token riders slot) ->
+          Effect.Create (Create.MkCreate quantity token riders slot creator) ->
             let front = NonEmpty.head (Card.Type.faces token)
-             in Effect.Create (Create.MkCreate quantity (token {Card.Type.faces = front NonEmpty.:| [arm front]}) riders slot)
+             in Effect.Create (Create.MkCreate quantity (token {Card.Type.faces = front NonEmpty.:| [arm front]}) riders slot creator)
           other -> other
         -- The same, on a minted EMBLEM in place of the token.
         armEmblem effect = case effect of
@@ -5025,7 +5025,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "no Create carries CR 712.14a's transformed entry rider" $ do
     ps <- S.allPrintings s
     let creates effect = case effect of
-          Effect.Create (Create.MkCreate _ _ riders _) -> EntryRiders.transformed riders
+          Effect.Create (Create.MkCreate _ _ riders _ _) -> EntryRiders.transformed riders
           _ -> False
         moves effect = case effect of
           Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _) -> EntryRiders.transformed riders
@@ -5135,9 +5135,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- One seat -- InSlot's answer, one indirection out.
           PlayerRef.ControllerOfBound _ -> True
         -- Every opcode that binds a batch under a name of the card's own: a
-        -- move, CR 701.20e's look, CR 701.20a's reveal and CR 701.17c's mill.
-        -- All four dispatch on how many objects arrived, so all four can leave
-        -- the group binding a singular reader cannot see.
+        -- move, CR 701.20e's look, CR 701.20a's reveal, CR 701.17c's mill and
+        -- CR 701.8's two look-back slots. The first four dispatch on how many
+        -- objects arrived, so each can leave the group binding a singular
+        -- reader cannot see; the destruction's two are group bindings
+        -- unconditionally, so they are plural at any size of sweep.
         boundPlurally effect = case effect of
           Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ mSlot _ _) | not (movesAtMostOne ref) -> Maybe.maybeToList mSlot
           Effect.LookAt (LookAt.MkLookAt ref slot) | not (movesAtMostOne ref) -> [slot]
@@ -5150,6 +5152,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           Effect.Mill (Mill.MkMill player quantity _ mSlot)
             | not (millsAtMostOne player quantity) ->
                 Maybe.maybeToList mSlot
+          -- No ref test: Pawl.Engine.Resolve's Destroy arm writes both through
+          -- bindObjectsSlot however few permanents it destroyed, so neither is
+          -- ever the singular shape -- not even for "destroy target creature".
+          Effect.Destroy (Destroy.MkDestroy _ _ _ mBuried mPermanents) ->
+            Maybe.maybeToList mBuried <> Maybe.maybeToList mPermanents
           _ -> []
         millsAtMostOne player quantity = case quantity of
           Quantity.Type.Literal n -> n <= 1 && namesOneSeat player
@@ -5213,7 +5220,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     ps <- S.allPrintings s
     let offends effect = case effect of
           Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone riders _ _ _) -> EntryRiders.exiledFaceDown riders && zone /= Zone.Exile
-          Effect.Create (Create.MkCreate _ _ riders _) -> EntryRiders.exiledFaceDown riders
+          Effect.Create (Create.MkCreate _ _ riders _ _) -> EntryRiders.exiledFaceDown riders
           _ -> False
         hides effect = case effect of
           Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _) -> EntryRiders.exiledFaceDown riders
@@ -5235,7 +5242,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     ps <- S.allPrintings s
     let offends effect = case effect of
           Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone riders _ _ _) -> EntryRiders.faceDown riders && zone /= Zone.Battlefield
-          Effect.Create (Create.MkCreate _ _ riders _) -> EntryRiders.faceDown riders
+          Effect.Create (Create.MkCreate _ _ riders _ _) -> EntryRiders.faceDown riders
           _ -> False
         manifests effect = case effect of
           Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _) -> EntryRiders.faceDown riders
@@ -5976,7 +5983,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               base {Face.spell = spellOf [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Quantity.Type.Literal 1, Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand}] Map.empty}
             ),
             ( "an ObjectRef.EachMatching set",
-              base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing Nothing)] Map.empty}
+              base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing Nothing Nothing)] Map.empty}
             ),
             ( "CR 603.6a's trigger condition",
               base
@@ -6077,7 +6084,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                             { Create.quantity = Quantity.Type.Literal 1,
                               Create.card = oneFaced (base {Face.staticAbilities = [StaticAbility.MkStaticAbility (Affected.Matching buried) Nothing Set.empty Nothing (NonEmpty.singleton Modification.LoseAllAbilities)]}),
                               Create.riders = EntryRiders.defaultValue,
-                              Create.slot = Nothing
+                              Create.slot = Nothing,
+                              Create.creator = PlayerRef.Relative PlayerRelation.You
                             }
                       ]
                       Map.empty
@@ -6203,7 +6211,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               base {Face.spell = spellOf [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Quantity.Type.Literal 1, Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand}] Map.empty}
             ),
             ( "an ObjectRef.EachMatching set",
-              base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing Nothing)] Map.empty}
+              base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing Nothing Nothing)] Map.empty}
             ),
             ( "CR 603.6a's trigger condition",
               base
@@ -6234,7 +6242,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                             { Create.quantity = Quantity.Type.Literal 1,
                               Create.card = oneFaced (base {Face.staticAbilities = [StaticAbility.MkStaticAbility (Affected.Matching buried) Nothing Set.empty Nothing (NonEmpty.singleton Modification.LoseAllAbilities)]}),
                               Create.riders = EntryRiders.defaultValue,
-                              Create.slot = Nothing
+                              Create.slot = Nothing,
+                              Create.creator = PlayerRef.Relative PlayerRelation.You
                             }
                       ]
                       Map.empty

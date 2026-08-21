@@ -19,13 +19,13 @@ spec s = Spec.describe s "Pawl.Codec.Destroy" $ do
     Common.assertCodec
       s
       Destroy.codec
-      (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)) Regenerability.Regenerable Nothing Nothing)
+      (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)) Regenerability.Regenerable Nothing Nothing Nothing)
       " {\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"regenerability\":{\"type\":\"Regenerable\"}} "
   Spec.it s "MkDestroy, a bound slot: the key is written" $
     Common.assertCodec
       s
       Destroy.codec
-      (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.HasCardType CardType.Artifact)) Regenerability.Regenerable (Just (SlotName.MkSlotName (Text.pack "destroyed"))) Nothing)
+      (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.HasCardType CardType.Artifact)) Regenerability.Regenerable (Just (SlotName.MkSlotName (Text.pack "destroyed"))) Nothing Nothing)
       " {\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}}},\"regenerability\":{\"type\":\"Regenerable\"},\"slot\":\"destroyed\"} "
   -- The other slot, and the other reading of "put into a graveyard this way":
   -- the CARDS the destruction buried rather than how many it destroyed. An
@@ -34,6 +34,15 @@ spec s = Spec.describe s "Pawl.Codec.Destroy" $ do
     Common.assertCodec
       s
       Destroy.codec
-      (Destroy.MkDestroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) Regenerability.Regenerable Nothing (Just (SlotName.MkSlotName (Text.pack "buried"))))
+      (Destroy.MkDestroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) Regenerability.Regenerable Nothing (Just (SlotName.MkSlotName (Text.pack "buried"))) Nothing)
       " {\"buried\":\"buried\",\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"regenerability\":{\"type\":\"Regenerable\"}} "
+  -- The third slot, and the third reading: the PERMANENTS the sweep destroyed,
+  -- which is what a rider naming each one's controller walks. Independent of the
+  -- other two keys again -- this case writes it alone.
+  Spec.it s "MkDestroy, a permanents slot: the key is written, and independently of the other two" $
+    Common.assertCodec
+      s
+      Destroy.codec
+      (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.HasCardType CardType.Artifact)) Regenerability.Regenerable Nothing Nothing (Just (SlotName.MkSlotName (Text.pack "swept"))))
+      " {\"permanents\":\"swept\",\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}}},\"regenerability\":{\"type\":\"Regenerable\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Destroy.codec

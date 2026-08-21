@@ -1292,7 +1292,7 @@ rewriteEffect pairs effect = case effect of
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot filter_ quantity) -> Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot (Filter.rewrite pairs filter_) quantity)
   Effect.RestartGame exempt -> Effect.RestartGame (fmap (rewriteObjectRef pairs) exempt)
   Effect.ControlPlayerNextTurn _ -> effect
-  Effect.Destroy (Destroy.MkDestroy ref regenerability mSlot mBuried) -> Effect.Destroy (Destroy.MkDestroy (rewriteObjectRef pairs ref) regenerability mSlot mBuried)
+  Effect.Destroy (Destroy.MkDestroy ref regenerability mSlot mBuried mPermanents) -> Effect.Destroy (Destroy.MkDestroy (rewriteObjectRef pairs ref) regenerability mSlot mBuried mPermanents)
   Effect.Sacrifice _ -> effect
   Effect.TurnFaceDown _ -> effect
   Effect.TurnFaceUp _ -> effect
@@ -1323,7 +1323,7 @@ rewriteEffect pairs effect = case effect of
   --
   -- Not implemented: a CR 122.1b keyword counter named in the riders keeps its
   -- printed keyword (#1190).
-  Effect.Create (Create.MkCreate quantity card riders slot) -> Effect.Create (Create.MkCreate quantity (rewriteCard pairs card) riders slot)
+  Effect.Create (Create.MkCreate quantity card riders slot creator) -> Effect.Create (Create.MkCreate quantity (rewriteCard pairs card) riders slot creator)
   -- CR 707.2 excludes text-changing effects from copiable values, so what the
   -- token becomes is not rewritten -- only the ref is.
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> Effect.CreateCopy (CreateCopy.MkCreateCopy quantity (rewriteObjectRef pairs ref))

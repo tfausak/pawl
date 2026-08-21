@@ -2185,7 +2185,9 @@ afterlife n =
                   EntryRiders.exiledFaceDown = False,
                   EntryRiders.faceDown = False
                 },
-            Create.slot = Nothing
+            Create.slot = Nothing,
+            -- CR 111.2 under CR 109.5: the keyword ability's own controller.
+            Create.creator = PlayerRef.Relative PlayerRelation.You
           }
 
 -- | CR 702.135a's token: 1/1 white and black Spirit creature with flying. Rule
@@ -2300,7 +2302,9 @@ fabricate n =
                   EntryRiders.exiledFaceDown = False,
                   EntryRiders.faceDown = False
                 },
-            Create.slot = Nothing
+            Create.slot = Nothing,
+            -- CR 111.2 under CR 109.5: the keyword ability's own controller.
+            Create.creator = PlayerRef.Relative PlayerRelation.You
           }
 
 -- | CR 702.123a's token: 1/1 colorless Servo artifact creature. Colorless is the

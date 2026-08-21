@@ -38,6 +38,7 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
@@ -3229,6 +3230,112 @@ baneOfProgressSpec s registry = Spec.describe s "BaneOfProgress" $ do
     Spec.assertEqWith s "no counters" (plusOnePlusOnesOn entered resolved) 0
     Spec.assertEqWith s "so Bane is the printed 2/2" (entered >>= \oid -> Projection.powerOf oid resolved) (Just 2)
 
+-- Rampage of the Clans {3}{G} Instant: "Destroy all artifacts and enchantments.
+-- For each permanent destroyed this way, its controller creates a 3/3 green
+-- Centaur creature token." Oracle text checked against api.scryfall.com,
+-- 2026-08-21.
+--
+-- Bane of Progress' sweep with the OTHER rider: the count half above reads how
+-- many died, and this reads WHICH -- Destroy's `permanents` slot, walked by
+-- Effect.ForEach with each member's controller supplying CR 111.2's creator
+-- through CR 608.2h last known information.
+--
+-- THREE SEATS, and the destroyed permanents are split between two of them:
+-- alice's artifact and bob's enchantment. A rider keyed to the CASTER rather
+-- than to each permanent's controller would put both Centaurs under alice, so
+-- the split is what makes the reading observable. carol holds the controls.
+--
+-- Cast off four Forests through the PRIORITY LOOP, castBaneOfProgress' posture:
+-- the spell resolves inside the loop and the tokens are on the board when it
+-- settles. Answers the finished board.
+castRampage :: Printing.Printing -> Printing.Printing -> GameState.GameState -> GameState.GameState
+castRampage forest rampage board =
+  let (withSpell, spell) = S.handOne rampage (S.landsFor forest S.alice 4 board)
+      afterCast = S.runPure S.identityAnswer withSpell (S.cast S.alice spell)
+   in S.runPure S.identityAnswer afterCast Engine.priorityLoop
+
+-- The permanents on the battlefield named "Centaur Token" that this player
+-- CONTROLS. Projection.controllerOf and not Support.countOnBattlefieldByName,
+-- which indexes the battlefield by OWNER (CR 108.3) and so cannot see control at
+-- all -- and CR 111.2 makes the creator both here, which is exactly why the
+-- weaker question would pass under either reading.
+centaursControlledBy :: PlayerId.PlayerId -> GameState.GameState -> [ObjectId.ObjectId]
+centaursControlledBy pid gs =
+  filter
+    ( \oid ->
+        fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack "Centaur Token"))
+          && Projection.controllerOf oid gs == Just pid
+    )
+    (Set.toList (GameState.battlefield gs))
+
+rampageOfTheClansSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+rampageOfTheClansSpec s registry = Spec.describe s "RampageOfTheClans" $ do
+  -- The proving case for #463: a mass destruction whose rider acts on EACH
+  -- permanent it destroyed rather than on how many there were.
+  --
+  -- The board separates every reading that could be taken:
+  --
+  --   * alice's Bonesplitter and bob's Bad Moon are destroyed, one per seat, so
+  --     "its controller" and "you" give different answers;
+  --   * carol's Darksteel Myr is an artifact the filter MATCHES and CR 702.12b
+  --     will not let be destroyed, so a rider walking the swept set rather than
+  --     the destroyed set would hand carol a Centaur;
+  --   * carol's Goblin Piker is neither, and is the control.
+  Spec.it s "CR 111.2 each destroyed permanent's own controller creates its Centaur" $ do
+    forest <- S.printingOf s registry "Forest"
+    rampage <- S.printingOf s registry "Rampage of the Clans"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    badMoon <- S.printingOf s registry "Bad Moon"
+    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (equipment, g1) = S.addCreature bonesplitter S.alice (Setup.emptyGame S.threePlayers)
+        (moon, g2) = S.addCreature badMoon S.bob g1
+        (myr, g3) = S.addCreature darksteelMyr S.carol g2
+        (bystander, board) = S.addCreature piker S.carol g3
+        resolved = castRampage forest rampage board
+    -- The gameplay-level assertion, and FIRST: a rider keyed to the caster puts
+    -- this at 0 and alice's at 2, so neither reading is vacuous here.
+    Spec.assertEqWith s "bob controlled the destroyed enchantment, so bob controls a Centaur" (length (centaursControlledBy S.bob resolved)) 1
+    Spec.assertEqWith s "alice controlled the destroyed artifact, so alice controls one and not two" (length (centaursControlledBy S.alice resolved)) 1
+    Spec.assertEqWith s "CR 702.12b carol's indestructible artifact was matched and not destroyed, so carol gets nothing" (length (centaursControlledBy S.carol resolved)) 0
+    Spec.assertEqWith s "stack empty: the spell resolved" (length (GameState.stack resolved)) 0
+    Spec.assertBool s (not (S.onBattlefield equipment resolved)) "the artifact died"
+    Spec.assertBool s (not (S.onBattlefield moon resolved)) "the enchantment died"
+    Spec.assertBool s (S.onBattlefield myr resolved) "the indestructible artifact creature stands"
+    Spec.assertBool s (S.onBattlefield bystander resolved) "the creature that is neither was never named"
+    -- CR 111.1: the token is what the card says it is, not a blank permanent.
+    case centaursControlledBy S.bob resolved of
+      [centaur] -> do
+        Spec.assertEqWith s "a 3/3" (Projection.powerOf centaur resolved) (Just 3)
+        Spec.assertEqWith s "with 3 toughness" (Projection.toughnessOf centaur resolved) (Just 3)
+        Spec.assertEqWith s "and green" (Set.toList (Projection.colorsOf centaur resolved)) [Color.Green]
+      other -> Spec.assertEqWith s "exactly one Centaur under bob" (length other) 1
+  -- The discriminating twin: the SAME spell over a board where ONE seat holds
+  -- both doomed permanents. Two Centaurs, both under bob -- so the case above's
+  -- one-each is the rider following each permanent rather than dealing one token
+  -- per seat that lost anything.
+  Spec.it s "two permanents of one player's make two Centaurs for that player" $ do
+    forest <- S.printingOf s registry "Forest"
+    rampage <- S.printingOf s registry "Rampage of the Clans"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    badMoon <- S.printingOf s registry "Bad Moon"
+    let (_, g1) = S.addCreature bonesplitter S.bob (Setup.emptyGame S.threePlayers)
+        (_, board) = S.addCreature badMoon S.bob g1
+        resolved = castRampage forest rampage board
+    Spec.assertEqWith s "both destroyed permanents were bob's, so bob makes two Centaurs" (length (centaursControlledBy S.bob resolved)) 2
+    Spec.assertEqWith s "and the caster, who lost nothing, makes none" (length (centaursControlledBy S.alice resolved)) 0
+  -- CR 608.2c with CR 101.3: the sweep destroys nothing, so the slot is unbound,
+  -- the loop has no members and nobody creates anything.
+  Spec.it s "an empty sweep leaves the loop no members, so no Centaur is created" $ do
+    forest <- S.printingOf s registry "Forest"
+    rampage <- S.printingOf s registry "Rampage of the Clans"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (bystander, board) = S.addCreature piker S.bob (Setup.emptyGame S.threePlayers)
+        resolved = castRampage forest rampage board
+    Spec.assertEqWith s "no Centaur for the caster" (length (centaursControlledBy S.alice resolved)) 0
+    Spec.assertEqWith s "none for bob either" (length (centaursControlledBy S.bob resolved)) 0
+    Spec.assertBool s (S.onBattlefield bystander resolved) "the creature that is neither an artifact nor an enchantment stands"
+
 -- Plummet ({1}{G} Instant, "Destroy target creature with flying"), the pool's
 -- first card whose Filter names a KEYWORD (Filter.HasKeyword, CR 702.9).
 --
@@ -3492,6 +3599,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   trumpetBlastSpec s registry
   auraThiefSpec s registry
   baneOfProgressSpec s registry
+  rampageOfTheClansSpec s registry
   comeBackWrongSpec s registry
   swiftSilenceSpec s registry
   countOnLuckSpec s registry
