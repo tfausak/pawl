@@ -208,8 +208,31 @@ data View = MkView
     -- No card position is exempt: Effect.AttachTarget's destination is the one
     -- that MAY hold it, and CR 303.4k's is not, because there the enchant-ability
     -- conjunct is the rule's rather than the card's (Attach.turnUpHosts).
-    -- Widening the subject to somewhere every evaluation can see it is #572.
+    -- The question with the two roles SWAPPED -- a candidate that could be
+    -- attached to a fixed host -- is `canAttachToSubject` below rather than a
+    -- widening of this field. Rule 701.3a asked with the host fixed by anything
+    -- but a searching ability's source is #2028.
     canHostSubject :: Bool,
+    -- CR 701.3a read the other way: could THIS CANDIDATE legally be attached to
+    -- the object the surrounding instruction fixes -- Auratouched Mage's "an Aura
+    -- card that could enchant it", where the host is fixed and the Aura varies?
+    --
+    -- `canHostSubject` above with the roles swapped, and here for the same reason
+    -- it is: the answer needs the candidate's enchant ability (CR 702.5a) AND the
+    -- fixed host's projected characteristics, so it differs per candidate.
+    -- Pawl.Engine.Resolve's Effect.Search arm is the only site that fills it,
+    -- from Pawl.Engine.Attach.attachmentFor -- the same function that performs
+    -- the move.
+    --
+    -- LAZY, for attachedToView's cost reason: filling it projects the candidate
+    -- and sweeps the battlefield for the fixed host's admission, so a search
+    -- filter that never names the atom pays nothing.
+    --
+    -- False everywhere else, and that is not a lost distinction: outside a search
+    -- no instruction fixes a host for the question to be about. Pawl.CardSpec
+    -- rejects the atom in every Filter position but a search's, the treatment
+    -- `canHostSubject` already gets.
+    canAttachToSubject :: Bool,
     -- CR 111.1 / 111.6: is this candidate a token rather than a card? Read from
     -- Object.source (Pawl.Engine.Game.isToken), never from a projection -- CR 111.3 makes
     -- a token's effect-defined characteristics equivalent to printed ones, so no
@@ -387,6 +410,11 @@ playerView pid =
       -- here: the only site that fills this field is Pawl.Engine.Resolve's
       -- AttachTarget arm, whose candidates are battlefield permanents.
       canHostSubject = False,
+      -- CR 303.4b again: an Aura attached to a player enchants them, so the
+      -- question CAN be asked of a player candidate (CR 702.5d) -- but not here,
+      -- since the only site that fills this field is Pawl.Engine.Resolve's
+      -- Effect.Search arm, whose candidates are library cards.
+      canAttachToSubject = False,
       -- CR 111.1: a token represents a PERMANENT, and a player is not one.
       token = False,
       tapped = False,
@@ -798,6 +826,9 @@ matches context view predicate = case predicate of
   -- CR 701.3a: a live read of the legality of the attach this match is framing,
   -- computed by the caller that knows what is moving. Vacuously False outside one.
   Filter.CanHostSubject -> canHostSubject view
+  -- CR 701.3a read from the candidate's side, computed by the caller that knows
+  -- which host the instruction fixed. Vacuously False outside a search.
+  Filter.CanAttachToSubject -> canAttachToSubject view
   -- CR 111.6: a token isn't a card. A live read of what the object is
   -- represented by (Object.source), never a stamp on the candidate -- and unlike
   -- the two arms above it cannot change while the game runs, because CR 111.3
@@ -927,6 +958,7 @@ rewrite pairs predicate = case predicate of
   Filter.IsAttachedToSource -> predicate
   Filter.IsHostOfSource -> predicate
   Filter.CanHostSubject -> predicate
+  Filter.CanAttachToSubject -> predicate
   Filter.IsToken -> predicate
   Filter.IsTapped -> predicate
   Filter.IsRingBearer -> predicate
@@ -1261,6 +1293,7 @@ bakeBound players predicate = case predicate of
   Filter.IsAttachedToSource -> predicate
   Filter.IsHostOfSource -> predicate
   Filter.CanHostSubject -> predicate
+  Filter.CanAttachToSubject -> predicate
   Filter.IsToken -> predicate
   Filter.IsTapped -> predicate
   Filter.IsRingBearer -> predicate
@@ -1337,6 +1370,7 @@ manaValueThresholds predicate = case predicate of
   Filter.IsAttachedToSource -> []
   Filter.IsHostOfSource -> []
   Filter.CanHostSubject -> []
+  Filter.CanAttachToSubject -> []
   Filter.IsToken -> []
   Filter.IsTapped -> []
   Filter.IsRingBearer -> []
@@ -1423,6 +1457,7 @@ statesAQuality predicate = case predicate of
   Filter.IsAttachedToSource -> True
   Filter.IsHostOfSource -> True
   Filter.CanHostSubject -> True
+  Filter.CanAttachToSubject -> True
   Filter.IsToken -> True
   Filter.IsTapped -> True
   Filter.IsRingBearer -> True

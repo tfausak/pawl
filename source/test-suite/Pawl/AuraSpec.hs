@@ -11,7 +11,9 @@
 -- opcode over Pawl.Engine.Attach (CR 701.3) and Pawl.Engine.Sba's three attachment
 -- state-based actions (CR 704.5m, 704.5n, 704.5p). Resolution is not the only door
 -- onto the battlefield: CR 303.4f's Aura entering from anywhere else has its host
--- chosen inside Pawl.Engine.Event.changeZoneAttaching, which is replenishSpec's.
+-- chosen inside Pawl.Engine.Event.changeZoneAttaching, which is replenishSpec's,
+-- and a search whose destination NAMES the host seeds that same funnel instead,
+-- which is couldEnchantSpec's.
 -- Rule 701.3's OTHER caller, CR 303.4k's attachment as an Aura is turned face up,
 -- is Pawl.FaceDownSpec's: CR 708.11 puts it inside the turning-over rather than in
 -- a resolution.
@@ -21,6 +23,7 @@
 -- proving it needs a real cast through this file's machinery.
 module Pawl.AuraSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -49,6 +52,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Departure as Departure.Type
@@ -806,6 +810,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   twoEnchantSpec s registry
   replenishSpec s registry
   attachRestrictionSpec s registry
+  couldEnchantSpec s registry
 
 -- Both of Convincing Mirage's prompts at once: its CR 303.4a enchant slot
 -- (Pool.Permanents narrowed to lands, so the recipient is tagged ToObject) and
@@ -1974,3 +1979,94 @@ attachRestrictionSpec s registry = Spec.describe s "AttachRestriction" $ do
     -- and did not get it, because CR 303.4's limit kept it out of the offer.
     Spec.assertBool s (notElem songId (attachedTo protectedLand after)) "CR 303.4: the protected land is not a destination"
     Spec.assertBool s (Maybe.isJust (Game.lookupObject songId after >>= Object.attachedTo)) "and the Aura did move, onto a permanent that will have it"
+
+-- The one battlefield object of alice's whose card carries this name. Every
+-- object here reaches the battlefield through CR 400.7, which mints a fresh id,
+-- so a fixture id taken before the move names nothing afterwards.
+battlefieldNamed :: CardName.CardName -> GameState.GameState -> Maybe ObjectId.ObjectId
+battlefieldNamed wanted gs =
+  List.find
+    (\oid -> fmap Face.name (Game.faceOf oid gs) == Just wanted)
+    (Game.zoneMembers Zone.Battlefield S.alice gs)
+
+-- Records every search's candidate list, takes what the search offers off the
+-- HEAD of it, and would put a CR 303.4f host choice on `other`.
+--
+-- The head and not a pinned card: the offer is what this case is about, so an
+-- answerer that went looking for the legal Aura would find it again after a
+-- mutation that widened the offer, and the board would come out identical. The
+-- fixture stocks the library so that the Aura the filter must REJECT sits at the
+-- head, which is what makes a widened offer change the board rather than only
+-- the recording.
+--
+-- `other` is a creature the Aura could equally well enchant. Nothing should ever
+-- ask: Pawl.Engine.Resolve.putFound seeds the entry with the host the effect
+-- named, so CR 303.4f's choice is not this move's. An answer of `other` is how a
+-- seed that went missing shows up as a wrong board rather than as a silence.
+mageAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
+mageAnswer other p = case p of
+  Prompt.SearchLibrary _ _ matches cap -> do
+    State.modify' (<> [matches])
+    pure (List.genericTake cap matches)
+  Prompt.Shuffle library -> pure library
+  Prompt.ChooseAttachment {} -> pure other
+  _ -> pure (S.identityAnswer p)
+
+-- CR 701.3a asked from the CANDIDATE's side -- "an Aura card that could enchant
+-- it", where the host is fixed for the whole evaluation and the Aura varies per
+-- candidate. Filter.CanHostSubject is the same rule with the two roles swapped,
+-- and auraGraftSpec above is its case.
+couldEnchantSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+couldEnchantSpec s registry = Spec.describe s "CouldEnchant" $ do
+  -- The gameplay-level proof design.md section 4 asks for: cast the Mage, let
+  -- its CR 603.2 trigger resolve, and see which Aura the search could reach.
+  --
+  -- The library holds three cards the HasSubtype conjunct and the CR 701.3a one
+  -- separate differently: Consecrate Land is an Aura the Mage cannot host (CR
+  -- 303.4's "enchant land") though the board holds six lands it could, Unholy
+  -- Strength is one it can, and a Goblin Piker is no Aura at all. Consecrate Land
+  -- is stocked LAST, so it is at the head of the library the search reads and is
+  -- what an offer that had stopped asking rule 701.3a would hand back.
+  Spec.it s "CR 701.3a whole card: Auratouched Mage finds only an Aura that could enchant it" $ do
+    plains <- S.printingOf s registry "Plains"
+    mage <- S.printingOf s registry "Auratouched Mage"
+    strength <- S.printingOf s registry "Unholy Strength"
+    consecrate <- S.printingOf s registry "Consecrate Land"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let base0 = S.landsInPlay plains 6
+        (pikerId, base1) = S.addCreature piker S.alice base0
+        (_, base2) = S.addLibraryCard piker S.alice base1
+        (_, base3) = S.addLibraryCard strength S.alice base2
+        (_, base4) = S.addLibraryCard consecrate S.alice base3
+        (gs, spell) = S.handOne mage base4
+        ((_, after), searches) =
+          State.runState
+            (Engine.runGame (mageAnswer pikerId) gs (do S.cast S.alice spell; Engine.priorityLoop))
+            []
+        strengthName = S.nameOf (Printing.card strength)
+        consecrateName = S.nameOf (Printing.card consecrate)
+        named = fmap (Maybe.mapMaybe (fmap Face.name . flip Game.faceOf gs))
+    Spec.assertEqWith s "before: nothing of alice's is enchanted" (S.countOnBattlefieldByName strengthName S.alice gs) 0
+    case battlefieldNamed (S.nameOf (Printing.card mage)) after of
+      Nothing -> Spec.assertFailure s "the Mage should have resolved onto the battlefield"
+      Just mageId -> do
+        -- THE gameplay-level assertion, and FIRST: the +2/+1 of the Aura the Mage
+        -- can host arrived, which an offer that had handed back Consecrate Land
+        -- instead could not have produced -- rule 303.4i would have left it in
+        -- the library and the Mage would still be a printed 3/3. It reads the
+        -- MAGE alone, so a run that put no Aura on the battlefield at all still
+        -- reaches it rather than tripping a structural check ahead of it.
+        Spec.assertEqWith s "CR 701.3a: the Mage is a 5/4, wearing the Aura it could host" (S.powerToughnessOf mageId after) (Just (5, 4))
+        -- CR 303.4i's entry-attached move, and the seed: the Aura is on the MAGE
+        -- and not on the other creature the answerer would have chosen.
+        Spec.assertEqWith
+          s
+          "and it entered attached to the Mage rather than to the other creature"
+          (fmap (\auraId -> Game.lookupObject auraId after >>= Object.attachedTo) (battlefieldNamed strengthName after))
+          (Just (Just (Recipient.ToCreature mageId)))
+    -- The OFFER itself, which the board above can only report one card of: the
+    -- search never showed the Aura rule 701.3a rejects.
+    Spec.assertEqWith s "the search offered exactly the Aura that could enchant the Mage" (named searches) [[strengthName]]
+    -- CR 701.23b: a search stating a quality may find fewer, so the rejected Aura
+    -- stayed where it was rather than being found and refused at the move.
+    Spec.assertEqWith s "and the Aura it rejected is still in the library" (S.countByName consecrateName S.alice after) 1

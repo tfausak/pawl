@@ -621,6 +621,10 @@ viewOfCard face =
           -- CR 701.3a: only Pawl.Engine.Resolve's AttachTarget arm fills this
           -- field, and its candidates are battlefield permanents.
           Filter.canHostSubject = False,
+          -- CR 701.3a's other side: only Pawl.Engine.Resolve's Effect.Search arm
+          -- fills this field, and it overlays it onto viewOfObject rather than
+          -- reaching this builder, which holds a printed FACE and no board.
+          Filter.canAttachToSubject = False,
           -- CR 111.6: "A token isn't a card." CR 704.5d already made a token in
           -- any zone this builder describes cease to exist.
           Filter.token = False,
@@ -761,6 +765,11 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- CR 701.3a: filled only by Resolve's AttachTarget arm, the one place that
       -- knows what is being moved.
       Filter.canHostSubject = False,
+      -- CR 701.3a's other side: filled only by Resolve's Effect.Search arm, the
+      -- one place that knows which host the instruction fixed. Overlaid onto this
+      -- builder's result rather than passed in, so a search pays for it only when
+      -- its filter names the atom.
+      Filter.canAttachToSubject = False,
       -- CR 111.6: fixed for the life of the object (CR 400.7).
       Filter.token = Game.isToken oid gs,
       Filter.tapped = Game.isTapped oid gs,
@@ -2594,6 +2603,11 @@ filterReads f = case f of
   -- behind this atom are the candidate's (CR 301.5) and the subject's (CR
   -- 702.5a), and nothing distinguishes the two here.
   Filter.Type.CanHostSubject -> Set.fromList [Types, Subtypes, Colors, Keywords, PowerA, Controller]
+  -- Over-declared for CanHostSubject's reason, one direction over: the
+  -- characteristics behind this atom are the candidate's enchant ability (CR
+  -- 702.5a) and the fixed host's (CR 301.5), and nothing here distinguishes the
+  -- two either.
+  Filter.Type.CanAttachToSubject -> Set.fromList [Types, Subtypes, Colors, Keywords, PowerA, Controller]
   -- Reads nothing: no Modification writes Object.source.
   Filter.Type.IsToken -> Set.empty
   -- CR 110.5: tap status is not a characteristic, so no layer writes it.
