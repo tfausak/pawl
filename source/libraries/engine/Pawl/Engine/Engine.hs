@@ -467,9 +467,13 @@ advanceSagas pid = do
 -- CR 800.4d, SECOND sentence, needs no separate filter: `orderPending` groups by
 -- `apnapPlayers`, which restricts every group to a still-playing controller. Two
 -- carriers can still reach it with a departed controller -- a DELAYED ability,
--- and an OBJECT-BORNE one reading CR 603.3a's controller from
--- GameState.battlefieldWhenTriggered (#604). CR 800.4d's FIRST sentence and CR
--- 800.4b's SECOND are enforced at the head of `Event.createTokens`.
+-- proved by Pawl.TriggerSpec's "CR 800.4d a departed player's delayed ability
+-- triggers, is consumed, and is not put on the stack", and an OBJECT-BORNE one
+-- reading CR 603.3a's controller from GameState.battlefieldWhenTriggered, proved
+-- by Pawl.DepartureSpec's "CR 603.3a/800.4d a borrowed permanent's trigger is
+-- the departing player's, so it is never put on the stack". CR 800.4d's FIRST
+-- sentence and CR 800.4b's SECOND are enforced at the head of
+-- `Event.createTokens`.
 placePendingTriggers :: Game Bool
 placePendingTriggers = do
   gs <- State.get
