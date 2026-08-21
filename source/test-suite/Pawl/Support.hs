@@ -1596,6 +1596,7 @@ oneMountainState mountain ph =
           GameState.enteringBeside = Set.empty,
           GameState.playerEffects = [],
           GameState.blockRequirements = [],
+          GameState.attackRequirements = [],
           GameState.ignoredAbilities = [],
           GameState.turnOrder = [alice],
           GameState.activePlayer = alice,

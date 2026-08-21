@@ -114,8 +114,8 @@ totalCost declaration gs =
 -- CR 509.1c's cost clause: a player is never required to pay a cost to block.
 -- True when this creature can be declared as a blocker for nothing.
 --
--- No quantifier over what it might block, where AttackCost.attacksFreely has one
--- over CR 508.1b's targets: the cost this asks about is not judged against what is
--- blocked, so there is nothing to range over.
+-- No pair to range over, where the attacking side asks costsOn of each
+-- (creature, target) announcement CR 508.1b admits: the cost this asks about is
+-- not judged against what is blocked, so a blocker is free or it is not.
 blocksFreely :: ObjectId -> GameState -> Bool
 blocksFreely blocker gs = null (costsOn blocker gs)

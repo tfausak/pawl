@@ -39,6 +39,7 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.Replace as Replace
+import qualified Pawl.Types.RequireAttack as RequireAttack
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.Search as Search
@@ -761,6 +762,15 @@ data Effect card
     -- what it must block -- so this takes ObjectRefs rather than AffectPlayers'
     -- scope, one requirement instance per (blocker, attacker) pair.
     RequireBlock RequireBlock.RequireBlock
+  | -- | CR 508.1d / 613.11: install a stored ATTACKING REQUIREMENT for a
+    -- duration. Alluring Siren's is `RequireAttack UntilEndOfTurn (InSlot
+    -- target) (Relative You)`.
+    --
+    -- RequireBlock's twin, and not its mirror image: rule 508.1d's two axes are
+    -- an OBJECT and a PLAYER -- which creature must attack, and whom it must
+    -- attack (CR 508.1b) -- so this pairs an ObjectRef with a PlayerRef, one
+    -- requirement instance per (attacker, defender) pair.
+    RequireAttack RequireAttack.RequireAttack
   | -- | CR 114.2: the resolving controller gets an emblem with the given
     -- abilities, put into the command zone. Targetless; the abilities ride a Card
     -- so the emblem reuses the whole ability pipeline.

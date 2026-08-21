@@ -35,7 +35,9 @@ import qualified Pawl.Types.Affected as Affected
 -- Pawl.Types.ActiveBlockRequirement is the sibling that carries both axes as
 -- bare ObjectIds, and it is still not a widening of this one: it is the
 -- RESOLUTION-created carrier (CR 702.39a's provoke), where the creature is named
--- by targeting and so is one object rather than an affected set. Reshaping this
+-- by targeting and so is one object rather than an affected set.
+-- Pawl.Types.AttackRequirement and Pawl.Types.ActiveAttackRequirement are the
+-- same two carriers on the other side of the combat phase. Reshaping this
 -- carrier to ObjectIds would freeze a set CR 611.2c keeps dynamic; reshaping
 -- that one to Affecteds would fabricate a set where targeting chose one object.
 --

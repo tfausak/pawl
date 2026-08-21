@@ -119,6 +119,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.RequireAttack as RequireAttack
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.Search as Search
@@ -1361,6 +1362,11 @@ rewriteEffect pairs effect = case effect of
   Effect.AffectPlayers {} -> effect
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration blocker attacker) ->
     Effect.RequireBlock (RequireBlock.MkRequireBlock (rewriteDuration pairs duration) (rewriteObjectRef pairs blocker) (rewriteObjectRef pairs attacker))
+  -- CR 612.1 reaches the OBJECT axis's ref and not its player: a word swap
+  -- changes card text, and the defender clause of Alluring Siren's sentence is
+  -- "you" rather than any word a Filter could name.
+  Effect.RequireAttack (RequireAttack.MkRequireAttack duration attacker defender) ->
+    Effect.RequireAttack (RequireAttack.MkRequireAttack (rewriteDuration pairs duration) (rewriteObjectRef pairs attacker) defender)
   -- CR 114.3 leaves an emblem no type line and no name, so its ABILITIES are the
   -- whole of what CR 612.1 can reach.
   Effect.CreateEmblem card -> Effect.CreateEmblem (rewriteCard pairs card)

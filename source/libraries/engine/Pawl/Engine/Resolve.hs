@@ -49,6 +49,7 @@ import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.AbilityName (AbilityName)
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
@@ -185,6 +186,7 @@ import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
+import qualified Pawl.Types.RequireAttack as RequireAttack
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Result as Result
@@ -474,6 +476,7 @@ slotsOf effect = case effect of
   Effect.ArmDelayedTrigger {} -> Map.empty
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers _ affected _) -> affectedPlayersSlots affected
   Effect.RequireBlock (RequireBlock.MkRequireBlock _ blocker attacker) -> joinTwo (objectRefSlots blocker) (objectRefSlots attacker)
+  Effect.RequireAttack (RequireAttack.MkRequireAttack _ attacker defender) -> joinTwo (objectRefSlots attacker) (playerRefSlots defender)
   Effect.CreateEmblem {} -> Map.empty
   -- CR 725.1's crown names a target slot only in the InSlot arm.
   Effect.BecomeMonarch target -> monarchTargetSlots target
@@ -693,6 +696,9 @@ slotsAreExhaustive effect = case effect of
   -- slotsOf drops the Duration, so the slotless test is made here.
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration _ _) ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
+  -- RequireBlock's reason, one axis over.
+  Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) ->
+    Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
   -- CR 114.2's emblem is minted with EMPTY bindings, so its card is literal text.
   Effect.CreateEmblem _ -> True
   Effect.BecomeMonarch MonarchTarget.TheController -> True
@@ -824,6 +830,7 @@ readsX = any effectReadsX
       Effect.ArmDelayedTrigger {} -> False
       Effect.AffectPlayers {} -> False
       Effect.RequireBlock {} -> False
+      Effect.RequireAttack {} -> False
       Effect.CreateEmblem {} -> False
       Effect.BecomeMonarch {} -> False
       Effect.Designate (Designate.MkDesignate _ _) -> False
@@ -920,6 +927,7 @@ searchesLibrary effect = case effect of
   Effect.ArmDelayedTrigger {} -> False
   Effect.AffectPlayers {} -> False
   Effect.RequireBlock {} -> False
+  Effect.RequireAttack {} -> False
   Effect.CreateEmblem {} -> False
   Effect.BecomeMonarch {} -> False
   Effect.Designate (Designate.MkDesignate _ _) -> False
@@ -1072,6 +1080,7 @@ boundSlots effect = case effect of
   Effect.ArmDelayedTrigger {} -> Set.empty
   Effect.AffectPlayers {} -> Set.empty
   Effect.RequireBlock {} -> Set.empty
+  Effect.RequireAttack {} -> Set.empty
   Effect.CreateEmblem {} -> Set.empty
   Effect.BecomeMonarch {} -> Set.empty
   Effect.Designate (Designate.MkDesignate _ _) -> Set.empty
@@ -4321,6 +4330,33 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 attacker <- attackers
               ]
          in gs1 {GameState.blockRequirements = stored <> GameState.blockRequirements gs1}
+  Effect.RequireAttack (RequireAttack.MkRequireAttack duration attackerRef defenderRef) ->
+    -- CR 508.1d / 613.11: store one requirement per (attacker, defender) pair the
+    -- two refs name, rule 508.1d counting requirements PER CREATURE. RequireBlock
+    -- above is the twin, and its arguments carry over: both sets are enumerated
+    -- ONCE for CR 608.2f's simultaneity, and an illegal slot (CR 608.2b) stores
+    -- nothing, which is Alluring Siren's fizzle.
+    State.modify' $ \gs -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
+      -- CR 611.2b: the duration never started, so nothing is stored.
+      Nothing -> gs
+      Just expiry ->
+        let attackers = objectRefObjects legal resolving controller source gs attackerRef
+            -- Through playerRefPlayers so the ref is read exactly as every other
+            -- opcode reads one, CR 608.2b's empty answer included.
+            defenders = playerRefPlayers legal controller gs defenderRef
+            (ts, gs1) = Game.freshTimestamp gs
+            stored =
+              [ ActiveAttackRequirement.MkActiveAttackRequirement
+                  { ActiveAttackRequirement.source = source,
+                    ActiveAttackRequirement.timestamp = ts,
+                    ActiveAttackRequirement.expiry = expiry,
+                    ActiveAttackRequirement.attacker = attacker,
+                    ActiveAttackRequirement.defender = defender
+                  }
+              | attacker <- attackers,
+                defender <- defenders
+              ]
+         in gs1 {GameState.attackRequirements = stored <> GameState.attackRequirements gs1}
   Effect.CreateEmblem card -> do
     -- CR 114.2: the resolving controller gets the emblem, minted by
     -- Event.createEmblem.

@@ -181,6 +181,7 @@ manaProduced effect = case effect of
   Effect.ArmDelayedTrigger {} -> Nothing
   Effect.AffectPlayers {} -> Nothing
   Effect.RequireBlock {} -> Nothing
+  Effect.RequireAttack {} -> Nothing
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing
   Effect.Designate (Designate.MkDesignate _ _) -> Nothing
@@ -358,6 +359,7 @@ movesLibraryCard effect = case effect of
   -- may do; none moves a card.
   Effect.AffectPlayers {} -> False
   Effect.RequireBlock {} -> False
+  Effect.RequireAttack {} -> False
   Effect.CreateEmblem {} -> False
   Effect.Designate (Designate.MkDesignate _ _) -> False
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> False

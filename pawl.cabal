@@ -484,6 +484,8 @@ library codec
     Pawl.Codec.ReplacementOrigin
     Pawl.Codec.ReplacementOriginSpec
     Pawl.Codec.ReplaceSpec
+    Pawl.Codec.RequireAttack
+    Pawl.Codec.RequireAttackSpec
     Pawl.Codec.RequireBlock
     Pawl.Codec.RequireBlockSpec
     Pawl.Codec.Reveal
@@ -914,6 +916,7 @@ library types
     Pawl.Types.ActivatedAbility
     Pawl.Types.ActivationRestriction
     Pawl.Types.Activations
+    Pawl.Types.ActiveAttackRequirement
     Pawl.Types.ActiveBlockRequirement
     Pawl.Types.ActivePlayerEffect
     Pawl.Types.ActiveReplacement
@@ -1187,6 +1190,7 @@ library types
     Pawl.Types.ReplacementEffect
     Pawl.Types.ReplacementEntry
     Pawl.Types.ReplacementOrigin
+    Pawl.Types.RequireAttack
     Pawl.Types.RequireBlock
     Pawl.Types.Response
     Pawl.Types.RestartSignal
