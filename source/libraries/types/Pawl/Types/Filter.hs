@@ -573,13 +573,45 @@ data Filter keyword
     --
     -- Writing it into any other Filter position is a FAILING TEST rather than a
     -- quiet False: Pawl.CardSpec walks every Filter position a card has and
-    -- rejects the atom in all but an attach's destination. Widening the subject so
-    -- every evaluation could see it is #572. Answered by
+    -- rejects the atom in all but an attach's destination. The mirror question --
+    -- a candidate that could be attached to a fixed host -- is CanAttachToSubject
+    -- below rather than a widening of this atom. Answered by
     -- Pawl.Engine.Attach.attachmentFor, so it reads CR 303.4's other limits on
     -- what a permanent can be enchanted by along with the subject's own enchant
     -- ability -- Pawl.AuraSpec's "Aura Graft will not move an Aura onto a land
     -- Consecrate Land protects" is what proves the two arrive together.
     CanHostSubject
+  | -- | CR 701.3a from the other side: could THIS CANDIDATE legally be attached
+    -- to the object the surrounding instruction fixes? Auratouched Mage's "an
+    -- Aura card that could enchant it".
+    --
+    -- The mirror of CanHostSubject above, with the two roles swapped: there the
+    -- fixed object is the permanent being moved and the candidate is a would-be
+    -- host; here the fixed object is the HOST and the candidate is what would be
+    -- attached to it. "Subject" means the same thing in both -- the object the
+    -- instruction fixes, one reading per evaluation -- which is why both arrive
+    -- through Pawl.Engine.Filter.View rather than through Context: the answer is
+    -- per-candidate and needs the game state.
+    --
+    -- Not expressible with the atoms above, for CanHostSubject's reason one
+    -- direction over: a search narrowed by HasSubtype would still find an Aura
+    -- whose enchant ability rejects the host.
+    --
+    -- Answerable in a SEARCH filter and nowhere else, since
+    -- Pawl.Engine.Resolve's Effect.Search arm is the only site that fills the
+    -- field -- there the fixed object is the searching ability's own source.
+    -- Writing it into any other Filter position is a FAILING TEST rather than a
+    -- quiet False, exactly as CanHostSubject's misuse is: Pawl.CardSpec walks
+    -- every Filter position a card has and rejects the atom in all but a
+    -- search's. Answered by Pawl.Engine.Attach.attachmentFor, the same function
+    -- that performs the move, so CR 303.4's other limits on what a permanent can
+    -- be enchanted by arrive with the candidate's own enchant ability.
+    --
+    -- Not implemented: the same question with the host fixed by anything but the
+    -- searching ability's source -- Sovereigns of Lost Alara's bound creature,
+    -- Bruna's, and Takklemaggot's choose-position reading of CanHostSubject
+    -- (#2028).
+    CanAttachToSubject
   | -- | CR 111.6: the candidate is a token. Ashaya, Soul of the Wild's "nontoken
     -- creatures you control" is spelled `Not IsToken` -- one relation, one
     -- spelling, the way "another" is spelled `Not IsSource` (#163).

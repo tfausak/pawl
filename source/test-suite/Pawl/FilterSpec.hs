@@ -54,6 +54,7 @@ blackCreature =
       Filter.attachedToView = Nothing,
       Filter.attachedTo = Nothing,
       Filter.canHostSubject = False,
+      Filter.canAttachToSubject = False,
       Filter.token = False,
       Filter.tapped = False,
       Filter.counters = Map.empty,
@@ -92,6 +93,7 @@ devoidBigCreature =
       Filter.attachedToView = Nothing,
       Filter.attachedTo = Nothing,
       Filter.canHostSubject = False,
+      Filter.canAttachToSubject = False,
       Filter.token = False,
       Filter.tapped = False,
       Filter.counters = Map.empty,
@@ -911,6 +913,24 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- view but the ones Pawl.Engine.Resolve's AttachTarget arm builds.
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.CanHostSubject)) "player"
+
+  -- CR 701.3a's other side, whose fixed object is the HOST rather than the
+  -- permanent being moved. Structurally the atom above -- a Bool the caller that
+  -- knows the fixed object supplies -- which is why the three cases mirror it.
+  Spec.describe s "CanAttachToSubject" $ do
+    Spec.it s "matches a view the caller marked as attachable to the fixed host" $ do
+      Spec.assertBool s (Filter.matches self (blackCreature {Filter.canAttachToSubject = True}) Filter.Type.CanAttachToSubject) "can attach"
+
+    -- The two halves of rule 701.3a are INDEPENDENT: a view the caller framed as
+    -- a legal destination says nothing about whether the candidate could itself
+    -- be attached to something else, so neither field may be read for the other.
+    Spec.it s "is independent of CanHostSubject" $ do
+      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.canHostSubject = True}) Filter.Type.CanAttachToSubject)) "hosting is not attaching"
+
+    -- Vacuously False wherever no search frames the match, which is every view
+    -- but the ones Pawl.Engine.Resolve's Effect.Search arm builds.
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.CanAttachToSubject)) "player"
 
   Spec.describe s "IsToken" $ do
     Spec.it s "matches a view whose object is a token" $ do

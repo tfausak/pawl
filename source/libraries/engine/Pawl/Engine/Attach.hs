@@ -1,6 +1,8 @@
 -- Rule 701.3's LEGALITY READING, in one place because callers a library apart need
 -- the same answer: Pawl.Engine.Event.attach, which every CR 701.3 move goes
--- through, Pawl.Engine.Resolve's two attach-the-target opcodes, and two arms of
+-- through, Pawl.Engine.Resolve's two attach-the-target opcodes, its Effect.Search
+-- arm and putFound -- CR 701.3a asked from the CANDIDATE's side, where the host is
+-- fixed and the Aura varies (Filter.CanAttachToSubject) -- and two arms of
 -- Pawl.Engine.Event -- the CR 303.4k rewrite for an Aura being turned face up, and
 -- changeZoneAttaching's CR 303.4f host choice for an Aura entering the battlefield
 -- by any means other than resolving as an Aura spell. Event sits BELOW Resolve, so

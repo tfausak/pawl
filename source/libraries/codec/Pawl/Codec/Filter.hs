@@ -80,6 +80,7 @@ codec keywordCodec =
       Arm.nullary "IsAttachedToSource" Filter.IsAttachedToSource,
       Arm.nullary "IsHostOfSource" Filter.IsHostOfSource,
       Arm.nullary "CanHostSubject" Filter.CanHostSubject,
+      Arm.nullary "CanAttachToSubject" Filter.CanAttachToSubject,
       Arm.nullary "IsToken" Filter.IsToken,
       Arm.nullary "IsTapped" Filter.IsTapped,
       Arm.nullary "IsRingBearer" Filter.IsRingBearer,

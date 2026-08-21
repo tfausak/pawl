@@ -232,6 +232,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.IsAttachedToSource -> predicate
   Filter.Type.IsHostOfSource -> predicate
   Filter.Type.CanHostSubject -> predicate
+  Filter.Type.CanAttachToSubject -> predicate
   Filter.Type.IsToken -> predicate
   Filter.Type.IsTapped -> predicate
   Filter.Type.IsRingBearer -> predicate
@@ -556,7 +557,10 @@ viewOfSnapshot mController isToken snapshot =
       -- carries no attachment, so there is no host here for AttachedTo's nest.
       Filter.attachedToView = Nothing,
       Filter.attachedTo = Nothing,
+      -- CR 701.3a, both directions: a snapshot is neither an attach's destination
+      -- nor a search's candidate, so nothing framed it as either.
       Filter.canHostSubject = False,
+      Filter.canAttachToSubject = False,
       -- CR 111.6: "A token isn't a card", which is a fact about the OBJECT and
       -- not a characteristic, so the arm supplies it above.
       Filter.token = isToken,

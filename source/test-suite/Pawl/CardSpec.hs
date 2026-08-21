@@ -2384,6 +2384,9 @@ canHostSubjects predicate = case predicate of
   Filter.Type.AttachedTo f -> canHostSubjects f
   Filter.Type.IsAttachedToSource -> 0
   Filter.Type.IsHostOfSource -> 0
+  -- Zero: the MIRROR atom is not this one, and its own lint counts it through the
+  -- codec (canAttachToSubjectCounts) rather than through this recursion.
+  Filter.Type.CanAttachToSubject -> 0
   Filter.Type.IsToken -> 0
   Filter.Type.IsTapped -> 0
   Filter.Type.HasNonManaActivatedAbility -> 0
@@ -3332,10 +3335,21 @@ data Framing
   | AttachDestination
   | InTargetSlot
   | SourceHostFramed
+  | -- | CR 701.23's search filter, the one position whose evaluator supplies the
+    -- object a CR 701.3a question can be asked ABOUT from the candidate's side:
+    -- Pawl.Engine.Resolve's Effect.Search arm overlays
+    -- Filter.View.canAttachToSubject with the searching ability's own source.
+    --
+    -- CR 702.29e's typecycling filter is deliberately NOT one, though
+    -- Pawl.Engine.Keyword turns it into an Effect.Search that would answer: the
+    -- card writes it as a keyword payload, so it is tagged where cardFilters
+    -- reaches it. The mistagging can only REJECT a legal card, never admit an
+    -- unanswerable one, and no printing writes the atom there.
+    SearchFramed
   deriving (Eq, Ord, Show)
 
--- Tag a Filter position as UNFRAMED -- one neither an attach nor a target slot
--- frames, which is every position in the type except the two named above.
+-- Tag a Filter position as UNFRAMED -- one none of the framings above applies
+-- to, which is every position in the type except the ones they name.
 unframed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 unframed = fmap ((,) Unframed)
 
@@ -3345,6 +3359,11 @@ unframed = fmap ((,) Unframed)
 -- site that turns an ObjectRef into objects.
 sourceHosted :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 sourceHosted = fmap ((,) SourceHostFramed)
+
+-- Tag a Filter position as a SEARCH's, the one position whose evaluator supplies
+-- Filter.View.canAttachToSubject (CR 701.3a from the candidate's side).
+searchFramed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+searchFramed = fmap ((,) SearchFramed)
 
 -- Every Filter one effect carries, paired with its Framing. Two arms answer
 -- AttachDestination -- Effect.AttachTarget's destination and
@@ -3357,9 +3376,9 @@ sourceHosted = fmap ((,) SourceHostFramed)
 -- False by construction --
 -- Projection.viewOfCard, Projection.viewOfCharacteristics, Filter.playerView and
 -- Count's event snapshot all set it so -- because outside an attach there is no
--- subject for CR 701.3a to be about. Widening the subject so that another
--- position could answer is #572; until a card asks for it, the framed side of
--- this traversal is exactly this one arm.
+-- subject for CR 701.3a to be about. The MIRROR question, whose fixed object is
+-- the host rather than the moving permanent, is Filter.CanAttachToSubject, and
+-- SearchFramed marks the one position that answers it.
 effectFilters :: Effect.Effect Card.Type.Card -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 effectFilters effect = case effect of
   -- THE one attach-framed position. CR 701.3a: "An Aura, Equipment, or
@@ -3379,7 +3398,10 @@ effectFilters effect = case effect of
   -- being paid for (Pawl.Engine.Mana.spendableOn), which is neither an attach
   -- destination nor a target slot.
   Effect.AddMana addition -> unframed (Maybe.maybeToList (ManaAddition.restriction addition))
-  Effect.Search (Search.MkSearch _ _ _ f _ _) -> unframed [f]
+  -- THE one search-framed position. CR 701.3a from the candidate's side:
+  -- Auratouched Mage's "an Aura card that could enchant it", where the host is
+  -- fixed for the whole evaluation and the Aura varies per candidate.
+  Effect.Search (Search.MkSearch _ _ _ f _ _) -> searchFramed [f]
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   -- Only the count's Filters: rule 701.39a describes the candidate pool, so no
@@ -3728,6 +3750,34 @@ canHostSubjectOffends card =
 -- the whole encoded face are counting the same occurrences.
 filterAtoms :: Text.Text -> Filter.Type.Filter Keyword.Keyword -> Int
 filterAtoms tag = jsonAtoms tag . Codec.encode (Filter.Codec.codec Keyword.Codec.codec)
+
+-- The CR 701.3a candidate-side tag, spelled once.
+canAttachToSubjectTag :: Text.Text
+canAttachToSubjectTag = Text.pack "CanAttachToSubject"
+
+-- How many CR 701.3a candidate-side atoms this card carries inside a SEARCH's
+-- filter, and how many anywhere else. The second number is the offence; the first
+-- is what Auratouched Mage legitimately has one of.
+canAttachToSubjectCounts :: Face.Face Card.Type.Card -> (Int, Int)
+canAttachToSubjectCounts card =
+  let total wanted = sum [filterAtoms canAttachToSubjectTag f | (framing, f) <- cardFilters card, (framing == SearchFramed) == wanted]
+   in (total True, total False)
+
+-- Filter.CanAttachToSubject is answerable only where the evaluator supplies the
+-- fixed host, and Pawl.Engine.Resolve's Effect.Search arm is the only one that
+-- does. Written into a target slot, an affected set, a Count filter or an attach
+-- destination it is a silent False rather than a rejected card, exactly as
+-- Filter.CanHostSubject is outside an attach. This is where that is made loud.
+--
+-- Two offences under one name, for canHostSubjectOffends' two reasons: the
+-- traversal found the atom outside a search, or the traversal and the codec
+-- disagree about how many the card holds -- the second being a blind spot in
+-- cardFilters, in which an atom would be reported as zero rather than as an
+-- offence.
+canAttachToSubjectOffends :: Face.Face Card.Type.Card -> Bool
+canAttachToSubjectOffends card =
+  let (framed, unframedCount) = canAttachToSubjectCounts card
+   in unframedCount /= 0 || framed + unframedCount /= jsonAtoms canAttachToSubjectTag (Codec.encode (Face.Codec.codec Card.codec) card)
 
 -- The CR 709.4a tag, spelled once.
 sameNameAsBoundTag :: Text.Text
@@ -5753,6 +5803,31 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           (cardFilters (S.combinedFace barrens))
       )
       "CR 702.29e landcycling's filter is a position the sweep walks"
+  -- CR 701.3a from the candidate's side: Filter.CanAttachToSubject is answerable
+  -- only where the evaluator supplies the fixed host, which is a search's filter
+  -- and nothing else. See canAttachToSubjectOffends for the two offences.
+  Spec.it s "CR 701.3a no card asks CanAttachToSubject outside a search's filter" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace canAttachToSubjectOffends . Printing.card) ps
+    Spec.assertEqWith s "the atom sits only in a search's filter" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous: the pool authors the atom, and the one card that does is
+    -- ACCEPTED here rather than skipped.
+    mage <- S.printingOf s registry "Auratouched Mage"
+    Spec.assertEqWith
+      s
+      "Auratouched Mage's one atom is framed by its own search"
+      (canAttachToSubjectCounts (S.combinedFace mage))
+      (1, 0)
+    Spec.assertEqWith
+      s
+      "and it is the pool's only one"
+      (sum (fmap (uncurry (+) . canAttachToSubjectCounts . S.combinedFace) ps))
+      1
+    -- The unframed side has room to spare, so a Framing that had stopped marking
+    -- searches would fail here rather than pass the sweep above by iterating over
+    -- nothing.
+    let positions = concatMap (cardFilters . S.combinedFace) ps
+    Spec.assertBool s (length (filter ((== SearchFramed) . fst) positions) > 5) "the pool gives the accepted side search filters to be about"
   -- CR 709.4a's Filter.SameNameAsBound is in CR 701.3a's position one axis over:
   -- answerable only where Filter.Context.slotNames is filled, which is a MODE's
   -- target slot and nothing else. See sameNameAsBoundOffends for the two offences

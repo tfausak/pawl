@@ -2913,8 +2913,23 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     --
     -- The context has no perspective (CR 109.5): a search filter never
     -- references a player, so ControlledBy is vacuously False.
+    --
+    -- CR 701.3a: one candidate's VIEW carries the field no projection can fill --
+    -- whether the CANDIDATE could legally be attached to the object this
+    -- instruction fixes (Auratouched Mage's "an Aura card that could enchant
+    -- it"), which for a search is the searching ability's own SOURCE. Answered by
+    -- Attach.attachmentFor, the same function the move goes through, so the offer
+    -- and the move cannot disagree. Lazy, so a filter that never names
+    -- Filter.CanAttachToSubject pays nothing for it.
+    --
+    -- No recursion to bound: this is called from a resolution rather than from
+    -- inside a CR 613 fold, so the projections attachmentFor reaches start fresh.
     let searchContext = Filter.contextFor Nothing Nothing
-        matches1 g oid = Filter.matches searchContext (Projection.viewOfObject oid g) filter_
+        viewOfCandidate g oid =
+          (Projection.viewOfObject oid g)
+            { Filter.canAttachToSubject = Maybe.isJust (Attach.attachmentFor oid (Recipient.ToObject source) g)
+            }
+        matches1 g oid = Filter.matches searchContext (viewOfCandidate g oid) filter_
      in do
           gs0 <- State.get
           -- Search.searcher names who searches; Search.owner names whose library
@@ -2990,7 +3005,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- CR 701.23e says the same of the reveal. The searcher is the
             -- revealer (CR 701.20a), and the cards go in the order the searcher
             -- named them.
-            Monad.mapM_ (putFound searcher destination) found
+            Monad.mapM_ (putFound searcher source destination) found
             -- The shuffle is the CARD's instruction too (CR 701.23h, CR 701.24b).
             -- The library shuffled is the one that was READ, so this seat is the
             -- owner.
@@ -5169,8 +5184,8 @@ bindAmountSlot holder slot n gs =
 -- CR 701.23: do to a found card what the search said -- a move for every
 -- destination and, for one of them, a CR 701.20a reveal first, through the CR
 -- 400.7 funnel either way.
-putFound :: PlayerId -> SearchDestination.SearchDestination -> ObjectId -> Game ()
-putFound searcher destination cardId = case destination of
+putFound :: PlayerId -> ObjectId -> SearchDestination.SearchDestination -> ObjectId -> Game ()
+putFound searcher source destination cardId = case destination of
   SearchDestination.BattlefieldTapped -> putTapped cardId
   -- The reveal comes FIRST, in the card's own order, and CR 701.20b makes that an
   -- order rather than decoration: revealing does not move the card. The two lines
@@ -5183,6 +5198,31 @@ putFound searcher destination cardId = case destination of
   -- it (CR 701.23e). Which card this instruction exiled is CR 607.2a's link,
   -- filed by recordExiledWith off the effect that ran rather than here.
   SearchDestination.Exile -> Event.changeZone cardId Zone.Exile
+  -- Auratouched Mage's "put that Aura card onto the battlefield attached to it".
+  -- The seed is the RECIPIENT Attach.attachmentFor produced rather than a
+  -- hand-built ToObject, for the reason Event.changeZoneAttaching's CR 303.4f arm
+  -- gives: Sba.stillLegalEnchant compares the (pool, tag) pair, so a mismatched
+  -- tag would have CR 704.5m bury the Aura on the next pass.
+  --
+  -- Supplying a seed at all is what keeps CR 303.4f's host prompt out of this
+  -- move: the effect DOES specify what the Aura will enchant, so its controller
+  -- chooses nothing.
+  --
+  -- CR 110.2a: it enters under the SEARCHER, the player whose effect is putting
+  -- it there -- not under its owner, which is what the other arms' Event.changeZone
+  -- leaves it to, since none of them puts anything onto the battlefield for
+  -- someone other than its owner.
+  --
+  -- Nothing is CR 303.4i's "the Aura remains in its current zone" -- unreachable
+  -- from a filter naming Filter.CanAttachToSubject, since that atom is this same
+  -- function, and the honest answer for a card whose filter does not.
+  SearchDestination.BattlefieldAttachedToSource -> do
+    gs <- State.get
+    case Attach.attachmentFor cardId (Recipient.ToObject source) gs of
+      Nothing -> pure ()
+      Just seed ->
+        Monad.void
+          (Event.changeZoneAttaching Nothing Set.empty cardId Zone.Battlefield LibraryPosition.defaultValue (Just seed) TapState.Untapped Map.empty (Just searcher) Nothing Facing.FaceUp False)
 
 -- Put a library card onto the battlefield tapped (CR 701.23's Evolving Wilds
 -- shape). changeZone mints a new object; tap it by id after the move.

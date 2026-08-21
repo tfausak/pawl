@@ -2889,10 +2889,13 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
           -- CR 303.4f: an Aura entering the battlefield "by any means other than
           -- by resolving as an Aura spell", where "the effect putting it onto the
           -- battlefield doesn't specify the object or player the Aura will
-          -- enchant". That second clause IS `seed` being Nothing: Pawl.Engine.Stack's
-          -- Aura branch is the only door that supplies a seed, and it is the only
-          -- door a resolving Aura spell takes, so the rule's own exclusion is
-          -- carried without this funnel asking what kind of move it is.
+          -- enchant". That second clause IS `seed` being Nothing: a door supplies
+          -- one exactly when the effect it carries named a destination -- CR
+          -- 303.4a's target for Pawl.Engine.Stack's Aura branch, which is also the
+          -- only door a resolving Aura spell takes, and the fixed host for
+          -- Pawl.Engine.Resolve.putFound's search destination (Auratouched Mage).
+          -- So the rule's own exclusion is carried without this funnel asking what
+          -- kind of move it is.
           --
           -- Gated on the SETTLED destination, `unlocking`'s reading one binding up:
           -- a CR 616.1 redirect that sends the Aura anywhere but the battlefield
