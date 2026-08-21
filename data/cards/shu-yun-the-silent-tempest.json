@@ -1,0 +1,171 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Prowess"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Shu Yun, the Silent Tempest",
+      "power": {
+        "type": "Literal",
+        "value": 3
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SpellCast",
+            "value": {
+              "filter": {
+                "type": "And",
+                "value": [
+                  {
+                    "type": "ControlledBy",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  {
+                    "type": "Not",
+                    "value": {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Creature"
+                      }
+                    }
+                  }
+                ]
+              },
+              "scope": {
+                "type": "EachTurn"
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "ModifyTarget",
+                        "value": {
+                          "duration": {
+                            "type": "UntilEndOfTurn"
+                          },
+                          "modification": {
+                            "type": "GainKeyword",
+                            "value": {
+                              "type": "DoubleStrike"
+                            }
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
+                        }
+                      }
+                    ],
+                    "payGate": {
+                      "branch": {
+                        "type": "IfPaid"
+                      },
+                      "cost": {
+                        "mana": [
+                          {
+                            "type": "Hybrid",
+                            "value": {
+                              "left": {
+                                "type": "Colored",
+                                "value": {
+                                  "type": "Red"
+                                }
+                              },
+                              "right": {
+                                "type": "Colored",
+                                "value": {
+                                  "type": "White"
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "type": "Hybrid",
+                            "value": {
+                              "left": {
+                                "type": "Colored",
+                                "value": {
+                                  "type": "Red"
+                                }
+                              },
+                              "right": {
+                                "type": "Colored",
+                                "value": {
+                                  "type": "White"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "payer": {
+                        "type": "InSlot",
+                        "value": "you"
+                      }
+                    }
+                  }
+                ],
+                "targetSlots": {
+                  "target": {
+                    "pool": {
+                      "type": "Creatures"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Human"
+          },
+          {
+            "type": "Monk"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

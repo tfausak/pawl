@@ -1480,9 +1480,6 @@ exercises resolving controller idx cIdx clause = case Clause.optionality clause 
 -- being keyed on the offering clause's ordinal. A clause naming an offer never
 -- made falls through and makes it, the named clause having failed its own CR
 -- 701.46a "if" or CR 603.5 "may".
---
--- Not implemented: CR 118.13b's announcement -- how a symbol payable in
--- multiple ways is being paid, chosen immediately before this payment (#373).
 payGateAdmits :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Map.Map ClauseIndex (Map.Map PlayerId Bool) -> Clause.Clause Card.Type.Card -> Game (Bool, Map.Map ClauseIndex (Map.Map PlayerId Bool))
 payGateAdmits resolving source controller idx cIdx legal answers clause = case Clause.payGate clause of
   Nothing -> pure (True, answers)
@@ -1545,7 +1542,20 @@ payGatePaidBy resolving source idx cIdx payer gate = do
       case decision of
         PaymentDecision.Declines -> pure False
         PaymentDecision.Pays -> do
-          outcome <- Cost.pay Nothing ManaSpending.AsProduced payer source cost
+          -- CR 118.13b: a symbol payable in multiple ways is announced by the
+          -- PAYER "immediately before they pay that cost" -- after CR 118.12's
+          -- "may" above, since what is announced is how to pay a cost already
+          -- chosen, and before the mana window Cost.pay opens.
+          --
+          -- CR 601.2f's totalling is `pure`: rule 601.2f is a casting rule, and
+          -- nothing reduces a cost paid during a resolution, so the announced
+          -- cost IS the cost that will be paid. That also keeps the offer
+          -- exactly as permissive as `Cost.canPay` above, which enumerates the
+          -- same CR 601.2b nonhybrid equivalents through Mana.resolutions --
+          -- so no route Mana.announce offers is one the gate refused, and its
+          -- no-payable-route fallback stays unreachable from here.
+          announced <- Cost.announce Nothing ManaSpending.AsProduced payer source pure cost
+          outcome <- Cost.pay Nothing ManaSpending.AsProduced payer source announced
           -- Not implemented: the slots this payment bound are dropped, so a
           -- CR 118.12 cost that sacrifices a permanent cannot be read by a
           -- later clause of the same resolution (#1872).
