@@ -62,6 +62,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.HybridPayment as HybridPayment
+import qualified Pawl.Types.HybridPhyrexian as HybridPhyrexian
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaAddition as ManaAddition
@@ -4679,6 +4680,27 @@ sigilSpec s registry = Spec.describe s "SyntheticHybridPhyrexianSigil" $ do
     Spec.assertEqWith s "and both halves were really asked" (halfAnnouncements askedGreen, halfAnnouncements askedBlue) ([greenMana], [blueMana])
     Spec.assertEqWith s "neither cost life" (S.lifeOf S.alice afterGreen, S.lifeOf S.alice afterBlue) (Just 20, Just 20)
 
+  -- Pawl.Engine.Mana.waysOf's three rows, read directly off an UNANNOUNCED
+  -- cost -- the path a special action's cost and a cost to attack still take
+  -- (#1990, #1991), and the only one that asks this function what the symbol
+  -- costs rather than what CR 601.2b left behind. The Phyrexian group's
+  -- least-life case one group up is the same reading for the monocoloured
+  -- symbol.
+  --
+  -- Three boards, and the answers differ on all three: either component colour
+  -- pays it for nothing, and with neither in play CR 107.4f's 2 life is what is
+  -- left.
+  Spec.it s "CR 107.4f an unannounced {G/U/P} costs no life off EITHER colour, and 2 off neither" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    let lifeOff = Mana.lifeNeeded Nothing Cost.manaActivations ManaSpending.AsProduced S.alice hybridPhyrexianCost
+    Spec.assertEqWith s "a Forest pays the green half" (lifeOff (S.landsInPlay forest 1)) (Just 0)
+    Spec.assertEqWith s "an Island pays the blue half" (lifeOff (S.landsInPlay island 1)) (Just 0)
+    Spec.assertEqWith s "a Mountain pays neither, so 2 life" (lifeOff (S.landsInPlay mountain 1)) (Just 2)
+    Spec.assertEqWith s "and off an empty board it is 2 as well" (lifeOff (Setup.emptyGame S.bothPlayers)) (Just 2)
+    Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice hybridPhyrexianCost (S.landsInPlay mountain 1)) "and the life route is payable at 20"
+
   -- CR 107.4f's third way, and the whole cost is it: no land at all, so the
   -- mana route is unpayable, nothing is asked, and 2 life casts the spell.
   Spec.it s "CR 107.4f off no land at all, 2 life pays the whole cost" $ do
@@ -4691,6 +4713,12 @@ sigilSpec s registry = Spec.describe s "SyntheticHybridPhyrexianSigil" $ do
     Spec.assertEqWith s "no mana route existed, so nothing was asked" (phyrexianAnnouncements asked) []
     Spec.assertEqWith s "nor about a half" (halfAnnouncements asked) []
     Spec.assertEqWith s "and the Sigil resolved" (length (GameState.stack resolved)) 0
+
+-- The Sigil's printed cost, restated rather than read off the card -- the
+-- phyrexianCost posture, and Pawl.CardSpec pins it against
+-- data/cards/synthetic-hybrid-phyrexian-sigil.json.
+hybridPhyrexianCost :: ManaCost.ManaCost
+hybridPhyrexianCost = ManaCost.MkManaCost [ManaSymbol.HybridPhyrexian (HybridPhyrexian.MkHybridPhyrexian Color.Green Color.Blue)]
 
 -- Tamiyo on the battlefield, `dragonOn`'s shape: the permanent the resolved
 -- spell became, which is a fresh object and so not the id that was cast.

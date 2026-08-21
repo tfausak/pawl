@@ -1129,6 +1129,17 @@ completions symbols = case symbols of
   -- CR 107.4f's hybrid Phyrexian symbol: three ways rather than two, the arm
   -- above's life route beside one nonhybrid equivalent per component colour.
   -- `hybridHalves` collapses the degenerate pair for the reason it does above.
+  --
+  -- A REGRESSION FENCE rather than proven behaviour, unlike every other arm
+  -- here: deleting it leaves the whole suite green. Both of this function's
+  -- callers reach `waysOf` for a symbol that rides through unexpanded, and
+  -- waysOf's rows say the same three things, so the two agree on every board --
+  -- and the one cost in the pool that prints this symbol prints exactly one of
+  -- it, so `announce`'s tail is announcement-free by the time it asks. What the
+  -- arm buys is the CONTRACT in the haddock above: a completion that still holds
+  -- one is not a nonhybrid equivalent cost, which is what CR 601.2f is defined
+  -- over. The card that would make it observable is one printing two
+  -- announceable symbols with a hybrid Phyrexian symbol among them; none does.
   ManaSymbol.HybridPhyrexian (HybridPhyrexian.MkHybridPhyrexian l r) : rest ->
     concatMap
       (\half -> [(ManaSymbol.OfType half : tail_, life) | (tail_, life) <- completions rest])
