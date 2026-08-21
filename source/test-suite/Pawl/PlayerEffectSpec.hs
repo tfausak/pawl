@@ -318,8 +318,9 @@ black = ManaSymbol.OfType (ManaType.Colored Color.Black)
 green :: ManaSymbol.ManaSymbol
 green = ManaSymbol.OfType (ManaType.Colored Color.Green)
 
--- CR 107.4c's {C}, the mana type that is not a colour -- CR 118.7d's subject,
--- where the three symbols above are CR 118.7b's and CR 118.7c's.
+-- CR 107.4c's {C}, the mana type that is not a colour. CR 118.7b names it
+-- alongside the colours; CR 118.7d is the arm that is about it alone, where CR
+-- 118.7c is about the coloured symbols above.
 colorless :: ManaSymbol.ManaSymbol
 colorless = ManaSymbol.OfType ManaType.Colorless
 
@@ -1159,9 +1160,8 @@ edgewalkerBoard plains edgewalker piker copies n =
 --
 -- The card the typed half of a reduction exists for, and the pool's one printing
 -- of CR 101.1's confinement -- the excess dropped rather than spilled, against
--- CR 118.7b-d's default. Edgewalker is itself a Cleric,
--- so the spell it discounts is another copy of itself and the pool needs no
--- second Cleric to make the point.
+-- CR 118.7b-d's default. Edgewalker is itself a Cleric, so the spell it
+-- discounts is another copy of itself and this group needs no second Cleric.
 edgewalkerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 edgewalkerSpec s registry =
   Spec.describe s "Edgewalker" $ do

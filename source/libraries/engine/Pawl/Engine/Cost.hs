@@ -675,9 +675,11 @@ announce casting spending pid oid total_ cost = case Cost.mana cost of
 -- order" is the payer's, and applying them in an order pawl picked would be the
 -- engine making it. Asked as the TOTAL each order reaches (`reductionOrders`),
 -- which is the whole of what an order does, and asked only where two totals differ:
--- a floored reduction beside an unfloored one on one cost is what separates them
--- (Heartstone and Blossoming Tortoise on an animated Mishra's Foundry), and the
--- cheapest is offered first so it is also the default a short transcript replays.
+-- two things separate them, a floored reduction beside an unfloored one
+-- (Heartstone and Blossoming Tortoise on an animated Mishra's Foundry) and a
+-- reduction confined to coloured mana beside one that is not (Edgewalker beside
+-- a typed reducer that prints no such sentence). The cheapest is offered first,
+-- so it is also the default a short transcript replays.
 --
 -- NOT FILTERED BY PAYABILITY, `chooseOne` above verbatim: the costlier order is a
 -- legal choice CR 601.2f grants outright, and CR 601.2h reverses a payment it
