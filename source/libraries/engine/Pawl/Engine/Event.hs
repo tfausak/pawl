@@ -3222,7 +3222,9 @@ destroyIn asOf cause regenerability oids = simultaneously $ do
 --
 -- The ability branch records NO event, so no trigger can watch it (#541). Widening
 -- GameEvent.SpellCountered is the wrong direction -- its one reader asks about
--- countering A SPELL and must stay silent here.
+-- countering A SPELL and must stay silent here. What a countered ability does
+-- leave is counterReturning's answer, which is the RESOLUTION's own tally (Glen
+-- Elendra's Answer's "countered this way") and not a look-back at the history.
 --
 -- TWO "can't be countered" gates, one per carrier. CR 101.2 makes either the whole
 -- story: the countering effect resolves and does nothing. Neither is targeting
@@ -3266,10 +3268,12 @@ counter source controller oid = Monad.void (counterOne source controller oid)
 -- cancelled each leave their victim out of the answer.
 --
 -- The VICTIMS as the caller named them, not the graveyard incarnations CR 400.7
--- mints, because the one reader wants how many rather than which: Swift
--- Silence's "draw a card for each spell countered this way", which
+-- mints, because every reader wants how many rather than which: Swift Silence's
+-- "draw a card for each spell countered this way" and Glen Elendra's Answer's
+-- "for each spell and ability countered this way", both of which
 -- Pawl.Engine.Resolve binds as an amount. An ability leaves no new object at all
--- (CR 608.2n), so there is no second id to report for it.
+-- (CR 608.2n), so there is no second id to report for it -- which is why the
+-- answer is the victims and not the incarnations.
 --
 -- A second door rather than a return type on `counter`, the destroyReturning
 -- posture: only the Counter opcode's bound-count slot uses the answer.

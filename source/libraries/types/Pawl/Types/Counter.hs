@@ -18,8 +18,14 @@ import qualified Pawl.Types.SlotName as SlotName
 --
 -- The count is of everything COUNTERED, which CR 701.6a makes "a spell or
 -- ability" -- Swift Silence's rider says "each SPELL countered this way", and
--- the two agree because its own ref names only spells (CR 109.2b). A card that
+-- the two agree because its own ref names only spells (CR 109.2b). Glen
+-- Elendra's Answer says "each spell and ability countered this way" and reads
+-- the count unnarrowed, its ref being ObjectRef.EachOnStack. A card that
 -- counters both and counts only one kind would need the narrowing here.
+--
+-- THE RESOLUTION'S OWN count, not a look-back at GameState.events: "this way"
+-- is CR 608.2's one resolution, so a countering by anything else is not in it.
+-- The events that resolution recorded are a different question (#541).
 data Counter = MkCounter
   { ref :: ObjectRef.ObjectRef,
     slot :: Maybe SlotName.SlotName

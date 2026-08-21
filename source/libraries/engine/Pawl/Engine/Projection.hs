@@ -1513,6 +1513,7 @@ rewriteObjectRef pairs ref = case ref of
   ObjectRef.EachCardInYourHand -> ref
   ObjectRef.EachCardExiledWithSource f -> ObjectRef.EachCardExiledWithSource (fmap (Filter.rewrite pairs) f)
   ObjectRef.EachSpell f -> ObjectRef.EachSpell (Filter.rewrite pairs f)
+  ObjectRef.EachOnStack f -> ObjectRef.EachOnStack (Filter.rewrite pairs f)
   ObjectRef.EachPlayer -> ref
   ObjectRef.EachOpponent -> ref
   ObjectRef.ChosenPlayer -> ref

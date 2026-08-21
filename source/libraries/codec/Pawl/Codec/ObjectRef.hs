@@ -45,6 +45,7 @@ codec =
       Arm.nullary "EachCardInYourHand" ObjectRef.EachCardInYourHand,
       Arm.optionalPayload "EachCardExiledWithSource" filterCodec ObjectRef.EachCardExiledWithSource (\x -> case x of ObjectRef.EachCardExiledWithSource y -> Just y; _ -> Nothing),
       Arm.payload "EachSpell" filterCodec ObjectRef.EachSpell (\x -> case x of ObjectRef.EachSpell y -> Just y; _ -> Nothing),
+      Arm.payload "EachOnStack" filterCodec ObjectRef.EachOnStack (\x -> case x of ObjectRef.EachOnStack y -> Just y; _ -> Nothing),
       Arm.nullary "EachPlayer" ObjectRef.EachPlayer,
       Arm.nullary "EachOpponent" ObjectRef.EachOpponent,
       Arm.nullary "ChosenPlayer" ObjectRef.ChosenPlayer,
