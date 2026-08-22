@@ -89,7 +89,8 @@ object properties required =
 -- No @propertyNames@. The decoder accepts any string as a key, so constraining
 -- keys here would make the schema claim more than the decoder guarantees --- the
 -- wrong direction, since the decoder is tightened to honour the schema rather
--- than the schema loosened to describe the decoder.
+-- than the schema loosened to describe the decoder. 'mapOfKeys' is the sibling
+-- for a decoder that does constrain its keys.
 mapOf :: Schema -> Schema
 mapOf s =
   fromPairs

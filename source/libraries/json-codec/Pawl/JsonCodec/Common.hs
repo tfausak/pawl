@@ -491,7 +491,9 @@ naturalKeyText c k =
 -- No format check beyond what the codec does. A non-canonical spelling such as
 -- @1e0@ decodes to the same key as @1@, and 'textMap''s repeated-key check is
 -- what stops the two collapsing onto one entry; the schema's @pattern@ is what
--- states the canonical shape.
+-- states the canonical shape. So the decoder is a shade LOOSER than the schema
+-- rather than stricter, which is the safe direction: nothing the schema accepts
+-- is rejected, which is what 'textMap''s comment refuses to allow.
 naturalKeyValue :: Codec.Codec k -> Text.Text -> Either Text.Text k
 naturalKeyValue c = parse >=> Codec.decode c
 

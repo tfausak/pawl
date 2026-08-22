@@ -358,12 +358,11 @@ checkPropertyNames c argument value = case value of
       $ Object.unwrap o
   _ -> []
 
--- | Applies to strings only; any other value is unconstrained, which is the
--- one place this module follows the specification's ignore-what-does-not-apply
--- rule rather than inverting it. A pattern outside
--- 'Pattern.matches'' subset is a failure HERE, at the value, because that is
--- the only channel this module has -- it is a defect in the schema rather than
--- in the value, and reporting it as valid would be the silent direction.
+-- | Constrains strings and nothing else, as 'checkMinimum' constrains numbers
+-- and nothing else. A pattern outside the subset 'Pattern.matches' supports is
+-- reported HERE, against the value, because that is the only channel this
+-- module has: it is a defect in the schema rather than in the value, and
+-- answering that the value is valid would be the silent direction.
 checkPattern :: Context -> Value.Value -> Value.Value -> [Failure]
 checkPattern c argument value = case argument of
   Value.String p -> case value of
