@@ -298,6 +298,31 @@ sacrificedCount = SlotName.MkSlotName (Text.pack "thatMany")
 sacrificedPermanent :: SlotName
 sacrificedPermanent = SlotName.MkSlotName (Text.pack "thatSacrificedPermanent")
 
+-- CR 601.2f: the reserved slot under which the permanents a COST payment TAPPED
+-- are bound -- "the tapped creature" in Unerring Sling's "deals damage equal to
+-- the tapped creature's power". Stamped by Pawl.Engine.Activate off the payment
+-- CR 601.2h makes, sacrificedPermanent's route exactly, and so readable by an
+-- activated ability only.
+--
+-- Unlike sacrificedPermanent, the permanent is still on the battlefield when the
+-- ability resolves -- CR 601.2h taps it, and tapping is not a zone change -- so
+-- CR 608.2h's first clause applies and every read is CURRENT information.
+-- Pawl.Engine.Resolve.effectViewOf needs no arm for this slot; the ordinary
+-- Projection.viewWithLastKnown road answers it.
+--
+-- Not needed for {T}: CR 107.5 taps the SOURCE, which CR 113.7's `triggerSource`
+-- already names.
+--
+-- CostComponent.TapForTotalPower is deliberately NOT bound here (#915). Its
+-- chosen set answers a different question -- CR 702.122a's crewing creatures --
+-- and merging the two into one name would make Binding.onlyOne answer Nothing on
+-- a cost carrying both components.
+--
+-- Not a target (CR 115.10a), so the same CR 608.2b posture and the same "no
+-- card's targetSlots may name it" sweep as sacrificedPermanent above.
+tappedPermanent :: SlotName
+tappedPermanent = SlotName.MkSlotName (Text.pack "thatTappedPermanent")
+
 -- CR 601.2i: the reserved slot under which a cast trigger's WATCHED SPELL is
 -- bound -- the printed "it" in Presence of the Master's "whenever a player casts
 -- an enchantment spell, counter it", and "that spell" wherever a card spells the
