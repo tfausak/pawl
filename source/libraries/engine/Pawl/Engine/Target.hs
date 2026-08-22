@@ -55,9 +55,26 @@ import qualified Pawl.Types.Zone as Zone
 -- stack only for a SPELL. A permanent's activated ability passes the source
 -- PERMANENT, so this subtracts nothing there -- the right answer rather than a
 -- happy accident, since the ability and not the permanent is the object CR 115.5
--- speaks of, so Prodigal Sorcerer may still ping itself. An ability targeting
--- ITSELF is the case this cannot reach, because the ability object's own id is
--- not in this frame at all (#638).
+-- speaks of, so Prodigal Sorcerer may still ping itself.
+--
+-- An ability targeting ITSELF is excluded EARLIER, and not by declining to ask:
+-- Activate.activateAbility and Engine.placeBorne mint the ability onto the stack
+-- and then choose its targets against the snapshot they bound BEFORE minting it,
+-- so the ability is absent from the state abilityRecipients draws the pool from.
+-- CR 602.2a and CR 603.3d put the ability on the stack first, so that snapshot is
+-- not the state those rules describe; the two differ by exactly the ability
+-- object, which this rule would subtract anyway, so no board tells them apart.
+--
+-- THOSE TWO FACTS ARE COUPLED, and the coupling is why the snapshot must not be
+-- "tidied" on its own. This function's gate reads `source`, which on the ability
+-- path is the permanent and never on the stack -- so a caller moved to the
+-- post-mint state without also being given the ability's own id would offer the
+-- ability itself, which is a real CR 115.5 violation where the snapshot is only a
+-- harmless deviation. Correcting it means a second frame here (the object ON THE
+-- STACK, distinct from the object targeting is relative to) threaded through
+-- legalSets, selectionLegal, chooseTargets, fillableModes and Resolve's CR 608.2b
+-- re-check. Pawl.TargetSpec's "CR 602.2a/115.5 Adric's ability is not offered its
+-- own object among the abilities it may counter" fences the half-way state.
 --
 -- The two frames are SEPARATE, and keeping them apart is the whole point:
 --
