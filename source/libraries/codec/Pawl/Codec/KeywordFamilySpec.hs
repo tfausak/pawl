@@ -184,6 +184,15 @@ spec s = Spec.describe s "Pawl.Codec.KeywordFamily" $ do
       KeywordFamily.Fabricate
       " {\"type\":\"Fabricate\"} "
 
+  -- CR 702.168a: the family CR 702.168d and CR 701.58d both name, "a face-down
+  -- permanent you control with a disguise ability".
+  Spec.it s "Disguise" $
+    Common.assertCodec
+      s
+      KeywordFamily.codec
+      KeywordFamily.Disguise
+      " {\"type\":\"Disguise\"} "
+
   Spec.it s "Ward" $
     Common.assertCodec
       s

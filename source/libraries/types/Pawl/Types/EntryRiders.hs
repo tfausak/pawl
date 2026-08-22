@@ -142,11 +142,12 @@ import qualified Pawl.Types.TapState as TapState
 -- the pool sets it.
 --
 -- A Bool and not a choice of listed characteristics, which is what CR 701.58a's
--- cloak would need -- a 2/2 with ward {2} -- and that second face is #922. The
--- same Bool is why Event.changeZoneEntering writes FaceDownReason.Manifested
--- unconditionally: CR 701.40a is the only rule in the pool that puts a card onto
--- the battlefield face down, and cloak, the one other rule that would, arrives
--- with the listing it needs (gap #922).
+-- cloak would need -- a 2/2 with ward {2}, which
+-- FaceDownCharacteristics.disguisedValue now is. The same Bool is why
+-- Event.changeZoneEntering writes FaceDownReason.Manifested unconditionally: CR
+-- 701.40a is the only rule in the pool that puts a card onto the battlefield face
+-- down, and cloak, the one other rule that would, would need both halves of this
+-- rider (gap #1668).
 data EntryRiders = MkEntryRiders
   { tapped :: TapState.TapState,
     attacking :: Bool,

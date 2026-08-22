@@ -18,6 +18,13 @@ data TurnUpProcedure
   = -- | CR 702.37e: pay what the permanent's morph cost would be if it were face
     -- up.
     Morph
+  | -- | CR 702.168d: pay what the permanent's disguise cost would be if it were
+    -- face up. Rule 702.37e's procedure with a different price list, and its
+    -- subject is the same shape -- "a face-down permanent you control WITH A
+    -- DISGUISE ABILITY" -- so this one asks nothing about the allower either. CR
+    -- 701.58d is where both this and a cloak's procedure would be open at once,
+    -- the case CR 701.40c already makes for morph and manifest.
+    Disguise
   | -- | CR 701.40b: show that the card is a creature card, pay that card's mana
     -- cost.
     Manifest

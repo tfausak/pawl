@@ -20,19 +20,20 @@
 -- an ordinary rules type and never an effect's identity -- Pawl.Engine.Event
 -- classifies both like any other.
 --
--- TWO PROCEDURES, because CR 708.7's permission belongs to whatever allowed the
--- permanent to be face down and two rules write one: CR 702.37e's, at the morph
--- cost, and CR 701.40b's, at the card's mana cost. CR 701.40c is the case where
--- both are open at once, and the engine offers both rather than picking.
+-- THREE PROCEDURES, because CR 708.7's permission belongs to whatever allowed
+-- the permanent to be face down and three rules write one: CR 702.37e's, at the
+-- morph cost; CR 702.168d's, at the disguise cost; and CR 701.40b's, at the
+-- card's mana cost. CR 701.40c and CR 701.58d are the cases where two are open at
+-- once, and the engine offers both rather than picking.
 --
--- A THIRD ROAD UP that is not a procedure at all: an Effect.TurnFaceUp
+-- A FURTHER ROAD UP that is not a procedure at all: an Effect.TurnFaceUp
 -- (Showstopping Surprise), which pays nothing and shows nothing. It shares
--- performTurnFaceUp with the two procedures because CR 701.40g replaces the
+-- performTurnFaceUp with the three procedures because CR 701.40g replaces the
 -- TURNING OVER and does not care what proposed it.
 --
--- THE INVARIANT: rules 701.40 and 702.37 are part of the rulebook, so reading
--- Keyword.Morph's cost or a FaceDownReason here is the same closed-half act as
--- reading a Phase. This module never asks which CARD is underneath.
+-- THE INVARIANT: rules 701.40, 702.37 and 702.168 are part of the rulebook, so
+-- reading Keyword.Morph's cost or a FaceDownReason here is the same closed-half
+-- act as reading a Phase. This module never asks which CARD is underneath.
 module Pawl.Engine.FaceDown where
 
 import qualified Control.Monad as Monad
@@ -72,9 +73,11 @@ import qualified Pawl.Types.TypeLine as TypeLine
 --
 -- Read through Game.faceUpFaceOf, the one door that steps around CR 708.2's
 -- substitution, because that substitution is exactly what makes a projected read
--- useless here: a face-down permanent has no keywords at all (CR 708.2a), so
--- Projection.keywordsOf would answer Nothing for every morph creature ever
--- printed. The rule's counterfactual is what licenses it.
+-- useless here: a face-down permanent has none of the CARD's keywords (CR
+-- 708.2), so Projection.keywordsOf would answer Nothing for every morph creature
+-- ever printed. The rule's counterfactual is what licenses it. What a projected
+-- read does find is whatever the allower LISTED -- disguise's ward {2} (CR
+-- 702.168b) -- which is never a morph or disguise cost.
 --
 -- Not a projected read, therefore not affected by Humility: a face-down
 -- permanent under a layer-6 ability removal can still be turned face up, since
@@ -84,6 +87,22 @@ morphCostOf :: ObjectId -> GameState -> Maybe (Cost Keyword)
 morphCostOf oid gs = do
   face <- Game.faceUpFaceOf oid gs
   Keyword.morphCost (Face.keywords face)
+
+-- CR 702.168d: "show all players what the permanent's disguise cost WOULD BE if
+-- it were face up". Nothing when the card underneath has no disguise ability,
+-- which is the rule's own parenthesis -- "if the permanent wouldn't have a
+-- disguise cost if it were face up, it can't be turned face up this way".
+--
+-- morphCostOf with rule 702.168d's price list in place of rule 702.37e's, and
+-- every note above applies here word for word: the read goes through
+-- Game.faceUpFaceOf because CR 708.2's substitution has taken the card's
+-- keywords away, and the rule's counterfactual is what licenses it. The face-down
+-- permanent's ONE keyword is the ward CR 702.168b listed, which is not the
+-- ability this asks about.
+disguiseCostOf :: ObjectId -> GameState -> Maybe (Cost Keyword)
+disguiseCostOf oid gs = do
+  face <- Game.faceUpFaceOf oid gs
+  Keyword.disguiseCost (Face.keywords face)
 
 -- CR 701.40b: "show all players that the card representing that permanent IS A
 -- CREATURE CARD and what THAT CARD'S MANA COST is, pay that cost". Its
@@ -107,12 +126,13 @@ manifestCostOf oid gs = do
   manaCost <- Face.manaCost face
   pure (Cost.Type.MkCost (Just manaCost) [])
 
--- What one of CR 708.7's two procedures costs on this permanent, or Nothing when
--- that procedure is closed to it. A classification of the two rules, never of a
--- card: which procedure is which is CR 701.40c's own distinction.
+-- What one of CR 708.7's three procedures costs on this permanent, or Nothing
+-- when that procedure is closed to it. A classification of the three rules,
+-- never of a card: which procedure is which is CR 701.40c's own distinction.
 costOf :: TurnUpProcedure -> ObjectId -> GameState -> Maybe (Cost Keyword)
 costOf procedure oid gs = case procedure of
   TurnUpProcedure.Morph -> morphCostOf oid gs
+  TurnUpProcedure.Disguise -> disguiseCostOf oid gs
   TurnUpProcedure.Manifest -> manifestCostOf oid gs
 
 -- CR 116.2b: may this player turn this permanent face up right now, by this
@@ -155,6 +175,12 @@ canTurnFaceUp pid procedure oid gs =
       -- shortcut.
       eligible = case procedure of
         TurnUpProcedure.Morph -> True
+        -- CR 702.168d's subject is "a face-down permanent you control WITH A
+        -- DISGUISE ABILITY", rule 702.37e's shape exactly, so this one asks about
+        -- the card and not about the allower either. A permanent cloaked or
+        -- manifested off a disguise card is turnable this way, which is CR
+        -- 701.58d in as many words.
+        TurnUpProcedure.Disguise -> True
         TurnUpProcedure.Manifest ->
           fmap (Facing.reasonOf . Object.facing) (Game.lookupObject oid gs)
             == Just (Just FaceDownReason.Manifested)
@@ -169,7 +195,8 @@ canTurnFaceUp pid procedure oid gs =
 -- order -- what Action.TurnFaceUp is built from.
 --
 -- ONE ENTRY PER PROCEDURE, so a manifested morph card appears twice. That is CR
--- 701.40c in the shape Pawl.Engine.Room.unlockable takes for CR 709.5e's doors:
+-- 701.40c (and CR 701.58d for disguise) in the shape Pawl.Engine.Room.unlockable
+-- takes for CR 709.5e's doors:
 -- "its controller MAY turn that card face up using EITHER ... OR", two prices,
 -- and offering both as legal actions is how the engine declines to choose
 -- (docs/design.md's second invariant).
@@ -177,15 +204,15 @@ turnableFaceUp :: PlayerId -> GameState -> [(ObjectId, TurnUpProcedure)]
 turnableFaceUp pid gs =
   [ (oid, procedure)
   | oid <- Set.toAscList (GameState.battlefield gs),
-    procedure <- [TurnUpProcedure.Morph, TurnUpProcedure.Manifest],
+    procedure <- [TurnUpProcedure.Morph, TurnUpProcedure.Disguise, TurnUpProcedure.Manifest],
     canTurnFaceUp pid procedure oid gs
   ]
 
--- CR 702.37e and CR 701.40b, in the order both rules share: show all players
--- what the procedure's cost is, pay it, then turn the permanent face up. ONE
--- function for both, because everything after the payment is the same game
--- action -- the two rules differ only in what they showed and what they charged,
--- which is `costOf` and nothing else.
+-- CR 702.37e, CR 702.168d and CR 701.40b, in the order all three rules share:
+-- show all players what the procedure's cost is, pay it, then turn the permanent
+-- face up. ONE function for all of them, because everything after the payment is
+-- the same game action -- the rules differ only in what they showed and what they
+-- charged, which is `costOf` and nothing else.
 --
 -- The SHOWING is not modelled. Nothing in pawl hides a face-down permanent's
 -- card from a reader in the first place, so there is no concealment for a reveal
@@ -199,8 +226,9 @@ turnableFaceUp pid gs =
 --
 -- The UNPAID branch is quiet, and for a reason of its own: CR 702.37e's
 -- reject-not-repair restores the state the attempt began with, log and all, and
--- CR 708.2a leaves the still-face-down permanent with no ability that could have
--- seen an event anyway.
+-- CR 708.2 leaves the still-face-down permanent with no ability watching a
+-- payment anyway -- disguise's listed ward (CR 702.168b) watches CR 702.21a's
+-- targeting and nothing else.
 --
 -- Everything from the status write on is performTurnFaceUp below, which the
 -- effect road shares.
@@ -230,7 +258,7 @@ turnFaceUp pid procedure oid = do
 -- permanent itself with no card type at all, so a projected read would answer
 -- about the 2/2 rather than about the card.
 --
--- The REVEAL is not modelled, for the reason the two procedures' showing is not:
+-- The REVEAL is not modelled, for the reason the procedures' showing is not:
 -- nothing in pawl hides a face-down permanent's card from a reader, so there is
 -- no concealment for it to lift (#682). What is left of the rule is the second
 -- half of its first sentence, and its second sentence.
@@ -248,7 +276,7 @@ revealsInsteadOfTurningUp oid gs =
 -- write, CR 708.11's replacement loop, and CR 708.7's event, in that order and
 -- for the reasons the notes below give.
 --
--- ONE funnel for both roads up. The special action above reaches it after CR
+-- ONE funnel for every road up. The special action above reaches it after CR
 -- 116.2b's payment; an Effect.TurnFaceUp reaches it through turnFaceUpByEffect,
 -- having paid nothing. CR 701.40g is the whole reason the two share a body
 -- rather than each writing the status: the rule replaces the TURNING OVER and
@@ -304,8 +332,8 @@ performTurnFaceUp procedure oid = do
       -- counterfactual: the permanent has its abilities back by now (CR
       -- 708.2a took them away only while it was face down), so
       -- Projection.replacementsAffecting simply sees the row. Running the
-      -- loop first would collect from a permanent with no abilities at all
-      -- and apply nothing.
+      -- loop first would collect from a permanent holding none of the card's
+      -- abilities and apply nothing.
       --
       -- BEFORE the event record, and that half is observable: a CR 614.1e
       -- ability and a CR 708.7 trigger on one card would otherwise be
