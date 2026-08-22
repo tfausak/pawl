@@ -531,6 +531,8 @@ library codec
     Pawl.Codec.Revealed
     Pawl.Codec.RevealedSpec
     Pawl.Codec.RevealSpec
+    Pawl.Codec.RollDie
+    Pawl.Codec.RollDieSpec
     Pawl.Codec.RoomIndex
     Pawl.Codec.RoomIndexSpec
     Pawl.Codec.Rounding
@@ -1016,6 +1018,7 @@ library test
     Pawl.DecideSpec
     Pawl.DepartureSpec
     Pawl.DetainSpec
+    Pawl.DiceSpec
     Pawl.DungeonSpec
     Pawl.EngineSpec
     Pawl.EntryRestrictionSpec
@@ -1375,6 +1378,7 @@ library types
     Pawl.Types.Reveal
     Pawl.Types.RevealCause
     Pawl.Types.Revealed
+    Pawl.Types.RollDie
     Pawl.Types.RoomIndex
     Pawl.Types.Rounding
     Pawl.Types.Sacrifice

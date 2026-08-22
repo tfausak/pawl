@@ -591,6 +591,22 @@ combatReplaySpec s =
         Spec.it s "an opponent CHOICE does not decode as a random selection" $ do
           let p = Prompt.RandomOpponent (S.bob NonEmpty.:| [S.carol])
           Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseOpponent S.bob)) Nothing
+        -- The fifth Decider-less prompt: CR 706.1a's die. RandomOpponent's
+        -- reasons, over a RANGE rather than a candidate list.
+        Spec.it s "RollDie round-trips through the transcript" $ do
+          let p = Prompt.RollDie 20
+          Spec.assertEqWith s "13 round trips" (Replay.decode p (Replay.encode p 13)) (Just 13)
+          -- Discriminating: a decode that ignored the response and handed back
+          -- the default would pass a 1-valued leg by accident.
+          Spec.assertEqWith s "7 round trips" (Replay.decode p (Replay.encode p 7)) (Just 7)
+        Spec.it s "a short transcript takes the floor of the die's range" $
+          Spec.assertEqWith s "the floor" (Replay.defaultAnswer (Prompt.RollDie 20)) 1
+        -- The assertion that fails if RollDie reuses Response.ChoseX rather than
+        -- getting its own constructor: both carry one Natural, so the types
+        -- would not object, and a player's ANNOUNCED X replaying as a die roll
+        -- is what Pawl.Types.Response's own rule forbids (CR 701.9b).
+        Spec.it s "an announced X does not decode as a die roll" $
+          Spec.assertEqWith s "mismatch" (Replay.decode (Prompt.RollDie 20) (Response.ChoseX 13)) Nothing
         -- CR 507.1 / 703.4h: the defending-player choice round-trips like every
         -- other prompt. NonEmpty because the action only runs when there is at
         -- least one candidate.

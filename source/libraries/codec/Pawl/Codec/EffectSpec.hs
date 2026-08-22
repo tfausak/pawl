@@ -103,6 +103,7 @@ import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.RequireAttack as RequireAttack
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.Reveal as Reveal
+import qualified Pawl.Types.RollDie as RollDie
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
@@ -1402,6 +1403,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.ChooseOpponentAtRandom (SlotName.MkSlotName (Text.pack "opponent")))
       " {\"type\":\"ChooseOpponentAtRandom\",\"value\":\"opponent\"} "
+  Spec.it s "RollDie" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.RollDie RollDie.MkRollDie {RollDie.sides = 20, RollDie.slot = SlotName.MkSlotName (Text.pack "result")})
+      " {\"type\":\"RollDie\",\"value\":{\"sides\":20,\"slot\":\"result\"}} "
   Spec.it s "ExileHandThenDraw" $
     Common.assertJsonCodec
       s

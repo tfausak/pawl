@@ -56,6 +56,7 @@ import qualified Pawl.Codec.Replace as Replace
 import qualified Pawl.Codec.RequireAttack as RequireAttack
 import qualified Pawl.Codec.RequireBlock as RequireBlock
 import qualified Pawl.Codec.Reveal as Reveal
+import qualified Pawl.Codec.RollDie as RollDie
 import qualified Pawl.Codec.Search as Search
 import qualified Pawl.Codec.SetClassLevel as SetClassLevel
 import qualified Pawl.Codec.ShuffleIntoLibrary as ShuffleIntoLibrary
@@ -158,6 +159,7 @@ codec cardCodec =
       Arm.payload "PlaySubgame" SlotName.codec Effect.PlaySubgame (\x -> case x of Effect.PlaySubgame y -> Just y; _ -> Nothing),
       Arm.payload "ChooseOpponent" SlotName.codec Effect.ChooseOpponent (\x -> case x of Effect.ChooseOpponent y -> Just y; _ -> Nothing),
       Arm.payload "ChooseOpponentAtRandom" SlotName.codec Effect.ChooseOpponentAtRandom (\x -> case x of Effect.ChooseOpponentAtRandom y -> Just y; _ -> Nothing),
+      Arm.payload "RollDie" RollDie.codec Effect.RollDie (\x -> case x of Effect.RollDie y -> Just y; _ -> Nothing),
       Arm.payload "TakeExtraTurn" TakeExtraTurn.codec Effect.TakeExtraTurn (\x -> case x of Effect.TakeExtraTurn y -> Just y; _ -> Nothing),
       Arm.payload "ShuffleIntoLibrary" ShuffleIntoLibrary.codec Effect.ShuffleIntoLibrary (\x -> case x of Effect.ShuffleIntoLibrary y -> Just y; _ -> Nothing),
       Arm.payload "OfferCast" OfferCast.codec Effect.OfferCast (\x -> case x of Effect.OfferCast y -> Just y; _ -> Nothing),

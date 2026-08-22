@@ -43,6 +43,7 @@ import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.RequireAttack as RequireAttack
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.Reveal as Reveal
+import qualified Pawl.Types.RollDie as RollDie
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
@@ -940,6 +941,25 @@ data Effect card
     -- Pawl.Engine.Resolve.definedSlots. Elided at one candidate, CR 102.2
     -- leaving a two-player game exactly one opponent.
     ChooseOpponentAtRandom SlotName.SlotName
+  | -- | CR 706.1: roll a die of the stated kind, and bind the result as an
+    -- AMOUNT at the payload's slot for a later effect of the same resolution to
+    -- read through Pawl.Types.Quantity's InSlot (Ancient Copper Dragon's "roll a
+    -- d20. You create a number of Treasure tokens equal to the result").
+    --
+    -- CR 706.4's half of CR 706: no results table, so the number itself is the
+    -- whole outcome and the card's own later text says what to do with it. What
+    -- a table would select between is #2082.
+    --
+    -- ChooseOpponentAtRandom's posture, one type over: Pawl.Types.Prompt's
+    -- RollDie carries no Pawl.Types.Decider and no PlayerId, because a die
+    -- result is nobody's choice -- there is no seat weighing options, so there
+    -- is nothing for CR 723 to usurp. The engine still only OFFERS and FILTERS:
+    -- it names the die and admits the interpreter's answer only inside CR
+    -- 706.1a's 1..N, never computing the outcome itself.
+    --
+    -- The slot is a definition, which Pawl.CardSpec's dataflow lint sees through
+    -- Pawl.Engine.Resolve.definedSlots.
+    RollDie RollDie.RollDie
   | -- | CR 103.5b (Serum Powder): exile every card in the resolving controller's
     -- hand, then draw that many. Targetless and controller-scoped.
     --
