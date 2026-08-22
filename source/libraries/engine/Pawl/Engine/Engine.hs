@@ -67,6 +67,7 @@ import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.DiscardCause as DiscardCause
+import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.Facing as Facing
@@ -1030,9 +1031,25 @@ priorityLoop = do
                                     [] -> State.modify' (\g -> g {GameState.priority = Nothing, GameState.passes = passes})
                                     _ -> do
                                       Stack.resolveTopWith playSubgame
-                                      settleForPriority
-                                      State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just (priorityHolder g)})
-                                      loop
+                                      ended <- State.gets GameState.endTurnSignal
+                                      case ended of
+                                        -- CR 724.1f: an effect ended the turn as
+                                        -- that object resolved, so no player gets
+                                        -- priority for the rest of this process.
+                                        -- Returning BEFORE settleForPriority is
+                                        -- the point: the rule puts the abilities
+                                        -- that triggered during the process onto
+                                        -- the stack in the cleanup step CR 724.1d
+                                        -- jumped to, and settling here would place
+                                        -- them now. CR 724.1d has already ended
+                                        -- this step, so runStepThatBegan resumes
+                                        -- and sweeps it exactly as it would a step
+                                        -- that ended by itself.
+                                        EndTurnSignal.Ended -> State.modify' (\g -> g {GameState.priority = Nothing})
+                                        EndTurnSignal.Running -> do
+                                          settleForPriority
+                                          State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just (priorityHolder g)})
+                                          loop
                                   else do
                                     State.modify' (\g -> g {GameState.passes = passes, GameState.priority = Just (nextStillPlaying gs p)})
                                     loop
@@ -1298,6 +1315,10 @@ runStep = do
   -- first turn's untap step, so if the previous step unwound on a restart, this is
   -- that untap step. Lower the signal first.
   State.modify' (\gs -> gs {GameState.restartSignal = RestartSignal.Playing})
+  -- CR 724.1d: if the previous step unwound because an effect ended the turn, this
+  -- is the cleanup step it jumped to. Lower that signal too, so this step's own
+  -- CR 514.3a settle and priority round (CR 724.1f) happen normally.
+  State.modify' (\gs -> gs {GameState.endTurnSignal = EndTurnSignal.Running})
   phase <- State.gets GameState.phase
   active <- State.gets GameState.activePlayer
   -- CR 614.1b makes "skip" a replacement effect, and CR 500.11 makes skipping a

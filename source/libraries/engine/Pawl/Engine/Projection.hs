@@ -1550,6 +1550,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Transform ref -> Effect.Transform (rewriteObjectRef pairs ref)
   Effect.PhaseOut ref -> Effect.PhaseOut (rewriteObjectRef pairs ref)
   Effect.AddPhases _ -> effect
+  Effect.EndTurn -> effect
   Effect.GainControl (DurationRef.MkDurationRef duration ref) -> Effect.GainControl (DurationRef.MkDurationRef (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
   Effect.ArmDelayedTrigger {} -> effect
   -- Not implemented: the Filter inside the PlayerEffect keeps its printed word

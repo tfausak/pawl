@@ -1198,6 +1198,7 @@ library types
     Pawl.Types.EachCardInGraveyard
     Pawl.Types.Effect
     Pawl.Types.EndingStep
+    Pawl.Types.EndTurnSignal
     Pawl.Types.EntryOption
     Pawl.Types.EntryR
     Pawl.Types.EntryRewrite
