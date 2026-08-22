@@ -256,10 +256,10 @@ candidateCostsFor name oid gs = case Game.lookupObject oid gs of
                   <> [untagged (withoutPayingManaCost face) | PlayerEffect.mayCastFromHandWithoutPayingManaCost (Object.owner obj) oid gs]
               _ -> fmap untagged (printed : alternatives)
     Source.OfToken _ -> []
-    Source.OfAbility _ _ -> []
-    Source.OfTrigger _ _ -> []
+    Source.OfAbility _ -> []
+    Source.OfTrigger _ -> []
     Source.OfEmblem _ -> []
-    Source.OfInherentTrigger _ _ -> []
+    Source.OfInherentTrigger _ -> []
 
 -- CR 601.2f: the mana or alternative cost, plus additional costs and increases,
 -- minus reductions. `cost` arrives with X already substituted (CR 601.2b precedes

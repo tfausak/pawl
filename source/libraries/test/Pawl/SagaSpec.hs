@@ -44,6 +44,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -283,7 +284,7 @@ sagaOf gs =
 chaptersOnStackFrom :: ObjectId.ObjectId -> GameState.GameState -> [Natural]
 chaptersOnStackFrom oid gs =
   let from sid = case fmap Object.source (Game.lookupObject sid gs) of
-        Just (Source.OfTrigger srcId ability) | srcId == oid -> Saga.chapterOf ability
+        Just (Source.OfTrigger triggered) | TriggeredAbilitySource.source triggered == oid -> Saga.chapterOf (TriggeredAbilitySource.ability triggered)
         _ -> Nothing
    in Maybe.mapMaybe from (GameState.stack gs)
 

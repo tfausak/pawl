@@ -13,11 +13,13 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Resolve as Resolve
+import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
@@ -26,6 +28,7 @@ import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.Zone as Zone
 
 -- The runner-aware resolve-the-top-of-stack: CR 729.1a's "the spell or ability
@@ -140,12 +143,12 @@ resolveTopWith runSubgame = do
         -- A token is never on the stack (created onto the battlefield, never
         -- cast).
         Source.OfToken _ -> State.put gs {GameState.stack = rest}
-        Source.OfAbility srcId ability -> do
+        Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = srcId, ActivatedAbilitySource.ability = ability} -> do
           -- CR 601.3's offer is NOT made here. It belongs to the Search effect
           -- itself (Resolve's Effect.Search arm), so it sees the state the player
           -- is actually searching from and reaches searching SPELLS too (#57).
           Resolve.resolveAbilityWith runSubgame oid srcId ability
-        Source.OfTrigger srcId ability ->
+        Source.OfTrigger TriggeredAbilitySource.MkTriggeredAbilitySource {TriggeredAbilitySource.source = srcId, TriggeredAbilitySource.ability = ability} ->
           -- CR 608.2a: an intervening "if" is checked AGAIN as the ability
           -- resolves. Object.owner is the ability's controller, which is "you".
           --
@@ -180,7 +183,7 @@ resolveTopWith runSubgame = do
         -- CR 114.5: an emblem is never on the stack (created into the command
         -- zone, never cast). Drop it, like a token.
         Source.OfEmblem _ -> State.put gs {GameState.stack = rest}
-        Source.OfInherentTrigger _ ability ->
+        Source.OfInherentTrigger InherentTriggerSource.MkInherentTriggerSource {InherentTriggerSource.ability = ability} ->
           -- An inherent ability has no source object, so the ability object
           -- itself stands in for one and Object.owner is its controller -- the
           -- monarch for CR 725.2's two abilities, the player whose engines are

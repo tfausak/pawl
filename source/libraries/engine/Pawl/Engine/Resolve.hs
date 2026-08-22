@@ -52,6 +52,7 @@ import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.AbilityName (AbilityName)
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
@@ -227,6 +228,7 @@ import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
 import qualified Pawl.Types.Toughness as Toughness
+import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.Uses as Uses
@@ -1882,12 +1884,12 @@ alreadyTurnedFor resolving victim gs = case Game.lookupObject resolving gs of
     -- 725.2's sourceless inherent trigger has no permanent to be an ability OF,
     -- so it falls out with the spells.
     abilityOf source = case source of
-      Source.OfAbility srcId _ -> srcId == victim
-      Source.OfTrigger srcId _ -> srcId == victim
+      Source.OfAbility activated -> ActivatedAbilitySource.source activated == victim
+      Source.OfTrigger triggered -> TriggeredAbilitySource.source triggered == victim
       Source.OfCard _ -> False
       Source.OfToken _ -> False
       Source.OfEmblem _ -> False
-      Source.OfInherentTrigger _ _ -> False
+      Source.OfInherentTrigger _ -> False
 
 -- CR 608.2b: the ONE recipient still legal in `slot`, for a reader that can take
 -- only one -- nothing when the slot named none, its target became illegal, or it

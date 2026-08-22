@@ -26,6 +26,7 @@ import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -170,7 +171,12 @@ placeInherent pending = do
         Object.MkObject
           { Object.owner = controller,
             Object.enteredUnder = Nothing,
-            Object.source = Source.OfInherentTrigger controller ability,
+            Object.source =
+              Source.OfInherentTrigger
+                InherentTriggerSource.MkInherentTriggerSource
+                  { InherentTriggerSource.controller = controller,
+                    InherentTriggerSource.ability = ability
+                  },
             Object.zone = Zone.Stack,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,

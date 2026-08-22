@@ -412,10 +412,10 @@ nonCardStackObjectsCease pid gs =
         Just obj -> case Object.source obj of
           Source.OfCard _ -> False
           Source.OfToken _ -> True
-          Source.OfAbility _ _ -> True
-          Source.OfTrigger _ _ -> True
+          Source.OfAbility _ -> True
+          Source.OfTrigger _ -> True
           Source.OfEmblem _ -> True
-          Source.OfInherentTrigger _ _ -> True
+          Source.OfInherentTrigger _ -> True
       theirs oid = Projection.controllerOf oid gs == Just pid && notACard oid
       cease g oid = case Game.lookupObject oid g of
         Nothing -> g

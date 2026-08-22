@@ -249,10 +249,10 @@ stackSpec s registry = Spec.describe s "Stack" $ do
             Source.OfCard printingId ->
               Spec.assertBool s (maybe False (Card.isCreature . Card.combined) (Game.cardOfPrinting printingId after)) "creature"
             Source.OfToken _ -> Spec.assertFailure s "expected a card source"
-            Source.OfAbility _ _ -> Spec.assertFailure s "expected a card source"
-            Source.OfTrigger _ _ -> Spec.assertFailure s "expected a card source"
+            Source.OfAbility _ -> Spec.assertFailure s "expected a card source"
+            Source.OfTrigger _ -> Spec.assertFailure s "expected a card source"
             Source.OfEmblem _ -> Spec.assertFailure s "expected a card source"
-            Source.OfInherentTrigger _ _ -> Spec.assertFailure s "expected a card source"
+            Source.OfInherentTrigger _ -> Spec.assertFailure s "expected a card source"
   Spec.it s "resolving conserves objects" $ do
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -358,10 +358,10 @@ castSpec s registry = Spec.describe s "Cast" $ do
             Source.OfCard printingId ->
               Spec.assertEqWith s "name" (fmap S.nameOf (Game.cardOfPrinting printingId after)) (Just (CardName.MkCardName $ Text.pack "Goblin Piker"))
             Source.OfToken _ -> Spec.assertFailure s "expected a card source"
-            Source.OfAbility _ _ -> Spec.assertFailure s "expected a card source"
-            Source.OfTrigger _ _ -> Spec.assertFailure s "expected a card source"
+            Source.OfAbility _ -> Spec.assertFailure s "expected a card source"
+            Source.OfTrigger _ -> Spec.assertFailure s "expected a card source"
             Source.OfEmblem _ -> Spec.assertFailure s "expected a card source"
-            Source.OfInherentTrigger _ _ -> Spec.assertFailure s "expected a card source"
+            Source.OfInherentTrigger _ -> Spec.assertFailure s "expected a card source"
   Spec.it s "CR 117.1a a Bolt is castable outside a main phase" $ do
     mountain <- S.printingOf s registry "Mountain"
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
@@ -3654,10 +3654,10 @@ nameOnStack wanted gs oid = case Game.lookupObject oid gs of
   Just o -> case Object.source o of
     Source.OfCard _ -> fmap Face.name (Game.faceOf oid gs) == Just wanted
     Source.OfToken printingId -> fmap S.nameOf (Game.cardOfPrinting printingId gs) == Just wanted
-    Source.OfAbility _ _ -> False
-    Source.OfTrigger _ _ -> False
+    Source.OfAbility _ -> False
+    Source.OfTrigger _ -> False
     Source.OfEmblem _ -> False
-    Source.OfInherentTrigger _ _ -> False
+    Source.OfInherentTrigger _ -> False
   Nothing -> False
 
 -- castFirstOption answering the search offer with the LAST option rather than

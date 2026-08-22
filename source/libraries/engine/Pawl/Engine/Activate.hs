@@ -25,6 +25,7 @@ import qualified Pawl.Engine.SplitSecond as SplitSecond
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.Card as Card
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Face as Face
@@ -503,7 +504,12 @@ activateAbility pid srcId ability = do
         Object.MkObject
           { Object.owner = pid,
             Object.enteredUnder = Nothing,
-            Object.source = Source.OfAbility srcId ability,
+            Object.source =
+              Source.OfAbility
+                ActivatedAbilitySource.MkActivatedAbilitySource
+                  { ActivatedAbilitySource.source = srcId,
+                    ActivatedAbilitySource.ability = ability
+                  },
             Object.zone = Zone.Stack,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,

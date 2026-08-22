@@ -86,6 +86,8 @@ library codec
     Pawl.Codec.AbilityTriggered
     Pawl.Codec.AbilityTriggeredSpec
     Pawl.Codec.ActivatedAbility
+    Pawl.Codec.ActivatedAbilitySource
+    Pawl.Codec.ActivatedAbilitySourceSpec
     Pawl.Codec.ActivatedAbilitySpec
     Pawl.Codec.ActivationRestriction
     Pawl.Codec.ActivationRestrictionSpec
@@ -370,6 +372,8 @@ library codec
     Pawl.Codec.HybridSpec
     Pawl.Codec.IncreaseSpellCost
     Pawl.Codec.IncreaseSpellCostSpec
+    Pawl.Codec.InherentTriggerSource
+    Pawl.Codec.InherentTriggerSourceSpec
     Pawl.Codec.InstanceOrdinal
     Pawl.Codec.InstanceOrdinalSpec
     Pawl.Codec.InZone
@@ -510,6 +514,8 @@ library codec
     Pawl.Codec.PrintedReplacement
     Pawl.Codec.PrintedReplacementSpec
     Pawl.Codec.Printing
+    Pawl.Codec.PrintingId
+    Pawl.Codec.PrintingIdSpec
     Pawl.Codec.PrintingSpec
     Pawl.Codec.ProductionTag
     Pawl.Codec.ProductionTagSpec
@@ -585,6 +591,8 @@ library codec
     Pawl.Codec.SkipNextPhaseSpec
     Pawl.Codec.SlotName
     Pawl.Codec.SlotNameSpec
+    Pawl.Codec.Source
+    Pawl.Codec.SourceSpec
     Pawl.Codec.SpecialAction
     Pawl.Codec.SpecialActionSpec
     Pawl.Codec.SpeedDecrease
@@ -638,6 +646,8 @@ library codec
     Pawl.Codec.TriggerCondition
     Pawl.Codec.TriggerConditionSpec
     Pawl.Codec.TriggeredAbility
+    Pawl.Codec.TriggeredAbilitySource
+    Pawl.Codec.TriggeredAbilitySourceSpec
     Pawl.Codec.TriggeredAbilitySpec
     Pawl.Codec.TriggerFrequency
     Pawl.Codec.TriggerFrequencySpec
@@ -1106,6 +1116,7 @@ library types
     Pawl.Types.AbilityTriggered
     Pawl.Types.Action
     Pawl.Types.ActivatedAbility
+    Pawl.Types.ActivatedAbilitySource
     Pawl.Types.ActivationRestriction
     Pawl.Types.Activations
     Pawl.Types.ActiveAttackRequirement
@@ -1284,6 +1295,7 @@ library types
     Pawl.Types.HybridPhyrexian
     Pawl.Types.IgnoredAbility
     Pawl.Types.IncreaseSpellCost
+    Pawl.Types.InherentTriggerSource
     Pawl.Types.InstanceOrdinal
     Pawl.Types.InZone
     Pawl.Types.Keyword
@@ -1454,6 +1466,7 @@ library types
     Pawl.Types.Transformed
     Pawl.Types.TriggerCondition
     Pawl.Types.TriggeredAbility
+    Pawl.Types.TriggeredAbilitySource
     Pawl.Types.TriggerEntry
     Pawl.Types.TriggerFrequency
     Pawl.Types.TriggerLimit
