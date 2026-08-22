@@ -268,7 +268,7 @@ applyModification viewOf src gs oid m pc =
               -- CR 702.5a makes enchant an ability, so CR 613.1f's removal takes
               -- it with the rest. Unproven: Humility reaches only creatures and
               -- nothing in the pool wipes a noncreature permanent's abilities, so
-              -- dropping this line leaves the suite green (#1703).
+              -- dropping this line leaves the suite green.
               PC.enchant = []
             }
         Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) ->
@@ -456,7 +456,7 @@ setLandSubtypeTo s pc
           PC.triggeredAbilities = [],
           -- CR 305.7's strip reaches an enchant ability for CR 613.1f's reason
           -- above. Unproven for the same reason: no board in the pool sets the
-          -- land subtype of a permanent that has one (#1703).
+          -- land subtype of a permanent that has one.
           PC.enchant = []
         }
 
@@ -2999,7 +2999,7 @@ modificationWrites m = case m of
   -- Filter.CanHostSubject, the atom that reads it, declares Keywords. A
   -- REGRESSION FENCE rather than a proved behaviour: no board in the pool makes
   -- another effect's affected set depend on a granted enchant, so Set.empty here
-  -- leaves the suite green (#1703).
+  -- leaves the suite green.
   Modification.GainEnchant _ -> Set.singleton Keywords
   -- Writes ProjectedCharacteristics.activatedAbilities or .triggeredAbilities,
   -- neither of which any Filter atom reads. LoseAllAbilities declares Keywords
@@ -3814,7 +3814,7 @@ mintedTriggeredAbilitiesOf pc =
 
 -- CR 702.5a / 613 layer 6: the object's enchant abilities after the fold --
 -- printed and granted together, which is what Modification.GainEnchant exists to
--- reach (#1703). Folded into CR 702.5c's single slot by
+-- reach. Folded into CR 702.5c's single slot by
 -- Pawl.Engine.Card.foldEnchant at each reader.
 enchantOf :: ObjectId -> GameState -> [TargetSlot.TargetSlot]
 enchantOf = enchantGiven Map.empty

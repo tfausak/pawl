@@ -1100,7 +1100,7 @@ enchantTargetSlot = foldEnchant . Face.enchant
 
 -- The fold itself, over the instances rather than over a face: CR 702.5c's
 -- conjunction has to answer the same way whether the instances were PRINTED or
--- GRANTED (Modification.GainEnchant, #1703), and this is the one place either
+-- GRANTED (Modification.GainEnchant), and this is the one place either
 -- reaches. Pawl.Engine.Projection seeds ProjectedCharacteristics.enchant from
 -- Face.enchant and appends grants to it, so a projected object's list is what
 -- Pawl.Engine.Attach and Pawl.Engine.Sba fold; the cast path (enchantSlotMap

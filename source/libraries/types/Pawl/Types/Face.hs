@@ -198,9 +198,16 @@ data Face card = MkFace
     -- TargetSlots, not Filters, because CR 702.5d's enchant-player Auras need the
     -- Pool axis and TargetSlot already is {pool, filter}. A LIST, because CR 702.5c
     -- makes multiple instances of enchant all apply -- printed order, the order the
-    -- other ability lists on this record keep. Pawl.Engine.Card.enchantTargetSlot
-    -- is the conjunction every reader goes through, and the one place that rule is
+    -- other ability lists on this record keep. Pawl.Engine.Card.foldEnchant is the
+    -- conjunction every reader goes through, and the one place that rule is
     -- applied.
+    --
+    -- PRINTED, and no longer the whole story on the battlefield: an effect can
+    -- GRANT an enchant ability (Modification.GainEnchant), which
+    -- Pawl.Engine.Projection seeds this field into and appends to, so
+    -- Pawl.Engine.Attach and Pawl.Engine.Sba fold the PROJECTED list. What still
+    -- reads this field alone is the cast path (Pawl.Engine.Card.enchantSlotMap),
+    -- since CR 601.2c judges a spell on the stack.
     enchant :: [TargetSlot.TargetSlot],
     -- | CR 113.6g: a can't-be-countered ability functions on the stack (Rending
     -- Volley). Read straight off the card by Event.counter rather than through the

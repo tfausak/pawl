@@ -15,8 +15,9 @@
 -- Cyber Conversion carries the half where the effect LISTS characteristics of
 -- its own, Defenestrated Phantom carries the half where a RULE does, Aven
 -- Farseer -- which has no morph ability at all -- is the WATCHER of rule 708.7's
--- other written form, and Soul Summons is the one card here that reaches rule 708
--- without a cast at all.
+-- other written form, and Soul Summons reaches rule 708 without a cast at all.
+-- Manifest is no longer Soul Summons' alone: Cloudform manifests too, and
+-- Pawl.AuraSpec's GrantedEnchant group is where that one is proved.
 --
 -- Ainok Tracker is the SUBSTITUTION's card. {5}{R} Creature -- Dog Scout 3/3,
 -- "First strike / Morph {4}{R}". Every axis CR 708.2a substitutes is observable

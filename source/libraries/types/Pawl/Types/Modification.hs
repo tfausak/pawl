@@ -36,7 +36,7 @@ data Modification ability
   = GainKeyword Keyword.Keyword -- layer 6 (Serpent's Gift)
   | -- | layer 6, CR 613.1f / CR 702.5a: this object gains an enchant ability --
     -- "becomes an Aura enchantment WITH ENCHANT CREATURE", the clause every
-    -- printing that turns a permanent into an Aura carries (#1703).
+    -- printing that turns a permanent into an Aura carries.
     --
     -- Its own arm rather than GainAbility, and legitimately so: enchant is a rule
     -- 702 keyword, hence a closed-half CITATION exactly as the Keyword GainKeyword
@@ -54,6 +54,12 @@ data Modification ability
     -- also what keeps a granted instance off the copiable values: the seed carries
     -- the printed instances alone (CR 707.2), the same posture activatedAbilities
     -- takes.
+    --
+    -- Its Filter is matched by Pawl.Engine.Target.admittedGiven, which fills
+    -- `perspective` and `source` and leaves `slotObjects` empty -- so a granted
+    -- enchant naming IsBound or SameNameAsBound would be vacuously False, exactly
+    -- as a PRINTED one is (#2057). A "ControlledBy You" conjunct, the shape
+    -- Old-Growth Troll prints, is answered honestly.
     GainEnchant TargetSlot.TargetSlot
   | -- | layer 6, CR 613.1f: this object gains a whole quoted ability, authored on
     -- the granting card (Presence of Gond's "Enchanted creature has '{T}: Create

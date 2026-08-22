@@ -68,7 +68,7 @@ import qualified Pawl.Types.Subtype as Subtype
 -- such a permanent nothing it may legally enchant.
 --
 -- Read off the PROJECTION rather than the printed face, which is what lets an
--- enchant ability be GRANTED (CR 613.1f, Modification.GainEnchant, #1703) --
+-- enchant ability be GRANTED (CR 613.1f, Modification.GainEnchant) --
 -- exactly as the Aura subtype it is gated on already is. CR 708.2a's substitution
 -- still applies, since Projection.baseCharacteristics seeds this field through
 -- Game.faceOf: a permanent that is still face down has no enchant ability and no

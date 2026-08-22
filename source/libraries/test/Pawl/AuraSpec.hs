@@ -2080,135 +2080,130 @@ couldEnchantSpec s registry = Spec.describe s "CouldEnchant" $ do
 
 -- CR 613.1f / 702.5a: an enchant ability that arrives from an EFFECT rather than
 -- from a printing (Modification.GainEnchant), which is what a "becomes an Aura
--- enchantment with enchant creature" clause needs. The two rule-702.5a jobs are
--- split across the two cases: what the permanent may be ATTACHED to
+-- with enchant creature" clause needs. The two jobs CR 702.5a gives that ability
+-- are split across the two cases below: what the permanent may be ATTACHED to
 -- (Pawl.Engine.Attach.attachmentFor) and CR 303.4c's state-based re-check of
 -- whether it still is (Pawl.Engine.Sba.fallsOff).
 --
--- The producer is a synthetic. Every printing that grants enchant needs a
--- capability pawl lacks besides this one: the twelve Licids need single-named-
--- ability removal (only Modification.LoseAllAbilities exists) and a Duration that
--- ends when a player pays a cost; Bronzehide Lion, Old-Growth Troll and Harold
--- and Bob, First Numens choose their host AS THEY RETURN, which needs an entrant
--- already under a continuous effect; Cloudform, Lightform and Rageform need
--- manifest as an authored effect; Necromancy's enchant filter names the Aura that
--- put the creature onto the battlefield; and Last Voyage of the _____ is an
--- un-set card. Scryfall o:"with enchant" and o:"becomes an Aura", 2026-08-22, are
--- the sweep that found them.
+-- Cloudform is the producer, and the whole card: the grant, CR 701.40a's manifest,
+-- the CR 701.3a attach onto the object its own move produced, and the CR 303.4m
+-- static ability riding that attachment. Its two siblings Lightform and Rageform
+-- are the same card with a different keyword pair.
+--
+-- What the rest of the pool needs BESIDES this arm, from Scryfall o:"with enchant"
+-- and o:"becomes an Aura", 2026-08-22: the twelve Licids need single-named-ability
+-- removal (only Modification.LoseAllAbilities exists) and a Duration that ends
+-- when a player pays a cost; Bronzehide Lion, Old-Growth Troll and Harold and Bob,
+-- First Numens choose their host AS THEY RETURN (#2099); Necromancy's enchant
+-- filter names the Aura that put the creature onto the battlefield; and Last
+-- Voyage of the _____ is an un-set card.
 grantedEnchantSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 grantedEnchantSpec s registry = Spec.describe s "GrantedEnchant" $ do
-  -- CR 701.3a through a granted enchant ability: the permanent stops being a
-  -- creature (CR 205.1a), gains the Aura subtype (CR 205.1b), gains "enchant
-  -- creature" (CR 702.5a) and attaches itself -- all in one resolution, so CR
-  -- 613.7c gives the three continuous effects one timestamp and layer 4's two
-  -- are unordered against each other.
+  -- One resolution, four effects: CR 205.1b's Aura subtype, CR 702.5a's enchant
+  -- ability, CR 701.40a's manifest, and CR 701.3a's attach onto what the manifest
+  -- just produced. Cloudform is already an Enchantment, so no card type moves --
+  -- what it lacks is the SUBTYPE and the ability, which is exactly the pair this
+  -- unit's arm and #2078's supply.
   --
-  -- The card is not the Licid it is modelled on: it prints neither the
-  -- lose-this-ability clause nor the pay-to-end duration, so it is a DIFFERENT
-  -- card rather than a mis-modelled Licid.
-  Spec.it s "CR 702.5a whole card: a creature becomes an Aura with a granted enchant ability and attaches itself" $ do
+  -- CR 704.3 never runs between the effects of one resolution, so the moment
+  -- Cloudform is an unattached Aura is not a moment CR 704.5m sees.
+  Spec.it s "CR 702.5a whole card: Cloudform becomes an Aura with a granted enchant ability and attaches to what it manifests" $ do
     island <- S.printingOf s registry "Island"
     piker <- S.printingOf s registry "Goblin Piker"
-    mammoth <- S.printingOf s registry "War Mammoth"
-    parasite <- S.printingOf s registry "Synthetic Clinging Parasite"
-    case grantedEnchantBoard island piker mammoth parasite of
-      Nothing -> Spec.assertFailure s "the synthetic should print an activated ability"
-      Just (leech, host, after) -> do
-        -- FIRST, and the gameplay-level assertion: the host has flying, which a
-        -- Goblin Piker does not print and only the parasite's CR 303.4m static
-        -- ability can have given it -- so it reads through the attachment rather
-        -- than around it.
-        Spec.assertBool s (Projection.hasKeyword Keyword.Flying host after) "CR 303.4m: the Piker has flying, which only the attachment can have given it"
-        -- Then the attachment itself, identity then count. Written as a lookup on
-        -- the PARASITE rather than as a scan for what the Piker wears: a refused
-        -- attach leaves an unattached Aura that CR 704.5m bins, and a scan then
-        -- compares two empty answers and passes vacuously.
+    cloudform <- S.printingOf s registry "Cloudform"
+    case cloudformBoard island piker cloudform of
+      Nothing -> Spec.assertFailure s "Cloudform and the card it manifests should both be on the battlefield"
+      Just (cloud, manifested, after) -> do
+        -- FIRST, and the gameplay-level pair: the manifested permanent has the two
+        -- keywords Cloudform's CR 303.4m static ability grants, neither of which a
+        -- face-down permanent has any way to get on its own (CR 708.2a leaves it a
+        -- 2/2 with no abilities). So this reads through the attachment.
+        Spec.assertBool s (Projection.hasKeyword Keyword.Flying manifested after) "CR 303.4m: the manifested creature has flying"
+        Spec.assertBool s (Projection.hasKeyword (Keyword.Hexproof Nothing) manifested after) "and hexproof"
+        -- Then the attachment itself. A lookup on CLOUDFORM rather than a scan for
+        -- what the manifested creature wears: a refused attach leaves an unattached
+        -- Aura that CR 704.5m bins, and a scan would then compare two empty answers.
         Spec.assertEqWith
           s
-          "and it is wearing the parasite"
-          (fmap Object.attachedTo (Game.lookupObject leech after))
-          (Just (Just (Recipient.ToCreature host)))
-        Spec.assertEqWith
-          s
-          "which is the only permanent attached to it"
-          (length (filter (\o -> Object.attachedTo o == Just (Recipient.ToCreature host)) (Map.elems (GameState.objects after))))
-          1
-        -- The three layer reads the attach went through, after the behaviour
-        -- rather than before, so none of them absorbs a mutation to it.
-        Spec.assertBool s (Set.member Subtype.Aura (Projection.subtypesOf leech after)) "CR 205.1b: the parasite gained the Aura subtype"
-        Spec.assertBool s (not (Projection.isCreatureOf leech after)) "CR 205.1a / 303.4d: and stopped being a creature, without which no Aura may enchant anything"
+          "and Cloudform is attached to it"
+          (fmap Object.attachedTo (Game.lookupObject cloud after))
+          (Just (Just (Recipient.ToCreature manifested)))
+        -- CR 701.40a: what the move put onto the battlefield is a 2/2 creature,
+        -- which is also why "enchant creature" admits it at all.
+        Spec.assertEqWith s "CR 701.40a: the manifested card is a 2/2 creature" (S.powerToughnessOf manifested after) (Just (2, 2))
+        -- The two layer reads the attach went through, after the behaviour rather
+        -- than before, so neither absorbs a mutation to it.
+        Spec.assertBool s (Set.member Subtype.Aura (Projection.subtypesOf cloud after)) "CR 205.1b: Cloudform gained the Aura subtype"
         Spec.assertEqWith
           s
           "CR 702.5a: the projected enchant ability is the granted 'enchant creature'"
-          (Card.foldEnchant (Projection.enchantOf leech after))
+          (Card.foldEnchant (Projection.enchantOf cloud after))
           (Just (TargetSlot.required Pool.Creatures Nothing))
-        Spec.assertBool s (Set.member leech (GameState.battlefield after)) "and CR 704.5m leaves it alone: it is attached to a host its enchant ability admits"
+        Spec.assertBool s (Set.member cloud (GameState.battlefield after)) "and CR 704.5m leaves Cloudform alone: its host is one its enchant ability admits"
   -- CR 704.5m through a GRANTED enchant ability, which is the clause
-  -- Pawl.Engine.Sba.fallsOff could not see while it read the printed face: the
-  -- synthetic's own card declares no enchant at all, so a printed-face read
-  -- answers Nothing and leaves a granted Aura on the battlefield attached to
-  -- something that is no longer there.
+  -- Pawl.Engine.Sba.fallsOff could not see while it read the printed face:
+  -- Cloudform's card declares no enchant at all, so a printed-face read answers
+  -- Nothing and leaves it on the battlefield attached to an id that is no longer
+  -- a permanent.
   --
-  -- The pair differs in exactly one thing -- the lethal damage marked on the host
-  -- -- and the quantity asserted is the SIZE of alice's graveyard: two under the
-  -- projected read (host and Aura), one under the printed-face read. CR 704.5n
-  -- needs Equipment and CR 704.5p sees an Aura that is not a creature, so neither
-  -- of the other two attachment state-based actions absorbs the difference.
+  -- The pair differs in exactly one thing -- the lethal damage marked on the
+  -- manifested creature -- and the quantity asserted is the SIZE of alice's
+  -- graveyard: two under the projected read (the manifested card and Cloudform),
+  -- one under the printed-face read. CR 704.5n needs an Equipment and CR 704.5p
+  -- sees an Aura that is not a creature, so neither of the other two attachment
+  -- state-based actions absorbs the difference.
   --
-  -- Two passes, per CR 704.3: the pass that buries the Piker judged the parasite
-  -- against a state in which the Piker was still there.
-  Spec.it s "CR 704.5m: the granted Aura is buried with its host" $ do
+  -- Two passes, per CR 704.3: the pass that buries the creature judged Cloudform
+  -- against a state the creature was still on.
+  Spec.it s "CR 704.5m: Cloudform is buried with the creature its granted enchant ability let it hold" $ do
     island <- S.printingOf s registry "Island"
     piker <- S.printingOf s registry "Goblin Piker"
-    mammoth <- S.printingOf s registry "War Mammoth"
-    parasite <- S.printingOf s registry "Synthetic Clinging Parasite"
-    case grantedEnchantBoard island piker mammoth parasite of
-      Nothing -> Spec.assertFailure s "the synthetic should print an activated ability"
-      Just (leech, host, attached) -> do
-        -- Goblin Piker is a 2/1 and the parasite grants it only flying, so one
+    cloudform <- S.printingOf s registry "Cloudform"
+    case cloudformBoard island piker cloudform of
+      Nothing -> Spec.assertFailure s "Cloudform and the card it manifests should both be on the battlefield"
+      Just (cloud, manifested, attached) -> do
+        -- A manifested permanent is a 2/2 whatever it prints (CR 701.40a), so two
         -- damage is lethal (CR 704.5g).
-        let pass1 = S.settleSba (S.markDamage host 1 attached)
+        let pass1 = S.settleSba (S.markDamage manifested 2 attached)
             pass2 = S.settleSba pass1
             control = S.settleSba attached
-        -- The control FIRST, so the assertions below cannot pass because the Aura
-        -- was never on the battlefield: one thing differs between the two boards,
-        -- the lethal damage marked on the host.
-        Spec.assertBool s (Set.member leech (GameState.battlefield control)) "control: with the host alive the Aura is still there"
+        -- The control FIRST, so the assertions below cannot pass because Cloudform
+        -- was never on the battlefield.
+        Spec.assertBool s (Set.member cloud (GameState.battlefield control)) "control: with its host alive Cloudform is still there"
         Spec.assertEqWith s "and alice's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice control)) 0
-        -- THE discriminating assertion: two cards, not one. A fallsOff that read
-        -- the printed face would leave the parasite on the battlefield attached to
-        -- an id that is no longer a permanent, and alice's graveyard would hold
-        -- only the Piker.
+        -- THE discriminating assertion: two cards, not one.
         Spec.assertEqWith s "alice's graveyard holds the host AND the Aura that was on it" (length (Game.zoneMembers Zone.Graveyard S.alice pass2)) 2
-        Spec.assertBool s (not (Set.member leech (GameState.battlefield pass2))) "so the granted Aura is off the battlefield"
-        Spec.assertEqWith s "the host died on the first pass" (Game.lookupObject host pass1) Nothing
-        Spec.assertBool s (Set.member leech (GameState.battlefield pass1)) "and CR 704.3 kept the Aura through that pass, since it judged a board the host was still on"
+        Spec.assertBool s (not (Set.member cloud (GameState.battlefield pass2))) "so Cloudform is off the battlefield"
+        Spec.assertEqWith s "the host died on the first pass" (Game.lookupObject manifested pass1) Nothing
+        Spec.assertBool s (Set.member cloud (GameState.battlefield pass1)) "and CR 704.3 kept Cloudform through that pass, since it judged a board the host was still on"
 
--- The board grantedEnchantSpec's two cases share: alice's synthetic activates its
--- ability targeting the Piker, with a War Mammoth on the battlefield as a second
--- candidate so the CR 601.2c target prompt has more candidates than the count and
--- cannot short-circuit. One Island pays the {U}; S.addCreature settles the
--- parasite, so CR 302.6 lets the {T} half be paid. One seat suffices: the granted
--- slot names no controller, and the second case reaches CR 704.5m by removing the
--- host rather than by stealing it.
+-- The board grantedEnchantSpec's two cases share: alice casts Cloudform off three
+-- Islands with one card in her library for it to manifest, and its CR 603.2 enters
+-- trigger resolves. No answerer beyond the identity one: the card names no target
+-- and CR 701.40a's manifest is not a choice, so there is no prompt to pin.
 --
--- Answers through aimAtOffered, which FILTERS the offered set rather than
--- building a recipient.
-grantedEnchantBoard ::
-  Printing.Printing ->
+-- Nothing is added to the battlefield by hand, which is what lets the manifested
+-- permanent be found WITHOUT reading the attachment that is under test: it is the
+-- one nonland battlefield object that is not Cloudform.
+cloudformBoard ::
   Printing.Printing ->
   Printing.Printing ->
   Printing.Printing ->
   Maybe (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-grantedEnchantBoard island piker mammoth parasite =
-  let base0 = S.landsInPlay island 1
-      (host, base1) = S.addCreature piker S.alice base0
-      (_, base2) = S.addCreature mammoth S.alice base1
-      (leech, base3) = S.addCreature parasite S.alice base2
-      ready = base3 {GameState.priority = Just S.alice}
-   in case Face.activatedAbilities (S.combinedFace parasite) of
-        [] -> Nothing
-        ability : _ ->
-          let activated = snd (Engine.runGamePure (aimAtOffered host) ready (Activate.activateAbility S.alice leech ability))
-              resolved = snd (Engine.runGamePure (aimAtOffered host) activated Stack.resolveTop)
-           in Just (leech, host, S.settleSba resolved)
+cloudformBoard island piker cloudform =
+  let base0 = S.landsInPlay island 3
+      (_, base1) = S.addLibraryCard piker S.alice base0
+      (gs, spellId) = S.handOne cloudform base1
+      cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
+      entered = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+      -- CR 704.3: the enters trigger waits until a player would get priority,
+      -- which resolveTop alone never reaches.
+      placed = snd (Engine.runGamePure S.identityAnswer entered Engine.placePendingTriggers)
+      after = snd (Engine.runGamePure S.identityAnswer placed Stack.resolveTop)
+      nonLand oid = not (Set.member CardType.Land (Projection.cardTypesOf oid after))
+   in case battlefieldNamed (S.nameOf (Printing.card cloudform)) after of
+        Nothing -> Nothing
+        Just cloud ->
+          fmap
+            (\manifested -> (cloud, manifested, after))
+            (List.find (\oid -> oid /= cloud && nonLand oid) (Game.zoneMembers Zone.Battlefield S.alice after))

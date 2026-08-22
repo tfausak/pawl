@@ -45,7 +45,7 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       codec
       (Modification.GainKeyword Keyword.Deathtouch)
       " {\"type\":\"GainKeyword\",\"value\":{\"type\":\"Deathtouch\"}} "
-  -- layer 6, CR 702.5a: the granted enchant ability (#1703). The payload is a
+  -- layer 6, CR 702.5a: the granted enchant ability. The payload is a
   -- whole TargetSlot, so this arm's wire form is the one Face.enchant's entries
   -- already take.
   Spec.it s "GainEnchant" $

@@ -133,8 +133,9 @@ import qualified Pawl.Types.TapState as TapState
 -- exiled card status at all; Object.exiledFaceDown says what it is instead.
 --
 -- `faceDown` is CR 708.3's "objects that are put onto the battlefield face
--- down", said by the EFFECT that does the putting -- Soul Summons' "manifest the
--- top card of your library" (CR 701.40a) -- against CR 110.5b's face-up default.
+-- down", said by the EFFECT that does the putting -- the "manifest the top card of
+-- your library" Soul Summons and Cloudform share (CR 701.40a) -- against CR
+-- 110.5b's face-up default.
 -- A rider and not a write after the move for `exiledFaceDown`'s reason and one
 -- of its own: CR 708.3 says the object is turned face down BEFORE it enters, so
 -- the CR 614.1c entry loop, the CR 603.2g Moved event and every trigger scanning

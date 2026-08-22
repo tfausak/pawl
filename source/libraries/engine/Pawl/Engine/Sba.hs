@@ -261,7 +261,7 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
 -- The instances come off the shared `pcs` pre-pass and not from Game.faceOf, for
 -- two reasons at once. The pre-pass is CR 704.3's simultaneity, the same read
 -- cannotBeAttached above takes. And the PROJECTED list is the only one that holds
--- a GRANTED enchant (CR 613.1f, Modification.GainEnchant, #1703): reading the
+-- a GRANTED enchant (CR 613.1f, Modification.GainEnchant): reading the
 -- printed face instead would leave a permanent that became an Aura by effect
 -- permanently exempt from this rule, since its own card declares no enchant at
 -- all. Pawl.AuraSpec's "CR 704.5m ... the granted Aura is buried with its host"
@@ -328,7 +328,8 @@ fallsOff pcs gs oid = case Map.lookup oid pcs of
 -- gains either. See Target.admittedRecipients.
 --
 -- Pool.Creatures with no Filter is the shape MOST folded enchant slots in this
--- pool carry (Unholy Strength) -- Card.enchantTargetSlot leaves a lone
+-- pool carry (Unholy Strength), and the shape a granted "enchant creature" takes
+-- as well -- Card.foldEnchant leaves a lone
 -- unfiltered instance exactly as printed, which is what keeps this arm reachable at all. Target.creatureRecipients tags every candidate
 -- ToCreature, drawn from the battlefield objects owned by a still-playing player,
 -- so with no Filter to narrow that set "still legal" reduces EXACTLY to "still a
