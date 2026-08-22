@@ -24,7 +24,7 @@ codec = Create.codec Common.text
 you :: PlayerRef.PlayerRef
 you = PlayerRef.Relative PlayerRelation.You
 
-plain :: EntryRiders.EntryRiders
+plain :: EntryRiders.EntryRiders Quantity.Quantity
 plain =
   EntryRiders.MkEntryRiders
     { EntryRiders.tapped = TapState.Untapped,

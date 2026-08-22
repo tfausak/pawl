@@ -1,6 +1,7 @@
 module Pawl.Codec.EntryRidersSpec where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Text as Text
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -8,6 +9,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EntryRiders as EntryRiders
+import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.TapState as TapState
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -34,14 +36,32 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
       EntryRiders.codec
       EntryRiders.defaultValue
       " {} "
-  -- CR 122.6a's counters, as a multiset: the kind appears once per counter, so
-  -- two of one kind is that tag twice.
+  -- CR 122.6's counters: one entry per KIND, carrying that kind's count, where
+  -- this used to be a multiset spelling the count as repeats.
   Spec.it s "MkEntryRiders, the counters an object enters with" $
     Common.assertCodec
       s
       EntryRiders.codec
-      EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.fromList [(CounterKind.PlusOnePlusOne, 2), (CounterKind.MinusOneMinusOne, 1)], EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
-      " {\"counters\":[{\"type\":\"PlusOnePlusOne\"},{\"type\":\"PlusOnePlusOne\"},{\"type\":\"MinusOneMinusOne\"}]} "
+      EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.fromList [(CounterKind.PlusOnePlusOne, Quantity.Literal 2), (CounterKind.MinusOneMinusOne, Quantity.Literal 1)], EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
+      " {\"counters\":[{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"count\":{\"type\":\"Literal\",\"value\":2}},{\"kind\":{\"type\":\"MinusOneMinusOne\"},\"count\":{\"type\":\"Literal\",\"value\":1}}]} "
+  -- CR 107.3c: the count need not be a literal at all -- Printlifter Ooze's X,
+  -- defined by the ability's own text, which is why this field is a Quantity.
+  Spec.it s "MkEntryRiders, a counter count that is not a literal" $
+    Common.assertCodec
+      s
+      EntryRiders.codec
+      EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.singleton CounterKind.PlusOnePlusOne Quantity.Power, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
+      " {\"counters\":[{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"count\":{\"type\":\"Power\"}}]} "
+  -- A repeated kind is rejected rather than combined, which the multiset could
+  -- not do: there a repeat was how a count was written.
+  Spec.it s "MkEntryRiders, a repeated counter kind is a decode error" $
+    Spec.assertBool
+      s
+      ( case Codec.decode EntryRiders.codec =<< Common.parse (Text.pack "{\"counters\":[{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"count\":{\"type\":\"Literal\",\"value\":1}},{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"count\":{\"type\":\"Literal\",\"value\":2}}]}") of
+          Left _ -> True
+          Right _ -> False
+      )
+      "expected a decode failure for a repeated counter kind"
   -- CR 110.2a's exception, which is independent of every other rider: undying
   -- returns its bearer under its owner's control and untapped.
   Spec.it s "MkEntryRiders, underOwner alone" $
@@ -69,7 +89,7 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
       " {\"faceDown\":true} "
   Spec.describe s "defaultValue" $ do
     Spec.it s "is untapped, not attacking and not transformed" $
-      Spec.assertEq s EntryRiders.defaultValue EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
+      Spec.assertEq s (EntryRiders.defaultValue :: EntryRiders.EntryRiders Quantity.Quantity) EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
     Spec.it s "a missing tapped key decodes as Untapped" $
       Common.assertFromJson s (Codec.decode EntryRiders.codec) "{\"attacking\":false}" EntryRiders.defaultValue
     Spec.it s "a missing attacking key decodes as False" $

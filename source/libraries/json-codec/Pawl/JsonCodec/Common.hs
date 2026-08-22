@@ -374,6 +374,31 @@ multiset c =
       Codec.schema = Schema.array <$> Codec.schema c
     }
 
+-- | A map whose ENTRY is spelled by the caller's codec, on the wire as an array
+-- of those entries ascending by key, so the encoding is canonical. The entry
+-- codec is the caller's because the field names belong to the type being
+-- written -- 'Pawl.Codec.EntryRiders' pairs a counter kind with the count an
+-- object enters with.
+--
+-- A repeated key is REJECTED rather than letting one win or combining them,
+-- which is 'set''s posture and the one 'multiset' cannot take: there a repeat is
+-- how a count is spelled. The schema stays 'Schema.array' and not
+-- 'Schema.uniqueArray', because what must be unique is the KEY rather than the
+-- whole entry -- two entries sharing a key differ as values, so the decoder is
+-- deliberately stricter than the schema here.
+keyedList :: (Ord k) => Codec.Codec (k, v) -> Codec.Codec (Map.Map k v)
+keyedList c =
+  Codec.MkCodec
+    { Codec.encode = Codec.encode (list c) . Map.toAscList,
+      Codec.decode = \value -> do
+        xs <- Codec.decode (list c) value
+        let m = Map.fromList xs
+        if Map.size m == length xs
+          then Right m
+          else Left $ Text.pack "expected an array with no repeated keys",
+      Codec.schema = Schema.array <$> Codec.schema c
+    }
+
 -- | A name-keyed map, on the wire as a JSON OBJECT keyed by the name, ascending
 -- by key -- which is canonical and byte-stable because 'Object.Object' is a LIST
 -- OF PAIRS rather than a map, so the order written is the order rendered

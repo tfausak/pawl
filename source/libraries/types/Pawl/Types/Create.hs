@@ -17,7 +17,7 @@ data Create card = MkCreate
     card :: card,
     -- | CR 110.5b's default is no riders at all, which is most tokens, so the
     -- key is elided rather than written.
-    riders :: EntryRiders.EntryRiders,
+    riders :: EntryRiders.EntryRiders Quantity.Quantity,
     -- | The slot the created tokens are bound to, when a later effect in the
     -- same list reads them. Absent when nothing does.
     slot :: Maybe SlotName.SlotName,
