@@ -792,7 +792,7 @@ effectCounts effect = case effect of
   -- the one on top, so there is no number a card author writes.
   Effect.Explore {} -> []
   Effect.Discard subject -> case subject of
-    Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity) -> quantityCounts quantity
+    Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> quantityCounts quantity
     Discard.These ref -> refCounts ref
   Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
@@ -3546,7 +3546,7 @@ effectFilters effect = case effect of
   -- The These arm's ref carries a Filter a card author writes -- Amnesia's
   -- "nonland" -- so the lint reaches it, as Reveal's does.
   Effect.Discard subject -> case subject of
-    Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity) -> unframed (quantityFilters quantity)
+    Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> unframed (quantityFilters quantity)
     Discard.These ref -> sourceHosted (objectRefFilters ref)
   Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
@@ -4938,7 +4938,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         variable = Just (ManaCost.MkManaCost [ManaSymbol.Variable])
         -- CR 109.5's "you", in the shape Baral, Chief of Compliance's TRIGGERED
         -- ability uses it: a bare-SlotName opcode naming the controller.
-        youDiscards = Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard Binding.you (Quantity.Type.Literal 1)))
+        youDiscards = Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard Binding.you (Quantity.Type.Literal 1) Nothing))
         -- Endless Cockroaches' payload (CR 400.7e) and rule 702.70a's, the two
         -- event slots, neither of which an activation has an event to bind.
         returnIt = Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.InSlot Binding.became) Zone.Hand EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue)

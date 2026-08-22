@@ -3826,11 +3826,25 @@ offerMiracleReveal pid drawn = do
 -- loop must record nothing (CR 603.2g). The id recorded is the one the funnel
 -- MINTED, since CR 702.29c's abilities trigger from wherever the card winds up.
 discard :: DiscardCause.DiscardCause -> PlayerId -> ObjectId -> Game ()
-discard cause pid oid = do
+discard cause pid oid = Monad.void (discardReturning cause pid oid)
+
+-- A second door rather than a return type on `discard`, the changeZoneReturning
+-- and destroyReturning shape: the ~dozen callers that only perform the discard
+-- keep their `Game ()`, and the one caller that binds "discarded this way" gets
+-- the id without a `Monad.void` at every other site.
+--
+-- The answer is the id the CR 400.7 funnel MINTED, which is the same id the
+-- Discarded event carries and for the same reason: the hand incarnation is gone
+-- by the time anything reads the slot, so binding it would name an object no
+-- reader of the destination zone can find. Nothing for a move that did not
+-- complete -- an unknown id, or a CR 616.1 loop the player cancelled.
+discardReturning :: DiscardCause.DiscardCause -> PlayerId -> ObjectId -> Game (Maybe ObjectId)
+discardReturning cause pid oid = do
   moved <- changeZoneReturning oid Zone.Graveyard
   case moved of
     Nothing -> pure ()
     Just newId -> State.modify' (recordEvent (GameEvent.Discarded (Discarded.MkDiscarded pid newId cause)))
+  pure moved
 
 -- The single reveal funnel (CR 701.20a): `pid` shows `oid` to all players, which
 -- here means appending what was shown to the public log. No-op for an unknown id.
