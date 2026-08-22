@@ -58,7 +58,7 @@ saves under a minute and the suite then blows its budget on cases that take
 The timeout catches infinite loops; it is not an assertion about speed. A few
 cases run 1-2s unloaded and the machine is shared, so a lone TIMEOUT is
 background noise --- re-run it unloaded first; a real hang fails at any budget.
-Two subtrees carry their own budgets via `Tasty.localOption` in `Main.hs`; CI
+Two subtrees carry their own budgets via `Tasty.localOption` in `Pawl.Test`; CI
 sets 5s suite-wide through `flake.nix`'s `testFlags`.
 
 ## Enumerate the edit sites in one pass
@@ -81,7 +81,7 @@ Three sweeps, all yours:
 - **When your change widens a capability**, grep for prose asserting the old
   limit --- the name of what you widened, the zone or type it now reaches, and
   the absolutes such claims use (`only`, `never`, `does not`, `no card`). Sweep
-  `source/test-suite/` too, and the files you did not edit.
+  `source/libraries/test/` too, and the files you did not edit.
 - **When you add a card**, grep the construct's type and constructor names for
   counting absolutes (`one`, `only`, `no card`, `the pool's`). A comment that
   counts producers is falsified by the card that becomes the second one, and
