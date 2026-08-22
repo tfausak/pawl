@@ -6,7 +6,7 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 
 -- | CR 603.3: a triggered ability on the stack -- the source permanent's id
 -- plus the ability. Travels with the object so it resolves even if the source
--- leaves (CR 603.3d).
+-- leaves (CR 113.7a).
 --
 -- A record rather than two positional fields, so the arm has the one payload a
 -- codec needs. Pawl.Types.Source is what this is an arm of.

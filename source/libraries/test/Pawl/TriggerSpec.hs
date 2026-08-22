@@ -574,8 +574,8 @@ stateTriggerSpec s registry =
               again = settle removed
           Spec.assertEqWith s "a fresh instance" (length (triggerIds again)) 1
         -- IMPORTANT-2 (review): Event.stateTriggers' instancesOnStack count
-        -- keys on BOTH the source object's id and the ability (`Source.OfTrigger
-        -- srcId ab`). Every test above uses exactly one
+        -- keys on BOTH the source object's id and the ability (the two fields of
+        -- `TriggeredAbilitySource`). Every test above uses exactly one
         -- Barbarian Outcast, so all of them would still pass a weaker
         -- implementation that compared only the TriggeredAbility and ignored
         -- srcId -- and that weaker version would wrongly suppress a second,
