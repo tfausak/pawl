@@ -1764,6 +1764,69 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertBool s (Projection.isCreatureOf forestId gs) "and a creature"
     Spec.assertBool s (Set.member CardType.Land (Projection.cardTypesOf forestId gs)) "and still a land"
 
+  -- The card-level proof of the layer-4 AddSubtype arm, the add for the families
+  -- the two family-tagged arms above cannot reach (CR 205.3g's artifact types
+  -- here, CR 205.3h's enchantment types the other half). Ygra, Eater of All
+  -- ({3}{B}{G} Legendary Creature -- Elemental Cat 6/6, "Other creatures are Food
+  -- artifacts in addition to their other types and have '{2}, {T}, Sacrifice this
+  -- permanent: You gain 3 life.'", checked against Scryfall) is the card.
+  --
+  -- The Goblin Piker is the OTHER creature: a non-artifact, so CR 205.3d's
+  -- correspondence has to be established by Ygra's own AddCardType rather than
+  -- found already there, and a creature printing no activated ability of its own,
+  -- so the granted one cannot be mistaken for one it had. Ygra is the built-in
+  -- negative control for the printed "Other" (Filter.Not Filter.IsSource).
+  Spec.it s "CR 205.1b Ygra makes another creature a Food artifact without replacing its own types" $ do
+    ygra <- S.printingOf s registry "Ygra, Eater of All"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let base = Setup.emptyGame S.bothPlayers
+        (ygraId, g1) = S.addCreature ygra S.alice base
+        (pikerId, gs) = S.addCreature piker S.alice g1
+    Spec.assertBool s (Set.member Subtype.Type.Food (Projection.subtypesOf pikerId gs)) "the Piker is a Food"
+    -- CR 205.1b's "in addition": the add must not replace what the Piker had. An
+    -- arm that SET the subtypes passes the assertion above and fails this one.
+    Spec.assertEqWith s "and still its printed Goblin Warrior" (Set.difference (Projection.subtypesOf pikerId gs) (Set.singleton Subtype.Type.Food)) (Set.fromList [Subtype.Type.Goblin, Subtype.Type.Warrior])
+    -- The card-type half of the same sentence, and CR 205.3d's precondition for
+    -- the Food: Ygra lists AddCardType Artifact ahead of AddSubtype Food, and
+    -- applyModification folds a static ability's modifications in that order.
+    Spec.assertBool s (Set.member CardType.Artifact (Projection.cardTypesOf pikerId gs)) "and an artifact in addition to being a creature"
+    Spec.assertBool s (Projection.isCreatureOf pikerId gs) "and still a creature"
+    -- The printed "Other", and the reason the affected filter is not vacuously
+    -- true: Ygra is a creature its own static ability does not reach.
+    Spec.assertBool s (not (Set.member Subtype.Type.Food (Projection.subtypesOf ygraId gs))) "Ygra itself is no Food"
+    -- The grant rides on the same affected set, so it lands on the same object.
+    Spec.assertEqWith s "the Piker printed no activated ability and now has exactly the granted one" (length (Projection.abilitiesOf pikerId gs)) 1
+
+  -- THE GAMEPLAY PROOF, end to end, and the reader half: Ygra's own trigger is a
+  -- TriggerCondition.PermanentDies over Filter.HasSubtype Food (CR 700.4: "dies"
+  -- is "put into a graveyard from the battlefield"), which reads the PROJECTED
+  -- subtypes -- so the card is self-reading, and the only thing making the Piker a
+  -- Food is the layer-4 arm under test.
+  --
+  -- alice's Lightning Bolt kills her own Piker, CR 704.5g's state-based action
+  -- moves it to the graveyard, the CR 117.5 settle puts the trigger on the stack,
+  -- and it resolves for two +1/+1 counters. Ygra ends 8/8 where a board on which
+  -- the Piker never became a Food leaves her at her printed 6/6.
+  Spec.it s "CR 700.4 whole cards: the Piker dies a Food and Ygra's own trigger sees it" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    ygra <- S.printingOf s registry "Ygra, Eater of All"
+    piker <- S.printingOf s registry "Goblin Piker"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    let (ygraId, g1) = S.addCreature ygra S.alice (S.landsInPlay mountain 1)
+        (pikerId, board) = S.addCreature piker S.alice g1
+        (withBolt, spellId) = S.handOne lightningBolt board
+        cast = S.runPure (aimAtCreature pikerId) withBolt (S.cast S.alice spellId)
+        damaged = S.runPure (aimAtCreature pikerId) cast Stack.resolveTop
+        settled = S.runPure (aimAtCreature pikerId) damaged Engine.settleForPriority
+        after = S.runPure (aimAtCreature pikerId) settled Stack.resolveTop
+    Spec.assertEqWith s "Ygra starts at her printed 6/6" (Projection.powerOf ygraId board, Projection.toughnessOf ygraId board) (Just 6, Just 6)
+    Spec.assertEqWith s "and ends 8/8" (Projection.powerOf ygraId after, Projection.toughnessOf ygraId after) (Just 8, Just 8)
+    Spec.assertEqWith s "on two +1/+1 counters" (S.counterOf CounterKind.PlusOnePlusOne ygraId after) 2
+    -- Diagnostics, after the behaviour: these separate "the Bolt never killed it"
+    -- from "the death never reached the trigger".
+    Spec.assertEqWith s "the Piker is gone" (Game.lookupObject pikerId settled) Nothing
+    Spec.assertEqWith s "and its death put exactly one trigger on the stack" (length (GameState.stack settled)) 1
+
   -- CR 702.73a's changeling, the subtype-defining ability -- CR 604.3 makes it a
   -- CDA, so CR 613.3 applies it at the start of its layer (4, CR 613.1d) rather
   -- than in timestamp order, and Pawl.Engine.Projection.applySubtypeDefining is

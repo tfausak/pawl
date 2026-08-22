@@ -119,6 +119,23 @@ data Modification ability
     -- when another object GRANTS it (CR 604.3a denies the granted instance CDA
     -- status), so Pawl.Engine.Projection.grantedDefiningParts mints this arm.
     AddEveryCreatureSubtype
+  | -- | layer 4, CR 613.1d / CR 205.1b add, over the subtype families the two
+    -- family-tagged adds above cannot reach: CR 205.3g's artifact types (Ygra,
+    -- Eater of All's "other creatures are Food artifacts in addition to their
+    -- other types") and CR 205.3h's enchantment types (a permanent that becomes
+    -- an Aura). CR 205.3d still refuses a type that corresponds to no card type
+    -- the object has, so a card granting one authors the card type first.
+    --
+    -- UNTAGGED where AddLandSubtype and AddCreatureSubtype carry their family
+    -- implicitly, and that is the whole reason those two are not generalised into
+    -- this: their constructor IS CR 612.2's gate in
+    -- Pawl.Engine.Projection.rewriteModificationWith, which asks whether the word
+    -- being swapped is a land type or a creature type. This arm has no such gate
+    -- to state, and correspondingly no printed text-changer reaches an artifact or
+    -- enchantment type, so it is deliberately left unrewritten there.
+    -- Pawl.CardSpec holds the fence: no AddSubtype in the pool may carry a land
+    -- type or a creature type, since those have their own arms and their own gate.
+    AddSubtype Subtype.Subtype
   | AddCardType CardType.CardType -- layer 4 (Opalescence -> Creature)
   | -- | layer 4, CR 613.1d / 205.1a set (Song of the Dryads -> land). The SET
     -- beside the add above, standing to it as SetLandSubtype stands to

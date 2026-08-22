@@ -174,6 +174,7 @@ widenModification m = case m of
   Modification.SetCreatureSubtype x -> Modification.SetCreatureSubtype x
   Modification.AddCreatureSubtype x -> Modification.AddCreatureSubtype x
   Modification.AddEveryCreatureSubtype -> Modification.AddEveryCreatureSubtype
+  Modification.AddSubtype x -> Modification.AddSubtype x
   Modification.AddCardType x -> Modification.AddCardType x
   Modification.SetCardType x -> Modification.SetCardType x
   Modification.AddSupertype x -> Modification.AddSupertype x
@@ -201,6 +202,7 @@ layer m = case m of
   Modification.SetCreatureSubtype _ -> Layer.Type
   Modification.AddCreatureSubtype _ -> Layer.Type
   Modification.AddEveryCreatureSubtype -> Layer.Type
+  Modification.AddSubtype _ -> Layer.Type
   Modification.AddCardType _ -> Layer.Type
   Modification.SetCardType _ -> Layer.Type
   Modification.AddSupertype _ -> Layer.Type
@@ -273,6 +275,11 @@ applyModification viewOf src gs oid m pc =
         -- (CR 613.3); this runs in timestamp order (CR 613.7).
         Modification.AddEveryCreatureSubtype ->
           pc {PC.subtypes = Set.union (gainableSubtypes pc Subtype.everyCreatureType) (PC.subtypes pc)}
+        -- CR 205.1b's add again, over CR 205.3g's and CR 205.3h's families: the
+        -- object keeps every subtype it had. Literally the two adds above, and
+        -- deliberately so -- what differs is CR 612.2's gate, which lives on the
+        -- constructor rather than here.
+        Modification.AddSubtype s -> gainSubtype s pc
         Modification.AddCardType t ->
           pc {PC.cardTypes = Set.insert t (PC.cardTypes pc)}
         -- CR 205.1a's set, and the whole of it: the new card type replaces the
@@ -1121,6 +1128,7 @@ freezeQuantities gs announcedOn source you m =
         Modification.SetCreatureSubtype _ -> Just m
         Modification.AddCreatureSubtype _ -> Just m
         Modification.AddEveryCreatureSubtype -> Just m
+        Modification.AddSubtype _ -> Just m
         Modification.AddCardType _ -> Just m
         Modification.SetCardType _ -> Just m
         Modification.AddSupertype _ -> Just m
@@ -1149,6 +1157,7 @@ quantitiesOf m = case m of
   Modification.SetCreatureSubtype _ -> []
   Modification.AddCreatureSubtype _ -> []
   Modification.AddEveryCreatureSubtype -> []
+  Modification.AddSubtype _ -> []
   Modification.AddCardType _ -> []
   Modification.SetCardType _ -> []
   Modification.AddSupertype _ -> []
@@ -1184,6 +1193,10 @@ setsLandSubtype m = case m of
   Modification.SetCreatureSubtype _ -> False
   Modification.AddCreatureSubtype _ -> False
   Modification.AddEveryCreatureSubtype -> False
+  -- An ADD, so CR 305.7's last sentence keeps the rules text even were the
+  -- subtype one of CR 205.3i's land types -- the same answer AddLandSubtype
+  -- gives above.
+  Modification.AddSubtype _ -> False
   -- The CARD-TYPE set: CR 305.7 fires on setting a land's SUBTYPE, so making an
   -- object a land does not strip its rules text.
   Modification.SetCardType _ -> False
@@ -1400,6 +1413,11 @@ rewriteModificationWith rewriteAbility pairs m =
         Modification.AddCreatureSubtype s -> Modification.AddCreatureSubtype (swap Subtype.isCreatureType from to s)
         -- Holds no word to swap: it names CR 205.3m's list, not a member of it.
         Modification.AddEveryCreatureSubtype -> acc
+        -- Deliberately unrewritten. CR 612.2 changes only a word used in the
+        -- correct way, and this arm carries no family to check the word against;
+        -- the two family-tagged adds above are where a land-type or creature-type
+        -- word rides, and Pawl.CardSpec keeps those words out of this one.
+        Modification.AddSubtype _ -> acc
         -- CR 702.14a: "[type]walk" holds a land-type word, so a hacked Lord of
         -- Atlantis grants swampwalk. The GRANTER's text is what this reads, which
         -- is CR 612.3. Filter.rewriteKeyword since the word is inside a Filter; no
@@ -2557,6 +2575,7 @@ removesAbilities m = case m of
   Modification.SetCreatureSubtype _ -> False
   Modification.AddCreatureSubtype _ -> False
   Modification.AddEveryCreatureSubtype -> False
+  Modification.AddSubtype _ -> False
   Modification.SetBasePowerToughness {} -> False
   Modification.ModifyPowerToughness {} -> False
   Modification.SwitchPowerToughness -> False
@@ -2943,6 +2962,7 @@ modificationWrites m = case m of
   Modification.SetCreatureSubtype _ -> Set.singleton Subtypes
   Modification.AddCreatureSubtype _ -> Set.singleton Subtypes
   Modification.AddEveryCreatureSubtype -> Set.singleton Subtypes
+  Modification.AddSubtype _ -> Set.singleton Subtypes
   Modification.ChangeSubtypeWord {} -> Set.fromList [Subtypes, Keywords]
   Modification.AddCardType _ -> Set.singleton Types
   -- CR 205.1a's set writes BOTH: the card types it replaces, and the subtypes it
@@ -2976,6 +2996,7 @@ modificationReads m = case m of
   Modification.SetCreatureSubtype _ -> Set.empty
   Modification.AddCreatureSubtype _ -> Set.empty
   Modification.AddEveryCreatureSubtype -> Set.empty
+  Modification.AddSubtype _ -> Set.empty
   Modification.ChangeSubtypeWord {} -> Set.empty
   Modification.AddCardType _ -> Set.empty
   Modification.SetCardType _ -> Set.empty
@@ -3694,6 +3715,7 @@ grantsKeywordWhere p m = case m of
   Modification.SetCreatureSubtype _ -> False
   Modification.AddCreatureSubtype _ -> False
   Modification.AddEveryCreatureSubtype -> False
+  Modification.AddSubtype _ -> False
   Modification.AddCardType _ -> False
   Modification.SetCardType _ -> False
   Modification.AddSupertype _ -> False
