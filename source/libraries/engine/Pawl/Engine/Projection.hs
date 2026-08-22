@@ -2731,9 +2731,13 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               -- Nor a level counter: CR 711.2a states a leveler's grants as
               -- static abilities of the card, which gatherStatic applies.
               CounterKind.Level -> []
-              -- Nor a luck counter: Gemstone Caverns reads its own count through
-              -- an ActivatedAbility condition, which is card data.
-              CounterKind.Luck -> []
+              -- Nor a card-named counter: CR 122.1 letters no such kind, so no
+              -- CR 613 layer reads one, and what reads the count is always the
+              -- card's own condition (Quantity.ObjectCounters) rather than this
+              -- fold. UNPROVEN by any board -- a grant that names nothing and no
+              -- grant at all are indistinguishable, so there is no assertion to
+              -- write here rather than one nobody wrote.
+              CounterKind.Named _ -> []
          in pt <> concatMap grantOf (Map.toList cs)
 
 -- CR 701.60c / 613.1f: a SUSPECTED permanent has menace, emitted as a layer-6
