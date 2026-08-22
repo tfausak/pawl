@@ -2212,6 +2212,138 @@ takesAltarOnce altarId birdsId p = case p of
     pure (if taken == 0 then takesAltar altarId birdsId p else Action.Type.Pass)
   _ -> pure (takesAltar altarId birdsId p)
 
+-- CR 601.2f, reached by CR 602.2b: an ACTIVATION cost is adjusted like a spell's
+-- mana cost, and CR 605.3b gives a mana ability no stack window for
+-- Pawl.Engine.Activate to do it in -- so Cost.manaActivations and
+-- Cost.tapForManaVia gather the adjustments themselves.
+--
+-- BOTH halves of CR 601.2f, one producer each, both pairings already printed:
+--
+--   * the REDUCTION -- Heartstone ("Activated abilities of creatures cost {1}
+--     less to activate. This effect can't reduce the mana in that cost to less
+--     than one mana") on Coal Golem ({5} Artifact Creature -- Golem, "{3},
+--     Sacrifice this creature: Add {R}{R}{R}"). The Golem is a creature, so the
+--     {3} is a {2}, and the floor at one mana is not reached.
+--
+--   * the ADDITIONAL COST -- Drought ("Activated abilities cost an additional
+--     \"Sacrifice a Swamp\" to activate for each black mana symbol in their
+--     activation costs") on Transmogrant Altar's "{B}, {T}, Sacrifice a
+--     creature", whose one {B} buys one Swamp.
+--
+-- INDEPENDENT of the CR 601.2g/h order this path also carries (#1120): the
+-- Golem's only component sacrifices ITSELF, which is a mana source for nothing
+-- but the ability being activated, so both payment orders reach the same board.
+activationAdjustmentSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+activationAdjustmentSpec s registry = Spec.describe s "CR 601.2f a mana ability's own activation cost" $ do
+  -- TWO boards differing in the Heartstone alone. Exactly two Mountains is what
+  -- makes the pair discriminate: {3} is one more than alice can pay and {2} is
+  -- exactly what she can, so the reduction is the whole of the difference.
+  Spec.it s "CR 601.2f a reduction reaches it, so Coal Golem activates for {2}" $ do
+    golem <- S.printingOf s registry "Coal Golem"
+    heartstone <- S.printingOf s registry "Heartstone"
+    mountain <- S.printingOf s registry "Mountain"
+    let (golemId, reduced) = golemBoard golem mountain (Just heartstone)
+        (_, printed) = golemBoard golem mountain Nothing
+        run gs = snd (State.evalState (Engine.runGame (takesSourceOnce golemId) gs Engine.priorityLoop) (0 :: Int))
+        after = run reduced
+        control = run printed
+    Spec.assertEqWith s "CR 601.2f Heartstone makes the {3} a {2}, and two Mountains pay it" (poolTypes S.alice after) [ManaType.Colored Color.Red, ManaType.Colored Color.Red, ManaType.Colored Color.Red]
+    Spec.assertEqWith s "CR 601.2h and the Golem sacrificed itself to do it" (S.creaturesInPlay S.alice after) 0
+    Spec.assertEqWith s "both Mountains went" (S.tappedCount S.alice after) 2
+    Spec.assertEqWith s "without the Heartstone the same board pays nothing" (poolTypes S.alice control) []
+    Spec.assertEqWith s "so the Golem is still there" (S.creaturesInPlay S.alice control) 1
+    Spec.assertEqWith s "and nothing was tapped in its name" (S.tappedCount S.alice control) 0
+
+  -- The OFFER, asked of the same two boards: CR 605.3a offers an activation the
+  -- payment can pay for and no other, so the gate and the payment have to read
+  -- the same total (Cost.manaActivations and Cost.tapForManaVia, one gather).
+  Spec.it s "CR 605.3a the offer is made against the reduced cost too" $ do
+    golem <- S.printingOf s registry "Coal Golem"
+    heartstone <- S.printingOf s registry "Heartstone"
+    mountain <- S.printingOf s registry "Mountain"
+    let (golemId, reduced) = golemBoard golem mountain (Just heartstone)
+        (_, printed) = golemBoard golem mountain Nothing
+        offers gs = length (filter (== Action.Type.ActivateManaAbility golemId) (Action.legalActions S.alice gs))
+    Spec.assertEqWith s "reduced to {2}, the Golem is on the menu" (offers reduced) 1
+    Spec.assertEqWith s "at its printed {3} it is not" (offers printed) 0
+
+  -- CR 601.2f's OTHER half on the same seam. One Swamp does double duty -- it
+  -- pays the {B} (CR 601.2g, before any cost is paid) and is then the Swamp the
+  -- added component eats -- so what separates the two boards is the Drought and
+  -- nothing else, and neither board can reach the other's answer by luck.
+  Spec.it s "CR 601.2f an added component reaches it, so the Altar eats a Swamp" $ do
+    altar <- S.printingOf s registry "Transmogrant Altar"
+    piker <- S.printingOf s registry "Goblin Piker"
+    swamp <- S.printingOf s registry "Swamp"
+    drought <- S.printingOf s registry "Drought"
+    let (altarId, taxed) = altarDroughtBoard altar piker swamp (Just drought)
+        (_, untaxed) = altarDroughtBoard altar piker swamp Nothing
+        run gs = snd (State.evalState (Engine.runGame (takesSourceOnce altarId) gs Engine.priorityLoop) (0 :: Int))
+        after = run taxed
+        control = run untaxed
+        swampsLeft = S.countOnBattlefieldByName (S.printingName swamp) S.alice
+    Spec.assertEqWith s "CR 601.2f the added \"Sacrifice a Swamp\" is paid, so the Swamp is gone" (swampsLeft after) 0
+    Spec.assertEqWith s "and the activation still yielded its three colorless" (poolTypes S.alice after) [ManaType.Colorless, ManaType.Colorless, ManaType.Colorless]
+    Spec.assertEqWith s "without the Drought the same Swamp survives" (swampsLeft control) 1
+    Spec.assertEqWith s "having paid the same {B} for the same three colorless" (poolTypes S.alice control) [ManaType.Colorless, ManaType.Colorless, ManaType.Colorless]
+
+  -- The GATE's half of the same addition, which the case above cannot separate:
+  -- there a Swamp was on the board either way. Here the {B} comes off a Birds of
+  -- Paradise and alice controls NO Swamp, so the added component is one CR 118.3
+  -- leaves her unable to pay -- and the Drought is again the only difference
+  -- between the two boards.
+  Spec.it s "CR 118.3 an added component the board cannot pay takes the offer away" $ do
+    altar <- S.printingOf s registry "Transmogrant Altar"
+    piker <- S.printingOf s registry "Goblin Piker"
+    birds <- S.printingOf s registry "Birds of Paradise"
+    drought <- S.printingOf s registry "Drought"
+    let (altarId, taxed) = altarDroughtBoard altar piker birds (Just drought)
+        (_, untaxed) = altarDroughtBoard altar piker birds Nothing
+        offers gs = length (filter (== Action.Type.ActivateManaAbility altarId) (Action.legalActions S.alice gs))
+    Spec.assertEqWith s "with the Drought and no Swamp to give, the Altar is off the menu" (offers taxed) 0
+    Spec.assertEqWith s "without it the same board offers the same activation" (offers untaxed) 1
+
+-- alice, active, in her precombat main phase: one Coal Golem, two Mountains, and
+-- the Heartstone or not. Returns the Golem.
+golemBoard :: Printing.Printing -> Printing.Printing -> Maybe Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+golemBoard golem mountain heartstone =
+  let (golemId, g1) = S.addCreature golem S.alice (Setup.emptyGame S.bothPlayers)
+      g2 = foldr (\_ gs -> snd (S.addCreature mountain S.alice gs)) g1 [1 :: Int, 2]
+      g3 = case heartstone of
+        Nothing -> g2
+        Just printing -> snd (S.addCreature printing S.alice g2)
+   in (golemId, g3 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
+
+-- alice, active, in her precombat main phase: one Transmogrant Altar, one Goblin
+-- Piker for the printed sacrifice, one `blackSource` for the {B} -- a Swamp
+-- where the Drought's added cost is to be payable and a Birds of Paradise where
+-- it is not -- and the Drought or not. Returns the Altar.
+altarDroughtBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Maybe Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+altarDroughtBoard altar piker blackSource drought =
+  let (altarId, g1) = S.addCreature altar S.alice (Setup.emptyGame S.bothPlayers)
+      (_, g2) = S.addCreature piker S.alice g1
+      (_, g3) = S.addCreature blackSource S.alice g2
+      g4 = case drought of
+        Nothing -> g3
+        Just printing -> snd (S.addCreature printing S.alice g3)
+   in (altarId, g4 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
+
+-- Activates ONE named source, at ONE priority prompt, and answers the payment
+-- window with whatever it offers. Once-only for takesAltarOnce's reason: an
+-- activation that fails leaves the board as it was, so a greedy answerer would
+-- be offered it again forever and a mutation would hang rather than fail.
+takesSourceOnce :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State Int r
+takesSourceOnce sourceId p = case p of
+  Prompt.ChooseAction _ _ actions -> do
+    taken <- State.get
+    State.modify' (+ 1)
+    pure $ case (taken :: Int, filter (== Action.Type.ActivateManaAbility sourceId) actions) of
+      (0, offer : _) -> offer
+      _ -> Action.Type.Pass
+  Prompt.ChooseManaSource _ _ candidates -> pure (Just (NonEmpty.head candidates))
+  Prompt.ChooseExtraManaSource {} -> pure Nothing
+  _ -> pure (S.identityAnswer p)
+
 -- CR 118.3 on the supply side again, for a repeatable ability whose cost spends no
 -- OBJECT. Treasonous Ogre ({3}{R} Creature -- Ogre Shaman, dethrone, "Pay 3 life:
 -- Add {R}") is the pool's first: its cost holds no {T} for CR 107.5 to bar a
@@ -3237,6 +3369,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   ashnodsAltarSpec s registry
   phyrexianAltarSpec s registry
   transmograntAltarSpec s registry
+  activationAdjustmentSpec s registry
   treasonousOgreSpec s registry
   sharedVictimSpec s registry
   sharedTapSpec s registry
