@@ -1933,12 +1933,15 @@ mandatoryLoopBoardSpec s registry = Spec.describe s "a mandatory loop (CR 104.4b
 -- both halves, since Cast.castableSpells offers a spell only when its cost can be
 -- paid.
 --
--- The seed Forest enters TAPPED. S.addCreature settles what it places, and Life
--- and Limb makes a Forest a creature, so an untapped one would offer alice CR
--- 605.3a's mana ability every round -- an optional action, which is what the
--- sibling case below is about. CR 107.5 takes it away. The TOKENS need no such
--- care: CR 302.6 refuses the {T} of a creature its controller has not controlled
--- since their turn began.
+-- The seed Forest enters TAPPED (CR 107.5). S.addCreature settles what it
+-- places, and Life and Limb makes a Forest a 1/1 creature, so an untapped one
+-- would offer alice CR 605.3a's mana ability at her first priority and move
+-- GameState.lastChoice. That is a speed measure, not what makes the loop
+-- mandatory: Aether Flash buries the Forest before a second priority, so
+-- dropping the tap only postpones the draw by the thousand events the marker
+-- then has to climb again, and the case stays green. The TOKENS need no such
+-- care either: CR 302.6 refuses the {T} of a creature its controller has not
+-- controlled since their turn began.
 --
 -- The two static permanents sit under bob so that alice -- the active player,
 -- whose menu the loop reads first -- controls nothing with an activatable
