@@ -404,14 +404,15 @@ affordableX family pid srcId gs cost = Cost.greatestPayableX Nothing (\x -> paya
 --
 -- Threading them buys the SHAPE of the loop: those wrappers hoist per CALL, and
 -- the caller is a loop over the battlefield, so an ability that reached them
--- cost a whole-board sweep per permanent. Pawl.PerformanceSpec's Prodigal
--- Sorcerer ceiling is what holds that line.
+-- cost a whole-board sweep per permanent. Not implemented: nothing asserts
+-- that line -- an allocation ceiling held it until measuring bytes was judged
+-- too compiler-specific to keep (gap #578).
 --
 -- `activatable` keeps Map.empty deliberately. It has no engine caller -- only
 -- tests -- so the slower per-object Projection.projectGiven fallback costs
--- nothing, and it makes the plain path a genuinely independent computation that
--- PerformanceSpec's differential test can hold the threaded one against -- its
--- `sources` is built off that same Map.empty for the same reason.
+-- nothing, and it makes the plain path a genuinely independent computation a
+-- differential test could hold the threaded one against -- its `sources` is
+-- built off that same Map.empty for the same reason.
 activatable :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
 activatable pid srcId ability gs =
   let grants = Projection.controlGrants gs

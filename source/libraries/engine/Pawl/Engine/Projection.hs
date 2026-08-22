@@ -2338,9 +2338,10 @@ gatherGiven stripped functioning seed gs =
       -- library, so what the walk costs per card is the whole of what it costs:
       -- mayStateZone below settles the common card without building a face, and
       -- Game.faceOfObject takes one lookup where the chain through Game.faceOf
-      -- took three. Pawl.PerformanceSpec's per-library-card ceiling is what
-      -- holds both -- see #1935, which measured the walk at 26% of the suite
-      -- before them.
+      -- took three. Not implemented: nothing asserts what that walk costs per
+      -- card -- a per-library-card ceiling held both until measuring bytes was
+      -- judged too compiler-specific to keep (gap #578). See #1935, which
+      -- measured the walk at 26% of the suite before them.
       --
       -- Not implemented: exile gets no arm of its own, so a stated set naming it
       -- is ignored -- Grist's does (gap #1933).

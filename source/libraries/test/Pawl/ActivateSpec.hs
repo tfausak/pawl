@@ -1,7 +1,9 @@
 {-# LANGUAGE GADTs #-}
 
 -- Covers Pawl.Engine.Activate: activating an ability onto the stack, summoning-sickness
--- gating, and the CR 605 mana-ability exclusion from stack activations.
+-- gating, and the CR 605 mana-ability exclusion from stack activations. Also the
+-- differential that pins Action.legalActions' hoisted enumeration to the answer
+-- its unhoisted wrappers give, at hoistDifferentialSpec.
 module Pawl.ActivateSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -112,6 +114,7 @@ singleModeAbility effects slots =
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
+  hoistDifferentialSpec s registry
   printedActivationRestrictionSpec s registry
   printedActivationConjunctionSpec s registry
   printedActivationCombatPointSpec s registry
@@ -3361,3 +3364,117 @@ printedActivationCombatPointSpec s registry = Spec.describe s "PrintedActivation
         Spec.assertEqWith s "control: so bob takes the Piker's 2" (S.lifeOf S.bob idle) (Just 18)
         Spec.assertEqWith s "control: and the Runner is untapped" (fmap Object.tapped (Game.lookupObject runnerId idle)) (Just TapState.Untapped)
       _ -> Spec.assertFailure s "fixture should have given alice an attacker and bob a Trap Runner"
+
+-- `n` copies of a printing on the battlefield under alice, in her precombat
+-- main phase.
+--
+-- Never a vanilla creature: the printing has to carry an activated ability, or
+-- the loop reads an empty list of PROJECTED activated abilities
+-- (Activate.abilitiesForGiven) and the per-object gates never run at all.
+-- Prodigal Sorcerer's "{T}: deals 1 damage to any target" is not a mana ability
+-- (CR 605.1a: it requires a target), so its enumeration runs every conjunct,
+-- including the two that ask about OTHER objects -- which is what makes it the
+-- fixture worth differencing.
+hoistBoardOf :: Printing.Printing -> Int -> GameState.GameState
+hoistBoardOf printing n =
+  let addOne gs _ = snd (S.addCreature printing S.alice gs)
+      board = List.foldl' addOne (Setup.emptyGame S.bothPlayers) [1 .. n]
+   in board {GameState.phase = Phase.PrecombatMain}
+
+-- `n` of EACH printing on the battlefield under alice. hoistBoardOf's mixed
+-- twin: a board of ONE printing cannot tell "every permanent answered" from
+-- "the first permanent's answer was reused".
+hoistMixedBoard :: [Printing.Printing] -> Int -> GameState.GameState
+hoistMixedBoard printings n =
+  let addOne gs printing = snd (S.addCreature printing S.alice gs)
+      board = List.foldl' addOne (Setup.emptyGame S.bothPlayers) (concat (replicate n printings))
+   in board {GameState.phase = Phase.PrecombatMain}
+
+-- Activate.activatableGiven fed everything Action.legalActions hoists for it.
+-- One expression, so the spec below reads as a differential rather than as a
+-- pile of arguments.
+threadedGate :: PlayerId.PlayerId -> ObjectId.ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card -> GameState.GameState -> Bool
+threadedGate pid oid ability gs =
+  let grants = Projection.controlGrants gs
+      pcs = Projection.projectAll gs
+   in Activate.activatableGiven grants pcs (Target.poolsGiven pcs gs) (Cost.supplyManaSourcesGiven grants pcs pid gs) pid oid ability gs
+
+-- Action.legalActions' two ACTIVATION lists rebuilt out of the plain per-call
+-- wrappers, which hoist nothing: Activate.activatable projects each object for
+-- itself and builds a fresh base pool and a fresh mana-source sweep per ability,
+-- and Mana.manaSources takes its own board. Same zones in the same order as the
+-- enumeration, so the two lists are comparable element for element and a hoist
+-- that reordered the menu would show up here.
+--
+-- Only those two, because they are the only ones #716 and #1073 touched. The
+-- other kinds of action in the menu are enumerated identically either way, so
+-- the spec compares this against the enumeration's activation slice.
+referenceActivations :: PlayerId.PlayerId -> GameState.GameState -> [A.Action]
+referenceActivations pid gs =
+  let forObject oid = fmap (A.Activate oid) (filter (\ab -> Activate.activatable pid oid ab gs) (Activate.abilitiesFor oid gs))
+      zones = Projection.controls pid gs <> Game.zoneMembers Zone.Hand pid gs <> Game.zoneMembers Zone.Graveyard pid gs
+   in concatMap forObject zones <> fmap A.ActivateManaAbility (Mana.manaSources Cost.manaActivations pid gs)
+
+-- The enumeration's activation slice. EXHAUSTIVE over Action, so a new kind of
+-- action has to be classified here rather than silently dropping out of the
+-- comparison above.
+activationsIn :: [A.Action] -> [A.Action]
+activationsIn =
+  let isActivation action = case action of
+        A.Activate _ _ -> True
+        A.ActivateManaAbility _ -> True
+        A.Pass -> False
+        A.Play _ _ -> False
+        A.Cast {} -> False
+        A.TurnFaceUp {} -> False
+        A.Unlock _ _ -> False
+        A.DiscardFromHand _ -> False
+        A.Plot _ -> False
+        A.Foretell _ -> False
+        A.Ignore _ -> False
+   in filter isActivation
+
+-- Action.legalActions threads ONE control-grant walk and ONE whole-board
+-- projection through both halves of its loop, and #1073 hoisted two more
+-- whole-board structures out of the per-ability loop -- the base target pools
+-- and the mana-source sweep. A hoist that drops or reorders a legal action is a
+-- RULES bug rather than a slow one, so these two pin the ANSWER: each reruns
+-- the same question through the unhoisted path and demands the same reply.
+--
+-- These arrived with the allocation guard #578 built and outlived it: that
+-- guard measured what the enumeration COST and was removed as compiler-specific,
+-- while these measure what it ANSWERS and are ordinary rules assertions.
+hoistDifferentialSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hoistDifferentialSpec s registry = do
+  -- Activate.activatable passes Map.empty for the projected board, so the plain
+  -- side really does project each object for itself through
+  -- Projection.projectGiven's per-object fallback while the threaded side reads
+  -- the pre-projected board. It is still a REGRESSION FENCE and not a proof,
+  -- since both sides read the same GameState -- the proof is the snapshot
+  -- argument at Projection.projectGiven.
+  Spec.it s "the threaded board answers what the unthreaded one answers" $ do
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let board = hoistBoardOf sorcerer 8
+        oids = Set.toList (GameState.battlefield board)
+        viaPlain oid = filter (\ab -> Activate.activatable S.alice oid ab board) (Activate.abilitiesFor oid board)
+        viaThreaded oid = filter (\ab -> threadedGate S.alice oid ab board) (Activate.abilitiesFor oid board)
+    Spec.assertEqWith s "the plain gate offers something to differ about" (fmap (length . viaPlain) oids) (replicate 8 1)
+    Spec.assertEqWith s "and the threaded gate agrees with it object for object" (fmap viaThreaded oids) (fmap viaPlain oids)
+
+  -- THE WHOLE MENU, not one gate.
+  --
+  -- A MIXED board, and that is what makes it discriminate. These four differ in
+  -- every conjunct the hoists reach -- a targeting activation (Prodigal
+  -- Sorcerer), a mana ability with no target (Llanowar Elves), a land whose mana
+  -- ability costs no {T} of a creature (Mountain), and a creature with no
+  -- activated ability at all (Hill Giant) -- so the reference and the
+  -- enumeration each answer a different action count per permanent.
+  Spec.it s "the enumeration answers what the unhoisted wrappers answer" $ do
+    printings <- traverse (S.printingOf s registry) ["Prodigal Sorcerer", "Llanowar Elves", "Mountain", "Hill Giant"]
+    let board = hoistMixedBoard printings 6
+        reference = referenceActivations S.alice board
+    -- 6 Sorcerer activations + 6 Elf and 6 Mountain mana activations, and
+    -- nothing from the Bears: three different answers on one board, so a hoist
+    -- that reused one permanent's answer cannot pass this.
+    Spec.assertEqWith s "the reference offers three different per-permanent answers to differ about" (length reference) 18
+    Spec.assertEqWith s "and the hoisted enumeration answers it action for action" (activationsIn (Action.legalActions S.alice board)) reference
