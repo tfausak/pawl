@@ -20,4 +20,4 @@ data ProductionTag
     -- Neither a mana type nor a colour (CR 107.4h), so it sits here rather than
     -- in Pawl.Types.ManaType.
     Snow
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

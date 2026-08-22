@@ -20,4 +20,4 @@ module Pawl.Types.RestartSignal where
 data RestartSignal
   = Playing
   | Restarted
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

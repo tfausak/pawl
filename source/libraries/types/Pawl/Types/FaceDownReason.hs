@@ -43,4 +43,4 @@ data FaceDownReason
     -- down this way is still turnable by CR 702.37e if the card would have a
     -- morph cost, and that rule asks about the CARD rather than about this.
     TurnedFaceDown
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)
