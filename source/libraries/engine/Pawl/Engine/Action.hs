@@ -262,14 +262,22 @@ legalActions pid gs =
       -- per-candidate filter over the shared pool below (#1448).
       grants = Projection.controlGrants gs
       pcs = Projection.projectAll gs
-      -- ONE mana-source sweep for the whole enumeration, shared by the cost gate
-      -- below and by CR 605.3a's offer at the end of this list. It is a walk of
-      -- everything this player controls, asking each what mana routes it offers,
-      -- and it does not depend on which permanent's ability is being gated -- so
-      -- the cost gate took an identical one per ability until it was handed this
-      -- one (#1073). The offer and the gate reading the SAME list is what keeps
-      -- them from disagreeing, which is the note at manaAbilityActivations.
+      -- ONE mana-source sweep of each kind for the whole enumeration. Each is a
+      -- walk of everything this player controls, asking each what mana routes it
+      -- offers, and neither depends on which permanent's ability is being gated
+      -- -- so the cost gate took an identical one per ability until it was
+      -- handed this one (#1073).
+      --
+      -- TWO sweeps and not one, because the two questions differ: CR 605.3a's
+      -- offer at the end of this list is every source that could be tapped
+      -- (`manaSources`), while the cost gate is judged against what the supply
+      -- walk can count (`supplySources`, Mana.supplyCapacity). They part on
+      -- exactly a permanent whose every mana route holds mana in its own cost,
+      -- which in `data/cards/` is Transmogrant Altar; the gate must take the
+      -- supply list or Mana.payableResolutionsGiven reads a source with no
+      -- options and finds no payable board at all.
       manaSources = Cost.activationManaSourcesGiven grants pcs pid gs
+      supplySources = Cost.supplyManaSourcesGiven grants pcs pid gs
       -- ONE set of base target pools for the whole enumeration, for the same
       -- reason: CR 115's candidate set for a Pool is a function of `gs` alone
       -- (Target.Pools), so building one per slot per ability walked the
@@ -278,7 +286,7 @@ legalActions pid gs =
       pools = Target.poolsGiven pcs gs
       activations =
         let forObject oid =
-              fmap (Action.Activate oid) (filter (\ab -> Activate.activatableGiven grants pcs pools manaSources pid oid ab gs) (Activate.abilitiesForGiven pcs oid gs))
+              fmap (Action.Activate oid) (filter (\ab -> Activate.activatableGiven grants pcs pools supplySources pid oid ab gs) (Activate.abilitiesForGiven pcs oid gs))
          in concatMap forObject (Projection.controlsGiven grants pid gs <> Game.zoneMembers Zone.Hand pid gs <> Game.zoneMembers Zone.Graveyard pid gs)
       -- CR 605.3a's first window -- "a player may activate an activated mana
       -- ability whenever they have priority" -- which the activation list above
@@ -286,9 +294,10 @@ legalActions pid gs =
       -- because CR 605.3b keeps it off the stack and that is the only thing an
       -- Action.Activate does with one.
       --
-      -- Mana.manaSourcesGiven is the whole gate, and it is the SAME list CR
-      -- 605.3a's other two windows are served from (Cost.payMana's candidates):
-      -- controlled, and offering some route Cost.manaActivations admits
+      -- Cost.activationManaSourcesGiven is the whole gate, and it is the SAME
+      -- list CR 605.3a's other two windows are served from (Cost.payMana's
+      -- candidates, where a mana ability's own window narrows it further; see
+      -- #2094): controlled, and offering some route Cost.manaActivations admits
       -- -- CR 118.3's payability of the ability's own cost (CR 602.2b), which
       -- carries CR 107.5's tapped permanent and CR 302.6's sick creature with
       -- it, plus CR 602.5's printed "activate only ..." rider, which CR 605.1

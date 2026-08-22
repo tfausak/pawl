@@ -94,6 +94,42 @@ import qualified Pawl.Types.Supertype as Supertype
 -- Pawl.Engine.Cost.manaActivations is the only answer the engine passes.
 type Capacity = Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> Cost Keyword.Keyword -> [ActivationRestriction.ActivationRestriction] -> GameState -> Activations.Activations
 
+-- The same question asked by the SUPPLY WALK rather than at the offer: a route
+-- whose own activation cost holds MANA (CR 602.2b) is worth nothing to it.
+--
+-- The walk measures a yield against a board and never the mana that yield EATS,
+-- so counting Transmogrant Altar's "{B}, {T}, Sacrifice a creature: Add
+-- {C}{C}{C}" would put three colorless on the supply side and leave the {B} on
+-- neither -- three mana for free, which is the OVERSTATEMENT
+-- payableResolutionsGiven exists to avoid: a supply too large offers a cast that
+-- then cannot be paid. Zero understates instead, the direction every other
+-- approximation in this module takes (manaSuppliesGiven's collapse, repeatsOf's
+-- ceilings): a cast a clever payment could have made is refused, and none is
+-- offered that cannot be paid.
+--
+-- Not implemented: the exact model, in which such a route is a supply that also
+-- CONSUMES a demand -- Supply/Demand/serves and Hall's condition below would
+-- each need a mana axis (#2095).
+--
+-- Unproven at manaSuppliesGiven, and provable only by a permanent carrying BOTH
+-- a mana-free route and a mana-eating one: with only the latter the permanent is
+-- not in the source list at all, so the wrap there is never asked. No printing
+-- in `data/cards/` has both.
+--
+-- APPLIED BY THE WALK, not by its callers: manaSuppliesGiven wraps whatever
+-- capacity it is handed, and canPayCommitting and payableResolutions wrap theirs
+-- before building a source list, so every entry point is understating whoever
+-- called it. `capacity` is Pawl.Engine.Cost.manaActivations at every one.
+--
+-- That is also what makes Pawl.Engine.Cost.manaActivations' CR 118.6 read
+-- terminate. It asks canPayCommitting whether its own route's mana part is
+-- payable; the walk under it runs on THIS capacity, which answers 0 for exactly
+-- the routes that would ask again.
+supplyCapacity :: Capacity -> Capacity
+supplyCapacity capacity pcs pid oid cost restrictions gs = case Cost.mana cost of
+  Just (ManaCost.MkManaCost []) -> capacity pcs pid oid cost restrictions gs
+  _ -> Activations.MkActivations {Activations.times = 0, Activations.claims = [], Activations.life = 0}
+
 -- | CR 305.6
 subtypeMana :: Subtype -> Maybe ManaType
 subtypeMana subtype = case subtype of
@@ -253,9 +289,15 @@ manaYieldsOfGiven pcs oid gs = List.nub (fmap ManaOption.yield (manaOptionsOfGiv
 -- on answering the ungated question.
 manaSuppliesGiven :: Capacity -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> GameState -> [(Activations.Activations, Mana)]
 manaSuppliesGiven capacity pcs pid oid gs =
-  let counted =
+  let -- Applied HERE and not left to the caller: this is the one reader of a
+      -- route's yield on the supply side, so wrapping it once is what makes the
+      -- understatement a property of the walk rather than of who called it.
+      -- Idempotent, so a caller that has already wrapped its own copy (to build
+      -- the matching source list) loses nothing.
+      supply = supplyCapacity capacity
+      counted =
         fmap
-          (\option -> (capacity pcs pid oid (ManaOption.cost option) (ManaOption.restrictions option) gs, ManaOption.yield option))
+          (\option -> (supply pcs pid oid (ManaOption.cost option) (ManaOption.restrictions option) gs, ManaOption.yield option))
           (manaOptionsOfGiven pcs oid gs)
       available = filter (\(activations, _) -> Activations.times activations > 0) counted
       timesOf (activations, _) = Activations.times activations
@@ -1233,7 +1275,7 @@ canPay capacity pid = canPayCommitting Nothing capacity ManaSpending.AsProduced 
 canPayCommitting :: Maybe ObjectId -> Capacity -> ManaSpending -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> Bool
 canPayCommitting casting capacity spending pid committed claimed cost gs =
   let pcs = Projection.projectAll gs
-   in canPayCommittingGiven casting capacity spending (manaSourcesGiven capacity (Projection.controlGrants gs) pcs pid gs) pcs pid committed claimed cost gs
+   in canPayCommittingGiven casting capacity spending (manaSourcesGiven (supplyCapacity capacity) (Projection.controlGrants gs) pcs pid gs) pcs pid committed claimed cost gs
 
 -- The same question given a board already walked -- see payableResolutionsGiven
 -- for what `sources` and `pcs` are and why handing them in changes no answer.
@@ -1415,7 +1457,7 @@ sourceOptions clauses contended supplies =
 payableResolutions :: Maybe ObjectId -> Capacity -> ManaSpending -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
 payableResolutions casting capacity spending pid committed claimed cost gs =
   let pcs = Projection.projectAll gs
-   in payableResolutionsGiven casting capacity spending (manaSourcesGiven capacity (Projection.controlGrants gs) pcs pid gs) pcs pid committed claimed cost gs
+   in payableResolutionsGiven casting capacity spending (manaSourcesGiven (supplyCapacity capacity) (Projection.controlGrants gs) pcs pid gs) pcs pid committed claimed cost gs
 
 -- The same list given a board the CALLER has already walked, which is the half
 -- Action.legalActions' enumeration wants: the wrapper above takes one
@@ -1427,12 +1469,16 @@ payableResolutions casting capacity spending pid committed claimed cost gs =
 -- taken, because that sweep is itself a walk of everything the player controls
 -- asking manaRoutesOfGiven of each -- identical for every ability of every
 -- permanent in one enumeration, and so one more per-permanent O(N) walk when it
--- is taken here (#1073). It is the SAME list Action.legalActions offers CR
--- 605.3a's mana activations from, so the offer and this gate cannot disagree.
+-- is taken here (#1073).
 --
--- IT MUST BE `capacity`'s OWN LIST. Nothing in the type says so: every caller
--- builds it with the same capacity it passes here, and the two plain wrappers
--- above are what a caller with no list of its own uses.
+-- IT MUST BE `supplyCapacity capacity`'s OWN LIST, which is what
+-- Pawl.Engine.Cost.supplyManaSourcesGiven builds. Nothing in the type says so,
+-- and the two plain wrappers above are what a caller with no list of its own
+-- uses. A source listed here whose every route the supply capacity refuses
+-- contributes an EMPTY option list, and `sequenceA options` below turns one of
+-- those into no board at all -- the whole player's mana unpayable. The offer
+-- list (Cost.activationManaSourcesGiven) is the superset that would do it: it
+-- admits a permanent whose only mana route holds mana in its own cost.
 --
 -- The SAME board manaSources is judged against serves the per-source yields
 -- too, rather than a fresh projection per source on top of the sweep (#200);
