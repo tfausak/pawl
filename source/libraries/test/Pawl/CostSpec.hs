@@ -2433,8 +2433,8 @@ morcantSpec s registry = Spec.describe s "High Perfect Morcant" $ do
 -- Unerring Sling {3} Artifact: "{3}, {T}, Tap an untapped creature you control:
 -- This artifact deals damage equal to the tapped creature's power to target
 -- attacking or blocking creature with flying." The producer for
--- Binding.tappedPermanent: the only card in the pool whose ability reads a
--- characteristic of what its OWN cost tapped.
+-- Binding.tappedPermanent, and the first card in `data/cards/` whose ability
+-- reads a characteristic of what its OWN cost tapped.
 --
 -- alice controls the Sling, a Decorated Griffin (2/3 flier) and a Hill Giant
 -- (3/3), plus exactly three untapped Forests -- the minimum that pays {3}, so
