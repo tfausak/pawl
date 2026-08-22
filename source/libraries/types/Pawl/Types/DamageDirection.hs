@@ -18,9 +18,10 @@ module Pawl.Types.DamageDirection where
 -- Not a Bool, for Pawl.Types.CostScale's reason: the constructor names the
 -- direction where @True@ would only say that something is different.
 --
--- Nothing here is CR 609.7a's CHOSEN source (Pawl.Types.PreventNextDamage's
--- @chosenSource@): a TARGETED source is declared on the stack (CR 601.2c), so
--- there is no property for CR 615.9 to recheck at the damage event.
+-- Nothing here is CR 609.7a's CHOSEN source (Pawl.Types.PreventAllDamage's
+-- @chosenSource@, beside this field): a TARGETED source is declared on the stack
+-- (CR 601.2c), so there is no property for CR 615.9 to recheck at the damage
+-- event.
 data DamageDirection
   = DealtTo
   | DealtBy
