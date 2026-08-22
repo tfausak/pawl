@@ -1225,8 +1225,8 @@ manaActivations pcs pid oid cost restrictions gs = manaActivationsGiven (PlayerE
 -- player abilities it prints, and it does not depend on which route is being
 -- measured -- so a caller that asks per ROUTE of per PERMANENT took an identical
 -- one every time, which is one more per-permanent O(N) walk inside
--- Action.legalActions' own loop (#1073, and Pawl.PerformanceSpec's two ceilings
--- are what caught it).
+-- Action.legalActions' own loop (#1073, which an allocation guard caught).
+-- Not implemented: nothing asserts it stays hoisted (gap #578).
 --
 -- PARTIALLY APPLIED, which is the whole of the hoist: one closure carrying one
 -- thunk, so every route the sweep under it measures shares the one walk.

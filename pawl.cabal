@@ -1038,7 +1038,6 @@ library test
     Pawl.ModalDoubleFacedSpec
     Pawl.ModalSpec
     Pawl.MulliganSpec
-    Pawl.PerformanceSpec
     Pawl.PhasingSpec
     Pawl.PlaneswalkerSpec
     Pawl.PlayerEffectSpec
