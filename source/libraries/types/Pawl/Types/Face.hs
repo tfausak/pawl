@@ -34,6 +34,7 @@ import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.DungeonRoom as DungeonRoom
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EntryRestriction as EntryRestriction
 import qualified Pawl.Types.HandAction as HandAction
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Loyalty as Loyalty
@@ -366,6 +367,15 @@ data Face card = MkFace
     -- that field gives: the two forbid unrelated game actions, and this one is
     -- read wherever CR 701.3a's attach is judged.
     attachRestrictions :: [AttachRestriction.AttachRestriction],
+    -- | CR 604.1/604.2 / 400.4a / 101.2: this face's printed ENTRY PROHIBITIONS
+    -- -- "creature cards in graveyards and libraries can't enter the
+    -- battlefield" (Grafdigger's Cage); read by Pawl.Engine.EntryRestriction,
+    -- never by Pawl.Engine.Projection, for blockRequirements' CR 613.11 reason.
+    --
+    -- Its own field rather than an arm of attachRestrictions above, for the
+    -- reason that field gives: the two forbid unrelated game actions, and this
+    -- one is read at the one funnel every battlefield entry reaches.
+    entryRestrictions :: [EntryRestriction.EntryRestriction],
     -- | CR 604.1/604.2 / 508.1c / 508.1h: this face's printed COSTS TO ATTACK --
     -- Ghostly Prison's {2} per attacking creature; read by Pawl.Engine.AttackCost,
     -- never by Pawl.Engine.Projection, for blockRequirements' CR 613.11 reason.

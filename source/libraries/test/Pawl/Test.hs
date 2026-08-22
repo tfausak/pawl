@@ -121,6 +121,7 @@ import qualified Pawl.Codec.EffectSpec
 import qualified Pawl.Codec.EndingStepSpec
 import qualified Pawl.Codec.EntryOptionSpec
 import qualified Pawl.Codec.EntryRSpec
+import qualified Pawl.Codec.EntryRestrictionSpec
 import qualified Pawl.Codec.EntryRewriteSpec
 import qualified Pawl.Codec.EntryRidersSpec
 import qualified Pawl.Codec.EventShapeSpec
@@ -309,6 +310,7 @@ import qualified Pawl.DepartureSpec
 import qualified Pawl.DetainSpec
 import qualified Pawl.DungeonSpec
 import qualified Pawl.EngineSpec
+import qualified Pawl.EntryRestrictionSpec
 import qualified Pawl.EventSpec
 import qualified Pawl.EventTriggerSpec
 import qualified Pawl.ExileSpec
@@ -669,6 +671,7 @@ spec s registry = do
   Pawl.Codec.RoomIndexSpec.spec s
   Pawl.Codec.RoundingSpec.spec s
   Pawl.Codec.SacrificeAnyNumberSpec.spec s
+  Pawl.Codec.EntryRestrictionSpec.spec s
   Pawl.Codec.SacrificeRestrictionSpec.spec s
   Pawl.Codec.SacrificeSpec.spec s
   Pawl.Codec.ScalingSpec.spec s
@@ -805,6 +808,7 @@ spec s registry = do
   Pawl.RoomSpec.spec s registry
   Pawl.SetupSpec.spec s registry
   Pawl.SlugSpec.spec s
+  Pawl.EntryRestrictionSpec.spec s registry
   Pawl.SacrificeRestrictionSpec.spec s registry
   Pawl.SagaSpec.spec s registry
   Pawl.SpecialActionSpec.spec s registry

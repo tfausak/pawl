@@ -34,6 +34,7 @@ import qualified Pawl.Codec.Counterability as Counterability
 import qualified Pawl.Codec.Defense as Defense
 import qualified Pawl.Codec.DungeonRoom as DungeonRoom
 import qualified Pawl.Codec.Effect as Effect
+import qualified Pawl.Codec.EntryRestriction as EntryRestriction
 import qualified Pawl.Codec.HandAction as HandAction
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Loyalty as Loyalty
@@ -101,6 +102,7 @@ codec cardCodec = Fields.object $ do
   sacrificeRestrictions <- Fields.defaulted "sacrificeRestrictions" [] (Common.list SacrificeRestriction.codec) Face.sacrificeRestrictions
   untapRestrictions <- Fields.defaulted "untapRestrictions" [] (Common.list UntapRestriction.codec) Face.untapRestrictions
   attachRestrictions <- Fields.defaulted "attachRestrictions" [] (Common.list AttachRestriction.codec) Face.attachRestrictions
+  entryRestrictions <- Fields.defaulted "entryRestrictions" [] (Common.list EntryRestriction.codec) Face.entryRestrictions
   attackCosts <- Fields.defaulted "attackCosts" [] (Common.list AttackCost.codec) Face.attackCosts
   blockCosts <- Fields.defaulted "blockCosts" [] (Common.list BlockCost.codec) Face.blockCosts
   additionalCosts <- Fields.defaulted "additionalCosts" [] (Common.list (CostComponent.codec Keyword.codec)) Face.additionalCosts
@@ -150,6 +152,7 @@ codec cardCodec = Fields.object $ do
         Face.sacrificeRestrictions = sacrificeRestrictions,
         Face.untapRestrictions = untapRestrictions,
         Face.attachRestrictions = attachRestrictions,
+        Face.entryRestrictions = entryRestrictions,
         Face.attackCosts = attackCosts,
         Face.blockCosts = blockCosts,
         Face.additionalCosts = additionalCosts,
