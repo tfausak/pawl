@@ -1325,8 +1325,9 @@ putOntoBattlefieldAttacking oid = do
 -- "It will also trigger if that creature becomes blocked by an effect or by a
 -- creature that's put onto the battlefield as a blocker, but only if the
 -- attacking creature was an unblocked creature at that time." The clause after
--- the comma is `wasBlocked`, read off Combat.blockers before the write, which is
--- also CR 509.1h's own once-per-attacker reading.
+-- the comma is `wasBlocked`, read off Combat.blockers before the write. CR
+-- 509.3c and not CR 509.1h is the authority: rule 509.1h is worded about
+-- creatures DECLARED as blockers, which this creature is not.
 --
 -- The guards are the ways the rules say the creature enters WITHOUT ever being a
 -- blocking creature, each a silent no-op because that is what those rules say:
@@ -1338,6 +1339,15 @@ putOntoBattlefieldAttacking oid = do
 --
 -- CR 506.3f (a creature that's also a battle) is not guarded, as
 -- putOntoBattlefieldAttacking does not guard it either: no printing is both.
+--
+-- The last two guards are REGRESSION FENCES rather than proved behaviour:
+-- dropping both leaves the whole suite green. The pool's one producer is Flash
+-- Foliage, whose target slot admits only an attacking creature an opponent
+-- controls and is re-read at CR 608.2b, so no board reaches this function with
+-- an attacker that has left combat or one attacking somebody else. The second
+-- becomes reachable under CR 802's attack-multiple-players (#175); the first
+-- needs a card that removes the target from combat between targeting and
+-- resolution.
 putOntoBattlefieldBlocking :: ObjectId -> ObjectId -> Game ()
 putOntoBattlefieldBlocking oid attacker = do
   gs <- State.get
@@ -1367,7 +1377,7 @@ putOntoBattlefieldBlocking oid attacker = do
                       Combat.joinedUnder = Map.insert oid controller (Combat.joinedUnder c)
                     }
               }
-          -- CR 509.1h: the attacker became a blocked creature. The defending
+          -- CR 509.3c: the attacker became a blocked creature. The defending
           -- player rides the event as it does off the declaration; the guard
           -- above has already settled that it is this creature's controller.
           Monad.unless wasBlocked $
