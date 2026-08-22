@@ -1326,9 +1326,11 @@ mintsCombatRestriction = not . null . mintedCombatRestrictionsFor
 -- Pawl.Types.ActivatedAbility's header already fixes for this type -- "carries
 -- the value and validates by membership, never an index".
 --
--- BOTH minters are asked because the caller knows the object and not the zone the
--- keyword functions from, and the two are disjoint by construction: no keyword
--- has a non-empty arm in both handAbilitiesFor and battlefieldAbilitiesFor.
+-- BOTH minters are asked, so that this is one question rather than one per zone:
+-- the caller supplies whichever keyword map its zone calls for, and the two are
+-- disjoint by construction -- no keyword has a non-empty arm in both
+-- handAbilitiesFor and battlefieldAbilitiesFor -- so asking both cannot answer
+-- twice for one keyword.
 --
 -- The five minting keywords -- cycling, reinforce, crew, level up, outlast -- all
 -- carry a payload, so familyOf answers Just for every one of them and its Nothing
@@ -1339,7 +1341,7 @@ mintsCombatRestriction = not . null . mintedCombatRestrictionsFor
 -- Not implemented: telling a keyword-minted ability from a PRINTED ability that
 -- happens to be byte-identical to one -- a card printing "{2}, Discard this card:
 -- Draw a card" functioning from a hand would be read as cycling here. No printing
--- in data/cards/ is such a twin (gap #NNNN).
+-- in data/cards/ is such a twin (gap #2072).
 familyGranting :: Map Keyword Natural -> ActivatedAbility Card -> Maybe KeywordFamily.KeywordFamily
 familyGranting counts ability =
   Maybe.listToMaybe

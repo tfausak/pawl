@@ -672,11 +672,12 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
     Spec.assertEqWith s "while the cycling ability on the same board is" (length (activationsOf maulerId (Action.legalActions S.alice gs))) 1
     Spec.assertBool s (not (null (Activate.abilitiesFor wretchId gs))) "and the Wretch has an ability to withhold"
 
-  -- The PAYMENT, which the two cases above cannot reach: the ability activated in
-  -- them is a cycling one, so a payment that ignores grantedBy agrees with one
-  -- that honours it. One Forest is what separates them -- the Wretch's {1} is
-  -- payable, so the activation is not a no-op either way, and the reading shows
-  -- up in whether the Forest is spent.
+  -- The PAYMENT, which neither case above can reach: the case above that
+  -- activates anything activates a CYCLING ability, and there a payment that
+  -- ignores grantedBy agrees with one that honours it, while the case between
+  -- them only reads what is offered. Activating the Wretch is where the two
+  -- diverge -- one Forest makes its {1} payable, so the activation is not a
+  -- no-op either way, and the reading shows up in whether the Forest is spent.
   Spec.it s "CR 601.2f the payment is narrowed too, not only the offer" $ do
     forest <- S.printingOf s registry "Forest"
     mauler <- S.printingOf s registry "Barkhide Mauler"
