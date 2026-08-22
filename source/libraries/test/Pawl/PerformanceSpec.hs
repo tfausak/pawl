@@ -192,7 +192,7 @@ threadedGate :: PlayerId.PlayerId -> ObjectId.ObjectId -> ActivatedAbility.Activ
 threadedGate pid oid ability gs =
   let grants = Projection.controlGrants gs
       pcs = Projection.projectAll gs
-   in Activate.activatableGiven grants pcs (Target.poolsGiven pcs gs) (Cost.activationManaSourcesGiven grants pcs pid gs) pid oid ability gs
+   in Activate.activatableGiven grants pcs (Target.poolsGiven pcs gs) (Cost.supplyManaSourcesGiven grants pcs pid gs) pid oid ability gs
 
 -- Action.legalActions' two ACTIVATION lists rebuilt out of the plain per-call
 -- wrappers, which hoist nothing: Activate.activatable projects each object for

@@ -1096,10 +1096,12 @@ priorityWindowSpec s registry = Spec.describe s "CR 605.3a the priority window" 
 
   -- CR 118.3 reaches this window too: the options are gated by whether the
   -- ability's own activation cost can be paid (CR 602.2b), the same predicate
-  -- the payment window is gated by. Phyrexian Tower is the pool's one mana
-  -- ability whose cost can fail -- "{T}, Sacrifice a creature: Add {B}{B}"
-  -- beside an always-payable "{T}: Add {C}" -- so the permanent is on the menu
-  -- either way and what changes is what taking it can yield.
+  -- the payment window is gated by. Phyrexian Tower is the pool's one permanent
+  -- pairing a mana ability whose cost can fail -- "{T}, Sacrifice a creature:
+  -- Add {B}{B}" -- with an always-payable "{T}: Add {C}", so the permanent is on
+  -- the menu either way and what changes is what taking it can yield.
+  -- Transmogrant Altar's cost can fail too and has no such sibling, which is
+  -- why transmograntAltarSpec asserts the whole permanent off the menu.
   Spec.it s "CR 118.3 what the activation may yield is gated by its own cost" $ do
     tower <- S.printingOf s registry "Phyrexian Tower"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -1153,14 +1155,14 @@ towerBoard tower victim =
 -- because none prints a rider there. Scryfall `o:"Activate only" o:"Add {"`,
 -- 2026-08-21: Grinning Ignus is the one printing whose mana ability names a
 -- STEP-or-phase window this vocabulary can say ("Activate only as a sorcery"),
--- and its activation cost holds MANA, which the supply model does not model
--- (#1120), plus a "return this to its owner's hand" component the cost
+-- and its activation cost holds MANA, which the supply model counts as no supply
+-- at all (#2095), plus a "return this to its owner's hand" component the cost
 -- vocabulary lacks (#2004). Lavinia, Foil to Conspiracy is in the pool and gates
 -- these same two windows, but through CR 102.1's turn axis alone
 -- (laviniaTurnRiderSpec below), so she leaves the phase axis unexercised. Vivi
 -- Ornitier and every other hit ride on "only once each turn" or "only if
 -- <condition>", neither of which Pawl.Types.ActivationRestriction can say.
--- Grinning Ignus replaces this card when #1120 and #2004 land.
+-- Grinning Ignus replaces this card when #2095 and #2004 land.
 --
 -- The two cases below are the SAME board at two moments, and the phase is the
 -- one thing that differs. That is what makes the pair a proof about the rider
@@ -2087,6 +2089,128 @@ nextColor p = case p of
           (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}])
           candidates
   _ -> pure (S.identityAnswer p)
+
+-- CR 601.2g before CR 601.2h, for the pool's one mana ability whose activation
+-- cost holds MANA: Transmogrant Altar, "{B}, {T}, Sacrifice a creature: Add
+-- {C}{C}{C}" ({3} Artifact). CR 602.2b routes an activation cost through rule
+-- 601.2b-i, so the mana window opens BEFORE the cost is paid, and the creature
+-- the cost eats is still there to be tapped for mana first.
+--
+-- The board is what makes the two orders differ, and it is built to leave no
+-- other way through: Birds of Paradise is at once the only source of the {B} and
+-- the only legal sacrifice, and alice controls no land. A Swamp, a second Birds
+-- or a second creature would let BOTH orders succeed and prove nothing.
+transmograntAltarSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+transmograntAltarSpec s registry = Spec.describe s "Transmogrant Altar" $ do
+  Spec.it s "CR 601.2g the mana window opens before CR 601.2h spends the source it needs" $ do
+    altar <- S.printingOf s registry "Transmogrant Altar"
+    birds <- S.printingOf s registry "Birds of Paradise"
+    let (altarId, g1) = S.addCreature altar S.alice (Setup.emptyGame S.bothPlayers)
+        (birdsId, g2) = S.addCreature birds S.alice g1
+        board = g2 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
+        after = snd (State.evalState (Engine.runGame (takesAltarOnce altarId birdsId) board Engine.priorityLoop) (0 :: Int))
+    Spec.assertEqWith s "CR 601.2g the Birds pays the {B} first, so the Altar's three colorless reach her pool" (poolTypes S.alice after) [ManaType.Colorless, ManaType.Colorless, ManaType.Colorless]
+    Spec.assertEqWith s "CR 601.2h and the same Birds is then what the sacrifice took" (S.creaturesInPlay S.alice after) 0
+    Spec.assertEqWith s "leaving the Altar itself as the one tapped permanent she still controls" (S.tappedCount S.alice after) 1
+
+  -- The window's own candidate list. CR 605.3a would offer every mana source;
+  -- this one offers the Birds alone, both guards at payManaExcept being what
+  -- takes the Altar itself off it (#2094). Recorded rather than inferred, since
+  -- the pool is the same whichever source the answerer would have declined.
+  Spec.it s "CR 605.3a the Altar's own window offers the Birds and not the Altar" $ do
+    altar <- S.printingOf s registry "Transmogrant Altar"
+    birds <- S.printingOf s registry "Birds of Paradise"
+    let (altarId, g1) = S.addCreature altar S.alice (Setup.emptyGame S.bothPlayers)
+        (birdsId, g2) = S.addCreature birds S.alice g1
+        board = g2 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
+        asked = snd (State.execState (Engine.runGame (recordsSources altarId birdsId) board Engine.priorityLoop) (0 :: Int, []))
+    Spec.assertEqWith s "one window, and the Birds is the only source its {B} may come from" asked [[birdsId]]
+
+  -- CR 118.3 at the OFFER. Two boards differing in ONE thing -- the Swamp -- so
+  -- the refusal cannot be about the sacrifice, the tap or the sickness rules,
+  -- each of which is satisfied on both. NOT CR 118.6, whose "unpayable cost" is
+  -- an object with no mana cost at all and whose activation is a legal action.
+  Spec.it s "CR 118.3 the activation is offered only where its own mana part is payable" $ do
+    altar <- S.printingOf s registry "Transmogrant Altar"
+    piker <- S.printingOf s registry "Goblin Piker"
+    swamp <- S.printingOf s registry "Swamp"
+    let (altarId, withSwamp, _) = altarSupplyBoard altar piker (Just swamp) Nothing
+        (_, noSwamp, _) = altarSupplyBoard altar piker Nothing Nothing
+        offers gs = filter (== Action.Type.ActivateManaAbility altarId) (Action.legalActions S.alice gs)
+    Spec.assertEqWith s "with a Swamp to pay the {B}, CR 605.3a offers the Altar" (length (offers withSwamp)) 1
+    Spec.assertEqWith s "with none, CR 118.3 leaves nothing to offer" (length (offers noSwamp)) 0
+
+  -- The SUPPLY half. Mana.supplyCapacity counts a route whose own cost holds
+  -- mana as no supply at all, which is an understatement (#2095) and never an
+  -- overstatement: the walk measures the {C}{C}{C} the Altar yields and not the
+  -- {B} it eats, so counting it gross would offer a cast the payment then fails.
+  Spec.it s "CR 118.3 the Altar's yield is no supply the cast gate may count" $ do
+    altar <- S.printingOf s registry "Transmogrant Altar"
+    piker <- S.printingOf s registry "Goblin Piker"
+    swamp <- S.printingOf s registry "Swamp"
+    splitter <- S.printingOf s registry "Bonesplitter"
+    crown <- S.printingOf s registry "Crown of the Ages"
+    let holding printing = case altarSupplyBoard altar piker (Just swamp) (Just printing) of
+          (_, board, Just oid) -> S.castable S.alice oid board
+          (_, _, Nothing) -> False
+    Spec.assertBool s (holding splitter) "the Swamp pays a {1}, so a source the walk refuses does not take the rest of the board with it"
+    Spec.assertBool s (not (holding crown)) "CR 118.3 but a {2} is refused: the Altar's three colorless are not supply, its own {B} being unmeasured"
+
+-- alice, active, in her precombat main phase: one Transmogrant Altar, one Goblin
+-- Piker for the sacrifice to take, and optionally a Swamp to pay the {B} and a
+-- pair of spells in her hand. Returns the Altar and whichever spells were dealt.
+altarSupplyBoard :: Printing.Printing -> Printing.Printing -> Maybe Printing.Printing -> Maybe Printing.Printing -> (ObjectId.ObjectId, GameState.GameState, Maybe ObjectId.ObjectId)
+altarSupplyBoard altar piker swamp spell =
+  let (altarId, g1) = S.addCreature altar S.alice (Setup.emptyGame S.bothPlayers)
+      (_, g2) = S.addCreature piker S.alice g1
+      g3 = case swamp of
+        Nothing -> g2
+        Just printing -> snd (S.addCreature printing S.alice g2)
+      -- S.handOne REPLACES the hand, so one spell per board and the pair of
+      -- boards below differ in that one card alone.
+      (g4, held) = case spell of
+        Nothing -> (g3, Nothing)
+        Just printing -> let (g3a, oid) = S.handOne printing g3 in (g3a, Just oid)
+   in (altarId, g4 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}, held)
+
+-- Activates the ALTAR and nothing else, pays its {B} off the Birds, and asks the
+-- Birds for black. Never the Birds at priority: floating the {B} before the
+-- ability is announced would let both payment orders pay out of the pool, which
+-- is the collapse this case is built to avoid. Never the Altar's second ability
+-- either -- that one makes a token and is no mana ability (CR 605.1a).
+takesAltar :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+takesAltar altarId birdsId p = case p of
+  Prompt.ChooseAction _ _ actions -> case filter (== Action.Type.ActivateManaAbility altarId) actions of
+    h : _ -> h
+    [] -> Action.Type.Pass
+  Prompt.ChooseManaSource _ _ candidates -> Just (if elem birdsId (NonEmpty.toList candidates) then birdsId else NonEmpty.head candidates)
+  Prompt.ChooseExtraManaSource {} -> Nothing
+  _ -> prefersColor Color.Black p
+
+-- takesAltar recording every in-payment source prompt, and taking the Altar only
+-- until one has been asked -- the once-guard takesAltarOnce spells with a count.
+recordsSources :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> State.State (Int, [[ObjectId.ObjectId]]) r
+recordsSources altarId birdsId p = case p of
+  Prompt.ChooseAction {} -> do
+    (taken, _) <- State.get
+    State.modify' (\(n, seen) -> (n + 1, seen))
+    pure (if taken == 0 then takesAltar altarId birdsId p else Action.Type.Pass)
+  Prompt.ChooseManaSource _ _ candidates -> do
+    State.modify' (\(n, seen) -> (n, seen <> [NonEmpty.toList candidates]))
+    pure (takesAltar altarId birdsId p)
+  _ -> pure (takesAltar altarId birdsId p)
+
+-- takesAltar allowed at ONE priority prompt. An activation that fails leaves the
+-- board exactly as it was, so a greedy answerer would be offered it again
+-- forever -- and the mutation this case exists to catch (components before mana)
+-- is exactly that shape, which would hang rather than fail.
+takesAltarOnce :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> State.State Int r
+takesAltarOnce altarId birdsId p = case p of
+  Prompt.ChooseAction {} -> do
+    taken <- State.get
+    State.modify' (+ 1)
+    pure (if taken == 0 then takesAltar altarId birdsId p else Action.Type.Pass)
+  _ -> pure (takesAltar altarId birdsId p)
 
 -- CR 118.3 on the supply side again, for a repeatable ability whose cost spends no
 -- OBJECT. Treasonous Ogre ({3}{R} Creature -- Ogre Shaman, dethrone, "Pay 3 life:
@@ -3112,6 +3236,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   bloodPetSpec s registry
   ashnodsAltarSpec s registry
   phyrexianAltarSpec s registry
+  transmograntAltarSpec s registry
   treasonousOgreSpec s registry
   sharedVictimSpec s registry
   sharedTapSpec s registry

@@ -398,8 +398,9 @@ affordableX family pid srcId gs cost = Cost.greatestPayableX Nothing (\x -> paya
 -- whole battlefield structure of its own per ability -- the target gate a base
 -- recipient set (Target.Pools), the cost gate this player's mana sources. Both
 -- are functions of `gs` alone, so both are the same for every permanent in one
--- enumeration (#1073). Build `sources` with Cost.activationManaSourcesGiven,
--- which is the one place that pairs the sweep with the capacity this gate reads.
+-- enumeration (#1073). Build `sources` with Cost.supplyManaSourcesGiven, which
+-- is the one place that pairs the sweep with the capacity this gate reads --
+-- NOT Cost.activationManaSourcesGiven, which is CR 605.3a's wider offer.
 --
 -- Threading them buys the SHAPE of the loop: those wrappers hoist per CALL, and
 -- the caller is a loop over the battlefield, so an ability that reached them
@@ -414,7 +415,7 @@ affordableX family pid srcId gs cost = Cost.greatestPayableX Nothing (\x -> paya
 activatable :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
 activatable pid srcId ability gs =
   let grants = Projection.controlGrants gs
-   in activatableGiven grants Map.empty (Target.poolsGiven Map.empty gs) (Cost.activationManaSourcesGiven grants Map.empty pid gs) pid srcId ability gs
+   in activatableGiven grants Map.empty (Target.poolsGiven Map.empty gs) (Cost.supplyManaSourcesGiven grants Map.empty pid gs) pid srcId ability gs
 
 activatableGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Target.Pools -> [ObjectId] -> PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
 activatableGiven grants pcs pools sources pid srcId ability gs =
