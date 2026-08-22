@@ -104,6 +104,7 @@ import qualified Pawl.Codec.DaytimeSpec
 import qualified Pawl.Codec.DealDamageSpec
 import qualified Pawl.Codec.DefenseSpec
 import qualified Pawl.Codec.DelayedTriggerSpec
+import qualified Pawl.Codec.DepartureSpec
 import qualified Pawl.Codec.DesignateSpec
 import qualified Pawl.Codec.DesignationSpec
 import qualified Pawl.Codec.DestroySpec
@@ -135,6 +136,7 @@ import qualified Pawl.Codec.ExileHauntingSpec
 import qualified Pawl.Codec.ExpirySpec
 import qualified Pawl.Codec.ExtraPhaseSpec
 import qualified Pawl.Codec.FaceDownCharacteristicsSpec
+import qualified Pawl.Codec.FaceDownReasonSpec
 import qualified Pawl.Codec.FaceSpec
 import qualified Pawl.Codec.FightSpec
 import qualified Pawl.Codec.FilterSpec
@@ -216,6 +218,7 @@ import qualified Pawl.Codec.PreventAllDamageSpec
 import qualified Pawl.Codec.PreventNextDamageSpec
 import qualified Pawl.Codec.PrintedReplacementSpec
 import qualified Pawl.Codec.PrintingSpec
+import qualified Pawl.Codec.ProductionTagSpec
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec
 import qualified Pawl.Codec.PutCountersSpec
 import qualified Pawl.Codec.QuantitySpec
@@ -231,6 +234,7 @@ import qualified Pawl.Codec.ReplacementEffectSpec
 import qualified Pawl.Codec.ReplacementOriginSpec
 import qualified Pawl.Codec.RequireAttackSpec
 import qualified Pawl.Codec.RequireBlockSpec
+import qualified Pawl.Codec.RestartSignalSpec
 import qualified Pawl.Codec.RevealCauseSpec
 import qualified Pawl.Codec.RevealSpec
 import qualified Pawl.Codec.RevealedSpec
@@ -502,6 +506,7 @@ spec s registry = do
   Pawl.Codec.ChooseBetweenSpec.spec s
   Pawl.Codec.ChooserSpec.spec s
   Pawl.Codec.ChosenCardFromAmongSpec.spec s
+  Pawl.Codec.DepartureSpec.spec s
   Pawl.Codec.EachCardFromAmongSpec.spec s
   Pawl.Codec.ChosenCardInGraveyardSpec.spec s
   Pawl.Codec.ChosenCardInHandSpec.spec s
@@ -576,6 +581,7 @@ spec s registry = do
   Pawl.Codec.ExpirySpec.spec s
   Pawl.Codec.ExtraPhaseSpec.spec s
   Pawl.Codec.FaceDownCharacteristicsSpec.spec s
+  Pawl.Codec.FaceDownReasonSpec.spec s
   Pawl.Codec.FaceSpec.spec s
   Pawl.Codec.FightSpec.spec s
   Pawl.Codec.FilterSpec.spec s
@@ -657,6 +663,7 @@ spec s registry = do
   Pawl.Codec.PreventNextDamageSpec.spec s
   Pawl.Codec.PrintedReplacementSpec.spec s
   Pawl.Codec.PrintingSpec.spec s
+  Pawl.Codec.ProductionTagSpec.spec s
   Pawl.Codec.ProjectedCharacteristicsSpec.spec s
   Pawl.Codec.PutCountersSpec.spec s
   Pawl.Codec.QuantitySpec.spec s
@@ -673,6 +680,7 @@ spec s registry = do
   Pawl.Codec.RequireAttackSpec.spec s
   Pawl.Codec.RequireBlockSpec.spec s
   Pawl.Codec.CantBeRegeneratedSpec.spec s
+  Pawl.Codec.RestartSignalSpec.spec s
   Pawl.Codec.RevealCauseSpec.spec s
   Pawl.Codec.RevealSpec.spec s
   Pawl.Codec.RevealedSpec.spec s

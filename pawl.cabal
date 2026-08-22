@@ -269,6 +269,8 @@ library codec
     Pawl.Codec.DefenseSpec
     Pawl.Codec.DelayedTrigger
     Pawl.Codec.DelayedTriggerSpec
+    Pawl.Codec.Departure
+    Pawl.Codec.DepartureSpec
     Pawl.Codec.Designate
     Pawl.Codec.DesignateSpec
     Pawl.Codec.Designation
@@ -332,6 +334,8 @@ library codec
     Pawl.Codec.Face
     Pawl.Codec.FaceDownCharacteristics
     Pawl.Codec.FaceDownCharacteristicsSpec
+    Pawl.Codec.FaceDownReason
+    Pawl.Codec.FaceDownReasonSpec
     Pawl.Codec.FaceSpec
     Pawl.Codec.Fight
     Pawl.Codec.FightSpec
@@ -495,6 +499,8 @@ library codec
     Pawl.Codec.PrintedReplacementSpec
     Pawl.Codec.Printing
     Pawl.Codec.PrintingSpec
+    Pawl.Codec.ProductionTag
+    Pawl.Codec.ProductionTagSpec
     Pawl.Codec.ProjectedCharacteristics
     Pawl.Codec.ProjectedCharacteristicsSpec
     Pawl.Codec.PutCounters
@@ -525,6 +531,8 @@ library codec
     Pawl.Codec.RequireAttackSpec
     Pawl.Codec.RequireBlock
     Pawl.Codec.RequireBlockSpec
+    Pawl.Codec.RestartSignal
+    Pawl.Codec.RestartSignalSpec
     Pawl.Codec.Reveal
     Pawl.Codec.RevealCause
     Pawl.Codec.RevealCauseSpec
