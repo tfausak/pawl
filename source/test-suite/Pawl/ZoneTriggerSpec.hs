@@ -118,6 +118,7 @@ import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Toughness as Toughness
+import qualified Pawl.Types.Transformed as Transformed
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Types.TriggerSource as TriggerSource
@@ -1699,6 +1700,10 @@ representativeEvents cond =
         -- CR 708.7's own event, and the only one this condition admits, on the
         -- BEARER -- so the pair really matches.
         TriggerCondition.SelfTurnedFaceUp -> one (GameEvent.TurnedFaceUp departed)
+        -- CR 701.27a's own event, and the only one this condition admits, on the
+        -- BEARER and naming the same face the condition does -- so the pair
+        -- really matches; the face below is the one everyTriggerCondition names.
+        TriggerCondition.SelfTransformedInto name -> one (GameEvent.Transformed (Transformed.MkTransformed departed (Set.singleton name)))
         -- The same event for the watcher-scoped form, and the only one it admits.
         -- `departed` again, so the pair really matches: the Filter this condition
         -- is instantiated with below is the trivial one, which admits whatever the
@@ -1872,6 +1877,7 @@ everyTriggerCondition =
     -- pin below would catch it.
     TriggerCondition.AnyOf [TriggerCondition.PermanentEnters Filter.Type.IsSource, TriggerCondition.RoomFullyUnlocked PlayerRelation.You],
     TriggerCondition.SelfTurnedFaceUp,
+    TriggerCondition.SelfTransformedInto (CardName.MkCardName (Text.pack "Blightsower Thallid")),
     TriggerCondition.PermanentTurnedFaceUp (Filter.Type.And []),
     TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated Designation.Renowned (Filter.Type.And [])),
     TriggerCondition.SelfEvolves,

@@ -490,6 +490,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.SelfHalfUnlocked (CardName.MkCardName (Text.pack "Steaming Sauna")))
       " {\"type\":\"SelfHalfUnlocked\",\"value\":\"Steaming Sauna\"} "
+  -- CR 701.27e, SelfHalfUnlocked's shape: a self-scoped condition whose payload
+  -- is the face named.
+  Spec.it s "SelfTransformedInto round-trips the face it names" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.SelfTransformedInto (CardName.MkCardName (Text.pack "Blightsower Thallid")))
+      " {\"type\":\"SelfTransformedInto\",\"value\":\"Blightsower Thallid\"} "
   -- CR 709.5i. The payload is a PlayerRelation, read against the controller of the
   -- permanent that became fully unlocked. BOTH relations, since the two are what
   -- separate "you fully unlock" from an opponent doing it.

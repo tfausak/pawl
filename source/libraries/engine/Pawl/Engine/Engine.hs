@@ -380,7 +380,7 @@ runTurnBasedActions phase = do
       -- CR 502.2 / 703.4b: the day/night check, second in the step and BEFORE the
       -- untap itself (CR 502.3 / 703.4c). Outside the CR 800.4j guard, rule 703.4b
       -- making it the GAME's action.
-      _ <- Daytime.untapCheck
+      _ <- Daytime.untapCheck Event.recordTransformed
       Monad.when hasActive $ do
         untapAll active
         settleAll active
@@ -612,6 +612,7 @@ abilityTriggeredOf event = case event of
   GameEvent.SpellCast {} -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
   GameEvent.Mentored {} -> Nothing
@@ -885,7 +886,7 @@ performSettle = do
   -- CR 702.145c/d/f/g, checked here for CR 704.3's reason and not because they are
   -- state-based actions -- both rules say they are not. Before the SBA pass, since
   -- turning a permanent over changes its power and toughness.
-  dayNight <- Daytime.settle
+  dayNight <- Daytime.settle Event.recordTransformed
   -- Also before the SBA pass: a permanent that just became world must be stamped
   -- before CR 704.5k reads the clock. No reason to loop.
   sampleWorldSince
