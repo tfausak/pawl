@@ -2114,17 +2114,27 @@ grantedEnchantSpec s registry = Spec.describe s "GrantedEnchant" $ do
     case grantedEnchantBoard island piker mammoth parasite of
       Nothing -> Spec.assertFailure s "the synthetic should print an activated ability"
       Just (leech, host, after) -> do
-        -- FIRST, and the gameplay-level pair: the host is wearing the thing, and
-        -- the static ability riding CR 303.4m's attachment has landed on it. A
-        -- Piker prints no flying, so this reads only through the attachment.
+        -- FIRST, and the gameplay-level assertion: the host has flying, which a
+        -- Goblin Piker does not print and only the parasite's CR 303.4m static
+        -- ability can have given it -- so it reads through the attachment rather
+        -- than around it.
+        Spec.assertBool s (Projection.hasKeyword Keyword.Flying host after) "CR 303.4m: the Piker has flying, which only the attachment can have given it"
+        -- Then the attachment itself, identity then count. Written as a lookup on
+        -- the PARASITE rather than as a scan for what the Piker wears: a refused
+        -- attach leaves an unattached Aura that CR 704.5m bins, and a scan then
+        -- compares two empty answers and passes vacuously.
         Spec.assertEqWith
           s
-          "the Piker is wearing exactly one permanent, and it is the parasite"
-          (filter (\o -> Object.attachedTo o == Just (Recipient.ToCreature host)) (Map.elems (GameState.objects after)))
-          (Maybe.maybeToList (Game.lookupObject leech after))
-        Spec.assertBool s (Projection.hasKeyword Keyword.Flying host after) "and the Piker has flying, which only the attachment can have given it"
-        -- The three layer reads the attach went through, after it rather than
-        -- before, so none of them absorbs the mutation above.
+          "and it is wearing the parasite"
+          (fmap Object.attachedTo (Game.lookupObject leech after))
+          (Just (Just (Recipient.ToCreature host)))
+        Spec.assertEqWith
+          s
+          "which is the only permanent attached to it"
+          (length (filter (\o -> Object.attachedTo o == Just (Recipient.ToCreature host)) (Map.elems (GameState.objects after))))
+          1
+        -- The three layer reads the attach went through, after the behaviour
+        -- rather than before, so none of them absorbs a mutation to it.
         Spec.assertBool s (Set.member Subtype.Aura (Projection.subtypesOf leech after)) "CR 205.1b: the parasite gained the Aura subtype"
         Spec.assertBool s (not (Projection.isCreatureOf leech after)) "CR 205.1a / 303.4d: and stopped being a creature, without which no Aura may enchant anything"
         Spec.assertEqWith
@@ -2159,15 +2169,20 @@ grantedEnchantSpec s registry = Spec.describe s "GrantedEnchant" $ do
         -- damage is lethal (CR 704.5g).
         let pass1 = S.settleSba (S.markDamage host 1 attached)
             pass2 = S.settleSba pass1
+            control = S.settleSba attached
+        -- The control FIRST, so the assertions below cannot pass because the Aura
+        -- was never on the battlefield: one thing differs between the two boards,
+        -- the lethal damage marked on the host.
+        Spec.assertBool s (Set.member leech (GameState.battlefield control)) "control: with the host alive the Aura is still there"
+        Spec.assertEqWith s "and alice's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice control)) 0
+        -- THE discriminating assertion: two cards, not one. A fallsOff that read
+        -- the printed face would leave the parasite on the battlefield attached to
+        -- an id that is no longer a permanent, and alice's graveyard would hold
+        -- only the Piker.
         Spec.assertEqWith s "alice's graveyard holds the host AND the Aura that was on it" (length (Game.zoneMembers Zone.Graveyard S.alice pass2)) 2
         Spec.assertBool s (not (Set.member leech (GameState.battlefield pass2))) "so the granted Aura is off the battlefield"
         Spec.assertEqWith s "the host died on the first pass" (Game.lookupObject host pass1) Nothing
         Spec.assertBool s (Set.member leech (GameState.battlefield pass1)) "and CR 704.3 kept the Aura through that pass, since it judged a board the host was still on"
-        -- The control, one thing different: with no damage marked the host lives
-        -- and the Aura stays, so the assertions above are not passing because it
-        -- was never on the battlefield.
-        Spec.assertBool s (Set.member leech (GameState.battlefield (S.settleSba attached))) "control: with the host alive the Aura is still there"
-        Spec.assertEqWith s "and alice's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice (S.settleSba attached))) 0
 
 -- The board grantedEnchantSpec's two cases share: alice's synthetic activates its
 -- ability targeting the Piker, with a War Mammoth on the battlefield as a second
