@@ -36,4 +36,4 @@ codecDelayed ::
   (Typeable.Typeable card, Eq card) =>
   Codec.Codec card ->
   Codec.Codec (Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility card))
-codecDelayed cardCodec = Common.textMap AbilityName.unwrap AbilityName.MkAbilityName (codec cardCodec)
+codecDelayed cardCodec = Common.textMap AbilityName.unwrap (Right . AbilityName.MkAbilityName) (codec cardCodec)

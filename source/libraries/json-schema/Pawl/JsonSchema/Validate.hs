@@ -26,6 +26,7 @@ import qualified Pawl.JsonPointer.Pointer as Pointer
 import qualified Pawl.JsonPointer.Token as Token
 import qualified Pawl.JsonSchema.Define as Define
 import qualified Pawl.JsonSchema.Name as Name
+import qualified Pawl.JsonSchema.Pattern as Pattern
 
 -- | Why a value was rejected, and where in the value it happened. The pointer
 -- is rendered rather than kept structured because reading it is the whole
@@ -122,6 +123,8 @@ keyword c schema value pair =
         "properties" -> checkProperties c argument value
         "required" -> checkRequired c argument value
         "additionalProperties" -> checkAdditionalProperties c schema argument value
+        "propertyNames" -> checkPropertyNames c argument value
+        "pattern" -> checkPattern c argument value
         "oneOf" -> checkOneOf c argument value
         "allOf" -> checkAllOf c argument value
         name -> [failure c $ Text.pack "unknown keyword " <> Text.pack name]
@@ -343,6 +346,39 @@ checkAdditionalProperties c schema argument value = case value of
           )
           $ Object.unwrap o
   _ -> []
+
+-- | Checks each of the value's property NAMES, as a string, against the
+-- argument schema. The failure is located at the property rather than at the
+-- object, since that is where a reader would look for the offending key.
+checkPropertyNames :: Context -> Value.Value -> Value.Value -> [Failure]
+checkPropertyNames c argument value = case value of
+  Value.Object o ->
+    concatMap
+      (\p -> let name = String.unwrap $ Pair.name p in check (into c name) argument $ Value.text name)
+      $ Object.unwrap o
+  _ -> []
+
+-- | Applies to strings only; any other value is unconstrained, which is the
+-- one place this module follows the specification's ignore-what-does-not-apply
+-- rule rather than inverting it. A pattern outside
+-- 'Pattern.matches'' subset is a failure HERE, at the value, because that is
+-- the only channel this module has -- it is a defect in the schema rather than
+-- in the value, and reporting it as valid would be the silent direction.
+checkPattern :: Context -> Value.Value -> Value.Value -> [Failure]
+checkPattern c argument value = case argument of
+  Value.String p -> case value of
+    Value.String x -> case Pattern.matches (String.unwrap p) (String.unwrap x) of
+      Left e -> [failure c $ Text.pack "unsupported pattern " <> render argument <> Text.pack ": " <> e]
+      Right True -> []
+      Right False ->
+        [ failure c $
+            Text.pack "expected a string matching "
+              <> render argument
+              <> Text.pack " but got "
+              <> render value
+        ]
+    _ -> []
+  _ -> [failure c $ Text.pack "expected pattern to be a string but got " <> render argument]
 
 -- | EXACTLY one branch, not at least one. 'Pawl.JsonSchema.Schema.oneOf' is how
 -- every tagged union is written, and two branches matching one value means two

@@ -36,4 +36,4 @@ codec = Fields.object $ do
 
 -- | A name-keyed map as a JSON OBJECT keyed by the slot name.
 codecMap :: Codec.Codec (Map.Map SlotName.SlotName Binding.Binding)
-codecMap = Common.textMap SlotName.unwrap SlotName.MkSlotName codec
+codecMap = Common.textMap SlotName.unwrap (Right . SlotName.MkSlotName) codec

@@ -97,6 +97,24 @@ mapOf s =
       Value.pair "additionalProperties" $ unwrap s
     ]
 
+-- | An object used as a map whose KEYS are constrained too, e.g. a map keyed
+-- by the decimal rendering of a number. Separate from 'mapOf' rather than an
+-- argument to it: 'mapOf' says the keys are unconstrained, which is the honest
+-- schema for a decoder that accepts any string, and this one is honest only
+-- for a decoder that rejects a key the key schema rejects.
+mapOfKeys :: Schema -> Schema -> Schema
+mapOfKeys k v =
+  fromPairs
+    [ Value.pair "type" $ Value.string "object",
+      Value.pair "propertyNames" $ unwrap k,
+      Value.pair "additionalProperties" $ unwrap v
+    ]
+
+-- | A string matching a regular expression. 'Pawl.JsonSchema.Pattern' says
+-- which patterns the validator can actually check.
+matching :: Text.Text -> Schema
+matching p = fromPairs $ keywords string <> [Value.pair "pattern" $ Value.text p]
+
 oneOf :: [Schema] -> Schema
 oneOf = fromPairs . pure . Value.pair "oneOf" . Value.array . fmap unwrap
 

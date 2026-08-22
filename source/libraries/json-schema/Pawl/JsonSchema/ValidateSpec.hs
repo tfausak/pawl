@@ -53,6 +53,26 @@ spec s = Spec.describe s "Pawl.JsonSchema.Validate" $ do
   accepts "nonEmptyArray" (Schema.nonEmptyArray Schema.string) (Value.array [text "a"])
   rejects "an empty array against nonEmptyArray" (Schema.nonEmptyArray Schema.string) (Value.array [])
 
+  let keyed = Schema.mapOfKeys (Schema.matching (Text.pack "^(0|[1-9][0-9]*)$")) Schema.integer
+  accepts "mapOfKeys" keyed (Value.object [Value.pair "0" (Value.integer 1), Value.pair "10" (Value.integer 2)])
+  rejects "a non-numeric key against mapOfKeys" keyed (Value.object [Value.pair "abc" (Value.integer 1)])
+  -- The alternation's first branch, so a matcher that only ever tried the last
+  -- one accepts nothing here.
+  rejects "a leading zero against mapOfKeys" keyed (Value.object [Value.pair "01" (Value.integer 1)])
+  rejects "an ill-typed value against mapOfKeys" keyed (Value.object [Value.pair "0" (text "a")])
+
+  -- pattern applies to strings and to nothing else, which is the one place this
+  -- module follows the specification's ignore-what-does-not-apply rule. Schema
+  -- has no combinator for a bare pattern -- matching pins the type too -- so the
+  -- keyword is written by hand here.
+  accepts
+    "a non-string against a bare pattern"
+    (Schema.fromPairs [Value.pair "pattern" (text "^a$")])
+    (Value.integer 1)
+  -- A pattern outside Pawl.JsonSchema.Pattern's subset is a schema defect, and
+  -- accepting the value would be the silent direction.
+  rejects "a value against an unsupported pattern" (Schema.matching (Text.pack "a+")) (text "aa")
+
   accepts "tupleOf" (Schema.tupleOf [Schema.string, Schema.integer]) (Value.array [text "a", Value.integer 1])
   rejects
     "a short array against tupleOf"
@@ -138,7 +158,7 @@ spec s = Spec.describe s "Pawl.JsonSchema.Validate" $ do
   Spec.it s "rejects a keyword it does not implement" $ do
     Spec.assertNe
       s
-      (Validate.validate (Define.run (pure (Schema.fromPairs [Value.pair "pattern" (text "^a$")]))) (text "a"))
+      (Validate.validate (Define.run (pure (Schema.fromPairs [Value.pair "multipleOf" (Value.integer 2)]))) (Value.integer 2))
       []
 
   -- A reference that leads back to itself without ever stepping into the value.
