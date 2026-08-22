@@ -218,6 +218,8 @@ library codec
     Pawl.Codec.CostScaleSpec
     Pawl.Codec.CostSpec
     Pawl.Codec.Count
+    Pawl.Codec.CountedDiscard
+    Pawl.Codec.CountedDiscardSpec
     Pawl.Codec.Counter
     Pawl.Codec.Counterability
     Pawl.Codec.CounterabilitySpec
@@ -295,6 +297,8 @@ library codec
     Pawl.Codec.EachCardFromAmongSpec
     Pawl.Codec.EachCardInGraveyard
     Pawl.Codec.EachCardInGraveyardSpec
+    Pawl.Codec.EachCardInHand
+    Pawl.Codec.EachCardInHandSpec
     Pawl.Codec.Effect
     Pawl.Codec.EffectSpec
     Pawl.Codec.EndingStep
@@ -1158,6 +1162,7 @@ library types
     Pawl.Types.CostReduction
     Pawl.Types.CostScale
     Pawl.Types.Count
+    Pawl.Types.CountedDiscard
     Pawl.Types.Counter
     Pawl.Types.Counterability
     Pawl.Types.CounterCause
@@ -1203,6 +1208,7 @@ library types
     Pawl.Types.DuringPhase
     Pawl.Types.EachCardFromAmong
     Pawl.Types.EachCardInGraveyard
+    Pawl.Types.EachCardInHand
     Pawl.Types.Effect
     Pawl.Types.EndingStep
     Pawl.Types.EndTurnSignal

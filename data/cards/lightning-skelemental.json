@@ -61,11 +61,14 @@
                       {
                         "type": "Discard",
                         "value": {
-                          "quantity": {
-                            "type": "Literal",
-                            "value": 2
-                          },
-                          "slot": "thatPlayer"
+                          "type": "Counted",
+                          "value": {
+                            "quantity": {
+                              "type": "Literal",
+                              "value": 2
+                            },
+                            "slot": "thatPlayer"
+                          }
                         }
                       }
                     ]

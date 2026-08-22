@@ -103,6 +103,7 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Count as Count.Type
+import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
@@ -127,6 +128,7 @@ import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
+import qualified Pawl.Types.EachCardInHand as EachCardInHand
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRestriction as EntryRestriction
@@ -788,7 +790,9 @@ effectCounts effect = case effect of
   -- No Quantity at all: rule 701.44a's counter is a literal one and its card is
   -- the one on top, so there is no number a card author writes.
   Effect.Explore {} -> []
-  Effect.Discard (Discard.MkDiscard _ quantity) -> quantityCounts quantity
+  Effect.Discard subject -> case subject of
+    Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity) -> quantityCounts quantity
+    Discard.These ref -> refCounts ref
   Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.ExchangeLifeTotals _ -> []
@@ -1493,7 +1497,7 @@ effectReplacements effect = case effect of
   Effect.Surveil {} -> []
   Effect.Fateseal {} -> []
   Effect.Explore {} -> []
-  Effect.Discard (Discard.MkDiscard _ _) -> []
+  Effect.Discard {} -> []
   Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.ExchangeLifeTotals _ -> []
@@ -2137,7 +2141,7 @@ effectMintedFaces effect = case effect of
   Effect.Surveil {} -> []
   Effect.Fateseal {} -> []
   Effect.Explore {} -> []
-  Effect.Discard (Discard.MkDiscard _ _) -> []
+  Effect.Discard {} -> []
   Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.ExchangeLifeTotals _ -> []
@@ -2752,9 +2756,13 @@ objectRefFilters ref = case ref of
   -- GraveyardScope names players rather than characteristics, so the Filter is
   -- the whole of what there is to lint.
   ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard _ f) -> [f]
-  -- Ignorant Bliss' "all cards from your hand" holds none either: CR 400.2
-  -- makes a hand hidden, so the arm carries no Filter to lint.
+  -- Ignorant Bliss' "all cards from your hand" holds none: the printing takes
+  -- the whole hand and states no characteristic, so the arm carries no Filter.
   ObjectRef.EachCardInYourHand -> []
+  -- Amnesia's "all nonland cards" does state one, and states it here. Optional,
+  -- so its reveal half -- the whole hand -- lints nothing, exactly as the linked
+  -- exile arm below does for the printings that take all of their set.
+  ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand _ f) -> Foldable.toList f
   -- Hoarding Dragon's "the exiled card" usually holds none: CR 607.2a's set is
   -- named by which object exiled the cards rather than by their characteristics.
   -- Karn Liberated's "all non-Aura permanent cards exiled with Karn" is the one
@@ -3530,7 +3538,11 @@ effectFilters effect = case effect of
   -- The ObjectRef's Filter is a position a card author writes, so the lint
   -- reaches it, as PutCounters' does.
   Effect.Explore ref -> sourceHosted (objectRefFilters ref)
-  Effect.Discard (Discard.MkDiscard _ quantity) -> unframed (quantityFilters quantity)
+  -- The These arm's ref carries a Filter a card author writes -- Amnesia's
+  -- "nonland" -- so the lint reaches it, as Reveal's does.
+  Effect.Discard subject -> case subject of
+    Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity) -> unframed (quantityFilters quantity)
+    Discard.These ref -> sourceHosted (objectRefFilters ref)
   Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   Effect.ExchangeLifeTotals _ -> []
@@ -4919,7 +4931,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         variable = Just (ManaCost.MkManaCost [ManaSymbol.Variable])
         -- CR 109.5's "you", in the shape Baral, Chief of Compliance's TRIGGERED
         -- ability uses it: a bare-SlotName opcode naming the controller.
-        youDiscards = Effect.Discard (Discard.MkDiscard Binding.you (Quantity.Type.Literal 1))
+        youDiscards = Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard Binding.you (Quantity.Type.Literal 1)))
         -- Endless Cockroaches' payload (CR 400.7e) and rule 702.70a's, the two
         -- event slots, neither of which an activation has an event to bind.
         returnIt = Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.InSlot Binding.became) Zone.Hand EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue)
@@ -5251,6 +5263,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           ObjectRef.EachMatching _ -> False
           ObjectRef.EachCardInGraveyard {} -> False
           ObjectRef.EachCardInYourHand -> False
+          ObjectRef.EachCardInHand {} -> False
           -- CR 607.3 is what makes this one plural even where the card's own
           -- words are singular: an ability referring to "the exiled card" whose
           -- linked ability exiled several performs its action on each of them.

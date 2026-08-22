@@ -83,6 +83,7 @@ import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -107,6 +108,7 @@ import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
+import qualified Pawl.Types.EachCardInHand as EachCardInHand
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
@@ -293,9 +295,9 @@ graveyardScopeSlots scope = case scope of
   GraveyardScope.Scoped _ -> Map.empty
   GraveyardScope.InSlot slot -> Map.singleton slot SlotArity.Many
 
--- The slots an ObjectRef reads. InSlot names one directly and
--- EachCardInGraveyard names one through its scope; the other sweeping arms name
--- none. Reporting a scope's slot does not make the SWEPT CARDS targets -- CR
+-- The slots an ObjectRef reads. InSlot names one directly, and
+-- EachCardInGraveyard and EachCardInHand name one through their scope; the other
+-- sweeping arms name none. Reporting a scope's slot does not make the SWEPT CARDS targets -- CR
 -- 115.10a needs the word "target" against them, and a graveyard scope says it
 -- against the PLAYER -- so what CR 608.2b judges is still the card's own target
 -- slot, holding that player, and not this read.
@@ -303,13 +305,18 @@ objectRefSlots :: ObjectRef -> Map.Map SlotName SlotArity
 objectRefSlots ref = case ref of
   ObjectRef.InSlot slot -> Map.singleton slot SlotArity.Many
   ObjectRef.EachMatching _ -> Map.empty
-  -- The one sweeping arm that DOES name a slot: CR 400.1's per-player graveyards
-  -- leave "whose" to be said, and Angel of Finality says it by pointing at the
-  -- player another slot of the same announcement targets. Reported, not dropped,
-  -- because the D4 dataflow lint reads this: a card whose ONLY use of that slot
-  -- is the scope would otherwise declare a target nothing reads.
+  -- The sweeping arms that DO name a slot are this one and EachCardInHand below:
+  -- CR 400.1's per-player zones leave "whose" to be said, and Angel of Finality
+  -- says it by pointing at the player another slot of the same announcement
+  -- targets. Reported, not dropped, because the D4 dataflow lint reads this: a
+  -- card whose ONLY use of that slot is the scope would otherwise declare a
+  -- target nothing reads.
   ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard scope _) -> graveyardScopeSlots scope
   ObjectRef.EachCardInYourHand -> Map.empty
+  -- The arm above's scope over the other per-player zone, reported for its
+  -- reason: Amnesia's ONLY use of its target slot is this scope, so dropping the
+  -- read would have the D4 dataflow lint call that target unread.
+  ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand scope _) -> graveyardScopeSlots scope
   ObjectRef.EachCardExiledWithSource {} -> Map.empty
   ObjectRef.EachSpell _ -> Map.empty
   ObjectRef.EachOnStack _ -> Map.empty
@@ -351,6 +358,7 @@ objectRefQuantities ref = case ref of
   ObjectRef.EachMatching _ -> []
   ObjectRef.EachCardInGraveyard {} -> []
   ObjectRef.EachCardInYourHand -> []
+  ObjectRef.EachCardInHand {} -> []
   ObjectRef.EachCardExiledWithSource {} -> []
   ObjectRef.EachSpell _ -> []
   ObjectRef.EachOnStack _ -> []
@@ -437,7 +445,12 @@ slotsOf effect = case effect of
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.Explore ref -> objectRefSlots ref
-  Effect.Discard (Discard.MkDiscard slot quantity) -> insertOne slot (quantitySlots quantity)
+  Effect.Discard subject -> case subject of
+    Discard.Counted (CountedDiscard.MkCountedDiscard slot quantity) -> insertOne slot (quantitySlots quantity)
+    -- The ref's own read, which for Amnesia's EachCardInHand is the scope's
+    -- target slot: the D4 dataflow lint asks this, and dropping it would make
+    -- that target unread.
+    Discard.These ref -> objectRefSlots ref
   Effect.LoseLife (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.ExchangeLifeTotals sides -> exchangeSidesSlots sides
@@ -681,7 +694,9 @@ slotsAreExhaustive effect = case effect of
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Explore {} -> True
-  Effect.Discard (Discard.MkDiscard _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.Discard subject -> case subject of
+    Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity) -> Quantity.slotsAreExhaustive quantity
+    Discard.These ref -> all Quantity.slotsAreExhaustive (objectRefQuantities ref)
   Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.ExchangeLifeTotals _ -> True
@@ -835,7 +850,9 @@ readsX = any effectReadsX
       Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Explore {} -> False
-      Effect.Discard (Discard.MkDiscard _ quantity) -> Quantity.readsX quantity
+      Effect.Discard subject -> case subject of
+        Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity) -> Quantity.readsX quantity
+        Discard.These ref -> any Quantity.readsX (objectRefQuantities ref)
       Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.ExchangeLifeTotals _ -> False
@@ -1979,8 +1996,28 @@ objectRefObjects legal resolving controller source gs ref = case ref of
     concatMap (\pid -> graveyardCardsOf (effectContext controller source legal (slotGroups resolving gs)) gs pid filter_) (graveyardScopePlayers legal controller gs scope)
   -- CR 400.1's per-player zone again, but only the RESOLVING CONTROLLER's, so no
   -- scope to fold over and no APNAP order to impose. In the zone's own order,
-  -- which no rule reads: CR 400.5 leaves a hand's arrangement to its owner.
+  -- which no rule reads: CR 402.3 leaves a hand's arrangement to its owner.
   ObjectRef.EachCardInYourHand -> Game.zoneMembers Zone.Hand controller gs
+  -- The arm above's zone under EachCardInGraveyard's scope and filter: CR
+  -- 109.2a's reading again, over the hands graveyardScopePlayers names rather
+  -- than the resolving controller's alone. In APNAP order (CR 608.2f) across
+  -- seats, and within a seat in the hand's own order, which no rule reads (CR
+  -- 402.3) -- the arm above's answer.
+  --
+  -- effectContext and NOT Filter.contextFor, so the resolution's own slot
+  -- bindings ride along and a filter reading a slot (Filter.IsBound) is not
+  -- vacuously False here. Amnesia's "nonland" reads no slot, so no test on this
+  -- module can tell the two apart at this site (#2075); the sibling sweeps are
+  -- written the same way for the reason spelled out at EachMatching above.
+  --
+  -- No sourceAttachedTo override, unlike EachMatching: no card in a hand names
+  -- what its Aura's host is.
+  ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand scope mFilter) ->
+    let context = effectContext controller source legal (slotGroups resolving gs)
+        held pid = case mFilter of
+          Nothing -> Game.zoneMembers Zone.Hand pid gs
+          Just filter_ -> handCardsOf context gs pid filter_
+     in concatMap held (graveyardScopePlayers legal controller gs scope)
   -- CR 607.2a's linked set: the cards GameState.exiledWith files against this
   -- effect's SOURCE. The relation, not a zone sweep, is the membership test, so a
   -- card exiled by a second copy of the same printing is not named; a stated
@@ -2152,7 +2189,7 @@ handChoosers legal controller gs player =
 -- 109.5's "you" rather than whoever is choosing.
 --
 -- NOT sorted, where the graveyard sibling sorts: the candidates keep the zone's
--- own order, which no rule reads (CR 400.5). Narrowing must not reorder.
+-- own order, which no rule reads (CR 402.3). Narrowing must not reorder.
 handCardsOf :: Filter.Context -> GameState -> PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
 handCardsOf context gs pid filter_ =
   filter
@@ -2230,6 +2267,7 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.EachMatching _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachCardInGraveyard {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachCardInYourHand -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
+  ObjectRef.EachCardInHand {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachCardExiledWithSource {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.TopOfLibrary {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.TopOfLibraryUntil {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
@@ -3509,6 +3547,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             ObjectRef.EachCardInYourHand -> do
               gs <- State.get
               pure (objectRefObjects legal resolving controller source gs ref)
+            -- Swept once from the PRE-MOVE state (CR 608.2c, CR 608.2f), the arm
+            -- above's answer over the wider scope.
+            ObjectRef.EachCardInHand {} -> do
+              gs <- State.get
+              pure (objectRefObjects legal resolving controller source gs ref)
             -- CR 607.2a, swept once from the PRE-MOVE state (CR 608.2c, CR
             -- 608.2f). CR 400.3 files a hand arrival under Object.owner.
             ObjectRef.EachCardExiledWithSource {} -> do
@@ -3837,7 +3880,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- and not Game.choose, since randomness is not CR 104.4b's optional action.
       --
       -- Elided at one card and skipped at none (CR 101.3, CR 609.3). Candidates are
-      -- the hand as CR 608.2c reaches it in the zone's own order (CR 400.5), seats
+      -- the hand as CR 608.2c reaches it in the zone's own order (CR 402.3), seats
       -- from handChoosers so the asks run in CR 608.2e's APNAP order. ONE card per
       -- SEAT, so a ref naming several writes the slot once each.
       ObjectRef.RandomCardInHand player ->
@@ -3930,7 +3973,24 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- (CR 608.2b) or a player recipient answers with nobody. CR 701.44d's APNAP
     -- half is objectRefObjects' order; its second key is the engine's (#1345).
     Monad.mapM_ exploreOne (objectRefObjects legal resolving controller source gs ref)
-  Effect.Discard (Discard.MkDiscard slot quantity) -> do
+  -- The card names the set, so CR 701.9b's default choice does not arise and
+  -- nobody is prompted. Swept ONCE as this instruction is reached (CR 608.2c) and
+  -- then fixed (CR 608.2f), and buried through the same funnel the counted branch
+  -- below uses, so CR 701.9a's move is RECORDED as a discard -- writing it as a
+  -- zone change instead would land every card in the right graveyard and leave
+  -- TriggerCondition.SelfDiscarded silent.
+  --
+  -- The discarding player is PER CARD: rule 701.9a moves a card from its OWNER's
+  -- hand, and a ref over CR 400.1's per-player zone can name several owners'
+  -- cards at once. A card whose owner cannot be read is skipped rather than
+  -- filed under the controller.
+  Effect.Discard (Discard.These ref) -> do
+    gs <- State.get
+    let owned oid = fmap ((,) oid . Object.owner) (Game.lookupObject oid gs)
+    Monad.mapM_
+      (\(oid, owner) -> Event.discard DiscardCause.Ordinary owner oid)
+      (Maybe.mapMaybe owned (objectRefObjects legal resolving controller source gs ref))
+  Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard slot quantity)) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal (slotGroups resolving gs)

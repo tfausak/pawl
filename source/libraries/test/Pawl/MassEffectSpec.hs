@@ -492,6 +492,90 @@ angelOfFinalitySpec s registry = Spec.describe s "AngelOfFinality" $ do
       (List.sort [named "Bird Maiden", named "Day of Judgment"])
     Spec.assertBool s (S.onBattlefield heroId after) "bob's creature was never moved, so nothing swept the battlefield"
 
+-- CR 109.2a's reading again, over the OTHER per-player zone CR 400.1 gives out
+-- and the one CR 400.2 calls hidden: ObjectRef.EachCardInHand, where
+-- angelOfFinalitySpec above is the graveyard's.
+--
+-- Amnesia {3}{U}{U}{U} Sorcery -- "Target player reveals their hand and discards
+-- all nonland cards." (name, cost, type line and Oracle text checked against
+-- api.scryfall.com, 2026-08-22). Its whole text is that one sentence, so nothing
+-- else on the card can be what these assertions read.
+--
+-- WHY THE HAND MAY BE SWEPT AT ALL: the card prints its own reveal (CR 701.20a),
+-- so which cards matched is public before any of them leaves. That is the
+-- visibility answer Pawl.Types.EachCardInHand's header states, and it is the
+-- card's rather than the engine's.
+--
+-- NO PROMPT, and that is a rule and not an elision: CR 701.9b's default choice
+-- is over WHICH cards, and this card names them, so there is nothing to ask.
+--
+-- TWO SEATS, with three control legs on the board, one per way the sweep can go
+-- wrong:
+--
+--   * THE FILTER. bob's hand holds a Forest, which "nonland" must leave standing
+--     -- a sweep with no filter, or one whose filter answers True on every
+--     candidate, empties his hand instead.
+--   * THE SCOPE. alice holds a Goblin Piker of her own, which "target player's"
+--     must leave standing -- a sweep wired to the resolving controller takes it.
+--   * THE FUNNEL. bob's Bartered Cow, {3}{W} 3/3 Creature -- Ox, "When this
+--     creature dies and when you discard this card, create a Food token", is the
+--     only board-visible witness that CR 701.9a's DISCARD ran rather than a bare
+--     hand-to-graveyard move. Writing Amnesia as an Effect.MoveToZone would put
+--     every card in the right graveyard and leave this silent, which is what
+--     assertion four keeps dead.
+--
+-- Distinct printings throughout, so each assertion reads identity and not merely
+-- a count. Six Islands, cast and resolved for real, and the trigger placed and
+-- resolved after -- the Food is only on the battlefield once it has.
+amnesiaSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+amnesiaSpec s registry = Spec.describe s "Amnesia" $ do
+  Spec.it s "CR 109.2a the nonland cards leave the targeted hand as DISCARDS, and the land and the caster's own hand stand" $ do
+    amnesia <- S.printingOf s registry "Amnesia"
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    maiden <- S.printingOf s registry "Bird Maiden"
+    cow <- S.printingOf s registry "Bartered Cow"
+    -- handOne REPLACES alice's hand and sets the phase up for a cast, so it runs
+    -- FIRST and every control leg is appended after it.
+    let (withSpell, spell) = S.handOne amnesia (S.landsInPlay island 6)
+        (_, withHers) = S.addHandCard piker S.alice withSpell
+        (_, withCow) = S.addHandCard cow S.bob withHers
+        (_, withHis) = S.addHandCard maiden S.bob withCow
+        (_, ready) = S.addHandCard forest S.bob withHis
+        -- The offered set is FILTERED rather than rebuilt, so the recipient is
+        -- one the engine itself minted and a mutation cannot be repaired by an
+        -- answerer that goes looking for a legal pick.
+        atBob :: Prompt.Prompt r -> r
+        atBob p = case p of
+          Prompt.ChooseTargets _ _ _ slots -> fmap (Set.filter (== Recipient.ToPlayer S.bob) . snd) slots
+          _ -> S.identityAnswer p
+        cast = S.runPure atBob ready (S.cast S.alice spell)
+        resolved = S.runPure atBob cast Stack.resolveTop
+        placed = S.runPure atBob resolved Engine.placePendingTriggers
+        after = S.runPure atBob placed Stack.resolveTop
+        named = Just . CardName.MkCardName . Text.pack
+    Spec.assertEqWith
+      s
+      "alice's own hand is untouched: the sweep read the target slot, not the resolving controller"
+      (namesIn Zone.Hand S.alice after)
+      [named "Goblin Piker"]
+    Spec.assertEqWith
+      s
+      "bob keeps exactly his land: 'nonland' matched the other two and not this one"
+      (namesIn Zone.Hand S.bob after)
+      [named "Forest"]
+    Spec.assertEqWith
+      s
+      "and both nonland cards are in bob's own graveyard (CR 400.3)"
+      (List.sort (namesIn Zone.Graveyard S.bob after))
+      (List.sort [named "Bartered Cow", named "Bird Maiden"])
+    Spec.assertEqWith
+      s
+      "the Cow's CR 701.9a discard trigger fired, so the cards were DISCARDED rather than moved"
+      (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Food Token")) S.bob after)
+      1
+
 -- CR 401.4's arrangement of two or more simultaneous library arrivals, taken back
 -- from the owner by text that states a RANDOM order -- the placement angel above
 -- has no reason to state, its destination being exile.
@@ -3808,6 +3892,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   returnAllSpec s registry
   riseOfTheDarkRealmsSpec s registry
   angelOfFinalitySpec s registry
+  amnesiaSpec s registry
   enduranceSpec s registry
   portOfKarfellSpec s registry
   midnightTillingSpec s registry

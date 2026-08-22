@@ -64,10 +64,12 @@ import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
+import qualified Pawl.Types.EachCardInHand as EachCardInHand
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryR as EntryR
@@ -1505,7 +1507,12 @@ rewriteEffect pairs effect = case effect of
   Effect.Surveil {} -> effect
   Effect.Fateseal {} -> effect
   Effect.Explore ref -> Effect.Explore (rewriteObjectRef pairs ref)
-  Effect.Discard {} -> effect
+  -- The These arm's ref carries a Filter, so rule 612's text change reaches it
+  -- exactly as Reveal's does; the Counted arm holds a slot and a count and no
+  -- word a change could swap.
+  Effect.Discard subject -> case subject of
+    Discard.Counted _ -> effect
+    Discard.These ref -> Effect.Discard (Discard.These (rewriteObjectRef pairs ref))
   Effect.LoseLife {} -> effect
   Effect.GainLife {} -> effect
   Effect.ExchangeLifeTotals _ -> effect
@@ -1611,6 +1618,7 @@ rewriteObjectRef pairs ref = case ref of
   ObjectRef.EachMatching f -> ObjectRef.EachMatching (Filter.rewrite pairs f)
   ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard s f) -> ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard s (Filter.rewrite pairs f))
   ObjectRef.EachCardInYourHand -> ref
+  ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand s f) -> ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand s (fmap (Filter.rewrite pairs) f))
   ObjectRef.EachCardExiledWithSource f -> ObjectRef.EachCardExiledWithSource (fmap (Filter.rewrite pairs) f)
   ObjectRef.EachSpell f -> ObjectRef.EachSpell (Filter.rewrite pairs f)
   ObjectRef.EachOnStack f -> ObjectRef.EachOnStack (Filter.rewrite pairs f)
