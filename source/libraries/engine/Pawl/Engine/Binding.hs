@@ -133,9 +133,10 @@ triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 -- names each opponent makes one offer per opponent and this slot holds every
 -- seat whose answer selected the branch. A reader that takes one recipient
 -- (Pawl.Types.SlotArity.One) therefore reads NOTHING out of it once two seats
--- are in it; only Pawl.Engine.Resolve's Effect.PlayerSacrifices arm takes them
--- all today. Not implemented: PlayerRef.InSlot is one of those one-recipient
--- readers, so no life-total opcode can read this slot yet (#1966).
+-- are in it; Pawl.Engine.Resolve's Effect.PlayerSacrifices arm and
+-- PlayerRef.EachInSlot are the readers that take them all. Not implemented: no
+-- card aims a life-total opcode at this slot, so the plural read of it is
+-- unexercised (#1966).
 --
 -- Not a target (nothing was chosen), so CR 608.2b has nothing to re-validate --
 -- Resolve's legalSlot answers True for any slot that declares no target. `you`'s

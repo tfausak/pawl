@@ -45,10 +45,10 @@ data Clause card = MkClause
     -- installed row, while this one gates whether the clause's instructions run
     -- at all.
     condition :: Maybe Condition.Condition,
-    -- | CR 603.5's printed "may", covering this clause's effects -- see
-    -- Pawl.Types.Optionality for why the flag rides a carrier rather than
-    -- wrapping each effect, and Pawl.Engine.Resolve.exercises for where the
-    -- choice is asked.
+    -- | CR 603.5's printed "may", covering this clause's effects, and WHO it
+    -- asks -- see Pawl.Types.Optionality for why the rider rides a carrier
+    -- rather than wrapping each effect and why the asker rides the rider, and
+    -- Pawl.Engine.Resolve.exercises for where the choice is asked.
     --
     -- A clause spanning two instructions is ONE question, which is what CR
     -- 608.2d's single announcement calls for: "you may draw a card and lose 1

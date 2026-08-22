@@ -1836,9 +1836,12 @@ playerRefPlayers legal controller gs ref = case ref of
   PlayerRef.InSlot slot -> case legalOne slot legal of
     Just (Recipient.ToPlayer pid) -> [pid]
     _ -> [] -- an unfilled, illegal, or non-player slot: no-op
-    -- Every player the slot names, InSlot's read without Binding.onlyOne's collapse
-    -- -- the seats a CR 603.5 "may" or a CR 118.12 gate selected. Non-player
-    -- recipients are dropped, as the arm above drops them.
+    -- Every player the slot names, InSlot's read without Binding.onlyOne's
+    -- collapse -- Binding.mayPlayers, the seats a CR 603.5 "may" selected.
+    -- Non-player recipients are dropped, as the arm above drops them.
+    --
+    -- Binding.gatePlayers is the same shape one question over; not implemented:
+    -- no card's opcode reads THAT slot plurally yet (#1966).
   PlayerRef.EachInSlot slot -> Maybe.mapMaybe Recipient.playerOf (legalMany slot legal)
   PlayerRef.Relative PlayerRelation.You -> [controller]
   PlayerRef.Relative PlayerRelation.Opponent -> filter (PlayerRelation.holds PlayerRelation.Opponent controller) everyone
