@@ -690,6 +690,10 @@ viewOfCard face =
           -- any zone this builder describes cease to exist.
           Filter.token = False,
           Filter.tapped = False,
+          -- CR 701.27g asks about a permanent on the battlefield; this is a
+          -- printed FACE with no object behind it, so the rule's own answer is
+          -- False rather than an unknown.
+          Filter.transformed = False,
           -- CR 122.1a-b: a counter can sit on a card off the battlefield, but this
           -- builder describes a printed FACE, so there is nothing to be on.
           Filter.counters = Map.empty,
@@ -850,6 +854,13 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- CR 111.6: fixed for the life of the object (CR 400.7).
       Filter.token = Game.isToken oid gs,
       Filter.tapped = Game.isTapped oid gs,
+      -- CR 701.27g's two conjuncts, and the only site that fills the field. The
+      -- face is read CURRENT -- Game.isFrontFaceUp reads Object.face, never the
+      -- Object.turnedOverAt beside it -- which is the rule's first exclusion, a
+      -- permanent front face up being untransformed however it got there. The
+      -- second exclusion holds today because no object is represented by more
+      -- than one card; see #369.
+      Filter.transformed = Set.member oid (GameState.battlefield gs) && not (Game.isFrontFaceUp oid gs),
       Filter.counters = counters,
       -- CR 701.54b: a designation rather than a characteristic. Nothing for an id
       -- naming no object -- a designation dies with the permanent (CR 400.7).
@@ -2854,6 +2865,9 @@ filterReads f = case f of
   Filter.Type.IsToken -> Set.empty
   -- CR 110.5: tap status is not a characteristic, so no layer writes it.
   Filter.Type.IsTapped -> Set.empty
+  -- Reads nothing: CR 712.8d/e make which face is up the thing characteristics
+  -- are read OFF rather than one of them, so no Modification writes Object.face.
+  Filter.Type.Transformed -> Set.empty
   -- CR 109.3 / 613.1f: the aspect LoseAllAbilities writes, Aspect having no
   -- finer grain than "the abilities".
   Filter.Type.HasNonManaActivatedAbility -> Set.singleton Keywords

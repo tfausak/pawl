@@ -86,6 +86,7 @@ codec keywordCodec =
       Arm.nullary "CanAttachToSubject" Filter.CanAttachToSubject,
       Arm.nullary "IsToken" Filter.IsToken,
       Arm.nullary "IsTapped" Filter.IsTapped,
+      Arm.nullary "Transformed" Filter.Transformed,
       Arm.nullary "IsRingBearer" Filter.IsRingBearer,
       Arm.payload "HasDesignation" Designation.codec Filter.HasDesignation (\x -> case x of Filter.HasDesignation y -> Just y; _ -> Nothing),
       Arm.payload "HasCounters" (CounterKind.codec keywordCodec) Filter.HasCounters (\x -> case x of Filter.HasCounters y -> Just y; _ -> Nothing),

@@ -22,8 +22,11 @@ module Pawl.TransformSpec where
 
 import qualified Control.Monad as Monad
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
@@ -41,9 +44,11 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
+import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
@@ -59,6 +64,13 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
+
+-- CR 701.27g's fixture, which is not the Gargoyle's: Tovolar, Dire Overlord //
+-- Tovolar, the Midnight Scourge and Mutagen Connoisseur. See
+-- transformedPermanentSpec.
+tovolarFront, tovolarBack :: CardName.CardName
+tovolarFront = CardName.MkCardName (Text.pack "Tovolar, Dire Overlord")
+tovolarBack = CardName.MkCardName (Text.pack "Tovolar, the Midnight Scourge")
 
 -- The two names the card prints. CR 712.8a gives the card only its front face's
 -- characteristics off the battlefield, so the second names a face rather than
@@ -114,6 +126,7 @@ sweep = sweepFrom S.noSource
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Transform" $ do
   enterTransformedSpec s registry
+  transformedPermanentSpec s registry
   -- CR 712.8d: "While a double-faced permanent has its front face up, it has
   -- only the characteristics of its front face." Nothing has turned this one
   -- over, so CR 712.8a's front face is what Pawl.Engine.Card.combined answers
@@ -407,3 +420,121 @@ enterTransformedSpec s registry = Spec.describe s "Entering the battlefield tran
     Spec.assertEqWith s "so nothing entered the battlefield" (Game.zoneMembers Zone.Battlefield S.alice refused) []
     Spec.assertEqWith s "the same card put there UNtransformed does enter" (fmap (\oid -> Projection.namesOf oid entered) (Game.zoneMembers Zone.Battlefield S.alice entered)) [Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker"))]
     Spec.assertEqWith s "and a double-faced card enters showing its back face" (fmap (\oid -> Projection.namesOf oid turned) (Game.zoneMembers Zone.Battlefield S.alice turned)) [Set.singleton antagonizerName]
+
+-- The face this permanent is showing, by name (CR 709.4a): Object.face is the
+-- one field CR 701.27a writes, and CR 712.8d/e make every characteristic follow
+-- it. Pawl.DaytimeSpec keeps its own copy for the same reason.
+faceNameOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe CardName.CardName
+faceNameOf oid gs = fmap Face.name (Game.faceOf oid gs)
+
+-- CR 117.5's settle, where CR 702.145c/d/f are checked. Not S.settleSba: those
+-- rules are explicitly not state-based actions.
+settleDaytime :: GameState.GameState -> GameState.GameState
+settleDaytime gs = S.runPure S.identityAnswer gs Engine.settleForPriority
+
+-- The upkeep step of alice's turn, Pawl.DaytimeSpec's `upkeep` exactly: the
+-- schedule loses its head so runStep advances OUT of the upkeep rather than back
+-- into it.
+aliceUpkeep :: GameState.GameState -> GameState.GameState
+aliceUpkeep gs =
+  gs
+    { GameState.activePlayer = S.alice,
+      GameState.phase = Phase.Beginning BeginningStep.Upkeep,
+      GameState.priority = Just S.alice,
+      GameState.remaining = Seq.drop 1 (GameState.remaining gs)
+    }
+
+-- CR 502.2's day/night check, run as the untap step's turn-based actions with
+-- `n` spells on the previous turn's books.
+untapStepAfter :: Natural.Natural -> GameState.GameState -> GameState.GameState
+untapStepAfter n gs =
+  S.runPure S.identityAnswer (gs {GameState.spellsCastLastTurn = n}) (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
+
+-- alice's board for CR 701.27g: Tovolar, two Russet Wolves, Mutagen Connoisseur
+-- and a Thraben Gargoyle, settled so CR 702.145d has made it day.
+--
+-- Two Wolves and no more because CR 603.4's intervening "if" wants three Wolves
+-- and/or Werewolves and Tovolar is himself the third; the Connoisseur and the
+-- Gargoyle are neither, so they do not stand in for one.
+transformedBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+transformedBoard tovolar wolf connoisseur gargoyle =
+  let (tovolarId, withTovolar) = S.addCreature tovolar S.alice emptyBoard
+      withWolves = foldr (\_ g -> snd (S.addCreature wolf S.alice g)) withTovolar [1 :: Int, 2]
+      (connoisseurId, withConnoisseur) = S.addCreature connoisseur S.alice withWolves
+      (_, withGargoyle) = S.addCreature gargoyle S.alice withConnoisseur
+   in (tovolarId, connoisseurId, settleDaytime withGargoyle)
+
+-- CR 701.27g, "transformed permanent", asked by a CARD rather than by the
+-- engine: Mutagen Connoisseur's "this creature gets +1/+0 for each transformed
+-- permanent you control" is `Filter.Transformed` conjoined with `ControlledBy
+-- You` under a Count over the battlefield, so its power IS the tally and every
+-- case here reads it.
+--
+-- Tovolar, Dire Overlord // Tovolar, the Midnight Scourge is the permanent that
+-- moves. CR 702.145c/f turn him over and back through the rules alone, which is
+-- the pool's only road to a permanent that is front face up AND has been back
+-- face up before -- the one board on which CR 701.27g's first exclusion is
+-- distinguishable from a reading off Object.turnedOverAt.
+--
+-- Thraben Gargoyle is on the board and never turns, so a reading of "transformed
+-- permanent" as "double-faced permanent" answers 2 where the rule answers 0. The
+-- two Russet Wolves are single-faced and contribute nothing under any reading;
+-- they are there to reach Tovolar's trigger.
+--
+-- CR 701.27g's SECOND exclusion -- an object represented by more than one card
+-- is never a transformed permanent -- is not asserted here because no board can
+-- reach one: pawl models no melded or merged permanent, so the exclusion holds
+-- uniformly. See #369.
+transformedPermanentSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+transformedPermanentSpec s registry = Spec.describe s "TransformedPermanent" $ do
+  -- CR 701.27g's positive: a double-faced permanent on the battlefield with its
+  -- BACK face up is a transformed permanent, and the Connoisseur counts exactly
+  -- one of them although two double-faced permanents are on the board.
+  Spec.it s "CR 701.27g a permanent with its back face up is a transformed permanent" $ do
+    tovolar <- S.printingOf s registry "Tovolar, Dire Overlord"
+    wolf <- S.printingOf s registry "Russet Wolves"
+    connoisseur <- S.printingOf s registry "Mutagen Connoisseur"
+    gargoyle <- S.printingOf s registry "Thraben Gargoyle"
+    let (tovolarId, connoisseurId, day) = transformedBoard tovolar wolf connoisseur gargoyle
+        night = S.runPure S.identityAnswer (aliceUpkeep day) Engine.runStep
+    Spec.assertEqWith s "the Connoisseur counts the one transformed permanent" (S.powerToughnessOf connoisseurId night) (Just (1, 5))
+    Spec.assertEqWith s "it is night" (GameState.daytime night) (Just Daytime.Night)
+    Spec.assertEqWith s "and Tovolar is the permanent showing a back face" (faceNameOf tovolarId night) (Just tovolarBack)
+  -- CR 701.27g's first sentence read the other way: with every double-faced
+  -- permanent front face up the tally is zero, although the board holds two of
+  -- them. The falsifier for "a double-faced permanent is a transformed
+  -- permanent", which would answer 2 here.
+  Spec.it s "CR 701.27g a permanent with its front face up is not one" $ do
+    tovolar <- S.printingOf s registry "Tovolar, Dire Overlord"
+    wolf <- S.printingOf s registry "Russet Wolves"
+    connoisseur <- S.printingOf s registry "Mutagen Connoisseur"
+    gargoyle <- S.printingOf s registry "Thraben Gargoyle"
+    let (tovolarId, connoisseurId, day) = transformedBoard tovolar wolf connoisseur gargoyle
+    Spec.assertEqWith s "the Connoisseur counts none" (S.powerToughnessOf connoisseurId day) (Just (0, 5))
+    Spec.assertEqWith s "it is day" (GameState.daytime day) (Just Daytime.Day)
+    Spec.assertEqWith s "and Tovolar shows his front face" (faceNameOf tovolarId day) (Just tovolarFront)
+  -- CR 701.27g's second sentence: "even if it had its back face up previously".
+  -- Tovolar goes day -> night -> day, so at the read he is front face up with
+  -- Object.turnedOverAt set twice over. The falsifier for an answer read off
+  -- that field instead of off Object.face, which would count him here.
+  --
+  -- The turnedOverAt assertion is the case's PRECONDITION and is read straight
+  -- off the object, so no change to the atom can move it -- without it this case
+  -- is the one above with extra steps.
+  Spec.it s "CR 701.27g not one even if it had its back face up previously" $ do
+    tovolar <- S.printingOf s registry "Tovolar, Dire Overlord"
+    wolf <- S.printingOf s registry "Russet Wolves"
+    connoisseur <- S.printingOf s registry "Mutagen Connoisseur"
+    gargoyle <- S.printingOf s registry "Thraben Gargoyle"
+    let (tovolarId, connoisseurId, day) = transformedBoard tovolar wolf connoisseur gargoyle
+        night = S.runPure S.identityAnswer (aliceUpkeep day) Engine.runStep
+        again = untapStepAfter 2 night
+    Spec.assertEqWith s "Tovolar has turned over before" (fmap (Maybe.isJust . Object.turnedOverAt) (Game.lookupObject tovolarId again)) (Just True)
+    Spec.assertEqWith s "yet the Connoisseur counts none" (S.powerToughnessOf connoisseurId again) (Just (0, 5))
+    Spec.assertEqWith s "it is day again" (GameState.daytime again) (Just Daytime.Day)
+    Spec.assertEqWith s "and Tovolar is back on his front face" (faceNameOf tovolarId again) (Just tovolarFront)

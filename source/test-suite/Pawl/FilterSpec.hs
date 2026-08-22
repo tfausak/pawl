@@ -58,6 +58,7 @@ blackCreature =
       Filter.canAttachToSubject = False,
       Filter.token = False,
       Filter.tapped = False,
+      Filter.transformed = False,
       Filter.counters = Map.empty,
       Filter.ringBearerFor = Nothing,
       Filter.designations = Set.empty,
@@ -98,6 +99,7 @@ devoidBigCreature =
       Filter.canAttachToSubject = False,
       Filter.token = False,
       Filter.tapped = False,
+      Filter.transformed = False,
       Filter.counters = Map.empty,
       Filter.ringBearerFor = Nothing,
       Filter.designations = Set.empty,
@@ -1037,6 +1039,23 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- is not one.
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.IsToken)) "player"
+
+  -- CR 701.27g. The atom itself is a bare field read; both of the rule's
+  -- exclusions live in the BUILDER that fills the field, so the gameplay-level
+  -- proof is Pawl.TransformSpec's TransformedPermanent group.
+  Spec.describe s "Transformed" $ do
+    Spec.it s "matches a view whose permanent has its back face up" $ do
+      Spec.assertBool s (Filter.matches self (blackCreature {Filter.transformed = True}) Filter.Type.Transformed) "transformed"
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.Transformed)) "front face up"
+
+    -- CR 712.8d/e: which face is up is what the characteristics are read OFF,
+    -- not one of them, so nothing on the characteristic axes implies it.
+    Spec.it s "is independent of every characteristic axis" $ do
+      Spec.assertBool s (not (Filter.matches self devoidBigCreature Filter.Type.Transformed)) "power does not imply transformed"
+
+    -- CR 701.27g asks about a PERMANENT, and CR 109.1 makes a player none.
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.Transformed)) "player"
 
   -- CR 701.54e's designation conjunct. Context-relative, so the same VIEW answers
   -- differently under `self` and `other`, which is the pair that pins "YOUR
