@@ -1096,10 +1096,12 @@ priorityWindowSpec s registry = Spec.describe s "CR 605.3a the priority window" 
 
   -- CR 118.3 reaches this window too: the options are gated by whether the
   -- ability's own activation cost can be paid (CR 602.2b), the same predicate
-  -- the payment window is gated by. Phyrexian Tower is the pool's one mana
-  -- ability whose cost can fail -- "{T}, Sacrifice a creature: Add {B}{B}"
-  -- beside an always-payable "{T}: Add {C}" -- so the permanent is on the menu
-  -- either way and what changes is what taking it can yield.
+  -- the payment window is gated by. Phyrexian Tower is the pool's one permanent
+  -- pairing a mana ability whose cost can fail -- "{T}, Sacrifice a creature:
+  -- Add {B}{B}" -- with an always-payable "{T}: Add {C}", so the permanent is on
+  -- the menu either way and what changes is what taking it can yield.
+  -- Transmogrant Altar's cost can fail too and has no such sibling, which is
+  -- why transmograntAltarSpec asserts the whole permanent off the menu.
   Spec.it s "CR 118.3 what the activation may yield is gated by its own cost" $ do
     tower <- S.printingOf s registry "Phyrexian Tower"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -2111,10 +2113,24 @@ transmograntAltarSpec s registry = Spec.describe s "Transmogrant Altar" $ do
     Spec.assertEqWith s "CR 601.2h and the same Birds is then what the sacrifice took" (S.creaturesInPlay S.alice after) 0
     Spec.assertEqWith s "leaving the Altar itself as the one tapped permanent she still controls" (S.tappedCount S.alice after) 1
 
-  -- CR 118.6 at the OFFER. Two boards differing in ONE thing -- the Swamp -- so
+  -- The window's own candidate list. CR 605.3a would offer every mana source;
+  -- this one offers the Birds alone, both guards at payManaExcept being what
+  -- takes the Altar itself off it (#2094). Recorded rather than inferred, since
+  -- the pool is the same whichever source the answerer would have declined.
+  Spec.it s "CR 605.3a the Altar's own window offers the Birds and not the Altar" $ do
+    altar <- S.printingOf s registry "Transmogrant Altar"
+    birds <- S.printingOf s registry "Birds of Paradise"
+    let (altarId, g1) = S.addCreature altar S.alice (Setup.emptyGame S.bothPlayers)
+        (birdsId, g2) = S.addCreature birds S.alice g1
+        board = g2 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
+        asked = State.execState (Engine.runGame (recordsSources altarId birdsId) board Engine.priorityLoop) []
+    Spec.assertEqWith s "one window, and the Birds is the only source its {B} may come from" asked [[birdsId]]
+
+  -- CR 118.3 at the OFFER. Two boards differing in ONE thing -- the Swamp -- so
   -- the refusal cannot be about the sacrifice, the tap or the sickness rules,
-  -- each of which is satisfied on both.
-  Spec.it s "CR 118.6 the activation is offered only where its own mana part is payable" $ do
+  -- each of which is satisfied on both. NOT CR 118.6, whose "unpayable cost" is
+  -- an object with no mana cost at all and whose activation is a legal action.
+  Spec.it s "CR 118.3 the activation is offered only where its own mana part is payable" $ do
     altar <- S.printingOf s registry "Transmogrant Altar"
     piker <- S.printingOf s registry "Goblin Piker"
     swamp <- S.printingOf s registry "Swamp"
@@ -2170,6 +2186,18 @@ takesAltar altarId birdsId p = case p of
   Prompt.ChooseManaSource _ _ candidates -> Just (if elem birdsId (NonEmpty.toList candidates) then birdsId else NonEmpty.head candidates)
   Prompt.ChooseExtraManaSource {} -> Nothing
   _ -> prefersColor Color.Black p
+
+-- takesAltar recording every in-payment source prompt, and taking the Altar only
+-- until one has been asked -- the once-guard takesAltarOnce spells with a count.
+recordsSources :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
+recordsSources altarId birdsId p = case p of
+  Prompt.ChooseAction {} -> do
+    seen <- State.get
+    pure (if null seen then takesAltar altarId birdsId p else Action.Type.Pass)
+  Prompt.ChooseManaSource _ _ candidates -> do
+    State.modify' (<> [NonEmpty.toList candidates])
+    pure (takesAltar altarId birdsId p)
+  _ -> pure (takesAltar altarId birdsId p)
 
 -- takesAltar allowed at ONE priority prompt. An activation that fails leaves the
 -- board exactly as it was, so a greedy answerer would be offered it again

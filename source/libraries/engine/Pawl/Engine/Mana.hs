@@ -111,6 +111,11 @@ type Capacity = Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Obje
 -- CONSUMES a demand -- Supply/Demand/serves and Hall's condition below would
 -- each need a mana axis (#2095).
 --
+-- Unproven at manaSuppliesGiven, and provable only by a permanent carrying BOTH
+-- a mana-free route and a mana-eating one: with only the latter the permanent is
+-- not in the source list at all, so the wrap there is never asked. No printing
+-- in `data/cards/` has both.
+--
 -- APPLIED BY THE WALK, not by its callers: manaSuppliesGiven wraps whatever
 -- capacity it is handed, and canPayCommitting and payableResolutions wrap theirs
 -- before building a source list, so every entry point is understating whoever

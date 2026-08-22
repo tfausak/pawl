@@ -324,8 +324,11 @@ selfReductions pid oid gs =
 -- CASTING a commander, and an activation is not a cast.
 --
 -- Not reached by a MANA ability's cost, which pays through manaActivations --
--- unobservably, every mana ability in `data/cards/` having an empty mana part
--- for a reduction to take from (#2093).
+-- unobservably for `data/cards/`, where every mana ability but Transmogrant
+-- Altar's has an empty mana part for a reduction to take from, and the Altar's
+-- own is one coloured {B} on an artifact: the three reducing printings narrow to
+-- a creature's abilities (Heartstone), a land's (Blossoming Tortoise) and
+-- cycling (Fluctuator), and each reduces GENERIC mana besides (#2093).
 --
 -- The KeywordFamily is the ability's PROVENANCE, threaded from the caller that
 -- has the ability in hand; see activationCostAdjustments for what it narrows.
@@ -1200,10 +1203,12 @@ canPay pid oid cost gs = case Cost.mana cost of
 -- whether its own {B} is payable by a walk that asks the same of the Altar --
 -- and the supply capacity answers 0 for exactly the routes that would ask again.
 --
--- CR 118.6 wants that read: an activation whose mana part nothing on the board
--- pays is not an offer, and offering it costs a player a priority action that
--- changes nothing. UNDERSTATING, since the walk under it refuses a mana-eating
--- route as supply, so the {B} of one Altar cannot be paid by another's yield.
+-- CR 118.3 wants that read, the same sentence Mana.manaSourcesGiven applies to a
+-- Phyrexian Tower with no creature to give: an activation whose mana part
+-- nothing on the board pays is not an offer, and offering it costs a player a
+-- priority action that changes nothing. UNDERSTATING, since the walk under it
+-- refuses a mana-eating route as supply, so the {B} of one Altar cannot be paid
+-- by another's yield.
 --
 -- The CLAIMS and the LIFE ride along with the count, which alone is a fact about
 -- this source in isolation: two sources whose costs both sacrifice a creature
@@ -1237,12 +1242,12 @@ manaActivations pcs pid oid cost restrictions gs =
         }
     else Activations.MkActivations {Activations.times = 0, Activations.claims = [], Activations.life = 0}
 
--- CR 118.3/118.6 asked of a mana ability's own MANA part, and the one read
--- manaActivations makes that could ask itself. Nothing means the cost is
--- unpayable outright (`canPay`'s own first arm); an EMPTY mana part is payable
--- with no walk at all, which is every mana ability in `data/cards/` but
--- Transmogrant Altar and is what keeps a whole-board walk off the tap-for-mana
--- path.
+-- CR 118.3 asked of a mana ability's own MANA part, and the one read
+-- manaActivations makes that could ask itself. Nothing is CR 118.6's unpayable
+-- cost -- an object with no mana cost -- and is `canPay`'s own first arm; an
+-- EMPTY mana part is payable with no walk at all, which is every mana ability in
+-- `data/cards/` but Transmogrant Altar and is what keeps a whole-board walk off
+-- the tap-for-mana path.
 --
 -- The life and the claims are the components', because CR 118.3's "fully"
 -- reaches across the two halves of one cost -- the same handoff `canPay` makes.
@@ -1788,12 +1793,12 @@ orderSensitive component = case component of
 -- pawl still chooses. Recomputed on EVERY pass, a tap being able to change
 -- it -- a Birds of Paradise tapped for blue takes the mana way to an unannounced
 -- {G/P} off the board, leaving CR 107.4f's 2 life.
-payMana :: Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
-payMana = payManaExcept Nothing
-
--- The same window opened by a MANA ability paying its own cost, which is the one
--- caller that has to bound the recursion CR 602.2b creates. `activating` is that
--- permanent.
+--
+-- The window in full, with the one narrowing a MANA ability's own payment takes.
+-- `activating` is the permanent whose mana ability is being paid for, and it is
+-- the one caller that has to bound the recursion CR 602.2b creates; `casting` is
+-- payMana's own first argument, the spell being cast. TWO Maybe ObjectIds side
+-- by side, and never both Just: an activation is not a cast.
 --
 -- Not implemented: CR 605.3a's window in full. Two narrowings apply while
 -- `activating` is Just -- the permanent itself is off the candidate list, and
@@ -1874,6 +1879,9 @@ payManaExcept activating casting spending pid cost = do
       Nothing -> gs
       Just sid -> gs {GameState.objects = Map.adjust (\o -> o {Object.manaSpent = spent}) sid (GameState.objects gs)}
 
+payMana :: Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
+payMana = payManaExcept Nothing
+
 -- Which source to tap next, or none. `covered` says whether the pool already
 -- pays the cost, which picks between CR 118.3c's question and CR 601.2g's.
 --
@@ -1925,8 +1933,9 @@ tapForMana = tapForManaVia manaActivations
 -- The same activation with the ROUTES narrowed, which is payManaExcept's second
 -- guard: inside a mana ability's own payment window `capacity` is
 -- Mana.supplyCapacity manaActivations, so only a route whose own cost holds no
--- mana may be taken and the recursion bottoms out one level down (#2094). CR
--- 605.3a's priority window narrows nothing and takes the plain capacity above.
+-- mana may be taken and the recursion bottoms out one level down; see #2094 for
+-- what that narrowing elides. CR 605.3a's priority window narrows nothing and
+-- takes the plain capacity above.
 tapForManaVia :: Mana.Capacity -> ObjectId -> Game Bool
 tapForManaVia capacity oid = do
   gs <- State.get
