@@ -151,6 +151,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.ArmDelayedTrigger {} -> Nothing
   Effect.AffectPlayers {} -> Nothing
   Effect.RequireBlock {} -> Nothing
+  Effect.CantBeRegenerated {} -> Nothing
   Effect.RequireAttack {} -> Nothing
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing

@@ -96,6 +96,7 @@ quiet gs =
     && null (GameState.playerEffects gs)
     && null (GameState.blockRequirements gs)
     && null (GameState.attackRequirements gs)
+    && null (GameState.unregeneratables gs)
     && null (GameState.ignoredAbilities gs)
     && Seq.null (GameState.delayedTriggers gs)
     && Seq.null (GameState.pendingPreventionRiders gs)

@@ -5,6 +5,7 @@ import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
+import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.Create as Create
@@ -783,6 +784,15 @@ data Effect card
     -- what it must block -- so this takes ObjectRefs rather than AffectPlayers'
     -- scope, one requirement instance per (blocker, attacker) pair.
     RequireBlock RequireBlock.RequireBlock
+  | -- | CR 701.19c / 611.1: install a stored REGENERATION PROHIBITION over the
+    -- permanents the ref names, for a duration. Hurr Jackal's is
+    -- `CantBeRegenerated UntilEndOfTurn (InSlot target)`.
+    --
+    -- RequireBlock's shape one axis narrower, and stored for the same reason: the
+    -- prohibition outlives the resolution that made it, where
+    -- Pawl.Types.Regenerability is a property of one destruction and is set by
+    -- the effect doing the destroying (Terror's "It can't be regenerated").
+    CantBeRegenerated CantBeRegenerated.CantBeRegenerated
   | -- | CR 508.1d / 613.11: install a stored ATTACKING REQUIREMENT for a
     -- duration. Alluring Siren's is `RequireAttack UntilEndOfTurn (InSlot
     -- target) (Relative You)`.

@@ -8,6 +8,7 @@ import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
+import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
@@ -316,6 +317,13 @@ data GameState = MkGameState
     -- phase. A permanent's printed attack requirements are NOT here --
     -- Pawl.Engine.AttackRequirement re-derives those live.
     attackRequirements :: [ActiveAttackRequirement.ActiveAttackRequirement],
+    -- | CR 701.19c / 611.1: stored REGENERATION PROHIBITIONS from resolutions
+    -- (Hurr Jackal), each with an expiry the Pawl.Engine.Expiry sweeps consult.
+    -- Read at Pawl.Engine.Event.resolveDestruction, which turns a standing row
+    -- into that event's Pawl.Types.Regenerability. Nothing printed lives here:
+    -- an effect that destroys and forbids regeneration in one breath (Terror)
+    -- carries the Regenerability on the destruction instead.
+    unregeneratables :: [ActiveUnregeneratable.ActiveUnregeneratable],
     -- | CR 116.2d: the ignores players have paid for, each with an expiry the
     -- Pawl.Engine.Expiry sweeps consult. Read by Pawl.Engine.PlayerEffect.applying,
     -- which drops an ignored permanent's abilities for the ignoring player alone

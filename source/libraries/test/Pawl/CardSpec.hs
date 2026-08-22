@@ -83,6 +83,7 @@ import qualified Pawl.Types.BlockCost as BlockCost
 import qualified Pawl.Types.BlockPermission as BlockPermission
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
+import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -850,6 +851,7 @@ effectCounts effect = case effect of
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ _) -> durationCounts duration
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration _ _) -> durationCounts duration
+  Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration _) -> durationCounts duration
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) -> durationCounts duration
   Effect.CreateEmblem card -> overFaces cardCounts card
   Effect.BecomeMonarch _ -> []
@@ -1110,6 +1112,7 @@ effectNestedEffects effect = case effect of
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers {} -> []
   Effect.RequireBlock {} -> []
+  Effect.CantBeRegenerated {} -> []
   Effect.RequireAttack {} -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
@@ -1537,6 +1540,7 @@ effectReplacements effect = case effect of
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers {} -> []
   Effect.RequireBlock {} -> []
+  Effect.CantBeRegenerated {} -> []
   Effect.RequireAttack {} -> []
   Effect.BecomeMonarch _ -> []
   Effect.Designate (Designate.MkDesignate _ _) -> []
@@ -2183,6 +2187,7 @@ effectMintedFaces effect = case effect of
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers {} -> []
   Effect.RequireBlock {} -> []
+  Effect.CantBeRegenerated {} -> []
   Effect.RequireAttack {} -> []
   Effect.BecomeMonarch _ -> []
   Effect.Designate (Designate.MkDesignate _ _) -> []
@@ -3592,6 +3597,8 @@ effectFilters effect = case effect of
   Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger _ _ mDuration) -> unframed (concatMap durationFilters (Maybe.maybeToList mDuration))
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ playerEffect) -> unframed (durationFilters duration <> playerEffectFilters playerEffect)
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration blocker attacker) -> unframed (durationFilters duration) <> sourceHosted (objectRefFilters blocker <> objectRefFilters attacker)
+  -- RequireBlock's arm one axis narrower.
+  Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration ref) -> unframed (durationFilters duration) <> sourceHosted (objectRefFilters ref)
   -- RequireBlock's arm one axis over. The PlayerRef carries no Filter.
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration attacker _) -> unframed (durationFilters duration) <> sourceHosted (objectRefFilters attacker)
   -- CR 114.2's emblem is a whole card too.
