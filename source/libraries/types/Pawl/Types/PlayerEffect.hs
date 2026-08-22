@@ -100,14 +100,18 @@ data PlayerEffect
     -- "activated abilities of creatures", Training Grounds "of creatures you
     -- control", Blossoming Tortoise "of lands you control" (HasCardType Creature
     -- or Land, with the possessive riding the carrier's PlayerScope as every
-    -- other arm's does).
+    -- other arm's does). The KIND of ability is a second criterion beside it --
+    -- Fluctuator's "cycling abilities you activate" -- and rides
+    -- ReduceActivationCost.grantedBy, which names a rule-702 family rather than a
+    -- Filter; see that type for why the two cannot be one field.
     --
-    -- Not expressible: a reducer that narrows by the KIND of ability rather than
-    -- by its source -- Fluctuator's "cycling abilities you activate", Helitrooper's
-    -- "equip abilities you activate that target this creature". This arm can only
-    -- state them as "the activated abilities of a permanent matching X", which is
-    -- WEAKER than each of them prints, so no such card belongs in the pool
-    -- (#1431).
+    -- Not expressible: a reducer that narrows by a kind rule 702 does not name.
+    -- Helitrooper's "equip abilities you activate that target this creature" is
+    -- the shape left out twice over -- pawl models equip as a printed activated
+    -- ability rather than a keyword, so no family designates it, and no criterion
+    -- can read an ability's TARGETS either. This arm can only state it as "the
+    -- activated abilities of a permanent matching X", which is WEAKER than the
+    -- card prints, so no such card belongs in the pool (#1431).
     --
     -- The FLOOR is carried rather than assumed, because it is card text (CR
     -- 101.1) and not a rule: both printings say "This effect can't reduce the

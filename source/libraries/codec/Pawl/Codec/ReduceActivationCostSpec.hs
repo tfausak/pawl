@@ -5,6 +5,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
@@ -20,9 +21,27 @@ spec s = Spec.describe s "Pawl.Codec.ReduceActivationCost" $ do
       ReduceActivationCost.codec
       ( ReduceActivationCost.MkReduceActivationCost
           { ReduceActivationCost.whichAbilities = Filter.HasCardType CardType.Creature,
+            ReduceActivationCost.grantedBy = Nothing,
             ReduceActivationCost.reduction = ManaCost.MkManaCost [ManaSymbol.Generic 1],
             ReduceActivationCost.floor = 1
           }
       )
       " {\"whichAbilities\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"reduction\":[{\"type\":\"Generic\",\"value\":1}],\"floor\":1} "
+  -- CR 702.29a: Fluctuator's "cycling abilities", the shape whose grantedBy is
+  -- written. Its own case rather than an edit to the one above, because
+  -- grantedBy is DEFAULTED -- a round trip whose value is Nothing encodes no key
+  -- at all and would stay green with the field dropped from the codec (#1715's
+  -- shape, arrived at through a default rather than an Arm.tagged wildcard).
+  Spec.it s "MkReduceActivationCost, narrowed to one keyword family" $
+    Common.assertCodec
+      s
+      ReduceActivationCost.codec
+      ( ReduceActivationCost.MkReduceActivationCost
+          { ReduceActivationCost.whichAbilities = Filter.And [],
+            ReduceActivationCost.grantedBy = Just KeywordFamily.Cycling,
+            ReduceActivationCost.reduction = ManaCost.MkManaCost [ManaSymbol.Generic 2],
+            ReduceActivationCost.floor = 0
+          }
+      )
+      " {\"whichAbilities\":{\"type\":\"And\",\"value\":[]},\"grantedBy\":{\"type\":\"Cycling\"},\"reduction\":[{\"type\":\"Generic\",\"value\":2}],\"floor\":0} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ReduceActivationCost.codec

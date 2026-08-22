@@ -1312,6 +1312,48 @@ mintedCombatRestrictionsFor keyword = case keyword of
 mintsCombatRestriction :: Keyword -> Bool
 mintsCombatRestriction = not . null . mintedCombatRestrictionsFor
 
+-- CR 702: WHICH RULE MINTED this activated ability of an object whose keywords
+-- are `counts`, as a family designator -- the classification
+-- Pawl.Types.ReduceActivationCost.grantedBy compares, so that Fluctuator's
+-- "cycling abilities you activate" reaches rule 702.29a's minted ability and
+-- nothing else (#1431). Nothing is "no keyword of this object minted it", which
+-- is every ability the card itself prints.
+--
+-- Answered by re-minting rather than by a provenance field on the ability:
+-- handAbilitiesOf and battlefieldAbilitiesOf both throw the keyword away, and an
+-- ActivatedAbility that carried its own origin would put an engine-only fact on
+-- the wire where a card could author a lie. Value equality is the idiom
+-- Pawl.Types.ActivatedAbility's header already fixes for this type -- "carries
+-- the value and validates by membership, never an index".
+--
+-- BOTH minters are asked, so that this is one question rather than one per zone:
+-- the caller supplies whichever keyword map its zone calls for, and the two are
+-- disjoint by construction -- no keyword has a non-empty arm in both
+-- handAbilitiesFor and battlefieldAbilitiesFor -- so asking both cannot answer
+-- twice for one keyword.
+--
+-- The five minting keywords -- cycling, reinforce, crew, level up, outlast -- all
+-- carry a payload, so familyOf answers Just for every one of them and its Nothing
+-- is unreachable from here. Its Nothing is still let through rather than made an
+-- error: a nullary keyword that minted an activated ability would have no family
+-- to name, and CR 702 would have to grow one first.
+--
+-- Not implemented: telling a keyword-minted ability from a PRINTED ability that
+-- happens to be byte-identical to one -- a card printing "{2}, Discard this card:
+-- Draw a card" functioning from a hand would be read as cycling here. No printing
+-- in data/cards/ is such a twin (gap #2072).
+familyGranting :: Map Keyword Natural -> ActivatedAbility Card -> Maybe KeywordFamily.KeywordFamily
+familyGranting counts ability =
+  Maybe.listToMaybe
+    ( Maybe.mapMaybe
+        ( \(keyword, count) ->
+            if elem ability (handAbilitiesFor keyword <> battlefieldAbilitiesFor keyword count)
+              then familyOf keyword
+              else Nothing
+        )
+        (Map.toAscList counts)
+    )
+
 -- CR 702: WHICH KEYWORD this is, with its payload dropped -- the classification
 -- Filter.HasKeywordFamily matches on, so that Flensing Raptor's "creature you
 -- control with toxic" reaches toxic 1 and toxic 3 alike (CR 702.164a).
