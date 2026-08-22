@@ -3,6 +3,7 @@ module Pawl.Types.MoveToZone where
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Zone as Zone
 
@@ -32,7 +33,7 @@ import qualified Pawl.Types.Zone as Zone
 data MoveToZone = MkMoveToZone
   { ref :: ObjectRef.ObjectRef,
     zone :: Zone.Zone,
-    riders :: EntryRiders.EntryRiders,
+    riders :: EntryRiders.EntryRiders Quantity.Quantity,
     slot :: Maybe SlotName.SlotName,
     origin :: Maybe Zone.Zone,
     placement :: LibraryPlacement.LibraryPlacement

@@ -2379,7 +2379,7 @@ changeZone oid requestedDest = Monad.void (changeZoneReturning oid requestedDest
 -- 712.14b is not a replacement effect -- there is no event for CR 616.1 to
 -- choose among, and running the entry loop first would fire CR 614.1c's
 -- as-enters abilities for a card that never enters.
-changeZoneEntering :: ObjectId -> Zone -> LibraryPosition.LibraryPosition -> EntryRiders.EntryRiders -> Maybe PlayerId -> Game (Maybe ObjectId)
+changeZoneEntering :: ObjectId -> Zone -> LibraryPosition.LibraryPosition -> EntryRiders.EntryRiders Natural -> Maybe PlayerId -> Game (Maybe ObjectId)
 changeZoneEntering = changeZoneEnteringIn Nothing Set.empty
 
 -- changeZoneEntering for ONE MEMBER of a CR 608.2f batch: `asOf` and `batch` are
@@ -2387,7 +2387,7 @@ changeZoneEntering = changeZoneEnteringIn Nothing Set.empty
 -- only caller that supplies either. A separate door rather than two more
 -- parameters on changeZoneEntering, changeZoneInBatch's shape one door over: the
 -- lone moves have no batch to name.
-changeZoneEnteringIn :: Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> EntryRiders.EntryRiders -> Maybe PlayerId -> Game (Maybe ObjectId)
+changeZoneEnteringIn :: Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> EntryRiders.EntryRiders Natural -> Maybe PlayerId -> Game (Maybe ObjectId)
 changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
   gs <- State.get
   let mCard = Game.cardOf oid gs

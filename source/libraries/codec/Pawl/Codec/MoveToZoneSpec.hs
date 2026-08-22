@@ -10,6 +10,7 @@ import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
@@ -30,7 +31,7 @@ bare =
       MoveToZone.placement = LibraryPlacement.defaultValue
     }
 
-tapped :: EntryRiders.EntryRiders
+tapped :: EntryRiders.EntryRiders Quantity.Quantity
 tapped = EntryRiders.defaultValue {EntryRiders.tapped = TapState.Tapped}
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()

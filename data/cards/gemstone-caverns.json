@@ -139,8 +139,14 @@
                 "riders": {
                   "counters": [
                     {
-                      "type": "Named",
-                      "value": "luck"
+                      "count": {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "kind": {
+                        "type": "Named",
+                        "value": "luck"
+                      }
                     }
                   ]
                 },

@@ -112,13 +112,13 @@
                       "riders": {
                         "counters": [
                           {
-                            "type": "PlusOnePlusOne"
-                          },
-                          {
-                            "type": "PlusOnePlusOne"
-                          },
-                          {
-                            "type": "PlusOnePlusOne"
+                            "count": {
+                              "type": "Literal",
+                              "value": 3
+                            },
+                            "kind": {
+                              "type": "PlusOnePlusOne"
+                            }
                           }
                         ]
                       }

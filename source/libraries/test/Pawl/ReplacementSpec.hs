@@ -3601,6 +3601,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   vorinclexSpec s registry
   damageCountersSpec s registry
   entryCountersSpec s registry
+  printlifterSpec s registry
   shieldCounterSpec s registry
   warLeechSpec s registry
   dragonstormGlobeSpec s registry
@@ -5978,11 +5979,12 @@ damageCountersSpec s registry = Spec.describe s "Counters damage causes (CR 120.
         Spec.assertEqWith s "the same two the bare board shows" (shrunk bare once) 2
       _ -> Spec.assertFailure s "fixture did not build both boards"
 
--- CR 122.6a with CR 701.53a: the counters an EFFECT says a token enters the
+-- CR 122.6 with CR 701.53a: the counters an EFFECT says a token enters the
 -- battlefield with. "To incubate N, create an Incubator token that enters the
--- battlefield with N +1/+1 counters on it" (CR 701.53a) is the pool's only
--- wording that writes Pawl.Types.EntryRiders' `counters` onto an Effect.Create --
--- undying and persist write it onto a MoveToZone -- and Eyes of Gitaxias
+-- battlefield with N +1/+1 counters on it" (CR 701.53a) is one of the two
+-- wordings in data/cards that write Pawl.Types.EntryRiders' `counters` onto an
+-- Effect.Create -- Printlifter Ooze's is the other, in printlifterSpec below, and
+-- undying and persist write the rider onto a MoveToZone -- and Eyes of Gitaxias
 -- ({2}{U} Sorcery, "Incubate 3. Draw a card.") is the producer picked for it: its
 -- other sentence asks for no choice, and its THREE is the count that tells the
 -- readings apart.
@@ -5999,7 +6001,7 @@ damageCountersSpec s registry = Spec.describe s "Counters damage causes (CR 120.
 -- Every assertion reads a permanent on the BATTLEFIELD: a token that left it
 -- would cease to exist (CR 111.7) and take the assertion with it.
 entryCountersSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-entryCountersSpec s registry = Spec.describe s "The counters a Create says its token enters with (CR 122.6a)" $ do
+entryCountersSpec s registry = Spec.describe s "The counters a Create says its token enters with (CR 122.6)" $ do
   let incubatorName = CardName.MkCardName (Text.pack "Incubator Token")
       phyrexianName = CardName.MkCardName (Text.pack "Phyrexian Token")
       -- BOTH seats hold five untapped Islands, so `caster` moves who is paying and
@@ -6064,6 +6066,79 @@ entryCountersSpec s registry = Spec.describe s "The counters a Create says its t
         Spec.assertEqWith s "0/0 plus six counters" (S.powerToughnessOf twice flipped) (Just (6, 6))
         Spec.assertEqWith s "and 0/0 plus three without the praetor" (S.powerToughnessOf once bare) (Just (3, 3))
       _ -> Spec.assertFailure s "the token did not reach the battlefield"
+
+-- CR 122.6 with CR 107.3c: an entry rider whose COUNT is not a number. Printlifter
+-- Ooze -- {1}{G} 2/2 Creature -- Ooze with deathtouch and disguise {3}{G} --
+-- prints "whenever this creature or another creature you control is turned face
+-- up, create a 0/0 green Ooze creature token with trample. The token enters with
+-- X +1/+1 counters on it, where X is the number of other creatures you control",
+-- and is the printing that puts the count INSIDE the rider: Scryfall
+-- `o:/token enters with/ -is:digital`, 2026-08-22, answers this card and Ochre
+-- Jelly, whose split token is an Effect.CreateCopy, which carries no riders at
+-- all (gap #1255). The other "X +1/+1 counters on it, where X" printings say it
+-- in a SECOND SENTENCE, which is an Effect.PutCounters after the Create and
+-- needs no rider at all -- CR 704.3 is why the 0/0 survives in between.
+--
+-- X is defined by the ability's own text (CR 107.3c) and answered once, when the
+-- effect is applied (CR 608.2h) -- Pawl.Engine.Resolve.freezeRiders, against the
+-- resolution's own context, which is what makes Filter.IsSource and CR 109.5's
+-- "you" live on this path.
+--
+-- THE BOARD SEPARATES FIVE READINGS. alice controls Printlifter Ooze, an Ainok
+-- Tracker cast face down for CR 702.37a's {3}, and two Goblin Pikers; bob
+-- controls two Goblin Pikers of his own. Turning the Ainok face up (CR 702.37e,
+-- paying {4}{R} out of the eight Mountains) fires the trigger, and X is THREE --
+-- the other three creatures alice controls. A reading that counts the source too
+-- says four, as does one that counts after the token arrived; one that drops CR
+-- 109.5's "you" says five; one that reads only the permanent that turned over
+-- says one; and a rider dropped entirely says zero, which CR 704.5f then puts in
+-- the graveyard before anything can read it.
+--
+-- Two rather than one Goblin Piker per seat so that those five are five different
+-- numbers, and a face-down permanent is CR 708.2a's 2/2, so three is not a
+-- toughness on the board either.
+printlifterSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+printlifterSpec s registry = Spec.describe s "The counters a Create says its token enters with (CR 122.6)" $ do
+  let oozeTokenName = CardName.MkCardName (Text.pack "Ooze Token")
+      -- The permanent a move added to the battlefield, or Nothing when it added
+      -- none or several. Identifies the new incarnation without asking what card
+      -- is under it, which is the whole point of a face-down one.
+      enteredOne gs after = case Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield gs)) of
+        [oid] -> Just oid
+        _ -> Nothing
+      -- Eight Mountains: three for CR 702.37a's morph cast and five for CR
+      -- 702.37e's {4}{R} turn-up cost. Answers the settled board and the
+      -- face-down permanent, or Nothing if the morph cast did not land.
+      board = do
+        mountain <- S.printingOf s registry "Mountain"
+        ooze <- S.printingOf s registry "Printlifter Ooze"
+        ainok <- S.printingOf s registry "Ainok Tracker"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (handed, morphCard) = S.handOne ainok (S.landsInPlay mountain 8)
+            seat pid gs = snd (S.addCreature piker pid gs)
+            seated = seat S.bob (seat S.bob (seat S.alice (seat S.alice (snd (S.addCreature ooze S.alice handed)))))
+            after = S.runPure S.identityAnswer seated (Cast.castSpell S.alice morphCard (S.printingName ainok) (Facing.faceDown FaceDownReason.Morphed) >> Stack.resolveTop)
+        pure (fmap (\permanent -> (after, permanent)) (enteredOne seated after))
+  Spec.it s "CR 122.6 the token enters with one +1/+1 counter per OTHER creature alice controls" $ do
+    made <- board
+    case made of
+      Nothing -> Spec.assertFailure s "the morph cast did not reach the battlefield"
+      Just (settled, morphling) -> do
+        -- The controls: the action really is on offer beforehand, so a board with
+        -- no token below is the rider and not a permanent that never turned over.
+        Spec.assertEqWith s "CR 702.37e the action is available" (FaceDown.turnableFaceUp S.alice settled) [(morphling, TurnUpProcedure.Morph)]
+        let after = S.runPure S.identityAnswer settled (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph morphling >> Engine.priorityLoop)
+        Spec.assertEqWith s "CR 110.5 it turned face up" (fmap Object.facing (Game.lookupObject morphling after)) (Just Facing.FaceUp)
+        case newestNamed oozeTokenName after of
+          Nothing -> Spec.assertFailure s "CR 111.1 the Ooze token did not reach the battlefield"
+          Just token -> do
+            -- THE DISCRIMINATING ASSERTION. Three: the Ainok, and alice's two
+            -- Goblin Pikers. Not the Ooze itself (CR 122.6 through the ability's
+            -- own Filter.IsSource), not bob's two, and not the token.
+            Spec.assertEqWith s "CR 122.6 three +1/+1 counters, one per other creature alice controls" (countersOn CounterKind.PlusOnePlusOne token after) 3
+            -- What the count is FOR: the token is printed 0/0, so CR 613.4c's
+            -- layer 7c leaves a 3/3 rather than something CR 704.5f removes.
+            Spec.assertEqWith s "CR 613.4c so the 0/0 token is a 3/3" (S.powerToughnessOf token after) (Just (3, 3))
 
 -- CR 122.1c: the replacement and the prevention effect one or more shield counters
 -- create. Gameplay-level throughout: Swooping Protector is cast and enters with its

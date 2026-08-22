@@ -251,6 +251,13 @@ insertOne slot = joinTwo (oneSlot slot)
 quantitySlots :: Quantity.Type.Quantity -> Map.Map SlotName SlotArity
 quantitySlots = Map.fromSet (const SlotArity.One) . Quantity.slots
 
+-- The Quantities an entry rider carries: CR 122.6's count per counter kind, which
+-- a card may write as anything a Quantity spells. A position the three walkers
+-- below would otherwise pass over -- every arm that reads a rider matches it as
+-- `_` -- so the reads are spelled out here and each walker goes through this.
+riderQuantities :: EntryRiders.EntryRiders Quantity.Type.Quantity -> [Quantity.Type.Quantity]
+riderQuantities = Map.elems . EntryRiders.counters
+
 -- The slots a PlayerRef reads. Only InSlot names one.
 playerRefSlots :: PlayerRef -> Map.Map SlotName SlotArity
 playerRefSlots ref = case ref of
@@ -427,7 +434,7 @@ slotsOf effect = case effect of
   Effect.TurnFaceUp slot -> oneSlot slot
   Effect.RemoveFromCombat slot -> oneSlot slot
   Effect.BecomesBlocked slot -> oneSlot slot
-  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> objectRefSlots ref
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _) -> joinTwo (objectRefSlots ref) (joinSlots (fmap quantitySlots (riderQuantities riders)))
   Effect.Draw (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   -- The tally's slot and CR 701.17c's are DEFINITIONS, not reads: see boundSlots
   -- below.
@@ -456,7 +463,7 @@ slotsOf effect = case effect of
   -- Create's slot is a DEFINITION, not a read, so the lint must not see it here.
   -- CR 111.2's creator is a READ: Rampage of the Clans names the controller of
   -- the permanent the loop around it bound.
-  Effect.Create (Create.MkCreate quantity _ _ _ creator) -> joinTwo (quantitySlots quantity) (playerRefSlots creator)
+  Effect.Create (Create.MkCreate quantity _ riders _ creator) -> joinSlots [quantitySlots quantity, playerRefSlots creator, joinSlots (fmap quantitySlots (riderQuantities riders))]
   -- A READ, unlike Create's slot: the ref names the permanent being copied.
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> joinTwo (quantitySlots quantity) (objectRefSlots ref)
   -- Both refs: either may name a slot.
@@ -679,8 +686,9 @@ slotsAreExhaustive effect = case effect of
   Effect.TurnFaceUp _ -> True
   Effect.RemoveFromCombat _ -> True
   Effect.BecomesBlocked _ -> True
-  -- Three of the four whose ref may nest a Quantity; ForEach is the fourth.
-  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> all Quantity.slotsAreExhaustive (objectRefQuantities ref)
+  -- Three of the four whose ref may nest a Quantity; ForEach is the fourth. The
+  -- entry rider nests one too, CR 122.6's count per kind.
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _) -> all Quantity.slotsAreExhaustive (objectRefQuantities ref <> riderQuantities riders)
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Mill (Mill.MkMill _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.Reveal (Reveal.MkReveal ref _) -> all Quantity.slotsAreExhaustive (objectRefQuantities ref)
@@ -700,7 +708,9 @@ slotsAreExhaustive effect = case effect of
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.DecreaseSpeed d -> Quantity.slotsAreExhaustive (SpeedDecrease.quantity d)
   -- CR 111.1's token is minted with empty bindings, so its card is literal text.
-  Effect.Create (Create.MkCreate quantity _ _ _ _) -> Quantity.slotsAreExhaustive quantity
+  -- Its entry riders are not: CR 122.6's count per kind is the effect speaking,
+  -- read in the resolution's own slots.
+  Effect.Create (Create.MkCreate quantity _ riders _ _) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.BecomeCopy {} -> True
   -- The ReplacementEffect holds no Quantity, and the one reference it can hold --
@@ -835,8 +845,9 @@ readsX = any effectReadsX
       Effect.RemoveFromCombat _ -> False
       Effect.BecomesBlocked _ -> False
       -- Commune with Lava's X sits inside the ObjectRef rather than beside it, so
-      -- these three -- and ForEach below -- go through objectRefQuantities.
-      Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> any Quantity.readsX (objectRefQuantities ref)
+      -- these three -- and ForEach below -- go through objectRefQuantities. The
+      -- entry rider is the other nested position, CR 122.6's count per kind.
+      Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _) -> any Quantity.readsX (objectRefQuantities ref <> riderQuantities riders)
       Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Mill (Mill.MkMill _ quantity _ _) -> Quantity.readsX quantity
       Effect.Reveal (Reveal.MkReveal ref _) -> any Quantity.readsX (objectRefQuantities ref)
@@ -855,7 +866,7 @@ readsX = any effectReadsX
       Effect.RedistributeLifeTotals -> False
       Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.DecreaseSpeed d -> Quantity.readsX (SpeedDecrease.quantity d)
-      Effect.Create (Create.MkCreate quantity _ _ _ _) -> Quantity.readsX quantity
+      Effect.Create (Create.MkCreate quantity _ riders _ _) -> any Quantity.readsX (quantity : riderQuantities riders)
       Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> Quantity.readsX quantity
       Effect.BecomeCopy {} -> False
       Effect.Replace {} -> False
@@ -2599,6 +2610,39 @@ effectContext :: PlayerId -> ObjectId -> Map.Map SlotName (Set Recipient) -> Map
 effectContext controller source legal groups =
   Filter.contextWithSlots (Just controller) (Just source) (Binding.withGroups (effectSlotObjects legal) groups)
 
+-- CR 608.2h for an entry rider's counts: the card writes a Quantity per counter
+-- kind (CR 122.6, CR 107.3c -- Printlifter Ooze's "X +1/+1 counters on it, where
+-- X is the number of other creatures you control"), and the funnel takes settled
+-- numbers. This is the ONE bridge between the two, so the answer is determined
+-- once, when the effect is applied, and nothing downstream can re-read the board.
+--
+-- Against the CALLER'S OWN context, which is the resolution's. Evaluating here
+-- rather than at the funnel is what keeps that available: Event.createTokens and
+-- Event.changeZoneEntering have no context and no view to hand, so one built
+-- there would be a Filter.contextFor with an empty slot map and no source --
+-- Filter.IsBound false, Filter.IsSource false and a Quantity.AgainstSlot
+-- unanswered, none of which raises anything.
+--
+-- CR 107.2 for an unevaluable count and CR 107.1b for a negative one, both zero;
+-- a zero-count kind is DROPPED rather than passed on, so CR 614.16's replacements
+-- are never offered an event that places no counter.
+freezeRiders ::
+  (ObjectId -> Maybe Filter.View) ->
+  Filter.Context ->
+  GameState ->
+  ObjectId ->
+  ObjectId ->
+  EntryRiders.EntryRiders Quantity.Type.Quantity ->
+  EntryRiders.EntryRiders Natural
+freezeRiders viewOf context gs resolving source riders =
+  riders
+    { EntryRiders.counters = Map.mapMaybe frozen (EntryRiders.counters riders)
+    }
+  where
+    frozen quantity = case Quantity.evaluateFor viewOf context gs resolving source quantity of
+      Just n | n > 0 -> Just (Integer.toNaturalSaturating n)
+      _ -> Nothing
+
 -- The ONE object each of a resolution's TARGET slots names, shared by
 -- effectContext above and effectViewOf below so the two cannot disagree about
 -- which object a slot is.
@@ -3447,8 +3491,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- a split card's instant and sorcery halves), and no such spell is a
         -- member of a batch entering the battlefield. A card whose ZoneChangeR
         -- named the battlefield would separate them.
-        moveOne before (sofar, acc) (target, position) = do
-          mNew <- Event.changeZoneEnteringIn (Just before) sofar target zone position entry (Just controller)
+        moveOne frozen before (sofar, acc) (target, position) = do
+          mNew <- Event.changeZoneEnteringIn (Just before) sofar target zone position frozen (Just controller)
           -- CR 614.6: the move was cancelled, or the id was already gone (CR
           -- 603.7c). Nothing entered, so there is nothing to bind.
           Monad.forM_ mNew $ \newId ->
@@ -3634,7 +3678,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- The batch's own board, read after CR 401.4's arrangement asks (which
           -- move nothing) and before any member does.
           before <- State.get
-          arrived <- fmap (reverse . snd) (Monad.foldM (moveOne before) (Set.empty, []) arrivals)
+          -- CR 608.2h: the counts the riders carry, settled ONCE off that same
+          -- board and before the fold, so no member of the batch can see how many
+          -- counters an earlier member arrived with (CR 608.2f).
+          let frozen = freezeRiders (effectViewOf source legal before) (chooseContext before) before resolving source entry
+          arrived <- fmap (reverse . snd) (Monad.foldM (moveOne frozen before) (Set.empty, []) arrivals)
           Monad.mapM_ (\slot -> bindArrivals slot (Maybe.catMaybes arrived)) mSlot
   -- CR 701.24: shuffle the objects the ref names into their OWNERS' libraries. Two
   -- steps: CR 400.7's move through the same changeZone funnel every destination
@@ -4195,6 +4243,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal (slotGroups resolving gs)
+        -- CR 608.2h: the counts the tokens enter with, settled ONCE off the
+        -- pre-effect board and outside the per-creator loop below, so every seat's
+        -- tokens carry the same answer (CR 608.2f).
+        frozen = freezeRiders viewOf context gs resolving source entry
         -- CR 111.2: WHOSE tokens. CR 109.5's "you" is the default reference, and
         -- every other one is somebody the sentence identified -- Rampage of the
         -- Clans' "its controller", read off the loop's member through CR 608.2h.
@@ -4210,9 +4262,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- CR 111: create n tokens under that player's control (CR 111.2)
               -- through the single funnel, so CR 614's token replacements get their
               -- opportunity. CR 110.5b: the funnel is handed the entry's tap state.
-              -- CR 122.6a's counters ride along through CR 122.6's own door, so a
-              -- counter replacement reaches them.
-              made <- Event.createTokens creating (bakeTokenCharacteristics (Quantity.evaluateFor viewOf context gs resolving source) card) Nothing (Integer.toNaturalSaturating n) (EntryRiders.tapped entry) (EntryRiders.counters entry)
+              -- CR 122.6's counters ride along through that rule's own door, so a
+              -- counter replacement reaches them, in the counts freezeRiders
+              -- settled above.
+              made <- Event.createTokens creating (bakeTokenCharacteristics (Quantity.evaluateFor viewOf context gs resolving source) card) Nothing (Integer.toNaturalSaturating n) (EntryRiders.tapped entry) (EntryRiders.counters frozen)
               -- CR 508.4: a creature put onto the battlefield attacking has its
               -- defending player chosen in Pawl.Engine.Combat, and CR 508.3a's
               -- attack triggers see nothing. After the entry loops rather than
