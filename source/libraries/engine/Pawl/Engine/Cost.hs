@@ -1244,7 +1244,7 @@ manaActivationsGiven effects pcs pid oid printedCost restrictions gs =
       -- whether SOME total is payable, `totalManas`' shape and
       -- canPaySomeCompletionGiven's posture.
       cost = plusComponents adjustments printedCost
-   in if manaPartPayable adjustments pid oid cost gs
+   in if manaPartPayable effects adjustments pid oid cost gs
         && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
         && jointlyPayable pid oid (Cost.components cost) gs
         && sicknessOkGiven pcs pid oid cost gs
@@ -1305,8 +1305,8 @@ manaActivationAdjustmentsGiven effects = PlayerEffect.activationCostAdjustmentsG
 -- reduction's hybrid halves (CR 118.7e) and the order of several reductions are
 -- the payer's, unmade at this moment, so a cost this refuses has to be one NO
 -- resolution could have paid.
-manaPartPayable :: CostAdjustments.CostAdjustments -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
-manaPartPayable adjustments pid oid cost gs = case Cost.mana cost of
+manaPartPayable :: [PlayerEffect.Type.PlayerEffect] -> CostAdjustments.CostAdjustments -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
+manaPartPayable effects adjustments pid oid cost gs = case Cost.mana cost of
   Nothing -> False
   Just (ManaCost.MkManaCost []) -> True
   Just manaCost ->
@@ -1314,7 +1314,7 @@ manaPartPayable adjustments pid oid cost gs = case Cost.mana cost of
       ( \totalled ->
           Mana.canPayCommitting
             Nothing
-            (manaActivationsGiven (PlayerEffect.applyingTo pid gs))
+            (manaActivationsGiven effects)
             ManaSpending.AsProduced
             pid
             (lifeOwedBy (Cost.components cost))
@@ -1872,9 +1872,15 @@ payManaExcept activating casting spending pid cost = do
   Monad.unless paid (State.put before)
   pure paid
   where
-    windowCapacity = case activating of
-      Nothing -> manaActivations
-      Just _ -> Mana.supplyCapacity manaActivations
+    -- Taken on the board of the PASS rather than once for the payment: a tap
+    -- changes the board, and Pawl.Engine.PlayerEffect.applyingTo is a function
+    -- of it. `pid` is the payer, and manaSourcesGiven below offers only what
+    -- that player controls, so the capacity's own `pid` is this one.
+    windowCapacityOn gs = case activating of
+      Nothing -> hoisted
+      Just _ -> Mana.supplyCapacity hoisted
+      where
+        hoisted = manaActivationsGiven (PlayerEffect.applyingTo pid gs)
     -- What the pool would leave if the cost were paid out of it right now.
     --
     -- CR 609.4b's clauses are resolved from the board on EVERY pass rather than
@@ -1893,6 +1899,7 @@ payManaExcept activating casting spending pid cost = do
           -- CR 605.3a offers every source; `activating` takes the permanent
           -- paying this cost off its own window, and windowCapacity takes every
           -- mana-eating route off it besides (#2094).
+          windowCapacity = windowCapacityOn gs
           offered = filter (\oid -> Just oid /= activating) (Mana.manaSourcesGiven windowCapacity (Projection.controlGrants gs) pcs pid gs)
       case filter (`Set.notMember` refused) offered of
         [] -> settle

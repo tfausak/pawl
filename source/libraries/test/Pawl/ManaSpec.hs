@@ -2287,6 +2287,22 @@ activationAdjustmentSpec s registry = Spec.describe s "CR 601.2f a mana ability'
     Spec.assertEqWith s "without the Drought the same Swamp survives" (swampsLeft control) 1
     Spec.assertEqWith s "having paid the same {B} for the same three colorless" (poolTypes S.alice control) [ManaType.Colorless, ManaType.Colorless, ManaType.Colorless]
 
+  -- The GATE's half of the same addition, which the case above cannot separate:
+  -- there a Swamp was on the board either way. Here the {B} comes off a Birds of
+  -- Paradise and alice controls NO Swamp, so the added component is one CR 118.3
+  -- leaves her unable to pay -- and the Drought is again the only difference
+  -- between the two boards.
+  Spec.it s "CR 118.3 an added component the board cannot pay takes the offer away" $ do
+    altar <- S.printingOf s registry "Transmogrant Altar"
+    piker <- S.printingOf s registry "Goblin Piker"
+    birds <- S.printingOf s registry "Birds of Paradise"
+    drought <- S.printingOf s registry "Drought"
+    let (altarId, taxed) = altarDroughtBoard altar piker birds (Just drought)
+        (_, untaxed) = altarDroughtBoard altar piker birds Nothing
+        offers gs = length (filter (== Action.Type.ActivateManaAbility altarId) (Action.legalActions S.alice gs))
+    Spec.assertEqWith s "with the Drought and no Swamp to give, the Altar is off the menu" (offers taxed) 0
+    Spec.assertEqWith s "without it the same board offers the same activation" (offers untaxed) 1
+
 -- alice, active, in her precombat main phase: one Coal Golem, two Mountains, and
 -- the Heartstone or not. Returns the Golem.
 golemBoard :: Printing.Printing -> Printing.Printing -> Maybe Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
@@ -2299,13 +2315,14 @@ golemBoard golem mountain heartstone =
    in (golemId, g3 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
 
 -- alice, active, in her precombat main phase: one Transmogrant Altar, one Goblin
--- Piker for the printed sacrifice, one Swamp for the {B}, and the Drought or
--- not. Returns the Altar.
+-- Piker for the printed sacrifice, one `blackSource` for the {B} -- a Swamp
+-- where the Drought's added cost is to be payable and a Birds of Paradise where
+-- it is not -- and the Drought or not. Returns the Altar.
 altarDroughtBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Maybe Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
-altarDroughtBoard altar piker swamp drought =
+altarDroughtBoard altar piker blackSource drought =
   let (altarId, g1) = S.addCreature altar S.alice (Setup.emptyGame S.bothPlayers)
       (_, g2) = S.addCreature piker S.alice g1
-      (_, g3) = S.addCreature swamp S.alice g2
+      (_, g3) = S.addCreature blackSource S.alice g2
       g4 = case drought of
         Nothing -> g3
         Just printing -> snd (S.addCreature printing S.alice g3)
