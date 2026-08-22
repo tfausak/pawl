@@ -458,10 +458,11 @@ plotting s registry = Spec.describe s "CR 116.2k Djinn of Fool's Fall" $ do
 -- GameEvent.Plotted would be indistinguishable from one that did. 2/1 to 5/3 is
 -- a value nothing else on this board produces.
 --
--- The DJINN OF FOOL'S FALL ({3}{U}, mana value 4) is the filter's negative
+-- The DJINN OF FOOL'S FALL ({4}{U}, mana value 5) is the filter's negative
 -- control. It is the only other card in the hand, so "mana value 3 or less"
 -- leaves exactly one candidate and CR 608.2d's prompt is elided -- which the
--- prompt log below asserts, since a widened filter would raise it.
+-- prompt log below asserts, since a widened filter raises it and the default
+-- answerer then takes the Djinn.
 kellanBoard ::
   Printing.Printing ->
   Printing.Printing ->
