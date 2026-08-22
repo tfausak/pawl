@@ -1845,7 +1845,11 @@ activatedAbilityOffends ability =
         if sacrificesAsCost (ActivatedAbility.cost ability)
           then Set.singleton Binding.sacrificedPermanent
           else Set.empty
-   in modalSlotsOffend (Set.unions [Set.fromList [Binding.triggerSource, Binding.you], announcedX, sacrificed]) (ActivatedAbility.modal ability)
+      tapped =
+        if tapsAsCost (ActivatedAbility.cost ability)
+          then Set.singleton Binding.tappedPermanent
+          else Set.empty
+   in modalSlotsOffend (Set.unions [Set.fromList [Binding.triggerSource, Binding.you], announcedX, sacrificed, tapped]) (ActivatedAbility.modal ability)
 
 -- Does this cost sacrifice a permanent the payer CHOOSES? Binding.variableX's
 -- shape exactly: CR 601.2h's payment binds the slot (Cost.payComponent's
@@ -1860,6 +1864,26 @@ sacrificesAsCost = any isSacrifice . Cost.Type.components
   where
     isSacrifice component = case component of
       CostComponent.Sacrifice {} -> True
+      _ -> False
+
+-- Does this cost tap permanents the payer CHOOSES? sacrificesAsCost's shape, and
+-- the same reason: CR 601.2h's payment binds Binding.tappedPermanent
+-- (Cost.payComponent's TapPermanents arm, folded on by Activate), so Unerring
+-- Sling's "the tapped creature's power" is an ordinary slot read.
+--
+-- CostComponent.TapThis is deliberately not counted: CR 107.5 taps the SOURCE,
+-- which CR 113.7's `triggerSource` already names.
+--
+-- CostComponent.TapForTotalPower is not counted either, and that is not an
+-- oversight: its arm binds nothing (#915).
+--
+-- Not offered on the CAST side (cardOffends below): Cast.castSpell discards the
+-- payment map, so a spell reading the slot would silently no-op.
+tapsAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
+tapsAsCost = any isTap . Cost.Type.components
+  where
+    isTap component = case component of
+      CostComponent.TapPermanents {} -> True
       _ -> False
 
 -- CR 603.7 / 109.5: does this card arm a delayed ability "on your next turn"
@@ -2005,6 +2029,7 @@ reservedSlots =
       Binding.eventAmount,
       Binding.sacrificedCount,
       Binding.sacrificedPermanent,
+      Binding.tappedPermanent,
       Binding.castSpell,
       Binding.targetingObject,
       Binding.blockingCreature,

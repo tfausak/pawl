@@ -1568,10 +1568,10 @@ pay casting spending pid oid cost = do
 -- having nothing of its own to rewind.
 --
 -- The bound slots ride out unread. A component of a combat toll binds what
--- payComponent binds it (Sacrifice reserves a name), and there is no resolving
--- ability holding a binding environment to write them into -- CR 508.1j and CR
--- 509.1f name a payment and no effect, where CR 601.2f's components are paid for a
--- spell that goes on to resolve.
+-- payComponent binds it (Sacrifice and TapPermanents each reserve a name), and
+-- there is no resolving ability holding a binding environment to write them
+-- into -- CR 508.1j and CR 509.1f name a payment and no effect, where CR
+-- 601.2f's components are paid for a spell that goes on to resolve.
 --
 -- Not implemented: CR 601.2h's order prompt ACROSS tags. Each tag's own components
 -- are ordered by payComponents below, but two taxing permanents are paid in
@@ -1655,7 +1655,8 @@ mergeBound bound outcome = case outcome of
   Payment.Unpaid -> Payment.Unpaid
   Payment.Paid rest -> Payment.Paid (Map.unionWith Set.union bound rest)
 
--- A component that bound no slot, which is every component but Sacrifice.
+-- A component that bound no slot, which is every component but Sacrifice and
+-- TapPermanents.
 bindsNothing :: Payment.Payment
 bindsNothing = Payment.Paid Map.empty
 
@@ -1982,8 +1983,9 @@ payComponent pid oid component = case component of
         Monad.mapM_ (Event.sacrifice pid) (Set.toAscList chosen)
         -- CR 608.2h: the permanents are gone by the time anything this cost paid
         -- for resolves, so an effect that reads one ("the sacrificed creature's
-        -- power") needs a name for it. The ONE component that binds a slot; every
-        -- other returns bindsNothing.
+        -- power") needs a name for it. One of the two components that bind a
+        -- slot, TapPermanents below being the other; every other returns
+        -- bindsNothing.
         --
         -- Bound under the id it had on the battlefield, which is the id
         -- Event.changeZone files its last known information under -- the graveyard
@@ -2001,7 +2003,9 @@ payComponent pid oid component = case component of
   --
   -- Not implemented: CR 702.122b/c's "crews a Vehicle" and "crewed by" relation,
   -- and so CR 702.122e's trigger and CR 702.122d's restriction -- the chosen set
-  -- is spent here and recorded nowhere (#915).
+  -- is spent here and recorded nowhere (#915). The sibling arm below binds
+  -- Binding.tappedPermanent, and this one deliberately does NOT share it: see
+  -- that slot's own comment for why one name for both questions would go quiet.
   CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n criterion) -> do
     gs <- State.get
     let candidates = tapCandidates pid oid criterion gs
@@ -2020,6 +2024,12 @@ payComponent pid oid component = case component of
   --
   -- Reject-not-repair, Sacrifice's posture again; the tap is a direct edit,
   -- TapThis' route.
+  --
+  -- Binds Binding.tappedPermanent, the second component to bind a slot at all
+  -- (CR 601.2f): Unerring Sling's "damage equal to the tapped creature's power"
+  -- needs a name for what its own cost tapped. Unlike Sacrifice's arm the object
+  -- is still on the battlefield, so the read is CR 608.2h's CURRENT information
+  -- rather than last known.
   CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) -> do
     gs <- State.get
     let candidates = tapCandidates pid oid criterion gs
@@ -2031,7 +2041,7 @@ payComponent pid oid component = case component of
     if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
       then do
         Monad.mapM_ tapObject (Set.toAscList chosen)
-        pure bindsNothing
+        pure (Payment.Paid (Map.singleton Binding.tappedPermanent (Set.map Recipient.ToObject chosen)))
       else pure Payment.Unpaid
   -- CR 701.9b: the discarding player chooses which cards, so this is a prompt.
   -- Elided only when forced -- as many MATCHING cards in hand as the count, which
