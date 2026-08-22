@@ -1,6 +1,9 @@
 -- Rule 702.170 in the one voice the rest of the engine cannot supply for itself:
 -- CR 116.2k's special action that pays a card's plot cost to exile it from a
--- hand, and the stamp that makes the exiled card a PLOTTED one.
+-- hand, and the stamp that makes the exiled card a PLOTTED one. CR 702.170c's
+-- other route into that stamp -- a spell or ability that makes an exiled card
+-- plotted -- is an Effect opcode and belongs to the open half, so its arm sits in
+-- Pawl.Engine.Resolve and calls becomePlotted here.
 --
 -- The rule's other half lives where every other casting question does. CR
 -- 702.170d's permission -- "a plotted card's owner may cast it from exile without
@@ -118,9 +121,9 @@ plottable pid gs = filter (\oid -> canPlot pid oid gs) (Game.zoneMembers Zone.Ha
 --
 -- The GameEvent.Plotted entry rides the same `newId` and the same branch as the
 -- stamp, for that reason and one more: a move that was cancelled plotted
--- nothing, so there is no event to record. It is what CR 702.170e's "when this
--- card becomes plotted" reads, the exile's own zone change saying only that a
--- card left a hand.
+-- nothing, so there is no event to record. It is what a "when this card becomes
+-- plotted" trigger (CR 702.170a, CR 702.170c) reads, the exile's own zone change
+-- saying only that a card left a hand.
 plot :: PlayerId -> ObjectId -> Game ()
 plot pid oid = do
   before <- State.get
@@ -136,7 +139,23 @@ plot pid oid = do
           exiled <- Event.changeZoneReturning oid Zone.Exile
           case exiled of
             Nothing -> pure ()
-            Just newId -> State.modify' (Event.recordEvent (GameEvent.Plotted newId) . stamp newId)
+            Just newId -> State.modify' (becomePlotted newId)
+
+-- "It becomes a plotted card" -- the stamp and the event together, which is the
+-- WHOLE of what becoming plotted is.
+--
+-- Two routes reach it and the rulebook gives them one meaning: CR 702.170a's
+-- special action above, and CR 702.170c's "some spells and abilities cause a card
+-- in exile to become plotted" (Pawl.Engine.Resolve's Effect.MakePlotted arm).
+-- Both land here so neither can drift from the other -- a route that stamped
+-- without recording would leave a "when this card becomes plotted" trigger (Aloe
+-- Alchemist) silent on a card that had, by the rules, become plotted.
+--
+-- Takes an ObjectId and nothing else, which is this module's invariant: it never
+-- asks which CARD is being plotted, so the opcode's arm hands it CR 400.7's
+-- exiled incarnation exactly as the special action does.
+becomePlotted :: ObjectId -> GameState -> GameState
+becomePlotted newId = Event.recordEvent (GameEvent.Plotted newId) . stamp newId
 
 -- CR 702.170a's "it becomes a plotted card", stamped with the turn the action was
 -- taken on -- which is what CR 702.170d's "any turn after the turn in which it

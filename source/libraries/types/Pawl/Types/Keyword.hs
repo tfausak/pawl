@@ -1154,14 +1154,18 @@ data Keyword
     -- Pawl.Engine.Plot reads the cost off the card the way Pawl.Engine.Room reads
     -- an unlock cost off a face.
     --
-    -- Not implemented: CR 702.170c's other producers -- an effect that makes an
-    -- exiled card plotted without this keyword (Jace Reawakened, Kellan Joins Up)
-    -- -- and CR 702.170f's plot from a zone other than a hand (Fblthp, Lost on the
-    -- Range) (#1390).
+    -- Not implemented: CR 702.170f's plot from a zone other than a hand (Fblthp,
+    -- Lost on the Range), which Pawl.Engine.Plot.canPlot's Zone.Hand test
+    -- refuses (#2091).
     --
-    -- CR 702.170e's "when this card becomes plotted" trigger reads
-    -- GameEvent.Plotted, which Pawl.Engine.Plot.plot records; Aloe Alchemist
-    -- prints it.
+    -- CR 702.170c's other route wants none of this: an effect that makes an
+    -- exiled card plotted (Kellan Joins Up) pays no plot cost and needs no
+    -- keyword, so it is Pawl.Types.Effect's MakePlotted rather than anything
+    -- here.
+    --
+    -- A "when this card becomes plotted" trigger (CR 702.170a, CR 702.170c)
+    -- reads GameEvent.Plotted, which Pawl.Engine.Plot.becomePlotted records for
+    -- both routes; Aloe Alchemist prints it.
     Plot (Cost.Cost Keyword)
   | -- | 702.179a: "start your engines!". A STATIC ability whose whole content is
     -- a state-based action -- CR 704.5aa gives a player with no speed who controls

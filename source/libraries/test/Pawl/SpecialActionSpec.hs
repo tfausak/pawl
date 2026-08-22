@@ -14,6 +14,11 @@
 -- 116.2 states -- any priority, the owner's own turn, and sorcery speed -- are
 -- what the groups' offer cases tell apart.
 --
+-- CR 702.170c's OTHER route to a plotted card -- an effect rather than the
+-- special action (Kellan Joins Up, Pawl.Types.Effect's MakePlotted) -- is here
+-- for the same reason: it lands on Pawl.Engine.Plot.becomePlotted beside CR
+-- 116.2k's, and the two are asserted against the same rule 702.170d readings.
+--
 -- Circling Vultures (WTH 64) is the fixture and the only producer there can be:
 -- CR 116.2e names it, so the row is closed at one card. Its upkeep ability is
 -- not here -- that clause is CR 406.2's cost component, whose gate-card cases
@@ -47,6 +52,7 @@ import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Ignore as Ignore
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
@@ -58,12 +64,15 @@ import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
@@ -428,6 +437,158 @@ plotting s registry = Spec.describe s "CR 116.2k Djinn of Fool's Fall" $ do
         1
       Spec.assertEqWith s "and exile is empty" (length (GameState.exile resolved)) 0
 
+-- Kellan Joins Up (OTJ 216) {G}{W}{U} Legendary Enchantment, "When Kellan Joins
+-- Up enters, you may exile a nonland card with mana value 3 or less from your
+-- hand. If you do, it becomes plotted" -- CR 702.170c's route into
+-- Object.plotted, the one that is NOT CR 116.2k's special action. Its second
+-- ability ("whenever a legendary creature you control enters, put a +1/+1
+-- counter on each creature you control") is printed and has nothing to fire on
+-- this board.
+--
+-- EXACTLY ONE Forest, one Plains and one Island: the mana cost is {G}{W}{U}, so
+-- the board pays it to the last mana and every land is tapped by the time the
+-- plotted card is offered. That is what makes the later cast discriminating, the
+-- Djinn group's argument one rule over -- a cast priced at anything at all could
+-- not be paid.
+--
+-- The GOBLIN PIKER (2/1) is what the plotted card's own trigger can aim at. Aloe
+-- Alchemist prints "when this card becomes plotted, target creature gets +3/+2
+-- and gains trample": with no legal target the trigger is removed on resolution
+-- (CR 608.2b) and an implementation that stamped the card without recording
+-- GameEvent.Plotted would be indistinguishable from one that did. 2/1 to 5/3 is
+-- a value nothing else on this board produces.
+--
+-- The DJINN OF FOOL'S FALL ({4}{U}, mana value 5) is the filter's negative
+-- control. It is the only other card in the hand, so "mana value 3 or less"
+-- leaves exactly one candidate and CR 608.2d's prompt is elided -- which the
+-- prompt log below asserts, since a widened filter raises it and the default
+-- answerer then takes the Djinn.
+kellanBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+kellanBoard forest plains island piker kellan aloe djinn =
+  let lands = S.landsFor plains S.alice 1 (S.landsFor island S.alice 1 (S.landsInPlay forest 1))
+      (pikerId, g1) = S.addCreature piker S.alice lands
+      (kellanId, g2) = S.addHandCard kellan S.alice g1
+      (_, g3) = S.addHandCard aloe S.alice g2
+      (djinnId, g4) = S.addHandCard djinn S.alice g3
+   in ( pikerId,
+        kellanId,
+        djinnId,
+        g4
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Says yes to CR 603.5's "may", aims Aloe Alchemist's trigger at the named
+-- creature, and records every CR 608.2d hand choice it is asked.
+--
+-- The RECORD is the point: Pawl.Types.Prompt.ChooseCardInHand is raised only at
+-- two or more candidates, so an empty log is the card's own filter having
+-- admitted exactly one card.
+--
+-- The aim is pinned by id though the Piker is the board's only creature and the
+-- default answerer would find it anyway: the pin is what keeps the case honest
+-- if a second creature is ever added beside it.
+kellanAnswers :: ObjectId.ObjectId -> (forall r. Prompt.Prompt r -> Log r)
+kellanAnswers pikerId prompt = case prompt of
+  Prompt.ChooseOptional {} -> pure OptionalDecision.Exercises
+  Prompt.ChooseCardInHand _ pid _ _ -> do
+    State.modify' (<> [pid])
+    pure (S.identityAnswer prompt)
+  Prompt.ChooseTargets _ _ _ sets -> pure (S.preferring ((== Just pikerId) . Recipient.objectOf) sets)
+  _ -> pure (S.identityAnswer prompt)
+
+makePlotted :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+makePlotted s registry = Spec.describe s "CR 702.170c Kellan Joins Up" $ do
+  -- The whole route in one game: alice casts the enchantment, its CR 603.2
+  -- trigger resolves, the chosen card leaves her hand for exile and BECOMES
+  -- PLOTTED there -- which the board reports twice over, once through the stamp
+  -- CR 702.170d reads and once through the trigger the plotted card itself
+  -- prints. The two fail independently, which is why both are asserted.
+  Spec.it s "CR 702.170c an effect makes an exiled card plotted, stamp and event alike" $ do
+    forest <- S.printingOf s registry "Forest"
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    kellan <- S.printingOf s registry "Kellan Joins Up"
+    aloe <- S.printingOf s registry "Aloe Alchemist"
+    djinn <- S.printingOf s registry "Djinn of Fool's Fall"
+    let (pikerId, kellanId, djinnId, gs) = kellanBoard forest plains island piker kellan aloe djinn
+        (asked, after) = case State.runState (Engine.runGame (kellanAnswers pikerId) gs (S.cast S.alice kellanId >> Engine.priorityLoop)) [] of
+          ((_, g), log') -> (log', g)
+        -- CR 702.170d's "any turn AFTER the turn in which it became plotted",
+        -- with the turn number moved and nothing else -- so every land is still
+        -- tapped and a cast priced at anything could not be paid.
+        later = after {GameState.turnNumber = GameState.turnNumber after + 1}
+        -- The control for that: the same card in the same exile on the same
+        -- later turn, with the stamp cleared. It is what says the permission
+        -- came from Object.plotted rather than from the card being in exile.
+        unplotted = later {GameState.objects = Map.map (\o -> o {Object.plotted = Nothing}) (GameState.objects later)}
+    Spec.assertEqWith s "the Piker started 2/1" (S.powerToughnessOf pikerId gs) (Just (2, 1))
+    -- The EVENT leg. Aloe Alchemist's "when this card becomes plotted" fires from
+    -- exile, so an arm that wrote the stamp and recorded nothing leaves the Piker
+    -- where it started while every zone assertion below still passes.
+    Spec.assertEqWith s "CR 702.170c the plotted card's own trigger fired: the Piker is 5/3" (S.powerToughnessOf pikerId after) (Just (5, 3))
+    Spec.assertBool s (Projection.hasKeyword Keyword.Trample pikerId after) "and gained trample, the trigger's other half"
+    Spec.assertBool s (Maybe.isJust (soleExile after)) "the card was exiled, so the cases below are about a card in exile"
+    Monad.forM_ (soleExile after) $ \exiledId -> do
+      -- The STAMP leg, and its two halves. CR 702.170d refuses the turn the card
+      -- became plotted, which is what tells a turn number from a bare flag: an
+      -- arm stamping the turn before, or stamping True, passes the `later` case
+      -- and fails this one.
+      Spec.assertBool s (not (S.castable S.alice exiledId after)) "CR 702.170d not on the turn it became plotted"
+      Spec.assertBool s (S.castable S.alice exiledId later) "CR 702.170d on the next turn it is castable -- with every land still tapped, so the cast is free"
+      Spec.assertBool s (not (S.castable S.alice exiledId unplotted)) "the control: the same card in the same exile, unplotted, is castable by nobody"
+      Spec.assertEqWith
+        s
+        "and the exiled card is Aloe Alchemist, stamped with the turn it became plotted"
+        (fmap Object.plotted (Game.lookupObject exiledId after))
+        (Just (Just (GameState.turnNumber after)))
+      Spec.assertEqWith
+        s
+        "the exiled card is the Alchemist"
+        (fmap S.nameOf (Game.cardOf exiledId after))
+        (Just (S.printingName aloe))
+    -- The FILTER, read off the hand it left behind: "nonland card with mana value
+    -- 3 or less" admitted the Alchemist and refused the mana value 5 Djinn.
+    Spec.assertEqWith s "alice's hand is the Djinn alone" (Game.zoneMembers Zone.Hand S.alice after) [djinnId]
+    Spec.assertEqWith s "so no CR 608.2d choice was raised: the filter left one candidate" asked []
+    Spec.assertEqWith s "all three lands paid for the enchantment" (S.tappedCount S.alice after) 3
+    Spec.assertEqWith s "and the stack is empty, so the trigger resolved" (GameState.stack after) []
+  -- The permission taken rather than merely asked about, the Djinn group's last
+  -- case one route over: the plotted card reaches the battlefield off a board
+  -- with no untapped land on it.
+  Spec.it s "CR 702.170d the card an effect plotted casts for nothing on a later turn" $ do
+    forest <- S.printingOf s registry "Forest"
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    kellan <- S.printingOf s registry "Kellan Joins Up"
+    aloe <- S.printingOf s registry "Aloe Alchemist"
+    djinn <- S.printingOf s registry "Djinn of Fool's Fall"
+    let (pikerId, kellanId, _, gs) = kellanBoard forest plains island piker kellan aloe djinn
+        after = snd (State.evalState (Engine.runGame (kellanAnswers pikerId) gs (S.cast S.alice kellanId >> Engine.priorityLoop)) [])
+        later = after {GameState.turnNumber = GameState.turnNumber after + 1}
+    Spec.assertBool s (Maybe.isJust (soleExile after)) "the card was exiled, so the case below runs at all"
+    Monad.forM_ (soleExile after) $ \exiledId -> do
+      let resolved = S.runPure S.castAnswer later (S.cast S.alice exiledId >> Stack.resolveTop)
+      Spec.assertEqWith
+        s
+        "the Alchemist is on the battlefield"
+        (S.countOnBattlefieldByName (S.printingName aloe) S.alice resolved)
+        1
+      Spec.assertEqWith s "exile is empty" (length (GameState.exile resolved)) 0
+      Spec.assertEqWith s "and the three lands are still the only tapped permanents: the cast paid nothing" (S.tappedCount S.alice resolved) 3
+
 -- Augury Raven (KHM 44) on alice's own precombat main, holding four Islands, the
 -- Raven and a Doomed Traveler.
 --
@@ -594,6 +755,7 @@ spec s registry = do
   dampingEngine s registry
   leoninArbiter s registry
   plotting s registry
+  makePlotted s registry
   foretelling s registry
 
 -- CR 116.2d again, on the two axes Leonin Arbiter cannot reach: WHO the action is

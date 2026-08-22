@@ -3668,7 +3668,7 @@ matoyaTriggerSpec s registry =
 -- Aloe Alchemist {1}{G} Creature -- Plant Warlock 3/2, "Trample; When this card
 -- becomes plotted, target creature gets +3/+2 and gains trample until end of
 -- turn; Plot {1}{G}" -- the pool's producer for TriggerCondition
--- SelfBecomesPlotted (CR 702.170e).
+-- SelfBecomesPlotted (CR 702.170a, CR 702.170c).
 --
 -- The one condition in the pool whose bearer is in EXILE when it fires: CR
 -- 702.170b's special action exiles the card as it becomes plotted, so
@@ -3694,7 +3694,7 @@ aloeAlchemistSpec s registry =
         -- The whole card: alice takes CR 116.2k's special action, the card lands
         -- in exile as a plotted card, and the ability printed on it fires from
         -- there.
-        Spec.it s "CR 702.170e plotting Aloe Alchemist pumps the targeted creature" $ do
+        Spec.it s "CR 702.170a plotting Aloe Alchemist pumps the targeted creature" $ do
           forest <- S.printingOf s registry "Forest"
           aloe <- S.printingOf s registry "Aloe Alchemist"
           piker <- S.printingOf s registry "Goblin Piker"
@@ -3707,7 +3707,7 @@ aloeAlchemistSpec s registry =
               after = S.runPure (aimAt pikerId) plotted Engine.priorityLoop
           Spec.assertEqWith s "the Piker started 2/1" (S.powerToughnessOf pikerId gs) (Just (2, 1))
           Spec.assertBool s (any isPlotted (S.eventsOf after)) "CR 702.170a the plot recorded its event"
-          Spec.assertEqWith s "CR 702.170e the targeted Piker is 5/3" (S.powerToughnessOf pikerId after) (Just (5, 3))
+          Spec.assertEqWith s "CR 702.170a the targeted Piker is 5/3" (S.powerToughnessOf pikerId after) (Just (5, 3))
           Spec.assertEqWith s "bob's untargeted Maiden is untouched" (S.powerToughnessOf maidenId after) (Just (1, 2))
           Spec.assertEqWith s "the card is in exile" (length (GameState.exile after)) 1
           Spec.assertEqWith s "and the stack is empty, so the trigger resolved" (GameState.stack after) []
@@ -3718,7 +3718,7 @@ aloeAlchemistSpec s registry =
         --
         -- Djinn of Fool's Fall {3}{U} is the pool's other plot card and prints no
         -- such trigger, which is what makes it the control.
-        Spec.it s "CR 702.170e plotting another card does not fire an exiled Aloe Alchemist" $ do
+        Spec.it s "CR 702.170a plotting another card does not fire an exiled Aloe Alchemist" $ do
           island <- S.printingOf s registry "Island"
           aloe <- S.printingOf s registry "Aloe Alchemist"
           djinn <- S.printingOf s registry "Djinn of Fool's Fall"
