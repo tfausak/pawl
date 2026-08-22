@@ -318,12 +318,13 @@ data Response
   | -- | CR 103.6: the hand card whose opening-hand action a player took, and which
     -- of that card's actions it was (Nothing = declined).
     TookOpeningHandAction (Maybe (ObjectId.ObjectId, HandActionIndex.HandActionIndex))
-  | -- | CR 603.5: whether the controller of a resolving spell or ability
-    -- exercised a printed "may".
+  | -- | CR 603.5: whether the player a printed "may" asked exercised it --
+    -- usually the resolving controller, and one answer per seat where the clause
+    -- names several (Pawl.Types.Optionality.Optional).
     ChoseOptional OptionalDecision.OptionalDecision
   | -- | CR 608.2g: whether a player took a cast a resolving effect offered them.
     -- Distinct from ChoseOptional, which records CR 603.5's "may" over a whole
-    -- mode, and from CastWhileSearched, which records the same rule's
+    -- CLAUSE, and from CastWhileSearched, which records the same rule's
     -- library-search producer and names which card was cast.
     ChoseOfferedCast OptionalDecision.OptionalDecision
   | -- | CR 709.3 / 712.11b / 715.3: which half of a multi-faced object a player

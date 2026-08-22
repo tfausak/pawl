@@ -489,6 +489,9 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
       PlayerRef.EachPlayerExcept _ -> Count.playersFor context gs ref
       PlayerRef.Relative _ -> Count.playersFor context gs ref
       PlayerRef.InSlot _ -> Count.playersFor context gs ref
+      -- InSlot's plural, answered there too: the read is off the source's
+      -- bindings, which that function holds.
+      PlayerRef.EachInSlot _ -> Count.playersFor context gs ref
       PlayerRef.Specific _ -> Count.playersFor context gs ref
       -- CR 508.6's set, left with Count.playersFor's Nothing even though the view
       -- IS here: this reference names a set of players and every quantity that
@@ -727,6 +730,8 @@ playerRefIsSlotless ref = case ref of
   PlayerRef.EachPlayerExcept _ -> False
   PlayerRef.Relative _ -> True
   PlayerRef.InSlot _ -> False
+  -- InSlot's answer: this reads a slot too, and every one of them.
+  PlayerRef.EachInSlot _ -> False
   -- The baked half names its player outright, so it reads no slot at all. A card
   -- cannot write one (Pawl.CardSpec's sweep), so this arm is only ever reached
   -- through a stored Expiry.While.
@@ -801,6 +806,7 @@ forCandidate pid = mapPlayerRefs substitute (\c -> c {Count.Type.scope = mapScop
       PlayerRef.EachPlayerExcept _ -> ref
       PlayerRef.Relative _ -> ref
       PlayerRef.InSlot _ -> ref
+      PlayerRef.EachInSlot _ -> ref
       PlayerRef.Specific _ -> ref
       PlayerRef.ControllerOfBound _ -> ref
       PlayerRef.Attacking _ -> ref
@@ -858,6 +864,11 @@ mapPlayerRefs f intoCount quantity = case quantity of
 bakePlayerRef :: Map.Map SlotName PlayerId.PlayerId -> PlayerRef.PlayerRef -> PlayerRef.PlayerRef
 bakePlayerRef players ref = case ref of
   PlayerRef.InSlot slot -> maybe ref PlayerRef.Specific (Map.lookup slot players)
+  -- LEFT STANDING, EachPlayerExcept's posture below and for its reason: this
+  -- names a SET and PlayerRef.Specific names one seat, so there is nothing to
+  -- bake to. Every scalar this function traverses reads exactly one player, so
+  -- the reference answers Nothing baked or not.
+  PlayerRef.EachInSlot _ -> ref
   PlayerRef.EachPlayer -> ref
   -- LEFT STANDING, ControllerOfBound's posture below, and here there is nothing
   -- to bake TO: PlayerRef.Specific names one seat and this names the rest of the

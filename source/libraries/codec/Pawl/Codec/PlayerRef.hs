@@ -20,6 +20,9 @@ codec =
       Arm.payload "EachPlayerExcept" SlotName.codec PlayerRef.EachPlayerExcept (\x -> case x of PlayerRef.EachPlayerExcept y -> Just y; _ -> Nothing),
       Arm.payload "Relative" PlayerRelation.codec PlayerRef.Relative (\x -> case x of PlayerRef.Relative y -> Just y; _ -> Nothing),
       Arm.payload "InSlot" SlotName.codec PlayerRef.InSlot (\x -> case x of PlayerRef.InSlot y -> Just y; _ -> Nothing),
+      -- InSlot's plural, which a card writes: Jungle Wayfinder's searchers are
+      -- every seat that took CR 603.5's "may".
+      Arm.payload "EachInSlot" SlotName.codec PlayerRef.EachInSlot (\x -> case x of PlayerRef.EachInSlot y -> Just y; _ -> Nothing),
       -- CR 611.2b's baked half. Decodable because an Expiry.While serialises its
       -- whole Condition (CR 603.7b's delayed ability), never because a card may
       -- write one -- Pawl.CardSpec sweeps the pool for that.

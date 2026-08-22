@@ -67,6 +67,7 @@ import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.ChangeText as ChangeText
@@ -254,6 +255,8 @@ playerRefSlots ref = case ref of
   PlayerRef.EachPlayerExcept slot -> Map.singleton slot SlotArity.One
   PlayerRef.Relative _ -> Map.empty
   PlayerRef.InSlot slot -> Map.singleton slot SlotArity.One
+  -- Read at arity MANY, which is the whole of what parts it from the arm above.
+  PlayerRef.EachInSlot slot -> Map.singleton slot SlotArity.Many
   PlayerRef.Specific _ -> Map.empty
   PlayerRef.Candidate -> Map.empty
   -- Read at arity one: a slot naming several objects names no one controller.
@@ -544,6 +547,7 @@ modeSlots mode =
   joinSlots
     [ joinSlots (fmap slotsOf (Foldable.toList (Mode.allEffects mode))),
       joinSlots (fmap payerSlot (Foldable.toList (Mode.clauses mode))),
+      joinSlots (fmap askerSlot (Foldable.toList (Mode.clauses mode))),
       joinSlots (fmap (poolSlot . TargetSlot.pool) (Map.elems (Mode.targetSlots mode))),
       -- And every slot a target slot's own FILTER names -- CR 603.2's "target
       -- artifact or enchantment that player controls".
@@ -555,6 +559,13 @@ modeSlots mode =
         . TargetSlot.filter
     -- Every clause's payer: CR 118.12 scopes a resolution cost to its clause.
     payerSlot = maybe Map.empty (playerRefSlots . PayGate.payer) . Clause.payGate
+    -- And every clause's ASKER, for its reason: CR 603.5's "may" is scoped to a
+    -- clause too, and Jungle Wayfinder's names the table rather than a slot --
+    -- but a card may name one, and an asker slot no effect also reads would
+    -- otherwise dangle.
+    askerSlot clause = case Clause.optionality clause of
+      Optionality.Mandatory -> Map.empty
+      Optionality.Optional ref -> playerRefSlots ref
 
 -- The slot a target pool draws its candidates from, if it draws them from one
 -- (CR 400.1's per-player graveyard), read singly.
@@ -1005,6 +1016,19 @@ gateDefinedSlots :: Mode.Mode card -> Set SlotName
 gateDefinedSlots mode
   | any (Maybe.isJust . Clause.payGate) (Mode.clauses mode) = Set.singleton Binding.gatePlayers
   | otherwise = Set.empty
+
+-- gateDefinedSlots' twin for CR 603.5's "may": the seats that took it
+-- (Binding.mayPlayers, stamped by exercises). A mode printing no "may" binds
+-- nothing, so a card reading that name without an optional clause is still
+-- caught by the dataflow lint.
+mayDefinedSlots :: Mode.Mode card -> Set SlotName
+mayDefinedSlots mode
+  | any (isOptional . Clause.optionality) (Mode.clauses mode) = Set.singleton Binding.mayPlayers
+  | otherwise = Set.empty
+  where
+    isOptional o = case o of
+      Optionality.Mandatory -> False
+      Optionality.Optional _ -> True
 
 -- slotsOf's mirror for ONE effect: the slots it BINDS rather than reads, which
 -- is also the set Pawl.CardSpec's reserved-name sweep ranges over. Exhaustive
@@ -1469,25 +1493,51 @@ gateHolds controller source chosen groups clause = case Clause.condition clause 
 -- HERE as the effect is applied. The unit is CR 608.2e's clause and not the whole
 -- mode, so a "may" printed on one sentence leaves its neighbours alone.
 --
--- `controller` is who "you" means (CR 405.4 for a spell, CR 113.8 for an ability)
--- and therefore who is asked, through Decide.deciderFor so a player controlled
--- under CR 723.1 has their controller answer.
+-- WHO is asked is the Optionality's own PlayerRef, resolved like every other
+-- (playerRefPlayers for the membership) and ordered by CR 101.4 through
+-- apnapPlayersOf. Every printed "you may" names the resolving controller -- CR
+-- 405.4 for a spell, CR 113.8 for an ability -- and Jungle Wayfinder's "each
+-- player may" names the whole table. Each of them is asked through
+-- Decide.deciderFor, so a player controlled under CR 723.1 has their controller
+-- answer.
+--
+-- ALL the asks BEFORE any effect runs, which is CR 608.2e: the choices for an
+-- action are made in APNAP order and then the action is taken. That is what
+-- forbids the ask-and-act-per-seat shape, and rule 101.4b is why each seat is
+-- asked against the live board rather than a snapshot.
+--
+-- The seats that ACCEPTED are bound under Binding.mayPlayers, which is how the
+-- clause's own instructions say "they" (PlayerRef.EachInSlot), and the clause
+-- happens when anybody accepted -- payGateAdmits' shape one question over. A
+-- reference naming nobody therefore accepts nobody and the clause does nothing.
 --
 -- `bound` is every slot the live bindings hold and `legal` is CR 608.2b's
 -- surviving recipients, both under the names this mode instance prints (CR
 -- 700.2d); an inert clause is not asked about at all -- see clauseIsInert.
+-- Binding.mayPlayers is added to `bound` for that test alone: the slot this very
+-- "may" is about to define is not dead, and without that a clause whose only
+-- read is its own accepters would be judged inert and decline with no prompt
+-- raised.
 exercises :: ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Set SlotName -> Map.Map SlotName (Set Recipient) -> Clause.Clause Card.Type.Card -> Game Bool
 exercises resolving controller idx cIdx bound legal clause = case Clause.optionality clause of
   Optionality.Mandatory -> pure True
-  Optionality.Optional
-    | clauseIsInert bound legal clause -> pure False
+  Optionality.Optional asker
+    | clauseIsInert (Set.insert Binding.mayPlayers bound) legal clause -> pure False
     | otherwise -> do
         gs <- State.get
-        let decider = Decide.deciderFor controller gs
-        decision <- Game.choose (Prompt.ChooseOptional decider controller resolving idx cIdx)
-        pure $ case decision of
-          OptionalDecision.Exercises -> True
-          OptionalDecision.Declines -> False
+        accepted <-
+          Monad.foldM
+            ( \acc pid -> do
+                gs1 <- State.get
+                decision <- Game.choose (Prompt.ChooseOptional (Decide.deciderFor pid gs1) pid resolving idx cIdx)
+                pure $ case decision of
+                  OptionalDecision.Exercises -> Set.insert pid acc
+                  OptionalDecision.Declines -> acc
+            )
+            Set.empty
+            (apnapPlayersOf asker legal controller gs)
+        State.modify' (bindPlayersSlot resolving Binding.mayPlayers accepted)
+        pure (not (Set.null accepted))
 
 -- CR 608.2b / 603.5: can this clause's answer not matter? Only when every one of
 -- its effects reads a slot and every slot it reads is illegal or unfilled, since
@@ -1786,6 +1836,13 @@ playerRefPlayers legal controller gs ref = case ref of
   PlayerRef.InSlot slot -> case legalOne slot legal of
     Just (Recipient.ToPlayer pid) -> [pid]
     _ -> [] -- an unfilled, illegal, or non-player slot: no-op
+    -- Every player the slot names, InSlot's read without Binding.onlyOne's
+    -- collapse -- Binding.mayPlayers, the seats a CR 603.5 "may" selected.
+    -- Non-player recipients are dropped, as the arm above drops them.
+    --
+    -- Binding.gatePlayers is the same shape one question over; not implemented:
+    -- no card's opcode reads THAT slot plurally yet (#1966).
+  PlayerRef.EachInSlot slot -> Maybe.mapMaybe Recipient.playerOf (legalMany slot legal)
   PlayerRef.Relative PlayerRelation.You -> [controller]
   PlayerRef.Relative PlayerRelation.Opponent -> filter (PlayerRelation.holds PlayerRelation.Opponent controller) everyone
   -- CR 102.1's whole table, off the roster rather than by consing the controller
@@ -2264,15 +2321,15 @@ slotOne slot resolving gs = do
 -- Questions 3 and 4 are asked of EACH half separately (CR 709.3a, CR 712.11c);
 -- where more than one survives, CR 709.3's choice is put to the caster before
 -- the "may" below, since CR 118.8c's excuse is a property of the spell being
--- cast. At Optionality.Mandatory the cast is not a decision, so
+-- cast. At CastObligation.Mandatory the cast is not a decision, so
 -- Prompt.OfferedCast is elided; question 4 is what a printed "if able" comes to
 -- (CR 601.3, CR 609.3). CR 118.8c is the exception: `excused` turns the
 -- mandatory branch back into a may, classified by Cost.statesHiddenQuality.
 --
 -- The caster is a parameter and not the resolving controller: CR 608.2g says "a
 -- player". Everything above is a CLASSIFICATION carried by the opcode's
--- CastOffer and its Optionality; nothing here asks which card is offered.
-offerCast :: ObjectId -> PlayerId -> SlotName -> Optionality.Optionality -> CastOffer.CastOffer -> Game ()
+-- CastOffer and its CastObligation; nothing here asks which card is offered.
+offerCast :: ObjectId -> PlayerId -> SlotName -> CastObligation.CastObligation -> CastOffer.CastOffer -> Game ()
 offerCast resolving caster slot optionality offer = do
   gs <- State.get
   let -- CR 712.11a for the transformed rider; CR 709.3, CR 712.11b and CR 715.3
@@ -2339,9 +2396,9 @@ offerCast resolving caster slot optionality offer = do
               OptionalDecision.Declines -> pure ()
               OptionalDecision.Exercises -> cast
       case optionality of
-        Optionality.Mandatory | not excused -> cast
-        Optionality.Mandatory -> mayCast
-        Optionality.Optional -> mayCast
+        CastObligation.Mandatory | not excused -> cast
+        CastObligation.Mandatory -> mayCast
+        CastObligation.Optional -> mayCast
 
 -- CR 615.3: install one floating damage row, for a duration. Shared by
 -- Effect.PreventNextDamage, Effect.PreventAllDamage and Effect.RedirectDamage,

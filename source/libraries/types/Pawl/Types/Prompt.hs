@@ -730,11 +730,17 @@ data Prompt r where
   -- player" is answered before the offer, so the starting player holding one is
   -- not asked a question with one answer.
   OpeningHandAction :: Decider.Decider -> PlayerId.PlayerId -> [(ObjectId.ObjectId, HandActionIndex.HandActionIndex)] -> Prompt (Maybe (ObjectId.ObjectId, HandActionIndex.HandActionIndex))
-  -- | CR 603.5 / 608.2d: whether the controller of a resolving spell or ability
-  -- exercises a printed "may". The ObjectId is the object RESOLVING, not its
-  -- source, since two triggers off one source resolve as two stack objects. The
-  -- ModeIndex and ClauseIndex say which question this is: the "may" covers the
-  -- CLAUSE it is printed on (CR 608.2e), not the whole mode.
+  -- | CR 603.5 / 608.2d: whether the player the PlayerId names exercises a
+  -- printed "may". Usually the resolving controller, and not always: Jungle
+  -- Wayfinder's "each player may search their library" asks the whole table, one
+  -- question each, in CR 101.4's APNAP order and all before the clause's effects
+  -- run (CR 608.2e). Pawl.Types.Optionality.Optional carries who.
+  --
+  -- The ObjectId is the object RESOLVING, not its source, since two triggers off
+  -- one source resolve as two stack objects. The ModeIndex and ClauseIndex say
+  -- which question this is: the "may" covers the CLAUSE it is printed on (CR
+  -- 608.2e), not the whole mode -- so several seats' answers to one clause share
+  -- an index and are told apart by the PlayerId.
   --
   -- Resolution-time and not cast-time: CR 603.5 puts an optional ability on the
   -- stack regardless, and CR 608.2d places the choice.

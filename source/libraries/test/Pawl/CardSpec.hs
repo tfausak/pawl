@@ -86,6 +86,7 @@ import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
@@ -1336,7 +1337,10 @@ modalSlotsOffend abilityBound modal =
             -- Plus what this mode's own CR 118.12 gate binds: the players its
             -- answer selected, which is how "each opponent ... unless THEY ..."
             -- says "they" (Binding.gatePlayers).
-            defined = Set.union (Resolve.definedSlots effects) (Resolve.gateDefinedSlots mode)
+            -- Plus what this mode's own CR 603.5 "may" binds: the players who
+            -- took it, which is how "each player may search THEIR library" says
+            -- "they" (Binding.mayPlayers).
+            defined = Set.unions [Resolve.definedSlots effects, Resolve.gateDefinedSlots mode, Resolve.mayDefinedSlots mode]
             -- The whole MODE's reads, not just its effect list's: CR 118.12a's
             -- "unless [a player] pays" names its payer by slot too.
             wanted = Map.keysSet (Resolve.modeSlots mode)
@@ -2030,6 +2034,7 @@ reservedSlots =
       Binding.you,
       Binding.triggerPlayer,
       Binding.gatePlayers,
+      Binding.mayPlayers,
       Binding.became,
       Binding.eventAmount,
       Binding.sacrificedCount,
@@ -5280,6 +5285,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- The whole table -- EachPlayer's answer, which this relation is.
           PlayerRef.Relative PlayerRelation.AnyPlayer -> False
           PlayerRef.InSlot _ -> True
+          -- A SET -- the arm above's plural, and the whole of what parts them.
+          PlayerRef.EachInSlot _ -> False
           PlayerRef.EachPlayer -> False
           -- The whole table but one seat -- EachPlayer's answer, and for its
           -- reason.
@@ -5349,7 +5356,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       ( clashes
           [ Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Zone.Exile EntryRiders.defaultValue (Just exiledSlot) Nothing LibraryPlacement.defaultValue),
-            Effect.OfferCast (OfferCast.MkOfferCast exiledSlot (PlayerRef.Relative PlayerRelation.You) Optionality.Optional CastOffer.defaultValue)
+            Effect.OfferCast (OfferCast.MkOfferCast exiledSlot (PlayerRef.Relative PlayerRelation.You) CastObligation.Optional CastOffer.defaultValue)
           ]
       )
       "a singular read of a plurally bound slot is caught"

@@ -32,6 +32,12 @@ spec s = Spec.describe s "Pawl.Codec.PlayerRef" $ do
       PlayerRef.codec
       (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target")))
       " {\"type\":\"InSlot\",\"value\":\"target\"} "
+  Spec.it s "EachInSlot" $
+    Common.assertCodec
+      s
+      PlayerRef.codec
+      (PlayerRef.EachInSlot (SlotName.MkSlotName (Text.pack "thoseWhoMay")))
+      " {\"type\":\"EachInSlot\",\"value\":\"thoseWhoMay\"} "
   Spec.it s "Specific" $
     Common.assertCodec
       s

@@ -49,6 +49,7 @@ import qualified Pawl.Codec.CantBeBlockedBySpec
 import qualified Pawl.Codec.CardNameSpec
 import qualified Pawl.Codec.CardSpec
 import qualified Pawl.Codec.CardTypeSpec
+import qualified Pawl.Codec.CastObligationSpec
 import qualified Pawl.Codec.CastOfferSpec
 import qualified Pawl.Codec.CastingPermissionSpec
 import qualified Pawl.Codec.CastingRestrictionSpec
@@ -486,6 +487,7 @@ spec s registry = do
   Pawl.Codec.CardNameSpec.spec s
   Pawl.Codec.CardSpec.spec s
   Pawl.Codec.CardTypeSpec.spec s
+  Pawl.Codec.CastObligationSpec.spec s
   Pawl.Codec.CastOfferSpec.spec s
   Pawl.Codec.CastingPermissionSpec.spec s
   Pawl.Codec.CastingRestrictionSpec.spec s
