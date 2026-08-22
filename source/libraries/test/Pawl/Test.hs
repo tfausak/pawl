@@ -360,6 +360,7 @@ import qualified Pawl.JsonPointer.PointerSpec
 import qualified Pawl.JsonPointer.TokenSpec
 import qualified Pawl.JsonSchema.DefineSpec
 import qualified Pawl.JsonSchema.NameSpec
+import qualified Pawl.JsonSchema.PatternSpec
 import qualified Pawl.JsonSchema.SchemaSpec
 import qualified Pawl.JsonSchema.ValidateSpec
 import qualified Pawl.KeywordTriggerSpec
@@ -808,6 +809,7 @@ spec s registry = do
   Pawl.JsonPointer.TokenSpec.spec s
   Pawl.JsonSchema.DefineSpec.spec s
   Pawl.JsonSchema.NameSpec.spec s
+  Pawl.JsonSchema.PatternSpec.spec s
   Pawl.JsonSchema.SchemaSpec.spec s
   Pawl.JsonSchema.ValidateSpec.spec s
   Pawl.InvestigateSpec.spec s registry

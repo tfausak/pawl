@@ -930,6 +930,8 @@ library json-schema
     Pawl.JsonSchema.DefineSpec
     Pawl.JsonSchema.Name
     Pawl.JsonSchema.NameSpec
+    Pawl.JsonSchema.Pattern
+    Pawl.JsonSchema.PatternSpec
     Pawl.JsonSchema.Schema
     Pawl.JsonSchema.SchemaSpec
     Pawl.JsonSchema.Validate

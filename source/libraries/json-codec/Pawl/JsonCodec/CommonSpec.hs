@@ -12,6 +12,7 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonSchema.Define as Define
 import qualified Pawl.JsonSchema.Schema as Schema
+import qualified Pawl.JsonSchema.Validate as Validate
 import qualified Pawl.Spec as Spec
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -221,17 +222,17 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
     Spec.it s "encodes in ascending key order" $
       Spec.assertEq
         s
-        (Common.render (Codec.encode (Common.textMap id id Common.integer) (Map.fromList [(Text.pack "z", 1), (Text.pack "a", 2)])))
+        (Common.render (Codec.encode (Common.textMap id Right Common.integer) (Map.fromList [(Text.pack "z", 1), (Text.pack "a", 2)])))
         (Text.pack "{\"a\":2,\"z\":1}")
     Spec.it s "round trips" $
       Spec.assertEq
         s
-        (Codec.decode (Common.textMap id id Common.integer) =<< Common.parse (Text.pack "{\"a\":2,\"z\":1}"))
+        (Codec.decode (Common.textMap id Right Common.integer) =<< Common.parse (Text.pack "{\"a\":2,\"z\":1}"))
         (Right (Map.fromList [(Text.pack "a", 2), (Text.pack "z", 1)]))
     Spec.it s "decodes the empty object" $
       Spec.assertEq
         s
-        (Codec.decode (Common.textMap id id Common.integer) =<< Common.parse (Text.pack "{}"))
+        (Codec.decode (Common.textMap id Right Common.integer) =<< Common.parse (Text.pack "{}"))
         (Right Map.empty :: Either Text.Text (Map.Map Text.Text Integer))
     -- Pawl.Json.Object does not dedupe, so a repeated key genuinely reaches the
     -- decoder. Rejected rather than letting the first win, which is Common.set's
@@ -239,26 +240,82 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
     Spec.it s "rejects a repeated key" $
       Spec.assertBool
         s
-        (Either.isLeft (Codec.decode (Common.textMap id id Common.integer) =<< Common.parse (Text.pack "{\"a\":1,\"a\":2}")))
+        (Either.isLeft (Codec.decode (Common.textMap id Right Common.integer) =<< Common.parse (Text.pack "{\"a\":1,\"a\":2}")))
         "expected a decode failure"
     Spec.it s "rejects an array" $
       Spec.assertBool
         s
-        (Either.isLeft (Codec.decode (Common.textMap id id Common.integer) =<< Common.parse (Text.pack "[]")))
+        (Either.isLeft (Codec.decode (Common.textMap id Right Common.integer) =<< Common.parse (Text.pack "[]")))
         "expected a decode failure"
     -- The bundle carries the pair's behaviour plus a Schema.mapOf schema, which
     -- is the half the loose pair could not supply.
     Spec.it s "the bundle round trips" $
       Common.assertCodec
         s
-        (Common.textMap id id Common.integer)
+        (Common.textMap id Right Common.integer)
         (Map.fromList [(Text.pack "a", 2), (Text.pack "z", 1)])
         "{\"a\":2,\"z\":1}"
     Spec.it s "the bundle's schema is mapOf over the value schema" $
       Spec.assertEq
         s
-        (Define.run (Codec.schema (Common.textMap id id Common.integer)))
+        (Define.run (Codec.schema (Common.textMap id Right Common.integer)))
         (Define.run (fmap Schema.mapOf (Codec.schema Common.integer)))
+
+  Spec.describe s "naturalMap" $ do
+    let codec = Common.naturalMap Common.natural Common.integer
+        entries = Map.fromList [(2, 3), (10, 4)] :: Map.Map Natural.Natural Integer
+    -- Keys 2 and 10 sort the other way as TEXT, so an encoder that ordered the
+    -- keys by their renderings rather than by the map fails here. 100 would
+    -- render as 1e2 if the key went through Value.encode.
+    Spec.it s "keys by the decimal rendering, ascending numerically" $
+      Spec.assertEq
+        s
+        (Common.render (Codec.encode codec (Map.insert 100 5 entries)))
+        (Text.pack "{\"2\":3,\"10\":4,\"100\":5}")
+    Spec.it s "the bundle round trips" $
+      Common.assertCodec s codec entries "{\"2\":3,\"10\":4}"
+    -- The mutation target: a total wrap would fold this to a key rather than
+    -- rejecting it, and no round trip can catch that because the encoder never
+    -- writes such a key.
+    Spec.it s "rejects a key that is not a number" $
+      Spec.assertBool
+        s
+        (Either.isLeft (Codec.decode codec =<< Common.parse (Text.pack "{\"abc\":1}")))
+        "expected a decode failure"
+    Spec.it s "rejects a key that is a number the key codec refuses" $
+      Spec.assertBool
+        s
+        (Either.isLeft (Codec.decode codec =<< Common.parse (Text.pack "{\"-1\":1}")))
+        "expected a decode failure"
+    -- Two spellings of one number are one KEY, so this is the repeated-key
+    -- check doing the work no canonical-format check was added for.
+    Spec.it s "rejects two spellings of one key" $
+      Spec.assertBool
+        s
+        (Either.isLeft (Codec.decode codec =<< Common.parse (Text.pack "{\"1\":1,\"1e0\":2}")))
+        "expected a decode failure"
+    Spec.it s "the schema constrains the keys to the decimal pattern" $
+      Spec.assertEq
+        s
+        (Define.run (Codec.schema codec))
+        (Define.run (fmap (Schema.mapOfKeys (Schema.matching Common.naturalKeyPattern)) (Codec.schema Common.integer)))
+    -- The pairing the schema equality cannot make: that the published schema
+    -- actually REJECTS the key the decoder rejects, so the two agree in the
+    -- direction Common.textMap's comment cares about.
+    Spec.it s "the schema rejects a key that is not a number" $
+      Spec.assertBool
+        s
+        ( Either.either
+            (const False)
+            (not . null . Validate.validate (Define.run (Codec.schema codec)))
+            (Common.parse (Text.pack "{\"abc\":1}"))
+        )
+        "expected the schema to reject the key"
+    Spec.it s "the schema accepts what the encoder writes" $
+      Spec.assertEq
+        s
+        (Validate.validate (Define.run (Codec.schema codec)) (Codec.encode codec entries))
+        []
 
   Spec.describe s "assertMatchesSchema" $ do
     -- A capturing spec, so that a FAILING assertion is a value rather than the

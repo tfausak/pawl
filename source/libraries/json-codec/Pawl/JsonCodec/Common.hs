@@ -410,13 +410,15 @@ keyedList c =
 -- object's key is a string rather than a 'Value.Value'; this module cannot name
 -- the key type either, since @pawl:json-codec@ does not depend on @pawl:types@.
 --
--- The wrap is total. Both key types in the corpus are unvalidated @Text@
--- newtypes, and 'Schema.mapOf' constrains no key, so a fallible wrap would
--- reject documents the schema says are valid.
+-- The wrap is FALLIBLE, because a key that is a rendering of something rather
+-- than a bare string can be malformed: see 'naturalMap', whose keys are
+-- numbers. A key type that accepts any string recovers the total form as
+-- @Right . f@, which is what all three @Text@-newtype call sites pass, so their
+-- wire format is unchanged.
 textMap ::
   (Ord k) =>
   (k -> Text.Text) ->
-  (Text.Text -> k) ->
+  (Text.Text -> Either Text.Text k) ->
   Codec.Codec v ->
   Codec.Codec (Map.Map k v)
 textMap unwrapKey wrapKey c =
@@ -427,13 +429,73 @@ textMap unwrapKey wrapKey c =
           . Map.toAscList,
       Codec.decode = \value -> do
         ps <- asObject value
-        entries <- traverse (\p -> fmap ((,) (wrapKey (String.unwrap (Pair.name p)))) (Codec.decode c (Pair.value p))) ps
+        entries <- traverse (\p -> (,) <$> wrapKey (String.unwrap (Pair.name p)) <*> Codec.decode c (Pair.value p)) ps
         let m = Map.fromList entries
         if Map.size m == length entries
           then Right m
           else Left $ Text.pack "expected an object with no repeated keys",
       Codec.schema = Schema.mapOf <$> Codec.schema c
     }
+
+-- | A map keyed by a NUMBER, on the wire as a JSON object whose keys are the
+-- decimal renderings of those numbers -- which is the class that dominates a
+-- game state, so its readability is what decides whether a written-out state is
+-- diffable.
+--
+-- The key functions are derived from the key type's OWN codec rather than
+-- hand-written, so the key's wire shape stays tied to the codec that already
+-- defines it and the fallibility falls out of 'Codec.decode'. That derivation
+-- is not applied uniformly to every key type: a string key would come back from
+-- its codec as a quoted JSON string, and rendering THAT would key the object by
+-- @\"a\"@ rather than by @a@. So 'textMap' is the string case and this is the
+-- number case, per scalar kind rather than per codec.
+--
+-- The schema constrains the keys, which is what lets the wrap reject one:
+-- 'Schema.mapOf' would claim any string is a key while this decoder rejects
+-- most of them.
+naturalMap ::
+  (Ord k) =>
+  Codec.Codec k ->
+  Codec.Codec v ->
+  Codec.Codec (Map.Map k v)
+naturalMap ck cv =
+  (textMap (naturalKeyText ck) (naturalKeyValue ck) cv)
+    { Codec.schema = Schema.mapOfKeys (Schema.matching naturalKeyPattern) <$> Codec.schema cv
+    }
+
+-- | What a 'naturalMap' key looks like: a decimal natural with no leading zero,
+-- no sign and no exponent.
+naturalKeyPattern :: Text.Text
+naturalKeyPattern = Text.pack "^(0|[1-9][0-9]*)$"
+
+-- | Encodes a key through its own codec and renders the resulting scalar as a
+-- decimal integer. Rendering the scalar as JSON would not do: 'Value.encode'
+-- writes a normalized decimal, so an object id of 100 would come out as
+-- @1e2@ -- one JSON number, but not the key string a reader expects.
+--
+-- Total, because 'textMap' takes a total unwrap. A key codec that writes
+-- something other than an integer falls back to the JSON rendering, which
+-- cannot match 'naturalKeyPattern', so 'assertMatchesSchema' catches it rather
+-- than the wire format quietly changing shape.
+naturalKeyText :: Codec.Codec k -> k -> Text.Text
+naturalKeyText c k =
+  let value = Codec.encode c k
+   in case asInteger value of
+        Right n -> Text.pack $ show n
+        Left _ -> render value
+
+-- | The other half of the derivation: parse the key string as a JSON scalar and
+-- hand it to the same codec, so @{"abc": ...}@ is REJECTED rather than folded
+-- to a silent @0@ that would then collide with a real key.
+--
+-- No format check beyond what the codec does. A non-canonical spelling such as
+-- @1e0@ decodes to the same key as @1@, and 'textMap''s repeated-key check is
+-- what stops the two collapsing onto one entry; the schema's @pattern@ is what
+-- states the canonical shape. So the decoder is a shade LOOSER than the schema
+-- rather than stricter, which is the safe direction: nothing the schema accepts
+-- is rejected, which is what 'textMap''s comment refuses to allow.
+naturalKeyValue :: Codec.Codec k -> Text.Text -> Either Text.Text k
+naturalKeyValue c = parse >=> Codec.decode c
 
 -- | 'assertJsonCodec' against a bundle rather than a loose pair, plus the
 -- assertion only a bundle can make: that the encoder writes what the schema
