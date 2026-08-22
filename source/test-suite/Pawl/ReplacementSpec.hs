@@ -3528,6 +3528,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   entryCountersSpec s registry
   shieldCounterSpec s registry
   warLeechSpec s registry
+  dragonstormGlobeSpec s registry
 
 -- Monstrous War-Leech {3}{B} Creature -- Leech Horror \*/*, whole text: "Kicker
 -- {U}. As this creature enters, if it was kicked, mill four cards. Monstrous
@@ -6406,3 +6407,96 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
     Spec.assertBool s (Set.member guard_ (GameState.battlefield (S.settleSba tookThePiker))) "and it survives"
     Spec.assertEqWith s "one counter spent either way" (shields guard_ tookTheAvatar) 0
     Spec.assertEqWith s "one counter spent either way" (shields guard_ tookThePiker) 0
+
+-- Dragonstorm Globe {3} Artifact, whole text: "Each Dragon you control enters
+-- with an additional +1/+1 counter on it. / {T}: Add one mana of any color."
+-- (checked against Scryfall)
+--
+-- CR 612.1's REPLACEMENT-EFFECT carrier, and the first producer in the pool that
+-- reaches it: a CR 604.2 replacement watching OTHER objects, so the permanent
+-- holding it is on the battlefield for a text change to point at. Every earlier
+-- replacement naming a subtype matches Filter.IsSource instead, and CR 400.7
+-- gives the new incarnation of an entering permanent no continuous effect the
+-- spell had.
+--
+-- CR 612.2 licenses the swap: "Dragon" here is a creature type word used as a
+-- creature type, on an artifact that is not itself a Dragon. CR 613.1c puts the
+-- change at layer 3, so Projection.replacementsOf hands the rewritten row to the
+-- CR 616.1 entry loop.
+--
+-- The board: alice controls the Globe, an Island and six Mountains, and holds
+-- Artificial Evolution ({U}) plus the card named by `entering`. The Globe is on
+-- the battlefield BEFORE either spell is cast, which is what makes its row live
+-- when the entry loop runs.
+globeChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe (Subtype.Subtype, Subtype.Subtype) -> String -> m (GameState.GameState, Maybe ObjectId.ObjectId)
+globeChain s registry swap entering = do
+  island <- S.printingOf s registry "Island"
+  mountain <- S.printingOf s registry "Mountain"
+  globe <- S.printingOf s registry "Dragonstorm Globe"
+  evolution <- S.printingOf s registry "Artificial Evolution"
+  creature <- S.printingOf s registry entering
+  let base = S.landsFor mountain S.alice 6 (S.landsInPlay island 1)
+      (globeId, g1) = S.addCreature globe S.alice base
+      (evolutionId, g2) = S.addHandCard evolution S.alice g1
+      (creatureId, g3) = S.addHandCard creature S.alice g2
+      ready =
+        g3
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      hacked = case swap of
+        Nothing -> ready
+        Just (from, to) -> castAndResolve (evolveAt globeId from to) ready evolutionId
+      after = castAndResolve S.identityAnswer hacked creatureId
+  pure (after, newestNamed (S.printingName creature) after)
+
+-- Aims every target set at one object and answers the creature-type swap, the
+-- Pawl.ActivateSpec helper of the same name.
+evolveAt :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
+evolveAt oid from to p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
+  Prompt.ChooseCreatureTypeSwap {} -> (from, to)
+  _ -> S.identityAnswer p
+
+-- The four legs are two pairs differing in exactly one thing. Goblin Piker
+-- (2/1 Creature -- Goblin Warrior) is the object the hacked word reaches and the
+-- printed word does not; Hoarding Dragon (4/4 Creature -- Dragon) is the object
+-- the printed word reaches and the hacked one does not. Distinct printed sizes,
+-- so no reading of the rule produces the same number as another.
+dragonstormGlobeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+dragonstormGlobeSpec s registry =
+  Spec.describe s "Dragonstorm Globe (CR 612.1)" $ do
+    Spec.it s "CR 612.1 a text change reaches a replacement effect: the hacked Globe swells an entering Goblin" $ do
+      (after, entered) <- globeChain s registry (Just (Subtype.Dragon, Subtype.Goblin)) "Goblin Piker"
+      case entered of
+        Nothing -> Spec.assertFailure s "the Goblin Piker did not reach the battlefield"
+        Just pikerId -> do
+          Spec.assertEqWith s "CR 613.1c the layer-3 swap reaches the row the entry loop reads" (Projection.powerOf pikerId after) (Just 3)
+          Spec.assertEqWith s "and the toughness with it" (Projection.toughnessOf pikerId after) (Just 2)
+          Spec.assertEqWith s "through the one +1/+1 counter CR 614.1c put on it" (countersOn CounterKind.PlusOnePlusOne pikerId after) 1
+    -- The control leg: the same board, the same Piker, no Artificial Evolution.
+    Spec.it s "unhacked, the printed Dragon leaves that same Goblin alone" $ do
+      (after, entered) <- globeChain s registry Nothing "Goblin Piker"
+      case entered of
+        Nothing -> Spec.assertFailure s "the Goblin Piker did not reach the battlefield"
+        Just pikerId -> do
+          Spec.assertEqWith s "printed 2/1, so the Globe's row did not apply" (Projection.powerOf pikerId after) (Just 2)
+          Spec.assertEqWith s "printed 2/1, so the Globe's row did not apply" (Projection.toughnessOf pikerId after) (Just 1)
+          Spec.assertEqWith s "no counter" (countersOn CounterKind.PlusOnePlusOne pikerId after) 0
+    -- The converse: CR 612.1 REPLACES the word rather than adding one, so the
+    -- Dragon the printed row named is no longer named.
+    Spec.it s "CR 612.1 the printed word is gone: after the hack an entering Dragon gets nothing" $ do
+      (after, entered) <- globeChain s registry (Just (Subtype.Dragon, Subtype.Goblin)) "Hoarding Dragon"
+      case entered of
+        Nothing -> Spec.assertFailure s "the Hoarding Dragon did not reach the battlefield"
+        Just dragonId -> do
+          Spec.assertEqWith s "printed 4/4" (Projection.powerOf dragonId after) (Just 4)
+          Spec.assertEqWith s "no counter" (countersOn CounterKind.PlusOnePlusOne dragonId after) 0
+    Spec.it s "unhacked, that same Dragon does take the counter" $ do
+      (after, entered) <- globeChain s registry Nothing "Hoarding Dragon"
+      case entered of
+        Nothing -> Spec.assertFailure s "the Hoarding Dragon did not reach the battlefield"
+        Just dragonId -> do
+          Spec.assertEqWith s "CR 614.1c the printed row applies to a Dragon" (Projection.powerOf dragonId after) (Just 5)
+          Spec.assertEqWith s "through one +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne dragonId after) 1
