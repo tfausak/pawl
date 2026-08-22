@@ -37,6 +37,7 @@ import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
@@ -858,9 +859,10 @@ castable pid oid name facing gs =
 -- and the player picks by picking an action. A card whose halves are separately
 -- gated appears only as often as CR 709.3a lets it.
 --
--- AND ONE MORE PER FACE WITH MORPH, which is CR 702.37d's permission being
--- offered the same way: "you can't normally cast a card face down; a morph
--- ability allows you to do so". Casting face up and casting face down are two
+-- AND ONE MORE PER FACE WITH MORPH OR DISGUISE, which is CR 702.37d's and CR
+-- 702.168c's permission being offered the same way: "you can't normally cast a
+-- card face down; a morph ability allows you to do so", and rule 702.168c is
+-- that sentence again for disguise. Casting face up and casting face down are two
 -- different casts of one card at two different costs for two different objects,
 -- so they are two actions and the player picks -- the engine never decides which
 -- (docs/design.md's second invariant). Both are then gated independently, since
@@ -881,6 +883,16 @@ castableSpells pid gs =
           -- facing this proposes carries FaceDownReason.Morphed, and CR 701.40b's
           -- procedure is closed to the permanent it becomes.
           : [Facing.faceDown FaceDownReason.Morphed | Maybe.isJust (Keyword.morphCost (Face.keywords face))]
+            -- CR 702.168b names its own allower the same way -- "turn the card face
+            -- down and ANNOUNCE THAT YOU ARE USING A DISGUISE ABILITY" -- and lists
+            -- ward {2} where rule 702.37c lists nothing, so this facing carries both
+            -- the reason and the list (CR 708.2).
+            --
+            -- A SECOND ENTRY and not a widened first: a card with both abilities
+            -- offers two face-down casts, since the two objects differ (one has ward
+            -- {2}) and CR 702.168d's price for turning up is not CR 702.37e's. No
+            -- printing has both.
+            <> [Facing.FaceDown FaceDownReason.Disguised FaceDownCharacteristics.disguisedValue | Maybe.isJust (Keyword.disguiseCost (Face.keywords face))]
       proposals oid =
         [ (oid, Face.name face, facing)
         | face <- foldMap Card.castableFaces (Game.cardOf oid gs),

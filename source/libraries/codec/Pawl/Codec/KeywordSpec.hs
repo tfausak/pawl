@@ -277,6 +277,18 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (flashback 1)
       " {\"type\":\"Flashback\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
     Spec.assertBool s (Codec.encode Keyword.codec (flashback 1) /= Codec.encode Keyword.codec (flashback 4)) "the cost is part of the encoding"
+  -- CR 702.168a's payload is a Cost too, and it must not share Morph's tag: the
+  -- two name the turn-face-up cost of DIFFERENT procedures (CR 702.37e and CR
+  -- 702.168d), and the objects they list differ by CR 702.168b's ward {2}.
+  Spec.it s "Disguise carries its cost, and is not Morph" $ do
+    let disguise n = Keyword.Disguise (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+        morphOf n = Keyword.Morph (Morph.MkMorph (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []) MorphVariant.Plain)
+    Common.assertCodec
+      s
+      Keyword.codec
+      (disguise 5)
+      " {\"type\":\"Disguise\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":5}]}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (disguise 5) /= Codec.encode Keyword.codec (morphOf 5)) "the same cost under two keywords encodes differently"
   -- CR 702.170a's payload is a whole Cost too, and it must not share Flashback's
   -- tag: the two name different costs on the same card -- flashback's is the
   -- cast's and plot's is the special action's.

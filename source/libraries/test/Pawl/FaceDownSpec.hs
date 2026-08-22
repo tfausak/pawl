@@ -103,17 +103,23 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.Printing as Printing
@@ -138,6 +144,7 @@ spec s registry = Spec.describe s "FaceDown" $ do
   listedSpec s registry
   manifestSpec s registry
   faceUpEffectSpec s registry
+  disguiseSpec s registry
 
 -- CR 303.4k: an Aura turned face up, choosing what it becomes attached to.
 --
@@ -1656,3 +1663,237 @@ faceUpEffectSpec s registry = Spec.describe s "TurnFaceUp (CR 701.40g)" $ do
         Spec.assertEqWith s "CR 708.7 the counter down the creature road" (S.counterOf CounterKind.PlusOnePlusOne creatureWatcher creatureAfter) 1
         Spec.assertEqWith s "CR 110.5 and that one is face up" (fmap Object.facing (Game.lookupObject creaturePermanent creatureAfter)) (Just Facing.FaceUp)
       _ -> Spec.assertFailure s "the manifest did not reach the battlefield"
+
+-- CR 702.168 disguise: rule 702.37's twin, and the one place rule 708.2's "no
+-- characteristics other than those LISTED" has a keyword in the list.
+--
+-- Defenestrated Phantom is the card, {4}{W}{W} Creature -- Spirit 4/3, "Flying /
+-- Disguise {4}{W}", transcribed whole. Chosen as the pool's plainest disguise
+-- creature: MKM's others carry investigate or a turned-face-up trigger, either of
+-- which would put a second observable event beside the one these cases read. Its
+-- printed values differ from CR 702.168b's listing on every axis the rule names
+-- -- 4/3 against the 2/2, a Spirit against no subtypes, flying against ward {2},
+-- a name against none, and a mana value of 6 against CR 202.3a's 0.
+--
+-- AINOK TRACKER IS THE PAIR, not a second fixture: the two cards differ in the
+-- keyword and in nothing else that these cases read. Both are creature cards cast
+-- face down for CR 702.37a's and CR 702.168a's shared {3}, both become 2/2s, and
+-- only one of them lists ward {2}. Every case below that asserts something about
+-- disguise asserts the same thing about morph on the same board.
+disguiseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+disguiseSpec s registry =
+  let disguised = Facing.FaceDown FaceDownReason.Disguised FaceDownCharacteristics.disguisedValue
+      morphed = Facing.faceDown FaceDownReason.Morphed
+      -- CR 702.21a's ward {2}, written as the trigger's cost is written, so the
+      -- assertion reads the listing rather than restating it.
+      ward2 = Keyword.Ward (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])
+   in Spec.describe s "Disguise" $ do
+        -- CR 702.168a prices the disguise cast at {3} exactly as CR 702.37a prices
+        -- the morph one, and CR 118.9's alternative replaces the mana cost -- so
+        -- three Plains buy the face-down cast and not the {4}{W}{W} one.
+        Spec.it s "CR 702.168a a disguise cast is offered for {3} where the printed cost is not" $ do
+          plains <- S.printingOf s registry "Plains"
+          phantom <- S.printingOf s registry phantomName
+          let (gs, oid) = morphBoard plains phantom 3
+              offered = Action.legalActions S.alice gs
+              name = S.printingName phantom
+          Spec.assertBool s (elem (Action.Type.Cast oid name disguised) offered) "the disguise cast is offered"
+          Spec.assertBool s (notElem (Action.Type.Cast oid name Facing.FaceUp) offered) "the {4}{W}{W} cast is not"
+          -- CR 702.168b's facing is the one the action carries, listing and all: a
+          -- morph proposal of the same card would be a different action, and CR
+          -- 708.2 makes it a different object.
+          Spec.assertBool s (notElem (Action.Type.Cast oid name morphed) offered) "and no morph cast is, the card having no morph ability"
+
+        -- THE PAIR's other half, on the same fixture: Ainok Tracker offers the
+        -- morph facing and never the disguise one, so the two proposals are told
+        -- apart by the keyword rather than by the board.
+        Spec.it s "CR 702.37c a morph card offers the morph facing and not the disguise one" $ do
+          plains <- S.printingOf s registry "Plains"
+          ainok <- S.printingOf s registry ainokName
+          let (gs, oid) = morphBoard plains ainok 3
+              offered = Action.legalActions S.alice gs
+              name = S.printingName ainok
+          Spec.assertBool s (elem (Action.Type.Cast oid name morphed) offered) "the morph cast is offered"
+          Spec.assertBool s (notElem (Action.Type.Cast oid name disguised) offered) "and no disguise cast is"
+
+        -- THE PROVING TEST for the listing. Every axis rule 702.168b names, read
+        -- off the permanent the disguise cast produced -- including the one that
+        -- makes this rule different from rule 702.37c, the ward {2} that survives
+        -- CR 708.2a's "no text".
+        Spec.it s "CR 702.168b a disguise cast becomes a 2/2 with ward {2}, no name and no subtypes" $ do
+          plains <- S.printingOf s registry "Plains"
+          phantom <- S.printingOf s registry phantomName
+          let (gs, oid) = morphBoard plains phantom 3
+              (after, entered) = castAndResolve phantom disguised gs oid
+          case entered of
+            Nothing -> Spec.assertFailure s "the disguise cast did not reach the battlefield"
+            Just permanent -> do
+              Spec.assertBool s (Projection.hasKeyword ward2 permanent after) "CR 702.168b ward {2}, which CR 708.2 leaves standing because the rule listed it"
+              Spec.assertEqWith s "CR 702.168b a 2/2, not the printed 4/3" (S.powerToughnessOf permanent after) (Just (2, 2))
+              Spec.assertEqWith s "CR 702.168b no name" (Projection.namesOf permanent after) noNames
+              Spec.assertEqWith s "CR 702.168b no subtypes, not Spirit" (Projection.subtypesOf permanent after) Set.empty
+              Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying permanent after)) "CR 708.2 no flying: the printed keyword is not on the list"
+              Spec.assertEqWith s "CR 708.6 it is face down, disguised, with the listing on it" (fmap Object.facing (Game.lookupObject permanent after)) (Just disguised)
+          Spec.assertEqWith s "CR 702.168a three mana paid, not six" (S.tappedCount S.alice after) 3
+
+        -- THE PAIR: the same cast of a morph card, whose rule lists nothing (CR
+        -- 702.37c), so the 2/2 has no ward. Without this the ward assertion above
+        -- could be passing because every face-down permanent had one.
+        Spec.it s "CR 702.37c a morph cast becomes a 2/2 with NO ward" $ do
+          plains <- S.printingOf s registry "Plains"
+          ainok <- S.printingOf s registry ainokName
+          let (gs, oid) = morphBoard plains ainok 3
+              (after, entered) = castAndResolve ainok morphed gs oid
+          case entered of
+            Nothing -> Spec.assertFailure s "the morph cast did not reach the battlefield"
+            Just permanent -> do
+              Spec.assertBool s (not (Projection.hasKeyword ward2 permanent after)) "CR 702.37c the morph listing names no keyword"
+              Spec.assertEqWith s "and it is the same 2/2" (S.powerToughnessOf permanent after) (Just (2, 2))
+
+        -- CR 702.168d: the special action, at the disguise cost and at no other.
+        -- Eight Plains -- three for the cast, five for {4}{W} -- and the whole
+        -- board is tapped by the end, which is what tells rule 702.168d's price
+        -- from CR 702.37e's and from CR 701.40b's {4}{W}{W}.
+        Spec.it s "CR 702.168d the disguise procedure turns it face up for {4}{W}" $ do
+          plains <- S.printingOf s registry "Plains"
+          phantom <- S.printingOf s registry phantomName
+          let (gs, oid) = morphBoard plains phantom 8
+              (down, entered) = castAndResolve phantom disguised gs oid
+          case entered of
+            Nothing -> Spec.assertFailure s "the disguise cast did not reach the battlefield"
+            Just permanent -> do
+              -- ONE procedure and not three: CR 702.37e's asks for a morph ability
+              -- this card has not got, and CR 701.40b's asks about the allower.
+              Spec.assertEqWith s "CR 702.168d only the disguise procedure is open" (FaceDown.turnableFaceUp S.alice down) [(permanent, TurnUpProcedure.Disguise)]
+              let up = S.runPure S.identityAnswer down (FaceDown.turnFaceUp S.alice TurnUpProcedure.Disguise permanent)
+              Spec.assertEqWith s "CR 702.168d it regains its normal characteristics: the printed 4/3" (S.powerToughnessOf permanent up) (Just (4, 3))
+              Spec.assertBool s (Projection.hasKeyword Keyword.Flying permanent up) "CR 702.168d and its flying"
+              Spec.assertBool s (not (Projection.hasKeyword ward2 permanent up)) "CR 702.168d the disguise effect ended, so the listed ward is gone"
+              Spec.assertEqWith s "CR 110.5 it is face up" (fmap Object.facing (Game.lookupObject permanent up)) (Just Facing.FaceUp)
+              Spec.assertEqWith s "CR 702.168d five more mana paid, eight in all" (S.tappedCount S.alice up) 8
+
+        -- The negative on the same axis, differing in ONE Plains: seven buy the
+        -- {3} cast and leave four, which is one short of {4}{W}, so the action is
+        -- not offered at all. A cheaper price would put it back on the menu.
+        Spec.it s "CR 702.168d four mana left is one short of the disguise cost" $ do
+          plains <- S.printingOf s registry "Plains"
+          phantom <- S.printingOf s registry phantomName
+          let (gs, oid) = morphBoard plains phantom 7
+              (down, entered) = castAndResolve phantom disguised gs oid
+          case entered of
+            Nothing -> Spec.assertFailure s "the disguise cast did not reach the battlefield"
+            Just permanent -> do
+              Spec.assertBool s (maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject permanent down)) "the permanent really is face down"
+              Spec.assertEqWith s "CR 702.168d no procedure is affordable" (FaceDown.turnableFaceUp S.alice down) []
+
+        -- THE PAIR: a morph card offers CR 702.37e's procedure and never CR
+        -- 702.168d's, so the two special actions are told apart by the card's
+        -- keyword rather than by the facing. Mountains rather than Plains, and
+        -- that is the Tracker's {4}{R} rather than anything about the rule: eight
+        -- of them pay the {3} cast and the morph cost, as eight Plains pay the {3}
+        -- cast and the Phantom's {4}{W} above.
+        Spec.it s "CR 702.37e a morph card offers the morph procedure and not the disguise one" $ do
+          mountain <- S.printingOf s registry "Mountain"
+          ainok <- S.printingOf s registry ainokName
+          let (gs, oid) = morphBoard mountain ainok 8
+              (down, entered) = castAndResolve ainok morphed gs oid
+          case entered of
+            Nothing -> Spec.assertFailure s "the morph cast did not reach the battlefield"
+            Just permanent ->
+              Spec.assertEqWith s "CR 702.37e the morph procedure alone" (FaceDown.turnableFaceUp S.alice down) [(permanent, TurnUpProcedure.Morph)]
+
+        -- WHAT THE LISTING IS FOR, at gameplay level: an opponent's removal aimed
+        -- at the face-down permanent fires CR 702.21a's trigger off the listed
+        -- ward, and declining counters the spell.
+        --
+        -- THREE SEATS, ZoneTriggerSpec's ward group's reason: carol is neither the
+        -- caster nor the ward's controller, so "an opponent controls it" is a
+        -- different sentence from "bob controls it".
+        Spec.it s "CR 702.168b / 702.21a the listed ward fires on an opponent's spell, and declining counters it" $ do
+          board <- wardedBoard s registry phantomName disguised
+          case board of
+            Nothing -> Spec.assertFailure s "the disguise cast did not reach the battlefield"
+            Just (permanent, onStack) -> do
+              -- The controls: the Growth really was cast (rule 702.21a is not a CR
+              -- 115 targeting restriction), and the trigger really went on over it.
+              Spec.assertEqWith s "CR 708.2 a 2/2 with the Growth unresolved" (S.powerToughnessOf permanent onStack) (Just (2, 2))
+              Spec.assertEqWith s "the Growth and the ward trigger are both on the stack" (length (GameState.stack onStack)) 2
+              let declined = S.runPure S.identityAnswer onStack (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop)
+              Spec.assertEqWith s "CR 702.21a bob declined, so the Growth was countered and it is still a 2/2" (S.powerToughnessOf permanent declined) (Just (2, 2))
+              Spec.assertEqWith s "CR 701.6a and the stack is empty" (length (GameState.stack declined)) 0
+
+        -- The same board and the same cast, differing in NOTHING but bob's answer.
+        Spec.it s "CR 702.21a paying the listed ward cost leaves the spell to resolve" $ do
+          board <- wardedBoard s registry phantomName disguised
+          case board of
+            Nothing -> Spec.assertFailure s "the disguise cast did not reach the battlefield"
+            Just (permanent, onStack) -> do
+              let paid = S.runPure (paysWard S.bob) onStack (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop)
+              Spec.assertEqWith s "CR 702.21a the Growth resolved on the 2/2" (S.powerToughnessOf permanent paid) (Just (5, 5))
+              Spec.assertEqWith s "and bob's Forests paid the ward on top of the Growth" (S.tappedCount S.bob paid) 3
+
+        -- THE PAIR, and the case that makes the two above about the LISTING rather
+        -- than about the board: the same three seats, the same Giant Growth, the
+        -- same {3} face-down cast, with a morph card underneath. Rule 702.37c
+        -- lists no ward, so nothing triggers and the Growth resolves off bob's one
+        -- Forest.
+        Spec.it s "CR 702.37c a morph cast has no ward, so the same spell resolves untouched" $ do
+          board <- wardedBoard s registry ainokName morphed
+          case board of
+            Nothing -> Spec.assertFailure s "the morph cast did not reach the battlefield"
+            Just (permanent, onStack) -> do
+              Spec.assertEqWith s "only the Growth is on the stack" (length (GameState.stack onStack)) 1
+              let after = S.runPure S.identityAnswer onStack (Stack.resolveTop >> Engine.settleForPriority)
+              Spec.assertEqWith s "CR 702.37c the Growth resolved with nothing to counter it" (S.powerToughnessOf permanent after) (Just (5, 5))
+              Spec.assertEqWith s "and bob spent only the Growth's Forest" (S.tappedCount S.bob after) 1
+
+-- The card whose face-down listing carries CR 702.168b's ward {2}.
+phantomName :: String
+phantomName = "Defenestrated Phantom"
+
+-- Its pair: the morph card whose rule lists nothing (CR 702.37c).
+ainokName :: String
+ainokName = "Ainok Tracker"
+
+-- THREE SEATS and one face-down permanent, with bob holding the removal: alice
+-- casts the named card face down for {3} off three Plains, and bob's Giant Growth
+-- is cast at it off three Forests -- one for the Growth and two for the ward cost,
+-- so a spell that survives did so because nothing triggered rather than because
+-- bob could not have paid.
+--
+-- The face-down permanent is the board's only creature, so identityAnswer's target
+-- choice is the only choice there is: nothing here searches for a target that
+-- makes an assertion pass.
+wardedBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  String ->
+  Facing.Facing ->
+  m (Maybe (ObjectId.ObjectId, GameState.GameState))
+wardedBoard s registry name facing = do
+  plains <- S.printingOf s registry "Plains"
+  forest <- S.printingOf s registry "Forest"
+  subject <- S.printingOf s registry name
+  growth <- S.printingOf s registry "Giant Growth"
+  let lands = S.landsFor forest S.bob 3 (S.landsFor plains S.alice 3 S.threePlayerGame)
+      (card, withCard) = S.addHandCard subject S.alice lands
+      (growthId, withGrowth) = S.addHandCard growth S.bob withCard
+      ready =
+        withGrowth
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      (down, entered) = castAndResolve subject facing ready card
+  pure (fmap (\permanent -> (permanent, S.runPure S.identityAnswer (S.runPure S.identityAnswer down (S.cast S.bob growthId)) Engine.settleForPriority)) entered)
+
+-- CR 702.21a's "unless that player pays [cost]", answered by paying -- and only
+-- when the payer and the decider are the named seat, so an offer made to anyone
+-- else falls through to declining and shows up as a countered spell.
+paysWard :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+paysWard who p = case p of
+  Prompt.ChooseToPay (Decider.MkDecider d) player _ _ _ _
+    | d == who && player == who ->
+        PaymentDecision.Pays
+  _ -> S.identityAnswer p

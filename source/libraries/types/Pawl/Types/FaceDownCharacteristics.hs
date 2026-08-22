@@ -2,6 +2,10 @@ module Pawl.Types.FaceDownCharacteristics where
 
 import qualified Data.Set as Set
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Toughness as Toughness
@@ -28,15 +32,18 @@ import qualified Pawl.Types.TypeLine as TypeLine
 -- name, mana cost, colour, supertypes, text -- is empty for every listing there
 -- is, so it is Card.faceDownFace's constant rather than a field here.
 --
--- Two listings are not implemented: the ABILITIES Magar lists (#1667), and the
--- KEYWORD disguise and cloak list (#922). Both are more fields on this record
--- when a card asks.
+-- Not implemented: the ABILITIES Magar lists, which are whole abilities rather
+-- than keywords (#1667). That is one more field on this record when a card asks.
 data FaceDownCharacteristics = MkFaceDownCharacteristics
   { typeLine :: TypeLine.TypeLine,
     -- | Absent for a listing that names no creature -- Yedora's "Forest land"
     -- has no power to list, and CR 208.3 gives a noncreature permanent none.
     power :: Maybe Power.Power,
-    toughness :: Maybe Toughness.Toughness
+    toughness :: Maybe Toughness.Toughness,
+    -- | CR 702.168b / 701.58a: the ward {2} disguise and cloak list. A Set and
+    -- not a count, Pawl.Types.Face.keywords' reason -- a listing says WHICH
+    -- keywords the object has, and no rule lists one twice.
+    keywords :: Set.Set Keyword.Keyword
   }
   deriving (Eq, Ord, Show)
 
@@ -54,5 +61,34 @@ defaultValue =
             TypeLine.subtypes = Set.empty
           },
       power = Just (Power.MkPower (Quantity.Literal 2)),
-      toughness = Just (Toughness.MkToughness (Quantity.Literal 2))
+      toughness = Just (Toughness.MkToughness (Quantity.Literal 2)),
+      keywords = Set.empty
+    }
+
+-- | CR 702.168b and CR 701.58a, which list the same thing in the same words: "a
+-- 2\/2 face-down creature card with ward {2}, no name, no subtypes, and no mana
+-- cost". CR 708.2a's list plus the one keyword, which is the whole of what
+-- disguise adds to morph.
+--
+-- ONE value for two rules, because the rules are one sentence apart: rule
+-- 701.58a is rule 702.168b's listing put onto the battlefield instead of onto
+-- the stack, and CR 701.58d has a single permanent under both at once. What
+-- separates them is the FaceDownReason beside this on Pawl.Types.Facing and the
+-- procedure that reads it, never the list.
+--
+-- Ward {2} and not a family designator: CR 702.168b lists a WRITTEN instance,
+-- which is what Pawl.Types.Keyword carries and what
+-- Pawl.Engine.Keyword.abilitiesFor needs to mint CR 702.21a's trigger with a
+-- cost on it.
+disguisedValue :: FaceDownCharacteristics
+disguisedValue =
+  defaultValue
+    { keywords =
+        Set.singleton
+          ( Keyword.Ward
+              Cost.MkCost
+                { Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 2]),
+                  Cost.components = []
+                }
+          )
     }

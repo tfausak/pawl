@@ -106,6 +106,7 @@ codec =
       Arm.nullary "Compleated" Keyword.Compleated,
       Arm.payload "Miracle" (Cost.codec codec) Keyword.Miracle (\x -> case x of Keyword.Miracle y -> Just y; _ -> Nothing),
       Arm.payload "Toxic" Common.natural Keyword.Toxic (\x -> case x of Keyword.Toxic y -> Just y; _ -> Nothing),
+      Arm.payload "Disguise" (Cost.codec codec) Keyword.Disguise (\x -> case x of Keyword.Disguise y -> Just y; _ -> Nothing),
       Arm.payload "Plot" (Cost.codec codec) Keyword.Plot (\x -> case x of Keyword.Plot y -> Just y; _ -> Nothing),
       Arm.payload "Foretell" (Cost.codec codec) Keyword.Foretell (\x -> case x of Keyword.Foretell y -> Just y; _ -> Nothing),
       Arm.nullary "StartYourEngines" Keyword.StartYourEngines,

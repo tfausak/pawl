@@ -66,8 +66,15 @@ import qualified Pawl.Types.TypeLine as TypeLine
 -- casting permissions and no additional or alternative costs. Every field below
 -- is that reading, written out rather than inherited, so a field added to
 -- Pawl.Types.Face has to be decided here rather than defaulting to the card's.
--- The three the argument reaches are the ones a printing lists -- see
+-- The four the argument reaches are the ones a listing names -- see
 -- Pawl.Types.FaceDownCharacteristics for which listings pawl cannot yet carry.
+--
+-- The KEYWORDS are the exception to "no abilities of any kind", and CR 702.168b
+-- is why: disguise's listing is "a 2/2 face-down creature card WITH WARD {2}",
+-- so rule 708.2's "no characteristics other than those listed" leaves that one
+-- ability standing. It arrives here as an ordinary Face.keywords set, so CR
+-- 702.21a's trigger is minted from the projection by the same road every printed
+-- ward takes; nothing about being face down is special-cased downstream.
 --
 -- The one field that is not empty besides the type line and the P/T is `spell`:
 -- a face-down creature spell still has to RESOLVE, and Face.defaultSpell is
@@ -91,7 +98,7 @@ faceDownFace listed =
       Face.toughness = FaceDownCharacteristics.toughness listed,
       Face.loyalty = Nothing,
       Face.defense = Nothing,
-      Face.keywords = Set.empty,
+      Face.keywords = FaceDownCharacteristics.keywords listed,
       Face.colorIndicator = Set.empty,
       Face.characteristicPT = Nothing,
       Face.staticAbilities = [],
