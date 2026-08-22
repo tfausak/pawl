@@ -717,9 +717,15 @@ data Effect card
     -- blocking are separate (CR 509.1h against CR 510.1c), so a creature this
     -- blocks assigns no combat damage and takes none.
     --
+    -- The BLOCKING side is not this opcode and never was: a creature put onto the
+    -- battlefield already blocking a named attacker is EntryRiders.blocking (CR
+    -- 509.4), and a creature already on the battlefield being made to block is CR
+    -- 509.1c's requirements -- Pawl.Types.BlockRequirement and
+    -- Pawl.Types.ActiveBlockRequirement, with Lure and provoke in the pool.
+    --
     -- Not implemented: CR 509.1h's other direction, an effect saying a creature
     -- becomes UNBLOCKED (Scryfall `oracle:"becomes unblocked"`, 2026-08-14, no
-    -- hit); and an effect that makes a creature BLOCK (#1387).
+    -- hit).
     BecomesBlocked SlotName.SlotName
   | -- | CR 500.8: add phases to a turn, directly after the specified phase, in
     -- written order -- Aggravated Assault is `[ExtraCombat, ExtraMain]`. A

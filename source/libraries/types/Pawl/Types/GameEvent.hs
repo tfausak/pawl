@@ -294,10 +294,12 @@ data GameEvent
     -- exact because CR 509.2a puts these triggers on the stack before any player
     -- gets priority.
     --
-    -- CR 509.3c's third producer is missing: an attacker whose only blocker is
-    -- one put onto the battlefield blocking becomes blocked too (CR 509.4 denies
-    -- that creature having "blocked", but says nothing about the attacker), and
-    -- nothing can put a creature onto the battlefield blocking (#1387).
+    -- CR 509.3c's THIRD producer records it as well: an attacker whose only
+    -- blocker is one put onto the battlefield blocking becomes blocked too -- CR
+    -- 509.4 denies that creature having "blocked", but says nothing about the
+    -- attacker. Pawl.Engine.Combat.putOntoBattlefieldBlocking is that writer, and
+    -- it records this event only where CR 509.3c's "was an unblocked creature at
+    -- that time" holds.
     --
     -- The PlayerId is CR 508.5's defending player for this attacker, exactly as
     -- AttackerDeclared above carries it and computed the same way, off what the

@@ -3,6 +3,7 @@ module Pawl.Types.EntryRiders where
 import qualified Data.Map.Strict as Map
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TapState as TapState
 
 -- | What an effect says about an object AS IT ARRIVES in a zone, beyond the
@@ -37,6 +38,26 @@ import qualified Pawl.Types.TapState as TapState
 -- say WHAT the creature attacks; whom it attacks is chosen as it enters, by
 -- Pawl.Engine.Combat.putOntoBattlefieldAttacking. CR 508.4's parenthetical case
 -- of an effect that does specify has no card in the pool.
+--
+-- `blocking` is CR 509.4's rider, and its ASYMMETRY with `attacking` one field
+-- up is the design call rather than an oversight. CR 509.4's parenthetical --
+-- "unless the effect that put it onto the battlefield specifies what it's
+-- blocking" -- is the case every printing of this shape is in: Flash Foliage
+-- names a target, Brimaz, King of Oreskos and Aetherplasm name a trigger's
+-- binding, Mirror Match names the attacker it copied. So the field names the
+-- SLOT the effect specified, and the engine never asks. A Bool plus a prompt
+-- would put a question to the player that the effect has already answered.
+--
+-- Not implemented: CR 509.4's unspecified form, where the creature's controller
+-- chooses which attacking creature it's blocking as it enters (#2089).
+-- Nothing distinguishes that from "no rider" here, and nothing needs to while no
+-- printing writes it.
+--
+-- Applied by Pawl.Engine.Combat.putOntoBattlefieldBlocking, which is where CR
+-- 506.3e and CR 509.4a's two no-op conditions live and where CR 509.4b's
+-- exemption from the declaration's requirements and restrictions is what NOT
+-- asking canBlock amounts to. Read by Create alone: the pool's producer is a
+-- token, and Pawl.CardSpec's corpus lint holds that no MoveToZone sets it.
 --
 -- `transformed` is a Bool rather than a face name for the reason CR 712.14a
 -- states: "If a spell or ability puts a double-faced card onto the battlefield
@@ -153,6 +174,7 @@ import qualified Pawl.Types.TapState as TapState
 data EntryRiders count = MkEntryRiders
   { tapped :: TapState.TapState,
     attacking :: Bool,
+    blocking :: Maybe SlotName.SlotName,
     transformed :: Bool,
     counters :: Map.Map (CounterKind.CounterKind Keyword.Keyword) count,
     underOwner :: Bool,

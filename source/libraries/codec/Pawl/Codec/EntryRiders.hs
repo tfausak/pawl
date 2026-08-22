@@ -6,6 +6,7 @@ import qualified Data.Map.Strict as Map
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Quantity as Quantity
+import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.TapState as TapState
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -39,6 +40,7 @@ codec :: Codec.Codec (EntryRiders.EntryRiders Quantity.Type.Quantity)
 codec = Fields.object $ do
   tapped <- Fields.defaulted "tapped" defaultTapped TapState.codec EntryRiders.tapped
   attacking <- Fields.defaulted "attacking" False Common.boolean EntryRiders.attacking
+  blocking <- Fields.defaulted "blocking" Nothing (Common.maybe SlotName.codec) EntryRiders.blocking
   transformed <- Fields.defaulted "transformed" False Common.boolean EntryRiders.transformed
   counters <- Fields.defaulted "counters" Map.empty (Common.keyedList counter) EntryRiders.counters
   underOwner <- Fields.defaulted "underOwner" False Common.boolean EntryRiders.underOwner
@@ -48,6 +50,7 @@ codec = Fields.object $ do
     EntryRiders.MkEntryRiders
       { EntryRiders.tapped = tapped,
         EntryRiders.attacking = attacking,
+        EntryRiders.blocking = blocking,
         EntryRiders.transformed = transformed,
         EntryRiders.counters = counters,
         EntryRiders.underOwner = underOwner,
@@ -57,7 +60,8 @@ codec = Fields.object $ do
 
 -- | The value every carrier elides: a card file carries riders only when the
 -- effect really does say otherwise (CR 110.5b for tapped, CR 508.4 for a
--- creature put onto the battlefield attacking, CR 712.14 for the front face a
+-- creature put onto the battlefield attacking, CR 509.4 for one put onto the
+-- battlefield blocking, CR 712.14 for the front face a
 -- double-faced card enters showing by default, CR 122.6 for the counters an
 -- object enters with, CR 110.2a for who it enters under, CR 406.3 for an exiled
 -- card being kept face up, CR 110.5b for a permanent entering face up).
@@ -66,6 +70,7 @@ defaultValue =
   EntryRiders.MkEntryRiders
     { EntryRiders.tapped = defaultTapped,
       EntryRiders.attacking = False,
+      EntryRiders.blocking = Nothing,
       EntryRiders.transformed = False,
       EntryRiders.counters = Map.empty,
       EntryRiders.underOwner = False,

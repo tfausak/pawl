@@ -8110,7 +8110,9 @@ eventBindings cond event = case (cond, event) of
   -- CR 702.130a's "defending player", the same phrase and the same reserved slot
   -- as the arm above -- CR 508.5 resolves it for an ability of an ATTACKING
   -- creature, which is what the bearer of this condition is. Read off the event
-  -- for that arm's reason, Combat.declareBlockers having stamped it there.
+  -- for that arm's reason: every writer of it stamps CR 508.5's answer there --
+  -- Combat.declareBlockers, Combat.becomeBlocked (CR 509.1h's effect) and
+  -- Combat.putOntoBattlefieldBlocking (CR 509.4).
   (TriggerCondition.SelfBecomesBlocked, GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked _ defending)) ->
     Binding.setTriggerPlayer defending Map.empty
   -- CR 615.13's "that many": how much this prevention effect prevented, which is

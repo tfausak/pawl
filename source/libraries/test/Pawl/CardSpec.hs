@@ -5449,6 +5449,26 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- prints one.
     Spec.assertBool s (any (anyFace (any hides . cardResolutionEffects) . Printing.card) ps) "the pool has a card exiling face down"
     Spec.assertEqWith s "only exile keeps a card face down (CR 406.3)" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 509.4's rider is read by the Create arm of Pawl.Engine.Resolve and by
+  -- nothing else, so on a MoveToZone it is inert card data. Not because the rule
+  -- forbids it -- CR 509.4 is about a creature "put onto the battlefield", which
+  -- Aetherplasm does from a hand -- but because that road has no producer in the
+  -- pool and so is unwired (#2087 is what Aetherplasm waits on). A card stating
+  -- it there says something nothing reads.
+  Spec.it s "no MoveToZone carries CR 509.4's blocking entry rider" $ do
+    ps <- S.allPrintings s
+    let offends effect = case effect of
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _) -> Maybe.isJust (EntryRiders.blocking riders)
+          _ -> False
+        blocks effect = case effect of
+          Effect.Create (Create.MkCreate _ _ riders _ _) -> Maybe.isJust (EntryRiders.blocking riders)
+          _ -> False
+        offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
+    -- Guards against a vacuous sweep: with no blocking rider in the pool at all
+    -- this would pass whatever a card said. Flash Foliage is the card that
+    -- prints one.
+    Spec.assertBool s (any (anyFace (any blocks . cardResolutionEffects) . Printing.card) ps) "the pool has a card creating a token that's blocking"
+    Spec.assertEqWith s "only a Create puts a creature onto the battlefield blocking (CR 509.4)" (fmap (S.nameOf . Printing.card) offenders) []
   -- The sibling lint for the OTHER face-down rider, one field over and pointed
   -- at the opposite zone: CR 708.3 is a rule about entering the BATTLEFIELD, so
   -- on any other destination it is inert card data. Inert on a Create outright,
