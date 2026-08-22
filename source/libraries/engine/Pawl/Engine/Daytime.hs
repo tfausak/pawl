@@ -150,7 +150,8 @@ dueToTurn gs = case GameState.daytime gs of
 -- CR 701.27a's event is recorded through the `record` argument rather than
 -- inline, and the argument is there because of the module graph rather than
 -- because two callers want two answers: Pawl.Engine.Event owns recordEvent and
--- imports THIS module, so the one caller passes Event.recordTransformed down.
+-- imports THIS module, so the modules above pass Event.recordTransformed down
+-- instead.
 -- Every road this module has to a turn takes it, so the CR 702.145c/f sweep is
 -- not a second, silent way to turn a permanent over.
 --

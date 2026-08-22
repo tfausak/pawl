@@ -6715,7 +6715,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- answer this arm wrong on both events. Pawl.Types.Transformed carries the
   -- sample for that reason.
   --
-  -- Set.member rather than equality because CR 201.1 admits several names and
+  -- Set.member rather than equality because CR 709.4a admits several names and
   -- CR 708.2a admits none; a permanent with no name matches nothing, which is
   -- the rule's own answer rather than a guard.
   TriggerCondition.SelfTransformedInto name -> case event of

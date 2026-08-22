@@ -65,6 +65,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
@@ -76,6 +77,8 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Transformed as Transformed
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 701.27g's fixture, which is not the Gargoyle's: Tovolar, Dire Overlord //
@@ -588,6 +591,14 @@ gather gs = S.runPure S.identityAnswer gs Engine.settleForPriority
 resolveTop :: GameState.GameState -> GameState.GameState
 resolveTop gs = S.runPure S.identityAnswer gs Stack.resolveTop
 
+-- Resolve EVERYTHING the gather put on the stack, not just its top. A count of
+-- tokens after one resolveTop cannot tell "one trigger fired" from "two fired
+-- and one is still waiting", which is exactly the pair the CR 701.27f case
+-- exists to separate. One pass per object already there, since nothing these
+-- boards resolve puts anything back.
+resolveStack :: GameState.GameState -> GameState.GameState
+resolveStack gs = foldr (\_ g -> resolveTop g) gs (GameState.stack gs)
+
 -- CR 701.27e, "transforms into", the phrase a CARD asks: Blightreaper Thallid //
 -- Blightsower Thallid, {1}{B} 2/2 Creature -- Fungus with "{3}{G/P}: Transform
 -- this creature. Activate only as a sorcery.", whose back face is a 3/3 Creature
@@ -607,7 +618,7 @@ resolveTop gs = S.runPure S.identityAnswer gs Stack.resolveTop
 -- duplicated.
 --
 -- The printed condition is an "or", so both limbs are exercised: the transform
--- one here, CR 603.2's ordinary SelfDies in the last case. Without that pair a
+-- one here, CR 700.4's ordinary SelfDies in the last case. Without that pair a
 -- condition that fired on the wrong limb would pass.
 --
 -- NOT covered: the CR 702.145c/f road to the same event (Pawl.Engine.Daytime's
@@ -630,7 +641,7 @@ transformTriggerSpec s registry = Spec.describe s "TransformsInto" $ do
       Right activated -> do
         let turned = resolveTop activated
             settled = gather turned
-            after = resolveTop settled
+            after = resolveStack settled
         Spec.assertEqWith s "the trigger resolved into one Saproling" (S.countOnBattlefieldByName saprolingToken S.alice after) 1
         Spec.assertEqWith s "no Saproling exists before the trigger resolves" (S.countOnBattlefieldByName saprolingToken S.alice turned) 0
         Spec.assertEqWith s "the settle put exactly one ability on the stack" (length (GameState.stack settled)) 1
@@ -651,28 +662,63 @@ transformTriggerSpec s registry = Spec.describe s "TransformsInto" $ do
       Left n -> Spec.assertFailure s ("expected one activated ability at each activation, got " <> show n)
       Right activated -> do
         let twice = resolveTop (resolveTop activated)
-            after = resolveTop (gather twice)
+            settled = gather twice
+            after = resolveStack settled
         Spec.assertEqWith s "one turn, so one Saproling" (S.countOnBattlefieldByName saprolingToken S.alice after) 1
+        Spec.assertEqWith s "the settle placed one trigger, not two" (length (GameState.stack settled)) 1
         Spec.assertEqWith s "both abilities were on the stack" (length (GameState.stack activated)) 2
         Spec.assertEqWith s "and the permanent is still on its back face" (faceNameOf oid twice) (Just thallidBack)
+  -- CR 608.2f: one instruction turns both Thallids over at once, so there are
+  -- two events in one group and two triggers -- one each, not one each per
+  -- event. The falsifier is a match that dropped the bearer comparison: each
+  -- Thallid would see the other's event too and the board would end on four
+  -- Saprolings.
+  --
+  -- A SPELL does the turning (S.noSource resolving, TransformSpec's `sweep`), so
+  -- CR 701.27f's gate is not what makes the count one apiece -- that rule is only
+  -- for a permanent's own ability.
+  Spec.it s "CR 608.2f two Thallids turned at once trigger once each" $ do
+    thallid <- S.printingOf s registry "Blightreaper Thallid"
+    let (first, g0) = S.addCreature thallid S.alice emptyBoard
+        (second, g1) = S.addCreature thallid S.alice g0
+        turned = sweep g1
+        settled = gather turned
+        after = resolveStack settled
+    Spec.assertEqWith s "one Saproling apiece, not one per event apiece" (S.countOnBattlefieldByName saprolingToken S.alice after) 2
+    Spec.assertEqWith s "the settle placed two triggers" (length (GameState.stack settled)) 2
+    Spec.assertEqWith s "and both really turned over" (fmap (\oid -> faceNameOf oid turned) [first, second]) [Just thallidBack, Just thallidBack]
+  -- CR 701.27e's "with a specified characteristic", asked of the match alone,
+  -- because no BOARD can ask it: Pawl.Engine.Card gives a transforming permanent
+  -- only the shown face's abilities, so a "transforms into X" trigger exists
+  -- exactly when the permanent is showing X and every printed pair matches. The
+  -- name becomes load-bearing for the bystander form (#2050) and under a copy
+  -- effect, which is why the check is here rather than dropped -- a UNIT fence,
+  -- stated as one, since the gameplay cases above stay green without it.
+  Spec.it s "CR 701.27e the condition refuses an event naming a different face" $ do
+    let board = emptyBoard
+        bearer = S.noSource
+        event into = GameEvent.Transformed (Transformed.MkTransformed bearer (Set.singleton into))
+        matches into = Event.matchesTrigger board bearer S.alice (TriggerCondition.SelfTransformedInto thallidBack) (event into)
+    Spec.assertBool s (matches thallidBack) "the face it names matches"
+    Spec.assertBool s (not (matches thallidFront)) "and the other face of the same card does not"
   -- The printed condition's OTHER limb, so the AnyOf is not proved by one side
-  -- alone: CR 603.2's "or dies", against the same board with the same card. The
+  -- alone: CR 700.4's "or dies", against the same board with the same card. The
   -- Thallid transforms (one Saproling), then a destruction reaches it on its back
   -- face (a second).
   --
   -- The destruction names Fungus rather than every creature, so it cannot reach
   -- the Saproling the first limb made -- which would leave the count reading the
   -- same under an engine that fired neither limb.
-  Spec.it s "CR 603.2 the same ability's other limb fires when it dies" $ do
+  Spec.it s "CR 700.4 the same ability's other limb fires when it dies" $ do
     thallid <- S.printingOf s registry "Blightreaper Thallid"
     forest <- S.printingOf s registry "Forest"
     let (oid, gs) = thallidBoard thallid forest 4
     case activateThallid oid gs of
       Left n -> Spec.assertFailure s ("expected one activated ability, got " <> show n)
       Right activated -> do
-        let fromTransform = resolveTop (gather (resolveTop activated))
+        let fromTransform = resolveStack (gather (resolveTop activated))
             destroyed = S.runPure S.identityAnswer fromTransform (Resolve.applyEffect S.noSource S.noSource S.alice Map.empty Map.empty destroyEveryFungus)
-            fromDeath = resolveTop (gather destroyed)
+            fromDeath = resolveStack (gather destroyed)
         Spec.assertEqWith s "the transform limb made one" (S.countOnBattlefieldByName saprolingToken S.alice fromTransform) 1
         Spec.assertEqWith s "and the death limb makes a second" (S.countOnBattlefieldByName saprolingToken S.alice fromDeath) 2
         Spec.assertEqWith s "the Thallid itself is gone" (faceNameOf oid fromDeath) Nothing
