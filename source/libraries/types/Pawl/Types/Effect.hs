@@ -906,6 +906,24 @@ data Effect card
     -- Not implemented: "choose a player", which would offer the controller too
     -- and so needs a scope beside the slot (#1444).
     ChooseOpponent SlotName.SlotName
+  | -- | ChooseOpponent's twin with the decision replaced by randomness: one of
+    -- the resolving controller's opponents is picked AT RANDOM and bound into
+    -- this slot for a later effect of the same resolution to name (Ruhan of the
+    -- Fomori's "choose an opponent at random. Ruhan attacks that player").
+    --
+    -- Its own arm rather than a flag on ChooseOpponent, for the reason
+    -- Pawl.Types.ObjectRef's RandomCardInHand gives beside ChosenCardInHand: the
+    -- two differ in who answers -- a seat weighing options against nobody
+    -- weighing anything -- so Pawl.Types.Prompt's RandomOpponent carries no
+    -- Pawl.Types.Decider where Prompt.ChooseOpponent does. CR 701.9b is the
+    -- rulebook's own acknowledgment that "at random" and "the player chooses"
+    -- are different instructions over the same domain.
+    --
+    -- CHOOSE, not target (CR 115.10a). The slot is a definition, which
+    -- Pawl.CardSpec's dataflow lint sees through
+    -- Pawl.Engine.Resolve.definedSlots. Elided at one candidate, CR 102.2
+    -- leaving a two-player game exactly one opponent.
+    ChooseOpponentAtRandom SlotName.SlotName
   | -- | CR 103.5b (Serum Powder): exile every card in the resolving controller's
     -- hand, then draw that many. Targetless and controller-scoped.
     --

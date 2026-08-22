@@ -3900,6 +3900,96 @@ conditionalAttackRequirementSpec s registry = Spec.describe s "ConditionalAttack
         Spec.assertBool s (Combat.legalAttackDeclaration S.alice [required] under) "and attacking with it is legal either way"
       _ -> Spec.assertFailure s "fixture should have one Juggernaut"
 
+-- CR 608.2d's random half, proved by Ruhan of the Fomori ("At the beginning of
+-- combat on your turn, choose an opponent at random. Ruhan attacks that player
+-- this combat if able."). Two effects in one resolution: the first binds the
+-- opponent randomness named into a slot, the second reads it back through
+-- PlayerRef.InSlot as the requirement's defender.
+--
+-- THREE SEATS, and that is load-bearing: CR 102.2 leaves a two-player game
+-- exactly one opponent, so the pick is elided and every implementation agrees.
+--
+-- The pair of boards differs in ONE thing -- which opponent alice named as the
+-- defending player at CR 507.1, before the trigger resolved -- and the random
+-- pick is pinned to carol on both. Only one opponent is attackable at a time (CR
+-- 506.2a), so the assertion is whether the requirement can be obeyed:
+--
+--   * defender carol: the requirement names the attackable seat, so CR 508.1d
+--     forbids declining.
+--   * defender bob: it names a seat that cannot be attacked at all, so the
+--     maximum is zero and declining is legal.
+--
+-- An engine that rolled the head of the offer itself (bob) rather than honouring
+-- the answer flips BOTH, and one that never landed the bind makes declining legal
+-- on both. Pinned to NonEmpty.last for exactly that reason: Replay.defaultAnswer
+-- -- which S.identityAnswer falls through to -- answers this prompt with the
+-- HEAD, so a head-pinned board could not tell the two apart.
+randomOpponentSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+randomOpponentSpec s registry = Spec.describe s "RandomOpponent" $ do
+  Spec.it s "CR 608.2d the opponent randomness named is the one the requirement makes Ruhan attack" $ do
+    ruhan <- S.printingOf s registry "Ruhan of the Fomori"
+    let (board, mine, _, _) = S.threePlayerCombat [ruhan] [] []
+        atCarol = S.runToStep (Phase.Combat CombatStep.DeclareAttackers) (ruhanAnswer S.carol) board
+        atBob = S.runToStep (Phase.Combat CombatStep.DeclareAttackers) (ruhanAnswer S.bob) board
+    case mine of
+      [ruhanId] -> do
+        -- THE GAMEPLAY ASSERTION. carol is the attackable seat and the
+        -- requirement names her, so CR 508.1d refuses the empty declaration.
+        Spec.assertBool
+          s
+          (not (Combat.legalAttackDeclaration S.alice [] atCarol))
+          "CR 508.1d: with carol defending, declining disobeys the requirement randomness bound"
+        Spec.assertBool
+          s
+          (Combat.legalAttackDeclarationAs S.alice [(ruhanId, AttackTarget.OfPlayer S.carol)] atCarol)
+          "and attacking carol obeys it"
+        -- The paired board, one thing different: bob defends, so the requirement
+        -- names a seat CR 506.2a leaves unattackable and the maximum is zero.
+        Spec.assertBool
+          s
+          (Combat.legalAttackDeclaration S.alice [] atBob)
+          "CR 508.1d: with bob defending, the requirement cannot be obeyed and declining is legal"
+        -- Supporting, and LAST so it cannot absorb a mutation the two above
+        -- should catch: the requirement really was stored against carol, not bob.
+        Spec.assertEqWith
+          s
+          "the stored requirement names carol"
+          (fmap ActiveAttackRequirement.defender (GameState.attackRequirements atCarol))
+          [S.carol]
+        Spec.assertEqWith
+          s
+          "and the attacker is Ruhan"
+          (fmap ActiveAttackRequirement.attacker (GameState.attackRequirements atCarol))
+          [ruhanId]
+      _ -> Spec.assertFailure s "fixture should have one Ruhan"
+  Spec.it s "CR 104.3a the offer is alice's opponents and never alice herself" $ do
+    ruhan <- S.printingOf s registry "Ruhan of the Fomori"
+    let (board, _, _, _) = S.threePlayerCombat [ruhan] [] []
+        logging :: Prompt.Prompt r -> State.State [[PlayerId.PlayerId]] r
+        logging p = case p of
+          Prompt.RandomOpponent offered -> do
+            State.modify' (NonEmpty.toList offered :)
+            pure (ruhanAnswer S.carol p)
+          _ -> pure (ruhanAnswer S.carol p)
+        offers = reverse (State.execState (Engine.runGame logging board Engine.runStep) [])
+    -- Recorded off the prompt, since the candidate list is not readable off the
+    -- resulting board. The engine never rolls -- it offers and filters back -- so
+    -- WHAT it offered is the part of that posture a test can see.
+    Spec.assertEqWith s "asked once, offering both opponents and not alice" offers [[S.bob, S.carol]]
+
+-- Pins BOTH of the beginning-of-combat step's questions: which opponent alice
+-- names as the defending player (CR 507.1), and which opponent randomness names
+-- (CR 608.2d). The defender is FILTERED out of the offered candidates rather than
+-- built, so an answer the engine never offered cannot slip through; the random
+-- pick is NonEmpty.last, which on this board is carol and is never the value
+-- Replay.defaultAnswer would supply.
+ruhanAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+ruhanAnswer defending p = case p of
+  Prompt.ChooseDefender _ _ candidates ->
+    Maybe.fromMaybe (NonEmpty.head candidates) (List.find (== defending) (NonEmpty.toList candidates))
+  Prompt.RandomOpponent offered -> NonEmpty.last offered
+  _ -> S.identityAnswer p
+
 -- Declines CR 508.1a's declaration the first time and declares everything the
 -- second, counting the asks. The first answer is ILLEGAL rather than
 -- unaffordable, which is CR 508.1's preamble reached through CR 508.1d instead of
@@ -3987,6 +4077,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   attackCostSpec s registry
   alluringSirenSpec s registry
   conditionalAttackRequirementSpec s registry
+  randomOpponentSpec s registry
   declarationRetrySpec s registry
   blockCostSpec s registry
   exertSpec s registry
