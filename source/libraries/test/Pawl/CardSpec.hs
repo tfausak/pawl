@@ -2746,11 +2746,12 @@ objectRefFilters ref = case ref of
   -- GraveyardScope names players rather than characteristics, so the Filter is
   -- the whole of what there is to lint.
   ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard _ f) -> [f]
-  -- Ignorant Bliss' "all cards from your hand" holds none either: CR 400.2
-  -- makes a hand hidden, so the arm carries no Filter to lint.
+  -- Ignorant Bliss' "all cards from your hand" holds none: the printing takes
+  -- the whole hand and states no characteristic, so the arm carries no Filter.
   ObjectRef.EachCardInYourHand -> []
-  -- Amnesia's "all nonland cards" states its own, and states it here -- the arm
-  -- reaching another player's hand is the one that can carry a Filter at all.
+  -- Amnesia's "all nonland cards" does state one, and states it here. Optional,
+  -- so its reveal half -- the whole hand -- lints nothing, exactly as the linked
+  -- exile arm below does for the printings that take all of their set.
   ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand _ f) -> Foldable.toList f
   -- Hoarding Dragon's "the exiled card" usually holds none: CR 607.2a's set is
   -- named by which object exiled the cards rather than by their characteristics.

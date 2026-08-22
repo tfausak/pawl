@@ -1985,13 +1985,13 @@ objectRefObjects legal resolving controller source gs ref = case ref of
     concatMap (\pid -> graveyardCardsOf (effectContext controller source legal (slotGroups resolving gs)) gs pid filter_) (graveyardScopePlayers legal controller gs scope)
   -- CR 400.1's per-player zone again, but only the RESOLVING CONTROLLER's, so no
   -- scope to fold over and no APNAP order to impose. In the zone's own order,
-  -- which no rule reads: CR 400.5 leaves a hand's arrangement to its owner.
+  -- which no rule reads: CR 402.3 leaves a hand's arrangement to its owner.
   ObjectRef.EachCardInYourHand -> Game.zoneMembers Zone.Hand controller gs
   -- The arm above's zone under EachCardInGraveyard's scope and filter: CR
   -- 109.2a's reading again, over the hands graveyardScopePlayers names rather
   -- than the resolving controller's alone. In APNAP order (CR 608.2f) across
   -- seats, and within a seat in the hand's own order, which no rule reads (CR
-  -- 400.5) -- the arm above's answer.
+  -- 402.3) -- the arm above's answer.
   --
   -- effectContext and NOT Filter.contextFor, so the resolution's own slot
   -- bindings ride along and a filter reading a slot (Filter.IsBound) is not
@@ -2003,12 +2003,10 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- what its Aura's host is.
   ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand scope mFilter) ->
     let context = effectContext controller source legal (slotGroups resolving gs)
-        stated oid = case mFilter of
-          Nothing -> True
-          Just filter_ -> Filter.matches context (Projection.viewOfObject oid gs) filter_
-     in concatMap
-          (\pid -> filter stated (Game.zoneMembers Zone.Hand pid gs))
-          (graveyardScopePlayers legal controller gs scope)
+        held pid = case mFilter of
+          Nothing -> Game.zoneMembers Zone.Hand pid gs
+          Just filter_ -> handCardsOf context gs pid filter_
+     in concatMap held (graveyardScopePlayers legal controller gs scope)
   -- CR 607.2a's linked set: the cards GameState.exiledWith files against this
   -- effect's SOURCE. The relation, not a zone sweep, is the membership test, so a
   -- card exiled by a second copy of the same printing is not named; a stated
@@ -2180,7 +2178,7 @@ handChoosers legal controller gs player =
 -- 109.5's "you" rather than whoever is choosing.
 --
 -- NOT sorted, where the graveyard sibling sorts: the candidates keep the zone's
--- own order, which no rule reads (CR 400.5). Narrowing must not reorder.
+-- own order, which no rule reads (CR 402.3). Narrowing must not reorder.
 handCardsOf :: Filter.Context -> GameState -> PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
 handCardsOf context gs pid filter_ =
   filter
@@ -3834,7 +3832,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- and not Game.choose, since randomness is not CR 104.4b's optional action.
       --
       -- Elided at one card and skipped at none (CR 101.3, CR 609.3). Candidates are
-      -- the hand as CR 608.2c reaches it in the zone's own order (CR 400.5), seats
+      -- the hand as CR 608.2c reaches it in the zone's own order (CR 402.3), seats
       -- from handChoosers so the asks run in CR 608.2e's APNAP order. ONE card per
       -- SEAT, so a ref naming several writes the slot once each.
       ObjectRef.RandomCardInHand player ->
