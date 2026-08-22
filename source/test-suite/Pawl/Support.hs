@@ -1829,6 +1829,9 @@ stubView table oid =
                 Filter.canAttachToSubject = False,
                 Filter.token = False,
                 Filter.tapped = False,
+                -- CR 701.27g: the table registers no face, and this stub stands
+                -- for a card outside the game rather than a permanent.
+                Filter.transformed = False,
                 Filter.counters = Map.empty,
                 Filter.ringBearerFor = Nothing,
                 Filter.designations = Set.empty,

@@ -525,8 +525,9 @@ turnFaceOver now gs oid objects
       _ -> objects
 
 -- CR 712.11: is this object showing the FRONT face of its card? The question CR
--- 702.145c asks of a daybound permanent and CR 702.145f asks (inverted) of a
--- nightbound one.
+-- 702.145c asks of a daybound permanent, CR 702.145f asks (inverted) of a
+-- nightbound one, and CR 701.27g asks (inverted, beside a battlefield conjunct)
+-- of a "transformed permanent".
 --
 -- Nothing in Object.face IS the front face, not an unknown one: CR 712.11 casts a
 -- double-faced spell with its front face up by default, so a permanent nothing
@@ -536,9 +537,12 @@ turnFaceOver now gs oid objects
 --
 -- An object with no card behind it (CR 113.7a: an ability on the stack) answers
 -- True as well, which is the same answer as "nothing has turned it over" and is
--- what its only caller wants: Pawl.Engine.Daytime asks this of battlefield
+-- what both callers want. Pawl.Engine.Daytime asks this of battlefield
 -- permanents, where CR 110.1 leaves no such object, and reads it beside a
--- keyword test that such an object fails anyway.
+-- keyword test that such an object fails anyway;
+-- Pawl.Engine.Projection.viewOfCharacteristics reads it beside a battlefield
+-- conjunct of its own, so CR 701.27g answers False for such an object either
+-- way.
 isFrontFaceUp :: ObjectId -> GameState -> Bool
 isFrontFaceUp oid gs = case lookupObject oid gs >>= Object.face of
   Nothing -> True

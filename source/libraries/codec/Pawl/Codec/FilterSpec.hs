@@ -293,6 +293,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.IsTapped
       " {\"type\":\"IsTapped\"} "
+  Spec.it s "Transformed" $
+    Common.assertCodec
+      s
+      codec
+      Filter.Transformed
+      " {\"type\":\"Transformed\"} "
   Spec.it s "IsRingBearer" $
     Common.assertCodec
       s

@@ -271,6 +271,17 @@ data View = MkView
     -- | CR 110.5a's tap status. Not a characteristic, so no projection writes it;
     -- read straight off the object.
     tapped :: Bool,
+    -- | CR 701.27g's "transformed permanent": a double-faced permanent on the
+    -- battlefield with its back face up. Not a characteristic either (CR
+    -- 712.8d/e make which face is up the thing characteristics are read off), so
+    -- no projection writes it -- Pawl.Engine.Projection.viewOfCharacteristics
+    -- reads the CURRENT face off the object and the battlefield off the board.
+    --
+    -- False for every candidate with no object on the battlefield behind it: a
+    -- printed face, a player, an event snapshot. Each says so at its own site,
+    -- and none of the three is a lost distinction -- CR 701.27g asks about a
+    -- permanent, and none of them is one.
+    transformed :: Bool,
     -- | CR 122.1: the counters on the candidate, counted per kind. Not a
     -- characteristic -- CR 109.3's list has no counters in it -- so no projection
     -- writes it, and it deliberately survives ALONGSIDE the power and toughness
@@ -456,6 +467,8 @@ playerView pid =
       -- CR 111.1: a token represents a PERMANENT, and a player is not one.
       token = False,
       tapped = False,
+      -- CR 701.27g asks about a PERMANENT, and CR 109.1 makes a player none.
+      transformed = False,
       -- CR 122.1 puts counters on an object OR a player, and a player's are
       -- Player.counters, read by Quantity.PlayerCounters. This field is the
       -- OBJECT half, so a player view has none of it.
@@ -882,6 +895,9 @@ matches context view predicate = case predicate of
   -- makes a token's characteristics equivalent to a card's.
   Filter.IsToken -> token view
   Filter.IsTapped -> tapped view
+  -- CR 701.27g, both exclusions inside the field: see the atom's own comment in
+  -- Pawl.Types.Filter, and the field below.
+  Filter.Transformed -> transformed view
   -- CR 602.1 with CR 605.1a's exclusion, both applied by the builder that holds
   -- the abilities. A live read: the projection is re-asked on every match, so a
   -- land Humility has stripped stops matching at once, and CR 702.29b's and CR
@@ -1012,6 +1028,7 @@ rewrite pairs predicate = case predicate of
   Filter.CanAttachToSubject -> predicate
   Filter.IsToken -> predicate
   Filter.IsTapped -> predicate
+  Filter.Transformed -> predicate
   Filter.IsRingBearer -> predicate
   Filter.HasDesignation _ -> predicate
   -- Untouched: CR 612.1 swaps a subtype, a colour or a card type word, and this
@@ -1360,6 +1377,7 @@ bakeBound players predicate = case predicate of
   Filter.CanAttachToSubject -> predicate
   Filter.IsToken -> predicate
   Filter.IsTapped -> predicate
+  Filter.Transformed -> predicate
   Filter.IsRingBearer -> predicate
   Filter.HasDesignation _ -> predicate
   Filter.HasCounters _ -> predicate
@@ -1441,6 +1459,7 @@ manaValueThresholds predicate = case predicate of
   Filter.CanAttachToSubject -> []
   Filter.IsToken -> []
   Filter.IsTapped -> []
+  Filter.Transformed -> []
   Filter.IsRingBearer -> []
   Filter.HasDesignation _ -> []
   Filter.HasCounters _ -> []
@@ -1532,6 +1551,7 @@ statesAQuality predicate = case predicate of
   Filter.CanAttachToSubject -> True
   Filter.IsToken -> True
   Filter.IsTapped -> True
+  Filter.Transformed -> True
   Filter.IsRingBearer -> True
   Filter.HasDesignation _ -> True
   Filter.HasCounters _ -> True

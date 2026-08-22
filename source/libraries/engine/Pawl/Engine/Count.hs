@@ -241,6 +241,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.CanAttachToSubject -> predicate
   Filter.Type.IsToken -> predicate
   Filter.Type.IsTapped -> predicate
+  Filter.Type.Transformed -> predicate
   Filter.Type.IsRingBearer -> predicate
   Filter.Type.HasDesignation _ -> predicate
   Filter.Type.HasCounters _ -> predicate
@@ -574,6 +575,12 @@ viewOfSnapshot mController isToken snapshot =
       -- not a characteristic, so the arm supplies it above.
       Filter.token = isToken,
       Filter.tapped = False,
+      -- CR 701.27g asks about a permanent ON THE BATTLEFIELD, and a snapshot is
+      -- a record of a past event rather than an object standing on one -- there
+      -- is no id here to ask which face is up. No card in the pool counts
+      -- transformed permanents through Scope.InHistory, so nothing observes the
+      -- difference between this and an answer the rule could give.
+      Filter.transformed = False,
       -- CR 122.1: a ProjectedCharacteristics records no counters -- CR 613.4c
       -- has already folded them into the power and toughness above -- so a past
       -- event carries none to read. The

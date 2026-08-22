@@ -665,6 +665,32 @@ data Filter keyword
     -- IsToken it is not immutable -- a permanent taps and untaps constantly --
     -- but mutability is not what filterReads asks about.
     IsTapped
+  | -- | CR 701.27g: the candidate is a "transformed permanent" -- a double-faced
+    -- permanent on the battlefield with its back face up. Mutagen Connoisseur's
+    -- "for each transformed permanent you control", whose "you control" is a
+    -- ControlledBy You conjunct beside this atom, the split IsRingBearer's
+    -- comment describes.
+    --
+    -- BOTH of the rule's exclusions are in the answer rather than in the caller.
+    -- The first is that a permanent showing its front face is never transformed
+    -- "even if it had its back face up previously", so the answer reads the face
+    -- the object shows NOW (Pawl.Engine.Game.isFrontFaceUp, off Object.face) and
+    -- never Object.turnedOverAt beside it, which records when it last turned and
+    -- is what a history reading would consult. The second is that an object
+    -- represented by more than one card is never transformed either; it holds
+    -- today because no object is, meld being unimplemented -- see #369, whose
+    -- lander owes this atom the conjunct.
+    --
+    -- The battlefield conjunct is the atom's own rather than the surrounding
+    -- set's, unlike IsRingBearer's: CR 701.27g states it, and a double-faced
+    -- SPELL on the stack cast with its back face up (CR 712.11a) would otherwise
+    -- answer True to a Count scoped over some other zone.
+    --
+    -- Uncharacteristic, like IsToken and IsTapped: CR 712.8d/e make which face is
+    -- up the thing a permanent's characteristics are read OFF, so it is not one
+    -- of them (CR 109.3), nothing in CR 613 writes it, and
+    -- Pawl.Engine.Projection.filterReads declares it as reading nothing.
+    Transformed
   | -- | CR 701.54e: the candidate "is your Ring-bearer" -- the permanent carrying
     -- the Ring-bearer designation made for the perspective player. The Ring's own
     -- "YOUR Ring-bearer is legendary" (CR 701.54c), which is rulebook text rather
