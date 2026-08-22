@@ -1908,9 +1908,10 @@ mandatoryLoopBoardSpec s registry = Spec.describe s "a mandatory loop (CR 104.4b
     Spec.assertEqWith s "CR 104.4b" result Result.Drawn
 
   Spec.it s "a loop containing an optional action is not" $ do
-    -- CR 104.4b's second sentence. The board differs by ONE card: a Lightning
-    -- Bolt in alice's hand, which her Mountain can pay for, so her menu has a
-    -- Cast on it every time she gets priority. That resets the marker each round,
+    -- CR 104.4b's second sentence. The board differs by an untapped Mountain and
+    -- a Lightning Bolt in alice's hand it pays for, so her menu carries both CR
+    -- 605.3a's mana ability and a Cast every time she gets priority -- either
+    -- alone would do it. That resets the marker each round,
     -- so the loop -- otherwise identical, and still running -- is never declared
     -- a draw. The game ends only because alice eventually concedes (CR 104.3a),
     -- which is the only way to get a terminating test out of a game the rules say
