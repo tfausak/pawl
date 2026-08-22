@@ -28,13 +28,14 @@ import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
+-- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
+-- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
+
+import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword.Engine
 import qualified Pawl.Engine.Projection as Projection
--- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
--- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
-
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Resolve as Resolve
@@ -107,6 +108,7 @@ import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
@@ -3603,6 +3605,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   shieldCounterSpec s registry
   warLeechSpec s registry
   dragonstormGlobeSpec s registry
+  hurrJackalSpec s registry
 
 -- Monstrous War-Leech {3}{B} Creature -- Leech Horror \*/*, whole text: "Kicker
 -- {U}. As this creature enters, if it was kicked, mill four cards. Monstrous
@@ -6648,3 +6651,108 @@ dragonstormGlobeSpec s registry =
         Just dragonId -> do
           Spec.assertEqWith s "CR 614.1c the printed row applies to a Dragon" (Projection.powerOf dragonId after) (Just 5)
           Spec.assertEqWith s "through one +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne dragonId after) 1
+
+-- Hurr Jackal {R} Creature -- Jackal 1/1, whole text: "{T}: Target creature
+-- can't be regenerated this turn." (oracle checked on Scryfall)
+--
+-- CR 701.19c's LASTING prohibition, a different carrier from Terror's: Terror
+-- sets the Regenerability of the destruction it performs, where the Jackal knows
+-- nothing about the destruction that eventually comes and so has to be read at
+-- Event.resolveDestruction instead.
+--
+-- The destruction below is the CR 704.5g state-based action, deliberately. A
+-- destruction any Effect.Destroy performed would carry its own Regenerability
+-- and would kill the creature on today's tree too, proving nothing.
+--
+-- THE BOARD. alice's Jackal, and bob's TWO creatures -- a 2/1 Goblin Piker and a
+-- 3/3 War Mammoth, each with a regeneration shield. bob owns both, so "it
+-- reached a graveyard" is CR 400.3's owner's graveyard and cannot be confused
+-- with a control-side move. TWO victims is what separates "prohibits the
+-- creature named" from "prohibits every creature": only the Piker is targeted.
+--
+-- Returned twice: once with the Jackal's ability never activated, and once with
+-- it resolved on the Piker. The pair differs in exactly that resolution.
+jackalBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+jackalBoard jackal piker mammoth =
+  let base = Setup.emptyGame S.bothPlayers
+      (jackalId, g1) = S.addCreature jackal S.alice base
+      (victim, g2) = S.addCreature piker S.bob g1
+      (bystander, g3) = S.addCreature mammoth S.bob g2
+      control = (S.addRegenShield bystander (S.addRegenShield victim g3)) {GameState.priority = Just S.alice}
+      activated = S.runPure (aimingAtObject victim) control (Activate.activateAbility S.alice jackalId (theAbility jackal) >> Stack.resolveTop)
+   in (control, victim, bystander, activated)
+
+-- CR 601.2c: aim the Jackal's ability at one particular creature. The offered
+-- set is FILTERED rather than rebuilt, so the target the engine re-reads at
+-- resolution (CR 608.2b) is the one it offered. Three creatures are on the
+-- board, so the prompt is a real choice.
+aimingAtObject :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimingAtObject oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just oid) . Recipient.objectOf) . snd) sets
+  _ -> S.identityAnswer p
+
+-- Exactly lethal to each (CR 704.5g): the Piker is a 2/1 and the Mammoth a 3/3,
+-- so the two amounts differ and a fixture that damaged the wrong creature could
+-- not be lethal to it by accident.
+hurtBoth :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+hurtBoth victim bystander gs = S.markDamage bystander 3 (S.markDamage victim 1 gs)
+
+-- The names of the cards in this player's graveyard. CR 400.7: a permanent that
+-- is destroyed reaches the graveyard as a NEW object with a new id, so the id
+-- the board was built with cannot be looked for there.
+buriedNames :: PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
+buriedNames pid gs =
+  Maybe.mapMaybe
+    ( \oid -> case fmap Object.source (Game.lookupObject oid gs) of
+        Just (Source.OfCard printing) -> Just (S.nameOf (Printing.card printing))
+        _ -> Nothing
+    )
+    (Game.zoneMembers Zone.Graveyard pid gs)
+
+hurrJackalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hurrJackalSpec s registry = Spec.describe s "Hurr Jackal (CR 701.19c)" $ do
+  let withBoard act = do
+        jackal <- S.printingOf s registry "Hurr Jackal"
+        piker <- S.printingOf s registry "Goblin Piker"
+        mammoth <- S.printingOf s registry "War Mammoth"
+        act (S.nameOf (Printing.card piker)) (jackalBoard jackal piker mammoth)
+  Spec.it s "CR 701.19c / 704.5g the prohibited creature's shield does not save it from lethal damage"
+    . withBoard
+    $ \pikerName (_, victim, bystander, activated) -> do
+      let settled = S.settleSba (hurtBoth victim bystander activated)
+      -- The gameplay quantity first: what is in bob's graveyard. CR 400.7 mints
+      -- a new object as the permanent moves, so the burial is asserted by NAME
+      -- and the battlefield by id.
+      Spec.assertEqWith s "the prohibited creature is in its owner's graveyard, and it alone" (buriedNames S.bob settled) [pikerName]
+      Spec.assertBool s (not (Set.member victim (GameState.battlefield settled))) "and off the battlefield"
+      -- THE CONTROL LEG, on this same board and this same CR 704.5g pass: the
+      -- creature the ability never named regenerates. Without it the assertions
+      -- above cannot tell a keyed prohibition from one that broke regeneration
+      -- outright.
+      Spec.assertBool s (Set.member bystander (GameState.battlefield settled)) "the creature the ability never named regenerates (CR 701.19a)"
+      Spec.assertEqWith s "and CR 701.19a removed its damage" (S.damageOf bystander settled) (Just 0)
+      -- CR 701.19c's sharp half: the prohibited creature's shield was never
+      -- APPLIED, so it was never spent either. One of the two shields went, and
+      -- it is the one that regenerated the Mammoth.
+      Spec.assertEqWith s "the unapplied shield was not consumed" (length (GameState.replacements settled)) 1
+  Spec.it s "CR 701.19a the same board without the ability: both shields hold"
+    . withBoard
+    $ \_ (control, victim, bystander, _) -> do
+      let settled = S.settleSba (hurtBoth victim bystander control)
+      Spec.assertBool s (Set.member victim (GameState.battlefield settled)) "the Piker regenerates when nothing forbade it"
+      Spec.assertBool s (Set.member bystander (GameState.battlefield settled)) "and so does the Mammoth"
+      Spec.assertEqWith s "nothing reached bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob settled)) 0
+  Spec.it s "CR 514.2 the prohibition lasts exactly the turn, and the same shield saves the same creature next turn"
+    . withBoard
+    $ \_ (_, victim, _, activated) -> do
+      -- CR 514.2's own sweep, then the handoff into bob's turn. The shield is
+      -- RE-ARMED after both: Support.addRegenShield arms Expiry.AtCleanup, so
+      -- the one this turn put up is gone either way and a case that did not
+      -- re-arm would pass for the wrong reason.
+      let bobsTurn = S.runPure S.identityAnswer (Expiry.dropAtCleanup activated) Engine.handoffTurn
+          settled = S.settleSba (S.markDamage victim 1 (S.addRegenShield victim bobsTurn))
+      Spec.assertBool s (Set.member victim (GameState.battlefield settled)) "the same creature regenerates once the turn it was named in is over"
+      Spec.assertEqWith s "CR 701.19a removed its damage" (S.damageOf victim settled) (Just 0)
+      Spec.assertEqWith s "nothing reached bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob settled)) 0
+      Spec.assertEqWith s "and the prohibition really is off the board" (GameState.unregeneratables bobsTurn) []
+      Spec.assertEqWith s "bob's turn really did begin" (GameState.activePlayer bobsTurn) S.bob

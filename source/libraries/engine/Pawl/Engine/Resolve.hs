@@ -55,6 +55,7 @@ import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
+import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
@@ -65,6 +66,7 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
+import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastObligation as CastObligation
@@ -514,6 +516,7 @@ slotsOf effect = case effect of
   Effect.ArmDelayedTrigger {} -> Map.empty
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers _ affected _) -> affectedPlayersSlots affected
   Effect.RequireBlock (RequireBlock.MkRequireBlock _ blocker attacker) -> joinTwo (objectRefSlots blocker) (objectRefSlots attacker)
+  Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated _ ref) -> objectRefSlots ref
   Effect.RequireAttack (RequireAttack.MkRequireAttack _ attacker defender) -> joinTwo (objectRefSlots attacker) (playerRefSlots defender)
   Effect.CreateEmblem {} -> Map.empty
   -- CR 725.1's crown names a target slot only in the InSlot arm.
@@ -750,6 +753,9 @@ slotsAreExhaustive effect = case effect of
   -- slotsOf drops the Duration, so the slotless test is made here.
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration _ _) ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
+  -- RequireBlock's reason, one axis narrower.
+  Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration _) ->
+    Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
   -- RequireBlock's reason, one axis over.
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
@@ -890,6 +896,7 @@ readsX = any effectReadsX
       Effect.ArmDelayedTrigger {} -> False
       Effect.AffectPlayers {} -> False
       Effect.RequireBlock {} -> False
+      Effect.CantBeRegenerated {} -> False
       Effect.RequireAttack {} -> False
       Effect.CreateEmblem {} -> False
       Effect.BecomeMonarch {} -> False
@@ -990,6 +997,7 @@ searchesLibrary effect = case effect of
   Effect.ArmDelayedTrigger {} -> False
   Effect.AffectPlayers {} -> False
   Effect.RequireBlock {} -> False
+  Effect.CantBeRegenerated {} -> False
   Effect.RequireAttack {} -> False
   Effect.CreateEmblem {} -> False
   Effect.BecomeMonarch {} -> False
@@ -1160,6 +1168,7 @@ boundSlots effect = case effect of
   Effect.ArmDelayedTrigger {} -> Set.empty
   Effect.AffectPlayers {} -> Set.empty
   Effect.RequireBlock {} -> Set.empty
+  Effect.CantBeRegenerated {} -> Set.empty
   Effect.RequireAttack {} -> Set.empty
   Effect.CreateEmblem {} -> Set.empty
   Effect.BecomeMonarch {} -> Set.empty
@@ -4641,6 +4650,31 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 attacker <- attackers
               ]
          in gs1 {GameState.blockRequirements = stored <> GameState.blockRequirements gs1}
+  Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration ref) ->
+    -- CR 701.19c / 611.1: store one prohibition per permanent the ref names.
+    -- RequireBlock above is the model and its arguments carry over: the ref is
+    -- enumerated ONCE, for the CR 608.2f simultaneity objectRefObjects buys, and
+    -- an illegal slot (CR 608.2b) stores nothing, which is Hurr Jackal's fizzle.
+    --
+    -- Nothing is written onto the permanent itself. CR 701.19c makes this a
+    -- property the DESTRUCTION acquires, so the row is read at
+    -- Event.resolveDestruction and never by a projection.
+    State.modify' $ \gs -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
+      -- CR 611.2b: the duration never started, so nothing is stored.
+      Nothing -> gs
+      Just expiry ->
+        let objects = objectRefObjects legal resolving controller source gs ref
+            (ts, gs1) = Game.freshTimestamp gs
+            stored =
+              [ ActiveUnregeneratable.MkActiveUnregeneratable
+                  { ActiveUnregeneratable.source = source,
+                    ActiveUnregeneratable.timestamp = ts,
+                    ActiveUnregeneratable.expiry = expiry,
+                    ActiveUnregeneratable.object = object
+                  }
+              | object <- objects
+              ]
+         in gs1 {GameState.unregeneratables = stored <> GameState.unregeneratables gs1}
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration attackerRef defenderRef) ->
     -- CR 508.1d / 613.11: store one requirement per (attacker, defender) pair the
     -- two refs name, rule 508.1d counting requirements PER CREATURE. RequireBlock
