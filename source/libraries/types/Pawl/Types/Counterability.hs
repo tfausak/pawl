@@ -4,8 +4,10 @@ module Pawl.Types.Counterability where
 --
 -- CR 113.6g makes this a property of the OBJECT and not of the countering effect,
 -- so Rending Volley carries it and Cancel does not -- the opposite arrangement
--- from Pawl.Types.Regenerability, which rides the Destroy effect because
--- CR 701.19c's "it can't be regenerated" is printed on the destroying spell.
+-- from Pawl.Types.Regenerability, which rides the DESTRUCTION. A regeneration
+-- prohibition printed apart from any destruction (Hurr Jackal's) does not
+-- change that: CR 701.19c stores it and folds it into the destruction's
+-- Regenerability, so it is a property of the permanent no more than Terror's is.
 --
 -- CR 101.2 is why a gate is the right shape rather than a negotiation: Cancel
 -- still resolves and still legally targeted the spell (CR 113.6g grants no

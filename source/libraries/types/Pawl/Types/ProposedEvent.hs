@@ -65,7 +65,9 @@ data ProposedEvent
   | -- | CR 701.8 / 701.19c: a permanent would be destroyed. The Regenerability is
     -- the destruction's own, not the permanent's: it says whether a CR 701.19a
     -- regeneration shield may be applied to THIS destruction, which is where
-    -- Terror's "It can't be regenerated" lives.
+    -- Terror's "It can't be regenerated" lives. CR 701.19c's lasting prohibition
+    -- (Hurr Jackal) reaches the same field, Event.resolveDestruction folding a
+    -- standing Pawl.Types.ActiveUnregeneratable in before the event is proposed.
     --
     -- The DestructionCause beside it is the same shape of fact one rule further
     -- on: CR 122.1c's replacement reaches a destruction only when an EFFECT is
