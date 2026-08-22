@@ -517,6 +517,7 @@ slotsOf effect = case effect of
   Effect.PlaySubgame _ -> Map.empty
   -- A DEFINITION too: chosen as this effect is applied (CR 608.2d), never read.
   Effect.ChooseOpponent _ -> Map.empty
+  Effect.ChooseOpponentAtRandom _ -> Map.empty
   Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn ref _) -> playerRefSlots ref
   -- Both halves may name a slot: what is shuffled, and whose library.
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named ref) -> joinTwo (maybe Map.empty playerRefSlots named) (objectRefSlots ref)
@@ -749,6 +750,7 @@ slotsAreExhaustive effect = case effect of
   Effect.PlaySubgame _ -> True
   -- PlaySubgame's answer: a definition reads no slot.
   Effect.ChooseOpponent _ -> True
+  Effect.ChooseOpponentAtRandom _ -> True
   Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn _ _) -> True
   Effect.ShuffleIntoLibrary {} -> True
   Effect.OfferCast {} -> True
@@ -877,6 +879,7 @@ readsX = any effectReadsX
       Effect.AttachTargetToEach {} -> False
       Effect.PlaySubgame _ -> False
       Effect.ChooseOpponent _ -> False
+      Effect.ChooseOpponentAtRandom _ -> False
       Effect.TakeExtraTurn {} -> False
       Effect.ShuffleIntoLibrary {} -> False
       Effect.OfferCast {} -> False
@@ -976,6 +979,7 @@ searchesLibrary effect = case effect of
   Effect.AttachTargetToEach {} -> False
   Effect.PlaySubgame _ -> False
   Effect.ChooseOpponent _ -> False
+  Effect.ChooseOpponentAtRandom _ -> False
   -- CR 701.24 shuffles a library but never LOOKS at one (CR 701.23a).
   Effect.ShuffleIntoLibrary {} -> False
   -- CR 608.2g's other producer, and not a search: the cast names one known object.
@@ -1047,6 +1051,7 @@ boundSlots effect = case effect of
   Effect.PlaySubgame slot -> Set.singleton slot
   -- CR 608.2d: the opponent this effect chose.
   Effect.ChooseOpponent slot -> Set.singleton slot
+  Effect.ChooseOpponentAtRandom slot -> Set.singleton slot
   -- Three slots CR 701.8's destruction may define: how many permanents it
   -- ACTUALLY destroyed, for a later "for each ... destroyed this way"; the cards
   -- it put into a graveyard, for a later clause that NAMES them (CR 400.7's
@@ -3176,6 +3181,28 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       first : second : rest -> do
         let offered = first NonEmpty.:| (second : rest)
         answer <- Game.choose (Prompt.ChooseOpponent (Decide.deciderFor controller gs) controller source offered)
+        pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
+    Monad.forM_ chosenOpponent $ \pid -> State.modify' (bindPlayerSlot resolving slot pid)
+  -- ChooseOpponent's twin with the decision replaced by randomness (Ruhan of the
+  -- Fomori): the same offer, the same filter, the same bind, and the same CR
+  -- 608.2d moment -- only the question changes. CR 701.9b's distinction between
+  -- "at random" and "the player chooses" is why it is a separate opcode and a
+  -- separate prompt.
+  --
+  -- Game.ask and not Game.choose, since randomness is not CR 104.4b's optional
+  -- action. The question goes to the INTERPRETER: the engine does not roll and no
+  -- player picks. Filtered rather than trusted, so an answer naming somebody
+  -- never offered falls back to the first candidate, the instruction being
+  -- mandatory.
+  Effect.ChooseOpponentAtRandom slot -> do
+    gs <- State.get
+    let opponents = filter (/= controller) (Game.stillPlaying gs)
+    chosenOpponent <- case opponents of
+      [] -> pure Nothing
+      [sole] -> pure (Just sole)
+      first : second : rest -> do
+        let offered = first NonEmpty.:| (second : rest)
+        answer <- Game.ask (Prompt.RandomOpponent offered)
         pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
     Monad.forM_ chosenOpponent $ \pid -> State.modify' (bindPlayerSlot resolving slot pid)
   Effect.ControlPlayerNextTurn slot ->

@@ -64,6 +64,18 @@ data Prompt r where
   -- it is asked of unobservable. The engine never rolls -- the interpreter
   -- supplies the outcome and the caller filters it back against the offer.
   RandomObject :: NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
+  -- | Which opponent randomness named, for
+  -- Pawl.Types.Effect.ChooseOpponentAtRandom (Ruhan of the Fomori). The
+  -- NonEmpty is the resolving controller's opponents still in the game (CR
+  -- 104.3a); the answer is the one bound into the effect's slot.
+  --
+  -- Carries neither a Decider nor a PlayerId, where Prompt.ChooseOpponent
+  -- carries both: randomness is not a choice, so there is no seat weighing
+  -- options and nowhere for a CR 723 controller to sit. The engine never rolls
+  -- -- the interpreter supplies the outcome and the caller filters it back
+  -- against the offer. Asked only for two or more, CR 102.2 leaving a
+  -- two-player game exactly one opponent.
+  RandomOpponent :: NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
   -- | CR 514.2. The [ObjectId] is the hand; the Natural is how many to discard.
   ChooseDiscard :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt [ObjectId.ObjectId]
   -- | CR 701.22a. The [ObjectId] is the top of the scrying player's own

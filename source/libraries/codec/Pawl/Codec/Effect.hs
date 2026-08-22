@@ -155,6 +155,7 @@ codec cardCodec =
       Arm.payload "AttachTargetToEach" AttachTarget.codec Effect.AttachTargetToEach (\x -> case x of Effect.AttachTargetToEach y -> Just y; _ -> Nothing),
       Arm.payload "PlaySubgame" SlotName.codec Effect.PlaySubgame (\x -> case x of Effect.PlaySubgame y -> Just y; _ -> Nothing),
       Arm.payload "ChooseOpponent" SlotName.codec Effect.ChooseOpponent (\x -> case x of Effect.ChooseOpponent y -> Just y; _ -> Nothing),
+      Arm.payload "ChooseOpponentAtRandom" SlotName.codec Effect.ChooseOpponentAtRandom (\x -> case x of Effect.ChooseOpponentAtRandom y -> Just y; _ -> Nothing),
       Arm.payload "TakeExtraTurn" TakeExtraTurn.codec Effect.TakeExtraTurn (\x -> case x of Effect.TakeExtraTurn y -> Just y; _ -> Nothing),
       Arm.payload "ShuffleIntoLibrary" ShuffleIntoLibrary.codec Effect.ShuffleIntoLibrary (\x -> case x of Effect.ShuffleIntoLibrary y -> Just y; _ -> Nothing),
       Arm.payload "OfferCast" OfferCast.codec Effect.OfferCast (\x -> case x of Effect.OfferCast y -> Just y; _ -> Nothing),
