@@ -1299,6 +1299,81 @@ putOntoBattlefieldAttacking oid = do
               }
     _ -> pure ()
 
+-- CR 509.4: a creature put onto the battlefield blocking. The ATTACKER is a
+-- parameter rather than a prompt, because CR 509.4's parenthetical is the case
+-- every printing of this shape is in -- "unless the effect that put it onto the
+-- battlefield specifies what it's blocking" -- and Resolve reads that attacker
+-- out of the slot the effect named (EntryRiders.blocking). CR 509.4's main
+-- clause, where the controller chooses instead, has no printing (#2089).
+--
+-- putOntoBattlefieldAttacking's twin, and its difference from
+-- attemptBlockDeclaration is the same shape as that function's from
+-- declareAttackers. The creature was never DECLARED, so:
+--
+--   * neither GameEvent.BlockerDeclared nor GameEvent.BlocksDeclared is
+--     recorded, which is CR 509.3a's and CR 509.3b's last sentence in both cases
+--     ("It won't trigger if the creature is put onto the battlefield blocking");
+--   * no CR 509.1b restriction and no CR 509.1c requirement is checked, and
+--     canBlock is never asked, per CR 509.4b in as many words -- so a Saproling
+--     put onto the battlefield blocking a flier really does block it (CR
+--     702.9b);
+--   * nothing is tapped and nothing is required to be untapped, CR 509.1a's
+--     condition belonging to the declaration CR 509.4b exempts this creature
+--     from.
+--
+-- GameEvent.AttackerBlocked IS recorded, and that is CR 509.3c's third producer:
+-- "It will also trigger if that creature becomes blocked by an effect or by a
+-- creature that's put onto the battlefield as a blocker, but only if the
+-- attacking creature was an unblocked creature at that time." The clause after
+-- the comma is `wasBlocked`, read off Combat.blockers before the write, which is
+-- also CR 509.1h's own once-per-attacker reading.
+--
+-- The guards are the ways the rules say the creature enters WITHOUT ever being a
+-- blocking creature, each a silent no-op because that is what those rules say:
+-- CR 506.3a (not a creature), CR 509.4a's first clause (the named creature is no
+-- longer attacking), and CR 506.3e / CR 509.4a's second clause -- which is
+-- Defender.playerOfAttacker, that function answering CR 508.5's three cases and
+-- so exactly rule 506.3e's "attacking the entering creature's controller, a
+-- planeswalker that player controls, or a battle that player protects".
+--
+-- CR 506.3f (a creature that's also a battle) is not guarded, as
+-- putOntoBattlefieldAttacking does not guard it either: no printing is both.
+putOntoBattlefieldBlocking :: ObjectId -> ObjectId -> Game ()
+putOntoBattlefieldBlocking oid attacker = do
+  gs <- State.get
+  let c = GameState.combat gs
+  case Projection.controllerOf oid gs of
+    Just controller
+      | Set.member oid (GameState.battlefield gs),
+        -- CR 506.3a
+        isCreatureObject oid gs,
+        -- CR 509.4a's first clause
+        Map.member attacker (Combat.attackers c),
+        -- CR 506.3e / CR 509.4a's second clause
+        Defender.playerOfAttacker attacker gs == Just controller -> do
+          -- CR 509.3c's "was an unblocked creature at that time", read BEFORE the
+          -- write below.
+          let wasBlocked = Map.member attacker (Combat.blockers c)
+          State.put
+            gs
+              { GameState.combat =
+                  c
+                    { -- insertWith and not adjust: the attacker this creature is
+                      -- put onto the battlefield blocking need not have been
+                      -- blocked already, so the key may be absent.
+                      Combat.blockers = Map.insertWith Set.union attacker (Set.singleton oid) (Combat.blockers c),
+                      -- CR 506.4's comparand: this is where the creature joins
+                      -- combat.
+                      Combat.joinedUnder = Map.insert oid controller (Combat.joinedUnder c)
+                    }
+              }
+          -- CR 509.1h: the attacker became a blocked creature. The defending
+          -- player rides the event as it does off the declaration; the guard
+          -- above has already settled that it is this creature's controller.
+          Monad.unless wasBlocked $
+            State.modify' (Event.recordEvent (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked attacker controller)))
+    _ -> pure ()
+
 -- CR 509.1: the defending player declares blockers -- singular. The loop is over
 -- at most one player, and Maybe.maybeToList is what makes "nobody is being
 -- attacked" and "one player is" one code path.
@@ -1458,11 +1533,11 @@ attemptBlockDeclaration pid attacking rejected = do
               -- does not become blocked a second time. A regression fence rather than a
               -- proof, Engine running this once per combat.
               --
-              -- Over `declaration` and not `merged`, which is STRICTER than rule 509.3c
-              -- on the attacking side: an attacker whose only blocker was put onto the
-              -- battlefield blocking really does become blocked, and this misses it.
-              -- Not implemented: any producer that puts a creature onto the battlefield
-              -- blocking (#1387).
+              -- Over `declaration` and not `merged`, and that stays exact now that
+              -- putOntoBattlefieldBlocking exists: an attacker whose only blocker was
+              -- put onto the battlefield blocking became blocked THERE, where that
+              -- function records this same event, and CR 509.3c's "only once each
+              -- combat" is what `wasBlocked` keeps true across the two writers.
               --
               -- The defending player rides the event as it rides AttackerDeclared (CR
               -- 702.130a's afflict is the reader), with `pid` as the fallback.

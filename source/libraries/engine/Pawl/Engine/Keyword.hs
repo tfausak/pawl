@@ -1512,6 +1512,7 @@ ingest =
             EntryRiders.MkEntryRiders
               { EntryRiders.tapped = TapState.Untapped,
                 EntryRiders.attacking = False,
+                EntryRiders.blocking = Nothing,
                 EntryRiders.transformed = False,
                 EntryRiders.counters = Map.empty,
                 EntryRiders.underOwner = False,
@@ -2212,6 +2213,7 @@ returns kind =
             EntryRiders.MkEntryRiders
               { EntryRiders.tapped = TapState.Untapped,
                 EntryRiders.attacking = False,
+                EntryRiders.blocking = Nothing,
                 EntryRiders.transformed = False,
                 EntryRiders.counters = Map.singleton kind (Quantity.Literal 1),
                 EntryRiders.underOwner = True,
@@ -2259,6 +2261,7 @@ afterlife n =
               EntryRiders.MkEntryRiders
                 { EntryRiders.tapped = TapState.Untapped,
                   EntryRiders.attacking = False,
+                  EntryRiders.blocking = Nothing,
                   EntryRiders.transformed = False,
                   EntryRiders.counters = Map.empty,
                   EntryRiders.underOwner = False,
@@ -2378,6 +2381,7 @@ fabricate n =
               EntryRiders.MkEntryRiders
                 { EntryRiders.tapped = TapState.Untapped,
                   EntryRiders.attacking = False,
+                  EntryRiders.blocking = Nothing,
                   EntryRiders.transformed = False,
                   EntryRiders.counters = Map.empty,
                   EntryRiders.underOwner = False,
@@ -2483,6 +2487,7 @@ soulshift n =
             EntryRiders.MkEntryRiders
               { EntryRiders.tapped = TapState.Untapped,
                 EntryRiders.attacking = False,
+                EntryRiders.blocking = Nothing,
                 EntryRiders.transformed = False,
                 EntryRiders.counters = Map.empty,
                 EntryRiders.underOwner = False,

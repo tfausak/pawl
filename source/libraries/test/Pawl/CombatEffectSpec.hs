@@ -3565,6 +3565,143 @@ becomesBlockedSpec s registry = Spec.describe s "BecomesBlocked" $ do
         Spec.assertBool s (Set.member (Recipient.ToCreature second) legal) "and admits the unblocked one"
       _ -> Spec.assertFailure s "fixture should have two attackers and Curtain of Light a 'target' slot"
 
+-- alice attacks with a Spined Thopter and a Sacred Prey; bob defends with NO
+-- creature at all, holds Flash Foliage and the three Forests that pay its
+-- {2}{G}, and has one card left in his library so the spell's draw is not a CR
+-- 104.3c loss. Returns the two attackers and the spell.
+--
+-- No blocker for bob is the point: it removes the declaration route entirely, so
+-- nothing on this board can confer blocking status except the spell.
+foliageBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState, [ObjectId.ObjectId], ObjectId.ObjectId)
+foliageBoard forest thopter prey foliage =
+  let (gs0, ours, _) = S.combatBoardOf [thopter, prey] []
+      lands = List.foldl' (\g _ -> snd (S.addCreature forest S.bob g)) gs0 [1 :: Int, 2, 3]
+      (foliageId, withCard) = S.addHandCard foliage S.bob lands
+      stocked = snd (S.addLibraryCard forest S.bob withCard)
+   in (stocked, ours, foliageId)
+
+-- Decline every block -- bob has nothing to declare anyway -- cast whatever is
+-- castable, and aim the target at `victim`. The offered set is FILTERED rather
+-- than replaced, so a leg whose target the card's own slot does not admit takes
+-- no target at all instead of quietly succeeding on a hand-built recipient.
+castFoliage :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+castFoliage victim p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, rs) -> Set.filter (== Recipient.ToCreature victim) rs) sets
+  Prompt.ChooseAction {} -> S.castAnswer p
+  Prompt.DeclareBlockers {} -> Map.empty
+  _ -> S.aggressiveAnswer p
+
+-- CR 509.4: "If a creature is put onto the battlefield blocking, its controller
+-- chooses which attacking creature it's blocking as it enters the battlefield
+-- (unless the effect that put it onto the battlefield specifies what it's
+-- blocking). A creature put onto the battlefield this way is 'blocking' but, for
+-- the purposes of trigger events and effects, it never 'blocked'."
+--
+-- Flash Foliage is the pool's producer -- {2}{G} INSTANT, "Cast this spell only
+-- during combat after blockers are declared. / Create a 1/1 green Saproling
+-- creature token that's blocking target creature attacking you. / Draw a card."
+-- It is CR 509.4's parenthetical case: the effect specifies what the token
+-- blocks, so nothing is prompted.
+--
+-- THE FLIER IS THE RULE, not decoration. A 1/1 Saproling has neither flying nor
+-- reach, so CR 702.9b makes it an illegal blocker for the Spined Thopter and CR
+-- 509.1b would throw out any declaration naming that pair -- which the pair of
+-- legalBlockDeclaration readings below asserts on the very board where the token
+-- IS blocking it. That is CR 509.4b ("A creature that's put onto the battlefield
+-- blocking isn't affected by requirements or restrictions that apply to the
+-- declaration of blockers") made observable.
+--
+-- The two attackers have DIFFERENT POWER (2 and 1) so bob's life at end of
+-- combat separates four implementations: 19 correct, 17 if the rider is dropped
+-- or if the entry is routed through CR 509.1's legality, and 18 if the slot is
+-- ignored and the token attaches to some other attacker. The two that collide at
+-- 17 are told apart by the alice-21 reading on the second leg.
+--
+-- Sacred Prey ("Whenever this creature becomes blocked, you gain 1 life") is CR
+-- 509.3c's observer, and its trigger is what proves the THIRD producer of
+-- GameEvent.AttackerBlocked: an attacker that was unblocked becomes blocked when
+-- a creature is put onto the battlefield blocking it.
+putOntoBattlefieldBlockingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+putOntoBattlefieldBlockingSpec s registry = Spec.describe s "PutOntoBattlefieldBlocking" $ do
+  Spec.it s "CR 509.4 whole card: Flash Foliage's Saproling blocks the flier it could never have been declared against" $ do
+    forest <- S.printingOf s registry "Forest"
+    thopter <- S.printingOf s registry "Spined Thopter"
+    prey <- S.printingOf s registry "Sacred Prey"
+    foliage <- S.printingOf s registry "Flash Foliage"
+    case foliageBoard forest thopter prey foliage of
+      (gs, [flier, ground], _) -> do
+        let atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+            -- The same answerer twice: once stopped before combat damage, where
+            -- the token is still alive and the combat record can be read against
+            -- it, and once run to the end, where the life totals are.
+            blocking = S.runToStep (Phase.Combat CombatStep.CombatDamage) (castFoliage flier) atBlockers
+            atEnd = runToEndOfCombat (castFoliage flier) atBlockers
+        Spec.assertEqWith s "the leg hands over at the declare blockers step, so the spell is cast after the declaration" (GameState.phase atBlockers) (Phase.Combat CombatStep.DeclareBlockers)
+        -- GAMEPLAY FIRST: the Thopter's 2 never reached bob, so the token really
+        -- did block it, and only the Prey's 1 got through.
+        Spec.assertEqWith s "CR 510.1c: the Thopter's 2 was assigned to the token, so bob takes only the Prey's 1" (S.lifeOf S.bob atEnd) (Just 19)
+        -- Identity, still at gameplay level: the Prey is the OTHER attacker, and
+        -- its becomes-blocked trigger stayed silent, so the token attached to
+        -- the attacker the target slot named rather than to whichever came first.
+        Spec.assertEqWith s "and the Prey was not the one blocked, so its CR 509.3c trigger never fired" (S.lifeOf S.alice atEnd) (Just 20)
+        case S.tokensOf blocking of
+          [saproling] -> do
+            Spec.assertEqWith s "CR 509.4: the Saproling is blocking the Thopter" (Combat.blockersOf flier blocking) (Set.singleton saproling)
+            Spec.assertEqWith s "and nothing is blocking the Prey" (Combat.blockersOf ground blocking) Set.empty
+            -- CR 509.4b, on the very board the token is blocking the flier on.
+            -- The pair differs in exactly one thing: which attacker the
+            -- hypothetical declaration names.
+            Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton saproling (Set.singleton flier)) blocking)) "CR 702.9b / CR 509.1b: declaring that same Saproling as a blocker for the flier would have been illegal"
+            Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton saproling (Set.singleton ground)) blocking) "control: and legal against the attacker without flying, so the refusal above is the flying"
+            Spec.assertEqWith s "CR 506.4: the token joined combat under bob" (Map.lookup saproling (Combat.Type.joinedUnder (GameState.combat blocking))) (Just S.bob)
+            Spec.assertEqWith s "CR 509.4b: and it is not tapped, CR 509.1a's condition belonging to the declaration" (tapStateOf saproling blocking) (Just TapState.Untapped)
+          other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
+        -- CR 509.3a and CR 509.3b's last sentence, at event level: the entry
+        -- records no declaration.
+        Spec.assertBool s (not (any (blockerWasDeclared . snd) (GameState.events atEnd))) "CR 509.3a / CR 509.3b: no blocker was declared"
+        -- Both traded: the Thopter's 1 toughness took the Saproling's 1, and the
+        -- Saproling's 1 toughness took the Thopter's 2. That is CR 510.1c damage
+        -- being assigned in both directions, which only a real blocker gets.
+        Spec.assertBool s (not (S.onBattlefield flier atEnd)) "CR 510.1c: the Thopter took the Saproling's 1 and died"
+        Spec.assertBool s (S.onBattlefield ground atEnd) "and the unblocked Prey is untouched"
+        Spec.assertEqWith s "and bob drew the card the spell says to draw" (length (Game.zoneMembers Zone.Library S.bob atEnd)) 0
+      _ -> Spec.assertFailure s "fixture should have two attackers"
+  Spec.it s "CR 509.3c the attacker it is put onto the battlefield blocking becomes blocked" $ do
+    -- The same board and the same answerer; the ONE difference is which
+    -- attacker the target slot names. Now the Prey is the one blocked, so CR
+    -- 509.3c's third producer fires and alice gains 1.
+    forest <- S.printingOf s registry "Forest"
+    thopter <- S.printingOf s registry "Spined Thopter"
+    prey <- S.printingOf s registry "Sacred Prey"
+    foliage <- S.printingOf s registry "Flash Foliage"
+    case foliageBoard forest thopter prey foliage of
+      (gs, [flier, ground], _) -> do
+        let atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+            blocking = S.runToStep (Phase.Combat CombatStep.CombatDamage) (castFoliage ground) atBlockers
+            atEnd = runToEndOfCombat (castFoliage ground) atBlockers
+            -- The control: the same board, the same declined blocks, nothing
+            -- cast. Both attackers connect.
+            uncast = runToEndOfCombat declineBlocks atBlockers
+        Spec.assertEqWith s "CR 509.3c: the Prey was an unblocked creature and a creature put onto the battlefield blocking it made it blocked" (S.lifeOf S.alice atEnd) (Just 21)
+        Spec.assertEqWith s "CR 510.1c: so the Prey's 1 was assigned to the token and bob takes only the Thopter's 2" (S.lifeOf S.bob atEnd) (Just 18)
+        Spec.assertEqWith s "CR 509.4: the Saproling is blocking the Prey" (Combat.blockersOf ground blocking) (Set.fromList (S.tokensOf blocking))
+        Spec.assertEqWith s "and nothing is blocking the Thopter" (Combat.blockersOf flier blocking) Set.empty
+        Spec.assertBool s (not (any (blockerWasDeclared . snd) (GameState.events atEnd))) "CR 509.3a / CR 509.3b: no blocker was declared here either"
+        Spec.assertBool s (S.onBattlefield flier atEnd) "the unblocked Thopter is untouched"
+        Spec.assertBool s (not (S.onBattlefield ground atEnd)) "and the Prey traded with the Saproling"
+        -- The control leg, differing from the first only in whether the spell is
+        -- cast: nothing is blocked, nothing triggers, and both attackers connect.
+        Spec.assertEqWith s "control: with no spell bob takes 2 and 1" (S.lifeOf S.bob uncast) (Just 17)
+        Spec.assertEqWith s "control: and the Prey's trigger is silent" (S.lifeOf S.alice uncast) (Just 20)
+        Spec.assertEqWith s "control: nothing is blocking anything" (Combat.Type.blockers (GameState.combat uncast)) Map.empty
+        Spec.assertEqWith s "control: bob's library is untouched" (length (Game.zoneMembers Zone.Library S.bob uncast)) 1
+      _ -> Spec.assertFailure s "fixture should have two attackers"
+
 -- CR 506.7b's window, "only during combat after blockers are declared", proved
 -- step by step on ONE board.
 --
@@ -4069,6 +4206,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   creaturePlaneswalkerCombatSpec s registry
   effectRemovalSpec s registry
   putOntoBattlefieldAttackingSpec s registry
+  putOntoBattlefieldBlockingSpec s registry
   towershellSpec s registry
   planeswalkerAttackSpec s registry
   trampleOverPlaneswalkersSpec s registry

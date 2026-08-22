@@ -29,6 +29,7 @@ plain =
   EntryRiders.MkEntryRiders
     { EntryRiders.tapped = TapState.Untapped,
       EntryRiders.attacking = False,
+      EntryRiders.blocking = Nothing,
       EntryRiders.transformed = False,
       EntryRiders.counters = Map.empty,
       EntryRiders.underOwner = False,

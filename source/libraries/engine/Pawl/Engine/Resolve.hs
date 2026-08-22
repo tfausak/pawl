@@ -258,6 +258,15 @@ quantitySlots = Map.fromSet (const SlotArity.One) . Quantity.slots
 riderQuantities :: EntryRiders.EntryRiders Quantity.Type.Quantity -> [Quantity.Type.Quantity]
 riderQuantities = Map.elems . EntryRiders.counters
 
+-- The slot an entry rider READS, which is CR 509.4's blocking rider and only it:
+-- every other rider is a flag or a Quantity (riderQuantities above). Read singly
+-- -- CR 509.4 names one attacking creature.
+--
+-- Create alone reaches it, which is where the rider is applied; a MoveToZone
+-- carrying one would be inert card data, and Pawl.CardSpec lints that none does.
+riderSlots :: EntryRiders.EntryRiders count -> Map.Map SlotName SlotArity
+riderSlots = maybe Map.empty oneSlot . EntryRiders.blocking
+
 -- The slots a PlayerRef reads. Only InSlot names one.
 playerRefSlots :: PlayerRef -> Map.Map SlotName SlotArity
 playerRefSlots ref = case ref of
@@ -463,8 +472,9 @@ slotsOf effect = case effect of
   Effect.DecreaseSpeed d -> joinTwo (playerRefSlots (SpeedDecrease.player d)) (quantitySlots (SpeedDecrease.quantity d))
   -- Create's slot is a DEFINITION, not a read, so the lint must not see it here.
   -- CR 111.2's creator is a READ: Rampage of the Clans names the controller of
-  -- the permanent the loop around it bound.
-  Effect.Create (Create.MkCreate quantity _ riders _ creator) -> joinSlots [quantitySlots quantity, playerRefSlots creator, joinSlots (fmap quantitySlots (riderQuantities riders))]
+  -- the permanent the loop around it bound. So is CR 509.4's blocking rider,
+  -- which names the attacker the token enters blocking (Flash Foliage's target).
+  Effect.Create (Create.MkCreate quantity _ riders _ creator) -> joinSlots [quantitySlots quantity, playerRefSlots creator, joinSlots (fmap quantitySlots (riderQuantities riders)), riderSlots riders]
   -- A READ, unlike Create's slot: the ref names the permanent being copied.
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> joinTwo (quantitySlots quantity) (objectRefSlots ref)
   -- Both refs: either may name a slot.
@@ -4291,6 +4301,21 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- APNAP (CR 608.2f) for a reference naming several, apnapPlayersOf's own
         -- intersection so a reference naming a departed seat mints nothing.
         creators = apnapPlayersOf creator legal controller gs
+    -- CR 509.4's parenthetical: the attacking creature the effect SPECIFIED,
+    -- named by slot. Read ONCE, ahead of the minting loop, so CR 608.2f's single
+    -- event cannot see it move; through fromAmongMembers, the reader every "the
+    -- object this slot names" site shares, so a targeted slot (Flash Foliage) and
+    -- one an earlier effect or a trigger bound read the same way.
+    --
+    -- Exactly one object or nothing: CR 509.4 names ONE attacking creature, and
+    -- no printing names several. Nothing here is Combat's own no-op case anyway.
+    mBlocked <- case EntryRiders.blocking entry of
+      Nothing -> pure Nothing
+      Just slot -> do
+        named <- fromAmongMembers legal resolving chosen slot
+        pure $ case named of
+          [attacker] -> Just attacker
+          _ -> Nothing
     -- PER CREATOR, every amount off the same pre-effect `gs` (CR 608.2f), so one
     -- seat's tokens cannot change how many the next seat gets.
     minted <- fmap concat . Monad.forM creators $ \creating ->
@@ -4309,6 +4334,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- attack triggers see nothing. After the entry loops rather than
               -- inside them: CR 614.16's replacement settles the COUNT first.
               Monad.when (EntryRiders.attacking entry) (Monad.mapM_ Combat.putOntoBattlefieldAttacking made)
+              -- CR 509.4, the blocking twin one rule over, and in the same place
+              -- for the same reason: CR 614.16's replacement settles the COUNT
+              -- first, and CR 506.3e / CR 509.4a's no-op conditions live in
+              -- Pawl.Engine.Combat rather than here.
+              Monad.forM_ mBlocked (\attacker -> Monad.mapM_ (\made' -> Combat.putOntoBattlefieldBlocking made' attacker) made)
               pure made
         _ -> pure []
     case (mSlot, namesEveryToken quantity, minted) of

@@ -1534,7 +1534,7 @@ manifestedWith s registry land top extra = do
 -- resolved. Nothing if the move did not land.
 putOntoBattlefield :: Bool -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, Maybe ObjectId.ObjectId)
 putOntoBattlefield faceDown oid gs =
-  let riders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = faceDown}
+  let riders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = faceDown}
       (entered, moved) = Engine.runGamePure S.identityAnswer gs (Event.changeZoneEntering oid Zone.Battlefield LibraryPosition.defaultValue riders (Just S.alice))
    in (S.runPure S.identityAnswer moved Engine.priorityLoop, entered)
 

@@ -281,8 +281,12 @@ data TriggerCondition
     -- Pawl.Engine.Combat.becomeBlocked's own guard. No blocker is bound; CR
     -- 508.5's defending player IS, which rule 702.130a's afflict reads.
     --
-    -- Not implemented: the third producer, a creature put onto the battlefield
-    -- as a blocker (CR 509.4) (#1387).
+    -- The THIRD producer reaches it too: a creature put onto the battlefield as a
+    -- blocker (CR 509.4), through
+    -- Pawl.Engine.Combat.putOntoBattlefieldBlocking, which records the same
+    -- event under the same unblocked-at-that-time guard. Flash Foliage is the
+    -- pool's producer, and Pawl.CombatEffectSpec's PutOntoBattlefieldBlocking
+    -- group is the proof.
     SelfBecomesBlocked
   | -- | CR 509.3d: "whenever [a creature] becomes blocked by a creature" -- rule
     -- 702.25a's flanking. Self-scoped on the attacking side, but against
