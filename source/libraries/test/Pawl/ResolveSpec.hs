@@ -1275,6 +1275,20 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
       "every seat was asked the may, and only the two who took it were asked to search"
       asked
       [may S.alice, may S.bob, may S.carol, search S.alice, search S.carol]
+  -- The same board differing in exactly one thing: EVERY seat declines. The
+  -- shuffle answerer is still the reversing one, so a library that came back in
+  -- its original order is one nothing shuffled -- and the whole sentence,
+  -- shuffle included, is what nobody performed.
+  Spec.it s "CR 603.5 whole card: nobody takes Jungle Wayfinder's may, so no library moves at all" $ do
+    (gs, spellId) <- wayfinderBoard s registry
+    let cast = snd (Engine.runGamePure findFirstExercising gs (S.cast S.alice spellId))
+        onStack = snd (Engine.runGamePure findFirstExercising cast (Stack.resolveTop >> Engine.settleForPriority))
+        ((_, after), asked) = State.runState (Engine.runGame decliningWayfinderAnswer onStack Stack.resolveTop) []
+        libraries g = fmap (\pid -> namesIn Zone.Library pid g) [S.alice, S.bob, S.carol]
+    Spec.assertEqWith s "every library is untouched, in its original order" (libraries after) (libraries onStack)
+    Spec.assertEqWith s "and every hand is empty" (fmap (\pid -> namesIn Zone.Hand pid after) [S.alice, S.bob, S.carol]) [[], [], []]
+    Spec.assertEqWith s "three asks and no search" asked [(Text.pack "may", S.alice), (Text.pack "may", S.bob), (Text.pack "may", S.carol)]
+    Spec.assertEqWith s "the Wayfinder itself still resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Jungle Wayfinder")) S.alice after) 1
   Spec.it s "CR 603/608.2n Rest in Peace's ETB exiles graveyards and ceases" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -1896,6 +1910,15 @@ wayfinderAnswer p = case p of
     pure (if pid == S.carol then [] else List.genericTake cap matches)
   Prompt.Shuffle offered -> pure (reverse offered)
   _ -> pure (S.identityAnswer p)
+
+-- wayfinderAnswer with every seat declining, and the SAME reversing shuffle, so
+-- a board run through both differs in exactly the decisions.
+decliningWayfinderAnswer :: Prompt.Prompt r -> State.State [(Text.Text, PlayerId.PlayerId)] r
+decliningWayfinderAnswer p = case p of
+  Prompt.ChooseOptional _ pid _ _ _ -> do
+    State.modify' (<> [(Text.pack "may", pid)])
+    pure OptionalDecision.Declines
+  _ -> wayfinderAnswer p
 
 -- findFirstExercising with the FIND pinned to one named card. The two Dragons of
 -- the CR 607.2a pair have to exile DIFFERENT artifacts for the linked set to be
