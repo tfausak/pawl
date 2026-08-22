@@ -107,7 +107,10 @@ stolenTowershellBoard base towershell controlMagic island =
 -- unambiguously.
 soleObjectOf :: Printing -> GameState.GameState -> Maybe (ObjectId, Object.Object)
 soleObjectOf printing gs =
-  List.find (\(_, obj) -> Object.source obj == Source.OfCard printing) (Map.toList (GameState.objects gs))
+  let isIt obj = case Object.source obj of
+        Source.OfCard printingId -> Game.printingOf printingId gs == Just printing
+        _ -> False
+   in List.find (\(_, obj) -> isIt obj) (Map.toList (GameState.objects gs))
 
 -- Run whole steps until the board is at `phase` on turn `turn`, WITHOUT running
 -- that step. Bounded so a bug cannot loop forever; stops on a finished game.

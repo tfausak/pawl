@@ -1357,6 +1357,7 @@ library types
     Pawl.Types.PreventNextDamage
     Pawl.Types.PrintedReplacement
     Pawl.Types.Printing
+    Pawl.Types.PrintingId
     Pawl.Types.ProductionTag
     Pawl.Types.Program
     Pawl.Types.ProjectedCharacteristics

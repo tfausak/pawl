@@ -591,12 +591,13 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     let base = Setup.emptyGame S.bothPlayers
         (islandId, g1) = S.addCreature island S.alice base
         (forestId, g2) = S.addCreature forest S.alice g1
-        (boilId, g3) = Game.freshObjectId g2
+        (boilPrintingId, g2b) = Game.intern boil g2
+        (boilId, g3) = Game.freshObjectId g2b
         boilObj =
           Object.MkObject
             { Object.owner = S.alice,
               Object.enteredUnder = Nothing,
-              Object.source = Source.OfCard boil,
+              Object.source = Source.OfCard boilPrintingId,
               Object.zone = Zone.Stack,
               Object.tapped = TapState.Untapped,
               Object.facing = Facing.FaceUp,
@@ -658,12 +659,13 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     bloodMoon <- S.printingOf s registry "Blood Moon"
     let base = Setup.emptyGame S.bothPlayers
         (nonbasicId, g1) = S.addCreature urborg S.alice base
-        (bloodMoonSpellId, g2) = Game.freshObjectId g1
+        (bloodMoonPrintingId, g1b) = Game.intern bloodMoon g1
+        (bloodMoonSpellId, g2) = Game.freshObjectId g1b
         bmObj =
           Object.MkObject
             { Object.owner = S.alice,
               Object.enteredUnder = Nothing,
-              Object.source = Source.OfCard bloodMoon,
+              Object.source = Source.OfCard bloodMoonPrintingId,
               Object.zone = Zone.Stack,
               Object.tapped = TapState.Untapped,
               Object.facing = Facing.FaceUp,
@@ -2178,7 +2180,8 @@ nonWinnersLose3 =
 -- the object is a spell like any other.
 subgameSpellOn :: Printing.Printing -> String -> [Effect.Effect Card.Type.Card] -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 subgameSpellOn borrowed name effects gs0 =
-  let (spellId, gs1) = Game.freshObjectId gs0
+  let (spellPrintingId, gs0b) = Game.intern (Printing.MkPrinting card) gs0
+      (spellId, gs1) = Game.freshObjectId gs0b
       (ts, gs2) = Game.freshTimestamp gs1
       card = Card.Type.MkCard {Card.Type.layout = Layout.Normal, Card.Type.faces = NonEmpty.singleton face}
       face =
@@ -2230,7 +2233,7 @@ subgameSpellOn borrowed name effects gs0 =
         Object.MkObject
           { Object.owner = S.alice,
             Object.enteredUnder = Nothing,
-            Object.source = Source.OfToken card,
+            Object.source = Source.OfToken spellPrintingId,
             Object.zone = Zone.Stack,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,

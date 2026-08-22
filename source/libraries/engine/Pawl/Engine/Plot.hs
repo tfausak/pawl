@@ -40,8 +40,6 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
 import Pawl.Types.PlayerId (PlayerId)
-import qualified Pawl.Types.Printing as Printing
-import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 702.170a: what this object's plot ability costs, or Nothing when it has
@@ -53,14 +51,7 @@ import qualified Pawl.Types.Zone as Zone
 -- hand member with no card behind it -- a token, an ability -- has no plot cost.
 plotCostOf :: ObjectId -> GameState -> Maybe (Cost Keyword)
 plotCostOf oid gs = do
-  obj <- Game.lookupObject oid gs
-  card <- case Object.source obj of
-    Source.OfCard printing -> Just (Printing.card printing)
-    Source.OfToken card -> Just card
-    Source.OfAbility _ _ -> Nothing
-    Source.OfTrigger _ _ -> Nothing
-    Source.OfEmblem _ -> Nothing
-    Source.OfInherentTrigger _ _ -> Nothing
+  card <- Game.cardOfHandMember oid gs
   Keyword.plotCost (Face.keywords (Card.combined card))
 
 -- CR 702.170a / 116.2k: may this player plot this card right now? Three

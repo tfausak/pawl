@@ -121,7 +121,7 @@ designationSpec s registry = Spec.describe s "Designation" $ do
     shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
     let gs = commanderBoard mountain shimatsu 4
     Spec.assertEqWith s "one card in the command zone" (length (inCommandZone gs)) 1
-    Spec.assertEqWith s "alice is designated it" (fmap Player.commander (Map.lookup S.alice (GameState.players gs))) (Just (Just shimatsu))
+    Spec.assertEqWith s "alice is designated it" (Map.lookup S.alice (GameState.players gs) >>= Player.commander >>= \i -> Game.printingOf i gs) (Just shimatsu)
     Spec.assertEqWith s "and it is her commander" (fmap (\oid -> Commander.isCommander oid gs) (inCommandZone gs)) [True]
     Spec.assertEqWith s "having cast it no times yet" (commanderCastsOf gs) (Just 0)
   -- The falsifier for a commander smuggled into the library: CR 903.6 puts it in
@@ -506,7 +506,7 @@ subgameSpec s registry = Spec.describe s "Subgame" $ do
       "alice's library is one card bigger: the commander came back to it instead"
       (length (Game.zoneMembers Zone.Library S.alice after))
       (length (Game.zoneMembers Zone.Library S.alice parent) + 1)
-    Spec.assertEqWith s "she is still designated it (CR 903.3 survives the subgame)" (fmap Player.commander (Map.lookup S.alice (GameState.players after))) (Just (Just shimatsu))
+    Spec.assertEqWith s "she is still designated it (CR 903.3 survives the subgame)" (fmap (commanderPrintingOf after) (Map.lookup S.alice (GameState.players after))) (Just (Just shimatsu))
     Spec.assertEqWith s "and no copy is left behind" (Map.size (GameState.objects after)) (2 + 5 + 1)
   -- CR 729.1b: nothing that happened in the subgame means anything in the main
   -- game, so a player who LOST the subgame is still playing the main one and
@@ -567,7 +567,7 @@ restartSpec s registry = Spec.describe s "Restart" $ do
         Spec.assertEqWith s "CR 727.5: it stayed in exile, where the exemption left it" (Set.member oid (GameState.exile after)) True
         -- CR 727.5a's second sentence, read both off the player and off the
         -- object, since Commander.isCommander is what every other rule asks.
-        Spec.assertEqWith s "it remains that deck's commander" (fmap Player.commander (Map.lookup S.alice (GameState.players after))) (Just (Just shimatsu))
+        Spec.assertEqWith s "it remains that deck's commander" (fmap (commanderPrintingOf after) (Map.lookup S.alice (GameState.players after))) (Just (Just shimatsu))
         Spec.assertEqWith s "so the exiled card is still recognised as her commander" (Commander.isCommander oid after) True
         -- The control leg, and the reason the first assertion is not passing on
         -- an engine that never refills the command zone: the SAME board and the
@@ -577,3 +577,11 @@ restartSpec s registry = Spec.describe s "Restart" $ do
         Spec.assertEqWith s "control leg: unexempted, CR 903.6 puts it back in the command zone" (inCommandZone kept) [oid]
         Spec.assertEqWith s "and it left exile to get there" (Set.member oid (GameState.exile kept)) False
       _ -> Spec.assertFailure s "fixture should give alice one commander in the command zone"
+
+-- Her commander AS A PRINTING. Player.commander names a printing rather than
+-- carrying one (#1592), and these assertions compare against the printing the
+-- fixture was built with, so the id is resolved before the comparison.
+commanderPrintingOf :: GameState.GameState -> Player.Player -> Maybe Printing.Printing
+commanderPrintingOf gs pl = case Player.commander pl of
+  Nothing -> Nothing
+  Just printingId -> Game.printingOf printingId gs

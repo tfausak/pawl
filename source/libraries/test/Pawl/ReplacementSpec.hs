@@ -6704,7 +6704,7 @@ buriedNames :: PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
 buriedNames pid gs =
   Maybe.mapMaybe
     ( \oid -> case fmap Object.source (Game.lookupObject oid gs) of
-        Just (Source.OfCard printing) -> Just (S.nameOf (Printing.card printing))
+        Just (Source.OfCard printingId) -> fmap S.nameOf (Game.cardOfPrinting printingId gs)
         _ -> Nothing
     )
     (Game.zoneMembers Zone.Graveyard pid gs)
