@@ -25,6 +25,7 @@ import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer
 import Pawl.Types.CastingPermission (CastingPermission)
 import qualified Pawl.Types.CastingPermission as CastingPermission
@@ -2051,7 +2052,7 @@ provoke =
     { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Optional Nothing (Seq.fromList [requirement, untap]))) (Map.singleton provokeTarget slot)))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.fromList [requirement, untap]))) (Map.singleton provokeTarget slot)))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -2420,7 +2421,7 @@ soulshift n =
     { TriggeredAbility.condition = TriggerCondition.SelfDies,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Optional Nothing (Seq.singleton back))) (Map.singleton soulshiftTarget slot)))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.singleton back))) (Map.singleton soulshiftTarget slot)))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -2517,7 +2518,7 @@ miracle cost =
             -- Rule 702.94a's "YOU may cast it": the revealer, who is the
             -- trigger's controller, and a "may".
             OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
-            OfferCast.optionality = Optionality.Optional,
+            OfferCast.optionality = CastObligation.Optional,
             OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Just cost}
           }
 
@@ -2667,7 +2668,7 @@ modular =
     { TriggeredAbility.condition = TriggerCondition.SelfDies,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Optional Nothing (Seq.singleton effect))) (Map.singleton modularTarget slot)))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.singleton effect))) (Map.singleton modularTarget slot)))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited

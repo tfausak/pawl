@@ -145,6 +145,27 @@ triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 gatePlayers :: SlotName
 gatePlayers = SlotName.MkSlotName (Text.pack "thosePlayers")
 
+-- CR 603.5: the reserved slot under which the players who TOOK a clause's
+-- printed "may" are bound -- the word "they" in a sentence whose "may" is not
+-- the resolving controller's. Jungle Wayfinder's "each player may search THEIR
+-- library" is the producer; its search names this slot as its searcher.
+--
+-- Stamped by Pawl.Engine.Resolve.exercises as the "may" is answered, which is
+-- `gatePlayers` one question over -- and a separate name for that reason rather
+-- than for tidiness: one clause may carry both a printed "may" and a CR 118.12
+-- gate, and sharing the name would have the second answer overwrite the first.
+--
+-- SEVERAL players, and readable as several: PlayerRef.EachInSlot is the arm that
+-- takes them all, where PlayerRef.InSlot reads one and so reads NOBODY out of a
+-- slot holding two seats.
+--
+-- Not a target, so CR 608.2b re-validates nothing -- `gatePlayers`' posture, and
+-- the same "no card's targetSlots may name it" sweep applies. Pawl.CardSpec's
+-- dataflow lint answers a read of it only for a mode one of whose clauses prints
+-- a "may".
+mayPlayers :: SlotName
+mayPlayers = SlotName.MkSlotName (Text.pack "thoseWhoMay")
+
 -- CR 400.7e / CR 603.6c: the reserved slot under which a zone-change trigger's
 -- ARRIVING incarnation is bound -- and, since CR 708.7's readers took it, the
 -- slot for the object an event trigger's event NAMES more generally.

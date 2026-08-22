@@ -22,6 +22,7 @@ import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer.Type
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.ClassLevel as ClassLevel
@@ -77,7 +78,6 @@ import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Onset as Onset
-import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -868,7 +868,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           OfferCast.MkOfferCast
             { OfferCast.slot = SlotName.MkSlotName (Text.pack "exiled"),
               OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
-              OfferCast.optionality = Optionality.Optional,
+              OfferCast.optionality = CastObligation.Optional,
               OfferCast.offer = CastOffer.defaultValue
             }
       )
@@ -882,7 +882,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           OfferCast.MkOfferCast
             { OfferCast.slot = SlotName.MkSlotName (Text.pack "exiled"),
               OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
-              OfferCast.optionality = Optionality.Optional,
+              OfferCast.optionality = CastObligation.Optional,
               OfferCast.offer =
                 CastOffer.Type.MkCastOffer
                   { CastOffer.Type.transformed = True,

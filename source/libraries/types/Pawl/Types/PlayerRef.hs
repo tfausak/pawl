@@ -41,6 +41,24 @@ data PlayerRef
   | -- | The player bound in a slot -- Sudden Impact's "that player's hand", where
     -- the slot was filled by targeting (CR 601.2c).
     InSlot SlotName.SlotName
+  | -- | InSlot's PLURAL twin: EVERY player a slot names, rather than the one it
+    -- names alone. Jungle Wayfinder's "each player may search THEIR library" is
+    -- the producer -- the searchers are the seats that took CR 603.5's "may",
+    -- bound under Binding.mayPlayers, and at three seats there are two of them.
+    --
+    -- Not a widening of InSlot, deliberately. That arm's contract is the printed
+    -- "that player" (Sudden Impact) and it reads through Binding.onlyOne, so a
+    -- slot naming several names nobody; a TARGET slot legitimately holds several
+    -- recipients, and letting InSlot read them all would silently change what
+    -- every card writing it means. The two arms are the two printed words.
+    --
+    -- A slot naming NOBODY names nobody here too -- InSlot's collapse rather than
+    -- EachPlayerExcept's widening -- since the seats are the ones an answer put
+    -- in, and none went in when nobody accepted.
+    --
+    -- Slots holding non-player recipients are dropped rather than refused: this
+    -- is the same read as InSlot's, which declines a slot holding an object.
+    EachInSlot SlotName.SlotName
   | -- | InSlot's BAKED half, and runtime-only: one particular player, named
     -- outright. Pawl.Engine.Condition.bakeBound substitutes it for an InSlot as a
     -- CR 611.2b duration begins, so a "for as long as" condition naming the

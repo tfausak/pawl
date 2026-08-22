@@ -163,6 +163,8 @@ library codec
     Pawl.Codec.CastingPermissionSpec
     Pawl.Codec.CastingRestriction
     Pawl.Codec.CastingRestrictionSpec
+    Pawl.Codec.CastObligation
+    Pawl.Codec.CastObligationSpec
     Pawl.Codec.CastOffer
     Pawl.Codec.CastOfferSpec
     Pawl.Codec.ChangeSubtypeWord
@@ -1117,6 +1119,7 @@ library types
     Pawl.Types.CardType
     Pawl.Types.CastingPermission
     Pawl.Types.CastingRestriction
+    Pawl.Types.CastObligation
     Pawl.Types.CastOffer
     Pawl.Types.ChangeSubtypeWord
     Pawl.Types.ChangeText

@@ -52,6 +52,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Combat as Combat
@@ -307,7 +308,7 @@ siegeDefeat =
             -- Rule 310.12b's "YOU may cast it": the trigger's controller, which
             -- is the resolving controller, and a "may".
             OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
-            OfferCast.optionality = Optionality.Optional,
+            OfferCast.optionality = CastObligation.Optional,
             OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = True, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing}
           }
 

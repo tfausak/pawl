@@ -23,6 +23,7 @@ import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PayObligation as PayObligation
 import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
 
@@ -60,7 +61,7 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
       s
       toJson
       fromJson
-      (Clause.MkClause Nothing Optionality.Optional Nothing Seq.empty)
+      (Clause.MkClause Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing Seq.empty)
       " {\"optionality\":{\"type\":\"Optional\"}} "
   -- CR 118.12a: Mana Leak's "unless its controller pays {3}" is what the
   -- payGate key encodes, and it is emitted only when there is one.
