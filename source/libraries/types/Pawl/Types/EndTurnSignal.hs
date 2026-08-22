@@ -16,8 +16,8 @@ module Pawl.Types.EndTurnSignal where
 -- Pawl.Types.RestartSignal's reason: the two states are an outcome -- "this step
 -- is running" and "an effect ended the turn" -- rather than a predicate.
 --
--- Scoped per GameState like RestartSignal, so a subgame (CR 727.6 / 729) runs in
--- its own StateT frame with its own signal.
+-- Scoped per GameState like RestartSignal, so a CR 729.1 subgame runs in its own
+-- StateT frame with its own signal.
 data EndTurnSignal
   = Running
   | Ended

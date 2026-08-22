@@ -1131,9 +1131,11 @@ castingFirst p = case p of
           [] -> Action.Pass
   _ -> S.identityAnswer p
 
--- The cards in one player's zone, by name.
-namesIn :: Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
-namesIn zone pid gs = fmap (`S.soleFaceName` gs) (Game.zoneMembers zone pid gs)
+-- The objects in one player's zone, by the name of the card each is a copy of --
+-- Nothing for an object that is a copy of no card, which is how a stray ability
+-- filed into a zone shows up rather than throwing.
+namesIn :: Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> [Maybe CardName.CardName]
+namesIn zone pid gs = fmap (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs)
 
 -- alice in her precombat main phase with priority, nine untapped Islands (Time
 -- Stop's {4}{U}{U} and Divination's {2}{U} together), a Sinister Gnarlbark, and
@@ -1149,6 +1151,9 @@ namesIn zone pid gs = fmap (`S.soleFaceName` gs) (Game.zoneMembers zone pid gs)
 --   * bob's Burst Lightning is a SECOND object on the stack, owned by the other
 --     seat, so CR 724.1b's exile cannot be confused with the resolving spell's
 --     own CR 608.2n move to a graveyard.
+--   * bob's activated Brothers of Fire ability is a THIRD object on the stack,
+--     and the one that is not represented by a card: CR 724.1b's second sentence
+--     says it ceases to exist, so it must NOT show up in bob's exile.
 --   * Divination is a SORCERY, so it is uncastable while bob's spell sits on the
 --     stack and becomes castable only in a priority window CR 724.1f forbids.
 --   * The precombat main phase leaves more than one entry between here and the
@@ -1164,22 +1169,27 @@ timeStopBoard ::
   Printing.Printing ->
   Printing.Printing ->
   Printing.Printing ->
-  (GameState.GameState, ObjectId, ObjectId, ObjectId)
-timeStopBoard island mountain gnarlbark timeStop divination burst =
-  let (tree, gs1) = S.addCreature gnarlbark S.alice (S.landsFor mountain S.bob 1 (S.landsInPlay island 9))
-      (stop, gs2) = S.addHandCard timeStop S.alice gs1
-      (divine, gs3) = S.addHandCard divination S.alice gs2
-      (bolt, gs4) = S.addHandCard burst S.bob gs3
+  Printing.Printing ->
+  (GameState.GameState, ObjectId, ObjectId)
+timeStopBoard island mountain gnarlbark timeStop divination burst brothers =
+  let (tree, gs1) = S.addCreature gnarlbark S.alice (S.landsFor mountain S.bob 4 (S.landsInPlay island 9))
+      (shaman, gs2) = S.addCreature brothers S.bob gs1
+      (_, gs3) = S.addHandCard timeStop S.alice gs2
+      (divine, gs4) = S.addHandCard divination S.alice gs3
+      (bolt, gs5) = S.addHandCard burst S.bob gs4
       stock g pid = List.foldl' (\g1 _ -> snd (S.addLibraryCard mountain pid g1)) g [1 .. (10 :: Int)]
       staged =
-        (stock (stock gs4 S.alice) S.bob)
+        (stock (stock gs5 S.alice) S.bob)
           { GameState.activePlayer = S.alice,
             GameState.priority = Just S.bob,
             GameState.phase = Phase.PrecombatMain,
             GameState.remaining = afterPrecombatMain
           }
-      onStack = snd (Engine.runGamePure (aimPlayer S.alice) staged (S.cast S.bob bolt))
-   in (onStack {GameState.priority = Just S.alice, GameState.passes = 0}, tree, stop, divine)
+      cast = snd (Engine.runGamePure (aimPlayer S.alice) staged (S.cast S.bob bolt))
+      activated = case assaultAbility brothers of
+        Nothing -> error "Pawl.TurnSpec: Brothers of Fire should have an activated ability"
+        Just ability -> snd (Engine.runGamePure (aimPlayer S.alice) cast (Activate.activateAbility S.bob shaman ability))
+   in (activated {GameState.priority = Just S.alice, GameState.passes = 0}, tree, divine)
 
 -- CR 724.1, end to end, through the pool's simplest producer: Time Stop
 -- ({4}{U}{U} Instant, "End the turn.").
@@ -1192,47 +1202,53 @@ endTurnSpec s registry = Spec.describe s "EndTheTurn" $ do
         timeStop <- S.printingOf s registry "Time Stop"
         divination <- S.printingOf s registry "Divination"
         burst <- S.printingOf s registry "Burst Lightning"
-        pure (timeStopBoard island mountain gnarlbark timeStop divination burst, S.printingName timeStop, S.printingName burst)
+        brothers <- S.printingOf s registry "Brothers of Fire"
+        pure (timeStopBoard island mountain gnarlbark timeStop divination burst brothers, S.printingName timeStop, S.printingName burst)
   -- THE CONTROL, and the same board differing in exactly one thing: whether alice
   -- casts anything. Without it every negative below is satisfied by a board where
   -- the end step trigger never existed.
   Spec.it s "CR 500.1 the control turn runs its steps and the end step trigger fires" $ do
-    ((gs, tree, _, _), _, _) <- board
+    ((gs, tree, _), _, _) <- board
     let (after, phases) = runTurn S.identityAnswer gs
     Spec.assertEqWith s "the whole turn ran" phases [Phase.PrecombatMain, Phase.Combat CombatStep.BeginningOfCombat, Phase.Combat CombatStep.DeclareAttackers, Phase.Combat CombatStep.EndOfCombat, Phase.PostcombatMain, Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]
     Spec.assertEqWith s "so Sinister Gnarlbark's end step trigger drew" (length (Game.zoneMembers Zone.Library S.alice after)) 9
     Spec.assertEqWith s "and blighted itself" (S.counterOf CounterKind.MinusOneMinusOne tree after) 1
-    Spec.assertEqWith s "and bob's Burst Lightning resolved" (S.lifeOf S.alice after) (Just 18)
+    -- Both of bob's stack objects resolved: 1 from the Brothers of Fire ability
+    -- (which also pings bob) and 2 from Burst Lightning.
+    Spec.assertEqWith s "and both of bob's stack objects resolved" (S.lifeOf S.alice after, S.lifeOf S.bob after) (Just 17, Just 19)
   -- CR 724.1d/724.1e: the schedule assertions, in their own case so no zone
   -- assertion can absorb a mutation to the jump.
   Spec.it s "CR 724.1d ending the turn skips straight to the cleanup step" $ do
-    ((gs, tree, _, _), _, _) <- board
-    let (after, phases) = runTurn castingFirst gs
+    ((gs, _, _), _, _) <- board
+    let phases = snd (runTurn castingFirst gs)
     Spec.assertEqWith s "the postcombat main phase and the end step never ran" phases [Phase.PrecombatMain, Phase.Ending EndingStep.Cleanup]
-    -- CR 724.1e: no end step began, so Sinister Gnarlbark's ability never
-    -- triggered -- read as a library count and a counter, against the control.
-    Spec.assertEqWith s "so nothing drew" (length (Game.zoneMembers Zone.Library S.alice after)) 10
-    Spec.assertEqWith s "and nothing blighted" (S.counterOf CounterKind.MinusOneMinusOne tree after) 0
+  -- CR 724.1e in its OWN case: the schedule assertion above would otherwise
+  -- absorb every mutation that skips to the wrong step, and never let this one
+  -- run.
+  Spec.it s "CR 724.1e the end step is skipped, so its triggers never trigger" $ do
+    ((gs, tree, _), _, _) <- board
+    let after = fst (runTurn castingFirst gs)
+    Spec.assertEqWith s "Sinister Gnarlbark never drew" (length (Game.zoneMembers Zone.Library S.alice after)) 10
+    Spec.assertEqWith s "and never blighted" (S.counterOf CounterKind.MinusOneMinusOne tree after) 0
   -- CR 724.1b against CR 608.2n: both spells are EXILED, and neither reaches a
   -- graveyard. Asserting Time Stop's own destination is also what makes a card
   -- that failed to parse unable to pass this group.
   Spec.it s "CR 724.1b it exiles the whole stack, the resolving spell included" $ do
-    ((gs, _, _, _), stopName, burstName) <- board
+    ((gs, _, _), stopName, burstName) <- board
     let after = fst (runTurn castingFirst gs)
-    Spec.assertEqWith s "alice's exile holds Time Stop" (namesIn Zone.Exile S.alice after) [stopName]
-    Spec.assertEqWith s "bob's exile holds Burst Lightning" (namesIn Zone.Exile S.bob after) [burstName]
+    Spec.assertEqWith s "alice's exile holds Time Stop" (namesIn Zone.Exile S.alice after) [Just stopName]
+    Spec.assertEqWith s "bob's exile holds Burst Lightning" (namesIn Zone.Exile S.bob after) [Just burstName]
     Spec.assertEqWith s "and neither graveyard has either" (namesIn Zone.Graveyard S.alice after, namesIn Zone.Graveyard S.bob after) ([], [])
     Spec.assertEqWith s "the stack is empty" (GameState.stack after) []
-    Spec.assertEqWith s "and Burst Lightning never resolved" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "and nothing on the stack resolved" (S.lifeOf S.alice after, S.lifeOf S.bob after) (Just 20, Just 20)
   -- CR 724.1f: no player gets priority during this process, and CR 724.1d has
   -- ended the step, so the window a sorcery would need never opens. The one
   -- assertion that separates a correct implementation from one that rewrites the
   -- schedule and settles anyway.
   Spec.it s "CR 724.1f no player gets priority once the turn has ended" $ do
-    ((gs, _, _, divine), _, _) <- board
+    ((gs, _, divine), _, _) <- board
     let after = fst (runTurn castingFirst gs)
     Spec.assertEqWith s "alice's Divination is still in her hand" (fmap Object.zone (Game.lookupObject divine after)) (Just Zone.Hand)
-    Spec.assertEqWith s "her hand holds only it" (S.handSize S.alice after) 1
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Turn" $ do

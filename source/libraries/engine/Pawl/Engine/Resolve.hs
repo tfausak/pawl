@@ -2686,6 +2686,20 @@ recordExiledWith source before gs =
       file oid = Map.insertWith (\_ inner -> inner) oid source
    in gs {GameState.exiledWith = Map.restrictKeys (foldr file (GameState.exiledWith gs) arrived) (GameState.exile gs)}
 
+-- CR 724.1b: how one object leaves the stack when an effect ends the turn. A card
+-- or a token copy of a spell is EXILED, which is a zone change like any other; an
+-- ability is not represented by a card, so it ceases to exist instead (Game.cease,
+-- CR 608.2n's own mechanism) rather than being filed into exile as a phantom that
+-- rule 724.1b's second sentence expects the next check to remove and that
+-- Pawl.Engine.Sba's CR 704.5d pass -- which reaches tokens only -- would not.
+exileOrCease :: ObjectId -> Game ()
+exileOrCease oid = do
+  gs <- State.get
+  case fmap Object.source (Game.lookupObject oid gs) of
+    Just (Source.OfCard _) -> Event.changeZone oid Zone.Exile
+    Just (Source.OfToken _) -> Event.changeZone oid Zone.Exile
+    _ -> State.modify' (Game.cease oid)
+
 -- One effect, applied. `runSubgame` is the injected nested-game runner; only
 -- the PlaySubgame arm consults it.
 --
@@ -4994,7 +5008,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- UNOBSERVED, and said plainly rather than left to look tested: Time Stop
     -- resolves at a priority boundary, which has just settled, so nothing is
     -- pending here. The pool holds no producer that can leave one -- Day's
-    -- Undoing draws seven before its own end-the-turn clause (#2065).
+    -- Undoing draws seven before its own end-the-turn clause (#2067).
     State.modify' $ \gs ->
       gs
         { GameState.scannedThrough = Natural.length (GameState.events gs),
@@ -5002,22 +5016,37 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         }
     -- CR 724.1b: exile every object on the stack, INCLUDING the one that is
     -- resolving -- which is still on GameState.stack, Stack.resolveTopWith
-    -- leaving it there until CR 608.2n moves it. Real zone changes, so an ability
-    -- that triggers off one is CR 724.1f's. Rule 724.1b's second sentence (a
-    -- non-card object ceases to exist at the next check) is CR 111.7, which
-    -- Pawl.Engine.Sba already performs.
+    -- leaving it there until CR 608.2n moves it. A real zone change, so an
+    -- ability that triggers off one is CR 724.1f's.
+    --
+    -- Rule 724.1b's second sentence -- an object not represented by a card ceases
+    -- to exist at the next check -- is taken HERE for an ability rather than at
+    -- CR 724.1c, and the two are indistinguishable: nothing happens between the
+    -- exile and that check, and Game.cease is already what CR 608.2n, CR 603.3c
+    -- and CR 701.6a use for an ability, which is not a card and so has no zone to
+    -- arrive in (CR 400.7 mints nothing). A TOKEN copy of a spell does go through
+    -- the exile, because Pawl.Engine.Sba does implement CR 704.5d for it.
     --
     -- finishSpell still runs when this fold returns, and is a no-op for it: CR
     -- 400.7 minted a fresh incarnation in exile, so changeZone's lookup of the
     -- old id finds nothing and the spell stays exiled rather than reaching a
     -- graveyard.
     onStack <- State.gets GameState.stack
-    Foldable.traverse_ (\oid -> Event.changeZone oid Zone.Exile) onStack
+    Foldable.traverse_ exileOrCease onStack
     -- CR 724.1c: check state-based actions, granting no priority and putting no
-    -- triggered ability on the stack -- so Sba.performStateBasedActions and not
+    -- triggered ability on the stack -- so Pawl.Engine.Sba's own pass and not
     -- Engine.performSettle, which places triggers. (Engine is unreachable from
     -- here in any case: Engine imports Stack imports Resolve.)
-    Monad.void Sba.performStateBasedActions
+    --
+    -- Repeated to a fixpoint on CR 704.3's authority -- "if any state-based
+    -- actions are performed as a result of a check, the check is repeated" -- and
+    -- one pass does not reach it: CR 704.5m's Aura falls off only on the pass
+    -- after the creature it enchanted died. Terminates because the flag is False
+    -- as soon as a pass performs nothing.
+    let checkToFixpoint = do
+          performed <- Sba.performStateBasedActions
+          Monad.when performed checkToFixpoint
+    checkToFixpoint
     -- CR 724.1d: the current phase and/or step ends; creatures and planeswalkers
     -- leave combat if this happened during one; the game skips straight to the
     -- cleanup step, or to a NEW cleanup step if this IS one.
