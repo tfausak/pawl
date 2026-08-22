@@ -33,10 +33,12 @@ data CountedDiscard = MkCountedDiscard
     -- names, so the only reader a card can write is a Count over one ZONE, and a
     -- discard CR 614 redirected to another public zone falls outside it (#2080).
     --
-    -- Absent for a discard nothing looks back at, which is every discard in the
-    -- pool but the one that does. Pawl.Types.Discard's These arm has no such
-    -- field: no printed card names what an "all nonland cards" discard moved, so
-    -- a slot there would be a bind position no card exercises.
+    -- Absent for a discard nothing looks back at, which is every discard in
+    -- data/cards/ but Psychic Miasma. Pawl.Types.Discard's These arm has no such
+    -- field at all: nothing in data/cards/ names what an "all nonland cards"
+    -- discard moved, so a slot there would be a bind position no card exercises
+    -- (docs/design.md section 4). A card pairing Amnesia's sweep with a "this
+    -- way" rider is what would call for one.
     discarded :: Maybe SlotName.SlotName
   }
   deriving (Eq, Ord, Show)

@@ -1132,8 +1132,7 @@ boundSlots effect = case effect of
   Effect.BecomesBlocked _ -> Set.empty
   Effect.Draw {} -> Set.empty
   -- CR 701.9a's cards "discarded this way", as CR 400.7's incarnations. The
-  -- These arm has none: no printed card looks back at what an "all nonland
-  -- cards" discard moved.
+  -- These arm has none, for the reason its type carries.
   --
   -- A REGRESSION FENCE rather than proven behaviour: emptying this arm leaves
   -- the suite green. The only consumer is Pawl.CardSpec's D4 dataflow lint, and
@@ -4057,9 +4056,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- exists, so a reader of the destination zone could match none of
                 -- them. Destroy's `buried` slot binds on exactly that argument.
                 --
-                -- No board filter of `buried`'s kind: CR 701.9c leaves a redirected
-                -- card discarded, so what the funnel moved is what was discarded
-                -- wherever it landed.
+                -- No board filter of `buried`'s kind: CR 701.9c takes a card put
+                -- somewhere other than its owner's graveyard to have been discarded
+                -- all the same, so what the funnel moved is what was discarded
+                -- wherever it landed. CR 400.7j then decides whether a later part
+                -- of the effect can FIND it -- a public destination yes, a hidden
+                -- one no -- which is a question about the reader.
                 --
                 -- Bound onto `resolving` and as a GROUP, `buried`'s shape and for
                 -- its reason: slotGroups reads live GameState unconditionally,
