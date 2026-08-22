@@ -547,7 +547,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 1))))
+      (Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 1) Nothing)))
       " {\"type\":\"Discard\",\"value\":{\"type\":\"Counted\",\"value\":{\"slot\":\"target\",\"quantity\":{\"type\":\"Literal\",\"value\":1}}}} "
   Spec.it s "LoseLife" $
     Common.assertJsonCodec

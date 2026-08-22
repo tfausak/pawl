@@ -24,7 +24,8 @@ spec s = Spec.describe s "Pawl.Codec.Discard" $ do
       ( Discard.Counted
           CountedDiscard.MkCountedDiscard
             { CountedDiscard.slot = SlotName.MkSlotName (Text.pack "player"),
-              CountedDiscard.quantity = Quantity.Literal 1
+              CountedDiscard.quantity = Quantity.Literal 1,
+              CountedDiscard.discarded = Nothing
             }
       )
       " {\"type\":\"Counted\",\"value\":{\"slot\":\"player\",\"quantity\":{\"type\":\"Literal\",\"value\":1}}} "

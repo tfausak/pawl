@@ -458,6 +458,49 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
         after = snd (Engine.runGamePure sameTwice cast Stack.resolveTop)
     Spec.assertEqWith s "two distinct cards discarded" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 2
     Spec.assertEqWith s "one card left in bob's hand" (S.handSize S.bob after) 1
+  -- CR 701.9a's discard BINDS what it moved, so the same resolution's next clause
+  -- can look back at it: Psychic Miasma's "if a land card is discarded this way,
+  -- return Psychic Miasma to its owner's hand". CR 701.70a's "if you discarded a
+  -- nonland card this way" is the same rider read from the other side; no printing
+  -- carries that literal wording outside connive and recruit reminder text
+  -- (Scryfall o:"nonland card is discarded this way", 2026-08-22, no hit).
+  --
+  -- TWO legs, and neither is redundant. The asserted quantity is Psychic Miasma's
+  -- own zone after resolution, and three implementations disagree about it:
+  -- binding the CR 400.7 incarnation gives hand / graveyard; binding the pre-move
+  -- HAND id -- which compiles, round-trips and loads -- makes Filter.IsBound false
+  -- against every graveyard card and gives graveyard / graveyard, so only leg A
+  -- separates it; dropping the card's Land conjunct gives hand / hand, so only leg
+  -- B separates that.
+  --
+  -- bob holds exactly ONE card, so CR 609.3 makes the discard forced and no
+  -- Prompt.ChooseDiscard answer stands between the board and the assertion. Two
+  -- seats, so the discarding hand and the returning card are never the same zone.
+  Spec.it s "CR 701.9a a land discarded this way returns Psychic Miasma to its owner's hand" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    miasma <- S.printingOf s registry "Psychic Miasma"
+    let base = S.landsInPlay swamp 3
+        withHand = handCards swamp S.bob 1 base
+        (gs, spellId) = S.handOne miasma withHand
+        cast = snd (Engine.runGamePure atBobAnswer gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop)
+    Spec.assertEqWith s "psychic miasma returned to alice's hand" (namesIn Zone.Hand S.alice after) [Just (S.printingName miasma)]
+    Spec.assertEqWith s "and did not also reach alice's graveyard" (namesIn Zone.Graveyard S.alice after) []
+    Spec.assertEqWith s "bob's hand emptied" (S.handSize S.bob after) 0
+    Spec.assertEqWith s "bob's graveyard holds the swamp" (namesIn Zone.Graveyard S.bob after) [Just (S.printingName swamp)]
+  Spec.it s "CR 701.9a a nonland discarded this way leaves Psychic Miasma in its owner's graveyard" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    miasma <- S.printingOf s registry "Psychic Miasma"
+    let base = S.landsInPlay swamp 3
+        withHand = handCards piker S.bob 1 base
+        (gs, spellId) = S.handOne miasma withHand
+        cast = snd (Engine.runGamePure atBobAnswer gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop)
+    Spec.assertEqWith s "psychic miasma stayed in alice's graveyard" (namesIn Zone.Graveyard S.alice after) [Just (S.printingName miasma)]
+    Spec.assertEqWith s "and reached no hand" (S.handSize S.alice after) 0
+    Spec.assertEqWith s "bob's hand emptied" (S.handSize S.bob after) 0
+    Spec.assertEqWith s "bob's graveyard holds the piker" (namesIn Zone.Graveyard S.bob after) [Just (S.printingName piker)]
 
 -- Griptide is "Put target creature on top of its owner's library", the pool's
 -- producer for a library arrival that is NOT the bottom (#989). Everything the
