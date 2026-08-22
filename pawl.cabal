@@ -300,6 +300,8 @@ library codec
     Pawl.Codec.EntryOption
     Pawl.Codec.EntryOptionSpec
     Pawl.Codec.EntryR
+    Pawl.Codec.EntryRestriction
+    Pawl.Codec.EntryRestrictionSpec
     Pawl.Codec.EntryRewrite
     Pawl.Codec.EntryRewriteSpec
     Pawl.Codec.EntryRiders
@@ -698,6 +700,7 @@ library engine
     Pawl.Engine.Dungeon
     Pawl.Engine.EffectZone
     Pawl.Engine.Engine
+    Pawl.Engine.EntryRestriction
     Pawl.Engine.Event
     Pawl.Engine.Expiry
     Pawl.Engine.FaceDown
@@ -1007,6 +1010,7 @@ library test
     Pawl.DetainSpec
     Pawl.DungeonSpec
     Pawl.EngineSpec
+    Pawl.EntryRestrictionSpec
     Pawl.EventSpec
     Pawl.EventTriggerSpec
     Pawl.ExileSpec
@@ -1200,6 +1204,7 @@ library types
     Pawl.Types.EndingStep
     Pawl.Types.EntryOption
     Pawl.Types.EntryR
+    Pawl.Types.EntryRestriction
     Pawl.Types.EntryRewrite
     Pawl.Types.EntryRiders
     Pawl.Types.EntwineDecision

@@ -37,6 +37,7 @@ import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryR as EntryR
+import qualified Pawl.Types.EntryRestriction as EntryRestriction
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter
@@ -70,6 +71,7 @@ import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.UntapRestriction as UntapRestriction
+import qualified Pawl.Types.Zone as Zone
 
 -- Fixtures --------------------------------------------------------------------
 --
@@ -139,6 +141,7 @@ baseFace =
       Face.sacrificeRestrictions = [],
       Face.untapRestrictions = [],
       Face.attachRestrictions = [],
+      Face.entryRestrictions = [],
       Face.attackCosts = [],
       Face.blockCosts = [],
       Face.additionalCosts = [],
@@ -190,6 +193,7 @@ minimalFace =
       Face.sacrificeRestrictions = [],
       Face.untapRestrictions = [],
       Face.attachRestrictions = [],
+      Face.entryRestrictions = [],
       Face.attackCosts = [],
       Face.blockCosts = [],
       Face.mulliganActions = [],
@@ -241,6 +245,7 @@ populatedFace =
       Face.sacrificeRestrictions = [SacrificeRestriction.MkSacrificeRestriction Affected.Attached],
       Face.untapRestrictions = [UntapRestriction.MkUntapRestriction Affected.Attached],
       Face.attachRestrictions = [AttachRestriction.MkAttachRestriction Affected.Attached (Filter.HasSubtype Subtype.Aura)],
+      Face.entryRestrictions = [EntryRestriction.MkEntryRestriction Affected.Attached (Set.singleton Zone.Graveyard)],
       Face.attackCosts = [AttackCost.MkAttackCost Affected.Attached (PerCreature.Fixed (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])) AttackCostScope.Controller],
       Face.blockCosts = [BlockCost.MkBlockCost Affected.Attached (PerCreature.Fixed (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []))],
       Face.additionalCosts = [CostComponent.TapThis],
@@ -279,6 +284,7 @@ populatedFaceJson =
     <> "\"sacrificeRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}],"
     <> "\"untapRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}],"
     <> "\"attachRestrictions\":[{\"affected\":{\"type\":\"Attached\"},\"attachers\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Aura\"}}}],"
+    <> "\"entryRestrictions\":[{\"affected\":{\"type\":\"Attached\"},\"origins\":[{\"type\":\"Graveyard\"}]}],"
     <> "\"attackCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perAttacker\":{\"type\":\"Fixed\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}},\"scope\":{\"type\":\"Controller\"}}],"
     <> "\"blockCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perBlocker\":{\"type\":\"Fixed\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}}}],"
     <> "\"additionalCosts\":[{\"type\":\"TapThis\"}],"
@@ -346,6 +352,9 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
     Spec.it s "attachRestrictions (CR 303.4/301.5/101.2) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.attachRestrictions <$> decodeFace v) (Right [])
+    Spec.it s "entryRestrictions (CR 400.4a/101.2) defaults to the empty list" $ do
+      v <- Common.assertJson s baseFaceJson
+      Spec.assertEq s (Face.entryRestrictions <$> decodeFace v) (Right [])
     Spec.it s "attackCosts (CR 508.1c/508.1h) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.attackCosts <$> decodeFace v) (Right [])
@@ -472,6 +481,13 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         decodeFace
         baseFace {Face.attachRestrictions = [AttachRestriction.MkAttachRestriction Affected.Attached (Filter.HasSubtype Subtype.Aura)]}
         (init baseFaceJson <> ",\"attachRestrictions\":[{\"affected\":{\"type\":\"Attached\"},\"attachers\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Aura\"}}}]}")
+    Spec.it s "entryRestrictions" $
+      Common.assertJsonCodec
+        s
+        encodeFace
+        decodeFace
+        baseFace {Face.entryRestrictions = [EntryRestriction.MkEntryRestriction Affected.Attached (Set.singleton Zone.Graveyard)]}
+        (init baseFaceJson <> ",\"entryRestrictions\":[{\"affected\":{\"type\":\"Attached\"},\"origins\":[{\"type\":\"Graveyard\"}]}]}")
     Spec.it s "attackCosts" $
       Common.assertJsonCodec
         s

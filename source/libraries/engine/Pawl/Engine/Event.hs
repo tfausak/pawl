@@ -37,6 +37,7 @@ import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.EffectZone as EffectZone
+import qualified Pawl.Engine.EntryRestriction as EntryRestriction
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -2632,6 +2633,41 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
         -- producer today -- no card in the pool cancels a zone change outright --
         -- but Maybe is what "the event does not happen" means on this path.
         Nothing -> pure Nothing
+        -- CR 400.4a / CR 101.2: an effect in force says this object can't enter
+        -- the battlefield, so it doesn't -- "it remains in its previous zone".
+        -- Grafdigger's Cage is the pool's printing, and CR 613.11 is why the
+        -- prohibition is asked here rather than anywhere in Pawl.Engine.Projection.
+        --
+        -- Nothing, this funnel's CR 614.6 cancel arm one case up and CR 303.4g's
+        -- answer one case down: the object is never deleted and never re-minted
+        -- (CR 400.7), so the card in the graveyard or the library is the SAME
+        -- object it always was. That is what separates a refusal from a redirect,
+        -- and Pawl.EntryRestrictionSpec's "each card remains in its previous zone,
+        -- as the same object" is the proof.
+        --
+        -- BEFORE placeObject and before the CR 614.1c entry loop, changeZoneEntering's
+        -- `refused` reason: running the loop first would fire as-enters abilities
+        -- for a card that never enters. Before mkObj too, which is CR 701.40f's
+        -- "if it was face up, it remains face up" -- the face-down status
+        -- changeZoneEntering computed for a manifest is written in mkObj and
+        -- nowhere earlier, so a refused manifest leaves the library card face up
+        -- with nothing to undo (Pawl.EntryRestrictionSpec's Soul Summons case).
+        --
+        -- AFTER the CR 616.1 replacement loop and asked of the SETTLED
+        -- destination, `unlocking`'s reading and CR 614.6's: a redirect that sends
+        -- the object anywhere but the battlefield is the event that happens, and
+        -- an entry prohibition has nothing to say about it.
+        --
+        -- `fromZone` is CR 400.4a's "previous zone", read off the object rather
+        -- than off `settled`: no ZoneChangeR rewrites an event's origin.
+        --
+        -- Not implemented: CR 608.3e's permanent spell, which this arm leaves on
+        -- the stack instead of putting into its owner's graveyard (#2065). No card
+        -- reaches it -- the pool's one entry prohibition names the graveyard and
+        -- the library, never the stack.
+        Just settled
+          | ZoneChange.to settled == Zone.Battlefield && EntryRestriction.prohibited oid fromZone gs ->
+              pure Nothing
         Just settled -> do
           let dest = ZoneChange.to settled
               -- CR 110.2a: "If an effect instructs a player to put an object onto

@@ -128,6 +128,7 @@ import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryR as EntryR
+import qualified Pawl.Types.EntryRestriction as EntryRestriction
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
@@ -287,6 +288,7 @@ vanillaFace name typeLine =
       Face.sacrificeRestrictions = [],
       Face.untapRestrictions = [],
       Face.attachRestrictions = [],
+      Face.entryRestrictions = [],
       Face.attackCosts = [],
       Face.blockCosts = [],
       Face.mulliganActions = [],
@@ -3677,9 +3679,10 @@ activatedAbilityFilters ability =
 --     permission.
 --   * `combatRestrictions` (CR 508.1c / 509.1b), `sacrificeRestrictions` (CR
 --     701.21a / 101.2), `untapRestrictions` (CR 502.3 / 101.2),
+--     `entryRestrictions` (CR 400.4a / 101.2),
 --     `attackRequirements` (CR 508.1d), `blockRequirements`
 --     (CR 509.1c), `attackCosts` (CR 508.1h) and `blockCosts` (CR 509.1d) --
---     seven more affected sets, plus each combat cost's Counted share, which is a
+--     eight more affected sets, plus each combat cost's Counted share, which is a
 --     Quantity, plus the CR 604.2 "as long as" clause an attacking requirement
 --     may carry (CR 508.1d's second reading).
 --   * `spell`, `activatedAbilities`, `triggeredAbilities`, `delayedAbilities` --
@@ -3730,6 +3733,7 @@ cardFilters card =
         <> concatMap (affectedFilters . SacrificeRestriction.affected) (Face.sacrificeRestrictions card)
         <> concatMap (affectedFilters . UntapRestriction.affected) (Face.untapRestrictions card)
         <> concatMap attachRestrictionFilters (Face.attachRestrictions card)
+        <> concatMap (affectedFilters . EntryRestriction.affected) (Face.entryRestrictions card)
     )
     <> concatMap staticAbilityFilters (Face.staticAbilities card)
     <> modalFilters (Face.spell card)
