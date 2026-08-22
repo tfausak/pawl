@@ -26,11 +26,14 @@
                   {
                     "type": "Discard",
                     "value": {
-                      "quantity": {
-                        "type": "Literal",
-                        "value": 2
-                      },
-                      "slot": "target"
+                      "type": "Counted",
+                      "value": {
+                        "quantity": {
+                          "type": "Literal",
+                          "value": 2
+                        },
+                        "slot": "target"
+                      }
                     }
                   }
                 ]

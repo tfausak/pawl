@@ -267,6 +267,7 @@ movesLibraryCard effect = case effect of
       ObjectRef.EachMatching _ -> False
       ObjectRef.EachCardInGraveyard {} -> False
       ObjectRef.EachCardInYourHand -> False
+      ObjectRef.EachCardInHand {} -> False
       ObjectRef.EachCardExiledWithSource {} -> False
       ObjectRef.EachSpell _ -> False
       ObjectRef.EachOnStack _ -> False

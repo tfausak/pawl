@@ -31,6 +31,7 @@ import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Count as Count
+import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Create as Create
@@ -544,8 +545,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Discard (Discard.MkDiscard (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 1)))
-      " {\"type\":\"Discard\",\"value\":{\"slot\":\"target\",\"quantity\":{\"type\":\"Literal\",\"value\":1}}} "
+      (Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 1))))
+      " {\"type\":\"Discard\",\"value\":{\"type\":\"Counted\",\"value\":{\"slot\":\"target\",\"quantity\":{\"type\":\"Literal\",\"value\":1}}}} "
   Spec.it s "LoseLife" $
     Common.assertJsonCodec
       s

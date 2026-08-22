@@ -14,6 +14,7 @@ import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
+import qualified Pawl.Types.EachCardInHand as EachCardInHand
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GraveyardScope as GraveyardScope
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -112,6 +113,24 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.codec
       ObjectRef.EachCardInYourHand
       " {\"type\":\"EachCardInYourHand\"} "
+  -- The arm above's zone with a scope and a filter, which is what reaching
+  -- ANOTHER player's hand costs: CR 400.1 makes "whose" a question, and the
+  -- filter is what a printed reveal (CR 701.20a) lets a card state.
+  Spec.it s "EachCardInHand" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand (GraveyardScope.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Just (Filter.Not (Filter.HasCardType CardType.Land)))))
+      " {\"type\":\"EachCardInHand\",\"value\":{\"hands\":{\"type\":\"InSlot\",\"value\":\"target\"},\"filter\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}} "
+  -- An absent filter is the whole hand, which is Amnesia's reveal: the key is
+  -- omitted rather than written null, so the shorter spelling is the unfiltered
+  -- one.
+  Spec.it s "EachCardInHand, no filter" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand (GraveyardScope.Scoped PlayerScope.You) Nothing))
+      " {\"type\":\"EachCardInHand\",\"value\":{\"hands\":{\"type\":\"Scoped\",\"value\":{\"type\":\"You\"}}}} "
   -- No player, for a rule: CR 607.2a's set is defined by which object exiled the
   -- card. The bare tag is the whole linked set, which is what three of the four
   -- printings that read one take.
@@ -277,13 +296,14 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
   Spec.it s "every arm carries a distinct tag" $
     Spec.assertEqWith
       s
-      "a slot, a battlefield sweep, a graveyard sweep, the hand sweep, the linked exile sweep, the stack's spells, the whole stack, the player sweep, the opponent sweep, the chosen player, a library's top cards, a walk of a library, a chosen graveyard card, a chosen card in hand, a chosen card from among a group, every card from among a group and a random card in hand all encode differently"
+      "a slot, a battlefield sweep, a graveyard sweep, your own hand sweep, a scoped hand sweep, the linked exile sweep, the stack's spells, the whole stack, the player sweep, the opponent sweep, the chosen player, a library's top cards, a walk of a library, a chosen graveyard card, a chosen card in hand, a chosen card from among a group, every card from among a group and a random card in hand all encode differently"
       ( length
           ( List.nub
               [ Codec.encode ObjectRef.codec (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
                 Codec.encode ObjectRef.codec (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)),
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard (GraveyardScope.Scoped PlayerScope.EachPlayer) (Filter.HasCardType CardType.Creature))),
                 Codec.encode ObjectRef.codec ObjectRef.EachCardInYourHand,
+                Codec.encode ObjectRef.codec (ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand (GraveyardScope.Scoped PlayerScope.You) Nothing)),
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardExiledWithSource Nothing),
                 Codec.encode ObjectRef.codec (ObjectRef.EachSpell (Filter.Not Filter.IsSource)),
                 Codec.encode ObjectRef.codec (ObjectRef.EachOnStack (Filter.Not Filter.IsSource)),
@@ -300,7 +320,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
               ]
           )
       )
-      17
+      18
   -- A tag the decoder does not know is an error rather than a silent slot. The
   -- tag has to be one no arm will ever claim -- @EachOpponent@ stood here until
   -- that became a real arm, and the case then failed rather than going quiet,

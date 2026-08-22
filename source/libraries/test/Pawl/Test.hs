@@ -79,6 +79,7 @@ import qualified Pawl.Codec.CostReductionSpec
 import qualified Pawl.Codec.CostScaleSpec
 import qualified Pawl.Codec.CostSpec
 import qualified Pawl.Codec.CountSpec
+import qualified Pawl.Codec.CountedDiscardSpec
 import qualified Pawl.Codec.CounterChangeSpec
 import qualified Pawl.Codec.CounterKindSpec
 import qualified Pawl.Codec.CounterNameSpec
@@ -117,6 +118,7 @@ import qualified Pawl.Codec.DurationSpec
 import qualified Pawl.Codec.DuringPhaseSpec
 import qualified Pawl.Codec.EachCardFromAmongSpec
 import qualified Pawl.Codec.EachCardInGraveyardSpec
+import qualified Pawl.Codec.EachCardInHandSpec
 import qualified Pawl.Codec.EffectSpec
 import qualified Pawl.Codec.EndingStepSpec
 import qualified Pawl.Codec.EntryOptionSpec
@@ -554,7 +556,9 @@ spec s registry = do
   Pawl.Codec.DurationRefSpec.spec s
   Pawl.Codec.DurationSpec.spec s
   Pawl.Codec.DuringPhaseSpec.spec s
+  Pawl.Codec.CountedDiscardSpec.spec s
   Pawl.Codec.EachCardInGraveyardSpec.spec s
+  Pawl.Codec.EachCardInHandSpec.spec s
   Pawl.Codec.EffectSpec.spec s
   Pawl.Codec.EndingStepSpec.spec s
   Pawl.Codec.EntryOptionSpec.spec s

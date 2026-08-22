@@ -5,6 +5,7 @@ import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
+import qualified Pawl.Types.EachCardInHand as EachCardInHand
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -38,9 +39,9 @@ data ObjectRef
     -- set drawn from another zone is one of the arms below -- a graveyard's is
     -- EachCardInGraveyard, a hand's EachCardInYourHand, exile's
     -- EachCardExiledWithSource -- and a FILTERED sweep of a zone is written on
-    -- the arm for that zone: the battlefield's is here, and a graveyard's, the
-    -- stack's and the linked exile set's are on their own arms. A hand and a
-    -- library still have none (#1309) -- TopOfLibraryUntil below is not one, since
+    -- the arm for that zone: the battlefield's is here, and a graveyard's, a
+    -- hand's, the stack's and the linked exile set's are on their own arms. A
+    -- library still has none (#1309) -- TopOfLibraryUntil below is not one, since
     -- it names a PREFIX of a library that a count of matches ends rather than the
     -- cards in it that match, and EachCardFromAmong is not one either, since it
     -- names the matches in a GROUP an earlier clause bound rather than the
@@ -66,8 +67,9 @@ data ObjectRef
     -- The zone is BAKED IN rather than carried as a Pawl.Types.Zone, the shape
     -- Pawl.Types.Pool.CardsInGraveyard takes one question over: each zone whose
     -- filtered sweep a card in the pool asks for gets its own arm --
-    -- EachCardExiledWithSource takes the exile one -- and the hidden zones (CR
-    -- 400.2) would owe a visibility question a graveyard does not (#1309).
+    -- EachCardExiledWithSource takes the exile one and EachCardInHand a hand's.
+    -- A hidden zone (CR 400.2) owes a visibility question a graveyard does not,
+    -- and Pawl.Types.EachCardInHand is where that answer is written.
     --
     -- The Pawl.Types.GraveyardScope is WHOSE, which CR 400.1 forces this arm to
     -- say and EachMatching's shared battlefield never has to. The SAME type a
@@ -92,9 +94,12 @@ data ObjectRef
     -- controller, who may already look at their own hand. NO FILTER: a filtered
     -- SWEEP of a hidden zone is the same question, since which cards matched is
     -- then read off what left the zone, and nothing needs to be told apart when
-    -- EVERY card goes (#1309). ChosenCardInHand below does carry a Filter, and
-    -- that is not this arm's question: one card chosen out of a hand tells nobody
-    -- which of the others matched.
+    -- EVERY card goes. EachCardInHand below carries both, and supersedes neither:
+    -- what makes IT legitimate is that its producer prints the reveal (CR
+    -- 701.20a) that shows the hand, which Ignorant Bliss does not and does not
+    -- need. ChosenCardInHand below does carry a Filter, and that is not this
+    -- arm's question either: one card chosen out of a hand tells nobody which of
+    -- the others matched.
     --
     -- Not a target and never one (CR 115.10a) -- a hidden zone has no target pool
     -- at all (#559) -- and swept when the effect executes (CR 608.2c), the two
@@ -106,6 +111,13 @@ data ObjectRef
     -- it, the first by asking that hand's own owner (CR 402.3) and the second by
     -- naming the card without anybody looking at all.
     EachCardInYourHand
+  | -- | Every card in the hands a Pawl.Types.GraveyardScope names that the
+    -- optional Filter matches -- Amnesia's "target player reveals their hand and
+    -- discards all nonland cards". EachCardInGraveyard's scope and filter over
+    -- the arm above's zone, both of which that arm declines;
+    -- Pawl.Types.EachCardInHand's header says why this one may have them and what
+    -- answers the CR 400.2 visibility question there.
+    EachCardInHand EachCardInHand.EachCardInHand
   | -- | CR 607.2a's linked set: every card in exile that an instruction in an
     -- ability of THIS EFFECT'S SOURCE put there -- Hoarding Dragon's "the exiled
     -- card". EachMatching's sibling with CR 109.2's battlefield default switched
@@ -161,8 +173,8 @@ data ObjectRef
     --
     -- The zone is BAKED IN rather than carried as a Pawl.Types.Zone, which is
     -- EachCardInGraveyard's reason: a card wanting a filtered sweep of one more
-    -- zone gets one more arm, and a hand's and a library's are the two still
-    -- unwritten (gap #1309).
+    -- zone gets one more arm, and a library's is the one still unwritten
+    -- (gap #1309).
     --
     -- Not a target and never one (CR 115.10a), so CR 608.2b has nothing to
     -- fizzle -- which is the whole difference between this and Cancel's targeted

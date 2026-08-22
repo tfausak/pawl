@@ -92,11 +92,14 @@
                       {
                         "type": "Discard",
                         "value": {
-                          "quantity": {
-                            "type": "Literal",
-                            "value": 1
-                          },
-                          "slot": "you"
+                          "type": "Counted",
+                          "value": {
+                            "quantity": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "slot": "you"
+                          }
                         }
                       }
                     ],

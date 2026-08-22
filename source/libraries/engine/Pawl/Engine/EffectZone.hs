@@ -65,6 +65,7 @@ zoneFunctionedFrom effect = case effect of
     ObjectRef.EachMatching _ -> Nothing
     ObjectRef.EachCardInGraveyard {} -> Nothing
     ObjectRef.EachCardInYourHand -> Nothing
+    ObjectRef.EachCardInHand {} -> Nothing
     ObjectRef.EachCardExiledWithSource {} -> Nothing
     ObjectRef.EachSpell _ -> Nothing
     ObjectRef.EachOnStack _ -> Nothing
