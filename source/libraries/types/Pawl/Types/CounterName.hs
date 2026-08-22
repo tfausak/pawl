@@ -29,17 +29,15 @@ newtype CounterName = UnsafeMkCounterName
 -- those two counters are interchangeable, so representing them apart is a
 -- rules-observable divergence rather than an inconvenience.
 --
--- HAND-KEPT, and nothing forces it: a twelfth 'Pawl.Types.CounterKind'
--- constructor compiles fine with no entry here, since answering "not reserved"
--- is a legal answer. The same site genre as #1715's codec arms. Deriving it from
--- an exhaustive case over 'Pawl.Types.CounterKind' is not open, because that
--- module imports this one.
+-- Not implemented: nothing forces this list. A new 'Pawl.Types.CounterKind'
+-- constructor compiles with no entry here, since answering "not reserved" is a
+-- legal answer, and CR 122.1b's "as well as any variants of those keywords" is
+-- not a closed list so a variant spelling is not fenced either (#2062).
+-- Deriving the list from an exhaustive case over 'Pawl.Types.CounterKind' is not
+-- open, because that module imports this one.
 --
--- CR 122.1b's fifteen keyword spellings sit alongside the kind spellings, for
--- the 'Pawl.Types.CounterKind.Keyword' arm. The rule's trailing "as well as any
--- variants of those keywords" is not a closed list and is not fenced here; a
--- card naming a variant reaches the same collision, which is the residue this
--- set does not cover.
+-- CR 122.1b's keyword spellings sit alongside the kind spellings, for the
+-- 'Pawl.Types.CounterKind.Keyword' arm.
 reserved :: Set.Set Text.Text
 reserved =
   Set.fromList $

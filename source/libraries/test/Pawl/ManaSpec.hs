@@ -393,8 +393,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
   -- kind end to end -- through the codec, through resolution, into the Map key
   -- the static ability then looks up.
   --
-  -- Seven BASIC Islands pay the cost, so the Tower is still the only nonbasic
-  -- land on the board and nothing Zhao's own text reaches can pay for it.
+  -- Seven BASIC Islands pay the {7}, which keeps the Tower the only nonbasic
+  -- land on the board and so the only object Zhao's affected set names.
   Spec.it s "CR 122.1 Zhao's own ability puts a conqueror counter on him, and the Tower becomes a Mountain" $ do
     zhao <- S.printingOf s registry "Zhao, the Moon Slayer"
     reliquaryTower <- S.printingOf s registry "Reliquary Tower"

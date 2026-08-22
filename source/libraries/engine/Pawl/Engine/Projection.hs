@@ -2732,10 +2732,11 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               -- static abilities of the card, which gatherStatic applies.
               CounterKind.Level -> []
               -- Nor a card-named counter: CR 122.1 letters no such kind, so no
-              -- CR 613 layer reads one. What reads the count is always the
-              -- card's own condition (Quantity.ObjectCounters), which is card
-              -- data. UNPROVEN by any board: a grant naming nothing and no grant
-              -- at all are indistinguishable, and no card asks for one.
+              -- CR 613 layer reads one, and what reads the count is always the
+              -- card's own condition (Quantity.ObjectCounters) rather than this
+              -- fold. UNPROVEN by any board -- a grant that names nothing and no
+              -- grant at all are indistinguishable, so there is no assertion to
+              -- write here rather than one nobody wrote.
               CounterKind.Named _ -> []
          in pt <> concatMap grantOf (Map.toList cs)
 

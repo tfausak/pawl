@@ -1990,7 +1990,7 @@ reliquaryHandOfNine plains extra =
       add g _ = snd (S.addHandCard plains S.alice g)
    in List.foldl' add withExtra [1 .. 9 :: Int]
 
--- The CR 613.10 pair's board: the same nine Plains in hand, plus a Reliquary
+-- The CR 613.10 cases' board: the same nine Plains in hand, plus a Reliquary
 -- Tower and Zhao, the Moon Slayer, who carries one counter of each of `kinds`.
 -- The runs differ in NOTHING but those counters.
 zhaoHandOfNine :: Printing.Printing -> Printing.Printing -> Printing.Printing -> [CounterKind.CounterKind Keyword.Keyword] -> GameState.GameState
@@ -2068,8 +2068,9 @@ reliquaryTowerSpec s registry =
     -- counter's identity its name, so it is that name the clause reads and
     -- nothing else about the board moves.
     --
-    -- Zhao, the Moon Slayer is the only printed static ability pairing an "as
-    -- long as" clause with a land-subtype set.
+    -- Zhao, the Moon Slayer is the printed card that pairs an "as long as"
+    -- clause (CR 604.2) with a land-subtype set (CR 305.7); before it landed the
+    -- corpus stood in a synthetic for exactly that shape.
     Spec.it s "CR 604.2/305.7 with no counter on Zhao the clause is false, and the Tower keeps its ability" $ do
       plains <- S.printingOf s registry "Plains"
       reliquaryTower <- S.printingOf s registry "Reliquary Tower"
