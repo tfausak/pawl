@@ -52,6 +52,7 @@ arms =
     Arm.payload "SetCreatureSubtype" Subtype.codec Modification.SetCreatureSubtype (\x -> case x of Modification.SetCreatureSubtype y -> Just y; _ -> Nothing),
     Arm.payload "AddCreatureSubtype" Subtype.codec Modification.AddCreatureSubtype (\x -> case x of Modification.AddCreatureSubtype y -> Just y; _ -> Nothing),
     Arm.nullary "AddEveryCreatureSubtype" Modification.AddEveryCreatureSubtype,
+    Arm.payload "AddSubtype" Subtype.codec Modification.AddSubtype (\x -> case x of Modification.AddSubtype y -> Just y; _ -> Nothing),
     Arm.payload "AddCardType" CardType.codec Modification.AddCardType (\x -> case x of Modification.AddCardType y -> Just y; _ -> Nothing),
     Arm.payload "SetCardType" CardType.codec Modification.SetCardType (\x -> case x of Modification.SetCardType y -> Just y; _ -> Nothing),
     Arm.payload "AddSupertype" Supertype.codec Modification.AddSupertype (\x -> case x of Modification.AddSupertype y -> Just y; _ -> Nothing),
