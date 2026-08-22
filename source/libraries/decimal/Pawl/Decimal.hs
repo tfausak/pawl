@@ -2,7 +2,6 @@ module Pawl.Decimal where
 
 import qualified Data.Function as Function
 import qualified Data.Ord as Ord
-import qualified GHC.Num.Integer as Integer
 
 -- | A decimal number representing @mantissa * 10 ^ exponent@.
 data Decimal = UnsafeDecimal
@@ -59,4 +58,8 @@ adjustedExponent (UnsafeDecimal m e) = e + digitCount m - 1
 -- | The number of base ten digits in an integer's absolute value. Zero counts
 -- as one digit.
 digitCount :: Integer -> Integer
-digitCount = (+ 1) . toInteger . Integer.integerLogBase 10 . abs
+digitCount m =
+  Function.fix
+    (\rec n d -> if n < 10 then d else rec (quot n 10) (d + 1))
+    (abs m)
+    1
