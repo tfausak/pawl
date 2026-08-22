@@ -43,6 +43,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Ring as Ring
+import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
@@ -107,6 +108,8 @@ import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
+import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
@@ -162,6 +165,7 @@ import qualified Pawl.Types.PayObligation as PayObligation
 import qualified Pawl.Types.Payment as Payment
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PendingEntryEffect as PendingEntryEffect
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import qualified Pawl.Types.Player as Player
@@ -482,6 +486,7 @@ slotsOf effect = case effect of
   Effect.Transform ref -> objectRefSlots ref
   Effect.PhaseOut ref -> objectRefSlots ref
   Effect.AddPhases _ -> Map.empty
+  Effect.EndTurn -> Map.empty
   Effect.GainControl (DurationRef.MkDurationRef _ ref) -> objectRefSlots ref
   Effect.ArmDelayedTrigger {} -> Map.empty
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers _ affected _) -> affectedPlayersSlots affected
@@ -696,6 +701,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Transform _ -> True
   Effect.PhaseOut _ -> True
   Effect.AddPhases _ -> True
+  Effect.EndTurn -> True
   -- slotsOf's arm drops this Duration, so the slotless test is made here.
   Effect.GainControl (DurationRef.MkDurationRef duration _) ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
@@ -838,6 +844,7 @@ readsX = any effectReadsX
       Effect.Transform _ -> False
       Effect.PhaseOut _ -> False
       Effect.AddPhases _ -> False
+      Effect.EndTurn -> False
       Effect.GainControl (DurationRef.MkDurationRef _ _) -> False
       Effect.ArmDelayedTrigger {} -> False
       Effect.AffectPlayers {} -> False
@@ -936,6 +943,7 @@ searchesLibrary effect = case effect of
   Effect.Transform _ -> False
   Effect.PhaseOut _ -> False
   Effect.AddPhases _ -> False
+  Effect.EndTurn -> False
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> False
   Effect.ArmDelayedTrigger {} -> False
   Effect.AffectPlayers {} -> False
@@ -1090,6 +1098,7 @@ boundSlots effect = case effect of
   Effect.Transform _ -> Set.empty
   Effect.PhaseOut _ -> Set.empty
   Effect.AddPhases _ -> Set.empty
+  Effect.EndTurn -> Set.empty
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> Set.empty
   Effect.ArmDelayedTrigger {} -> Set.empty
   Effect.AffectPlayers {} -> Set.empty
@@ -2676,6 +2685,20 @@ recordExiledWith source before gs =
   let arrived = Set.difference (GameState.exile gs) before
       file oid = Map.insertWith (\_ inner -> inner) oid source
    in gs {GameState.exiledWith = Map.restrictKeys (foldr file (GameState.exiledWith gs) arrived) (GameState.exile gs)}
+
+-- CR 724.1b: how one object leaves the stack when an effect ends the turn. A card
+-- or a token copy of a spell is EXILED, which is a zone change like any other; an
+-- ability is not represented by a card, so it ceases to exist instead (Game.cease,
+-- CR 608.2n's own mechanism) rather than being filed into exile as a phantom that
+-- rule 724.1b's second sentence expects the next check to remove and that
+-- Pawl.Engine.Sba's CR 704.5d pass -- which reaches tokens only -- would not.
+exileOrCease :: ObjectId -> Game ()
+exileOrCease oid = do
+  gs <- State.get
+  case fmap Object.source (Game.lookupObject oid gs) of
+    Just (Source.OfCard _) -> Event.changeZone oid Zone.Exile
+    Just (Source.OfToken _) -> Event.changeZone oid Zone.Exile
+    _ -> State.modify' (Game.cease oid)
 
 -- One effect, applied. `runSubgame` is the injected nested-game runner; only
 -- the PlaySubgame arm consults it.
@@ -4971,6 +4994,85 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.AddPhases extras ->
     State.modify' $ \gs ->
       gs {GameState.remaining = Turn.splicePhases (GameState.phase gs) extras (GameState.remaining gs)}
+  -- CR 724.1: end the turn (Time Stop). Rule 724.1's six steps, in its own order,
+  -- and deliberately NOT the CR 608 process the fold around this is running.
+  Effect.EndTurn -> do
+    -- CR 724.1a: an ability that triggered before this process began but is not
+    -- yet on the stack ceases to exist. There is no pending queue to flush -- a
+    -- pending trigger is DERIVED from GameState.events behind the CR 117.5
+    -- watermark -- so this is a watermark bump, which is also what makes rule
+    -- 724.1f's exception fall out: everything recorded after this line is an
+    -- ability that triggered DURING the process, and stays unscanned until the
+    -- cleanup step settles.
+    --
+    -- UNOBSERVED, and said plainly rather than left to look tested: Time Stop
+    -- resolves at a priority boundary, which has just settled, so nothing is
+    -- pending here. The pool holds no producer that can leave one -- Day's
+    -- Undoing draws seven before its own end-the-turn clause (#2067).
+    State.modify' $ \gs ->
+      gs
+        { GameState.scannedThrough = Natural.length (GameState.events gs),
+          GameState.battlefieldWhenTriggered = Map.empty
+        }
+    -- CR 724.1b: exile every object on the stack, INCLUDING the one that is
+    -- resolving -- which is still on GameState.stack, Stack.resolveTopWith
+    -- leaving it there until CR 608.2n moves it. A real zone change, so an
+    -- ability that triggers off one is CR 724.1f's.
+    --
+    -- Rule 724.1b's second sentence -- an object not represented by a card ceases
+    -- to exist at the next check -- is taken HERE for an ability rather than at
+    -- CR 724.1c, and the two are indistinguishable: nothing happens between the
+    -- exile and that check, and Game.cease is already what CR 608.2n, CR 603.3c
+    -- and CR 701.6a use for an ability, which is not a card and so has no zone to
+    -- arrive in (CR 400.7 mints nothing). A TOKEN copy of a spell does go through
+    -- the exile, because Pawl.Engine.Sba does implement CR 704.5d for it.
+    --
+    -- finishSpell still runs when this fold returns, and is a no-op for it: CR
+    -- 400.7 minted a fresh incarnation in exile, so changeZone's lookup of the
+    -- old id finds nothing and the spell stays exiled rather than reaching a
+    -- graveyard.
+    onStack <- State.gets GameState.stack
+    Foldable.traverse_ exileOrCease onStack
+    -- CR 724.1c: check state-based actions, granting no priority and putting no
+    -- triggered ability on the stack -- so Pawl.Engine.Sba's own pass and not
+    -- Engine.performSettle, which places triggers. (Engine is unreachable from
+    -- here in any case: Engine imports Stack imports Resolve.)
+    --
+    -- Repeated to a fixpoint on CR 704.3's authority -- "if any state-based
+    -- actions are performed as a result of a check, the check is repeated" -- and
+    -- one pass does not reach it: CR 704.5m's Aura falls off only on the pass
+    -- after the creature it enchanted died. Terminates because the flag is False
+    -- as soon as a pass performs nothing.
+    let checkToFixpoint = do
+          performed <- Sba.performStateBasedActions
+          Monad.when performed checkToFixpoint
+    checkToFixpoint
+    -- CR 724.1d: the current phase and/or step ends; creatures and planeswalkers
+    -- leave combat if this happened during one; the game skips straight to the
+    -- cleanup step, or to a NEW cleanup step if this IS one.
+    --
+    -- What ends the step is Engine.runStepThatBegan, which resumes after the
+    -- signal below stops the priority round and runs CR 500.5's expiries, CR
+    -- 703.4q's mana emptying and CR 704.3 for the step exactly as it would for a
+    -- step that ended by itself. Nothing of that is duplicated here.
+    --
+    -- Not implemented: the PHASE-scoped expiries of a phase ended part-way
+    -- through, so an "until end of combat" effect survives a turn ended during
+    -- combat -- Turn.phaseEndingAt answers from the last step alone (#526).
+    State.modify' $ \gs ->
+      let phase = GameState.phase gs
+          cleared = case phase of
+            Phase.Combat _ -> Combat.clearCombat gs
+            _ -> gs
+          jumped = case phase of
+            Phase.Ending EndingStep.Cleanup -> Turn.spliceExtraCleanup (GameState.remaining gs)
+            _ -> Turn.jumpToCleanup (GameState.remaining gs)
+       in cleared {GameState.remaining = jumped}
+    -- CR 724.1f: no player gets priority during this process. Engine.priorityLoop
+    -- reads this and returns without settling and without granting another round,
+    -- so the exiles above stay unscanned until the cleanup step's own CR 514.3a
+    -- settle puts them on the stack. Engine.runStep lowers it there.
+    State.modify' (\gs -> gs {GameState.endTurnSignal = EndTurnSignal.Ended})
   Effect.GainControl (DurationRef.MkDurationRef duration ref) ->
     State.modify' $ \gs ->
       -- Enumerated ONCE by the shared sweep; a player recipient, an illegal slot

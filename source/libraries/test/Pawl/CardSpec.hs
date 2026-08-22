@@ -840,6 +840,7 @@ effectCounts effect = case effect of
   Effect.Transform _ -> []
   Effect.PhaseOut _ -> []
   Effect.AddPhases _ -> []
+  Effect.EndTurn -> []
   Effect.GainControl (DurationRef.MkDurationRef duration _) -> durationCounts duration
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ _) -> durationCounts duration
@@ -1085,6 +1086,7 @@ effectNestedEffects effect = case effect of
   Effect.Transform {} -> []
   Effect.PhaseOut {} -> []
   Effect.AddPhases {} -> []
+  Effect.EndTurn -> []
   Effect.GainControl {} -> []
   Effect.Unsuspect {} -> []
   Effect.Evolve {} -> []
@@ -1520,6 +1522,7 @@ effectReplacements effect = case effect of
   Effect.Transform _ -> []
   Effect.PhaseOut _ -> []
   Effect.AddPhases _ -> []
+  Effect.EndTurn -> []
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> []
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers {} -> []
@@ -2163,6 +2166,7 @@ effectMintedFaces effect = case effect of
   Effect.Transform _ -> []
   Effect.PhaseOut _ -> []
   Effect.AddPhases _ -> []
+  Effect.EndTurn -> []
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> []
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers {} -> []
@@ -3560,6 +3564,7 @@ effectFilters effect = case effect of
   Effect.Transform ref -> sourceHosted (objectRefFilters ref)
   Effect.PhaseOut ref -> sourceHosted (objectRefFilters ref)
   Effect.AddPhases _ -> []
+  Effect.EndTurn -> []
   Effect.GainControl (DurationRef.MkDurationRef duration ref) -> unframed (durationFilters duration) <> sourceHosted (objectRefFilters ref)
   Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger _ _ mDuration) -> unframed (concatMap durationFilters (Maybe.maybeToList mDuration))
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ playerEffect) -> unframed (durationFilters duration <> playerEffectFilters playerEffect)

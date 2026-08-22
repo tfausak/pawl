@@ -145,6 +145,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.Transform _ -> Nothing
   Effect.PhaseOut _ -> Nothing
   Effect.AddPhases _ -> Nothing
+  Effect.EndTurn -> Nothing
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> Nothing
   Effect.ArmDelayedTrigger {} -> Nothing
   Effect.AffectPlayers {} -> Nothing
