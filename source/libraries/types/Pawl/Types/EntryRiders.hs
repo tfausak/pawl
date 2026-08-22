@@ -55,9 +55,9 @@ import qualified Pawl.Types.TapState as TapState
 -- and Pawl.CardSpec's corpus lint holds that no Create in the pool sets it.
 --
 -- `counters` is CR 122.6's "an object that's given counters as it enters the
--- battlefield", said by
--- the EFFECT rather than by the permanent -- undying's and persist's "return it
--- to the battlefield ... with a +1/+1 counter on it" (CR 702.93a, CR 702.79a).
+-- battlefield", said by the EFFECT rather than by the permanent -- undying's and
+-- persist's "return it to the battlefield ... with a +1/+1 counter on it" (CR
+-- 702.93a, CR 702.79a).
 -- The same rider one opcode over is incubate's "create an Incubator token that
 -- enters the battlefield with N +1/+1 counters on it" (CR 701.53a).
 -- A rider and not an Effect.PutCounters afterwards, because the permanent must

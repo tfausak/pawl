@@ -6069,10 +6069,12 @@ entryCountersSpec s registry = Spec.describe s "The counters a Create says its t
 -- prints "whenever this creature or another creature you control is turned face
 -- up, create a 0/0 green Ooze creature token with trample. The token enters with
 -- X +1/+1 counters on it, where X is the number of other creatures you control",
--- and is the pool's one printing that puts the count INSIDE the rider. The dozen
--- other "X +1/+1 counters, where X" cards print a second sentence instead, which
--- is an Effect.PutCounters after the Create and needs no rider at all -- CR 704.3
--- is why the 0/0 survives in between.
+-- and is the printing that puts the count INSIDE the rider: Scryfall
+-- `o:/token enters with/ -is:digital`, 2026-08-22, answers this card and Ochre
+-- Jelly, whose split token is an Effect.CreateCopy, which carries no riders at
+-- all (gap #1255). The other "X +1/+1 counters on it, where X" printings say it
+-- in a SECOND SENTENCE, which is an Effect.PutCounters after the Create and
+-- needs no rider at all -- CR 704.3 is why the 0/0 survives in between.
 --
 -- X is defined by the ability's own text (CR 107.3c) and answered once, when the
 -- effect is applied (CR 608.2h) -- Pawl.Engine.Resolve.freezeRiders, against the
@@ -6132,7 +6134,7 @@ printlifterSpec s registry = Spec.describe s "The counters a Create says its tok
             -- own Filter.IsSource), not bob's two, and not the token.
             Spec.assertEqWith s "CR 122.6 three +1/+1 counters, one per other creature alice controls" (countersOn CounterKind.PlusOnePlusOne token after) 3
             -- What the count is FOR: the token is printed 0/0, so CR 613.4c's
-            -- layer 7d leaves a 3/3 rather than something CR 704.5f removes.
+            -- layer 7c leaves a 3/3 rather than something CR 704.5f removes.
             Spec.assertEqWith s "CR 613.4c so the 0/0 token is a 3/3" (S.powerToughnessOf token after) (Just (3, 3))
 
 -- CR 122.1c: the replacement and the prevention effect one or more shield counters

@@ -2569,11 +2569,12 @@ effectContext controller source legal groups =
 -- numbers. This is the ONE bridge between the two, so the answer is determined
 -- once, when the effect is applied, and nothing downstream can re-read the board.
 --
--- Against the caller's own `context` -- Filter.contextFor's slot map is empty, so
--- IsBound and IsSource would answer False and an AgainstSlot would answer
--- unanswered, none of which raises anything. Evaluating here rather than at the
--- funnel is what keeps that context available: Event.changeZoneEntering and
--- Event.createTokens have none to hand.
+-- Against the CALLER'S OWN context, which is the resolution's. Evaluating here
+-- rather than at the funnel is what keeps that available: Event.createTokens and
+-- Event.changeZoneEntering have no context and no view to hand, so one built
+-- there would be a Filter.contextFor with an empty slot map and no source --
+-- Filter.IsBound false, Filter.IsSource false and a Quantity.AgainstSlot
+-- unanswered, none of which raises anything.
 --
 -- CR 107.2 for an unevaluable count and CR 107.1b for a negative one, both zero;
 -- a zero-count kind is DROPPED rather than passed on, so CR 614.16's replacements

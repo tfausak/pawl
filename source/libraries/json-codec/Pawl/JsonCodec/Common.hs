@@ -382,7 +382,10 @@ multiset c =
 --
 -- A repeated key is REJECTED rather than letting one win or combining them,
 -- which is 'set''s posture and the one 'multiset' cannot take: there a repeat is
--- how a count is spelled.
+-- how a count is spelled. The schema stays 'Schema.array' and not
+-- 'Schema.uniqueArray', because what must be unique is the KEY rather than the
+-- whole entry -- two entries sharing a key differ as values, so the decoder is
+-- deliberately stricter than the schema here.
 keyedList :: (Ord k) => Codec.Codec (k, v) -> Codec.Codec (Map.Map k v)
 keyedList c =
   Codec.MkCodec
