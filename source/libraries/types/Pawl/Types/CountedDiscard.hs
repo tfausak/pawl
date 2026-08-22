@@ -23,10 +23,15 @@ data CountedDiscard = MkCountedDiscard
     -- arrives a fresh id, so a slot holding the hand id would name an object no
     -- reader of the destination zone can see.
     --
-    -- Bound wherever the card wound up rather than only in a graveyard, which is
-    -- CR 701.9c: a discarded card a replacement sends elsewhere is discarded all
-    -- the same. Whether a READER can find it there is the reader's question, and
-    -- data/cards/psychic-miasma.json carries that note.
+    -- Bound wherever the card wound up rather than only in a graveyard: CR
+    -- 701.9c takes a card put into a hidden zone instead of a graveyard to have
+    -- been discarded all the same, and CR 400.7j is what decides whether a later
+    -- part of the effect can then FIND it -- a public destination yes, a hidden
+    -- one no. That is a question about the reader, not about this slot.
+    --
+    -- Not implemented: Pawl.Types.Scope cannot fold over the objects a slot
+    -- names, so the only reader a card can write is a Count over one ZONE, and a
+    -- discard CR 614 redirected to another public zone falls outside it (#2080).
     --
     -- Absent for a discard nothing looks back at, which is every discard in the
     -- pool but the one that does. Pawl.Types.Discard's These arm has no such

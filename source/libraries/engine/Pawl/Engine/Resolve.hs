@@ -1126,6 +1126,12 @@ boundSlots effect = case effect of
   -- CR 701.9a's cards "discarded this way", as CR 400.7's incarnations. The
   -- These arm has none: no printed card looks back at what an "all nonland
   -- cards" discard moved.
+  --
+  -- A REGRESSION FENCE rather than proven behaviour: emptying this arm leaves
+  -- the suite green. The only consumer is Pawl.CardSpec's D4 dataflow lint, and
+  -- the read it would have to notice is a Filter.IsBound inside a Count inside a
+  -- Clause.condition -- which modeSlots does not fold at all, and which
+  -- Count.slots would not descend into if it did (#1079).
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ _ mDiscarded) -> foldMap Set.singleton mDiscarded
     Discard.These _ -> Set.empty
