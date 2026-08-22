@@ -31,6 +31,11 @@
 -- targets, so its case is about CR 601.2c's one announcement over two slots
 -- rather than about the pool alone.
 --
+-- Cancel and Stifle's case has a third beside it, on the same pool one rule
+-- over: CR 115.5's self-exclusion for an ABILITY, which Adric, Mathematical
+-- Genius is the first card in the pool to make reachable. It is a fence rather
+-- than a proof -- Pawl.Engine.Target.legalRecipients' own note says why.
+--
 -- The last case is hexproof's other axis: not who is targeting but WHETHER THE
 -- KEYWORD IS THERE AT ALL. Dawnglade Regent grants it through a CR 604.2 "as
 -- long as you're the monarch" clause, so the same Doom Blade answers both ways
@@ -63,6 +68,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
@@ -93,6 +99,15 @@ soleTargetSlot modal = case Map.elems (Modal.allTargetSlots modal) of
 triggerTargetSlot :: Printing.Printing -> Maybe TargetSlot.TargetSlot
 triggerTargetSlot printing = case Face.triggeredAbilities (S.combinedFace printing) of
   [ability] -> soleTargetSlot (TriggeredAbility.modal ability)
+  _ -> Nothing
+
+-- The one ACTIVATED ability of a printing that declares exactly one. Nothing for
+-- any other printing, so a card that grew a second ability fails the case that
+-- names it rather than silently picking whichever came first -- soleTargetSlot
+-- above is the same shape for the same reason.
+soleActivatedAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+soleActivatedAbility p = case Face.activatedAbilities (S.combinedFace p) of
+  [only] -> Just only
   _ -> Nothing
 
 -- `pid` controls the restricted creature -- a Blurred Mongoose or a Slippery
@@ -862,6 +877,84 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
             Spec.assertEqWith s "Cancel sees the spell and only the spell" cancelLegal (Set.singleton (Recipient.ToObject spellId))
             Spec.assertEqWith s "Stifle sees the ability and only the ability" stifleLegal (Set.singleton (Recipient.ToObject abilId))
           _ -> Spec.assertFailure s "the fixture should put one ability and one spell on the stack, and both cards should declare a target slot"
+
+  -- CR 602.2a creates an activated ability on the stack BEFORE CR 602.2b routes
+  -- the rest of the activation through CR 601.2b-i, so CR 601.2c's targets are
+  -- chosen in a state that already holds the ability. Activate.activateAbility
+  -- chooses them against the PRE-MINT snapshot instead. The two states differ by
+  -- exactly the ability object, and CR 115.5 -- "a spell or ability on the stack
+  -- is an illegal target for itself" -- subtracts that object anyway, so no board
+  -- tells them apart and this case cannot prove which one pawl reads.
+  --
+  -- What it does prove is the HALF-correction wrong, and that is why it is here:
+  -- legalRecipientsGiven's CR 115.5 gate is `source` being on the stack, and on
+  -- this path `source` is the source PERMANENT (see its own note). Moving this
+  -- caller to the post-mint state without also handing that function the
+  -- ability's own id offers the ability itself, and the answerer below takes it.
+  --
+  -- Adric, Mathematical Genius' "Ultimate Sacrifice -- {1}{U}, Sacrifice Adric:
+  -- Counter target activated or triggered ability" is Stifle's undifferentiated
+  -- Pool.Abilities on an ACTIVATED ability, which is what makes the path
+  -- reachable at all. Not implemented, so the card file omits it: its other
+  -- ability, "{2}{U}, {T}: Copy target activated or triggered ability you
+  -- control. You may choose new targets for the copy" -- nothing copies an object
+  -- on the stack (#1006) -- which leaves pawl's Adric stricter than printed.
+  -- "Ultimate Sacrifice" is an ability word (CR 207.2c) and Doctor's companion is
+  -- deck construction (CR 903); neither has a rules meaning in play.
+  --
+  -- The answerer takes the LARGEST recipient, and Recipient's derived Ord orders
+  -- ToObject by ObjectId while Game.freshObjectId hands out increasing ones -- so
+  -- it names the newest object on the stack the moment it is ever offered one.
+  -- bob's Prodigal Sorcerer ability is aimed at ALICE, so whether it was
+  -- countered is readable as her life total rather than as a stack length, which
+  -- both readings leave empty.
+  Spec.it s "CR 602.2a/115.5 Adric's ability is not offered its own object among the abilities it may counter" $ do
+    island <- S.printingOf s registry "Island"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    adric <- S.printingOf s registry "Adric, Mathematical Genius"
+    case (soleActivatedAbility sorcerer, soleActivatedAbility adric) of
+      (Just ping, Just ultimateSacrifice) -> do
+        let (srcId, withSorcerer) = S.addCreature sorcerer S.bob (Setup.emptyGame S.bothPlayers)
+            -- CR 302.6: the Sorcerer must have settled before its {T} is legal.
+            -- Adric needs no such thing -- its cost carries no {T}.
+            settled = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.bob)
+            (adricId, withAdric) = S.addCreature adric S.alice settled
+            (_, withIsland) = S.addCreature island S.alice withAdric
+            (_, withIslands) = S.addCreature island S.alice withIsland
+            atAlice :: Prompt.Prompt r -> r
+            atAlice p = case p of
+              Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.alice))) sets
+              _ -> S.identityAnswer p
+            pinging = S.runPure atAlice (withIslands {GameState.priority = Just S.bob}) (Activate.activateAbility S.bob srcId ping)
+            takeNewest :: Prompt.Prompt r -> r
+            takeNewest p = case p of
+              Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> maybe Set.empty Set.singleton (Set.lookupMax legal)) sets
+              _ -> S.identityAnswer p
+            countering = S.runPure takeNewest (pinging {GameState.priority = Just S.alice}) (Activate.activateAbility S.alice adricId ultimateSacrifice)
+            after = S.runPure S.identityAnswer (S.runPure S.identityAnswer countering Stack.resolveTop) Stack.resolveTop
+        case GameState.stack pinging of
+          [pingId] -> do
+            -- The discriminating pair, stated first: countering the ping is the
+            -- only way alice's life stays 20. An ability that had been offered
+            -- itself would have taken itself instead, and the ping would have
+            -- resolved.
+            Spec.assertEqWith s "alice's life is untouched: Adric's ability countered the ping (CR 701.6a)" (S.lifeOf S.alice after) (Just 20)
+            Spec.assertEqWith s "and no damage was ever dealt" (fmap DamageEvent.amount (Maybe.mapMaybe Event.damageOf (S.eventsOf after))) []
+            -- Supporting, not discriminating: an ability leaves the stack
+            -- whether it resolved (CR 608.2m) or was countered (CR 608.2n), so
+            -- this and the two below hold under both readings. They are here to
+            -- stop a green that came from the activation never happening.
+            Spec.assertEqWith s "the ping is no longer an object at all" (Game.lookupObject pingId after) Nothing
+            Spec.assertEqWith s "the stack is empty" (GameState.stack after) []
+            Spec.assertEqWith s "Adric is in alice's graveyard: the sacrifice was paid" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+            -- Legibility, and last so it can absorb no mutation the assertions
+            -- above should catch: the pool the announcement was made against held
+            -- the ping alone.
+            case soleTargetSlot (ActivatedAbility.modal ultimateSacrifice) of
+              Nothing -> Spec.assertFailure s "Ultimate Sacrifice should declare one target slot"
+              Just theSlot -> Spec.assertEqWith s "and the pool held the ping and nothing else" (Target.legalRecipients (Just S.alice) adricId theSlot pinging) (Set.singleton (Recipient.ToObject pingId))
+          _ -> Spec.assertFailure s "the fixture should put exactly one ability on the stack"
+      _ -> Spec.assertFailure s "Prodigal Sorcerer and Adric should each declare exactly one activated ability"
 
   -- CR 115.2's OTHER escape hatch, the one Pool.Spells and Pool.Abilities are
   -- not: "only permanents are legal targets for spells and abilities, unless a
