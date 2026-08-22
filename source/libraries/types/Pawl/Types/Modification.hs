@@ -131,8 +131,10 @@ data Modification ability
     -- this: their constructor IS CR 612.2's gate in
     -- Pawl.Engine.Projection.rewriteModificationWith, which asks whether the word
     -- being swapped is a land type or a creature type. This arm has no such gate
-    -- to state, and correspondingly no printed text-changer reaches an artifact or
-    -- enchantment type, so it is deliberately left unrewritten there.
+    -- to state, so it is deliberately left unrewritten there. Every printed text
+    -- changer swaps a colour word, a basic land type or a creature type, and none
+    -- reaches an artifact or enchantment type -- Scryfall
+    -- o:"replacing all instances of one", 2026-08-22, twelve cards, all read.
     -- Pawl.CardSpec holds the fence: no AddSubtype in the pool may carry a land
     -- type or a creature type, since those have their own arms and their own gate.
     AddSubtype Subtype.Subtype

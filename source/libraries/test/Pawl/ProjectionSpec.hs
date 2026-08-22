@@ -7,7 +7,8 @@
 -- proven independently of any card wiring; the card-level proofs live alongside.
 -- Also Pawl.Engine.Subtype, the CR 205.3i land-type and CR 205.3m creature-type
 -- classifications the layer-4 SetLandSubtype, SetCreatureSubtype,
--- AddCreatureSubtype and AddEveryCreatureSubtype arms fold with.
+-- AddCreatureSubtype and AddEveryCreatureSubtype arms fold with, and the
+-- untagged AddSubtype beside them.
 module Pawl.ProjectionSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State

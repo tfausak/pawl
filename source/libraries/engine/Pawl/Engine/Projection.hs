@@ -202,6 +202,10 @@ layer m = case m of
   Modification.SetCreatureSubtype _ -> Layer.Type
   Modification.AddCreatureSubtype _ -> Layer.Type
   Modification.AddEveryCreatureSubtype -> Layer.Type
+  -- CR 613.1d, and a regression fence rather than a proved behaviour: no board
+  -- in the pool orders the one AddSubtype (Ygra, Eater of All's Food) against an
+  -- effect in another layer, so answering any other layer here leaves the suite
+  -- green.
   Modification.AddSubtype _ -> Layer.Type
   Modification.AddCardType _ -> Layer.Type
   Modification.SetCardType _ -> Layer.Type
@@ -1193,9 +1197,9 @@ setsLandSubtype m = case m of
   Modification.SetCreatureSubtype _ -> False
   Modification.AddCreatureSubtype _ -> False
   Modification.AddEveryCreatureSubtype -> False
-  -- An ADD, so CR 305.7's last sentence keeps the rules text even were the
-  -- subtype one of CR 205.3i's land types -- the same answer AddLandSubtype
-  -- gives above.
+  -- Not a SET, so CR 305.7 does not fire whatever family the subtype belongs to
+  -- -- the same answer AddLandSubtype gives above, and Pawl.CardSpec keeps CR
+  -- 205.3i's land types off this arm anyway.
   Modification.AddSubtype _ -> False
   -- The CARD-TYPE set: CR 305.7 fires on setting a land's SUBTYPE, so making an
   -- object a land does not strip its rules text.
@@ -2962,6 +2966,10 @@ modificationWrites m = case m of
   Modification.SetCreatureSubtype _ -> Set.singleton Subtypes
   Modification.AddCreatureSubtype _ -> Set.singleton Subtypes
   Modification.AddEveryCreatureSubtype -> Set.singleton Subtypes
+  -- The honest answer -- the arm writes PC.subtypes and nothing else -- but a
+  -- regression fence rather than a proved behaviour: no board in the pool makes
+  -- another effect depend on the one AddSubtype, so Set.empty here leaves the
+  -- suite green too.
   Modification.AddSubtype _ -> Set.singleton Subtypes
   Modification.ChangeSubtypeWord {} -> Set.fromList [Subtypes, Keywords]
   Modification.AddCardType _ -> Set.singleton Types
