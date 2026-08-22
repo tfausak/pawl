@@ -1,10 +1,14 @@
 module Pawl.Codec.CounterKindSpec where
 
+import qualified Data.Either as Either
+import qualified Data.Text as Text
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterName as CounterName
 import qualified Pawl.Types.Keyword as Keyword
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -78,12 +82,40 @@ spec s = Spec.describe s "Pawl.Codec.CounterKind" $ do
       (CounterKind.codec Keyword.codec)
       CounterKind.Level
       " {\"type\":\"Level\"} "
-  -- CR 122.1's unlettered kind, read by Gemstone Caverns' own ability alone.
-  Spec.it s "Luck" $
+  -- CR 122.1's unlettered kinds, carrying the name the card prints rather than
+  -- one constructor per printing.
+  Spec.it s "Named carries the name the card prints" $
     Common.assertCodec
       s
       (CounterKind.codec Keyword.codec)
-      CounterKind.Luck
-      " {\"type\":\"Luck\"} "
+      (CounterKind.Named (CounterName.UnsafeMkCounterName (Text.pack "conqueror")))
+      " {\"type\":\"Named\",\"value\":\"conqueror\"} "
+  Spec.it s "Named, a second name" $
+    Common.assertCodec
+      s
+      (CounterKind.codec Keyword.codec)
+      (CounterKind.Named (CounterName.UnsafeMkCounterName (Text.pack "luck")))
+      " {\"type\":\"Named\",\"value\":\"luck\"} "
+  -- CR 122.1: counters with the same name are interchangeable, so a name that
+  -- collides with a constructor above would be two Map keys for one rules
+  -- object. The decoder is the only door in, so this is where it is refused.
+  Spec.it s "Named rejects a spelling CR 122.1b already gives the Keyword arm" $
+    Spec.assertBool
+      s
+      ( Either.isLeft
+          ( Common.parse (Text.pack " {\"type\":\"Named\",\"value\":\"flying\"} ")
+              >>= Codec.decode (CounterKind.codec Keyword.codec)
+          )
+      )
+      "expected a decode failure"
+  Spec.it s "Named rejects a spelling another constructor already has" $
+    Spec.assertBool
+      s
+      ( Either.isLeft
+          ( Common.parse (Text.pack " {\"type\":\"Named\",\"value\":\"loyalty\"} ")
+              >>= Codec.decode (CounterKind.codec Keyword.codec)
+          )
+      )
+      "expected a decode failure"
   Spec.it s "has a schema" $
     Common.assertHasSchema s (CounterKind.codec Keyword.codec)

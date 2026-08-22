@@ -80,6 +80,7 @@ import qualified Pawl.Codec.CostSpec
 import qualified Pawl.Codec.CountSpec
 import qualified Pawl.Codec.CounterChangeSpec
 import qualified Pawl.Codec.CounterKindSpec
+import qualified Pawl.Codec.CounterNameSpec
 import qualified Pawl.Codec.CounterPatternSpec
 import qualified Pawl.Codec.CounterRSpec
 import qualified Pawl.Codec.CounterSpec
@@ -516,6 +517,7 @@ spec s registry = do
   Pawl.Codec.CounterSpec.spec s
   Pawl.Codec.CounterChangeSpec.spec s
   Pawl.Codec.CounterKindSpec.spec s
+  Pawl.Codec.CounterNameSpec.spec s
   Pawl.Codec.CounterPatternSpec.spec s
   Pawl.Codec.CounterRSpec.spec s
   Pawl.Codec.CounterabilitySpec.spec s

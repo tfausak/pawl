@@ -12,7 +12,8 @@
               "measured": {
                 "type": "ObjectCounters",
                 "value": {
-                  "type": "Luck"
+                  "type": "Named",
+                  "value": "luck"
                 }
               },
               "threshold": {
@@ -63,7 +64,8 @@
               "measured": {
                 "type": "ObjectCounters",
                 "value": {
-                  "type": "Luck"
+                  "type": "Named",
+                  "value": "luck"
                 }
               },
               "threshold": {
@@ -137,7 +139,8 @@
                 "riders": {
                   "counters": [
                     {
-                      "type": "Luck"
+                      "type": "Named",
+                      "value": "luck"
                     }
                   ]
                 },
