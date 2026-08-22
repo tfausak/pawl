@@ -3,13 +3,8 @@
     {
       "manaCost": [
         {
-          "type": "OfType",
-          "value": {
-            "type": "Colored",
-            "value": {
-              "type": "Green"
-            }
-          }
+          "type": "Generic",
+          "value": 3
         },
         {
           "type": "OfType",
