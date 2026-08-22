@@ -47,6 +47,7 @@ encode p answer = case p of
   Prompt.Shuffle _ -> Response.Shuffled answer
   Prompt.RandomFirstPlayer _ -> Response.DeterminedFirstPlayer answer
   Prompt.RandomObject _ -> Response.SelectedAtRandom answer
+  Prompt.RandomOpponent _ -> Response.SelectedOpponentAtRandom answer
   Prompt.ChooseAction {} -> Response.ChoseAction answer
   Prompt.Concede _ -> Response.Conceded answer
   Prompt.ChooseDiscard {} -> Response.ChoseDiscard answer
@@ -150,6 +151,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.RandomObject _ -> case response of
     Response.SelectedAtRandom oid -> Just oid
+    _ -> Nothing
+  Prompt.RandomOpponent _ -> case response of
+    Response.SelectedOpponentAtRandom pid -> Just pid
     _ -> Nothing
   Prompt.ChooseAction {} -> case response of
     Response.ChoseAction action -> Just action
@@ -424,6 +428,9 @@ defaultAnswer p = case p of
   -- answerer, or it proves nothing about an engine that reveals the first card
   -- unasked (Pawl.ResolveSpec's "RandomReveal" pair).
   Prompt.RandomObject candidates -> NonEmpty.head candidates
+  -- The head of the offer is always one of the offered opponents, and FIXED for
+  -- the reason RandomObject gives just above.
+  Prompt.RandomOpponent candidates -> NonEmpty.head candidates
   Prompt.ChooseAction _ _ actions -> case actions of
     h : _ -> h
     [] -> Action.Pass
