@@ -2412,7 +2412,7 @@ statesZone zone = Set.member zone . StaticAbility.functionsFrom
 -- exact test in gatherGiven.
 mayStateZone :: GameState -> Zone.Zone -> Object.Object -> Bool
 mayStateZone gs zone obj = case Object.facing obj of
-  Facing.FaceDown _ _ -> True
+  Facing.FaceDown _ -> True
   Facing.FaceUp -> case Game.cardOfSource gs (Just (Object.source obj)) of
     Nothing -> False
     Just card -> any (any (statesZone zone) . Face.staticAbilities) (Card.Type.faces card)

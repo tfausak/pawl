@@ -125,6 +125,7 @@ import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
+import qualified Pawl.Types.FaceDownState as FaceDownState
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter.Type
@@ -3482,7 +3483,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             | otherwise ->
                 gs
                   { GameState.objects =
-                      Map.adjust (\o -> o {Object.facing = Facing.FaceDown FaceDownReason.TurnedFaceDown listed}) target (GameState.objects gs)
+                      Map.adjust (\o -> o {Object.facing = Facing.FaceDown FaceDownState.MkFaceDownState {FaceDownState.reason = FaceDownReason.TurnedFaceDown, FaceDownState.listed = listed}}) target (GameState.objects gs)
                   }
         -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
         _ -> gs

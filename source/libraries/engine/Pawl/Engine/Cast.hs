@@ -39,6 +39,7 @@ import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
+import qualified Pawl.Types.FaceDownState as FaceDownState
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -128,7 +129,7 @@ timingOk pid oid name gs = case proposedFace oid name gs of
 proposedFace :: ObjectId -> CardName.CardName -> GameState -> Maybe (Face.Face Card.Type.Card)
 proposedFace oid name gs = case fmap Object.facing (Game.lookupObject oid gs) of
   Nothing -> Nothing
-  Just (Facing.FaceDown _ listed) -> Just (Card.faceDownFace listed)
+  Just (Facing.FaceDown state) -> Just (Card.faceDownFace (FaceDownState.listed state))
   Just Facing.FaceUp -> fmap (Game.resolveFace (Just name)) (Game.cardOf oid gs)
 
 -- CR 304.1 / 702.8a: is this card one the rules let its controller cast whenever
@@ -897,7 +898,7 @@ castableSpells pid gs =
             -- printing with both would be the card that refutes it, and the rules
             -- allow one (CR 701.58c and CR 701.58d put both procedures on one
             -- permanent).
-            <> [Facing.FaceDown FaceDownReason.Disguised FaceDownCharacteristics.disguisedValue | Maybe.isJust (Keyword.disguiseCost (Face.keywords face))]
+            <> [Facing.FaceDown FaceDownState.MkFaceDownState {FaceDownState.reason = FaceDownReason.Disguised, FaceDownState.listed = FaceDownCharacteristics.disguisedValue} | Maybe.isJust (Keyword.disguiseCost (Face.keywords face))]
       proposals oid =
         [ (oid, Face.name face, facing)
         | face <- foldMap Card.castableFaces (Game.cardOf oid gs),
