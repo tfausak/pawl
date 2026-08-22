@@ -1508,8 +1508,8 @@ rewriteEffect pairs effect = case effect of
   Effect.Fateseal {} -> effect
   Effect.Explore ref -> Effect.Explore (rewriteObjectRef pairs ref)
   -- The These arm's ref carries a Filter, so rule 612's text change reaches it
-  -- exactly as Reveal's does; the Counted arm holds a slot and a count and no
-  -- word a change could swap.
+  -- exactly as Reveal's does; the Counted arm holds two slot NAMES and a count,
+  -- and a slot name is not a word rule 612 can swap.
   Effect.Discard subject -> case subject of
     Discard.Counted _ -> effect
     Discard.These ref -> Effect.Discard (Discard.These (rewriteObjectRef pairs ref))

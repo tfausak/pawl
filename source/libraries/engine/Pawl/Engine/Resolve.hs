@@ -446,7 +446,8 @@ slotsOf effect = case effect of
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.Explore ref -> objectRefSlots ref
   Effect.Discard subject -> case subject of
-    Discard.Counted (CountedDiscard.MkCountedDiscard slot quantity) -> insertOne slot (quantitySlots quantity)
+    -- The bound slot is a DEFINITION, not a read, so it is not joined in here.
+    Discard.Counted (CountedDiscard.MkCountedDiscard slot quantity _) -> insertOne slot (quantitySlots quantity)
     -- The ref's own read, which for Amnesia's EachCardInHand is the scope's
     -- target slot: the D4 dataflow lint asks this, and dropping it would make
     -- that target unread.
@@ -695,7 +696,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Explore {} -> True
   Effect.Discard subject -> case subject of
-    Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity) -> Quantity.slotsAreExhaustive quantity
+    Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> Quantity.slotsAreExhaustive quantity
     Discard.These ref -> all Quantity.slotsAreExhaustive (objectRefQuantities ref)
   Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
@@ -851,7 +852,7 @@ readsX = any effectReadsX
       Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Explore {} -> False
       Effect.Discard subject -> case subject of
-        Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity) -> Quantity.readsX quantity
+        Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> Quantity.readsX quantity
         Discard.These ref -> any Quantity.readsX (objectRefQuantities ref)
       Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
@@ -1122,7 +1123,12 @@ boundSlots effect = case effect of
   Effect.RemoveFromCombat _ -> Set.empty
   Effect.BecomesBlocked _ -> Set.empty
   Effect.Draw {} -> Set.empty
-  Effect.Discard {} -> Set.empty
+  -- CR 701.9a's cards "discarded this way", as CR 400.7's incarnations. The
+  -- These arm has none: no printed card looks back at what an "all nonland
+  -- cards" discard moved.
+  Effect.Discard subject -> case subject of
+    Discard.Counted (CountedDiscard.MkCountedDiscard _ _ mDiscarded) -> foldMap Set.singleton mDiscarded
+    Discard.These _ -> Set.empty
   Effect.LoseLife {} -> Set.empty
   Effect.GainLife {} -> Set.empty
   Effect.ExchangeLifeTotals _ -> Set.empty
@@ -3990,7 +3996,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     Monad.mapM_
       (\(oid, owner) -> Event.discard DiscardCause.Ordinary owner oid)
       (Maybe.mapMaybe owned (objectRefObjects legal resolving controller source gs ref))
-  Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard slot quantity)) -> do
+  Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard slot quantity mDiscarded)) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal (slotGroups resolving gs)
@@ -4004,28 +4010,52 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             | n > 0 -> do
                 let held = Game.zoneMembers Zone.Hand target gs
                     -- CR 701.9a's move, through the shared discard funnel, so the
-                    -- discard is recorded for a trigger to read.
-                    bury :: [ObjectId] -> Game ()
-                    bury = Monad.mapM_ (Event.discard DiscardCause.Ordinary target)
+                    -- discard is recorded for a trigger to read. The funnel's own
+                    -- answers come back for the binding below; a move that did not
+                    -- complete answers Nothing and is dropped.
+                    bury :: [ObjectId] -> Game [ObjectId]
+                    bury = fmap Maybe.catMaybes . Monad.mapM (Event.discardReturning DiscardCause.Ordinary target)
                     -- `n > 0` above, so the clamp never decides anything here.
                     count = Integer.toNaturalSaturating n
-                if count >= Natural.length held
-                  -- CR 609.3: discarding the whole hand is "as much as possible," so
-                  -- it is forced -- no choice, so no prompt.
-                  then bury held
-                  else do
-                    -- CR 701.9b: the discarding player chooses which cards.
-                    let decider = Decide.deciderFor target gs
-                    choices <- Game.choose (Prompt.ChooseDiscard decider target held count)
-                    -- FILTERED AND COMPLETED, PlayerSacrifices' posture. This
-                    -- branch is reached only when the hand is LARGER than the
-                    -- count, so CR 609.3 does no work and every omitted card is one
-                    -- the player could have discarded. Deduplicated too, since the
-                    -- answer is a LIST and a card named twice would fill two of the
-                    -- n slots; `valid <> filler` permutes `held`, so the take is n.
-                    let valid = List.nub (filter (\c -> elem c held) choices)
-                        filler = filter (\c -> List.notElem c valid) held
-                    bury (List.genericTake count (valid <> filler))
+                moved <-
+                  if count >= Natural.length held
+                    -- CR 609.3: discarding the whole hand is "as much as possible," so
+                    -- it is forced -- no choice, so no prompt.
+                    then bury held
+                    else do
+                      -- CR 701.9b: the discarding player chooses which cards.
+                      let decider = Decide.deciderFor target gs
+                      choices <- Game.choose (Prompt.ChooseDiscard decider target held count)
+                      -- FILTERED AND COMPLETED, PlayerSacrifices' posture. This
+                      -- branch is reached only when the hand is LARGER than the
+                      -- count, so CR 609.3 does no work and every omitted card is one
+                      -- the player could have discarded. Deduplicated too, since the
+                      -- answer is a LIST and a card named twice would fill two of the
+                      -- n slots; `valid <> filler` permutes `held`, so the take is n.
+                      let valid = List.nub (filter (\c -> elem c held) choices)
+                          filler = filter (\c -> List.notElem c valid) held
+                      bury (List.genericTake count (valid <> filler))
+                -- The cards "discarded this way", for a later effect of the same
+                -- resolution to look back at -- Psychic Miasma's "if a land card is
+                -- discarded this way". The CR 400.7 incarnations the funnel MINTED,
+                -- never the hand ids it was handed: the hand incarnation no longer
+                -- exists, so a reader of the destination zone could match none of
+                -- them. Destroy's `buried` slot binds on exactly that argument.
+                --
+                -- No board filter of `buried`'s kind: CR 701.9c leaves a redirected
+                -- card discarded, so what the funnel moved is what was discarded
+                -- wherever it landed.
+                --
+                -- Bound onto `resolving` and as a GROUP, `buried`'s shape and for
+                -- its reason: slotGroups reads live GameState unconditionally,
+                -- which is what puts the slot in front of Filter.IsBound when the
+                -- NEXT clause's gate is evaluated. A single binding would land in
+                -- the target half of the context instead, where gateHolds does not
+                -- look. Nothing is bound when nothing moved, so the gate finds an
+                -- unbound slot and the "if" is false -- which is what the rider
+                -- asks for.
+                Monad.forM_ mDiscarded $ \bound ->
+                  Monad.unless (null moved) (State.modify' (bindObjectsSlot resolving bound (Seq.fromList moved)))
           _ -> pure ()
       -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
       _ -> pure ()
