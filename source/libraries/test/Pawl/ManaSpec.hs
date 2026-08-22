@@ -2123,7 +2123,7 @@ transmograntAltarSpec s registry = Spec.describe s "Transmogrant Altar" $ do
     let (altarId, g1) = S.addCreature altar S.alice (Setup.emptyGame S.bothPlayers)
         (birdsId, g2) = S.addCreature birds S.alice g1
         board = g2 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
-        asked = State.execState (Engine.runGame (recordsSources altarId birdsId) board Engine.priorityLoop) []
+        asked = snd (State.execState (Engine.runGame (recordsSources altarId birdsId) board Engine.priorityLoop) (0 :: Int, []))
     Spec.assertEqWith s "one window, and the Birds is the only source its {B} may come from" asked [[birdsId]]
 
   -- CR 118.3 at the OFFER. Two boards differing in ONE thing -- the Swamp -- so
@@ -2189,13 +2189,14 @@ takesAltar altarId birdsId p = case p of
 
 -- takesAltar recording every in-payment source prompt, and taking the Altar only
 -- until one has been asked -- the once-guard takesAltarOnce spells with a count.
-recordsSources :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
+recordsSources :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> State.State (Int, [[ObjectId.ObjectId]]) r
 recordsSources altarId birdsId p = case p of
   Prompt.ChooseAction {} -> do
-    seen <- State.get
-    pure (if null seen then takesAltar altarId birdsId p else Action.Type.Pass)
+    (taken, _) <- State.get
+    State.modify' (\(n, seen) -> (n + 1, seen))
+    pure (if taken == 0 then takesAltar altarId birdsId p else Action.Type.Pass)
   Prompt.ChooseManaSource _ _ candidates -> do
-    State.modify' (<> [NonEmpty.toList candidates])
+    State.modify' (\(n, seen) -> (n, seen <> [NonEmpty.toList candidates]))
     pure (takesAltar altarId birdsId p)
   _ -> pure (takesAltar altarId birdsId p)
 
