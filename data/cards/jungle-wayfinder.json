@@ -67,11 +67,18 @@
                             "value": 1
                           },
                           "searcher": {
-                            "type": "EachPlayer"
+                            "type": "EachInSlot",
+                            "value": "thoseWhoMay"
                           }
                         }
                       }
-                    ]
+                    ],
+                    "optionality": {
+                      "type": "Optional",
+                      "value": {
+                        "type": "EachPlayer"
+                      }
+                    }
                   }
                 ]
               }

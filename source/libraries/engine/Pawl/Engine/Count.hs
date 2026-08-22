@@ -371,6 +371,16 @@ playersFor context gs ref =
             Recipient.ToPlaneswalker _ -> Nothing
             Recipient.ToBattle _ -> Nothing
             Recipient.ToObject _ -> Nothing
+        -- InSlot's plural, off the same bindings: EVERY player the slot names,
+        -- with the non-player recipients dropped rather than collapsing the
+        -- whole read the way Binding.onlyOne does above. An UNBOUND slot is
+        -- still unanswerable, which is that arm's posture -- nothing named
+        -- nobody, and a fold over the empty set would be a different claim.
+        PlayerRef.EachInSlot name -> do
+          src <- Filter.source context
+          obj <- Game.lookupObject src gs
+          recipients <- Map.lookup name (Binding.targetsOf (Object.bindings obj))
+          Just (Maybe.mapMaybe Recipient.playerOf (Set.toList recipients))
         -- InSlot's baked half, and answered exactly as the arm above answers a
         -- slot that names one player: the seat, with no roster test. Per the CR
         -- 102.1 note above a departed player keeps their row, so this can name one

@@ -6,6 +6,7 @@
 -- sibling modules named in Main.hs, which all describe under the same name.
 module Pawl.ResolveSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -1202,31 +1203,12 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   -- cross product empties each library into its owner's hand -- three cards per
   -- seat -- where the coupled reading takes exactly one.
   --
-  -- The printed "may" is not transcribed, and pawl's copy is no weaker for it:
-  -- CR 701.23b already lets a search STATING A QUALITY -- "a basic land card" --
-  -- find nothing, which is the whole of the permission as far as the find goes.
-  -- What is left over is the shuffle a player who declined outright would not
-  -- make; pawl's copy shuffles every library, which is stricter than printed.
-  -- Not implemented: a per-player "may", each player the clause reaches deciding
-  -- for themselves (#1862).
+  -- The printed "may" is each seat's own (CR 603.5), which is why every seat is
+  -- answered Exercises here; the case below is the one that declines.
   Spec.it s "CR 701.23a whole card: Jungle Wayfinder has each player search THEIR OWN library" $ do
-    forest <- S.printingOf s registry "Forest"
-    wayfinder <- S.printingOf s registry "Jungle Wayfinder"
-    island <- S.printingOf s registry "Island"
-    mountain <- S.printingOf s registry "Mountain"
-    plains <- S.printingOf s registry "Plains"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let stock printing pid g = List.foldl' (\h _ -> snd (S.addLibraryCard printing pid h)) g [1 :: Int .. 3]
-        g0 = S.landsFor forest S.alice 3 S.threePlayerGame
-        (_, g1) = S.addLibraryCard piker S.alice g0
-        g2 = stock island S.alice g1
-        (_, g3) = S.addLibraryCard piker S.bob g2
-        g4 = stock mountain S.bob g3
-        (_, g5) = S.addLibraryCard piker S.carol g4
-        g6 = stock plains S.carol g5
-        (gs, spellId) = S.handOne wayfinder g6
-        cast = snd (Engine.runGamePure findFirst gs (S.cast S.alice spellId))
-        settled = snd (Engine.runGamePure findFirst cast Engine.priorityLoop)
+    (gs, spellId) <- wayfinderBoard s registry
+    let cast = snd (Engine.runGamePure findFirstExercising gs (S.cast S.alice spellId))
+        settled = snd (Engine.runGamePure findFirstExercising cast Engine.priorityLoop)
         nameOf = Just . CardName.MkCardName . Text.pack
     Spec.assertEqWith s "alice found ONE of her three Islands -- her library was searched once, by her" (namesIn Zone.Hand S.alice settled) [nameOf "Island"]
     Spec.assertEqWith s "bob one of his three Mountains" (namesIn Zone.Hand S.bob settled) [nameOf "Mountain"]
@@ -1238,6 +1220,75 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "bob's the other two Mountains" (List.sort (namesIn Zone.Library S.bob settled)) (List.sort [nameOf "Mountain", nameOf "Mountain", nameOf "Goblin Piker"])
     Spec.assertEqWith s "and carol's the other two Plains" (List.sort (namesIn Zone.Library S.carol settled)) (List.sort [nameOf "Plains", nameOf "Plains", nameOf "Goblin Piker"])
     Spec.assertEqWith s "the Wayfinder itself resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Jungle Wayfinder")) S.alice settled) 1
+  -- The same card and the same board, with the "may" answered three ways: alice
+  -- takes it and finds, bob DECLINES, carol takes it and finds nothing (CR
+  -- 701.23b's fail-to-find, which a search stating a quality always allows).
+  --
+  -- The discriminating pair is bob against carol, and the quantity that tells
+  -- them apart is LIBRARY ORDER. Hand size cannot: CR 701.23b lets carol find
+  -- nothing, so both seats end with an empty hand. Library CONTENTS cannot
+  -- either, for the same reason. Only the shuffle separates them -- a player who
+  -- declines performs none of the sentence, so no shuffle -- and the answerer
+  -- REVERSES whatever library it is offered, so a shuffle that happened is
+  -- visible as the reversed order and one that did not as the original. That is
+  -- the whole reason the third seat is on the board: at two seats there is no
+  -- way to hold "declined" and "accepted, found nothing" apart.
+  --
+  -- Walked to the end: nothing later in the resolution touches bob's library --
+  -- alice's find goes to its OWNER's hand (CR 400.3) and the Wayfinder's own
+  -- move to the battlefield is alice's -- and no state-based action reorders a
+  -- library, so the divergence survives to the assertion.
+  --
+  -- What this board does NOT prove is CR 608.2e's APNAP ORDER of the asks: alice
+  -- is the active player, the controller and the head of the roster at once, so
+  -- APNAP order, roster order and controller-first coincide. An enters trigger
+  -- cannot be made to resolve while its controller is nonactive, so no cheap
+  -- board separates them; the ordering rides apnapPlayersOf, which CR 118.12a's
+  -- gate already exercises.
+  Spec.it s "CR 603.5 whole card: Jungle Wayfinder's may is each seat's own, and a decliner's library is not shuffled" $ do
+    (gs, spellId) <- wayfinderBoard s registry
+    let cast = snd (Engine.runGamePure findFirstExercising gs (S.cast S.alice spellId))
+        -- Resolve the creature spell, so what is left on the stack is the enters
+        -- trigger alone and the asks below are its.
+        onStack = snd (Engine.runGamePure findFirstExercising cast (Stack.resolveTop >> Engine.settleForPriority))
+        ((_, after), asked) = State.runState (Engine.runGame wayfinderAnswer onStack Stack.resolveTop) []
+        nameOf = Just . CardName.MkCardName . Text.pack
+        may pid = (Text.pack "may", pid)
+        search pid = (Text.pack "search", pid)
+    Spec.assertEqWith s "CR 603.6a: the enters trigger, and nothing else, is on the stack" (length (GameState.stack onStack)) 1
+    Spec.assertEqWith s "each library starts with three basics and a Piker" (fmap (\pid -> length (namesIn Zone.Library pid onStack)) [S.alice, S.bob, S.carol]) [4, 4, 4]
+    Spec.assertEqWith
+      s
+      "CR 603.5: bob declined, so his library was never shuffled -- it is in its original order"
+      (namesIn Zone.Library S.bob after)
+      (namesIn Zone.Library S.bob onStack)
+    Spec.assertEqWith
+      s
+      "carol took the may and found nothing (CR 701.23b), so her library WAS shuffled"
+      (namesIn Zone.Library S.carol after)
+      (reverse (namesIn Zone.Library S.carol onStack))
+    Spec.assertEqWith s "alice took it and found one Island" (namesIn Zone.Hand S.alice after) [nameOf "Island"]
+    Spec.assertEqWith s "bob's hand is empty" (namesIn Zone.Hand S.bob after) []
+    Spec.assertEqWith s "and carol's" (namesIn Zone.Hand S.carol after) []
+    Spec.assertEqWith
+      s
+      "every seat was asked the may, and only the two who took it were asked to search"
+      asked
+      [may S.alice, may S.bob, may S.carol, search S.alice, search S.carol]
+  -- The same board differing in exactly one thing: EVERY seat declines. The
+  -- shuffle answerer is still the reversing one, so a library that came back in
+  -- its original order is one nothing shuffled -- and the whole sentence,
+  -- shuffle included, is what nobody performed.
+  Spec.it s "CR 603.5 whole card: nobody takes Jungle Wayfinder's may, so no library moves at all" $ do
+    (gs, spellId) <- wayfinderBoard s registry
+    let cast = snd (Engine.runGamePure findFirstExercising gs (S.cast S.alice spellId))
+        onStack = snd (Engine.runGamePure findFirstExercising cast (Stack.resolveTop >> Engine.settleForPriority))
+        ((_, after), asked) = State.runState (Engine.runGame decliningWayfinderAnswer onStack Stack.resolveTop) []
+        libraries g = fmap (\pid -> namesIn Zone.Library pid g) [S.alice, S.bob, S.carol]
+    Spec.assertEqWith s "every library is untouched, in its original order" (libraries after) (libraries onStack)
+    Spec.assertEqWith s "and every hand is empty" (fmap (\pid -> namesIn Zone.Hand pid after) [S.alice, S.bob, S.carol]) [[], [], []]
+    Spec.assertEqWith s "three asks and no search" asked [(Text.pack "may", S.alice), (Text.pack "may", S.bob), (Text.pack "may", S.carol)]
+    Spec.assertEqWith s "the Wayfinder itself still resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Jungle Wayfinder")) S.alice after) 1
   Spec.it s "CR 603/608.2n Rest in Peace's ETB exiles graveyards and ceases" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -1814,6 +1865,60 @@ findFirstDeclining :: Prompt.Prompt r -> r
 findFirstDeclining p = case p of
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
   _ -> findFirst p
+
+-- The board the two Jungle Wayfinder cases share: alice casts it off three
+-- Forests, and every seat's library holds three of ONE basic plus a Goblin Piker
+-- for the filter to reject. See the first case for why three seats, three basics
+-- each, and a different basic per seat.
+wayfinderBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId)
+wayfinderBoard s registry = do
+  forest <- S.printingOf s registry "Forest"
+  wayfinder <- S.printingOf s registry "Jungle Wayfinder"
+  island <- S.printingOf s registry "Island"
+  mountain <- S.printingOf s registry "Mountain"
+  plains <- S.printingOf s registry "Plains"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let stock printing pid g = List.foldl' (\h _ -> snd (S.addLibraryCard printing pid h)) g [1 :: Int .. 3]
+      g0 = S.landsFor forest S.alice 3 S.threePlayerGame
+      (_, g1) = S.addLibraryCard piker S.alice g0
+      g2 = stock island S.alice g1
+      (_, g3) = S.addLibraryCard piker S.bob g2
+      g4 = stock mountain S.bob g3
+      (_, g5) = S.addLibraryCard piker S.carol g4
+      g6 = stock plains S.carol g5
+  pure (S.handOne wayfinder g6)
+
+-- Three different answers to one clause's "may", plus a log of WHO was asked
+-- what -- a pure Prompt -> r answerer could report the decisions but not the
+-- seats they were put to, and "bob was never asked to search" is half of what
+-- the case proves.
+--
+-- The shuffle is answered by REVERSING whatever library it is offered, which is
+-- what makes a shuffle that happened visible at all (Game.honourShuffle honours
+-- any permutation). Everything else falls through to S.identityAnswer, which
+-- DECLINES a CR 603.5 may -- so the accepting arm is written out rather than
+-- left to it.
+wayfinderAnswer :: Prompt.Prompt r -> State.State [(Text.Text, PlayerId.PlayerId)] r
+wayfinderAnswer p = case p of
+  Prompt.ChooseOptional _ pid _ _ _ -> do
+    State.modify' (<> [(Text.pack "may", pid)])
+    pure (if pid == S.bob then OptionalDecision.Declines else OptionalDecision.Exercises)
+  -- CR 701.23b's fail-to-find for carol; the filter states a quality, so an
+  -- empty answer stands rather than being completed.
+  Prompt.SearchLibrary _ pid matches cap -> do
+    State.modify' (<> [(Text.pack "search", pid)])
+    pure (if pid == S.carol then [] else List.genericTake cap matches)
+  Prompt.Shuffle offered -> pure (reverse offered)
+  _ -> pure (S.identityAnswer p)
+
+-- wayfinderAnswer with every seat declining, and the SAME reversing shuffle, so
+-- a board run through both differs in exactly the decisions.
+decliningWayfinderAnswer :: Prompt.Prompt r -> State.State [(Text.Text, PlayerId.PlayerId)] r
+decliningWayfinderAnswer p = case p of
+  Prompt.ChooseOptional _ pid _ _ _ -> do
+    State.modify' (<> [(Text.pack "may", pid)])
+    pure OptionalDecision.Declines
+  _ -> wayfinderAnswer p
 
 -- findFirstExercising with the FIND pinned to one named card. The two Dragons of
 -- the CR 607.2a pair have to exile DIFFERENT artifacts for the linked set to be

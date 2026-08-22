@@ -1,7 +1,7 @@
 module Pawl.Types.OfferCast where
 
+import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer
-import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.SlotName as SlotName
 
@@ -24,7 +24,7 @@ data OfferCast = MkOfferCast
     -- loud. Nor does it always remove the question -- CR 118.8c hands it back
     -- where the mandatory additional cost names cards of a stated quality in a
     -- hidden zone, which Pawl.Engine.Cost.statesHiddenQuality classifies.
-    optionality :: Optionality.Optionality,
+    optionality :: CastObligation.CastObligation,
     -- | Elided when the offer carries neither rider, which is an ordinary cast
     -- of the card.
     offer :: CastOffer.CastOffer
