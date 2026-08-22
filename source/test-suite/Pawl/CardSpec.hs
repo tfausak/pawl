@@ -622,6 +622,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.AnyOf conditions -> concatMap triggerConditionCounts conditions
   -- CR 708.7's condition is nullary, so there is nothing in it to be a Quantity.
   TriggerCondition.SelfTurnedFaceUp -> []
+  -- CR 701.27e's names a face, which is a CardName and not a Quantity.
+  TriggerCondition.SelfTransformedInto _ -> []
   -- Its watcher-scoped sibling carries a Filter, and a Filter holds no Count for
   -- PermanentEnters' reason.
   TriggerCondition.PermanentTurnedFaceUp _ -> []
@@ -2841,6 +2843,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.AnyOf conditions -> concatMap triggerConditionFilters conditions
   -- CR 708.7's condition is nullary, so there is nothing in it to be a Filter.
   TriggerCondition.SelfTurnedFaceUp -> []
+  -- CR 701.27e's names a face by name; nothing about it is a Filter.
+  TriggerCondition.SelfTransformedInto _ -> []
   -- Its watcher-scoped sibling carries one, and Aven Farseer's is the trivial
   -- `And []` -- which this sweep must still see, an empty Filter being a Filter.
   TriggerCondition.PermanentTurnedFaceUp f -> [f]

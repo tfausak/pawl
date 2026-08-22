@@ -27,6 +27,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StepBegan as StepBegan
+import qualified Pawl.Types.Transformed as Transformed
 import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
 
 -- | CR 608.2i: one entry of the turn-scoped record of what happened. Effects
@@ -566,6 +567,29 @@ data GameEvent
     -- sentence) is the opposite change and would be its own event -- and no
     -- printed card triggers on it, so there would be nothing to feed.
     TurnedFaceUp ObjectId.ObjectId
+  | -- | CR 701.27a: a double-faced permanent TRANSFORMED -- it was turned over so
+    -- that its other face is up. CR 701.27b makes that a different game action
+    -- from TurnedFaceUp above, and CR 712.18 keeps it the same object, so no
+    -- Moved event describes it and nothing else in this list carries it.
+    --
+    -- Recorded by the two roads that turn a permanent over, both through
+    -- Pawl.Engine.Event.recordTransformed: CR 701.27a's opcode in
+    -- Pawl.Engine.Resolve, and CR 702.145c/f's day/night sweep in
+    -- Pawl.Engine.Daytime. Only for a permanent that ACTUALLY turned -- CR
+    -- 701.27c/d/f and CR 702.145b each leave an instruction doing nothing, and a
+    -- turn that did not happen is not an event.
+    --
+    -- CR 701.28a routes convert through CR 701.27a-f, so whoever implements it
+    -- must record this same event rather than mint a second one; see #698.
+    --
+    -- NOT recorded for CR 712.13a's "enters transformed" (EntryRewrite in
+    -- Pawl.Engine.Event): nothing turns over there, the permanent arrives on its
+    -- back face.
+    --
+    -- The payload carries the names because CR 701.27e reads them "immediately
+    -- after it does so"; Pawl.Types.Transformed says why they are sampled at the
+    -- write rather than at the match.
+    Transformed Transformed.Transformed
   | -- | A permanent GAINED THIS DESIGNATION -- CR 702.112b's renowned, CR 701.37b's
     -- monstrous or CR 701.60b's suspected. Emitted by Pawl.Engine.Resolve's
     -- Effect.Designate arm, the one place any of them is written, and only on a

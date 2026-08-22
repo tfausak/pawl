@@ -580,6 +580,8 @@ library codec
     Pawl.Codec.TopOfLibraryUntilSpec
     Pawl.Codec.Toughness
     Pawl.Codec.ToughnessSpec
+    Pawl.Codec.Transformed
+    Pawl.Codec.TransformedSpec
     Pawl.Codec.TriggerCondition
     Pawl.Codec.TriggerConditionSpec
     Pawl.Codec.TriggeredAbility
@@ -1255,6 +1257,7 @@ library types
     Pawl.Types.TopOfLibrary
     Pawl.Types.TopOfLibraryUntil
     Pawl.Types.Toughness
+    Pawl.Types.Transformed
     Pawl.Types.TriggerCondition
     Pawl.Types.TriggeredAbility
     Pawl.Types.TriggerEntry

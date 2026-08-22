@@ -1,6 +1,7 @@
 module Pawl.Codec.GameEventSpec where
 
 import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.GameEvent as GameEvent
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec as ProjectedCharacteristicsSpec
@@ -47,6 +48,7 @@ import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.StepBegan as StepBegan
+import qualified Pawl.Types.Transformed as Transformed
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
 import qualified Pawl.Types.Zone as Zone
@@ -249,6 +251,14 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.TurnedFaceUp (ObjectId.MkObjectId 5))
       " {\"type\":\"TurnedFaceUp\",\"value\":5} "
+  -- CR 701.27a, the different game action CR 701.27b holds it apart from. Two
+  -- fields rather than one: CR 701.27e reads what the permanent turned INTO.
+  Spec.it s "Transformed" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.Transformed (Transformed.MkTransformed (ObjectId.MkObjectId 5) (Set.singleton (CardName.MkCardName (Text.pack "Blightsower Thallid")))))
+      " {\"type\":\"Transformed\",\"value\":{\"object\":5,\"names\":[\"Blightsower Thallid\"]}} "
   -- CR 702.112b. One id, TurnedFaceUp's payload exactly: the designation says only
   -- which permanent got it.
   Spec.it s "BecameDesignated Renowned" $
