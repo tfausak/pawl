@@ -1,4 +1,4 @@
--- CR 400.4a / 101.2 / 613.11: the continuous effects that FORBID an object from
+-- CR 101.2 / 400.4a / 613.11: the continuous effects that FORBID an object from
 -- entering the battlefield. One of the modules on the axis CR 613.11 reaches past
 -- the layer system (alongside Pawl.Engine.PlayerEffect,
 -- Pawl.Engine.BlockRequirement, Pawl.Engine.AttackRequirement,
@@ -28,7 +28,7 @@ import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.Zone (Zone)
 
--- CR 400.4a with CR 101.2: does an effect in force right now say that `oid`,
+-- CR 101.2 with CR 400.4a: does an effect in force right now say that `oid`,
 -- currently in `origin`, CAN'T ENTER THE BATTLEFIELD? Grafdigger's Cage's first
 -- sentence.
 --
@@ -69,6 +69,15 @@ prohibited oid origin gs =
             (null setEffs || Projection.liveAfterLayers setEffs source gs)
               && not (removed source)
               && any (fromRestriction source (Projection.textChangesAffecting source gs)) restrictions
+      -- Two of the three gates above are REGRESSION FENCES rather than proven
+      -- behaviour, and both were mutated: CR 305.7's setEffs gate cannot fire for
+      -- the pool's one printing, which is an artifact rather than a land, and no
+      -- card in data/cards text-changes a Grafdigger's Cage, so dropping the CR
+      -- 612.1 rewrite below leaves the suite green. They are copied from
+      -- Pawl.Engine.SacrificeRestriction because the CR states them and an
+      -- inconsistency between five carriers is the worse answer. The CR 604.2
+      -- ability-loss gate IS proven -- Pawl.EntryRestrictionSpec's Titania's Song
+      -- leg.
       fromRestriction source changes restriction =
         let affected = EntryRestriction.affected restriction
          in Set.member origin (EntryRestriction.origins restriction)

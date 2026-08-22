@@ -2630,13 +2630,18 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
       (resolved, exiledBy) <- resolveZoneChange asOf (ZoneChange.MkZoneChange oid oid fromZone requestedDest)
       case resolved of
         -- CR 614.6: nothing survived the loop, so no zone change happens. No
-        -- producer today -- no card in the pool cancels a zone change outright --
-        -- but Maybe is what "the event does not happen" means on this path.
+        -- producer today -- no ReplacementEffect in data/cards cancels a zone
+        -- change outright, where the entry PROHIBITION one case down is a CR
+        -- 101.2 "can't" rather than a rule 614 replacement -- but Maybe is what
+        -- "the event does not happen" means on this path.
         Nothing -> pure Nothing
-        -- CR 400.4a / CR 101.2: an effect in force says this object can't enter
-        -- the battlefield, so it doesn't -- "it remains in its previous zone".
-        -- Grafdigger's Cage is the pool's printing, and CR 613.11 is why the
-        -- prohibition is asked here rather than anywhere in Pawl.Engine.Projection.
+        -- CR 101.2 with CR 400.4a: an effect in force states this object can't
+        -- enter the battlefield, and CR 101.2 makes that "can't" beat whatever
+        -- allowed or directed the entry. CR 400.4a is the rulebook's own answer
+        -- to what happens next -- "it remains in its previous zone" -- stated
+        -- there for a card type, and again in CR 701.40f for a prohibited
+        -- manifest. Grafdigger's Cage is the pool's printing, and CR 613.11 is
+        -- why the prohibition is asked here rather than in Pawl.Engine.Projection.
         --
         -- Nothing, this funnel's CR 614.6 cancel arm one case up and CR 303.4g's
         -- answer one case down: the object is never deleted and never re-minted
@@ -2658,8 +2663,8 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
         -- the object anywhere but the battlefield is the event that happens, and
         -- an entry prohibition has nothing to say about it.
         --
-        -- `fromZone` is CR 400.4a's "previous zone", read off the object rather
-        -- than off `settled`: no ZoneChangeR rewrites an event's origin.
+        -- `fromZone` is the "previous zone" both rules name, read off the object
+        -- rather than off `settled`: no ZoneChangeR rewrites an event's origin.
         --
         -- Not implemented: CR 608.3e's permanent spell, which this arm leaves on
         -- the stack instead of putting into its owner's graveyard (#2065). No card

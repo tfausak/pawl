@@ -4,10 +4,17 @@ import qualified Data.Set as Set
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Zone as Zone
 
--- | CR 400.4a / CR 101.2: one printed ENTRY PROHIBITION -- an effect saying an
+-- | CR 101.2 / CR 400.4a: one printed ENTRY PROHIBITION -- an effect saying an
 -- object "can't enter the battlefield". Grafdigger's Cage's first sentence
 -- ("creature cards in graveyards and libraries can't enter the battlefield") is
 -- the pool's printing.
+--
+-- The two rules divide the sentence. CR 101.2 gives the "can't" its force over
+-- whatever allowed or directed the entry. CR 400.4a says what happens instead --
+-- "it remains in its previous zone" -- which it states for a CARD TYPE that can't
+-- enter rather than for an effect, and which CR 701.40f states again for a
+-- prohibited manifest; both readings of "an object that can't enter" get the same
+-- answer, which is why this type answers only a Bool.
 --
 -- Pawl.Types.SacrificeRestriction's shape and its filing, one game action over:
 -- CR 613.11 puts a continuous effect that "affects game rules rather than

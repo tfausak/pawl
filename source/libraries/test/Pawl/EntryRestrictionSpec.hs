@@ -1,4 +1,4 @@
--- Covers: CR 400.4a / CR 101.2's ENTRY PROHIBITION -- Pawl.Types.EntryRestriction,
+-- Covers: CR 101.2 / CR 400.4a's ENTRY PROHIBITION -- Pawl.Types.EntryRestriction,
 -- the Bool Pawl.Engine.EntryRestriction answers, and the one place it is asked
 -- (Pawl.Engine.Event.changeZoneAttaching, the funnel every battlefield entry
 -- reaches). Also CR 701.40f, whose "that card isn't manifested ... it remains in
@@ -8,7 +8,7 @@
 -- Grafdigger's Cage is the fixture: "Creature cards in graveyards and libraries
 -- can't enter the battlefield." Its second sentence ("players can't cast spells
 -- from graveyards or libraries") is NOT on pawl's card, so this printing runs
--- weaker than the real one (#2064); nothing here reads that clause.
+-- weaker than the real one (gap #2064); nothing here reads that clause.
 --
 -- THE BOARD SHAPE that makes these cases discriminating:
 --
@@ -114,7 +114,19 @@ exhumeCase s registry = do
     Spec.assertEqWith s "both players were asked" (asked responses) 2
     Spec.assertEqWith s "one creature per seat is on the battlefield" (length (arrivals before after)) 2
     Spec.assertEqWith s "and two of the four buried cards left their graveyards (CR 400.7)" (length (filter ((== (Nothing, Nothing)) . (`whereIs` after)) graves)) 2
-  Spec.it s "CR 400.4a no creature card in a graveyard can enter the battlefield" $ do
+  -- CR 604.2 / CR 613.1f: a Cage that has LOST its abilities prohibits nothing.
+  -- Titania's Song gives every noncreature artifact LoseAllAbilities, so the same
+  -- board with the Cage still on the battlefield behaves like the leg above --
+  -- which is what proves the reader's ability-removal gate rather than asserting
+  -- it. The Song is not itself an artifact, so it cannot strip its own text.
+  Spec.it s "CR 604.2 a Cage stripped of its abilities prohibits nothing" $ do
+    (exhume, swamp, buried, cage) <- fixtures
+    song <- S.printingOf s registry "Titania's Song"
+    let (spell, _, before) = board exhume swamp buried [cage, song]
+        (after, _) = run spell before
+    Spec.assertEqWith s "the sorcery resolved into alice's graveyard (CR 608.2n)" (elem (S.printingName exhume) (namesIn Zone.Graveyard S.alice after)) True
+    Spec.assertEqWith s "one creature per seat entered anyway" (length (arrivals before after)) 2
+  Spec.it s "CR 101.2 no creature card in a graveyard can enter the battlefield" $ do
     (exhume, swamp, buried, cage) <- fixtures
     let (spell, graves, before) = board exhume swamp buried [cage]
         (after, responses) = run spell before
@@ -126,7 +138,7 @@ exhumeCase s registry = do
     -- "prohibited" from "the effect did nothing".
     Spec.assertEqWith s "both players were still asked (CR 608.2d)" (asked responses) 2
     -- THE HEADLINE.
-    Spec.assertEqWith s "CR 400.4a nothing entered the battlefield" (arrivals before after) []
+    Spec.assertEqWith s "CR 101.2 nothing entered the battlefield" (arrivals before after) []
     -- THE DISCRIMINATOR against a redirect. A ZoneChangeR that sent the move to
     -- the graveyard would also leave the battlefield empty, but CR 400.7 would
     -- mint a fresh object there and leave these ids dangling. A refusal leaves
@@ -144,7 +156,7 @@ exhumeCase s registry = do
 -- origin zones refuses this, because the stack is off the battlefield too.
 hardcastCase :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 hardcastCase s registry =
-  Spec.it s "CR 400.4a a hardcast creature spell is not in a graveyard or a library, so it still enters" $ do
+  Spec.it s "CR 101.2 a hardcast creature spell is not in a graveyard or a library, so it still enters" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
     cage <- S.printingOf s registry "Grafdigger's Cage"
@@ -191,7 +203,7 @@ manifestCase s registry = do
     let (spell, top, before) = board summons plains piker wraith [cage]
         after = S.runPure S.identityAnswer before (S.cast S.alice spell >> Stack.resolveTop)
     Spec.assertEqWith s "the sorcery resolved into alice's graveyard (CR 608.2n)" (elem (S.printingName summons) (namesIn Zone.Graveyard S.alice after)) True
-    Spec.assertEqWith s "CR 400.4a nothing entered the battlefield" (arrivals before after) []
+    Spec.assertEqWith s "CR 101.2 nothing entered the battlefield" (arrivals before after) []
     Spec.assertEqWith
       s
       "CR 701.40f the library is the same length"
