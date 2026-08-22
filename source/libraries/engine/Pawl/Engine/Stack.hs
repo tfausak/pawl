@@ -121,10 +121,10 @@ resolveTopWith runSubgame = do
                       -- status, never the card's identity.
                       --
                       -- The Aura branch below carries FaceUp instead, and cannot
-                    -- need this: it is reached only for a spell `face` calls an
-                    -- Aura, and a face-down spell's `face` is
-                    -- Card.faceDownFace -- whose subtypes are the ones the
-                    -- listing names, and no listing in the pool names Aura.
+                      -- need this: it is reached only for a spell `face` calls an
+                      -- Aura, and a face-down spell's `face` is
+                      -- Card.faceDownFace -- whose subtypes are the ones the
+                      -- listing names, and no listing in the pool names Aura.
                         carryOver oid =<< Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just controller) entering (Object.facing obj) False
                       else -- CR 303.4a made this spell target, so CR 608.2b applies
                       -- to it. THE INVARIANT: is-it-an-Aura is a SUBTYPE read off
