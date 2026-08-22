@@ -835,7 +835,7 @@ data GameEvent
     -- nothing.
     Surveiled PlayerId.PlayerId
   | -- | CR 702.170a: a card became a plotted card. The ObjectId is the card AS
-    -- IT LANDED IN EXILE -- Pawl.Engine.Plot.plot's `newId` and not the object
+    -- IT SITS IN EXILE -- Pawl.Engine.Plot.plot's `newId` and not the object
     -- that was in the hand -- because CR 400.7 mints a new object as it moves
     -- and that new one is what bears the "when this card becomes plotted"
     -- ability (Aloe Alchemist) printed on it.

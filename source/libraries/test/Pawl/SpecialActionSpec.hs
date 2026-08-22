@@ -493,9 +493,11 @@ kellanBoard forest plains island piker kellan aloe djinn =
 --
 -- The RECORD is the point: Pawl.Types.Prompt.ChooseCardInHand is raised only at
 -- two or more candidates, so an empty log is the card's own filter having
--- admitted exactly one card. Aiming the trigger is pinned by id rather than left
--- to the default answerer, which takes the smallest recipient and would find the
--- Piker again whatever the payload did.
+-- admitted exactly one card.
+--
+-- The aim is pinned by id though the Piker is the board's only creature and the
+-- default answerer would find it anyway: the pin is what keeps the case honest
+-- if a second creature is ever added beside it.
 kellanAnswers :: ObjectId.ObjectId -> (forall r. Prompt.Prompt r -> Log r)
 kellanAnswers pikerId prompt = case prompt of
   Prompt.ChooseOptional {} -> pure OptionalDecision.Exercises
@@ -557,7 +559,7 @@ makePlotted s registry = Spec.describe s "CR 702.170c Kellan Joins Up" $ do
         (fmap S.nameOf (Game.cardOf exiledId after))
         (Just (S.printingName aloe))
     -- The FILTER, read off the hand it left behind: "nonland card with mana value
-    -- 3 or less" admitted the Alchemist and refused the mana value 4 Djinn.
+    -- 3 or less" admitted the Alchemist and refused the mana value 5 Djinn.
     Spec.assertEqWith s "alice's hand is the Djinn alone" (Game.zoneMembers Zone.Hand S.alice after) [djinnId]
     Spec.assertEqWith s "so no CR 608.2d choice was raised: the filter left one candidate" asked []
     Spec.assertEqWith s "all three lands paid for the enchantment" (S.tappedCount S.alice after) 3
@@ -576,6 +578,7 @@ makePlotted s registry = Spec.describe s "CR 702.170c Kellan Joins Up" $ do
     let (pikerId, kellanId, _, gs) = kellanBoard forest plains island piker kellan aloe djinn
         after = snd (State.evalState (Engine.runGame (kellanAnswers pikerId) gs (S.cast S.alice kellanId >> Engine.priorityLoop)) [])
         later = after {GameState.turnNumber = GameState.turnNumber after + 1}
+    Spec.assertBool s (Maybe.isJust (soleExile after)) "the card was exiled, so the case below runs at all"
     Monad.forM_ (soleExile after) $ \exiledId -> do
       let resolved = S.runPure S.castAnswer later (S.cast S.alice exiledId >> Stack.resolveTop)
       Spec.assertEqWith
