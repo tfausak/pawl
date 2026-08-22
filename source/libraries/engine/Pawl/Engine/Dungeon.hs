@@ -178,14 +178,14 @@ enter pid = do
   gs <- State.get
   case Map.lookup pid (GameState.players gs) >>= Player.dungeon of
     Nothing -> pure ()
-    Just printing -> do
+    Just printingId -> do
       let (oid, gs1) = Game.freshObjectId gs
           (ts, gs2) = Game.freshTimestamp gs1
           obj =
             Object.MkObject
               { Object.owner = pid,
                 Object.enteredUnder = Nothing,
-                Object.source = Source.OfCard printing,
+                Object.source = Source.OfCard printingId,
                 Object.zone = Zone.Command,
                 Object.tapped = TapState.Untapped,
                 Object.facing = Facing.FaceUp,

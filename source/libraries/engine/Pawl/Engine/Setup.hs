@@ -30,7 +30,7 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
-import Pawl.Types.Printing (Printing)
+import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.RestartSignal as RestartSignal
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
@@ -47,10 +47,15 @@ import qualified Pawl.Types.Zone as Zone
 -- rather than on a claim about Magic: Deck.commander is set by nothing but a
 -- Commander deck, and pawl has no game options at all (#175), so there is no
 -- way for the two to come apart.
-startingLife :: Maybe Printing -> Integer
+--
+-- Parametric because the designation reaches it two ways -- as the Deck's
+-- Printing when a game is built, and as the Player's PrintingId when one is
+-- restarted (CR 727) -- and rule 903.7 turns on WHETHER a commander was
+-- designated, never on which card it is.
+startingLife :: Maybe a -> Integer
 startingLife commander = if Maybe.isJust commander then 40 else 20
 
--- How many cards this deck holds, CR 903.5's commander included: rule 903.5
+-- How many cards this deck holds, CR 903.5a's commander included: rule 903.5a
 -- counts the deck at exactly 100 cards "including its commander", so the card
 -- that starts in the command zone is still one of the deck's cards. Every
 -- non-Commander deck has no commander and so is unaffected.
@@ -137,6 +142,9 @@ emptyGame order =
           GameState.restartSignal = RestartSignal.Playing,
           GameState.endTurnSignal = EndTurnSignal.Running,
           GameState.nextObjectId = ObjectId.MkObjectId 0,
+          GameState.printings = Map.empty,
+          GameState.printingIds = Map.empty,
+          GameState.nextPrintingId = PrintingId.MkPrintingId 0,
           GameState.nextTimestamp = Timestamp.MkTimestamp 0,
           GameState.lastChoice = Timestamp.MkTimestamp 0,
           GameState.drewFromEmpty = mempty,
@@ -156,8 +164,8 @@ emptyGame order =
           GameState.turnAnchor = Nothing
         }
 
-createCard :: PlayerId -> Printing -> Game ObjectId
-createCard pid printing = do
+createCard :: PlayerId -> PrintingId.PrintingId -> Game ObjectId
+createCard pid printingId = do
   gs <- State.get
   let (oid, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
@@ -165,7 +173,7 @@ createCard pid printing = do
         Object.MkObject
           { Object.owner = pid,
             Object.enteredUnder = Nothing,
-            Object.source = Source.OfCard printing,
+            Object.source = Source.OfCard printingId,
             Object.zone = Zone.Library,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,
@@ -224,6 +232,7 @@ createCard pid printing = do
 -- zones constantly; an id or an object field could not survive that.
 createDeck :: PlayerId -> Deck.Deck -> Game ()
 createDeck pid deck = do
+  dungeonId <- Monad.mapM (State.state . Game.intern) (Deck.dungeon deck)
   -- CR 903.7 / CR 103.4: the starting life total, which is the deck's business
   -- and so cannot be settled by emptyGame above.
   State.modify' $ \gs ->
@@ -233,12 +242,19 @@ createDeck pid deck = do
           -- minted for it, because dungeon cards begin OUTSIDE the game and
           -- outside the game is not a zone (CR 400.11). CR 701.49a is what brings
           -- it in; Pawl.Engine.Dungeon.enter is that rule.
-          Map.adjust (\p -> p {Player.life = startingLife (Deck.commander deck), Player.dungeon = Deck.dungeon deck}) pid (GameState.players gs)
+          Map.adjust (\p -> p {Player.life = startingLife (Deck.commander deck), Player.dungeon = dungeonId}) pid (GameState.players gs)
       }
-  Monad.forM_ (Map.toList (Deck.cards deck)) $ \(printing, n) ->
-    Monad.replicateM_ (Natural.toIntSaturating n) (createCard pid printing)
+  Monad.forM_ (Map.toList (Deck.cards deck)) $ \(printing, n) -> do
+    printingId <- State.state (Game.intern printing)
+    Monad.replicateM_ (Natural.toIntSaturating n) (createCard pid printingId)
+  -- One intern, and the id goes to BOTH the object and the designation below --
+  -- which is why Commander.isCommander's comparison holds without leaning on
+  -- Game.intern's idempotence. That idempotence is what keeps a malformed deck
+  -- listing its commander among its cards too (CR 903.5b forbids it; #940 means
+  -- pawl does not enforce it) down to one entry.
   Monad.forM_ (Deck.commander deck) $ \printing -> do
-    oid <- createCard pid printing
+    printingId <- State.state (Game.intern printing)
+    oid <- createCard pid printingId
     State.modify' $ \gs ->
       let moved =
             Game.insertIntoZone Zone.Command LibraryPosition.defaultValue pid oid (Game.removeFromZones pid oid gs)
@@ -251,7 +267,7 @@ createDeck pid deck = do
               { GameState.objects =
                   Map.adjust (\o -> o {Object.zone = Zone.Command}) oid (GameState.objects moved)
               }
-       in Commander.designate pid printing rezoned
+       in Commander.designate pid printingId rezoned
 
 newGame :: HandActionPerformer -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game ()
 newGame perform matchup = do
@@ -709,6 +725,18 @@ funnelBack finalSub parent =
           -- CR 729.2c moved only the commanders, so only they can come back.
           GameState.command = Set.union (Set.difference (GameState.command parent) oldCmdIds) (Map.keysSet toCommand),
           GameState.nextObjectId = max (GameState.nextObjectId parent) (GameState.nextObjectId finalSub),
+          -- The subgame's cards come back as library objects above, and each
+          -- names its printing by id -- so the entries those ids name have to
+          -- come back too, or the returned cards would resolve to nothing.
+          --
+          -- Union is unambiguous rather than merely convenient:
+          -- subgameStateFrom builds the subgame as a record update on `parent`,
+          -- so it INHERITS the table and the counter whole. Anything the
+          -- subgame interned was minted above every id the parent held, so the
+          -- two tables never disagree about an id.
+          GameState.printings = Map.union (GameState.printings finalSub) (GameState.printings parent),
+          GameState.printingIds = Map.union (GameState.printingIds finalSub) (GameState.printingIds parent),
+          GameState.nextPrintingId = max (GameState.nextPrintingId parent) (GameState.nextPrintingId finalSub),
           GameState.nextTimestamp = max (GameState.nextTimestamp parent) (GameState.nextTimestamp finalSub),
           -- CR 104.4b: the subgame's events are not a stretch during which the
           -- parent's players could not act -- they were playing the subgame.

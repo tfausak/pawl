@@ -92,6 +92,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
@@ -353,13 +354,14 @@ playLandAnswer p = case p of
 -- Any printing, on the battlefield under pid's control, untapped and Settled.
 addCreature :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addCreature printing pid gs =
-  let (oid, gs1) = Game.freshObjectId gs
+  let (printingId, gsP) = Game.intern printing gs
+      (oid, gs1) = Game.freshObjectId gsP
       (ts, gs2) = Game.freshTimestamp gs1
       obj =
         Object.MkObject
           { Object.owner = pid,
             Object.enteredUnder = Nothing,
-            Object.source = Source.OfCard printing,
+            Object.source = Source.OfCard printingId,
             Object.zone = Zone.Battlefield,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,
@@ -584,13 +586,14 @@ artifactId gs =
 -- when a test needs a token on the board without resolving a maker.
 addToken :: Card.Type.Card -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addToken card pid gs =
-  let (oid, gs1) = Game.freshObjectId gs
+  let (cardId, gsP) = Game.intern (Printing.MkPrinting card) gs
+      (oid, gs1) = Game.freshObjectId gsP
       (ts, gs2) = Game.freshTimestamp gs1
       obj =
         Object.MkObject
           { Object.owner = pid,
             Object.enteredUnder = Nothing,
-            Object.source = Source.OfToken card,
+            Object.source = Source.OfToken cardId,
             Object.zone = Zone.Battlefield,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,
@@ -637,13 +640,14 @@ addToken card pid gs =
 -- One card of a printing in pid's library.
 addLibraryCard :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addLibraryCard printing pid gs =
-  let (oid, gs1) = Game.freshObjectId gs
+  let (printingId, gsP) = Game.intern printing gs
+      (oid, gs1) = Game.freshObjectId gsP
       (ts, gs2) = Game.freshTimestamp gs1
       obj =
         Object.MkObject
           { Object.owner = pid,
             Object.enteredUnder = Nothing,
-            Object.source = Source.OfCard printing,
+            Object.source = Source.OfCard printingId,
             Object.zone = Zone.Library,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,
@@ -694,13 +698,14 @@ addLibraryCard printing pid gs =
 -- (Pawl.Engine.Cost.topExileCandidate), which reads the LAST member.
 addGraveyardCard :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addGraveyardCard printing pid gs =
-  let (oid, gs1) = Game.freshObjectId gs
+  let (printingId, gsP) = Game.intern printing gs
+      (oid, gs1) = Game.freshObjectId gsP
       (ts, gs2) = Game.freshTimestamp gs1
       obj =
         Object.MkObject
           { Object.owner = pid,
             Object.enteredUnder = Nothing,
-            Object.source = Source.OfCard printing,
+            Object.source = Source.OfCard printingId,
             Object.zone = Zone.Graveyard,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,
@@ -756,13 +761,14 @@ addGraveyardCard printing pid gs =
 -- funnel rather than being written onto a hand-built object.
 addExiledCard :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addExiledCard printing pid gs =
-  let (oid, gs1) = Game.freshObjectId gs
+  let (printingId, gsP) = Game.intern printing gs
+      (oid, gs1) = Game.freshObjectId gsP
       (ts, gs2) = Game.freshTimestamp gs1
       obj =
         Object.MkObject
           { Object.owner = pid,
             Object.enteredUnder = Nothing,
-            Object.source = Source.OfCard printing,
+            Object.source = Source.OfCard printingId,
             Object.zone = Zone.Exile,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,
@@ -823,13 +829,14 @@ entersWithTrigger printing pid gs0 =
 -- replaces the hand and sets up the phase for a cast).
 addHandCard :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addHandCard printing pid gs =
-  let (oid, gs1) = Game.freshObjectId gs
+  let (printingId, gsP) = Game.intern printing gs
+      (oid, gs1) = Game.freshObjectId gsP
       (ts, gs2) = Game.freshTimestamp gs1
       obj =
         Object.MkObject
           { Object.owner = pid,
             Object.enteredUnder = Nothing,
-            Object.source = Source.OfCard printing,
+            Object.source = Source.OfCard printingId,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,
@@ -899,13 +906,14 @@ landsInPlay land n = landsFor land alice n (Setup.emptyGame bothPlayers)
 landsFor :: Printing.Printing -> PlayerId.PlayerId -> Int -> GameState.GameState -> GameState.GameState
 landsFor land pid n base =
   let add gs _ =
-        let (oid, gs1) = Game.freshObjectId gs
+        let (landId, gsP) = Game.intern land gs
+            (oid, gs1) = Game.freshObjectId gsP
             (ts, gs2) = Game.freshTimestamp gs1
             obj =
               Object.MkObject
                 { Object.owner = pid,
                   Object.enteredUnder = Nothing,
-                  Object.source = Source.OfCard land,
+                  Object.source = Source.OfCard landId,
                   Object.zone = Zone.Battlefield,
                   Object.tapped = TapState.Untapped,
                   Object.facing = Facing.FaceUp,
@@ -951,13 +959,14 @@ landsFor land pid n base =
 -- Put one card of a printing into alice's hand in a main phase with priority.
 handOne :: Printing.Printing -> GameState.GameState -> (GameState.GameState, ObjectId.ObjectId)
 handOne printing base =
-  let (oid, gs1) = Game.freshObjectId base
+  let (printingId, baseP) = Game.intern printing base
+      (oid, gs1) = Game.freshObjectId baseP
       (ts, gs2) = Game.freshTimestamp gs1
       obj =
         Object.MkObject
           { Object.owner = alice,
             Object.enteredUnder = Nothing,
-            Object.source = Source.OfCard printing,
+            Object.source = Source.OfCard printingId,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,
@@ -1009,13 +1018,14 @@ handOne printing base =
 pikerInHand :: Printing.Printing -> Printing.Printing -> Int -> Phase.Phase -> (GameState.GameState, ObjectId.ObjectId)
 pikerInHand land piker n ph =
   let base = landsInPlay land n
-      (oid, gs1) = Game.freshObjectId base
+      (pikerId, baseP) = Game.intern piker base
+      (oid, gs1) = Game.freshObjectId baseP
       (ts, gs2) = Game.freshTimestamp gs1
       obj =
         Object.MkObject
           { Object.owner = alice,
             Object.enteredUnder = Nothing,
-            Object.source = Source.OfCard piker,
+            Object.source = Source.OfCard pikerId,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,
@@ -1217,15 +1227,7 @@ lifeOf pid gs = fmap Player.life (Map.lookup pid (GameState.players gs))
 
 creaturesInPlay :: PlayerId.PlayerId -> GameState.GameState -> Int
 creaturesInPlay pid gs =
-  let isCreatureObject oid = case Game.lookupObject oid gs of
-        Nothing -> False
-        Just obj -> case Object.source obj of
-          Source.OfCard printing -> Card.isCreature (combinedFace printing)
-          Source.OfToken card -> Card.isCreature (Card.combined card)
-          Source.OfAbility _ _ -> False
-          Source.OfTrigger _ _ -> False
-          Source.OfEmblem _ -> False
-          Source.OfInherentTrigger _ _ -> False
+  let isCreatureObject oid = maybe False (Card.isCreature . Card.combined) (Game.cardOf oid gs)
    in length (filter isCreatureObject (Game.zoneMembers Zone.Battlefield pid gs))
 
 -- The name on a card's combined face, which for every card in this pool is its
@@ -1250,15 +1252,7 @@ combinedFace = Card.combined . Printing.card
 
 countByName :: CardName.CardName -> PlayerId.PlayerId -> GameState.GameState -> Int
 countByName wanted pid gs =
-  let named oid = case Game.lookupObject oid gs of
-        Nothing -> False
-        Just obj -> case Object.source obj of
-          Source.OfCard printing -> nameOf (Printing.card printing) == wanted
-          Source.OfToken card -> nameOf card == wanted
-          Source.OfAbility _ _ -> False
-          Source.OfTrigger _ _ -> False
-          Source.OfEmblem _ -> False
-          Source.OfInherentTrigger _ _ -> False
+  let named oid = fmap nameOf (Game.cardOf oid gs) == Just wanted
       inLibrary = filter named (Game.zoneMembers Zone.Library pid gs)
       inHand = filter named (Game.zoneMembers Zone.Hand pid gs)
    in length inLibrary + length inHand
@@ -1266,15 +1260,7 @@ countByName wanted pid gs =
 -- How many of pid's battlefield objects are copies of a card with this name.
 countOnBattlefieldByName :: CardName.CardName -> PlayerId.PlayerId -> GameState.GameState -> Int
 countOnBattlefieldByName wanted pid gs =
-  let named oid = case Game.lookupObject oid gs of
-        Nothing -> False
-        Just obj -> case Object.source obj of
-          Source.OfCard printing -> nameOf (Printing.card printing) == wanted
-          Source.OfToken card -> nameOf card == wanted
-          Source.OfAbility _ _ -> False
-          Source.OfTrigger _ _ -> False
-          Source.OfEmblem _ -> False
-          Source.OfInherentTrigger _ _ -> False
+  let named oid = fmap nameOf (Game.cardOf oid gs) == Just wanted
    in length (filter named (Game.zoneMembers Zone.Battlefield pid gs))
 
 damageOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Natural
@@ -1533,15 +1519,22 @@ m2aKeywords =
     ("Goblin Chariot", Keyword.Haste)
   ]
 
+-- The printing id oneMountainState below interns its Mountain as. Named rather
+-- than spelled in both places, so a spec asserting on that object's source does
+-- not restate the fixture's first-id assumption.
+oneMountainPrintingId :: PrintingId.PrintingId
+oneMountainPrintingId = PrintingId.MkPrintingId 0
+
 -- A GameState with a single Mountain in alice's hand, in a chosen phase.
 oneMountainState :: Printing.Printing -> Phase.Phase -> GameState.GameState
 oneMountainState mountain ph =
   let oid = ObjectId.MkObjectId 0
+      printingId = oneMountainPrintingId
       obj =
         Object.MkObject
           { Object.owner = alice,
             Object.enteredUnder = Nothing,
-            Object.source = Source.OfCard mountain,
+            Object.source = Source.OfCard printingId,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,
@@ -1622,6 +1615,9 @@ oneMountainState mountain ph =
           GameState.restartSignal = RestartSignal.Playing,
           GameState.endTurnSignal = EndTurnSignal.Running,
           GameState.nextObjectId = ObjectId.MkObjectId 1,
+          GameState.printings = Map.singleton printingId mountain,
+          GameState.printingIds = Map.singleton mountain printingId,
+          GameState.nextPrintingId = PrintingId.MkPrintingId 1,
           GameState.nextTimestamp = Timestamp.MkTimestamp 1,
           GameState.lastChoice = Timestamp.MkTimestamp 0,
           GameState.drewFromEmpty = mempty,
@@ -1717,13 +1713,14 @@ pikerOf gs = case Game.zoneMembers Zone.Battlefield bob gs of
 -- set up counter targets without paying to cast the victim.
 spellOnStack :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 spellOnStack printing pid gs =
-  let (oid, gs1) = Game.freshObjectId gs
+  let (printingId, gsP) = Game.intern printing gs
+      (oid, gs1) = Game.freshObjectId gsP
       (ts, gs2) = Game.freshTimestamp gs1
       obj =
         Object.MkObject
           { Object.owner = pid,
             Object.enteredUnder = Nothing,
-            Object.source = Source.OfCard printing,
+            Object.source = Source.OfCard printingId,
             Object.zone = Zone.Stack,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,

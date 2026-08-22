@@ -31,6 +31,8 @@ import qualified Pawl.Types.PhasedOut as PhasedOut
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prevention as Prevention
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Types.RestartSignal as RestartSignal
 import qualified Pawl.Types.Result as Result
@@ -371,6 +373,35 @@ data GameState = MkGameState
     -- Engine.runStep lowers it as CR 724.1d's cleanup step begins.
     endTurnSignal :: EndTurnSignal.EndTurnSignal,
     nextObjectId :: ObjectId.ObjectId,
+    -- | Every printing this game knows, named by an id the objects carry
+    -- instead of the whole Printing. Two ids naming the same card is a benign
+    -- state, not something to guard against: CR 109.3 lists what an object's
+    -- characteristics are and closes with "any other information about an
+    -- object isn't a characteristic", which is where the illustration (CR
+    -- 203.1) and the expansion symbol (CR 206.1) sit -- both stated to have no
+    -- effect on game play. The engine's identity questions are name-keyed
+    -- instead (CR 100.2a's deck limit, CR 201.2's matching).
+    --
+    -- Append-only, and never collected -- a token that ceases to exist under
+    -- CR 704.5d drops its Object but keeps its entry (gap #1594).
+    printings :: Map.Map PrintingId.PrintingId Printing.Printing,
+    -- | `printings` read backwards, so Pawl.Engine.Game.intern answers with the
+    -- id a printing already has instead of minting a second one for it. That
+    -- makes "objects of the same printing share an id" a property of the table
+    -- rather than a convention each minting site has to keep.
+    --
+    -- No CURRENT reader breaks without it: Pawl.Engine.Setup.createDeck interns
+    -- once and hands the one id to both createCard and Commander.designate, so
+    -- isCommander's comparison holds either way. What it buys is that a future
+    -- minting site cannot get it wrong, and that a deck listing its commander
+    -- among its cards too (CR 903.5b forbids it; #940 means pawl does not
+    -- enforce it) behaves like a well-formed one.
+    --
+    -- Keyed by the whole Printing, so interning pays a deep Ord Card. It is paid
+    -- once per DISTINCT printing per game: at setup, and once per
+    -- token-creation or emblem event.
+    printingIds :: Map.Map Printing.Printing PrintingId.PrintingId,
+    nextPrintingId :: PrintingId.PrintingId,
     -- | CR 613.7: the monotonic source of timestamps for objects (at creation) and
     -- stored continuous effects (at CR 611 creation). See Timestamp.
     nextTimestamp :: Timestamp.Timestamp,

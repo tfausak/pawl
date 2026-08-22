@@ -133,6 +133,7 @@ import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import Pawl.Types.Prevention (Prevention)
+import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import Pawl.Types.ProposedEvent (ProposedEvent)
@@ -586,12 +587,17 @@ placeObject pid mkObj dest position = do
 -- what makes Projection.defaultControllerOf answer the owner, which is CR
 -- 109.4c and so CR 114.2's last sentence.
 createEmblem :: PlayerId -> Card -> Game ObjectId
-createEmblem pid card =
+createEmblem pid card = do
+  -- An emblem's characteristics are effect-defined (CR 114.3), so its entry is
+  -- minted here rather than coming from a deck -- interned once for the one
+  -- object it backs, and carrying no print-level data because an emblem is not
+  -- a card (CR 114.5).
+  emblemId <- State.state (Game.intern (Printing.MkPrinting card))
   let mkObj ts =
         Object.MkObject
           { Object.owner = pid,
             Object.enteredUnder = Nothing,
-            Object.source = Source.OfEmblem card,
+            Object.source = Source.OfEmblem emblemId,
             Object.zone = Zone.Command,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,
@@ -628,7 +634,7 @@ createEmblem pid card =
             Object.doesNotUntapNext = False,
             Object.exertedBy = Set.empty
           }
-   in placeObject pid mkObj Zone.Command LibraryPosition.defaultValue
+  placeObject pid mkObj Zone.Command LibraryPosition.defaultValue
 
 -- CR 614: settle a proposed zone change. Nothing means the move does not happen.
 -- The typed door changeZoneAttaching below uses, so the funnel itself never cases
@@ -3660,11 +3666,15 @@ createTokens controller card copy n tapped entering = do
       case resolved of
         Nothing -> pure []
         Just (owner, tokenCard, count) -> do
+          -- Interned ONCE for the whole event, not once per token: `count`
+          -- tokens created by one effect are copies of one set of
+          -- effect-defined characteristics (CR 111.3), so they name one entry.
+          tokenId <- State.state (Game.intern (Printing.MkPrinting tokenCard))
           let mkObj ts =
                 Object.MkObject
                   { Object.owner = owner,
                     Object.enteredUnder = Nothing,
-                    Object.source = Source.OfToken tokenCard,
+                    Object.source = Source.OfToken tokenId,
                     Object.zone = Zone.Battlefield,
                     -- CR 110.5b: untapped unless an effect says otherwise, which
                     -- is why the caller supplies this rather than the default

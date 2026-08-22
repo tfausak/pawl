@@ -4,7 +4,7 @@ import qualified Data.Map.Strict as Map
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
-import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Status as Status
 
 data Player = MkPlayer
@@ -64,13 +64,19 @@ data Player = MkPlayer
     --
     -- A PRINTING and not an ObjectId, because CR 400.7 mints a fresh id on every
     -- zone change and a commander crosses zones constantly -- command zone to
-    -- stack to battlefield to command zone again. An id would name a dead object
-    -- after the first cast. A printing survives, and CR 903.5's singleton deck
-    -- construction is what makes it unambiguous: a Commander deck holds at most
-    -- one card with a given name, so "the object whose printing is this one" picks
-    -- out exactly the commander. Pawl does not ENFORCE rule 903.5 (#940), so a
-    -- malformed deck with two copies would make both answer to it.
-    commander :: Maybe Printing.Printing,
+    -- stack to battlefield to command zone again. An object id would name a dead
+    -- object after the first cast. A printing survives, and CR 903.5b's singleton
+    -- deck construction is what makes it unambiguous: a Commander deck holds at
+    -- most one card with a given English name, so "the object whose printing is
+    -- this one" picks out exactly the commander. Pawl does not ENFORCE rule
+    -- 903.5b (#940), so a malformed deck with two copies would make both answer
+    -- to it.
+    --
+    -- The printing is named by its id (#1592), which is stable for the whole
+    -- game: Pawl.Engine.Setup.internDeck interns each of a deck's distinct
+    -- printings exactly once, so this id is the same one the commander's own
+    -- objects carry and Pawl.Engine.Commander.isCommander can compare the two.
+    commander :: Maybe PrintingId.PrintingId,
     -- | CR 903.8: how many times this player has cast their commander from the
     -- command zone this game. The commander tax is {2} for each of them.
     --
@@ -98,12 +104,14 @@ data Player = MkPlayer
     -- A PRINTING and not an ObjectId, for `commander`'s reason turned inside out:
     -- there is no object at all until CR 701.49a brings the card into the command
     -- zone, and CR 309.5b removes it from the game and lets the SAME card be
-    -- brought back in as a new object. What persists across both is the printing.
+    -- brought back in as a new object. What persists across both is the printing,
+    -- named by its id (#1592) -- interned by Pawl.Engine.Setup.internDeck along
+    -- with the rest of the deck, so it is minted before any of this is read.
     --
     -- Read only by Pawl.Engine.Dungeon. It is not emptied when the dungeon enters
     -- the game: CR 309.5b has the player put a dungeon they own back into the
     -- command zone after finishing one, so the card outside the game is a supply
     -- rather than a stock of one.
-    dungeon :: Maybe Printing.Printing
+    dungeon :: Maybe PrintingId.PrintingId
   }
   deriving (Eq, Ord, Show)

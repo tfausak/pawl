@@ -37,6 +37,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
@@ -90,6 +91,65 @@ freshTimestamp :: GameState -> (Timestamp.Timestamp, GameState)
 freshTimestamp gs =
   let Timestamp.MkTimestamp n = GameState.nextTimestamp gs
    in (Timestamp.MkTimestamp n, gs {GameState.nextTimestamp = Timestamp.MkTimestamp (n + 1)})
+
+freshPrintingId :: GameState -> (PrintingId.PrintingId, GameState)
+freshPrintingId gs =
+  let PrintingId.MkPrintingId n = GameState.nextPrintingId gs
+   in (PrintingId.MkPrintingId n, gs {GameState.nextPrintingId = PrintingId.MkPrintingId (n + 1)})
+
+-- Put a printing in the table and answer with the id that names it. The ONLY
+-- way to obtain a PrintingId, which is what makes a dangling one
+-- unconstructible.
+--
+-- IDEMPOTENT: a printing already in the table answers with the id it already
+-- has, so a caller may intern wherever it is convenient rather than exactly
+-- once. It also bounds the table by DISTINCT printings rather than by minting
+-- events, which is most of what #1594 is about.
+--
+-- Not load-bearing for any reader today -- Pawl.Engine.Setup.createDeck interns
+-- once and gives the same id to the object and to the designation, so
+-- Pawl.Engine.Commander.isCommander holds without it. It is here so that a
+-- later minting site cannot quietly break that.
+--
+-- The cost is a deep Ord Card per intern, through GameState.printingIds. It is
+-- paid once per distinct printing per game -- at setup, and per token-creation
+-- or emblem event -- and never on a read.
+intern :: Printing.Printing -> GameState -> (PrintingId.PrintingId, GameState)
+intern printing gs = case Map.lookup printing (GameState.printingIds gs) of
+  Just pid -> (pid, gs)
+  Nothing ->
+    let (pid, gs1) = freshPrintingId gs
+     in ( pid,
+          gs1
+            { GameState.printings = Map.insert pid printing (GameState.printings gs1),
+              GameState.printingIds = Map.insert printing pid (GameState.printingIds gs1)
+            }
+        )
+
+printingOf :: PrintingId.PrintingId -> GameState -> Maybe Printing.Printing
+printingOf pid gs = Map.lookup pid (GameState.printings gs)
+
+-- The PRINTING behind an object, which is `cardOf` one unwrap earlier.
+--
+-- It exists because the difference is an allocation on the layer fold's hot
+-- path: this hands back the Maybe the table lookup already built, where cardOf
+-- fmaps Printing.card into a SECOND one. A caller that goes straight on to read
+-- a field of the card wants this and pays for the unwrap in nothing.
+-- Enumerated rather than delegated to printingOfSource below, and the duplication
+-- is deliberate: routing this through it measured 130376 -> 167528 bytes per
+-- permanent on Pawl.PerformanceSpec's Sorcerer board, which is the whole
+-- optimisation. No wildcard arm, so -Werror still reports both sites when a
+-- card-shaped Source constructor is added -- the silent-absorption hazard is the
+-- `_`, not the second enumeration.
+printingOfObject :: ObjectId -> GameState -> Maybe Printing.Printing
+printingOfObject oid gs = case fmap Object.source (lookupObject oid gs) of
+  Nothing -> Nothing
+  Just (Source.OfCard pid) -> printingOf pid gs
+  Just (Source.OfToken pid) -> printingOf pid gs
+  Just (Source.OfAbility _ _) -> Nothing
+  Just (Source.OfTrigger _ _) -> Nothing
+  Just (Source.OfEmblem pid) -> printingOf pid gs
+  Just (Source.OfInherentTrigger _ _) -> Nothing
 
 -- Reject-not-repair, as payment already does: only a genuine permutation of the
 -- offered indices is honoured. Anything else -- a short answer, a duplicate, an
@@ -271,7 +331,7 @@ cease abilId gs =
 
 -- The card an object is a copy of. Nothing when the id is unknown.
 cardOf :: ObjectId -> GameState -> Maybe Card
-cardOf oid gs = cardOfSource (fmap Object.source (lookupObject oid gs))
+cardOf oid gs = cardOfSource gs (fmap Object.source (lookupObject oid gs))
 
 -- CR 608.2h: `cardOf` for an object that may already be gone. The live object
 -- first, then the record filed under the id it had while it existed.
@@ -290,21 +350,43 @@ cardOf oid gs = cardOfSource (fmap Object.source (lookupObject oid gs))
 -- permanent for every projection and quantity read that goes through it.
 cardOfWithLastKnown :: ObjectId -> GameState -> Maybe Card
 cardOfWithLastKnown oid gs = case lookupObject oid gs of
-  Just obj -> cardOfSource (Just (Object.source obj))
-  Nothing -> cardOfSource (fmap LastKnown.source (Map.lookup oid (GameState.lastKnown gs)))
+  Just obj -> cardOfSource gs (Just (Object.source obj))
+  Nothing -> cardOfSource gs (fmap LastKnown.source (Map.lookup oid (GameState.lastKnown gs)))
 
 -- The card behind a Source, if it has one. An ability on the stack does not: it
 -- is an object in its own right (CR 113.7a), and the card is its SOURCE's.
-cardOfSource :: Maybe Source.Source -> Maybe Card
-cardOfSource mSource = case mSource of
+--
+-- Takes the GameState because the three card-shaped constructors name their
+-- printing rather than carrying it (#1592). Both callers above already held it.
+cardOfSource :: GameState -> Maybe Source.Source -> Maybe Card
+cardOfSource gs mSource = case mSource of
   Nothing -> Nothing
   Just source -> case source of
-    Source.OfCard printing -> Just (Printing.card printing)
-    Source.OfToken card -> Just card
+    Source.OfCard pid -> cardOfPrinting pid gs
+    Source.OfToken pid -> cardOfPrinting pid gs
     Source.OfAbility _ _ -> Nothing
     Source.OfTrigger _ _ -> Nothing
-    Source.OfEmblem card -> Just card
+    Source.OfEmblem pid -> cardOfPrinting pid gs
     Source.OfInherentTrigger _ _ -> Nothing
+
+cardOfPrinting :: PrintingId.PrintingId -> GameState -> Maybe Card
+cardOfPrinting pid gs = fmap Printing.card (printingOf pid gs)
+
+-- `cardOf` for a member of a HAND. An emblem answers Nothing where `cardOf`
+-- answers a card: CR 114.5 keeps an emblem off the battlefield, and CR 114.1
+-- puts it in the command zone, so the arm states what a hand can hold rather
+-- than covering a case a hand can reach.
+--
+-- One reader for the four that asked it separately -- Pawl.Engine.Foretell's
+-- and Pawl.Engine.Plot's cost lookups, and Pawl.Engine.Action's land-play and
+-- special-action scans. All four read a card in the hand, which pawl's
+-- projection does not reach (#160), so all four go to the printed card.
+cardOfHandMember :: ObjectId -> GameState -> Maybe Card
+cardOfHandMember oid gs = do
+  obj <- lookupObject oid gs
+  case Object.source obj of
+    Source.OfEmblem _ -> Nothing
+    source -> cardOfSource gs (Just source)
 
 -- Narrow a card down to the face a (possibly absent) chosen name picks out --
 -- CR 709.3b's half of resolveFaceFor below, which faceOf and faceOfWithLastKnown
@@ -396,7 +478,7 @@ namesFor mObj card = case mObj of
 -- that goes looking, so CR 708.5's "you can't look at face-down permanents
 -- controlled by another player" is unimplemented (#682).
 faceOf :: ObjectId -> GameState -> Maybe (Face Card)
-faceOf oid gs = faceOfObject =<< lookupObject oid gs
+faceOf oid gs = faceOfObject gs =<< lookupObject oid gs
 
 -- `faceOf` for a caller that already holds the object, and the function `faceOf`
 -- itself is written in terms of -- ONE lookup where the chain through
@@ -409,10 +491,10 @@ faceOf oid gs = faceOfObject =<< lookupObject oid gs
 --
 -- EXHAUSTIVE over Facing, where `faceOf` above could only be exhaustive over a
 -- Maybe: a third way for an object to be turned has to be classified here.
-faceOfObject :: Object.Object -> Maybe (Face Card)
-faceOfObject obj = case Object.facing obj of
+faceOfObject :: GameState -> Object.Object -> Maybe (Face Card)
+faceOfObject gs obj = case Object.facing obj of
   Facing.FaceDown _ listed -> Just (Card.faceDownFace listed)
-  Facing.FaceUp -> fmap (resolveFaceFor (Just obj)) (cardOfSource (Just (Object.source obj)))
+  Facing.FaceUp -> fmap (resolveFaceFor (Just obj)) (cardOfSource gs (Just (Object.source obj)))
 
 -- CR 201.1 / 709.4a: the names of the object an id names -- `faceOf`'s plural
 -- companion, and the value Pawl.Engine.Projection.baseCharacteristics seeds
@@ -424,7 +506,7 @@ faceOfObject obj = case Object.facing obj of
 namesOf :: ObjectId -> GameState -> Set.Set CardName.CardName
 namesOf oid gs = case fmap Object.facing (lookupObject oid gs) of
   Just (Facing.FaceDown _ _) -> Set.empty
-  _ -> maybe Set.empty (namesFor (lookupObject oid gs)) (cardOf oid gs)
+  _ -> maybe Set.empty (namesFor (lookupObject oid gs) . Printing.card) (printingOfObject oid gs)
 
 -- `faceOf` IGNORING CR 708.2's substitution: what the object's own card shows,
 -- whichever way up the object is -- CR 709.3b's chosen half, CR 709.4's combined
@@ -442,8 +524,8 @@ namesOf oid gs = case fmap Object.facing (lookupObject oid gs) of
 -- wants to know what an object IS wants faceOf.
 faceUpFaceOf :: ObjectId -> GameState -> Maybe (Face Card)
 faceUpFaceOf oid gs = do
-  card <- cardOf oid gs
-  Just (resolveFaceFor (lookupObject oid gs) card)
+  printing <- printingOfObject oid gs
+  Just (resolveFaceFor (lookupObject oid gs) (Printing.card printing))
 
 -- `faceOf`, narrowed to the one characteristic that is not always read off the
 -- live face: CR 712.8e calculates a nonmodal double-faced permanent's mana value
@@ -464,7 +546,8 @@ manaCostFaceOf :: ObjectId -> GameState -> Maybe (Face Card)
 manaCostFaceOf oid gs = case fmap Object.facing (lookupObject oid gs) of
   Just (Facing.FaceDown _ listed) -> Just (Card.faceDownFace listed)
   _ -> do
-    card <- cardOf oid gs
+    printing <- printingOfObject oid gs
+    let card = Printing.card printing
     Just (Card.manaCostFace card (resolveFaceFor (lookupObject oid gs) card))
 
 -- `faceOf` for an object that may already be gone -- cardOfWithLastKnown's

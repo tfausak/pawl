@@ -66,6 +66,7 @@ import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
@@ -837,6 +838,9 @@ lastKnownRiderSpec s registry =
         ability : _ -> do
           let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
               (collarId, g1) = S.addCreature basiliskCollar S.alice g0
+              -- Read off the object rather than rebuilt, so the snapshot names
+              -- the same printing entry its own object does.
+              sorcererSource = fmap Object.source (Game.lookupObject srcId g1)
               equipped = S.attach collarId srcId g1
               -- The snapshot the guard must ignore, taken while the Collar's
               -- grant is still live, then filed under the still-live id.
@@ -844,7 +848,9 @@ lastKnownRiderSpec s registry =
                 LastKnown.MkLastKnown
                   { LastKnown.characteristics = Projection.project srcId equipped,
                     LastKnown.controller = S.alice,
-                    LastKnown.source = Source.OfCard prodigalSorcerer,
+                    -- The fallback is unreachable: srcId was just minted by
+                    -- S.addCreature two bindings above.
+                    LastKnown.source = Maybe.fromMaybe (Source.OfCard (PrintingId.MkPrintingId 0)) sorcererSource,
                     -- CR 122.1: nothing put a counter on the Sorcerer, and this
                     -- case is about a keyword grant rather than a counter.
                     LastKnown.counters = Map.empty,

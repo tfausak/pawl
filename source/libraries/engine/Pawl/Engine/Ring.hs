@@ -59,6 +59,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Source as Source
@@ -325,9 +326,14 @@ refreshTheRing :: PlayerId -> Game ()
 refreshTheRing pid =
   State.modify' $ \gs ->
     let card = theRingEmblem (temptationsOf pid gs)
+        -- Interned rather than carried (#1592). Game.intern is idempotent, so a
+        -- refresh that finds the same tier reuses that tier's id; a new tier
+        -- mints one, which is what makes the emblem's four incarnations four
+        -- entries rather than one mutated in place.
+        (printingId, interned) = Game.intern (Printing.MkPrinting card) gs
         rewrite :: ObjectId -> Map.Map ObjectId Object.Object -> Map.Map ObjectId Object.Object
-        rewrite = Map.adjust (\o -> o {Object.source = Source.OfEmblem card})
-     in gs {GameState.objects = foldr rewrite (GameState.objects gs) (theRings pid gs)}
+        rewrite = Map.adjust (\o -> o {Object.source = Source.OfEmblem printingId})
+     in interned {GameState.objects = foldr rewrite (GameState.objects interned) (theRings pid interned)}
 
 -- CR 701.54a: this creature becomes that player's Ring-bearer.
 --
