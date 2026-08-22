@@ -1018,21 +1018,30 @@ rewrite pairs predicate = case predicate of
   -- atom names none -- "an activated ability that isn't a mana ability" has no
   -- word inside it for Artificial Evolution to reach.
   Filter.HasNonManaActivatedAbility -> predicate
-  -- Rewritten THROUGH the kind: CR 122.1b's keyword counter carries a keyword,
-  -- and rule 612.1 reaches a word inside one exactly as it does in HasKeyword
-  -- above. Every other kind names no word to swap.
-  Filter.HasCounters kind -> Filter.HasCounters $ case kind of
-    CounterKind.Keyword k -> CounterKind.Keyword (rewriteKeyword pairs k)
-    CounterKind.PlusOnePlusOne -> kind
-    CounterKind.MinusOneMinusOne -> kind
-    CounterKind.Loyalty -> kind
-    CounterKind.Lore -> kind
-    CounterKind.Defense -> kind
-    CounterKind.Time -> kind
-    CounterKind.Fade -> kind
-    CounterKind.Shield -> kind
-    CounterKind.Level -> kind
-    CounterKind.Luck -> kind
+  -- Rewritten THROUGH the kind, for the reason rewriteCounterKind gives.
+  Filter.HasCounters kind -> Filter.HasCounters (rewriteCounterKind pairs kind)
+
+-- CR 612.1's word swap inside a COUNTER KIND. Rewritten THROUGH the kind: CR
+-- 122.1b's keyword counter carries a keyword, and rule 612.1 reaches a word
+-- inside one exactly as it does in Filter.HasKeyword. Every other kind names no
+-- word to swap. Exhaustive rather than a wildcard, so a later kind carrying a
+-- word fails to compile here instead of silently keeping the printed one.
+--
+-- Top-level because Pawl.Engine.Projection needs the same rewrite over the
+-- counter kinds a replacement effect names (CR 612.1 over CR 604.2's text).
+rewriteCounterKind :: [(Subtype.Subtype, Subtype.Subtype)] -> CounterKind.CounterKind Keyword.Type.Keyword -> CounterKind.CounterKind Keyword.Type.Keyword
+rewriteCounterKind pairs kind = case kind of
+  CounterKind.Keyword k -> CounterKind.Keyword (rewriteKeyword pairs k)
+  CounterKind.PlusOnePlusOne -> kind
+  CounterKind.MinusOneMinusOne -> kind
+  CounterKind.Loyalty -> kind
+  CounterKind.Lore -> kind
+  CounterKind.Defense -> kind
+  CounterKind.Time -> kind
+  CounterKind.Fade -> kind
+  CounterKind.Shield -> kind
+  CounterKind.Level -> kind
+  CounterKind.Luck -> kind
 
 -- CR 612.1's word swap INSIDE a keyword. Rule 702 spells some keywords with a
 -- word in them: CR 702.14a has landwalk "appear within an object's rules text as
