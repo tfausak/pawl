@@ -4,4 +4,4 @@ data Departure
   = Lost
   | Conceded
   | Drew
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)
