@@ -71,12 +71,15 @@ import qualified Pawl.Types.Expiry as Expiry
 import Pawl.Types.ExtraTurn (ExtraTurn)
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.FloatingCandidate as FloatingCandidate
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.InstanceOrdinal as InstanceOrdinal
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.PermanentCandidate as PermanentCandidate
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -153,7 +156,13 @@ collect sources floating =
         ReplacementCandidate.MkReplacementCandidate
           { -- CR 614.5 / 702.136b: one identity per INSTANCE, so a permanent
             -- carrying one ability twice gets the rule's two opportunities.
-            ReplacementCandidate.identity = CandidateId.OfPermanent src re instance_,
+            ReplacementCandidate.identity =
+              CandidateId.OfPermanent
+                PermanentCandidate.MkPermanentCandidate
+                  { PermanentCandidate.source = src,
+                    PermanentCandidate.effect = re,
+                    PermanentCandidate.ordinal = instance_
+                  },
             ReplacementCandidate.effect = re,
             ReplacementCandidate.source = src,
             -- CR 109.5: "you" is the SOURCE's controller, read live off the
@@ -180,7 +189,12 @@ collect sources floating =
           }
       fromFloating active =
         ReplacementCandidate.MkReplacementCandidate
-          { ReplacementCandidate.identity = CandidateId.OfFloating (ActiveReplacement.source active) (ActiveReplacement.timestamp active),
+          { ReplacementCandidate.identity =
+              CandidateId.OfFloating
+                FloatingCandidate.MkFloatingCandidate
+                  { FloatingCandidate.source = ActiveReplacement.source active,
+                    FloatingCandidate.timestamp = ActiveReplacement.timestamp active
+                  },
             ReplacementCandidate.effect = ActiveReplacement.effect active,
             ReplacementCandidate.source = ActiveReplacement.source active,
             -- CR 109.5, BAKED at installation rather than derived: this row's
@@ -278,11 +292,11 @@ printedRider src you re = case re of
 -- replacement's position mid-loop. What the ordinal DOES prove is the duplicate
 -- itself -- dropping it to a constant reddens Pawl.ReplacementSpec's two
 -- "CR 702.136b riot twice" cases.
-numberInstances :: [(ObjectId, ReplacementEffect (Effect.Effect Card))] -> [(Natural, (ObjectId, ReplacementEffect (Effect.Effect Card)))]
+numberInstances :: [(ObjectId, ReplacementEffect (Effect.Effect Card))] -> [(InstanceOrdinal.InstanceOrdinal, (ObjectId, ReplacementEffect (Effect.Effect Card)))]
 numberInstances =
   let step seen row =
         let n = Map.findWithDefault 0 row seen
-         in (Map.insert row (n + 1) seen, (n, row))
+         in (Map.insert row (n + 1) seen, (InstanceOrdinal.MkInstanceOrdinal n, row))
    in snd . List.mapAccumL step Map.empty
 
 -- The candidates that apply to this event. `asOf` is Nothing for a lone event
@@ -1340,9 +1354,11 @@ revealableFromHand pid filter_ gs =
 consume :: CandidateId -> Game ()
 consume identity_ = case identity_ of
   CandidateId.OfPermanent {} -> pure ()
-  CandidateId.OfFloating src ts ->
+  CandidateId.OfFloating floating ->
     State.modify' $ \gs ->
-      let spent active =
+      let src = FloatingCandidate.source floating
+          ts = FloatingCandidate.timestamp floating
+          spent active =
             ActiveReplacement.source active == src
               && ActiveReplacement.timestamp active == ts
               && ActiveReplacement.uses active == Uses.Once
@@ -1367,9 +1383,11 @@ consume identity_ = case identity_ of
 setShield :: CandidateId -> DamageR.DamageR (Effect.Effect Card) -> Natural -> Game ()
 setShield identity_ damageR left = case identity_ of
   CandidateId.OfPermanent {} -> pure ()
-  CandidateId.OfFloating src ts ->
+  CandidateId.OfFloating floating ->
     State.modify' $ \gs ->
-      let mine active =
+      let src = FloatingCandidate.source floating
+          ts = FloatingCandidate.timestamp floating
+          mine active =
             ActiveReplacement.source active == src
               && ActiveReplacement.timestamp active == ts
           rewrite active

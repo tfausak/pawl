@@ -1,11 +1,7 @@
 module Pawl.Types.CandidateId where
 
-import Numeric.Natural (Natural)
-import qualified Pawl.Types.Card as Card
-import qualified Pawl.Types.Effect as Effect
-import qualified Pawl.Types.ObjectId as ObjectId
-import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
-import qualified Pawl.Types.Timestamp as Timestamp
+import qualified Pawl.Types.FloatingCandidate as FloatingCandidate
+import qualified Pawl.Types.PermanentCandidate as PermanentCandidate
 
 -- | CR 614.5's identity: what counts as ONE replacement effect for the rule that
 -- an effect gets only one opportunity to affect an event. Without it Hardened
@@ -31,6 +27,6 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- timestamp counter is monotone, so two Fogs are two instances even from one
 -- source object.
 data CandidateId
-  = OfPermanent ObjectId.ObjectId (ReplacementEffect.ReplacementEffect (Effect.Effect Card.Card)) Natural
-  | OfFloating ObjectId.ObjectId Timestamp.Timestamp
+  = OfPermanent PermanentCandidate.PermanentCandidate
+  | OfFloating FloatingCandidate.FloatingCandidate
   deriving (Eq, Ord, Show)

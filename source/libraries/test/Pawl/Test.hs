@@ -45,6 +45,7 @@ import qualified Pawl.Codec.BlockPermissionSpec
 import qualified Pawl.Codec.BlockRequirementSpec
 import qualified Pawl.Codec.BlockerDeclaredSpec
 import qualified Pawl.Codec.BlocksDeclaredSpec
+import qualified Pawl.Codec.CandidateIdSpec
 import qualified Pawl.Codec.CantBeBlockedBySpec
 import qualified Pawl.Codec.CantBeRegeneratedSpec
 import qualified Pawl.Codec.CardNameSpec
@@ -142,6 +143,7 @@ import qualified Pawl.Codec.FaceSpec
 import qualified Pawl.Codec.FacingSpec
 import qualified Pawl.Codec.FightSpec
 import qualified Pawl.Codec.FilterSpec
+import qualified Pawl.Codec.FloatingCandidateSpec
 import qualified Pawl.Codec.ForEachSpec
 import qualified Pawl.Codec.GameEventSpec
 import qualified Pawl.Codec.GrantPlayFromExileSpec
@@ -153,6 +155,7 @@ import qualified Pawl.Codec.HandActionSpec
 import qualified Pawl.Codec.HybridSpec
 import qualified Pawl.Codec.InZoneSpec
 import qualified Pawl.Codec.IncreaseSpellCostSpec
+import qualified Pawl.Codec.InstanceOrdinalSpec
 import qualified Pawl.Codec.KeywordFamilySpec
 import qualified Pawl.Codec.KeywordSpec
 import qualified Pawl.Codec.LayoutSpec
@@ -197,6 +200,7 @@ import qualified Pawl.Codec.PayBranchSpec
 import qualified Pawl.Codec.PayGateSpec
 import qualified Pawl.Codec.PayObligationSpec
 import qualified Pawl.Codec.PermanentBecomesDesignatedSpec
+import qualified Pawl.Codec.PermanentCandidateSpec
 import qualified Pawl.Codec.PermanentSacrificedSpec
 import qualified Pawl.Codec.PhasePatternSpec
 import qualified Pawl.Codec.PhaseSelectorSpec
@@ -275,6 +279,7 @@ import qualified Pawl.Codec.TapPermanentsSpec
 import qualified Pawl.Codec.TapStateSpec
 import qualified Pawl.Codec.TargetCountSpec
 import qualified Pawl.Codec.TargetSlotSpec
+import qualified Pawl.Codec.TimestampSpec
 import qualified Pawl.Codec.TokenPatternSpec
 import qualified Pawl.Codec.TokenRSpec
 import qualified Pawl.Codec.TopOfLibrarySpec
@@ -494,6 +499,7 @@ spec s registry = do
   Pawl.Codec.BlockRequirementSpec.spec s
   Pawl.Codec.BlockerDeclaredSpec.spec s
   Pawl.Codec.BlocksDeclaredSpec.spec s
+  Pawl.Codec.CandidateIdSpec.spec s
   Pawl.Codec.CantBeBlockedBySpec.spec s
   Pawl.Codec.CardNameSpec.spec s
   Pawl.Codec.CardSpec.spec s
@@ -589,6 +595,7 @@ spec s registry = do
   Pawl.Codec.FacingSpec.spec s
   Pawl.Codec.FightSpec.spec s
   Pawl.Codec.FilterSpec.spec s
+  Pawl.Codec.FloatingCandidateSpec.spec s
   Pawl.Codec.ForEachSpec.spec s
   Pawl.Codec.GameEventSpec.spec s
   Pawl.Codec.GrantPlayFromExileSpec.spec s
@@ -600,6 +607,7 @@ spec s registry = do
   Pawl.Codec.HybridSpec.spec s
   Pawl.Codec.InZoneSpec.spec s
   Pawl.Codec.IncreaseSpellCostSpec.spec s
+  Pawl.Codec.InstanceOrdinalSpec.spec s
   Pawl.Codec.KeywordFamilySpec.spec s
   Pawl.Codec.KeywordSpec.spec s
   Pawl.Codec.LayoutSpec.spec s
@@ -644,6 +652,7 @@ spec s registry = do
   Pawl.Codec.PayGateSpec.spec s
   Pawl.Codec.PayObligationSpec.spec s
   Pawl.Codec.PermanentBecomesDesignatedSpec.spec s
+  Pawl.Codec.PermanentCandidateSpec.spec s
   Pawl.Codec.PermanentSacrificedSpec.spec s
   Pawl.Codec.PhasePatternSpec.spec s
   Pawl.Codec.PhaseSelectorSpec.spec s
@@ -724,6 +733,7 @@ spec s registry = do
   Pawl.Codec.TapStateSpec.spec s
   Pawl.Codec.TargetCountSpec.spec s
   Pawl.Codec.TargetSlotSpec.spec s
+  Pawl.Codec.TimestampSpec.spec s
   Pawl.Codec.TokenPatternSpec.spec s
   Pawl.Codec.TokenRSpec.spec s
   Pawl.Codec.TopOfLibrarySpec.spec s
