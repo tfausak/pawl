@@ -72,6 +72,7 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaOption as ManaOption
@@ -325,7 +326,10 @@ selfReductions pid oid gs =
 -- Not reached by a MANA ability's cost, which pays through manaActivations --
 -- unobservably, every mana ability in `data/cards/` having an empty mana part
 -- for a reduction to take from (#1120).
-activationAdjustments :: PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
+--
+-- The KeywordFamily is the ability's PROVENANCE, threaded from the caller that
+-- has the ability in hand; see activationCostAdjustments for what it narrows.
+activationAdjustments :: Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
 activationAdjustments = PlayerEffect.activationCostAdjustments
 
 -- Every way CR 118.7e's choice could resolve the reductions that apply --

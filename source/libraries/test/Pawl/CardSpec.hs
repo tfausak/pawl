@@ -3016,8 +3016,10 @@ playerEffectFilters playerEffect = case playerEffect of
   PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f _) -> [f]
   PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost f _ _) -> [f]
   -- CR 601.2f's other moment: Heartstone's Filter narrows the ability's SOURCE
-  -- PERMANENT rather than a spell, and is authored the same way.
-  PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f _ _) -> [f]
+  -- PERMANENT rather than a spell, and is authored the same way. The grantedBy
+  -- beside it is not returned: a KeywordFamily is not a Filter, so the lints this
+  -- list feeds have nothing to say about it.
+  PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f _ _ _) -> [f]
   -- CR 601.2f's addition carries a Filter in two places: its own criterion
   -- ("nontoken Rebels"), and one inside each component it adds ("sacrifice a
   -- land"). Both are authored by the card, so both are linted, and the inner
