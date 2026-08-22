@@ -3962,7 +3962,7 @@ randomOpponentSpec s registry = Spec.describe s "RandomOpponent" $ do
           (fmap ActiveAttackRequirement.attacker (GameState.attackRequirements atCarol))
           [ruhanId]
       _ -> Spec.assertFailure s "fixture should have one Ruhan"
-  Spec.it s "CR 104.3a the offer is alice's opponents and never alice herself" $ do
+  Spec.it s "CR 104.3a the offer is the opponents still in the game, and never the controller" $ do
     ruhan <- S.printingOf s registry "Ruhan of the Fomori"
     let (board, _, _, _) = S.threePlayerCombat [ruhan] [] []
         logging :: Prompt.Prompt r -> State.State [[PlayerId.PlayerId]] r
