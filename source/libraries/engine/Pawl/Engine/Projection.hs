@@ -165,6 +165,7 @@ widenModification :: Modification.Modification Void.Void -> Modification
 widenModification m = case m of
   Modification.GainAbility a -> Void.absurd a
   Modification.GainKeyword k -> Modification.GainKeyword k
+  Modification.GainEnchant x -> Modification.GainEnchant x
   Modification.LoseAllAbilities -> Modification.LoseAllAbilities
   Modification.SetBasePowerToughness x -> Modification.SetBasePowerToughness x
   Modification.ModifyPowerToughness x -> Modification.ModifyPowerToughness x
@@ -192,6 +193,11 @@ widenModification m = case m of
 layer :: Modification -> Layer
 layer m = case m of
   Modification.GainKeyword _ -> Layer.Ability
+  -- CR 613.1f, not layer 4: CR 702.5a makes enchant a static ABILITY, so
+  -- granting one is an ability-adding effect however much the clause it comes
+  -- from ("becomes an Aura enchantment with enchant creature") also changes
+  -- types.
+  Modification.GainEnchant _ -> Layer.Ability
   Modification.GainAbility _ -> Layer.Ability
   Modification.LoseAllAbilities -> Layer.Ability
   Modification.SetBasePowerToughness {} -> Layer.SetPT
@@ -233,6 +239,13 @@ applyModification viewOf src gs oid m pc =
         -- keyword count twice.
         Modification.GainKeyword k ->
           pc {PC.keywords = Map.insertWith (+) k 1 (PC.keywords pc)}
+        -- CR 613.1f layer 6 / CR 702.5c: an APPEND, since "if an Aura has
+        -- multiple instances of enchant, all of them apply" -- the printed
+        -- instances are in the seed and this adds to them, so
+        -- Pawl.Engine.Card.foldEnchant conjoins the two exactly as it conjoins two
+        -- printed ones.
+        Modification.GainEnchant slot ->
+          pc {PC.enchant = PC.enchant pc <> [slot]}
         -- CR 613.1f layer 6: one whole quoted ability. Appended to the card's own
         -- printed abilities, which is what makes it the RECEIVER's (CR 113.7, CR
         -- 602.2, CR 603.3a, CR 303.4e) and lets two grants stack in CR 613.7
@@ -251,7 +264,12 @@ applyModification viewOf src gs oid m pc =
               PC.characteristicPT = Nothing,
               PC.activatedAbilities = [],
               PC.replacementEffects = [],
-              PC.triggeredAbilities = []
+              PC.triggeredAbilities = [],
+              -- CR 702.5a makes enchant an ability, so CR 613.1f's removal takes
+              -- it with the rest. Unproven: Humility reaches only creatures and
+              -- nothing in the pool wipes a noncreature permanent's abilities, so
+              -- dropping this line leaves the suite green.
+              PC.enchant = []
             }
         Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) ->
           pc
@@ -435,7 +453,11 @@ setLandSubtypeTo s pc
           PC.characteristicPT = Nothing,
           PC.activatedAbilities = [],
           PC.replacementEffects = [],
-          PC.triggeredAbilities = []
+          PC.triggeredAbilities = [],
+          -- CR 305.7's strip reaches an enchant ability for CR 613.1f's reason
+          -- above. Unproven for the same reason: no board in the pool sets the
+          -- land subtype of a permanent that has one.
+          PC.enchant = []
         }
 
 -- CR 613.4b: layer 7b establishes base P/T, so an object with no printed P/T
@@ -957,6 +979,7 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
         PC.activatedAbilities = [],
         PC.replacementEffects = [],
         PC.triggeredAbilities = [],
+        PC.enchant = [],
         PC.subtypeWordChanges = []
       }
   Just face ->
@@ -1005,6 +1028,13 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
             PC.activatedAbilities = Face.activatedAbilities face,
             PC.replacementEffects = Face.replacementEffects face,
             PC.triggeredAbilities = Face.triggeredAbilities face,
+            -- CR 702.5a's printed instances. In the SEED rather than folded in
+            -- later, so they ride copiableCharacteristics: CR 707.2 names rules
+            -- text among the copiable values, and a granted instance is not
+            -- copiable precisely because applyModification writes it after the
+            -- seed. Read off `face`, so CR 708.2a's face-down substitution leaves
+            -- a face-down permanent with none.
+            PC.enchant = Face.enchant face,
             -- The seed is CR 613.1's starting point, before layer 3 has run.
             PC.subtypeWordChanges = []
           }
@@ -1122,6 +1152,7 @@ freezeQuantities gs announcedOn source you m =
         Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> fmap Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness <$> freeze p <*> freeze t)
         -- No quantity to freeze; named explicitly per the exhaustiveness discipline.
         Modification.GainKeyword _ -> Just m
+        Modification.GainEnchant _ -> Just m
         -- The granted ability's own quantities are NOT frozen: CR 611.2d fixes a
         -- variable in this effect, not in a quoted ability's own future one.
         Modification.GainAbility _ -> Just m
@@ -1152,6 +1183,10 @@ quantitiesOf m = case m of
   Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> [p, t]
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> [p, t]
   Modification.GainKeyword _ -> []
+  -- A target slot's Filter can nest a Count, but a Filter's quantities are read
+  -- where the Filter is matched rather than frozen here -- the answer GainKeyword
+  -- gives above, whose keyword can nest one too.
+  Modification.GainEnchant _ -> []
   -- The layer fold evaluates nothing inside a quoted ability.
   Modification.GainAbility _ -> []
   Modification.LoseAllAbilities -> []
@@ -1189,6 +1224,7 @@ setsLandSubtype m = case m of
   -- An ability grant is layer 6 and sets no subtype at all.
   Modification.GainAbility _ -> False
   Modification.GainKeyword _ -> False
+  Modification.GainEnchant _ -> False
   -- A control op, not a type change.
   Modification.SetController _ -> False
   Modification.SetControllerToSource -> False
@@ -1427,6 +1463,10 @@ rewriteModificationWith rewriteAbility pairs m =
         -- is CR 612.3. Filter.rewriteKeyword since the word is inside a Filter; no
         -- family gate is restated there -- the word's use is its family.
         Modification.GainKeyword k -> Modification.GainKeyword (Filter.rewriteKeyword [(from, to)] k)
+        -- CR 612.1 through the granted enchant's own Filter, which is text
+        -- printed on the GRANTER (CR 612.3) exactly as the keyword above is.
+        -- rewriteTargetSlot is the same descent a mode's target slots take.
+        Modification.GainEnchant slot -> Modification.GainEnchant (rewriteTargetSlot [(from, to)] slot)
         -- CR 612.1 over the whole quoted ability: the words are printed on the
         -- GRANTER, so a text change affecting it rewrites them before the grant.
         Modification.GainAbility a -> Modification.GainAbility (rewriteAbility [(from, to)] a)
@@ -2565,6 +2605,9 @@ removesAbilities :: Modification -> Bool
 removesAbilities m = case m of
   Modification.LoseAllAbilities -> True
   Modification.GainKeyword _ -> False
+  -- A grant, the other direction of CR 613.1f, exactly as GainKeyword above and
+  -- GainAbility below.
+  Modification.GainEnchant _ -> False
   -- The other direction of CR 613.1f: a grant is not a removal, so timestamp
   -- order alone decides whether a granted ability survives Humility. Proven
   -- through the FOLD by Pawl.ActivateSpec's "Presence of Gond" pair; this arm's
@@ -2942,9 +2985,9 @@ filterReads f = case f of
 
 -- Which aspects a Modification writes -- the other half of the pair above.
 --
--- Five arms write Keywords: GainKeyword and LoseAllAbilities per CR 613.1f, both
--- subtype-setting arms per CR 305.7, and ChangeSubtypeWord per CR 612.1, a text
--- change reaching the land type inside a landwalk keyword.
+-- The arms that write Keywords: GainKeyword, GainEnchant and LoseAllAbilities per
+-- CR 613.1f, both subtype-setting arms per CR 305.7, and ChangeSubtypeWord per CR
+-- 612.1, a text change reaching the land type inside a landwalk keyword.
 --
 -- ChangeSubtypeWord also rewrites PC.characteristicPT, deliberately not PowerA:
 -- this asks what a modification writes IN ITS OWN LAYER, and the rewritten CDA
@@ -2952,6 +2995,13 @@ filterReads f = case f of
 modificationWrites :: Modification -> Set Aspect
 modificationWrites m = case m of
   Modification.GainKeyword _ -> Set.singleton Keywords
+  -- Writes ProjectedCharacteristics.enchant, which Aspect has no finer grain for
+  -- than Keywords -- CR 702.5a's enchant is an ability, and
+  -- Filter.CanHostSubject, the atom that reads it, declares Keywords. A
+  -- REGRESSION FENCE rather than a proved behaviour: no board in the pool makes
+  -- another effect's affected set depend on a granted enchant, so Set.empty here
+  -- leaves the suite green.
+  Modification.GainEnchant _ -> Set.singleton Keywords
   -- Writes ProjectedCharacteristics.activatedAbilities or .triggeredAbilities,
   -- neither of which any Filter atom reads. LoseAllAbilities declares Keywords
   -- because it also empties the map.
@@ -2994,6 +3044,8 @@ modificationReads m = case m of
   Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> quantityReads p <> quantityReads t
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityReads p <> quantityReads t
   Modification.GainKeyword _ -> Set.empty
+  -- Carries no Quantity of its own; its Filter is read where the slot is matched.
+  Modification.GainEnchant _ -> Set.empty
   -- A quoted ability's quantities are read at ITS resolution.
   Modification.GainAbility _ -> Set.empty
   Modification.LoseAllAbilities -> Set.empty
@@ -3712,6 +3764,9 @@ replacementsAffecting gs =
 grantsKeywordWhere :: (Keyword -> Bool) -> Modification -> Bool
 grantsKeywordWhere p m = case m of
   Modification.GainKeyword k -> p k
+  -- Hands out CR 702.5a's enchant, which is not a Pawl.Types.Keyword at all, so
+  -- there is nothing here for `p` to be asked about.
+  Modification.GainEnchant _ -> False
   -- Hands out an ability but never a KEYWORD, which is all the callers ask about.
   Modification.GainAbility _ -> False
   Modification.LoseAllAbilities -> False
@@ -3757,6 +3812,17 @@ mintedTriggeredAbilitiesOf :: ProjectedCharacteristics -> [TriggeredAbility Card
 mintedTriggeredAbilitiesOf pc =
   let pairs = fmap (\c -> (ChangeSubtypeWord.from c, ChangeSubtypeWord.to c)) (PC.subtypeWordChanges pc)
    in fmap (rewriteTriggeredAbility pairs) (Keyword.triggeredAbilitiesOf (PC.keywords pc))
+
+-- CR 702.5a / 613 layer 6: the object's enchant abilities after the fold --
+-- printed and granted together, which is what Modification.GainEnchant exists to
+-- reach. Folded into CR 702.5c's single slot by Pawl.Engine.Card.foldEnchant at
+-- each reader.
+--
+-- No `enchantGiven` sibling beside it, where subtypesOf and cardTypesOf have one:
+-- the caller that holds a pre-pass is Pawl.Engine.Sba, and it reads PC.enchant out
+-- of that map directly rather than asking for a projection it already has.
+enchantOf :: ObjectId -> GameState -> [TargetSlot.TargetSlot]
+enchantOf oid gs = PC.enchant (project oid gs)
 
 subtypesOf :: ObjectId -> GameState -> Set Subtype.Type.Subtype
 subtypesOf = subtypesGiven Map.empty

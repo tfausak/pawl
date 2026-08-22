@@ -3029,17 +3029,19 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
           --
           -- The Aura test is the PROJECTION's subtypes (CR 205.3 -- CR 303.4 speaks
           -- about characteristics) rather than the printed type line
-          -- Pawl.Engine.Card.isAura reads. Nothing observes the difference in this
-          -- pool: every Aura subtype in data/cards is a printed type line or a
-          -- HasSubtype filter, and no effect grants the subtype.
+          -- Pawl.Engine.Card.isAura reads, and the two now differ: Cloudform GRANTS
+          -- itself the Aura subtype (Modification.AddSubtype) and the enchant
+          -- ability that goes with it (Modification.GainEnchant). Unobserved here
+          -- all the same -- Cloudform grants both while already on the battlefield,
+          -- so no board in this pool has a granted Aura ENTERING one.
           --
           -- `entryFacing` and not the projection is what answers CR 708.2a, and the
           -- distinction matters: the projection sees the object in the zone it is
           -- LEAVING, where an Aura card manifested off a library (CR 701.40a) is
           -- still face up and would trip this gate. A permanent entering face down
           -- has no subtypes and no enchant ability, so it is not an Aura CR 303.4f
-          -- speaks about -- it enters unattached, and Sba.fallsOff, which reads the
-          -- substituted face too, leaves it alone. Pawl.AuraSpec's "a manifested
+          -- speaks about -- it enters unattached, and Sba.fallsOff leaves it alone,
+          -- reading a projection the substituted face seeds. Pawl.AuraSpec's "a manifested
           -- Aura card is not an Aura" is the proof: Soul Summons manifests an Unholy
           -- Strength over two legal hosts, and dropping the conjunct raises a prompt.
           --

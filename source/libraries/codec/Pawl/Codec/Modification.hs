@@ -11,6 +11,7 @@ import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Supertype as Supertype
+import qualified Pawl.Codec.TargetSlot as TargetSlot
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -43,6 +44,7 @@ grantless = Arm.tagged arms
 arms :: (Eq ability) => [Arm.Arm (Modification.Modification ability)]
 arms =
   [ Arm.payload "GainKeyword" Keyword.codec Modification.GainKeyword (\x -> case x of Modification.GainKeyword y -> Just y; _ -> Nothing),
+    Arm.payload "GainEnchant" TargetSlot.codec Modification.GainEnchant (\x -> case x of Modification.GainEnchant y -> Just y; _ -> Nothing),
     Arm.nullary "LoseAllAbilities" Modification.LoseAllAbilities,
     Arm.payload "SetBasePowerToughness" SetBasePowerToughness.codec Modification.SetBasePowerToughness (\x -> case x of Modification.SetBasePowerToughness y -> Just y; _ -> Nothing),
     Arm.payload "ModifyPowerToughness" ModifyPowerToughness.codec Modification.ModifyPowerToughness (\x -> case x of Modification.ModifyPowerToughness y -> Just y; _ -> Nothing),

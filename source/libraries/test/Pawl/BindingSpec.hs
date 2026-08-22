@@ -36,6 +36,7 @@ sampleSnapshot =
       PC.activatedAbilities = [],
       PC.replacementEffects = [],
       PC.triggeredAbilities = [],
+      PC.enchant = [],
       PC.subtypeWordChanges = []
     }
 

@@ -23,10 +23,12 @@ import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.TargetSlot as TargetSlot
 
 -- | The `ability` parameter is instantiated at @GrantedAbility Text@, which is
 -- what every card position holds with `card` in turn instantiated at 'Text.Text'
@@ -43,6 +45,15 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       codec
       (Modification.GainKeyword Keyword.Deathtouch)
       " {\"type\":\"GainKeyword\",\"value\":{\"type\":\"Deathtouch\"}} "
+  -- layer 6, CR 702.5a: the granted enchant ability. The payload is a
+  -- whole TargetSlot, so this arm's wire form is the one Face.enchant's entries
+  -- already take.
+  Spec.it s "GainEnchant" $
+    Common.assertCodec
+      s
+      codec
+      (Modification.GainEnchant (TargetSlot.required Pool.Creatures Nothing))
+      " {\"type\":\"GainEnchant\",\"value\":{\"pool\":{\"type\":\"Creatures\"}}} "
   -- layer 6 (Humility).
   Spec.it s "LoseAllAbilities" $
     Common.assertCodec

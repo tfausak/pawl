@@ -65,6 +65,7 @@ import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
@@ -811,6 +812,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   replenishSpec s registry
   attachRestrictionSpec s registry
   couldEnchantSpec s registry
+  grantedEnchantSpec s registry
 
 -- Both of Convincing Mirage's prompts at once: its CR 303.4a enchant slot
 -- (Pool.Permanents narrowed to lands, so the recipient is tagged ToObject) and
@@ -2075,3 +2077,133 @@ couldEnchantSpec s registry = Spec.describe s "CouldEnchant" $ do
     -- CR 701.23b: a search stating a quality may find fewer, so the rejected Aura
     -- stayed where it was rather than being found and refused at the move.
     Spec.assertEqWith s "and the Aura it rejected is still in the library" (S.countByName consecrateName S.alice after) 1
+
+-- CR 613.1f / 702.5a: an enchant ability that arrives from an EFFECT rather than
+-- from a printing (Modification.GainEnchant), which is what a "becomes an Aura
+-- with enchant creature" clause needs. The two jobs CR 702.5a gives that ability
+-- are split across the two cases below: what the permanent may be ATTACHED to
+-- (Pawl.Engine.Attach.attachmentFor) and CR 303.4c's state-based re-check of
+-- whether it still is (Pawl.Engine.Sba.fallsOff).
+--
+-- Cloudform is the producer, and the whole card: the grant, CR 701.40a's manifest,
+-- the CR 701.3a attach onto the object its own move produced, and the CR 303.4m
+-- static ability riding that attachment. Its two siblings Lightform and Rageform
+-- are the same card with a different keyword pair.
+--
+-- What the rest of the pool needs BESIDES this arm, from Scryfall o:"with enchant"
+-- and o:"becomes an Aura", 2026-08-22: the twelve Licids need single-named-ability
+-- removal (only Modification.LoseAllAbilities exists) and a Duration that ends
+-- when a player pays a cost; Bronzehide Lion, Old-Growth Troll and Harold and Bob,
+-- First Numens choose their host AS THEY RETURN (#2099); Necromancy's enchant
+-- filter names the Aura that put the creature onto the battlefield; and Last
+-- Voyage of the _____ is an un-set card.
+grantedEnchantSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+grantedEnchantSpec s registry = Spec.describe s "GrantedEnchant" $ do
+  -- One resolution, four effects: CR 205.1b's Aura subtype, CR 702.5a's enchant
+  -- ability, CR 701.40a's manifest, and CR 701.3a's attach onto what the manifest
+  -- just produced. Cloudform is already an Enchantment, so no card type moves --
+  -- what it lacks is the SUBTYPE and the ability, which is exactly the pair this
+  -- unit's arm and #2078's supply.
+  --
+  -- CR 704.3 never runs between the effects of one resolution, so the moment
+  -- Cloudform is an unattached Aura is not a moment CR 704.5m sees.
+  Spec.it s "CR 702.5a whole card: Cloudform becomes an Aura with a granted enchant ability and attaches to what it manifests" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    cloudform <- S.printingOf s registry "Cloudform"
+    case cloudformBoard island piker cloudform of
+      Nothing -> Spec.assertFailure s "Cloudform and the card it manifests should both be on the battlefield"
+      Just (cloud, manifested, after) -> do
+        -- FIRST, and the gameplay-level pair: the manifested permanent has the two
+        -- keywords Cloudform's CR 303.4m static ability grants, neither of which a
+        -- face-down permanent has any way to get on its own (CR 708.2a leaves it a
+        -- 2/2 with no abilities). So this reads through the attachment.
+        Spec.assertBool s (Projection.hasKeyword Keyword.Flying manifested after) "CR 303.4m: the manifested creature has flying"
+        Spec.assertBool s (Projection.hasKeyword (Keyword.Hexproof Nothing) manifested after) "and hexproof"
+        -- Then the attachment itself. A lookup on CLOUDFORM rather than a scan for
+        -- what the manifested creature wears: a refused attach leaves an unattached
+        -- Aura that CR 704.5m bins, and a scan would then compare two empty answers.
+        Spec.assertEqWith
+          s
+          "and Cloudform is attached to it"
+          (fmap Object.attachedTo (Game.lookupObject cloud after))
+          (Just (Just (Recipient.ToCreature manifested)))
+        -- CR 701.40a: what the move put onto the battlefield is a 2/2 creature,
+        -- which is also why "enchant creature" admits it at all.
+        Spec.assertEqWith s "CR 701.40a: the manifested card is a 2/2 creature" (S.powerToughnessOf manifested after) (Just (2, 2))
+        -- The two layer reads the attach went through, after the behaviour rather
+        -- than before, so neither absorbs a mutation to it.
+        Spec.assertBool s (Set.member Subtype.Aura (Projection.subtypesOf cloud after)) "CR 205.1b: Cloudform gained the Aura subtype"
+        Spec.assertEqWith
+          s
+          "CR 702.5a: the projected enchant ability is the granted 'enchant creature'"
+          (Card.foldEnchant (Projection.enchantOf cloud after))
+          (Just (TargetSlot.required Pool.Creatures Nothing))
+        Spec.assertBool s (Set.member cloud (GameState.battlefield after)) "and CR 704.5m leaves Cloudform alone: its host is one its enchant ability admits"
+  -- CR 704.5m through a GRANTED enchant ability, which is the clause
+  -- Pawl.Engine.Sba.fallsOff could not see while it read the printed face:
+  -- Cloudform's card declares no enchant at all, so a printed-face read answers
+  -- Nothing and leaves it on the battlefield attached to an id that is no longer
+  -- a permanent.
+  --
+  -- The pair differs in exactly one thing -- the lethal damage marked on the
+  -- manifested creature -- and the quantity asserted is the SIZE of alice's
+  -- graveyard: two under the projected read (the manifested card and Cloudform),
+  -- one under the printed-face read. CR 704.5n needs an Equipment and CR 704.5p
+  -- sees an Aura that is not a creature, so neither of the other two attachment
+  -- state-based actions absorbs the difference.
+  --
+  -- Two passes, per CR 704.3: the pass that buries the creature judged Cloudform
+  -- against a state the creature was still on.
+  Spec.it s "CR 704.5m: Cloudform is buried with the creature its granted enchant ability let it hold" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    cloudform <- S.printingOf s registry "Cloudform"
+    case cloudformBoard island piker cloudform of
+      Nothing -> Spec.assertFailure s "Cloudform and the card it manifests should both be on the battlefield"
+      Just (cloud, manifested, attached) -> do
+        -- A manifested permanent is a 2/2 whatever it prints (CR 701.40a), so two
+        -- damage is lethal (CR 704.5g).
+        let pass1 = S.settleSba (S.markDamage manifested 2 attached)
+            pass2 = S.settleSba pass1
+            control = S.settleSba attached
+        -- The control FIRST, so the assertions below cannot pass because Cloudform
+        -- was never on the battlefield.
+        Spec.assertBool s (Set.member cloud (GameState.battlefield control)) "control: with its host alive Cloudform is still there"
+        Spec.assertEqWith s "and alice's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice control)) 0
+        -- THE discriminating assertion: two cards, not one.
+        Spec.assertEqWith s "alice's graveyard holds the host AND the Aura that was on it" (length (Game.zoneMembers Zone.Graveyard S.alice pass2)) 2
+        Spec.assertBool s (not (Set.member cloud (GameState.battlefield pass2))) "so Cloudform is off the battlefield"
+        Spec.assertEqWith s "the host died on the first pass" (Game.lookupObject manifested pass1) Nothing
+        Spec.assertBool s (Set.member cloud (GameState.battlefield pass1)) "and CR 704.3 kept Cloudform through that pass, since it judged a board the host was still on"
+
+-- The board grantedEnchantSpec's two cases share: alice casts Cloudform off three
+-- Islands with one card in her library for it to manifest, and its CR 603.2 enters
+-- trigger resolves. No answerer beyond the identity one: the card names no target
+-- and CR 701.40a's manifest is not a choice, so there is no prompt to pin.
+--
+-- Nothing is added to the battlefield by hand, which is what lets the manifested
+-- permanent be found WITHOUT reading the attachment that is under test: it is the
+-- one nonland battlefield object that is not Cloudform.
+cloudformBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Maybe (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+cloudformBoard island piker cloudform =
+  let base0 = S.landsInPlay island 3
+      (_, base1) = S.addLibraryCard piker S.alice base0
+      (gs, spellId) = S.handOne cloudform base1
+      cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
+      entered = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+      -- CR 704.3: the enters trigger waits until a player would get priority,
+      -- which resolveTop alone never reaches.
+      placed = snd (Engine.runGamePure S.identityAnswer entered Engine.placePendingTriggers)
+      after = snd (Engine.runGamePure S.identityAnswer placed Stack.resolveTop)
+      nonLand oid = not (Set.member CardType.Land (Projection.cardTypesOf oid after))
+   in case battlefieldNamed (S.nameOf (Printing.card cloudform)) after of
+        Nothing -> Nothing
+        Just cloud ->
+          fmap
+            (\manifested -> (cloud, manifested, after))
+            (List.find (\oid -> oid /= cloud && nonLand oid) (Game.zoneMembers Zone.Battlefield S.alice after))

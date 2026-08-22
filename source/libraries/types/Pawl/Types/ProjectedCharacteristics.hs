@@ -17,6 +17,7 @@ import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 
 -- | The characteristics of an object after the layer fold (design.md §2.5). Maybe
@@ -133,6 +134,22 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- 603.2's scan reads this field, so a granted trigger fires without
     -- Pawl.Engine.Event learning that it was granted.
     triggeredAbilities :: [TriggeredAbility.TriggeredAbility Card.Card],
+    -- | CR 702.5a / 613 layer 6: this object's enchant abilities after the layer
+    -- system -- what restricts an Aura spell's target and what the Aura can
+    -- enchant. Seeded from Face.enchant and added to by CR 613.1f's grant
+    -- (Modification.GainEnchant, the Licid clause), emptied by LoseAllAbilities
+    -- and by CR 305.7's strip, exactly as the three ability lists above are.
+    --
+    -- A LIST and not a folded Maybe TargetSlot, because CR 702.5c's conjunction
+    -- is a question a reader asks rather than a value the fold maintains: the
+    -- printed field Pawl.Types.Face.enchant is a list for that reason, and
+    -- Pawl.Engine.Card.foldEnchant is the one place both are folded, so a printed
+    -- instance and a granted one cannot be conjoined by different rules.
+    --
+    -- The seed's instances are copiable (CR 707.2 names rules text) and a
+    -- GRANTED one is not, which falls out of where each is written rather than
+    -- being enforced here -- the posture activatedAbilities takes.
+    enchant :: [TargetSlot.TargetSlot],
     -- | CR 612.1 layer 3: the subtype word swaps applied to this object, in the
     -- order they were applied. A RECORD of what layer 3 did, where every field
     -- above is the RESULT of it -- kept because rule 702's abilities are minted

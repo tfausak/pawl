@@ -12,9 +12,11 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.TargetSlot as TargetSlot
 
 -- | `name` and `cardTypes` are the only required keys; every other field is
 -- omitted when it is at its default. One populated fixture, with every
@@ -47,6 +49,7 @@ testCharacteristics =
       PC.activatedAbilities = [],
       PC.replacementEffects = [],
       PC.triggeredAbilities = [FaceSpec.minimalTriggeredAbility],
+      PC.enchant = [TargetSlot.required Pool.Creatures Nothing],
       PC.subtypeWordChanges = [ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Spirit Subtype.Elf]
     }
 
@@ -57,6 +60,7 @@ testCharacteristicsJson =
     <> "\"cardTypes\":[{\"type\":\"Creature\"}],\"subtypes\":[{\"type\":\"Human\"}],"
     <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
     <> "\"modal\":{\"modes\":[{}]}}],"
+    <> "\"enchant\":[{\"pool\":{\"type\":\"Creatures\"}}],"
     <> "\"subtypeWordChanges\":[{\"from\":{\"type\":\"Spirit\"},\"to\":{\"type\":\"Elf\"}}]}"
 
 -- | Every field but the two required ones at its default.
@@ -78,6 +82,7 @@ minimalCharacteristics =
       PC.activatedAbilities = [],
       PC.replacementEffects = [],
       PC.triggeredAbilities = [],
+      PC.enchant = [],
       PC.subtypeWordChanges = []
     }
 

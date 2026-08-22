@@ -579,6 +579,11 @@ durationCounts duration = case duration of
 modificationCounts :: Projection.Modification -> [Count.Type.Count Quantity.Type.Quantity]
 modificationCounts modification = case modification of
   Modification.GainKeyword _ -> []
+  -- CR 702.5a's granted enchant carries a TargetSlot, whose Filter can nest a
+  -- Count -- but a Filter's Counts are reached through modificationFilters below
+  -- and countFilters, never through this sweep, which is the answer GainKeyword
+  -- gives above for the Filter inside its keyword.
+  Modification.GainEnchant _ -> []
   -- CR 613.1f's other grant carries a whole ability, so the sweep descends into
   -- it exactly as it does into a printed one, whichever of CR 113.3's kinds it is.
   Modification.GainAbility granted -> case granted of
@@ -2861,6 +2866,11 @@ durationFilters = countFilters . durationCounts
 modificationFilters :: Projection.Modification -> [Filter.Type.Filter Keyword.Keyword]
 modificationFilters modification = case modification of
   Modification.GainKeyword keyword -> keywordFilters keyword
+  -- CR 702.5a again: the granted slot's own Filter, which is card text like any
+  -- other and has to be swept. NOT [] -- of the arms that answer with something,
+  -- this and GainKeyword above are the two, and every arm below carries no Filter
+  -- at all.
+  Modification.GainEnchant slot -> targetSlotFilters slot
   -- Nothing HERE, and that is not a hole: a granted ability's Filters are swept
   -- by grantedActivatedAbilities and grantedTriggeredAbilities below, at the
   -- outer level, so they keep the Framing that a printed ability's do. Answering
@@ -5513,8 +5523,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
     -- Guards against a vacuous sweep: with no face-down entry in the pool at all
-    -- this would pass whatever a card said. Soul Summons is the card that
-    -- prints one.
+    -- this would pass whatever a card said. Soul Summons and Cloudform are the
+    -- cards that print one.
     Spec.assertBool s (any (anyFace (any manifests . cardResolutionEffects) . Printing.card) ps) "the pool has a card putting a permanent onto the battlefield face down"
     Spec.assertEqWith s "only the battlefield takes a face-down entry (CR 708.3)" (fmap (S.nameOf . Printing.card) offenders) []
   -- What Pawl.Engine.Replacement.applies rests on when it gates a WithCounters
