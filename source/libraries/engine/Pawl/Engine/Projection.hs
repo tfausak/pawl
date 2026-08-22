@@ -860,6 +860,13 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- permanent front face up being untransformed however it got there. The
       -- second exclusion holds today because no object is represented by more
       -- than one card; see #369.
+      --
+      -- The battlefield conjunct is a REGRESSION FENCE rather than a proved
+      -- behaviour: every Count that reaches the atom is already scoped to a
+      -- zone, so dropping it leaves the suite green. It is CR 701.27g's own
+      -- wording, and the object it excludes -- a double-faced spell on the stack
+      -- with its back face up (CR 712.11a) -- is reachable, so the conjunct
+      -- stays.
       Filter.transformed = Set.member oid (GameState.battlefield gs) && not (Game.isFrontFaceUp oid gs),
       Filter.counters = counters,
       -- CR 701.54b: a designation rather than a characteristic. Nothing for an id

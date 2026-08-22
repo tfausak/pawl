@@ -9,7 +9,12 @@
 -- face by a different road: Pawl.Types.EntryRiders carries it and
 -- Pawl.Engine.Event.changeZoneEntering applies it. See enterTransformedSpec.
 --
--- Every case but that group runs against the printed Thraben Gargoyle //
+-- Also CR 701.27g's "transformed permanent", the phrase a CARD asks rather than
+-- the engine: Pawl.Types.Filter's Transformed atom, filled by
+-- Pawl.Engine.Projection.viewOfCharacteristics. See transformedPermanentSpec,
+-- whose fixture is Tovolar and Mutagen Connoisseur rather than the Gargoyle.
+--
+-- Every case but those two groups runs against the printed Thraben Gargoyle //
 -- Stonewing Antagonizer, a nonmodal double-faced card (CR 712.2) whose front
 -- face is a {1} 2/2 Artifact Creature -- Gargoyle with defender and "{6}:
 -- Transform this creature", and whose back face is a 4/2 Artifact Creature --
@@ -298,7 +303,8 @@ spec s registry = Spec.describe s "Transform" $ do
   -- double-faced card: a second transform turns the permanent back. Nothing
   -- remembers that it was ever the Gargoyle -- CR 701.27g is explicit that a
   -- permanent with its front face up is never a transformed permanent "even if
-  -- it had its back face up previously".
+  -- it had its back face up previously" -- which transformedPermanentSpec below
+  -- proves through a card that asks the question.
   --
   -- It takes an outside effect, because Stonewing Antagonizer prints no ability
   -- at all: the case above proves the {6} is gone with the front face.
