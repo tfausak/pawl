@@ -524,6 +524,21 @@ turnFaceOver now gs oid objects
         Just name -> Map.insert oid object {Object.face = Just name, Object.turnedOverAt = Just now} objects
       _ -> objects
 
+-- CR 701.27a over a swept set, from the other side: which of these ids ACTUALLY
+-- turned over. `turnFaceOver` above declines four ways -- an id naming nothing on
+-- the battlefield, no card behind it, CR 701.27c's card that is not double-faced,
+-- CR 701.27d's instant or sorcery face -- and Pawl.Engine.Resolve's `turnOver`
+-- adds CR 701.27f and CR 702.145b on top. A turn that did not happen is not an
+-- event, so both roads read the answer here rather than each keeping its own
+-- list, and neither can come to disagree with the write about what turned.
+--
+-- Object.face is the whole comparison because it is the whole write; an id absent
+-- from both maps compares equal and so is not reported.
+facesTurned :: Map.Map ObjectId Object -> Map.Map ObjectId Object -> [ObjectId] -> [ObjectId]
+facesTurned before after = filter (\oid -> faceIn before oid /= faceIn after oid)
+  where
+    faceIn objects oid = Map.lookup oid objects >>= Object.face
+
 -- CR 712.11: is this object showing the FRONT face of its card? The question CR
 -- 702.145c asks of a daybound permanent, CR 702.145f asks (inverted) of a
 -- nightbound one, and CR 701.27g asks (inverted, beside a battlefield conjunct)
@@ -684,6 +699,7 @@ castOf event = case event of
   GameEvent.SpellCast cast -> Just cast
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
   GameEvent.Mentored {} -> Nothing
@@ -744,6 +760,7 @@ discardOf event = case event of
   GameEvent.SpellCast {} -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
   GameEvent.Mentored {} -> Nothing
@@ -801,6 +818,7 @@ enteredBattlefield event = case event of
   GameEvent.SpellCast {} -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
   GameEvent.Mentored {} -> Nothing
@@ -879,6 +897,7 @@ damagedPlayer event = case event of
   GameEvent.SpellCast {} -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
   GameEvent.Mentored {} -> Nothing

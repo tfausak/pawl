@@ -4549,7 +4549,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- CR 731.1: the GAME gains the designation; what that entails is
   -- Pawl.Engine.Daytime's. Nobody is named and nothing is prompted.
   Effect.ItBecomes designation -> do
-    _ <- Daytime.becomes designation
+    _ <- Daytime.becomes Event.recordTransformed designation
     pure ()
   -- CR 701.3a / 702.6a: the SOURCE moves, relocating it if it is already
   -- attached elsewhere; AttachTarget below moves the slot's TARGET instead.
@@ -4910,17 +4910,27 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- which withholds a turn from a permanent that is not double-faced (CR
       -- 701.27c) or whose other face is an instant or sorcery (CR 701.27d).
       --
-      -- CR 701.27b: turning over is its own game action, and a card that triggers
-      -- ON it needs a trigger condition pawl does not have (#695). ONE fresh
-      -- timestamp for the whole instruction (CR 701.27f), minted even when nothing
-      -- turns over, and ONE whole-board projection, CR 702.145b's restriction
-      -- being read off the layer fold.
+      -- CR 701.27b: turning over is its own game action, so it records its own
+      -- event -- Event.recordTransformed, over the victims that ACTUALLY turned
+      -- rather than the ones this instruction named, since the four ways a turn
+      -- is withheld leave nothing for CR 603.2 to fire on.
+      --
+      -- AFTER the fold, and the order is load-bearing: Pawl.Engine.Card gives a
+      -- transforming permanent only the SHOWN face's abilities, so a trigger
+      -- printed on the face just turned to is among recordEvent's candidates only
+      -- because the write has already happened. Pawl.TransformSpec's CR 701.27e
+      -- group is what proves it.
+      --
+      -- ONE fresh timestamp for the whole instruction (CR 701.27f), minted even
+      -- when nothing turns over, and ONE whole-board projection, CR 702.145b's
+      -- restriction being read off the layer fold.
       let (now, g1) = Game.freshTimestamp gs
           pcs = Projection.projectAll g1
-       in g1
-            { GameState.objects =
-                foldr (turnOver pcs resolving now g1) (GameState.objects g1) (objectRefObjects legal resolving controller source g1 ref)
-            }
+          victims = objectRefObjects legal resolving controller source g1 ref
+          turned = foldr (turnOver pcs resolving now g1) (GameState.objects g1) victims
+       in Event.recordTransformed
+            (Game.facesTurned (GameState.objects g1) turned victims)
+            g1 {GameState.objects = turned}
   Effect.PhaseOut ref ->
     State.modify' $ \gs ->
       -- CR 702.26b: each named permanent phases out; the victims are enumerated

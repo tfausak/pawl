@@ -146,14 +146,27 @@ dueToTurn gs = case GameState.daytime gs of
 -- `turnOver`, which this does not go through. Pawl.DaytimeSpec's
 -- restrictionSpec proves the pair -- a spell's transform is refused, the sweep's
 -- is not.
-turnDue :: Game Bool
-turnDue = do
+--
+-- CR 701.27a's event is recorded through the `record` argument rather than
+-- inline, and the argument is there because of the module graph rather than
+-- because two callers want two answers: Pawl.Engine.Event owns recordEvent and
+-- imports THIS module, so the one caller passes Event.recordTransformed down.
+-- Every road this module has to a turn takes it, so the CR 702.145c/f sweep is
+-- not a second, silent way to turn a permanent over.
+--
+-- A REGRESSION FENCE rather than a proved behaviour: no daybound or nightbound
+-- card in data/cards prints a "transforms into" trigger, so removing the record
+-- from this road leaves the suite green. Wildsong Howler would observe it
+-- (#2051).
+turnDue :: ([ObjectId] -> GameState -> GameState) -> Game Bool
+turnDue record = do
   gs <- State.get
   case dueToTurn gs of
     [] -> pure False
     due -> do
       let (now, g1) = Game.freshTimestamp gs
-      State.put g1 {GameState.objects = foldr (Game.turnFaceOver now g1) (GameState.objects g1) due}
+          turned = foldr (Game.turnFaceOver now g1) (GameState.objects g1) due
+      State.put (record (Game.facesTurned (GameState.objects g1) turned due) g1 {GameState.objects = turned})
       pure True
 
 -- | CR 731.1: "it becomes day" / "it becomes night" -- the game gains that
@@ -171,14 +184,14 @@ turnDue = do
 -- 702.145f both say it "happens immediately and isn't a state-based action", so
 -- an effect that goes on to do something else after saying "it becomes night"
 -- (Tovolar, Dire Overlord's upkeep trigger) sees the turned permanent.
-becomes :: Daytime -> Game Bool
-becomes designation = do
+becomes :: ([ObjectId] -> GameState -> GameState) -> Daytime -> Game Bool
+becomes record designation = do
   gs <- State.get
   if GameState.daytime gs == Just designation
     then pure False
     else do
       State.put gs {GameState.daytime = Just designation}
-      _ <- turnDue
+      _ <- turnDue record
       pure True
 
 -- | CR 702.145d and CR 702.145g, the two rules that get a game to a designation
@@ -225,19 +238,19 @@ becomes designation = do
 -- projecting only if one is found -- would be exact today only because nothing
 -- in the pool grants daybound, and that is a claim about the card pool rather
 -- than about the rules.
-settle :: Game Bool
-settle = do
+settle :: ([ObjectId] -> GameState -> GameState) -> Game Bool
+settle record = do
   gs <- State.get
   case GameState.daytime gs of
-    Just _ -> turnDue
+    Just _ -> turnDue record
     Nothing ->
       let pcs = Projection.projectAll gs
           onBattlefield = Set.toList (GameState.battlefield gs)
        in if any (hasKeyword Keyword.Daybound pcs) onBattlefield
-            then becomes Daytime.Day
+            then becomes record Daytime.Day
             else
               if any (hasKeyword Keyword.Nightbound pcs) onBattlefield
-                then becomes Daytime.Night
+                then becomes record Daytime.Night
                 else pure False
 
 -- | CR 502.2 (stated again as CR 731.2): as the second part of the untap step,
@@ -257,10 +270,10 @@ settle = do
 --
 -- CR 502.2a's shared-team-turns variant is not implemented, because pawl has no
 -- teams (#175).
-untapCheck :: Game Bool
-untapCheck = do
+untapCheck :: ([ObjectId] -> GameState -> GameState) -> Game Bool
+untapCheck record = do
   gs <- State.get
   case GameState.daytime gs of
     Nothing -> pure False
-    Just Daytime.Day -> if GameState.spellsCastLastTurn gs == 0 then becomes Daytime.Night else pure False
-    Just Daytime.Night -> if GameState.spellsCastLastTurn gs >= 2 then becomes Daytime.Day else pure False
+    Just Daytime.Day -> if GameState.spellsCastLastTurn gs == 0 then becomes record Daytime.Night else pure False
+    Just Daytime.Night -> if GameState.spellsCastLastTurn gs >= 2 then becomes record Daytime.Day else pure False

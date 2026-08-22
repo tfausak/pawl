@@ -1937,6 +1937,9 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.RoomFullyUnlocked _ -> condition
   TriggerCondition.AnyOf conditions -> TriggerCondition.AnyOf (fmap (rewriteTriggerCondition pairs) conditions)
   TriggerCondition.SelfTurnedFaceUp -> condition
+  -- CR 612.1's text change reaches land types and colour words; CR 701.27e's
+  -- payload is a face's NAME, which CR 201.2 leaves untouched.
+  TriggerCondition.SelfTransformedInto _ -> condition
   TriggerCondition.PermanentTurnedFaceUp f -> TriggerCondition.PermanentTurnedFaceUp (Filter.rewrite pairs f)
   TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated d f) -> TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated d (Filter.rewrite pairs f))
   TriggerCondition.SelfEvolves -> condition

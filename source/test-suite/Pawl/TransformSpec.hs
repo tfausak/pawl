@@ -9,12 +9,18 @@
 -- face by a different road: Pawl.Types.EntryRiders carries it and
 -- Pawl.Engine.Event.changeZoneEntering applies it. See enterTransformedSpec.
 --
+-- Also CR 701.27e's "transforms into", the trigger condition a CARD names:
+-- Pawl.Types.TriggerCondition's SelfTransformedInto against the
+-- GameEvent.Transformed that Pawl.Engine.Event.recordTransformed writes. See
+-- transformTriggerSpec, whose fixture is Blightreaper Thallid // Blightsower
+-- Thallid, the Gargoyle printing no text on its back face to trigger with.
+--
 -- Also CR 701.27g's "transformed permanent", the phrase a CARD asks rather than
 -- the engine: Pawl.Types.Filter's Transformed atom, filled by
 -- Pawl.Engine.Projection.viewOfCharacteristics. See transformedPermanentSpec,
 -- whose fixture is Tovolar and Mutagen Connoisseur rather than the Gargoyle.
 --
--- Every case but those two groups runs against the printed Thraben Gargoyle //
+-- Every case but those three groups runs against the printed Thraben Gargoyle //
 -- Stonewing Antagonizer, a nonmodal double-faced card (CR 712.2) whose front
 -- face is a {1} 2/2 Artifact Creature -- Gargoyle with defender and "{6}:
 -- Transform this creature", and whose back face is a 4/2 Artifact Creature --
@@ -54,6 +60,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Daytime as Daytime
+import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
@@ -67,6 +74,7 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
 
@@ -132,6 +140,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Transform" $ do
   enterTransformedSpec s registry
   transformedPermanentSpec s registry
+  transformTriggerSpec s registry
   -- CR 712.8d: "While a double-faced permanent has its front face up, it has
   -- only the characteristics of its front face." Nothing has turned this one
   -- over, so CR 712.8a's front face is what Pawl.Engine.Card.combined answers
@@ -544,3 +553,139 @@ transformedPermanentSpec s registry = Spec.describe s "TransformedPermanent" $ d
     Spec.assertEqWith s "yet the Connoisseur counts none" (S.powerToughnessOf connoisseurId again) (Just (0, 5))
     Spec.assertEqWith s "it is day again" (GameState.daytime again) (Just Daytime.Day)
     Spec.assertEqWith s "and Tovolar is back on his front face" (faceNameOf tovolarId again) (Just tovolarFront)
+
+-- The two names Blightreaper Thallid // Blightsower Thallid prints, and the
+-- token its back face makes. CR 701.27e's group reads all three.
+thallidFront, thallidBack, saprolingToken :: CardName.CardName
+thallidFront = CardName.MkCardName (Text.pack "Blightreaper Thallid")
+thallidBack = CardName.MkCardName (Text.pack "Blightsower Thallid")
+saprolingToken = CardName.MkCardName (Text.pack "Phyrexian Saproling Token")
+
+-- alice's board for CR 701.27e: one Blightreaper Thallid and `n` Forests, in her
+-- own precombat main phase with priority, since CR 307.5 is what the card's
+-- "Activate only as a sorcery" rider asks for.
+--
+-- Forests rather than any land because {3}{G/P} wants a GREEN one: S.identityAnswer
+-- declines Pawl.Types.Prompt's Phyrexian offer (CR 107.4f's life payment), so the
+-- symbol is paid with mana and the board has to hold some.
+thallidBoard :: Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
+thallidBoard thallid forest n =
+  let (oid, g0) = S.addCreature thallid S.alice (S.landsInPlay forest n)
+   in (oid, g0 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain})
+
+-- Activate the Thallid's one ability, or say how many it offered instead.
+activateThallid :: ObjectId.ObjectId -> GameState.GameState -> Either Int GameState.GameState
+activateThallid oid gs = case Activate.abilitiesFor oid gs of
+  [ability] -> Right (S.runPure S.identityAnswer gs (Activate.activateAbility S.alice oid ability))
+  abilities -> Left (length abilities)
+
+-- CR 117.5's settle, where CR 603.3 gathers what triggered and puts it on the
+-- stack. Named apart from settleDaytime above because this group is about the
+-- gather rather than about the day/night check inside it.
+gather :: GameState.GameState -> GameState.GameState
+gather gs = S.runPure S.identityAnswer gs Engine.settleForPriority
+
+resolveTop :: GameState.GameState -> GameState.GameState
+resolveTop gs = S.runPure S.identityAnswer gs Stack.resolveTop
+
+-- CR 701.27e, "transforms into", the phrase a CARD asks: Blightreaper Thallid //
+-- Blightsower Thallid, {1}{B} 2/2 Creature -- Fungus with "{3}{G/P}: Transform
+-- this creature. Activate only as a sorcery.", whose back face is a 3/3 Creature
+-- -- Phyrexian Fungus reading "When this creature transforms into Blightsower
+-- Thallid or dies, create a 1/1 green Phyrexian Saproling creature token."
+--
+-- The card is the producer rather than the Gargoyle because the Gargoyle's back
+-- face prints no text at all, and this rule is about a trigger printed on the
+-- face turned TO. That placement is the whole difficulty: Pawl.Engine.Card gives
+-- a transforming permanent only the SHOWN face's abilities, so the trigger does
+-- not exist until the turn has happened, and Pawl.Engine.Resolve's Transform arm
+-- records its event after the fold for exactly that reason.
+--
+-- The token is the assertion in every case because it is a quantity a partial
+-- fix cannot reach another way: the Thallid makes no token by any other road,
+-- and counting alice's permanents instead would move if the Thallid itself were
+-- duplicated.
+--
+-- The printed condition is an "or", so both limbs are exercised: the transform
+-- one here, CR 603.2's ordinary SelfDies in the last case. Without that pair a
+-- condition that fired on the wrong limb would pass.
+--
+-- NOT covered: the CR 702.145c/f road to the same event (Pawl.Engine.Daytime's
+-- sweep, which records through the same Event.recordTransformed). No daybound
+-- card in data/cards prints a "transforms into" trigger, so the record on that
+-- road is a regression fence rather than a proved behaviour (#2051).
+transformTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+transformTriggerSpec s registry = Spec.describe s "TransformsInto" $ do
+  -- CR 701.27e's own case: the permanent turns over, and the ability printed on
+  -- the face it turned INTO triggers.
+  --
+  -- Four Forests pay {3}{G/P} with mana rather than life, and the board is
+  -- alice's own precombat main phase because of the sorcery-speed rider.
+  Spec.it s "CR 701.27e the Thallid's own ability turns it over and the back face's trigger fires" $ do
+    thallid <- S.printingOf s registry "Blightreaper Thallid"
+    forest <- S.printingOf s registry "Forest"
+    let (oid, gs) = thallidBoard thallid forest 4
+    case activateThallid oid gs of
+      Left n -> Spec.assertFailure s ("expected one activated ability, got " <> show n)
+      Right activated -> do
+        let turned = resolveTop activated
+            settled = gather turned
+            after = resolveTop settled
+        Spec.assertEqWith s "the trigger resolved into one Saproling" (S.countOnBattlefieldByName saprolingToken S.alice after) 1
+        Spec.assertEqWith s "no Saproling exists before the trigger resolves" (S.countOnBattlefieldByName saprolingToken S.alice turned) 0
+        Spec.assertEqWith s "the settle put exactly one ability on the stack" (length (GameState.stack settled)) 1
+        Spec.assertEqWith s "and the permanent really did turn over" (faceNameOf oid turned) (Just thallidBack)
+  -- CR 701.27f from the event's side: the second resolution is IGNORED, so it is
+  -- not an event and nothing triggers on it. Eight Forests put both activations
+  -- on the stack before either resolves, TransformSpec's own CR 701.27f board.
+  --
+  -- The falsifier is an implementation that records the event for every victim
+  -- the instruction NAMED rather than for the ones that turned: it makes two
+  -- Saprolings here, and one everywhere else, so this is the only case that can
+  -- tell the two apart.
+  Spec.it s "CR 701.27f a turn that was ignored triggers nothing" $ do
+    thallid <- S.printingOf s registry "Blightreaper Thallid"
+    forest <- S.printingOf s registry "Forest"
+    let (oid, gs) = thallidBoard thallid forest 8
+    case activateThallid oid gs >>= activateThallid oid of
+      Left n -> Spec.assertFailure s ("expected one activated ability at each activation, got " <> show n)
+      Right activated -> do
+        let twice = resolveTop (resolveTop activated)
+            after = resolveTop (gather twice)
+        Spec.assertEqWith s "one turn, so one Saproling" (S.countOnBattlefieldByName saprolingToken S.alice after) 1
+        Spec.assertEqWith s "both abilities were on the stack" (length (GameState.stack activated)) 2
+        Spec.assertEqWith s "and the permanent is still on its back face" (faceNameOf oid twice) (Just thallidBack)
+  -- The printed condition's OTHER limb, so the AnyOf is not proved by one side
+  -- alone: CR 603.2's "or dies", against the same board with the same card. The
+  -- Thallid transforms (one Saproling), then a destruction reaches it on its back
+  -- face (a second).
+  --
+  -- The destruction names Fungus rather than every creature, so it cannot reach
+  -- the Saproling the first limb made -- which would leave the count reading the
+  -- same under an engine that fired neither limb.
+  Spec.it s "CR 603.2 the same ability's other limb fires when it dies" $ do
+    thallid <- S.printingOf s registry "Blightreaper Thallid"
+    forest <- S.printingOf s registry "Forest"
+    let (oid, gs) = thallidBoard thallid forest 4
+    case activateThallid oid gs of
+      Left n -> Spec.assertFailure s ("expected one activated ability, got " <> show n)
+      Right activated -> do
+        let fromTransform = resolveTop (gather (resolveTop activated))
+            destroyed = S.runPure S.identityAnswer fromTransform (Resolve.applyEffect S.noSource S.noSource S.alice Map.empty Map.empty destroyEveryFungus)
+            fromDeath = resolveTop (gather destroyed)
+        Spec.assertEqWith s "the transform limb made one" (S.countOnBattlefieldByName saprolingToken S.alice fromTransform) 1
+        Spec.assertEqWith s "and the death limb makes a second" (S.countOnBattlefieldByName saprolingToken S.alice fromDeath) 2
+        Spec.assertEqWith s "the Thallid itself is gone" (faceNameOf oid fromDeath) Nothing
+
+-- "Destroy each Fungus", which on this board is the Thallid alone -- the
+-- Saproling the transform limb made is a Phyrexian Saproling and not one.
+destroyEveryFungus :: Effect.Effect card
+destroyEveryFungus =
+  Effect.Destroy
+    Destroy.MkDestroy
+      { Destroy.ref = ObjectRef.EachMatching (Filter.Type.HasSubtype Subtype.Fungus),
+        Destroy.regenerability = Regenerability.Regenerable,
+        Destroy.slot = Nothing,
+        Destroy.buried = Nothing,
+        Destroy.permanents = Nothing
+      }

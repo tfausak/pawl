@@ -683,6 +683,29 @@ data TriggerCondition
     -- action and the characteristics regained are all things a printed ability
     -- could say "that much" about, and none does.
     SelfTurnedFaceUp
+  | -- | CR 701.27e: "when this creature transforms into Blightsower Thallid",
+    -- against GameEvent.Transformed. Self-scoped PLUS the name, which is
+    -- TriggerCondition.SelfHalfUnlocked's shape and its reason -- every printing
+    -- of this names a face, and naming it is the card stating a fact about
+    -- itself rather than the engine casing on which card it is.
+    --
+    -- The name is not decoration. CR 701.27e admits an ability that triggers
+    -- when an object "transforms into" an object with a SPECIFIED
+    -- CHARACTERISTIC, and both faces of a card can carry one: Brutal Cathar
+    -- fires on the turn back to the front face while Wildsong Howler fires on
+    -- the turn away from it, and only the name tells the two events apart.
+    -- Matched against the names the event carries (CR 201.1 / 707.2's projected
+    -- ones, not the printed face's), which is CR 701.27e's "has the specified
+    -- characteristic immediately after it does so".
+    --
+    -- CR 701.28a makes a convert follow CR 701.27a-f, so this condition fires on
+    -- one too once there is such an opcode; see #698.
+    --
+    -- Not implemented: the BYSTANDER form CR 701.27e also admits, a card
+    -- watching another permanent transform (Corruption of Towashi, Neglected
+    -- Heirloom). The event carries everything such a condition would read, so
+    -- what is missing is the arm rather than the record (#2050).
+    SelfTransformedInto CardName.CardName
   | -- | CR 708.7's other written form read by a BYSTANDER (Aven Farseer).
     -- Filtered rather than self-scoped, so it reads the permanent's
     -- characteristics for a narrowed printing (Deathmist Raptor, Hamza);
