@@ -48,7 +48,9 @@ common library
 
 common executable
   import: library
-  ghc-options: -rtsopts
+  ghc-options:
+    -rtsopts
+    -threaded
 
 -- A JSON codec for each type.
 library codec
@@ -1304,7 +1306,6 @@ executable pawl
     pawl:json-codec,
     pawl:json-schema,
 
-  ghc-options: -threaded
   hs-source-dirs: source/executable
   main-is: Main.hs
 
