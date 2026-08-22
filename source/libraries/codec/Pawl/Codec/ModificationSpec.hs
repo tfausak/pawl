@@ -107,6 +107,15 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       codec
       Modification.AddEveryCreatureSubtype
       " {\"type\":\"AddEveryCreatureSubtype\"} "
+  -- layer 4, CR 205.1b add outside the land and creature families (Ygra, Eater
+  -- of All). A different subtype from every arm above, so a codec that crossed
+  -- this arm with one of them cannot pass both.
+  Spec.it s "AddSubtype" $
+    Common.assertCodec
+      s
+      codec
+      (Modification.AddSubtype Subtype.Food)
+      " {\"type\":\"AddSubtype\",\"value\":{\"type\":\"Food\"}} "
   -- layer 4 (Opalescence -> Creature).
   Spec.it s "AddCardType" $
     Common.assertCodec
