@@ -582,12 +582,14 @@ spendingFor pid oid gs = case Game.lookupObject oid gs >>= Object.playableFromEx
 --     which counts every turn the game takes -- extra turns (CR 500.7) included
 --     -- so the clause needs no other bookkeeping.
 --
--- The rule's own "during their main phase while the stack is empty" is NOT a
--- conjunct here, and it is exact all the same for every card in the pool: CR
--- 307.5's window is what a creature card is cast in anyway, and the one printing
--- pawl models is a creature. A plotted INSTANT would need it, and the seam is
--- this function rather than Cast.timingOk -- that one is a disjunction, so it can
--- only widen a window and never narrow one (#1392).
+-- Not implemented: the rule's own "during their main phase while the stack is
+-- empty" is no conjunct here. Every card the pool PRINTS plot on is a creature
+-- (Djinn of Fool's Fall, Aloe Alchemist), and CR 307.5's window is what a
+-- creature card is cast in anyway -- but CR 702.170c's route plots whatever the
+-- exiling clause admits, and Kellan Joins Up's is "a nonland card with mana
+-- value 3 or less", which reaches an instant. The seam is this function rather
+-- than Cast.timingOk -- that one is a disjunction, so it can only widen a window
+-- and never narrow one (#1392).
 permitsCastPlotted :: PlayerId -> ObjectId -> GameState -> Bool
 permitsCastPlotted pid oid gs = Maybe.fromMaybe False $ do
   obj <- Game.lookupObject oid gs
