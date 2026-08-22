@@ -535,6 +535,19 @@ cyclingBoard s registry = do
       (g1, oid) = S.handOne mauler g0
   pure (oid, g1 {GameState.priority = Just S.alice})
 
+-- cyclingBoard's board with the land count opened up and Fluctuator optional:
+-- `lands` Forests under alice, the artifact when a printing is passed, a Barkhide
+-- Mauler in her hand and a Goblin Piker in her library. The positive and the
+-- negative differ in that Maybe and in nothing else, which is what makes an
+-- offer or a tapped Forest attributable to the reduction.
+fluctuatorBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Maybe Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+fluctuatorBoard forest mauler piker lands mFluctuator =
+  let g0 = S.landsFor forest S.alice lands (Setup.emptyGame S.bothPlayers)
+      g1 = maybe g0 (\fluctuator -> snd (S.addCreature fluctuator S.alice g0)) mFluctuator
+      (_, g2) = S.addLibraryCard piker S.alice g1
+      (g3, oid) = S.handOne mauler g2
+   in (oid, g3 {GameState.priority = Just S.alice})
+
 cyclingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cyclingSpec s registry = Spec.describe s "Cycling" $ do
   -- CR 702.29a: "Cycling is an activated ability that functions only while
@@ -605,6 +618,78 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
     let (g0, _) = S.handOne mauler (S.landsInPlay forest 1)
         gs = g0 {GameState.priority = Just S.alice}
     Spec.assertBool s (not (any isActivate (Action.legalActions S.alice gs))) "one Forest cannot pay {2}"
+
+  -- CR 601.2f / CR 702.29a: a reduction that names the KIND of ability rather
+  -- than the source object. Fluctuator -- "{2} Artifact. Cycling abilities you
+  -- activate cost {2} less to activate" (checked against Scryfall) -- is the first
+  -- card in the pool whose sentence narrows to one keyword's minted ability, and
+  -- the three cases below are the gate, the criterion and the payment.
+  --
+  -- The BOARD is cyclingBoard's, minus a Forest and plus the artifact: one Forest
+  -- cannot pay the printed {2} (the case directly above), so an Activate offered
+  -- at all is the reduction, and the Forest going untapped is the reduction
+  -- reaching {0} rather than {1}. A Goblin Piker in the library keeps CR 704.5b
+  -- away from the draw, for cyclingBoard's reason.
+  Spec.it s "CR 601.2f Fluctuator reduces cycling {2} to {0}" $ do
+    forest <- S.printingOf s registry "Forest"
+    mauler <- S.printingOf s registry "Barkhide Mauler"
+    piker <- S.printingOf s registry "Goblin Piker"
+    fluctuator <- S.printingOf s registry "Fluctuator"
+    let (withId, withArtifact) = fluctuatorBoard forest mauler piker 1 (Just fluctuator)
+        (withoutId, withoutArtifact) = fluctuatorBoard forest mauler piker 1 Nothing
+    Spec.assertEqWith s "the cycling ability is offered on one Forest" (length (activationsOf withId (Action.legalActions S.alice withArtifact))) 1
+    Spec.assertEqWith s "where the printed {2} is not payable there" (length (activationsOf withoutId (Action.legalActions S.alice withoutArtifact))) 0
+    case Activate.abilitiesFor withId withArtifact of
+      [ability] -> do
+        let activated = S.runPure S.identityAnswer withArtifact (Activate.activateAbility S.alice withId ability)
+            resolved = S.runPure S.identityAnswer activated Stack.resolveTop
+        Spec.assertEqWith s "the Forest went untapped: {2} minus {2} is {0}, not {1}" (S.tappedCount S.alice activated) 0
+        Spec.assertEqWith s "the Mauler still left the hand as the cost was paid" (S.handSize S.alice activated) 0
+        Spec.assertEqWith s "and is in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice activated)) 1
+        Spec.assertEqWith s "then the draw resolves into her hand" (S.handSize S.alice resolved) 1
+      _ -> Spec.assertFailure s "expected exactly one cycling ability"
+
+  -- The criterion, from the other side, and the case that fails if grantedBy is
+  -- ignored: Withered Wretch's "{1}: Exile target card from a graveyard" is a
+  -- PRINTED activated ability, so rule 702.29a minted nothing and Fluctuator's
+  -- sentence does not name it. On ZERO lands the two readings are different
+  -- offers -- the wide one reduces the {1} to {0} and offers it, the printed cost
+  -- is unpayable.
+  --
+  -- The Goblin Piker in bob's graveyard is load-bearing: with every graveyard
+  -- empty the Wretch's target slot is unfillable and it would go unoffered for a
+  -- reason that has nothing to do with the cost.
+  Spec.it s "CR 601.2f Fluctuator does not reduce an ability rule 702.29a did not mint" $ do
+    forest <- S.printingOf s registry "Forest"
+    mauler <- S.printingOf s registry "Barkhide Mauler"
+    piker <- S.printingOf s registry "Goblin Piker"
+    fluctuator <- S.printingOf s registry "Fluctuator"
+    wretch <- S.printingOf s registry "Withered Wretch"
+    let (maulerId, base) = fluctuatorBoard forest mauler piker 0 (Just fluctuator)
+        (wretchId, withWretch) = S.addCreature wretch S.alice base
+        gs = snd (S.addGraveyardCard piker S.bob withWretch)
+    Spec.assertEqWith s "the Wretch's printed {1} is not reduced away" (length (activationsOf wretchId (Action.legalActions S.alice gs))) 0
+    Spec.assertEqWith s "while the cycling ability on the same board is" (length (activationsOf maulerId (Action.legalActions S.alice gs))) 1
+    Spec.assertBool s (not (null (Activate.abilitiesFor wretchId gs))) "and the Wretch has an ability to withhold"
+
+  -- The PAYMENT, which neither case above can reach: the case above that
+  -- activates anything activates a CYCLING ability, and there a payment that
+  -- ignores grantedBy agrees with one that honours it, while the case between
+  -- them only reads what is offered. Activating the Wretch is where the two
+  -- diverge -- one Forest makes its {1} payable, so the activation is not a
+  -- no-op either way, and the reading shows up in whether the Forest is spent.
+  Spec.it s "CR 601.2f the payment is narrowed too, not only the offer" $ do
+    forest <- S.printingOf s registry "Forest"
+    mauler <- S.printingOf s registry "Barkhide Mauler"
+    piker <- S.printingOf s registry "Goblin Piker"
+    fluctuator <- S.printingOf s registry "Fluctuator"
+    wretch <- S.printingOf s registry "Withered Wretch"
+    let (_, base) = fluctuatorBoard forest mauler piker 1 (Just fluctuator)
+        (wretchId, withWretch) = S.addCreature wretch S.alice base
+        gs = snd (S.addGraveyardCard piker S.bob withWretch)
+        after = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice wretchId (theAbility wretch))
+    Spec.assertEqWith s "the Forest paid the Wretch's {1} in full" (S.tappedCount S.alice after) 1
+    Spec.assertEqWith s "and the ability is on the stack" (length (GameState.stack after)) 1
 
   -- CR 702.29e: typecycling is the same ability with a search in place of the
   -- draw. Ash Barrens' basic landcycling {1} finds a basic land card and puts

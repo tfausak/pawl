@@ -34,6 +34,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
+import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Modal as Modal.Type
@@ -124,6 +125,33 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
     Just face -> Keyword.handAbilitiesOf (Face.keywords face) <> zoneAbilitiesOf Zone.Hand oid gs
   Just Zone.Graveyard -> zoneAbilitiesOf Zone.Graveyard oid gs
   _ -> []
+
+-- CR 702 / CR 601.2f: WHICH RULE minted this ability of `oid`, as the family
+-- designator Pawl.Types.ReduceActivationCost.grantedBy compares -- Fluctuator's
+-- "cycling abilities you activate" against the ability actually being activated
+-- (#1431). Nothing for an ability the card itself prints.
+--
+-- The zone split is abilitiesForGiven's above, and for its reason: the hand arm
+-- reads PRINTED keywords because rules 702.29a and 702.77a state the hand, and
+-- the battlefield arm reads POST-LAYER ones because CR 613.1f can take a keyword
+-- away. Kept in step with that function by hand -- an arm here that named a
+-- different keyword source than the arm that MINTED the ability would classify it
+-- as printed, which reads as "no reduction" rather than as an error.
+--
+-- Nothing for every other zone, matching abilitiesForGiven's silence there: no
+-- rule-702 keyword mints an activated ability outside a hand or the battlefield.
+familyGrantingGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> ActivatedAbility.ActivatedAbility Card.Card -> Maybe KeywordFamily.KeywordFamily
+familyGrantingGiven pcs oid gs ability = case fmap Object.zone (Game.lookupObject oid gs) of
+  Just Zone.Battlefield -> Keyword.familyGranting (Projection.keywordsGiven pcs oid gs) ability
+  Just Zone.Hand -> case Game.faceOf oid gs of
+    Nothing -> Nothing
+    Just face -> Keyword.familyGranting (Map.fromSet (const 1) (Face.keywords face)) ability
+  _ -> Nothing
+
+-- familyGrantingGiven off this object's own board -- `activatable`'s pairing, and
+-- activateAbility's, neither of which is inside an enumeration.
+familyGranting :: ObjectId -> GameState -> ActivatedAbility.ActivatedAbility Card.Card -> Maybe KeywordFamily.KeywordFamily
+familyGranting = familyGrantingGiven Map.empty
 
 -- CR 113.6j + CR 113.6m + CR 702.178b: the AUTHORED abilities a card outside the
 -- battlefield offers from the zone it is in. Two zones ask it today -- the
@@ -284,12 +312,12 @@ loyaltyActivatedThisTurn srcId gs = elem (GameEvent.LoyaltyAbilityActivated srcI
 -- demands nothing at all (Mana.waysOf), so leaving it in place would answer the
 -- same as X=0 by accident rather than by rule -- the accident that made the {X}
 -- free (#544).
-payableCost :: PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCost :: Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCost = payableCostAt 0
 
 -- The same predicate on a board the caller already walked -- see
 -- Cost.canPaySomeCompletionGiven.
-payableCostGiven :: [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCostGiven :: [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostGiven sources pcs = payableCostAtGiven sources pcs 0
 
 -- The same question asked at some OTHER value of X -- `payableCost` is this at
@@ -313,16 +341,16 @@ payableCostGiven sources pcs = payableCostAtGiven sources pcs 0
 -- offers: CR 601.2b's completion comes before CR 601.2f's totalling, so a {2/R}
 -- totalled while still spelled {2/R} would hide the generic reduction the
 -- announcement exposes.
-payableCostAt :: Natural -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCostAt x pid srcId gs cost =
-  let adjustments = Cost.activationAdjustments pid srcId gs
+payableCostAt :: Natural -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCostAt x family pid srcId gs cost =
+  let adjustments = Cost.activationAdjustments family pid srcId gs
    in Cost.canPaySomeCompletion Nothing ManaSpending.AsProduced pid srcId (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs
 
 -- The same predicate on a board the caller already walked -- see
 -- Cost.canPaySomeCompletionGiven.
-payableCostAtGiven :: [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Natural -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCostAtGiven sources pcs x pid srcId gs cost =
-  let adjustments = Cost.activationAdjustments pid srcId gs
+payableCostAtGiven :: [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Natural -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCostAtGiven sources pcs x family pid srcId gs cost =
+  let adjustments = Cost.activationAdjustments family pid srcId gs
    in Cost.canPaySomeCompletionGiven Nothing ManaSpending.AsProduced sources pcs pid srcId (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs
 
 -- CR 601.2b via 602.2b: the greatest X this player could actually pay for, which
@@ -338,8 +366,8 @@ payableCostAtGiven sources pcs x pid srcId gs cost =
 -- Nightmare) (#1985). What that leaves is Cost.greatestPayableX's other ground
 -- for terminating -- a demand that grows -- which every {X} in an activation
 -- cost in the pool has.
-affordableX :: PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
-affordableX pid srcId gs cost = Cost.greatestPayableX Nothing (\x -> payableCostAt x pid srcId gs cost) cost
+affordableX :: Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
+affordableX family pid srcId gs cost = Cost.greatestPayableX Nothing (\x -> payableCostAt x family pid srcId gs cost) cost
 
 -- CR 602.2/602.5: the ability is a member of the source's abilities
 -- (abilitiesFor), it is not a mana ability, the whole activation cost is payable
@@ -412,7 +440,7 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
     && Modal.selectionPossible
       (Target.fillableModesGiven pcs grants pools (Just pid) Map.empty srcId Map.empty (ActivatedAbility.modal ability) gs)
       (Modal.Type.selection (ActivatedAbility.modal ability))
-    && payableCostGiven sources pcs pid srcId gs (ActivatedAbility.cost ability)
+    && payableCostGiven sources pcs (familyGrantingGiven pcs srcId gs ability) pid srcId gs (ActivatedAbility.cost ability)
 
 -- CR 602.2a: an ability activated from a hidden zone reveals the card that has
 -- it (CR 701.20a). Note what the rule does NOT say: there is no qualifier about
@@ -522,6 +550,13 @@ activateAbility pid srcId ability = do
       -- what tells the two apart, CR 700.2d's exception included.
       legal = Target.fillableModes (Just pid) Map.empty srcId Map.empty (ActivatedAbility.modal ability) gs
       selection = Modal.Type.selection (ActivatedAbility.modal ability)
+      -- CR 601.2f's reductions can name the KIND of ability (Fluctuator's
+      -- "cycling abilities"), so every totalling below is asked with this
+      -- ability's provenance -- the two gates and the payment alike, or a
+      -- reduction the gate withheld could still be applied when the cost is
+      -- paid. Read off `gs`, the pre-stack board, because the ability's source is
+      -- still in the zone whose keywords minted it.
+      family = familyGranting srcId gs ability
   State.put onStack
   -- Sorted on the way in, for the reason Cast.castProposed gives: printed order
   -- (CR 608.2c), with a repeated mode's instances adjacent (CR 700.2d).
@@ -551,7 +586,7 @@ activateAbility pid srcId ability = do
       let printedCost = ActivatedAbility.cost ability
       mAmount <-
         if Cost.hasVariable printedCost
-          then fmap Just (Game.choose (Prompt.ChooseX decider pid abilId (affordableX pid srcId gs printedCost)))
+          then fmap Just (Game.choose (Prompt.ChooseX decider pid abilId (affordableX family pid srcId gs printedCost)))
           else pure Nothing
       let announcedAtX = maybe printedCost (\x -> Cost.substituteX x printedCost) mAmount
       -- CR 602.2: an activation a player cannot comply with is illegal, and the
@@ -573,7 +608,7 @@ activateAbility pid srcId ability = do
       -- Asked unconditionally rather than only when there is an {X}, which buys
       -- one predicate over one cost instead of two spellings of when the gate
       -- applies.
-      if not (payableCost pid srcId gs announcedAtX)
+      if not (payableCost family pid srcId gs announcedAtX)
         then State.put before -- reject: the whole activation is a no-op
         else do
           -- CR 118.13a's announcement, which names an activated ability's
@@ -598,7 +633,7 @@ activateAbility pid srcId ability = do
           -- offers are filtered against the claims a component makes on a zone,
           -- so a Phyrexian symbol offered without the added "Sacrifice a land"
           -- in view would be offered against a board that has one land too many.
-          let gathered = Cost.activationAdjustments pid srcId gs
+          let gathered = Cost.activationAdjustments family pid srcId gs
           -- The Phyrexian life record is DISCARDED here: CR 702.150a reads what
           -- the player who CAST a spell announced, and no rule asks the same of
           -- an activation cost.

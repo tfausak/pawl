@@ -45,6 +45,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.IgnoredAbility as IgnoredAbility
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import Pawl.Types.Keyword (Keyword)
+import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import Pawl.Types.ManaUnit (ManaUnit)
@@ -375,7 +376,7 @@ rewritePlayerEffect pairs effect = case effect of
   -- Edgewalker's "Cleric spells" does, and Haakon's "Knight spells" would.
   PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f n) -> PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost (Filter.rewrite pairs f) n)
   PlayerEffect.ReduceSpellCost x -> PlayerEffect.ReduceSpellCost x {ReduceSpellCost.whichSpells = Filter.rewrite pairs (ReduceSpellCost.whichSpells x)}
-  PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f cost floor_) -> PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost (Filter.rewrite pairs f) cost floor_)
+  PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f family cost floor_) -> PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost (Filter.rewrite pairs f) family cost floor_)
   -- The two arms with a word in TWO places: their own criterion ("nontoken
   -- Rebels"), and the criterion inside each component they add ("sacrifice a
   -- LAND", "sacrifice a SWAMP"). Both descend, which is Filter.rewriteCost's
@@ -954,6 +955,14 @@ spellCostAdjustments pid oid gs =
 -- permanent's here, and the permanent is projected rather than printed for the
 -- same reason (an animated Vehicle's abilities are a creature's).
 --
+-- `family` is the SECOND criterion, and the one the source filter cannot say:
+-- which rule-702 keyword minted the ability being activated, as the caller
+-- derived it (Pawl.Engine.Keyword.familyGranting). A reducer carrying no
+-- grantedBy ignores it, which is every reducer whose sentence says "activated
+-- abilities"; Fluctuator's says "cycling abilities" and carries CR 702.29a's
+-- family. Compared and never inspected further: a KeywordFamily is a rulebook
+-- designator, so nothing here learns what the reduced ability DOES.
+--
 -- No MANA increases: nothing in pawl raises the mana part of an activation cost,
 -- so that list is empty rather than gathered (#1242). Kept in the record all the
 -- same, since CR 601.2f orders increases before reductions whoever writes one.
@@ -964,13 +973,13 @@ spellCostAdjustments pid oid gs =
 -- sentence says "this effect", so an effect that states no floor is not bound by
 -- another's, and Pawl.Engine.Cost.applyAdjustments applies each floor as its own
 -- reduction lands.
-activationCostAdjustments :: PlayerId -> ObjectId -> GameState -> CostAdjustments
-activationCostAdjustments pid srcId gs =
+activationCostAdjustments :: Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> CostAdjustments
+activationCostAdjustments family pid srcId gs =
   let reductionOf effect = case effect of
-        PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost criterion amount floor_) ->
+        PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost criterion granted amount floor_) ->
           -- Never confined to coloured mana: no printed activation-cost reducer
           -- states Edgewalker's sentence, so CR 118.7b-d's spill stands.
-          if matchesObject criterion srcId gs
+          if matchesObject criterion srcId gs && maybe True (\g -> Just g == family) granted
             then Just (AppliedReduction.MkAppliedReduction amount floor_ False)
             else Nothing
         -- The non-mana addition, gathered by `additionOf` below: CR 601.2f's
