@@ -34,6 +34,7 @@ import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
@@ -153,7 +154,7 @@ roomPermanent gs =
 -- The riders an effect that merely puts a permanent onto the battlefield asks
 -- for: CR 110.5b's untapped and face up, no CR 508.1 attacking entry, and CR
 -- 712.14's untransformed default.
-plainEntry :: EntryRiders.EntryRiders
+plainEntry :: EntryRiders.EntryRiders Natural
 plainEntry = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
 
 -- Every unlock this player is offered right now, as CR 709.5e's pair.

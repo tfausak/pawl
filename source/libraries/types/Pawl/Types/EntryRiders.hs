@@ -1,7 +1,6 @@
 module Pawl.Types.EntryRiders where
 
 import qualified Data.Map.Strict as Map
-import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.TapState as TapState
@@ -20,7 +19,7 @@ import qualified Pawl.Types.TapState as TapState
 -- Each rider is meaningful only in the zone its own rule scopes it to, and every
 -- other destination carries the default: `tapped`, `attacking`, `counters`,
 -- `transformed` and `underOwner` are battlefield-only (CR 110.5d, CR 508.4, CR
--- 122.6a, CR 712.14a, CR 110.2a), `exiledFaceDown` is exile-only (CR 406.3),
+-- 122.6, CR 712.14a, CR 110.2a), `exiledFaceDown` is exile-only (CR 406.3),
 -- and `faceDown` is battlefield-only (CR 708.3).
 -- A card stating one on the wrong zone states something nothing reads, which
 -- Pawl.CardSpec lints.
@@ -55,7 +54,8 @@ import qualified Pawl.Types.TapState as TapState
 -- rules instead). So Pawl.Engine.Resolve's Create arm does not read this rider,
 -- and Pawl.CardSpec's corpus lint holds that no Create in the pool sets it.
 --
--- `counters` is CR 122.6a's "enters the battlefield with counters on it", said by
+-- `counters` is CR 122.6's "an object that's given counters as it enters the
+-- battlefield", said by
 -- the EFFECT rather than by the permanent -- undying's and persist's "return it
 -- to the battlefield ... with a +1/+1 counter on it" (CR 702.93a, CR 702.79a).
 -- The same rider one opcode over is incubate's "create an Incubator token that
@@ -76,20 +76,22 @@ import qualified Pawl.Types.TapState as TapState
 -- token created with three +1/+1 counters on it takes six from Vorinclex.
 --
 -- A Map by kind, Object.counters' shape, rather than WithCounters' one kind and
--- one count: nothing in CR 122.6a limits an effect to a single kind, and empty is
+-- one count: nothing in CR 122.6 limits an effect to a single kind, and empty is
 -- the default every other move carries.
 --
--- A literal count per kind rather than a Quantity, which is what bounds the
--- wordings this can carry: every card that prints incubate prints a number, and
--- undying and persist mint a one.
+-- The COUNT is the type parameter, and the two instantiations are the two sides
+-- of CR 608.2h. A card writes EntryRiders Quantity -- Printlifter Ooze's "the
+-- token enters with X +1/+1 counters on it, where X is the number of other
+-- creatures you control", whose X is defined by the ability's own text (CR
+-- 107.3c) -- while the funnel takes EntryRiders Natural, a settled number.
+-- Pawl.Engine.Resolve.freezeRiders is the one bridge: it evaluates each count
+-- once, when the effect is applied, which is the rule the parameter exists to
+-- state. A Quantity reaching the funnel unevaluated is then a type error rather
+-- than a context built where there is none to build.
 --
 -- CR 122.6a's "may specify which player puts those counters on it" is not
 -- carried. No effect in the pool names one, and the rule's own default -- the
 -- object's controller -- is what putCounters already uses.
---
--- Not implemented: a count that is not a literal, so Printlifter Ooze's "the token
--- enters with X +1/+1 counters on it, where X is the number of other creatures you
--- control" is unsayable (#1256).
 --
 -- `underOwner` is CR 110.2a's "unless the effect states otherwise". Undying and
 -- persist return the permanent "under its OWNER's control", where CR 110.2a
@@ -148,11 +150,11 @@ import qualified Pawl.Types.TapState as TapState
 -- 701.40a is the only rule in the pool that puts a card onto the battlefield face
 -- down, and cloak, the one other rule that would, would need both halves of this
 -- rider (gap #1668).
-data EntryRiders = MkEntryRiders
+data EntryRiders count = MkEntryRiders
   { tapped :: TapState.TapState,
     attacking :: Bool,
     transformed :: Bool,
-    counters :: Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural,
+    counters :: Map.Map (CounterKind.CounterKind Keyword.Keyword) count,
     underOwner :: Bool,
     exiledFaceDown :: Bool,
     faceDown :: Bool

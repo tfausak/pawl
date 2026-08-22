@@ -19,6 +19,7 @@ module Pawl.Engine.Foretell where
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Event as Event
@@ -160,7 +161,10 @@ foretell pid oid = do
 
 -- CR 406.3's rider and nothing else: every other rider is battlefield-only, and
 -- this move names exile.
-riders :: EntryRiders.EntryRiders
+--
+-- The funnel's instantiation, a settled count rather than a Quantity: nothing
+-- here is resolving, so there is no CR 608.2h moment to evaluate one at.
+riders :: EntryRiders.EntryRiders Natural
 riders =
   EntryRiders.MkEntryRiders
     { EntryRiders.tapped = TapState.Untapped,

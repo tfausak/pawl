@@ -2458,6 +2458,16 @@ canHostSubjects predicate = case predicate of
 -- silently and drops it -- which is exactly what happened when landwalk's
 -- Subtype became a Filter (#499). A new Filter-bearing keyword needs its arm
 -- added here by hand.
+-- Both Filter positions an entry rider has: the counter KINDS it is keyed by (CR
+-- 122.1b's keyword counter carries a whole Keyword) and the COUNTS it holds (CR
+-- 122.6, each a Quantity, which may carry a Count whose Filter is card text).
+-- One function so the two effect arms that read a rider cannot sweep different
+-- halves of it.
+riderFilters :: EntryRiders.EntryRiders Quantity.Type.Quantity -> [Filter.Type.Filter Keyword.Keyword]
+riderFilters riders =
+  concatMap counterKindFilters (Map.keys (EntryRiders.counters riders))
+    <> concatMap quantityFilters (Map.elems (EntryRiders.counters riders))
+
 -- CR 122.1b: the one counter kind with a Filter under it, since it carries a
 -- whole Keyword. Exhaustive so a new kind with a payload breaks this build.
 counterKindFilters :: CounterKind.CounterKind Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
@@ -3498,12 +3508,14 @@ effectFilters effect = case effect of
   Effect.ControlPlayerNextTurn _ -> []
   Effect.Destroy (Destroy.MkDestroy ref _ _ _ _) -> sourceHosted (objectRefFilters ref)
   Effect.Sacrifice _ -> []
-  -- The riders reach a Filter one level further down than the ObjectRef: CR
-  -- 122.6a's counters are keyed by CounterKind, and CR 122.1b's keyword counter
-  -- carries a whole Keyword. Swept for the reason canHostSubjects sweeps the
-  -- same shape -- the lint is about the positions a card author can write, not
-  -- about which of them the pool has used.
-  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _) -> sourceHosted (objectRefFilters ref) <> unframed (concatMap counterKindFilters (Map.keys (EntryRiders.counters riders)))
+  -- The riders reach a Filter by TWO roads one level further down than the
+  -- ObjectRef: CR 122.6's counters are keyed by CounterKind, and CR 122.1b's
+  -- keyword counter carries a whole Keyword; and each count is a Quantity, which
+  -- may carry a Count whose Filter is card text. KEYS AND ELEMS both, therefore
+  -- -- a keys-only sweep would leave the counts unlinted. Swept for the reason
+  -- canHostSubjects sweeps the same shape -- the lint is about the positions a
+  -- card author can write, not about which of them the pool has used.
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _) -> sourceHosted (objectRefFilters ref) <> unframed (riderFilters riders)
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   -- The tally's Filter is a position a card author writes, so the lint reaches
   -- it: rule 728.1's "nonland card" is one of these.
@@ -3528,7 +3540,7 @@ effectFilters effect = case effect of
   Effect.DecreaseSpeed d -> unframed (quantityFilters (SpeedDecrease.quantity d))
   -- CR 111.1's token is a whole card, and every Filter position it has is one a
   -- card author can write -- the same nesting Pawl.Codec's round trip walks.
-  Effect.Create (Create.MkCreate quantity card riders _ _) -> unframed (quantityFilters quantity <> concatMap counterKindFilters (Map.keys (EntryRiders.counters riders))) <> overFaces cardFilters card
+  Effect.Create (Create.MkCreate quantity card riders _ _) -> unframed (quantityFilters quantity <> riderFilters riders) <> overFaces cardFilters card
   -- An EachMatching ref's Filter is card text like RequireBlock's below, and the
   -- count's Filters are as much card text as Create's.
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> unframed (quantityFilters quantity) <> sourceHosted (objectRefFilters ref)
