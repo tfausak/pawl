@@ -65,6 +65,7 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.Expiry as Expiry
@@ -1618,6 +1619,7 @@ oneMountainState mountain ph =
           GameState.turnNumber = 1,
           GameState.result = Nothing,
           GameState.restartSignal = RestartSignal.Playing,
+          GameState.endTurnSignal = EndTurnSignal.Running,
           GameState.nextObjectId = ObjectId.MkObjectId 1,
           GameState.nextTimestamp = Timestamp.MkTimestamp 1,
           GameState.lastChoice = Timestamp.MkTimestamp 0,

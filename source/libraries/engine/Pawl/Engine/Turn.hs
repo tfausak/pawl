@@ -221,6 +221,26 @@ spliceSecondDamage remaining = Phase.Combat CombatStep.CombatDamage Seq.<| remai
 spliceExtraCleanup :: Seq Phase -> Seq Phase
 spliceExtraCleanup remaining = Phase.Ending EndingStep.Cleanup Seq.<| remaining
 
+-- CR 724.1d: what is left of the turn once an effect ends it -- the cleanup step
+-- and everything scheduled after it, with every phase and step between here and
+-- that cleanup step skipped.
+--
+-- Positional, and NOT a truncation to a lone cleanup step: CR 500.8 lets an
+-- effect add a phase after the ending phase, and those entries sit BEHIND the
+-- cleanup step in `remaining`. Rule 724.1d skips what lies between this step and
+-- the cleanup step and says nothing about what is scheduled after it.
+--
+-- A schedule holding no cleanup step gets one rather than emptying the turn: the
+-- rule says the game skips straight TO the cleanup step, so there is one to skip
+-- to even where Engine.skipWholePhase dropped the ending phase.
+--
+-- The caller handles CR 724.1d's own exception -- ending the turn DURING the
+-- cleanup step, where spliceExtraCleanup's new step is what the rule asks for.
+jumpToCleanup :: Seq Phase -> Seq Phase
+jumpToCleanup remaining = case Seq.elemIndexL (Phase.Ending EndingStep.Cleanup) remaining of
+  Nothing -> spliceExtraCleanup remaining
+  Just i -> Seq.drop i remaining
+
 -- The steps one added phase expands to. CR 506.1 fixes the combat phase's five
 -- and their order; CR 505.2 ("The main phase has no steps") is why a main phase
 -- is one element.

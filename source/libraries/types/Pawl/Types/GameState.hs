@@ -14,6 +14,7 @@ import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
+import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
 import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -356,6 +357,11 @@ data GameState = MkGameState
     -- to the rebuilt turn 1 instead of acting on it. Transient: Engine.runStep
     -- lowers it as that turn's untap step begins.
     restartSignal :: RestartSignal.RestartSignal,
+    -- | CR 724.1: raised while an effect that ends the turn is unwinding through
+    -- the frames that were running the step it ended, so Engine.priorityLoop
+    -- neither settles nor grants another round (CR 724.1f). Transient:
+    -- Engine.runStep lowers it as CR 724.1d's cleanup step begins.
+    endTurnSignal :: EndTurnSignal.EndTurnSignal,
     nextObjectId :: ObjectId.ObjectId,
     -- | CR 613.7: the monotonic source of timestamps for objects (at creation) and
     -- stored continuous effects (at CR 611 creation). See Timestamp.

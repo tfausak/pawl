@@ -16,6 +16,7 @@ import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Deck as Deck
+import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
 import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
@@ -133,6 +134,7 @@ emptyGame order =
           GameState.turnNumber = 1,
           GameState.result = Nothing,
           GameState.restartSignal = RestartSignal.Playing,
+          GameState.endTurnSignal = EndTurnSignal.Running,
           GameState.nextObjectId = ObjectId.MkObjectId 0,
           GameState.nextTimestamp = Timestamp.MkTimestamp 0,
           GameState.lastChoice = Timestamp.MkTimestamp 0,
@@ -445,6 +447,8 @@ restartGame perform exempt starter = do
             -- Engine.priorityLoop and Engine.runStep read this and unwind to
             -- the rebuilt turn 1 rather than granting priority.
             GameState.restartSignal = RestartSignal.Restarted,
+            -- CR 724.1: the rebuilt game is not the one whose turn was ended.
+            GameState.endTurnSignal = EndTurnSignal.Running,
             -- CR 104.4b: CR 727.1 ends the game that was being played, so the
             -- rebuilt one starts owing nobody a choice. The timestamp supply is
             -- preserved across the restart, so this is the supply's current
@@ -571,6 +575,8 @@ subgameStateFrom starter parent =
           GameState.turnNumber = 1,
           GameState.result = Nothing,
           GameState.restartSignal = RestartSignal.Playing,
+          -- CR 724.1: the subgame is its own game, so it starts running its own turn.
+          GameState.endTurnSignal = EndTurnSignal.Running,
           -- CR 104.4b: the subgame is its own game, so it starts owing nobody a
           -- choice. Set to the INHERITED nextTimestamp rather than to zero,
           -- which the timestamp supply is not: a copied parent marker would

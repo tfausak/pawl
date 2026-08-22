@@ -726,6 +726,21 @@ data Effect card
     -- where the CR 505.1a/506.1 detail of WHAT is inserted and the CR 511.3
     -- question of WHERE both live.
     AddPhases [ExtraPhase.ExtraPhase]
+  | -- | CR 724.1: end the turn (Time Stop). Nullary -- rule 724.1's six steps
+    -- fix the whole procedure, and no printing parameterises any of them.
+    --
+    -- Not a schedule rewrite that a caller composes: CR 724.1a-f differ from CR
+    -- 608's resolution process, so the opcode owns the pending-trigger watermark
+    -- (724.1a), the exile of the whole stack including the resolving object
+    -- (724.1b), the state-based check that grants no priority (724.1c), and the
+    -- jump to the cleanup step (724.1d). CR 724.1f's "no player gets priority
+    -- during this process" is what GameState.endTurnSignal carries out to
+    -- Engine.priorityLoop; it cannot be expressed in `remaining` alone.
+    --
+    -- Not implemented: CR 724.2's sibling, ending the COMBAT PHASE, whose one
+    -- printing (Mandate of Peace) says "cast this spell only during combat" and
+    -- so waits on #527 (#873).
+    EndTurn
   | -- | CR 613.1b / 611.2c: install a layer-2 control effect on the objects the
     -- ObjectRef names, for a duration. The new controller is this effect's
     -- source's controller, baked into a stored SetController effect -- derived,

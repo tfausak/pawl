@@ -1133,6 +1133,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.AddPhases [ExtraPhase.ExtraCombat, ExtraPhase.ExtraCombat])
       " {\"type\":\"AddPhases\",\"value\":[{\"type\":\"ExtraCombat\"},{\"type\":\"ExtraCombat\"}]} "
+  -- CR 724.1: nullary for TemptWithTheRing's reason -- rule 724.1's six steps
+  -- fix the whole procedure, leaving an author nothing to write.
+  Spec.it s "EndTurn" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Effect.EndTurn
+      " {\"type\":\"EndTurn\"} "
   Spec.it s "GainControl round-trips both ObjectRef arms" $ do
     Common.assertJsonCodec
       s
