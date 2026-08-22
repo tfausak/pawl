@@ -26,6 +26,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -1717,6 +1718,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   omniscienceSpec s registry
   springleafDrumSpec s registry
   morcantSpec s registry
+  unerringSlingSpec s registry
 
 -- alice holds `card` and controls `n` untapped Mountains, plus Omniscience when
 -- `granted` is True, with priority in her own precombat main phase so a sorcery
@@ -2427,6 +2429,89 @@ morcantSpec s registry = Spec.describe s "High Perfect Morcant" $ do
     Spec.assertBool s (isTapped morcantId after) "Morcant paid this time"
     Spec.assertBool s (not (isTapped spared after)) "and the Elf left out is untapped"
     Spec.assertEqWith s "the ability is on the stack" (length (GameState.stack after)) 1
+
+-- Unerring Sling {3} Artifact: "{3}, {T}, Tap an untapped creature you control:
+-- This artifact deals damage equal to the tapped creature's power to target
+-- attacking or blocking creature with flying." The producer for
+-- Binding.tappedPermanent, and the first card in `data/cards/` whose ability
+-- reads a characteristic of what its OWN cost tapped.
+--
+-- alice controls the Sling, a Decorated Griffin (2/3 flier) and a Hill Giant
+-- (3/3), plus exactly three untapped Forests -- the minimum that pays {3}, so
+-- the mana window has nothing to decide. bob defends with nothing, CR 506.2's
+-- defending player being all combat needs here.
+--
+-- The Griffin attacks, which taps it (CR 508.1f) and makes it the only creature
+-- the ability's target filter admits (CR 508.1k, and it is the only flier). That
+-- leaves the Hill Giant as the ONLY candidate the cost's `Not IsTapped` criterion
+-- offers, so Cost.payComponent elides Prompt.ChooseTaps and no answerer picks
+-- the creature whose power this case reads.
+slingBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+slingBoard sling griffin hillGiant forest =
+  let (combat, ours, _) = S.combatBoardOf [griffin, hillGiant] []
+      (griffinId, giantId) = case ours of
+        [a, b] -> (a, b)
+        _ -> (S.noSource, S.noSource)
+      (slingId, withSling) = S.addCreature sling S.alice combat
+      withLands = S.landsFor forest S.alice 3 withSling
+   in (slingId, griffinId, giantId, S.runPure (attackingWith griffinId) withLands (Combat.declareAttackers S.alice))
+
+-- Attack with one named creature, FILTERED against the offer: an id the engine
+-- did not offer is not a legal declaration, so filtering keeps the case about
+-- the engine's own candidates.
+attackingWith :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+attackingWith wanted p = case p of
+  Prompt.DeclareAttackers _ _ ids -> filter (== wanted) ids
+  _ -> S.identityAnswer p
+
+-- Target the named creature, FILTERED out of the offered recipients rather than
+-- hand-built: a hand-built ToObject of the same permanent is a different
+-- recipient and CR 608.2b would drop it at resolution with no error.
+targeting :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+targeting victim p = case p of
+  Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, legal) -> Set.filter ((== Just victim) . Recipient.objectOf) legal) asked
+  _ -> S.identityAnswer p
+
+unerringSlingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+unerringSlingSpec s registry = Spec.describe s "Unerring Sling" $ do
+  -- CR 601.2f pays the cost by tapping a creature and CR 608.2h reads that
+  -- creature's power as the ability resolves -- CURRENT information, the Giant
+  -- never having left the battlefield.
+  --
+  -- Three implementations, three readings, which is what makes the damage the
+  -- discriminating assertion: an unbound slot deals nothing (Quantity.evaluateFor
+  -- answers Nothing and Resolve drops the recipient), a slot aimed at the SOURCE
+  -- reads an artifact's absent power, and one aimed at the target reads the
+  -- Griffin's own 2. Only the tapped Giant's 3 is lethal to a 2/3.
+  Spec.it s "CR 608.2h the ability reads the power of the creature its own cost tapped" $ do
+    sling <- S.printingOf s registry "Unerring Sling"
+    griffin <- S.printingOf s registry "Decorated Griffin"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    forest <- S.printingOf s registry "Forest"
+    let (slingId, griffinId, giantId, gs) = slingBoard sling griffin hillGiant forest
+        activated = S.runPure (targeting griffinId) gs (Activate.activateAbility S.alice slingId (theAbility sling))
+        resolved = S.runPure (targeting griffinId) activated Stack.resolveTop
+        settled = S.settleSba resolved
+    Spec.assertEqWith s "the Griffin took the tapped Hill Giant's 3 power" (S.damageOf griffinId resolved) (Just 3)
+    Spec.assertBool s (not (S.onBattlefield griffinId settled)) "CR 704.5g so 3 damage on a 2/3 is lethal"
+    Spec.assertBool s (isTapped giantId activated) "the cost really tapped the Giant"
+    Spec.assertBool s (isTapped slingId activated) "and CR 107.5's own half of the cost tapped the Sling"
+    Spec.assertEqWith s "the ability was on the stack with the payment already made" (length (GameState.stack activated)) 1
+  -- The discriminating twin, a pair of boards differing in exactly one thing:
+  -- WHICH creature the cost taps. Swapping the Hill Giant for a 1/1 changes the
+  -- damage and nothing else -- so a fix that read a constant, the source or the
+  -- target would give the same number on both boards.
+  Spec.it s "CR 601.2f a different tapped creature is a different amount of damage" $ do
+    sling <- S.printingOf s registry "Unerring Sling"
+    griffin <- S.printingOf s registry "Decorated Griffin"
+    elf <- S.printingOf s registry "Glistener Elf"
+    forest <- S.printingOf s registry "Forest"
+    let (slingId, griffinId, elfId, gs) = slingBoard sling griffin elf forest
+        activated = S.runPure (targeting griffinId) gs (Activate.activateAbility S.alice slingId (theAbility sling))
+        resolved = S.runPure (targeting griffinId) activated Stack.resolveTop
+    Spec.assertEqWith s "the Elf's 1 power, not the Giant's 3" (S.damageOf griffinId resolved) (Just 1)
+    Spec.assertBool s (S.onBattlefield griffinId (S.settleSba resolved)) "so the 2/3 Griffin survives"
+    Spec.assertBool s (isTapped elfId activated) "the cost tapped the Elf"
 
 -- alice with Everbark Shaman settled on the battlefield, `buried` in her own
 -- graveyard, and Maskwood Nexus beside the Shaman when `withNexus`. Priority in
