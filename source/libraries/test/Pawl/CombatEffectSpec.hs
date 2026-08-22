@@ -3616,11 +3616,16 @@ castFoliage victim p = case p of
 -- blocking isn't affected by requirements or restrictions that apply to the
 -- declaration of blockers") made observable.
 --
--- The two attackers have DIFFERENT POWER (2 and 1) so bob's life at end of
--- combat separates four implementations: 19 correct, 17 if the rider is dropped
--- or if the entry is routed through CR 509.1's legality, and 18 if the slot is
--- ignored and the token attaches to some other attacker. The two that collide at
--- 17 are told apart by the alice-21 reading on the second leg.
+-- The two attackers have DIFFERENT POWER (2 and 1), so bob's life at end of
+-- combat is the discriminating quantity: 19 correct, 17 both when the rider is
+-- dropped and when the entry is routed through CR 509.1's legality. Those two
+-- are told apart by the second leg, which the legality reading leaves green (its
+-- attacker has no flying) and the dropped rider reddens at alice-21.
+--
+-- The second leg is also what catches an implementation that IGNORES the slot
+-- and attaches the token to some other attacker: measured against
+-- Map.lookupMin of Combat.attackers it leaves leg one green, the Thopter
+-- holding the lower object id, and reddens leg two's alice-21.
 --
 -- Sacred Prey ("Whenever this creature becomes blocked, you gain 1 life") is CR
 -- 509.3c's observer, and its trigger is what proves the THIRD producer of
