@@ -3310,11 +3310,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- Dragon's "roll a d20. You create a number of Treasure tokens equal to the
   -- result").
   --
-  -- Bound on `source` and NOT on `resolving`, which is where Quantity.InSlot
-  -- reads an amount back from (CR 608.2h) and the holder Destroy's "destroyed
-  -- this way" tally already uses. The two ids differ inside a TRIGGERED ability,
-  -- which is exactly this producer, and the wrong one leaves the read
-  -- unevaluable and the Create minting nothing.
+  -- Bound on `source`, which is bindAmountSlot's own contract (CR 608.2h aims an
+  -- amount read at the effect's source) and the holder Destroy's "destroyed this
+  -- way" tally already uses. Unobservable on THIS producer, and the DiceSpec case
+  -- below does not prove it: Quantity.InSlot reads the source first and then the
+  -- object CR 603.3 put on the stack, which for a triggered ability is
+  -- `resolving`, so either holder answers here. Consistency, not a behaviour.
   --
   -- Game.ask and not Game.choose, since a die result is not CR 104.4b's optional
   -- action: nobody is deciding, so there is nothing to usurp. The question goes
