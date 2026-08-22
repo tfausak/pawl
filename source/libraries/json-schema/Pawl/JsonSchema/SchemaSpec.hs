@@ -90,3 +90,21 @@ spec s = Spec.describe s "Pawl.JsonSchema.Schema" $ do
       $ [ Value.pair "type" (str "object"),
           Value.pair "additionalProperties" (Schema.unwrap Schema.integer)
         ]
+
+  -- The counterpart mapOf refuses to be: propertyNames is honest only where the
+  -- decoder rejects a key the key schema rejects, which is
+  -- Pawl.JsonCodec.Common.naturalMap and not textMap.
+  Spec.it s "mapOfKeys pins the key shape as well" $ do
+    Spec.assertEq s (Schema.unwrap (Schema.mapOfKeys Schema.string Schema.integer))
+      . obj
+      $ [ Value.pair "type" (str "object"),
+          Value.pair "propertyNames" (Schema.unwrap Schema.string),
+          Value.pair "additionalProperties" (Schema.unwrap Schema.integer)
+        ]
+
+  Spec.it s "matching is a string with a pattern" $ do
+    Spec.assertEq s (Schema.unwrap (Schema.matching (Text.pack "^a$")))
+      . obj
+      $ [ Value.pair "type" (str "string"),
+          Value.pair "pattern" (str "^a$")
+        ]
