@@ -13,9 +13,10 @@
 -- FOUR morph cards carry the CAST and TURN-FACE-UP halves of rule 708, one per
 -- part of them this file reaches, another carries the TURN-FACE-DOWN half,
 -- Cyber Conversion carries the half where the effect LISTS characteristics of
--- its own, Aven Farseer -- which has no morph ability at all -- is the WATCHER
--- of rule 708.7's other written form, and Soul Summons is the one card here that
--- reaches rule 708 without a cast at all.
+-- its own, Defenestrated Phantom carries the half where a RULE does, Aven
+-- Farseer -- which has no morph ability at all -- is the WATCHER of rule 708.7's
+-- other written form, and Soul Summons is the one card here that reaches rule 708
+-- without a cast at all.
 --
 -- Ainok Tracker is the SUBSTITUTION's card. {5}{R} Creature -- Dog Scout 3/3,
 -- "First strike / Morph {4}{R}". Every axis CR 708.2a substitutes is observable
@@ -68,6 +69,11 @@
 -- targeting side, which is what Goblin Piker (2/1, no keywords) is on the board
 -- to prove: it is a creature in the same pool and only the family filter keeps
 -- Backslide off it.
+--
+-- Defenestrated Phantom is DISGUISE's card, and the reason the disguise group
+-- below says the rest: {4}{W}{W} Creature -- Spirit 4/3, "Flying / Disguise
+-- {4}{W}", the pool's plainest disguise creature. It is the only card here whose
+-- face-down listing is not CR 708.2a's default, the ward {2} CR 702.168b names.
 --
 -- Soul Summons is MANIFEST's card, and the only one here whose permanent never
 -- passes through the stack. {1}{W} Sorcery, "Manifest the top card of your
@@ -1801,6 +1807,54 @@ disguiseSpec s registry =
             Nothing -> Spec.assertFailure s "the morph cast did not reach the battlefield"
             Just permanent ->
               Spec.assertEqWith s "CR 702.37e the morph procedure alone" (FaceDown.turnableFaceUp S.alice down) [(permanent, TurnUpProcedure.Morph)]
+
+        -- CR 701.40d: "if a card with disguise is MANIFESTED, its controller may
+        -- turn that card face up using EITHER the procedure described in rule
+        -- 702.168d ... or the procedure described above" -- CR 701.40c's twin, one
+        -- keyword over, and the case where two of CR 708.7's procedures are open
+        -- on one permanent at once.
+        --
+        -- THE PRICES are what tell them apart, the discriminator the manifest
+        -- group's CR 701.40c case uses: CR 701.40b charges the Phantom's MANA COST
+        -- of {4}{W}{W} -- six lands -- and CR 702.168d its DISGUISE COST of {4}{W}
+        -- -- five. Both end with the same printed 4/3, so "it is face up" alone
+        -- could not discriminate.
+        --
+        -- The permanent is MANIFESTED and not disguise-cast, which is what makes
+        -- the manifest road open at all (CR 701.40a's reason guard), and the
+        -- disguise road is open beside it because CR 702.168d asks about the CARD.
+        Spec.it s "CR 701.40d a manifested disguise card is offered both procedures, at two prices" $ do
+          plains <- S.printingOf s registry "Plains"
+          phantom <- S.printingOf s registry phantomName
+          (after, entered) <- manifestedWith s registry plains phantom 6
+          case entered of
+            Nothing -> Spec.assertFailure s "the manifest did not reach the battlefield"
+            Just permanent -> do
+              let manifested = S.runPure S.identityAnswer after (FaceDown.turnFaceUp S.alice TurnUpProcedure.Manifest permanent)
+                  disguisedUp = S.runPure S.identityAnswer after (FaceDown.turnFaceUp S.alice TurnUpProcedure.Disguise permanent)
+              Spec.assertEqWith s "CR 701.40b six more lands went down for {4}{W}{W}" (S.tappedCount S.alice manifested) 8
+              Spec.assertEqWith s "CR 702.168d five for {4}{W}" (S.tappedCount S.alice disguisedUp) 7
+              -- CR 708.8 off both roads, which is why the price is the
+              -- discriminator and this is the control.
+              Spec.assertEqWith s "CR 708.8 the printed 4/3 after the manifest procedure" (S.powerToughnessOf permanent manifested) (Just (4, 3))
+              Spec.assertEqWith s "CR 708.8 and after the disguise one" (S.powerToughnessOf permanent disguisedUp) (Just (4, 3))
+              -- The fixture facts, after the behaviour: it really was manifested,
+              -- and the sorcery really left six lands.
+              Spec.assertEqWith s "CR 701.40a it is face down, manifested" (fmap Object.facing (Game.lookupObject permanent after)) (Just (Facing.faceDown FaceDownReason.Manifested))
+              Spec.assertEqWith s "the {1}{W} sorcery tapped two lands and no more" (S.tappedCount S.alice after) 2
+              Spec.assertEqWith s "CR 701.40d both roads are open" (FaceDown.turnableFaceUp S.alice after) [(permanent, TurnUpProcedure.Disguise), (permanent, TurnUpProcedure.Manifest)]
+
+        -- The gate, so the six above is the rule's price and not the fixture's:
+        -- five lands left after the sorcery pay {4}{W} and not {4}{W}{W}, so only
+        -- the disguise procedure is offered. Everything else is held fixed.
+        Spec.it s "CR 701.40d five lands buy the disguise procedure alone" $ do
+          plains <- S.printingOf s registry "Plains"
+          phantom <- S.printingOf s registry phantomName
+          (short, shortEntered) <- manifestedWith s registry plains phantom 5
+          case shortEntered of
+            Nothing -> Spec.assertFailure s "the manifest did not reach the battlefield"
+            Just permanent ->
+              Spec.assertEqWith s "CR 702.168d the disguise procedure alone" (FaceDown.turnableFaceUp S.alice short) [(permanent, TurnUpProcedure.Disguise)]
 
         -- WHAT THE LISTING IS FOR, at gameplay level: an opponent's removal aimed
         -- at the face-down permanent fires CR 702.21a's trigger off the listed
