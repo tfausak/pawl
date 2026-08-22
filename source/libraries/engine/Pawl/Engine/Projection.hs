@@ -1529,8 +1529,8 @@ rewriteEffect pairs effect = case effect of
   -- CR 612.1: a rider's text is as changeable as any other.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration kind ref chosenSource quantity rider) ->
     Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage (rewriteDuration pairs duration) kind ref chosenSource quantity (fmap (rewriteEffect pairs) rider))
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration kind ref direction rider) ->
-    Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage (rewriteDuration pairs duration) kind ref direction (fmap (rewriteEffect pairs) rider))
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration kind ref direction chosenSource rider) ->
+    Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage (rewriteDuration pairs duration) kind ref direction chosenSource (fmap (rewriteEffect pairs) rider))
   Effect.RedirectDamage {} -> effect
   Effect.Counter (Counter.MkCounter ref mSlot) -> Effect.Counter (Counter.MkCounter (rewriteObjectRef pairs ref) mSlot)
   -- Not implemented: a CR 122.1b keyword counter named in the kind keeps its

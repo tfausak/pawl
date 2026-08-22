@@ -1,0 +1,86 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "SacrificeThis"
+              }
+            ],
+            "mana": [
+              {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "White"
+                  }
+                }
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "PreventAllDamage",
+                        "value": {
+                          "chosenSource": {
+                            "type": "And",
+                            "value": []
+                          },
+                          "duration": {
+                            "type": "UntilEndOfTurn"
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "you"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        }
+      ],
+      "name": "Auriok Replica",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Cleric"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          },
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

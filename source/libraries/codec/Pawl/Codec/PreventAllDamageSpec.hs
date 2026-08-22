@@ -9,6 +9,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.DamageDirection as DamageDirection
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Duration as Duration
+import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.SlotName as SlotName
@@ -22,7 +23,7 @@ codec = PreventAllDamage.codec Common.text
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.PreventAllDamage" $ do
   -- CR 615.1's shield naming no kind and carrying no CR 615.5 clause -- Selfless
-  -- Squire's. All three optional keys are elided, so this is byte for byte what
+  -- Squire's. All four optional keys are elided, so this is byte for byte what
   -- Pawl.Codec.DurationRef used to write for this arm.
   Spec.it s "MkPreventAllDamage, kind, direction and riders elided" $
     Common.assertCodec
@@ -33,6 +34,7 @@ spec s = Spec.describe s "Pawl.Codec.PreventAllDamage" $ do
             PreventAllDamage.kind = Nothing,
             PreventAllDamage.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you")),
             PreventAllDamage.direction = DamageDirection.DealtTo,
+            PreventAllDamage.chosenSource = Nothing,
             PreventAllDamage.riders = Seq.empty
           }
       )
@@ -49,8 +51,28 @@ spec s = Spec.describe s "Pawl.Codec.PreventAllDamage" $ do
             PreventAllDamage.kind = Just DamageKind.Combat,
             PreventAllDamage.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
             PreventAllDamage.direction = DamageDirection.DealtBy,
+            PreventAllDamage.chosenSource = Nothing,
             PreventAllDamage.riders = Seq.singleton (Text.pack "a rider")
           }
       )
       " {\"direction\":{\"type\":\"DealtBy\"},\"duration\":{\"type\":\"UntilEndOfTurn\"},\"kind\":{\"type\":\"Combat\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"riders\":[\"a rider\"]} "
+  -- CR 609.7a's "by a source of your choice" on the UNBOUNDED shield, which is
+  -- Auriok Replica: the key is WRITTEN and its Filter is the trivial one, since
+  -- the card names no property the chosen source must have. Elided and
+  -- present-but-trivial are different shields, so the round trip has to keep them
+  -- apart.
+  Spec.it s "MkPreventAllDamage, CR 609.7a's chosen source" $
+    Common.assertCodec
+      s
+      codec
+      ( PreventAllDamage.MkPreventAllDamage
+          { PreventAllDamage.duration = Duration.UntilEndOfTurn,
+            PreventAllDamage.kind = Nothing,
+            PreventAllDamage.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you")),
+            PreventAllDamage.direction = DamageDirection.DealtTo,
+            PreventAllDamage.chosenSource = Just (Filter.And []),
+            PreventAllDamage.riders = Seq.empty
+          }
+      )
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"you\"},\"chosenSource\":{\"type\":\"And\",\"value\":[]}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

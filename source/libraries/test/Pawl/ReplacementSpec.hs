@@ -1010,6 +1010,78 @@ healingGraceSpec s registry = Spec.describe s "Healing Grace (CR 609.7a)" $ do
     Spec.assertEqWith s "the same unchosen source's 2 is prevented here" (S.damageOf victim (strike alpha 2 shielded)) (Just 0)
     Spec.assertEqWith s "and nobody was asked to choose a source" (chosenSourcesIn (answersFor (aimCreature victim) g4 (S.cast S.alice spellId >> Stack.resolveTop))) []
 
+-- Answer CR 609.7a's source choice with `src` and take the default everywhere
+-- else. FILTERED, not built, for aimAndChoose's reason; the group below asks for
+-- no targets, so there is nothing else to aim.
+chooseDamageSourceOf :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+chooseDamageSourceOf src p = case p of
+  Prompt.ChooseDamageSource _ _ _ candidates ->
+    Maybe.fromMaybe (NonEmpty.head candidates) (List.find (== src) (NonEmpty.toList candidates))
+  _ -> S.identityAnswer p
+
+-- CR 609.7a's chosen source on the UNBOUNDED shield, whose producer is Auriok
+-- Replica ({3} Artifact Creature -- Cleric, 2/2: "{W}, Sacrifice this creature:
+-- Prevent all damage a source of your choice would deal to you this turn").
+--
+-- Healing Grace above with the amount removed, which is the difference CR 615.3
+-- makes: that shield is used up by the 3 damage it prevents, this one runs until
+-- the duration expires however many times the chosen source strikes.
+--
+-- The chosen source is deliberately NOT the first candidate the prompt offers:
+-- CR 609.7a's pool here is alice's Plains, the two Pikers and the ability itself
+-- on the stack, sorted ascending, so an engine that ignored the answer and took
+-- the head would shield against the Plains and both damage assertions would read
+-- the other way round. The Replica is not in the pool at all -- its own cost
+-- sacrificed it -- so nothing about the choice can come from the source object.
+auriokReplicaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+auriokReplicaSpec s registry = Spec.describe s "Auriok Replica (CR 609.7a)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+  Spec.it s "CR 609.7a the unbounded shield watches the source its controller chose and no other" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    replica <- S.printingOf s registry "Auriok Replica"
+    let base = S.landsInPlay plains 1
+        (replicaId, g1) = S.addCreature replica S.alice base
+        (alpha, g2) = S.addCreature pikerPrinting S.bob g1
+        (omega, g3) = S.addCreature pikerPrinting S.bob g2
+        activate = Activate.activateAbility S.alice replicaId (theAbility replica) Monad.>> Stack.resolveTop
+        shielded = S.runPure (chooseDamageSourceOf omega) g3 activate
+        strike src n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit src (Recipient.ToPlayer S.alice) n])
+    -- THE gameplay assertion: the source alice did NOT choose is not shielded
+    -- against. Before the chosenSource field this 2 was prevented, the row
+    -- naming no source at all.
+    Spec.assertEqWith s "the unchosen source's 2 lands in full" (S.lifeOf S.alice (strike alpha 2 shielded)) (Just 18)
+    -- Its twin on the same board: the chosen source's damage IS prevented, so
+    -- the case cannot pass by installing no shield.
+    Spec.assertEqWith s "the chosen source's 3 is prevented whole" (S.lifeOf S.alice (strike omega 3 shielded)) (Just 20)
+    -- CR 615.3: only the duration ends this shield, so the second 3 from the
+    -- same source is prevented too. This is what separates it from Healing
+    -- Grace's countdown on the same board.
+    Spec.assertEqWith s "CR 615.3 the unbounded shield is not spent, so the chosen source's second 3 is prevented too" (S.lifeOf S.alice (strike omega 3 (strike omega 3 shielded))) (Just 20)
+    -- The proxies, after the behaviour.
+    Spec.assertEqWith s "setup: the shield is a floating replacement" (length (GameState.replacements shielded)) 1
+    Spec.assertEqWith s "alice was asked which source, and answered omega" (chosenSourcesIn (answersFor (chooseDamageSourceOf omega) g3 activate)) [omega]
+  -- The discriminating twin, differing from the case above in the ANSWER alone:
+  -- CR 609.7a's source is the player's choice, so the same board answering alpha
+  -- shields alpha and leaves omega unshielded. Without it the case above could
+  -- pass on an engine that baked a fixed candidate -- the last one, say -- rather
+  -- than the one alice named.
+  Spec.it s "CR 609.7a the same board answering the OTHER source shields that one instead" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    replica <- S.printingOf s registry "Auriok Replica"
+    let base = S.landsInPlay plains 1
+        (replicaId, g1) = S.addCreature replica S.alice base
+        (alpha, g2) = S.addCreature pikerPrinting S.bob g1
+        (omega, g3) = S.addCreature pikerPrinting S.bob g2
+        activate = Activate.activateAbility S.alice replicaId (theAbility replica) Monad.>> Stack.resolveTop
+        shielded = S.runPure (chooseDamageSourceOf alpha) g3 activate
+        strike src n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit src (Recipient.ToPlayer S.alice) n])
+    Spec.assertEqWith s "alpha's 2 is prevented now that alpha is the chosen source" (S.lifeOf S.alice (strike alpha 2 shielded)) (Just 20)
+    Spec.assertEqWith s "and omega's 3 lands in full" (S.lifeOf S.alice (strike omega 3 shielded)) (Just 17)
+    Spec.assertEqWith s "alice was asked which source, and answered alpha" (chosenSourcesIn (answersFor (chooseDamageSourceOf alpha) g3 activate)) [alpha]
+
 -- CR 615.5's ADDITIONAL EFFECT, whose producer is Test of Faith ({1}{W} Instant:
 -- "Prevent the next 3 damage that would be dealt to target creature this turn.
 -- For each 1 damage prevented this way, put a +1/+1 counter on that creature").
@@ -3499,6 +3571,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   voltaicSurgeSpec s registry
   mendingHandsSpec s registry
   healingGraceSpec s registry
+  auriokReplicaSpec s registry
   testOfFaithSpec s registry
   decoratedGriffinSpec s registry
   braceForImpactSpec s registry

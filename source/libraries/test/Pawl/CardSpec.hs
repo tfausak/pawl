@@ -810,7 +810,7 @@ effectCounts effect = case effect of
   -- CR 615.5's rider is an effect list a card authors, so its Counts are this
   -- card's Counts -- the same recursion Create takes into a minted token.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ quantity rider) -> durationCounts duration <> quantityCounts quantity <> concatMap effectCounts rider
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ rider) -> durationCounts duration <> concatMap effectCounts rider
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ rider) -> durationCounts duration <> concatMap effectCounts rider
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ _ _) -> durationCounts duration
   -- CR 708.2's listed characteristics are card data, so the listed power and
   -- toughness are walked for the reason Create's minted face is. The listed type
@@ -1018,7 +1018,7 @@ effectNestedEffects effect = case effect of
   -- CR 615.5's rider on the two prevention opcodes a SPELL authors: Test of
   -- Faith's counters, Inkshield's Inklings.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ riders) -> Foldable.toList riders
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ riders) -> Foldable.toList riders
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ riders) -> Foldable.toList riders
   -- CR 608.2f's body, run once per member of the fold.
   Effect.ForEach (ForEach.MkForEach _ _ body) -> Foldable.toList body
   Effect.Create {} -> []
@@ -1494,7 +1494,7 @@ effectReplacements effect = case effect of
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- CR 615.5's rider can carry an Effect.Replace, so this descends.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ rider) -> concatMap effectReplacements rider
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ rider) -> concatMap effectReplacements rider
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ rider) -> concatMap effectReplacements rider
   -- CR 608.2f's body can too, for the same reason.
   Effect.ForEach (ForEach.MkForEach _ _ body) -> concatMap effectReplacements body
   Effect.RedirectDamage {} -> []
@@ -1592,8 +1592,8 @@ phasePatternOffends replacement = case replacement of
 -- PlayerId, so the recipient a shield covers -- CR 615.7's, and CR 615.3's
 -- unbounded one -- is for Resolve's prevention arms to write, CR 609.7a's chosen
 -- SOURCE beside it likewise, and CR 615.7's remaining amount rides the same
--- carrier. A card says "a source of your choice" through
--- Effect.PreventNextDamage's chosenSource, which is a Filter and names nothing. CR 122.1c's pair is engine-only for a
+-- carrier. A card says "a source of your choice" through the chosenSource of
+-- Effect.PreventNextDamage or Effect.PreventAllDamage, which is a Filter and names nothing. CR 122.1c's pair is engine-only for a
 -- different reason: a RULE creates it off a permanent's counters, so a card
 -- printing either half would be claiming an ability no rule gives it.
 --
@@ -2135,7 +2135,7 @@ effectMintedFaces effect = case effect of
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- CR 615.5's rider can mint a token or emblem of its own, so this descends.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ rider) -> concatMap effectMintedFaces rider
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ rider) -> concatMap effectMintedFaces rider
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ rider) -> concatMap effectMintedFaces rider
   -- CR 608.2f's body can too, for the same reason.
   Effect.ForEach (ForEach.MkForEach _ _ body) -> concatMap effectMintedFaces body
   Effect.RedirectDamage {} -> []
@@ -3528,8 +3528,8 @@ effectFilters effect = case effect of
   -- Replacement.matchesDamageSource evaluates the shield's rechecked half.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ ref chosenSource quantity rider) ->
     unframed (durationFilters duration <> quantityFilters quantity <> Maybe.maybeToList chosenSource) <> sourceHosted (objectRefFilters ref) <> concatMap effectFilters rider
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ ref _ rider) ->
-    unframed (durationFilters duration) <> sourceHosted (objectRefFilters ref) <> concatMap effectFilters rider
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ ref _ chosenSource rider) ->
+    unframed (durationFilters duration <> Maybe.maybeToList chosenSource) <> sourceHosted (objectRefFilters ref) <> concatMap effectFilters rider
   -- BOTH refs, or a Filter inside a redirect's destination escapes this lint.
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ srcRef destRef) ->
     unframed (durationFilters duration) <> sourceHosted (objectRefFilters srcRef <> objectRefFilters destRef)
