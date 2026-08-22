@@ -1884,21 +1884,27 @@ spec s registry = Spec.describe s "Pawl.Engine.Game" $ do
   mandatoryLoopSpec s
   mandatoryLoopBoardSpec s registry
 
--- CR 104.4b at gameplay level. Aether Flash deals 2 damage to each creature that
--- enters; Synthetic Recursion is a 1/1 that returns itself when it dies. So it
--- enters, takes lethal damage (CR 704.5g), dies, returns, enters. Nothing in the
--- cycle is optional and nothing in it makes progress: a loop of mandatory
--- actions, repeating a sequence of events with no way to stop.
+-- CR 104.4b at gameplay level, out of two printings. Life and Limb makes every
+-- Saproling a Forest land and every Forest a Saproling creature (CR 613.1d,
+-- layer 4; CR 205.1b keeps the types it already had), so each 1/1 Saproling
+-- token Sporemound mints is itself a land entering under alice's control, and
+-- Sporemound's "whenever a land you control enters" triggers again (CR 603.6a).
+-- Nothing in the cycle is optional and nothing in it makes progress: a loop of
+-- mandatory actions, repeating a sequence of events with no way to stop.
 --
--- Synthetic Recursion is a LABELED CRUTCH (#683). The canonical board is
--- Worldgorger Dragon reanimated by Animate Dead, and neither card is authorable
--- yet.
+-- Aether Flash is on the board to keep the loop in a STEADY STATE rather than to
+-- drive it: each Saproling is a 1/1, so 2 damage buries it on arrival (CR
+-- 704.5g) and no permanent accumulates. Without it the tokens pile up as
+-- untapped Forest lands, and the loop would then rest on CR 302.6 refusing their
+-- {T} forever instead of on there being nothing to tap.
 mandatoryLoopBoardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 mandatoryLoopBoardSpec s registry = Spec.describe s "a mandatory loop (CR 104.4b)" $ do
   Spec.it s "a loop nobody can interrupt is a draw" $ do
     flash <- S.printingOf s registry "Aether Flash"
-    recursion <- S.printingOf s registry "Synthetic Recursion"
-    let result = runConcedingAt 10000 (loopBoard flash recursion Nothing)
+    limb <- S.printingOf s registry "Life and Limb"
+    sporemound <- S.printingOf s registry "Sporemound"
+    forest <- S.printingOf s registry "Forest"
+    let result = runConcedingAt 10000 (loopBoard flash limb sporemound forest Nothing)
     Spec.assertEqWith s "CR 104.4b" result Result.Drawn
 
   Spec.it s "a loop containing an optional action is not" $ do
@@ -1910,40 +1916,57 @@ mandatoryLoopBoardSpec s registry = Spec.describe s "a mandatory loop (CR 104.4b
     -- which is the only way to get a terminating test out of a game the rules say
     -- does not end.
     flash <- S.printingOf s registry "Aether Flash"
-    recursion <- S.printingOf s registry "Synthetic Recursion"
+    limb <- S.printingOf s registry "Life and Limb"
+    sporemound <- S.printingOf s registry "Sporemound"
+    forest <- S.printingOf s registry "Forest"
     mountain <- S.printingOf s registry "Mountain"
     bolt <- S.printingOf s registry "Lightning Bolt"
-    let result = runConcedingAt 200 (loopBoard flash recursion (Just (mountain, bolt)))
+    let result = runConcedingAt 200 (loopBoard flash limb sporemound forest (Just (mountain, bolt)))
     Spec.assertEqWith s "alice conceded, so bob won -- no draw" result (Result.Won S.bob)
 
--- alice, active, in her precombat main phase: bob's Aether Flash, and alice's
--- Synthetic Recursion ENTERING (so CR 603.6a's event is there for Aether Flash to
--- see). Empty libraries and nothing scheduled after this phase, so the loop is
--- the only thing that can happen and nothing on the board can end the game.
--- `castable`,
+-- alice, active, in her precombat main phase: bob's Aether Flash and Life and
+-- Limb, alice's Sporemound, and a Forest of alice's ENTERING (so CR 603.6a's
+-- event is there for Sporemound's landfall trigger to see). Empty libraries and
+-- nothing scheduled after this phase, so the loop is the only thing that can
+-- happen and nothing on the board can end the game. `castable`,
 -- if any, is an untapped land for alice plus a spell in her hand it pays for --
 -- both halves, since Cast.castableSpells offers a spell only when its cost can be
 -- paid.
 --
+-- The seed Forest enters TAPPED. S.addCreature settles what it places, and Life
+-- and Limb makes a Forest a creature, so an untapped one would offer alice CR
+-- 605.3a's mana ability every round -- an optional action, which is what the
+-- sibling case below is about. CR 107.5 takes it away. The TOKENS need no such
+-- care: CR 302.6 refuses the {T} of a creature its controller has not controlled
+-- since their turn began.
+--
+-- The two static permanents sit under bob so that alice -- the active player,
+-- whose menu the loop reads first -- controls nothing with an activatable
+-- ability.
+--
 -- Seeded ten events short of the limit rather than starting from zero: the
 -- mechanism is the same at any gap, and this keeps the test at a handful of
 -- cycles instead of a few hundred.
-loopBoard :: Printing.Printing -> Printing.Printing -> Maybe (Printing.Printing, Printing.Printing) -> GameState.GameState
-loopBoard flash recursion castable =
+loopBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Maybe (Printing.Printing, Printing.Printing) -> GameState.GameState
+loopBoard flash limb sporemound forest castable =
   let base = Setup.emptyGame S.bothPlayers
       (_, gs1) = S.addCreature flash S.bob base
-      gs2 = case castable of
-        Nothing -> gs1
+      (_, gs2) = S.addCreature limb S.bob gs1
+      (_, gs3) = S.addCreature sporemound S.alice gs2
+      gs4 = case castable of
+        Nothing -> gs3
         Just (land, spell) ->
-          let (_, withLand) = S.addCreature land S.alice gs1
+          let (_, withLand) = S.addCreature land S.alice gs3
            in snd (S.addHandCard spell S.alice withLand)
-      (_, gs3) = S.entersWithTrigger recursion S.alice gs2
-   in gs3
-        { GameState.phase = Phase.PrecombatMain,
-          GameState.remaining = Seq.empty,
-          GameState.nextTimestamp = Timestamp.MkTimestamp (Engine.mandatoryLoopLimit - 10),
-          GameState.lastChoice = Timestamp.MkTimestamp 0
-        }
+      (forestId, gs5) = S.entersWithTrigger forest S.alice gs4
+      seeded =
+        gs5
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.remaining = Seq.empty,
+            GameState.nextTimestamp = Timestamp.MkTimestamp (Engine.mandatoryLoopLimit - 10),
+            GameState.lastChoice = Timestamp.MkTimestamp 0
+          }
+   in S.tapObject forestId seeded
 
 -- Play the game out, with alice conceding once she has been asked `limit` times.
 -- The concession is a backstop for the test that expects NO draw: without it that
