@@ -51,6 +51,7 @@ import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterName as CounterName
 import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
@@ -156,22 +157,30 @@ castabilitySpec s registry = Spec.describe s "Castability" $ do
     Spec.assertEqWith s "one creature in play" (S.creaturesInPlay S.alice gs) 1
     Spec.assertEqWith s "lands tapped" (S.tappedCount S.alice gs) 1
 
--- The board the two CR 604.2 cases below share: alice controls a Synthetic Waxing
--- Moon ("As long as you control a Forest, nonbasic lands are Mountains") and a
--- Reliquary Tower, plus -- and only when `forest` -- one Forest. The two runs
--- differ in that one permanent and in nothing else, so neither the Tower's mana
--- nor the Moon's own text can be what moved between them.
+-- The board the three CR 604.2 cases below share: alice controls Zhao, the Moon
+-- Slayer ("As long as Zhao has a conqueror counter on him, nonbasic lands are
+-- Mountains") and a Reliquary Tower, and Zhao carries one counter of each of
+-- `kinds`. The runs differ in NOTHING but which counters sit on Zhao, so neither
+-- the Tower's mana nor Zhao's own text can be what moved between them.
 --
--- The Forest is BASIC, so the Moon's own affected set does not name it: adding it
--- turns the clause on without adding a second permanent for CR 305.7 to reach.
--- Reliquary Tower's "{T}: Add {C}" is the discriminator, and colorless is a mana
--- type the board can produce no other way -- the Forest makes green and a
--- Mountain'd Tower red.
-waxingMoonBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, GameState.GameState)
-waxingMoonBoard waxingMoon reliquaryTower forest hasForest =
+-- Two permanents and not three: the Tower is the only nonbasic land, so it is
+-- the only object Zhao's affected set names. Reliquary Tower's "{T}: Add {C}" is
+-- the discriminator, and colorless is a mana type this board can produce no
+-- other way -- a Mountain'd Tower makes red.
+--
+-- Zhao's "Nonbasic lands enter tapped" never fires here: S.addCreature writes
+-- the Object record directly rather than going through Event.placeObject, so the
+-- Tower arrives untapped and there is mana to tap for.
+zhaoBoard :: Printing.Printing -> Printing.Printing -> [CounterKind.CounterKind Keyword.Keyword] -> (ObjectId.ObjectId, GameState.GameState)
+zhaoBoard zhao reliquaryTower kinds =
   let (towerId, g1) = S.addCreature reliquaryTower S.alice (Setup.emptyGame S.bothPlayers)
-      (_, g2) = S.addCreature waxingMoon S.alice g1
-   in (towerId, if hasForest then snd (S.addCreature forest S.alice g2) else g2)
+      (zhaoId, g2) = S.addCreature zhao S.alice g1
+   in (towerId, foldr (\k -> S.addCounter k 1 zhaoId) g2 kinds)
+
+-- CR 122.1: the kind Zhao's two sentences both name. A counter's identity is its
+-- name, so this is exact Text equality with what the card file writes.
+conquerorCounter :: CounterKind.CounterKind Keyword.Keyword
+conquerorCounter = CounterKind.Named (CounterName.UnsafeMkCounterName (Text.pack "conqueror"))
 
 -- One mana unit of `mt`, untagged -- what tapping a land for its one mana ability
 -- floats.
@@ -290,7 +299,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     caverns <- S.printingOf s registry "Gemstone Caverns"
     let base = Setup.emptyGame S.bothPlayers
         (cavernsId, gs) = S.addCreature caverns S.alice base
-        lucky = S.addCounter CounterKind.Luck 1 cavernsId gs
+        lucky = S.addCounter (CounterKind.Named (CounterName.UnsafeMkCounterName (Text.pack "luck"))) 1 cavernsId gs
     Spec.assertEqWith s "no counter: colorless and nothing else" (Mana.manaTypesOf cavernsId gs) [ManaType.Colorless]
     Spec.assertBool s (ManaType.Colored Color.White `elem` Mana.manaTypesOf cavernsId lucky) "with a luck counter, white is available"
     Spec.assertBool s (ManaType.Colored Color.Green `elem` Mana.manaTypesOf cavernsId lucky) "and so is green -- CR 105.4's whole five"
@@ -338,33 +347,73 @@ manaSpec s registry = Spec.describe s "Mana" $ do
   -- {R} once it holds. The pool is the pool a player would actually have floated.
   --
   -- A REGRESSION FENCE for this half rather than a proof of it: gatherStatic
-  -- already gated the ability, so the fold was right before this pair existed and
-  -- neither case goes red when that gate is wired open. What the gate half's
+  -- already gated the ability, so the fold was right before these cases existed
+  -- and none of them goes red when that gate is wired open. What the gate half's
   -- divergence needed was a reader outside the fold, and Pawl.PlayerEffectSpec's
-  -- Waxing Moon pair is that -- it is the one this pair composes with.
+  -- Zhao pair is that -- it is the one this trio composes with.
   --
-  -- Synthetic Waxing Moon stands in for Zhao, the Moon Slayer, the only printed
-  -- static ability pairing a clause with a land-subtype set: Zhao's clause counts a
-  -- conqueror counter, which no card can name yet (#1386).
-  Spec.it s "CR 604.2/305.7 with no Forest the Waxing Moon strips nothing, and the Tower still taps for {C}" $ do
-    waxingMoon <- S.printingOf s registry "Synthetic Waxing Moon"
+  -- A PROOF for the counter kind, which is the new half: CR 122.1 makes a
+  -- counter's identity its name, and the trio below reads the kind three ways --
+  -- absent, present-but-a-different-kind, present.
+  Spec.it s "CR 604.2/305.7 with no counter on Zhao the clause is false, and the Tower still taps for {C}" $ do
+    zhao <- S.printingOf s registry "Zhao, the Moon Slayer"
     reliquaryTower <- S.printingOf s registry "Reliquary Tower"
-    forest <- S.printingOf s registry "Forest"
-    let (towerId, gs) = waxingMoonBoard waxingMoon reliquaryTower forest False
+    let (towerId, gs) = zhaoBoard zhao reliquaryTower []
     Spec.assertEqWith s "pool" (Game.poolOf S.alice (S.runPure S.identityAnswer gs (Cost.tapForMana towerId))) (oneUnit ManaType.Colorless)
     Spec.assertBool s (Subtype.Mountain `notElem` Set.toList (Projection.subtypesOf towerId gs)) "and the layer-4 set did not happen either"
 
-  -- The same board with the clause satisfied, which is what keeps the case above
-  -- from passing on a gate wired SHUT: one Forest arrives, the Moon's effect
-  -- starts to apply, and the Tower is a Mountain that taps for red alone.
-  Spec.it s "CR 604.2/305.7 one Forest turns the clause on, and the Tower taps for {R}" $ do
-    waxingMoon <- S.printingOf s registry "Synthetic Waxing Moon"
+  -- The discriminating case: Zhao carries a counter, but of the WRONG KIND. An
+  -- implementation that sums Object.counters instead of looking the kind up --
+  -- or that matches any Named counter -- turns the clause on here and floats
+  -- {R}. +1/+1 and not an obscure kind, because the engine already places and
+  -- reads that one (layer 7c), so a "count any counter" bug is guaranteed to see
+  -- it rather than missing it for an unrelated reason.
+  Spec.it s "CR 122.1 a +1/+1 counter is not a conqueror counter, and the Tower still taps for {C}" $ do
+    zhao <- S.printingOf s registry "Zhao, the Moon Slayer"
     reliquaryTower <- S.printingOf s registry "Reliquary Tower"
-    forest <- S.printingOf s registry "Forest"
-    let (towerId, gs) = waxingMoonBoard waxingMoon reliquaryTower forest True
+    let (towerId, gs) = zhaoBoard zhao reliquaryTower [CounterKind.PlusOnePlusOne]
+    Spec.assertEqWith s "pool" (Game.poolOf S.alice (S.runPure S.identityAnswer gs (Cost.tapForMana towerId))) (oneUnit ManaType.Colorless)
+    Spec.assertBool s (Subtype.Mountain `notElem` Set.toList (Projection.subtypesOf towerId gs)) "and the layer-4 set did not happen either"
+
+  -- The same board with the clause satisfied, which is what keeps the two cases
+  -- above from passing on a gate wired SHUT: one conqueror counter arrives,
+  -- Zhao's effect starts to apply, and the Tower is a Mountain that taps for red
+  -- alone.
+  Spec.it s "CR 604.2/305.7 a conqueror counter turns the clause on, and the Tower taps for {R}" $ do
+    zhao <- S.printingOf s registry "Zhao, the Moon Slayer"
+    reliquaryTower <- S.printingOf s registry "Reliquary Tower"
+    let (towerId, gs) = zhaoBoard zhao reliquaryTower [conquerorCounter]
     Spec.assertEqWith s "pool" (Game.poolOf S.alice (S.runPure S.identityAnswer gs (Cost.tapForMana towerId))) (oneUnit (ManaType.Colored Color.Red))
     Spec.assertBool s (Subtype.Mountain `elem` Set.toList (Projection.subtypesOf towerId gs)) "the Tower is a Mountain (CR 305.7's set)"
     Spec.assertEqWith s "and its printed ability is gone" (Projection.abilitiesOf towerId gs) []
+
+  -- The counter arriving from the CARD rather than from S.addCounter: "{7}: Put a
+  -- conqueror counter on Zhao" is activated and resolved, and the land subtype
+  -- set switches on afterwards. That is Effect.PutCounters carrying a card-named
+  -- kind end to end -- through the codec, through resolution, into the Map key
+  -- the static ability then looks up.
+  --
+  -- Seven BASIC Islands pay the cost, so the Tower is still the only nonbasic
+  -- land on the board and nothing Zhao's own text reaches can pay for it.
+  Spec.it s "CR 122.1 Zhao's own ability puts a conqueror counter on him, and the Tower becomes a Mountain" $ do
+    zhao <- S.printingOf s registry "Zhao, the Moon Slayer"
+    reliquaryTower <- S.printingOf s registry "Reliquary Tower"
+    island <- S.printingOf s registry "Island"
+    let (zhaoId, g1) = S.addCreature zhao S.alice (S.landsInPlay island 7)
+        (towerId, g2) = S.addCreature reliquaryTower S.alice g1
+        gs = g2 {GameState.priority = Just S.alice}
+        ability = case Face.activatedAbilities (S.combinedFace zhao) of
+          ab : _ -> Just ab
+          [] -> Nothing
+    case ability of
+      Nothing -> Spec.assertFailure s "expected Zhao to have an activated ability"
+      Just ab -> do
+        let activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice zhaoId ab)
+            after = S.runPure S.identityAnswer activated Stack.resolveTop
+        Spec.assertBool s (Subtype.Mountain `elem` Set.toList (Projection.subtypesOf towerId after)) "the Tower is a Mountain once the ability has resolved"
+        Spec.assertBool s (Subtype.Mountain `notElem` Set.toList (Projection.subtypesOf towerId activated)) "and was not one while the ability was still on the stack"
+        Spec.assertEqWith s "one conqueror counter" (S.counterOf conquerorCounter zhaoId after) 1
+        Spec.assertEqWith s "and no +1/+1 counter, so the kind is what was placed" (S.counterOf CounterKind.PlusOnePlusOne zhaoId after) 0
 
   -- CR 305.7's strip again, with the new type CHOSEN as an Aura entered (CR
   -- 614.1c) rather than printed on the stripper. Reliquary Tower's "{T}: Add

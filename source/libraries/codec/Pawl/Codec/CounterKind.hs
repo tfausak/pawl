@@ -1,6 +1,7 @@
 module Pawl.Codec.CounterKind where
 
 import qualified Data.Typeable as Typeable
+import qualified Pawl.Codec.CounterName as CounterName
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -23,5 +24,5 @@ codec keywordCodec =
       Arm.nullary "Fade" CounterKind.Fade,
       Arm.nullary "Shield" CounterKind.Shield,
       Arm.nullary "Level" CounterKind.Level,
-      Arm.nullary "Luck" CounterKind.Luck
+      Arm.payload "Named" CounterName.codec CounterKind.Named (\x -> case x of CounterKind.Named y -> Just y; _ -> Nothing)
     ]

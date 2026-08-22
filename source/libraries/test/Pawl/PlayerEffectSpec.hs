@@ -96,6 +96,8 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostAdjustments as CostAdjustments
+import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterName as CounterName
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -1988,6 +1990,18 @@ reliquaryHandOfNine plains extra =
       add g _ = snd (S.addHandCard plains S.alice g)
    in List.foldl' add withExtra [1 .. 9 :: Int]
 
+-- The CR 613.10 pair's board: the same nine Plains in hand, plus a Reliquary
+-- Tower and Zhao, the Moon Slayer, who carries one counter of each of `kinds`.
+-- The runs differ in NOTHING but those counters.
+zhaoHandOfNine :: Printing.Printing -> Printing.Printing -> Printing.Printing -> [CounterKind.CounterKind Keyword.Keyword] -> GameState.GameState
+zhaoHandOfNine plains reliquaryTower zhao kinds =
+  let gs0 = Setup.emptyGame S.bothPlayers
+      (_, g1) = S.addCreature reliquaryTower S.alice gs0
+      (zhaoId, g2) = S.addCreature zhao S.alice g1
+      g3 = List.foldl' (\g k -> S.addCounter k 1 zhaoId g) g2 kinds
+      add g _ = snd (S.addHandCard plains S.alice g)
+   in List.foldl' add g3 [1 .. 9 :: Int]
+
 reliquaryCleanup :: GameState.GameState -> GameState.GameState
 reliquaryCleanup gs = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
 
@@ -2050,25 +2064,35 @@ reliquaryTowerSpec s registry =
     -- gatherStatic dropped it from the fold -- the two halves of one rule
     -- disagreeing.
     --
-    -- The pair differs in ONE permanent, the Forest. It is basic, so the Moon's own
-    -- affected set does not name it and it changes nothing but the clause's answer.
+    -- The pair differs in ONE thing, the counter on Zhao. CR 122.1 makes a
+    -- counter's identity its name, so it is that name the clause reads and
+    -- nothing else about the board moves.
     --
-    -- Synthetic Waxing Moon stands in for Zhao, the Moon Slayer, the only printed
-    -- static ability pairing an "as long as" clause with a land-subtype set: Zhao's
-    -- clause counts a conqueror counter, which no card can name yet (#1386).
-    Spec.it s "CR 604.2/305.7 with no Forest the Waxing Moon's clause is false, and the Tower keeps its ability" $ do
+    -- Zhao, the Moon Slayer is the only printed static ability pairing an "as
+    -- long as" clause with a land-subtype set.
+    Spec.it s "CR 604.2/305.7 with no counter on Zhao the clause is false, and the Tower keeps its ability" $ do
       plains <- S.printingOf s registry "Plains"
       reliquaryTower <- S.printingOf s registry "Reliquary Tower"
-      waxingMoon <- S.printingOf s registry "Synthetic Waxing Moon"
-      let board = reliquaryHandOfNine plains [reliquaryTower, waxingMoon]
+      zhao <- S.printingOf s registry "Zhao, the Moon Slayer"
+      let board = zhaoHandOfNine plains reliquaryTower zhao []
       Spec.assertEqWith s "no maximum" (PlayerEffect.maximumHandSize S.alice board) Nothing
 
-    Spec.it s "CR 604.2/305.7 one Forest turns the clause on, and the Tower is stripped" $ do
+    -- The wrong KIND of counter, which is what tells a kind lookup apart from a
+    -- "does this permanent have any counters" read: +1/+1 is a kind the engine
+    -- itself places and reads, so a bug that counts every kind is guaranteed to
+    -- see it.
+    Spec.it s "CR 122.1 a +1/+1 counter on Zhao is not a conqueror counter, and the Tower keeps its ability" $ do
       plains <- S.printingOf s registry "Plains"
       reliquaryTower <- S.printingOf s registry "Reliquary Tower"
-      waxingMoon <- S.printingOf s registry "Synthetic Waxing Moon"
-      forest <- S.printingOf s registry "Forest"
-      let board = reliquaryHandOfNine plains [reliquaryTower, waxingMoon, forest]
+      zhao <- S.printingOf s registry "Zhao, the Moon Slayer"
+      let board = zhaoHandOfNine plains reliquaryTower zhao [CounterKind.PlusOnePlusOne]
+      Spec.assertEqWith s "no maximum" (PlayerEffect.maximumHandSize S.alice board) Nothing
+
+    Spec.it s "CR 604.2/305.7 a conqueror counter turns the clause on, and the Tower is stripped" $ do
+      plains <- S.printingOf s registry "Plains"
+      reliquaryTower <- S.printingOf s registry "Reliquary Tower"
+      zhao <- S.printingOf s registry "Zhao, the Moon Slayer"
+      let board = zhaoHandOfNine plains reliquaryTower zhao [CounterKind.Named (CounterName.UnsafeMkCounterName (Text.pack "conqueror"))]
       Spec.assertEqWith s "seven again" (PlayerEffect.maximumHandSize S.alice board) (Just 7)
 
 -- alice's board with BOTH maximum-hand-size effects live, built in one of the two

@@ -225,6 +225,8 @@ library codec
     Pawl.Codec.CounteringSpec
     Pawl.Codec.CounterKind
     Pawl.Codec.CounterKindSpec
+    Pawl.Codec.CounterName
+    Pawl.Codec.CounterNameSpec
     Pawl.Codec.CounterPattern
     Pawl.Codec.CounterPatternSpec
     Pawl.Codec.CounterR
@@ -1155,6 +1157,7 @@ library types
     Pawl.Types.CounterChange
     Pawl.Types.Countering
     Pawl.Types.CounterKind
+    Pawl.Types.CounterName
     Pawl.Types.CounterPattern
     Pawl.Types.CounterR
     Pawl.Types.Create

@@ -1,5 +1,7 @@
 module Pawl.Types.CounterKind where
 
+import qualified Pawl.Types.CounterName as CounterName
+
 -- | CR 122.1: a marker that modifies characteristics or interacts with a rule.
 -- Its KIND is a closed-half classification, the same posture as Keyword: the
 -- rules core reads counts by kind (CR 613.4c, the CR 704.5q SBA) and never cases
@@ -118,18 +120,29 @@ data CounterKind keyword
     -- cards." A class level is not a counter at all, so it is not a kind here --
     -- it is Object.classLevel, and the two must not share a field.
     Level
-  | -- | Gemstone Caverns' luck counter. Rule 122.1 gives it no lettered clause --
-    -- 122.1a-j never name it -- so rule 122.1's own first sentence is the whole
-    -- citation: a marker that "interacts with a rule, ability, or effect".
+  | -- | CR 122.1: a kind no rule in the CR reads, identified by the NAME the
+    -- card prints -- Zhao, the Moon Slayer's conqueror counter, Gemstone
+    -- Caverns' luck counter. Rule 122.1 letters none of them, so its own first
+    -- sentence is the whole citation: a marker that "interacts with a rule,
+    -- ability, or effect".
+    --
+    -- ONE arm for the whole open set, rather than a constructor per printing.
+    -- The closed half never learns which name: no module under
+    -- @source/libraries/engine@ looks inside the payload, and every exhaustive
+    -- case over this type answers the same thing for every name. That is the
+    -- same posture Keyword above takes for CR 122.1b, and the reason this is a
+    -- classification rather than card identity in the rules core.
     --
     -- Contributes nothing to the CR 613 layer system, so
-    -- Pawl.Engine.Projection.counterGathered grants nothing for this kind. Its
-    -- one reader is the card's own mana ability, which gates on the count
-    -- through an ActivatedAbility condition (Quantity.ObjectCounters) -- ordinary
-    -- card data, which is what makes this the Loyalty shape rather than the
+    -- Pawl.Engine.Projection.counterGathered grants nothing for this kind. What
+    -- reads such a count is always the card's own text -- an ActivatedAbility or
+    -- StaticAbility condition over Quantity.ObjectCounters -- which is ordinary
+    -- card data, and is what makes this the Loyalty shape rather than the
     -- Keyword shape.
     --
-    -- Never counted DOWN, unlike Time and Fade: nothing removes it, and the
-    -- permanent carries it for the rest of the game.
-    Luck
+    -- CounterName.make is why two spellings cannot be two kinds: CR 122.1's last
+    -- sentence makes counters with the same name interchangeable, so the name is
+    -- the identity and a spelling that collides with a constructor above is
+    -- rejected at the only door in.
+    Named CounterName.CounterName
   deriving (Eq, Ord, Show)

@@ -25,6 +25,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterName as CounterName
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -935,7 +936,7 @@ spec s registry =
       -- CR 122.6a through CR 103.6a: the permanent bob began the game with, and
       -- the count it began with. One list, so a board that placed nothing fails
       -- here rather than at a later size check.
-      Spec.assertEqWith s "one permanent, carrying one luck counter" (fmap (\oid -> S.counterOf CounterKind.Luck oid after) placed) [1]
+      Spec.assertEqWith s "one permanent, carrying one luck counter" (fmap (\oid -> S.counterOf (CounterKind.Named (CounterName.UnsafeMkCounterName (Text.pack "luck"))) oid after) placed) [1]
       -- "If you do, exile a card from your hand" -- an effect of the same action,
       -- so it runs exactly when the action is taken. Six cards were offered, so
       -- the choice was a real one rather than an elision.
