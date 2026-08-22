@@ -10,6 +10,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TapState as TapState
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -18,15 +19,25 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
     Common.assertCodec
       s
       EntryRiders.codec
-      EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = True, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
+      EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = True, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
       " {\"tapped\":{\"type\":\"Tapped\"},\"attacking\":true} "
+  -- CR 509.4's rider, which is a SLOT and not a flag: the effect specifies which
+  -- attacking creature the entering creature blocks (Flash Foliage's target),
+  -- and it implies nothing about tapped-ness -- CR 509.4b exempts the creature
+  -- from CR 509.1a's untapped condition either way.
+  Spec.it s "MkEntryRiders, blocking names the attacker's slot" $
+    Common.assertCodec
+      s
+      EntryRiders.codec
+      EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.blocking = Just (SlotName.MkSlotName (Text.pack "target")), EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
+      " {\"blocking\":\"target\"} "
   -- CR 712.14a's rider, which no other rider implies: a card returned
   -- transformed is not tapped and not attacking by that fact.
   Spec.it s "MkEntryRiders, transformed alone" $
     Common.assertCodec
       s
       EntryRiders.codec
-      EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = True, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
+      EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.blocking = Nothing, EntryRiders.transformed = True, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
       " {\"transformed\":true} "
   -- CR 110.5b's default written out means every key elided: an untapped,
   -- non-attacking, untransformed entry is what an EMPTY object means.
@@ -42,7 +53,7 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
     Common.assertCodec
       s
       EntryRiders.codec
-      EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.fromList [(CounterKind.PlusOnePlusOne, Quantity.Literal 2), (CounterKind.MinusOneMinusOne, Quantity.Literal 1)], EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
+      EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.fromList [(CounterKind.PlusOnePlusOne, Quantity.Literal 2), (CounterKind.MinusOneMinusOne, Quantity.Literal 1)], EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
       " {\"counters\":[{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"count\":{\"type\":\"Literal\",\"value\":2}},{\"kind\":{\"type\":\"MinusOneMinusOne\"},\"count\":{\"type\":\"Literal\",\"value\":1}}]} "
   -- CR 107.3c: the count need not be a literal at all -- Printlifter Ooze's X,
   -- defined by the ability's own text, which is why this field is a Quantity.
@@ -50,7 +61,7 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
     Common.assertCodec
       s
       EntryRiders.codec
-      EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.singleton CounterKind.PlusOnePlusOne Quantity.Power, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
+      EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.singleton CounterKind.PlusOnePlusOne Quantity.Power, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
       " {\"counters\":[{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"count\":{\"type\":\"Power\"}}]} "
   -- A repeated kind is rejected rather than combined, which the multiset could
   -- not do: there a repeat was how a count was written.
@@ -68,7 +79,7 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
     Common.assertCodec
       s
       EntryRiders.codec
-      EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = True, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
+      EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = True, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
       " {\"underOwner\":true} "
   -- CR 406.3's rider, which is the one rider about a zone that is not the
   -- battlefield: Ignorant Bliss exiles face down and says nothing else.
@@ -76,7 +87,7 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
     Common.assertCodec
       s
       EntryRiders.codec
-      EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = True, EntryRiders.faceDown = False}
+      EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = True, EntryRiders.faceDown = False}
       " {\"exiledFaceDown\":true} "
   -- CR 708.3's rider, and the one above it are two different keys because they
   -- are two different rules (CR 110.5d): Soul Summons manifests and says nothing
@@ -85,11 +96,11 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
     Common.assertCodec
       s
       EntryRiders.codec
-      EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = True}
+      EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = True}
       " {\"faceDown\":true} "
   Spec.describe s "defaultValue" $ do
     Spec.it s "is untapped, not attacking and not transformed" $
-      Spec.assertEq s (EntryRiders.defaultValue :: EntryRiders.EntryRiders Quantity.Quantity) EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
+      Spec.assertEq s (EntryRiders.defaultValue :: EntryRiders.EntryRiders Quantity.Quantity) EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
     Spec.it s "a missing tapped key decodes as Untapped" $
       Common.assertFromJson s (Codec.decode EntryRiders.codec) "{\"attacking\":false}" EntryRiders.defaultValue
     Spec.it s "a missing attacking key decodes as False" $
