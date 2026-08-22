@@ -43,7 +43,6 @@ module Pawl.PerformanceSpec where
 import qualified Control.Exception as Exception
 import qualified Data.List as List
 import qualified Data.Set as Set
-import qualified GHC.Conc as Conc
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cost as Cost
@@ -64,6 +63,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Zone as Zone
+import qualified System.Mem as Mem
 
 -- The two board sizes every measurement here is taken at. Their RATIO is what
 -- the growth guard reads: 4x the board costs about 4x a linear enumeration and
@@ -231,16 +231,16 @@ activationsIn =
 
 -- Bytes the calling thread allocates while forcing `f n`.
 --
--- GHC.Conc's allocation counter is PER HASKELL THREAD and counts DOWN, so the
+-- The allocation counter is PER HASKELL THREAD and counts DOWN, so the
 -- drop across the call is this thread's own allocation and no test running
 -- beside it can perturb the reading. It needs no RTS option, no profiling build
 -- and no -T. Its granularity is the nursery block, which is nothing against the
 -- megabyte the large board allocates.
 allocationsOf :: (Int -> Int) -> Int -> IO Integer
 allocationsOf f n = do
-  before <- Conc.getAllocationCounter
+  before <- Mem.getAllocationCounter
   _ <- Exception.evaluate (f n)
-  after <- Conc.getAllocationCounter
+  after <- Mem.getAllocationCounter
   pure (toInteger before - toInteger after)
 
 -- How much more the 4x board may allocate before this is called a regression.
