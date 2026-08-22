@@ -39,6 +39,7 @@ import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Plot as Plot
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replacement as Replacement
@@ -509,6 +510,7 @@ slotsOf effect = case effect of
   Effect.Untap ref -> objectRefSlots ref
   Effect.Detain ref -> objectRefSlots ref
   Effect.Goad ref -> objectRefSlots ref
+  Effect.MakePlotted ref -> objectRefSlots ref
   Effect.DoesNotUntapNext ref -> objectRefSlots ref
   Effect.Transform ref -> objectRefSlots ref
   Effect.PhaseOut ref -> objectRefSlots ref
@@ -741,6 +743,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Untap _ -> True
   Effect.Detain _ -> True
   Effect.Goad _ -> True
+  Effect.MakePlotted _ -> True
   Effect.DoesNotUntapNext _ -> True
   Effect.Transform _ -> True
   Effect.PhaseOut _ -> True
@@ -892,6 +895,7 @@ readsX = any effectReadsX
       Effect.Untap _ -> False
       Effect.Detain _ -> False
       Effect.Goad _ -> False
+      Effect.MakePlotted _ -> False
       Effect.DoesNotUntapNext _ -> False
       Effect.Transform _ -> False
       Effect.PhaseOut _ -> False
@@ -994,6 +998,7 @@ searchesLibrary effect = case effect of
   Effect.Untap _ -> False
   Effect.Detain _ -> False
   Effect.Goad _ -> False
+  Effect.MakePlotted _ -> False
   Effect.DoesNotUntapNext _ -> False
   Effect.Transform _ -> False
   Effect.PhaseOut _ -> False
@@ -1179,6 +1184,7 @@ boundSlots effect = case effect of
   Effect.Untap _ -> Set.empty
   Effect.Detain _ -> Set.empty
   Effect.Goad _ -> Set.empty
+  Effect.MakePlotted _ -> Set.empty
   Effect.DoesNotUntapNext _ -> Set.empty
   Effect.Transform _ -> Set.empty
   Effect.PhaseOut _ -> Set.empty
@@ -3792,6 +3798,20 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                     }
                 grant o = o {Object.playableFromExile = Just permission}
              in gs {GameState.objects = foldr (Map.adjust grant) (GameState.objects gs) targets}
+  -- CR 702.170c: each named card becomes plotted -- the stamp CR 702.170d reads
+  -- and the GameEvent.Plotted entry a "when this card becomes plotted" trigger
+  -- reads, both through Pawl.Engine.Plot.becomePlotted, so this route and CR
+  -- 116.2k's special action say the same thing by construction. The victims are
+  -- enumerated ONCE (CR 608.2f).
+  --
+  -- NOT gated on the object being in exile, Effect.GrantPlayFromExile's reason one
+  -- rule over: every producer supplies the exile in the same clause, so a zone
+  -- test would gate a branch nothing can reach. A stamp that landed elsewhere is
+  -- inert anyway -- Cast.permitsCastPlotted is asked only of exile's members, and
+  -- CR 400.7's new incarnation carries no stamp across a zone change.
+  Effect.MakePlotted ref ->
+    State.modify' $ \gs ->
+      foldr Plot.becomePlotted gs (objectRefObjects legal resolving controller source gs ref)
   Effect.ForEach (ForEach.MkForEach ref slot body) -> do
     gs0 <- State.get
     -- CR 608.2f: WHICH members, swept ONCE from the pre-loop board and then fixed,

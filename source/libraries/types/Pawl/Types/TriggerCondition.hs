@@ -839,9 +839,11 @@ data TriggerCondition
     -- keeps it apart from a condition built on CR 701.25a's zone changes. CR
     -- 701.25c's surveil 0 fires nothing.
     PlayerSurveils PlayerRelation.PlayerRelation
-  | -- | CR 702.170e: "when this card becomes plotted" (Aloe Alchemist), against
-    -- GameEvent.Plotted naming the bearer. Self-scoped and nullary. Watched for
-    -- from EXILE, where CR 702.170b's special action leaves the card.
+  | -- | CR 702.170a / 702.170c: "when this card becomes plotted" (Aloe
+    -- Alchemist), against GameEvent.Plotted naming the bearer. Self-scoped and
+    -- nullary. Watched for from EXILE, which is where both routes leave the
+    -- card -- CR 702.170b's special action exiles it, and rule 702.170c's
+    -- effect acts on a card already there.
     SelfBecomesPlotted
   | -- | CR 701.44b: "whenever a creature you control explores" (Wildgrowth
     -- Walker), against GameEvent.Explored, with the Filter applied to the

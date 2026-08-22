@@ -1554,6 +1554,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Untap ref -> Effect.Untap (rewriteObjectRef pairs ref)
   Effect.Detain ref -> Effect.Detain (rewriteObjectRef pairs ref)
   Effect.Goad ref -> Effect.Goad (rewriteObjectRef pairs ref)
+  Effect.MakePlotted ref -> Effect.MakePlotted (rewriteObjectRef pairs ref)
   Effect.DoesNotUntapNext ref -> Effect.DoesNotUntapNext (rewriteObjectRef pairs ref)
   Effect.Transform ref -> Effect.Transform (rewriteObjectRef pairs ref)
   Effect.PhaseOut ref -> Effect.PhaseOut (rewriteObjectRef pairs ref)

@@ -7527,7 +7527,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
-  -- CR 702.170e: the bearer's own card became plotted. Self-scoped, so the
+  -- CR 702.170a / 702.170c: the bearer's own card became plotted. Self-scoped, so the
   -- match is the id and nothing else -- and the id the event carries is the
   -- CR 400.7 incarnation in exile, which is the bearer here because
   -- Event.eventTriggers finds this ability through its exile scan rather than
@@ -8341,7 +8341,7 @@ eventBindingSlots cond = case cond of
   -- reserved source slot, which every borne trigger gets at placement.
   TriggerCondition.RoomEntered _ -> Set.empty
   -- Nothing, for all four keyword actions. CR 701.22d and CR 701.25d name a
-  -- player and CR 702.170e and CR 701.44b an object, but no printed payload
+  -- player and CR 702.170a and CR 701.44b an object, but no printed payload
   -- under any of them points at one: Matoya, Archon Elder draws, Aloe
   -- Alchemist targets a creature of its controller's choosing and Wildgrowth
   -- Walker grows itself. A card printing "that player" or "that creature" is

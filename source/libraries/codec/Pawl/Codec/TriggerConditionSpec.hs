@@ -673,7 +673,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PlayerSurveils PlayerRelation.Opponent)
       " {\"type\":\"PlayerSurveils\",\"value\":{\"type\":\"Opponent\"}} "
-  -- CR 702.170e. Nullary, SelfCycled's shape: the ability is printed on the card
+  -- CR 702.170a. Nullary, SelfCycled's shape: the ability is printed on the card
   -- that becomes plotted, so there is nothing to select among.
   Spec.it s "SelfBecomesPlotted round-trips" $
     Common.assertCodec

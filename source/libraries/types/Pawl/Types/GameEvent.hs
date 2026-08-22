@@ -835,16 +835,18 @@ data GameEvent
   | -- | CR 702.170a: a card became a plotted card. The ObjectId is the card AS
     -- IT LANDED IN EXILE -- Pawl.Engine.Plot.plot's `newId` and not the object
     -- that was in the hand -- because CR 400.7 mints a new object as it moves
-    -- and that new one is what bears the ability CR 702.170e's "when this card
-    -- becomes plotted" is printed on.
+    -- and that new one is what bears the "when this card becomes plotted"
+    -- ability (Aloe Alchemist) printed on it.
     --
     -- Distinct from the Moved entry the same exile records: a card exiled any
     -- other way makes the same hand-to-exile zone change without becoming
     -- plotted, so a reader matching the zone pair would admit both.
     --
-    -- Not implemented: CR 702.170c's other route -- a spell or ability that
-    -- makes a card in exile become plotted -- which would record this same
-    -- event (#1390).
+    -- BOTH routes record it, through Pawl.Engine.Plot.becomePlotted: CR
+    -- 116.2k's special action, and CR 702.170c's "some spells and abilities
+    -- cause a card in exile to become plotted" (Pawl.Engine.Resolve's
+    -- Effect.MakePlotted arm, Kellan Joins Up). Nothing here tells them apart,
+    -- and rule 702.170d does not either.
     Plotted ObjectId.ObjectId
   | -- | CR 701.44b: this permanent completed CR 701.44a's explore. Recorded
     -- after the whole process, and "even if some or all of those actions were

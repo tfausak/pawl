@@ -164,6 +164,7 @@ codec cardCodec =
       Arm.payload "ShuffleIntoLibrary" ShuffleIntoLibrary.codec Effect.ShuffleIntoLibrary (\x -> case x of Effect.ShuffleIntoLibrary y -> Just y; _ -> Nothing),
       Arm.payload "OfferCast" OfferCast.codec Effect.OfferCast (\x -> case x of Effect.OfferCast y -> Just y; _ -> Nothing),
       Arm.payload "GrantPlayFromExile" GrantPlayFromExile.codec Effect.GrantPlayFromExile (\x -> case x of Effect.GrantPlayFromExile y -> Just y; _ -> Nothing),
+      Arm.payload "MakePlotted" ObjectRef.codec Effect.MakePlotted (\x -> case x of Effect.MakePlotted y -> Just y; _ -> Nothing),
       Arm.payload "ForEach" forEachCodec Effect.ForEach (\x -> case x of Effect.ForEach y -> Just y; _ -> Nothing)
     ]
   where

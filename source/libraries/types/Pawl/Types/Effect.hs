@@ -1118,6 +1118,25 @@ data Effect card
     -- grants (Release to the Wind, Soul Partition) each carry a second clause
     -- pawl cannot yet spell.
     GrantPlayFromExile GrantPlayFromExile.GrantPlayFromExile
+  | -- | CR 702.170c: "in addition to the plot special action, some spells and
+    -- abilities cause a card in exile to become plotted" -- so the objects the
+    -- ObjectRef names each become plotted (Kellan Joins Up).
+    --
+    -- NOT named Plot: CR 702.170e reserves that verb for CR 116.2k's special
+    -- action, which this route is not -- it pays no plot cost, wants no plot
+    -- keyword, and takes no special action. The rule's own words are "become
+    -- plotted".
+    --
+    -- NO DURATION and no beneficiary beside it: CR 702.170d fixes both, naming
+    -- the card's OWNER and putting no end on the permission.
+    --
+    -- The SIBLING of GrantPlayFromExile and never a use of it. That opcode
+    -- writes Object.playableFromExile, CR 715.3d's permission for a named
+    -- PLAYER with no cost stated; rule 702.170d names the owner, makes the cast
+    -- free, and fixes the timing to a later turn's main phase. Object.plotted's
+    -- own comment argues one field cannot answer both, and one opcode cannot
+    -- either.
+    MakePlotted ObjectRef.ObjectRef
   | -- | CR 608.2f: an action taken on several objects and/or players that cannot
     -- be processed simultaneously "is instead processed considering each affected
     -- player or object individually" -- so take the swept set one member at a

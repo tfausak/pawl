@@ -1181,6 +1181,30 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))) ManaSpending.AnyType))
       " {\"type\":\"GrantPlayFromExile\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"spending\":{\"type\":\"AnyType\"}}} "
+  -- CR 702.170c, a BARE ObjectRef where its neighbour above carries a record: rule
+  -- 702.170d fixes the beneficiary and the duration this one would otherwise
+  -- state. The two must not collapse into each other on the wire, since they
+  -- write different fields of the same exiled object. data/cards prints the slot
+  -- arm (Kellan Joins Up); the filter arm costs nothing.
+  Spec.it s "MakePlotted round-trips both ObjectRef arms, and is not GrantPlayFromExile" $ do
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.MakePlotted (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "plotted"))))
+      " {\"type\":\"MakePlotted\",\"value\":{\"type\":\"InSlot\",\"value\":\"plotted\"}} "
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.MakePlotted (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
+      " {\"type\":\"MakePlotted\",\"value\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+    Spec.assertBool
+      s
+      ( toJson (Effect.MakePlotted (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "plotted"))))
+          /= toJson (Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.Indefinite (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "plotted"))) ManaSpending.AsProduced))
+      )
+      "MakePlotted and GrantPlayFromExile of the same slot encode differently"
   -- The shapes the encoder can emit, told apart by LENGTH: a bare ability name
   -- (CR 603.7a/b's defaults), a two-element form (a stated duration, onset
   -- still the default), and a three-element form (a stated onset, whose last

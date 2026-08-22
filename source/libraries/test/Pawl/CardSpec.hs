@@ -701,7 +701,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 603.7's slot-named condition holds a SlotName, which is no Count.
   TriggerCondition.LoseControlOfBound _ -> []
   TriggerCondition.RoomEntered _ -> []
-  -- CR 701.22d and CR 701.25d carry a PlayerRelation and CR 702.170e nothing
+  -- CR 701.22d and CR 701.25d carry a PlayerRelation and CR 702.170a nothing
   -- at all, so none of the three holds a Count. CR 701.44b holds a Filter, and
   -- a Filter holds no Count for PermanentEnters' reason above.
   TriggerCondition.PlayerScries _ -> []
@@ -842,6 +842,7 @@ effectCounts effect = case effect of
   Effect.Untap _ -> []
   Effect.Detain _ -> []
   Effect.Goad _ -> []
+  Effect.MakePlotted _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
   Effect.PhaseOut _ -> []
@@ -1091,6 +1092,7 @@ effectNestedEffects effect = case effect of
   Effect.Untap {} -> []
   Effect.Detain {} -> []
   Effect.Goad {} -> []
+  Effect.MakePlotted {} -> []
   Effect.DoesNotUntapNext {} -> []
   Effect.Transform {} -> []
   Effect.PhaseOut {} -> []
@@ -1533,6 +1535,7 @@ effectReplacements effect = case effect of
   Effect.Untap _ -> []
   Effect.Detain _ -> []
   Effect.Goad _ -> []
+  Effect.MakePlotted _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
   Effect.PhaseOut _ -> []
@@ -2181,6 +2184,7 @@ effectMintedFaces effect = case effect of
   Effect.Untap _ -> []
   Effect.Detain _ -> []
   Effect.Goad _ -> []
+  Effect.MakePlotted _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
   Effect.PhaseOut _ -> []
@@ -2998,7 +3002,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- the slot holds was selected by the arming spell's own target slot.
   TriggerCondition.LoseControlOfBound _ -> []
   TriggerCondition.RoomEntered _ -> []
-  -- CR 701.22d and CR 701.25d carry a PlayerRelation and CR 702.170e nothing,
+  -- CR 701.22d and CR 701.25d carry a PlayerRelation and CR 702.170a nothing,
   -- so none of them holds a Filter.
   TriggerCondition.PlayerScries _ -> []
   TriggerCondition.PlayerSurveils _ -> []
@@ -3604,6 +3608,7 @@ effectFilters effect = case effect of
   Effect.Untap ref -> sourceHosted (objectRefFilters ref)
   Effect.Detain ref -> sourceHosted (objectRefFilters ref)
   Effect.Goad ref -> sourceHosted (objectRefFilters ref)
+  Effect.MakePlotted ref -> sourceHosted (objectRefFilters ref)
   Effect.DoesNotUntapNext ref -> sourceHosted (objectRefFilters ref)
   Effect.Transform ref -> sourceHosted (objectRefFilters ref)
   Effect.PhaseOut ref -> sourceHosted (objectRefFilters ref)
