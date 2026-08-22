@@ -151,6 +151,8 @@ library codec
     Pawl.Codec.BlockRequirementSpec
     Pawl.Codec.BlocksDeclared
     Pawl.Codec.BlocksDeclaredSpec
+    Pawl.Codec.CandidateId
+    Pawl.Codec.CandidateIdSpec
     Pawl.Codec.CantBeBlockedBy
     Pawl.Codec.CantBeBlockedBySpec
     Pawl.Codec.CantBeRegenerated
@@ -341,6 +343,8 @@ library codec
     Pawl.Codec.FightSpec
     Pawl.Codec.Filter
     Pawl.Codec.FilterSpec
+    Pawl.Codec.FloatingCandidate
+    Pawl.Codec.FloatingCandidateSpec
     Pawl.Codec.ForEach
     Pawl.Codec.ForEachSpec
     Pawl.Codec.GameEvent
@@ -362,6 +366,8 @@ library codec
     Pawl.Codec.HybridSpec
     Pawl.Codec.IncreaseSpellCost
     Pawl.Codec.IncreaseSpellCostSpec
+    Pawl.Codec.InstanceOrdinal
+    Pawl.Codec.InstanceOrdinalSpec
     Pawl.Codec.InZone
     Pawl.Codec.InZoneSpec
     Pawl.Codec.Keyword
@@ -453,6 +459,8 @@ library codec
     Pawl.Codec.PerCreature
     Pawl.Codec.PermanentBecomesDesignated
     Pawl.Codec.PermanentBecomesDesignatedSpec
+    Pawl.Codec.PermanentCandidate
+    Pawl.Codec.PermanentCandidateSpec
     Pawl.Codec.PermanentSacrificed
     Pawl.Codec.PermanentSacrificedSpec
     Pawl.Codec.Phase
@@ -609,6 +617,8 @@ library codec
     Pawl.Codec.TargetCountSpec
     Pawl.Codec.TargetSlot
     Pawl.Codec.TargetSlotSpec
+    Pawl.Codec.Timestamp
+    Pawl.Codec.TimestampSpec
     Pawl.Codec.TokenPattern
     Pawl.Codec.TokenPatternSpec
     Pawl.Codec.TokenR
@@ -1250,6 +1260,7 @@ library types
     Pawl.Types.Facing
     Pawl.Types.Fight
     Pawl.Types.Filter
+    Pawl.Types.FloatingCandidate
     Pawl.Types.ForEach
     Pawl.Types.Game
     Pawl.Types.GameEvent
@@ -1268,6 +1279,7 @@ library types
     Pawl.Types.HybridPhyrexian
     Pawl.Types.IgnoredAbility
     Pawl.Types.IncreaseSpellCost
+    Pawl.Types.InstanceOrdinal
     Pawl.Types.InZone
     Pawl.Types.Keyword
     Pawl.Types.KeywordFamily
@@ -1330,6 +1342,7 @@ library types
     Pawl.Types.PendingTrigger
     Pawl.Types.PerCreature
     Pawl.Types.PermanentBecomesDesignated
+    Pawl.Types.PermanentCandidate
     Pawl.Types.PermanentSacrificed
     Pawl.Types.Phase
     Pawl.Types.PhasedOut
