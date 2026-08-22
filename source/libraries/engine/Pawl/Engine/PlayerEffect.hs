@@ -974,7 +974,20 @@ spellCostAdjustments pid oid gs =
 -- another's, and Pawl.Engine.Cost.applyAdjustments applies each floor as its own
 -- reduction lands.
 activationCostAdjustments :: Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> CostAdjustments
-activationCostAdjustments family pid srcId gs =
+activationCostAdjustments family pid srcId gs = activationCostAdjustmentsGiven (applyingTo pid gs) family srcId gs
+
+-- The same gather given the effect list the CALLER has already taken, which is
+-- the half a per-permanent loop wants: `applying` is a walk of everything in
+-- play asking each what player abilities it prints, and it does not depend on
+-- which permanent's ability is being adjusted -- so a caller that asks this per
+-- ROUTE of per PERMANENT takes an identical one every time (#1073's shape,
+-- Pawl.Engine.Cost.manaActivationsGiven the caller).
+--
+-- IT MUST BE `applyingTo pid gs`'s OWN ANSWER for the same pid and the same
+-- board. Nothing in the type says so, and the wrapper above is what a caller
+-- with no list of its own uses.
+activationCostAdjustmentsGiven :: [PlayerEffect] -> Maybe KeywordFamily.KeywordFamily -> ObjectId -> GameState -> CostAdjustments
+activationCostAdjustmentsGiven effects family srcId gs =
   let reductionOf effect = case effect of
         PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost criterion granted amount floor_) ->
           -- Never confined to coloured mana: no printed activation-cost reducer
@@ -1044,12 +1057,17 @@ activationCostAdjustments family pid srcId gs =
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
-      effects = fmap snd (applying pid gs)
    in CostAdjustments.MkCostAdjustments
         { CostAdjustments.increases = [],
           CostAdjustments.reductions = Maybe.mapMaybe reductionOf effects,
           CostAdjustments.components = concat (Maybe.mapMaybe additionOf effects)
         }
+
+-- The player effects in force for `pid`, with the CR 601.3a source dropped: the
+-- shape every cost gather reads, and the hoist activationCostAdjustmentsGiven
+-- takes. `applying`'s own haddock has the ordering argument.
+applyingTo :: PlayerId -> GameState -> [PlayerEffect]
+applyingTo pid gs = fmap snd (applying pid gs)
 
 -- CR 601.3b: may `pid` begin to cast `oid` as though it had flash (Vedalken
 -- Orrery)? By CR 702.8a that means "any time you could cast an instant", which CR
