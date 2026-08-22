@@ -5,6 +5,7 @@ import qualified Pawl.Codec.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Codec.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Codec.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Codec.EachCardInGraveyard as EachCardInGraveyard
+import qualified Pawl.Codec.EachCardInHand as EachCardInHand
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.PlayerRef as PlayerRef
@@ -26,7 +27,7 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- was waiting on. The wire format is unchanged by that conversion -- the same
 -- tags, emitted identically -- and what it adds is the schema.
 --
--- 'EachCardInGraveyard', 'TopOfLibrary', 'TopOfLibraryUntil', 'ChosenCardInGraveyard',
+-- 'EachCardInGraveyard', 'EachCardInHand', 'TopOfLibrary', 'TopOfLibraryUntil', 'ChosenCardInGraveyard',
 -- 'ChosenCardInHand', 'ChosenCardFromAmong' and 'EachCardFromAmong' each carry a payload record of
 -- their own (#1464), so no arm here writes a positional array.
 -- 'RandomCardInHand' carries a bare PlayerRef instead, since it holds only the
@@ -43,6 +44,7 @@ codec =
       Arm.payload "EachMatching" filterCodec ObjectRef.EachMatching (\x -> case x of ObjectRef.EachMatching y -> Just y; _ -> Nothing),
       Arm.payload "EachCardInGraveyard" EachCardInGraveyard.codec ObjectRef.EachCardInGraveyard (\x -> case x of ObjectRef.EachCardInGraveyard y -> Just y; _ -> Nothing),
       Arm.nullary "EachCardInYourHand" ObjectRef.EachCardInYourHand,
+      Arm.payload "EachCardInHand" EachCardInHand.codec ObjectRef.EachCardInHand (\x -> case x of ObjectRef.EachCardInHand y -> Just y; _ -> Nothing),
       Arm.optionalPayload "EachCardExiledWithSource" filterCodec ObjectRef.EachCardExiledWithSource (\x -> case x of ObjectRef.EachCardExiledWithSource y -> Just y; _ -> Nothing),
       Arm.payload "EachSpell" filterCodec ObjectRef.EachSpell (\x -> case x of ObjectRef.EachSpell y -> Just y; _ -> Nothing),
       Arm.payload "EachOnStack" filterCodec ObjectRef.EachOnStack (\x -> case x of ObjectRef.EachOnStack y -> Just y; _ -> Nothing),
