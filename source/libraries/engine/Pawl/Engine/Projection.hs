@@ -2605,7 +2605,8 @@ removesAbilities :: Modification -> Bool
 removesAbilities m = case m of
   Modification.LoseAllAbilities -> True
   Modification.GainKeyword _ -> False
-  -- A grant, the other direction of CR 613.1f, exactly as the two below.
+  -- A grant, the other direction of CR 613.1f, exactly as GainKeyword above and
+  -- GainAbility below.
   Modification.GainEnchant _ -> False
   -- The other direction of CR 613.1f: a grant is not a removal, so timestamp
   -- order alone decides whether a granted ability survives Humility. Proven
@@ -3814,13 +3815,14 @@ mintedTriggeredAbilitiesOf pc =
 
 -- CR 702.5a / 613 layer 6: the object's enchant abilities after the fold --
 -- printed and granted together, which is what Modification.GainEnchant exists to
--- reach. Folded into CR 702.5c's single slot by
--- Pawl.Engine.Card.foldEnchant at each reader.
+-- reach. Folded into CR 702.5c's single slot by Pawl.Engine.Card.foldEnchant at
+-- each reader.
+--
+-- No `enchantGiven` sibling beside it, where subtypesOf and cardTypesOf have one:
+-- the caller that holds a pre-pass is Pawl.Engine.Sba, and it reads PC.enchant out
+-- of that map directly rather than asking for a projection it already has.
 enchantOf :: ObjectId -> GameState -> [TargetSlot.TargetSlot]
-enchantOf = enchantGiven Map.empty
-
-enchantGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> [TargetSlot.TargetSlot]
-enchantGiven pcs oid gs = PC.enchant (projectGiven pcs oid gs)
+enchantOf oid gs = PC.enchant (project oid gs)
 
 subtypesOf :: ObjectId -> GameState -> Set Subtype.Type.Subtype
 subtypesOf = subtypesGiven Map.empty

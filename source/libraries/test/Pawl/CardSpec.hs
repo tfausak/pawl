@@ -2867,8 +2867,9 @@ modificationFilters :: Projection.Modification -> [Filter.Type.Filter Keyword.Ke
 modificationFilters modification = case modification of
   Modification.GainKeyword keyword -> keywordFilters keyword
   -- CR 702.5a again: the granted slot's own Filter, which is card text like any
-  -- other and has to be swept. NOT [] -- this is the one grant arm below whose
-  -- right answer is non-empty.
+  -- other and has to be swept. NOT [] -- of the arms that answer with something,
+  -- this and GainKeyword above are the two, and every arm below carries no Filter
+  -- at all.
   Modification.GainEnchant slot -> targetSlotFilters slot
   -- Nothing HERE, and that is not a hole: a granted ability's Filters are swept
   -- by grantedActivatedAbilities and grantedTriggeredAbilities below, at the
