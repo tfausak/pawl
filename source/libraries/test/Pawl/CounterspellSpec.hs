@@ -102,12 +102,13 @@ twoBoltState :: Printing.Printing -> Printing.Printing -> Printing.Printing -> G
 twoBoltState piker mountain lightningBolt =
   let (_, withPiker) = S.addCreature piker S.bob (S.landsInPlay mountain 2)
       (gs1, _oid1) = S.handOne lightningBolt withPiker
-      (oid2, gs2) = Game.freshObjectId gs1
+      (boltPrintingId, gs1b) = Game.intern lightningBolt gs1
+      (oid2, gs2) = Game.freshObjectId gs1b
       obj =
         Object.MkObject
           { Object.owner = S.alice,
             Object.enteredUnder = Nothing,
-            Object.source = Source.OfCard lightningBolt,
+            Object.source = Source.OfCard boltPrintingId,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,
@@ -165,8 +166,9 @@ cancelVictim island cancel victim =
 -- so a second in-hand card must be appended, not re-inserted).
 handAppend :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 handAppend printing pid gs =
-  let (oid, gs1) = Game.freshObjectId gs
-      obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped Facing.FaceUp False 0 (Sickness.Settled pid) Map.empty Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty False 0 (Mana.MkMana []) Nothing Set.empty Set.empty False Set.empty
+  let (printingId, gsP) = Game.intern printing gs
+      (oid, gs1) = Game.freshObjectId gsP
+      obj = Object.MkObject pid Nothing (Source.OfCard printingId) Zone.Hand TapState.Untapped Facing.FaceUp False 0 (Sickness.Settled pid) Map.empty Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty False 0 (Mana.MkMana []) Nothing Set.empty Set.empty False Set.empty
    in ( oid,
         gs1
           { GameState.objects = Map.insert oid obj (GameState.objects gs1),

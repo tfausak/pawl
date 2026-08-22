@@ -2171,8 +2171,8 @@ anyConditional gs =
         Just face -> any (Maybe.isJust . StaticAbility.condition) (Face.staticAbilities face)
       conditionalStating zone oid = case Game.lookupObject oid gs of
         Nothing -> False
-        Just obj | not (mayStateZone zone obj) -> False
-        Just obj -> case Game.faceOfObject obj of
+        Just obj | not (mayStateZone gs zone obj) -> False
+        Just obj -> case Game.faceOfObject gs obj of
           Nothing -> False
           Just face -> any (\sa -> Maybe.isJust (StaticAbility.condition sa) && statesZone zone sa) (Face.staticAbilities face)
    in any conditional (Set.toList (GameState.battlefield gs))
@@ -2261,7 +2261,7 @@ gatherGiven stripped functioning seed gs =
       static = concatMap (fmap snd . permanentParts stripped functioning setEffs setStripped gs) (abilitySources gs)
       fromEmblem emblemId = case Game.lookupObject emblemId gs of
         Nothing -> []
-        Just emblemObj -> case Game.faceOfObject emblemObj of
+        Just emblemObj -> case Game.faceOfObject gs emblemObj of
           Nothing -> []
           Just face ->
             -- CR 114.4 / 113.6: an emblem's abilities function in the command
@@ -2271,7 +2271,7 @@ gatherGiven stripped functioning seed gs =
       emblems = concatMap fromEmblem (Set.toList (GameState.command gs))
       fromSpell spellId = case Game.lookupObject spellId gs of
         Nothing -> []
-        Just spellObj -> case Game.faceOfObject spellObj of
+        Just spellObj -> case Game.faceOfObject gs spellObj of
           Nothing -> []
           Just face ->
             -- CR 604.2's second limb and CR 113.6: an instant's or sorcery's
@@ -2295,7 +2295,7 @@ gatherGiven stripped functioning seed gs =
       spells = concatMap fromSpell (GameState.stack gs)
       fromGraveyardCard cardId = case Game.lookupObject cardId gs of
         Nothing -> []
-        Just cardObj -> case Game.faceOfObject cardObj of
+        Just cardObj -> case Game.faceOfObject gs cardObj of
           Nothing -> []
           Just face ->
             -- CR 113.6f: an ability that restricts or modifies which zones its
@@ -2347,8 +2347,8 @@ gatherGiven stripped functioning seed gs =
       -- is ignored -- Grist's does (gap #1933).
       fromHiddenCard zone cardId = case Game.lookupObject cardId gs of
         Nothing -> []
-        Just cardObj | not (mayStateZone zone cardObj) -> []
-        Just cardObj -> case Game.faceOfObject cardObj of
+        Just cardObj | not (mayStateZone gs zone cardObj) -> []
+        Just cardObj -> case Game.faceOfObject gs cardObj of
           Nothing -> []
           Just face ->
             concat [gatherStatic (functioning cardId) cardId (Object.timestamp cardObj) [] (const False) n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), statesZone zone sa]
@@ -2410,10 +2410,10 @@ statesZone zone = Set.member zone . StaticAbility.functionsFrom
 -- 708.2's substituted face comes from the ability that turned the object down
 -- rather than from its card, so this answers True and leaves the work to the
 -- exact test in gatherGiven.
-mayStateZone :: Zone.Zone -> Object.Object -> Bool
-mayStateZone zone obj = case Object.facing obj of
+mayStateZone :: GameState -> Zone.Zone -> Object.Object -> Bool
+mayStateZone gs zone obj = case Object.facing obj of
   Facing.FaceDown _ _ -> True
-  Facing.FaceUp -> case Game.cardOfSource (Just (Object.source obj)) of
+  Facing.FaceUp -> case Game.cardOfSource gs (Just (Object.source obj)) of
     Nothing -> False
     Just card -> any (any (statesZone zone) . Face.staticAbilities) (Card.Type.faces card)
 
