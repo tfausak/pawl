@@ -54,6 +54,7 @@ import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.WithCounters as WithCounters
 
 -- | CR 714.2b's threshold crossing: did a count going from `before` to `after`
@@ -234,7 +235,7 @@ awaitingChapter pcs events gs oid =
       -- creature, whose second text box holds abilities independent of its chapter
       -- symbols, is the shape that would tell them apart.
       onStack sid = case fmap Object.source (Game.lookupObject sid gs) of
-        Just (Source.OfTrigger srcId ability) -> srcId == oid && Maybe.isJust (chapterOf ability)
+        Just (Source.OfTrigger triggered) -> TriggeredAbilitySource.source triggered == oid && Maybe.isJust (chapterOf (TriggeredAbilitySource.ability triggered))
         _ -> False
       -- Triggered but not yet placed: an unscanned CR 122.6 placement on this
       -- permanent that crossed one of its chapters. The same comparison

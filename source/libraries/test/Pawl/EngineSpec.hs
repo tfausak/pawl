@@ -47,10 +47,10 @@ cardBackedCount gs =
   let fromCard obj = case Object.source obj of
         Source.OfCard _ -> True
         Source.OfToken _ -> False
-        Source.OfAbility _ _ -> False
-        Source.OfTrigger _ _ -> False
+        Source.OfAbility _ -> False
+        Source.OfTrigger _ -> False
         Source.OfEmblem _ -> False
-        Source.OfInherentTrigger _ _ -> False
+        Source.OfInherentTrigger _ -> False
    in Map.size (Map.filter fromCard (GameState.objects gs))
 
 battlefieldCount :: GameState.GameState -> Int

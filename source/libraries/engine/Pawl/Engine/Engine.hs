@@ -105,6 +105,7 @@ import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.Zone as Zone
 
 -- The interpreter seam: every decision the engine suspends on is answered here.
@@ -714,7 +715,12 @@ placeBorne srcId pending = do
         Object.MkObject
           { Object.owner = controller,
             Object.enteredUnder = Nothing,
-            Object.source = Source.OfTrigger srcId ability,
+            Object.source =
+              Source.OfTrigger
+                TriggeredAbilitySource.MkTriggeredAbilitySource
+                  { TriggeredAbilitySource.source = srcId,
+                    TriggeredAbilitySource.ability = ability
+                  },
             Object.zone = Zone.Stack,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,

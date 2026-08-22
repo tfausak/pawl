@@ -86,6 +86,7 @@ import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 310: is this object a battle? Read off the PROJECTED card types, so a
@@ -361,7 +362,7 @@ defenseOn oid gs = case Game.lookupObject oid gs of
 awaitingAbility :: [GameEvent.GameEvent] -> GameState -> ObjectId.ObjectId -> Bool
 awaitingAbility events gs oid =
   let onStack sid = case fmap Object.source (Game.lookupObject sid gs) of
-        Just (Source.OfTrigger srcId _) -> srcId == oid
+        Just (Source.OfTrigger triggered) -> TriggeredAbilitySource.source triggered == oid
         _ -> False
       -- CR 310.12b's condition, matched exactly as Event.matchesTrigger matches it:
       -- an unscanned removal on this permanent that took its last defense counter.

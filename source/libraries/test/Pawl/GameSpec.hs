@@ -35,6 +35,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.AttackTarget as AttackTarget
@@ -2179,10 +2180,10 @@ namedIs wanted gs mo =
         Just o -> case Object.source o of
           Source.OfCard printingId -> named printingId
           Source.OfToken printingId -> named printingId
-          Source.OfAbility _ _ -> False
-          Source.OfTrigger _ _ -> False
+          Source.OfAbility _ -> False
+          Source.OfTrigger _ -> False
           Source.OfEmblem _ -> False
-          Source.OfInherentTrigger _ _ -> False
+          Source.OfInherentTrigger _ -> False
         Nothing -> False
 
 -- The controller's strategy: when asked to decide for bob (the CONTROLLED player,
@@ -2490,7 +2491,12 @@ restartOnStack mountain =
         Object.MkObject
           { Object.owner = S.bob,
             Object.enteredUnder = Nothing,
-            Object.source = Source.OfAbility (ObjectId.MkObjectId 0) ability,
+            Object.source =
+              Source.OfAbility
+                ActivatedAbilitySource.MkActivatedAbilitySource
+                  { ActivatedAbilitySource.source = ObjectId.MkObjectId 0,
+                    ActivatedAbilitySource.ability = ability
+                  },
             Object.zone = Zone.Stack,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,

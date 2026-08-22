@@ -284,10 +284,10 @@ humilityTimestamp humility gs =
         Just obj -> case Object.source obj of
           Source.OfCard p -> Game.cardOfPrinting p gs == Just (Printing.card humility)
           Source.OfToken _ -> False
-          Source.OfAbility _ _ -> False
-          Source.OfTrigger _ _ -> False
+          Source.OfAbility _ -> False
+          Source.OfTrigger _ -> False
           Source.OfEmblem _ -> False
-          Source.OfInherentTrigger _ _ -> False
+          Source.OfInherentTrigger _ -> False
       hums = filter isHum (Set.toList (GameState.battlefield gs))
       stampOf oid = fmap Object.timestamp (Game.lookupObject oid gs)
    in case Maybe.mapMaybe stampOf hums of

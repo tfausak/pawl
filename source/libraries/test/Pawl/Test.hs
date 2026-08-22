@@ -14,6 +14,7 @@ import qualified Pawl.CastSpec
 import qualified Pawl.ClassSpec
 import qualified Pawl.Codec.AbilityNameSpec
 import qualified Pawl.Codec.AbilityTriggeredSpec
+import qualified Pawl.Codec.ActivatedAbilitySourceSpec
 import qualified Pawl.Codec.ActivatedAbilitySpec
 import qualified Pawl.Codec.ActivationRestrictionSpec
 import qualified Pawl.Codec.AddActivationCostSpec
@@ -155,6 +156,7 @@ import qualified Pawl.Codec.HandActionSpec
 import qualified Pawl.Codec.HybridSpec
 import qualified Pawl.Codec.InZoneSpec
 import qualified Pawl.Codec.IncreaseSpellCostSpec
+import qualified Pawl.Codec.InherentTriggerSourceSpec
 import qualified Pawl.Codec.InstanceOrdinalSpec
 import qualified Pawl.Codec.KeywordFamilySpec
 import qualified Pawl.Codec.KeywordSpec
@@ -223,6 +225,7 @@ import qualified Pawl.Codec.PowerSpec
 import qualified Pawl.Codec.PreventAllDamageSpec
 import qualified Pawl.Codec.PreventNextDamageSpec
 import qualified Pawl.Codec.PrintedReplacementSpec
+import qualified Pawl.Codec.PrintingIdSpec
 import qualified Pawl.Codec.PrintingSpec
 import qualified Pawl.Codec.ProductionTagSpec
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec
@@ -261,6 +264,7 @@ import qualified Pawl.Codec.SetPowerToughnessSpec
 import qualified Pawl.Codec.ShuffleIntoLibrarySpec
 import qualified Pawl.Codec.SkipNextPhaseSpec
 import qualified Pawl.Codec.SlotNameSpec
+import qualified Pawl.Codec.SourceSpec
 import qualified Pawl.Codec.SpecialActionSpec
 import qualified Pawl.Codec.SpeedDecreaseSpec
 import qualified Pawl.Codec.SpellCastSpec
@@ -289,6 +293,7 @@ import qualified Pawl.Codec.TransformedSpec
 import qualified Pawl.Codec.TriggerConditionSpec
 import qualified Pawl.Codec.TriggerFrequencySpec
 import qualified Pawl.Codec.TriggerLimitSpec
+import qualified Pawl.Codec.TriggeredAbilitySourceSpec
 import qualified Pawl.Codec.TriggeredAbilitySpec
 import qualified Pawl.Codec.TurnFaceDownSpec
 import qualified Pawl.Codec.TurnScopeSpec
@@ -468,6 +473,7 @@ spec s registry = do
   Pawl.CastSpec.spec s registry
   Pawl.Codec.AbilityNameSpec.spec s
   Pawl.Codec.AbilityTriggeredSpec.spec s
+  Pawl.Codec.ActivatedAbilitySourceSpec.spec s
   Pawl.Codec.ActivatedAbilitySpec.spec s
   Pawl.Codec.ActivationRestrictionSpec.spec s
   Pawl.Codec.AddActivationCostSpec.spec s
@@ -607,6 +613,7 @@ spec s registry = do
   Pawl.Codec.HybridSpec.spec s
   Pawl.Codec.InZoneSpec.spec s
   Pawl.Codec.IncreaseSpellCostSpec.spec s
+  Pawl.Codec.InherentTriggerSourceSpec.spec s
   Pawl.Codec.InstanceOrdinalSpec.spec s
   Pawl.Codec.KeywordFamilySpec.spec s
   Pawl.Codec.KeywordSpec.spec s
@@ -675,6 +682,7 @@ spec s registry = do
   Pawl.Codec.PreventAllDamageSpec.spec s
   Pawl.Codec.PreventNextDamageSpec.spec s
   Pawl.Codec.PrintedReplacementSpec.spec s
+  Pawl.Codec.PrintingIdSpec.spec s
   Pawl.Codec.PrintingSpec.spec s
   Pawl.Codec.ProductionTagSpec.spec s
   Pawl.Codec.ProjectedCharacteristicsSpec.spec s
@@ -715,6 +723,7 @@ spec s registry = do
   Pawl.Codec.ShuffleIntoLibrarySpec.spec s
   Pawl.Codec.SkipNextPhaseSpec.spec s
   Pawl.Codec.SlotNameSpec.spec s
+  Pawl.Codec.SourceSpec.spec s
   Pawl.Codec.SpecialActionSpec.spec s
   Pawl.Codec.SpeedDecreaseSpec.spec s
   Pawl.Codec.SpellCastSpec.spec s
@@ -743,6 +752,7 @@ spec s registry = do
   Pawl.Codec.TriggerConditionSpec.spec s
   Pawl.Codec.TriggerFrequencySpec.spec s
   Pawl.Codec.TriggerLimitSpec.spec s
+  Pawl.Codec.TriggeredAbilitySourceSpec.spec s
   Pawl.Codec.TriggeredAbilitySpec.spec s
   Pawl.Codec.TurnScopeSpec.spec s
   Pawl.Codec.TurnUpRSpec.spec s

@@ -61,6 +61,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -89,6 +90,7 @@ import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TurnWindow as TurnWindow
 import qualified Pawl.Types.Zone as Zone
@@ -167,7 +169,7 @@ logSpec s registry =
           after = snd (Engine.runGamePure S.identityAnswer ending Engine.advance)
           isTrigger oid = case Game.lookupObject oid after of
             Just obj -> case Object.source obj of
-              Source.OfTrigger _ _ -> True
+              Source.OfTrigger _ -> True
               _ -> False
             Nothing -> False
       Spec.assertBool s (any isTrigger (GameState.stack after)) "the pending trigger reached the stack"
@@ -508,7 +510,7 @@ stateTriggerSpec s registry =
   let triggerIds gs = filter (isTriggerObject gs) (GameState.stack gs)
       isTriggerObject gs oid = case Game.lookupObject oid gs of
         Just obj -> case Object.source obj of
-          Source.OfTrigger _ _ -> True
+          Source.OfTrigger _ -> True
           _ -> False
         Nothing -> False
       settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
@@ -572,8 +574,8 @@ stateTriggerSpec s registry =
               again = settle removed
           Spec.assertEqWith s "a fresh instance" (length (triggerIds again)) 1
         -- IMPORTANT-2 (review): Event.stateTriggers' instancesOnStack count
-        -- keys on BOTH the source object's id and the ability (`Source.OfTrigger
-        -- srcId ab`). Every test above uses exactly one
+        -- keys on BOTH the source object's id and the ability (the two fields of
+        -- `TriggeredAbilitySource`). Every test above uses exactly one
         -- Barbarian Outcast, so all of them would still pass a weaker
         -- implementation that compared only the TriggeredAbility and ignored
         -- srcId -- and that weaker version would wrongly suppress a second,
@@ -741,7 +743,7 @@ textChangedTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Regist
 textChangedTriggerSpec s registry =
   let isTriggerObject gs oid = case Game.lookupObject oid gs of
         Just obj -> case Object.source obj of
-          Source.OfTrigger _ _ -> True
+          Source.OfTrigger _ -> True
           _ -> False
         Nothing -> False
       triggerIds gs = filter (isTriggerObject gs) (GameState.stack gs)
@@ -848,7 +850,7 @@ historySpec s registry =
               fired = settle (beginEndStep quiet)
               isTrigger oid = case Game.lookupObject oid fired of
                 Just obj -> case Object.source obj of
-                  Source.OfTrigger _ _ -> True
+                  Source.OfTrigger _ -> True
                   _ -> False
                 Nothing -> False
           Spec.assertEqWith s "nothing before the step began" (GameState.stack quiet) []
@@ -1872,10 +1874,10 @@ monarchOrderingSpec s registry =
            in pick True <> pick False
         _ -> S.identityAnswer p
       inherentController placed oid = case fmap Object.source (Game.lookupObject oid placed) of
-        Just (Source.OfInherentTrigger pid _) -> Just pid
+        Just (Source.OfInherentTrigger inherent) -> Just (InherentTriggerSource.controller inherent)
         _ -> Nothing
       triggerSourceOf placed oid = case fmap Object.source (Game.lookupObject oid placed) of
-        Just (Source.OfTrigger src _) -> Just src
+        Just (Source.OfTrigger triggered) -> Just (TriggeredAbilitySource.source triggered)
         _ -> Nothing
    in Spec.describe s "MonarchTriggerOrdering" $ do
         -- The collision itself: both triggers reach ONE CR 603.3b choice.
@@ -2488,7 +2490,7 @@ secondPlacementPassSpec s registry =
       triggerSourcesOnStack gs =
         Maybe.mapMaybe
           ( \sid -> case fmap Object.source (Game.lookupObject sid gs) of
-              Just (Source.OfTrigger srcId _) -> Just srcId
+              Just (Source.OfTrigger triggered) -> Just (TriggeredAbilitySource.source triggered)
               _ -> Nothing
           )
           (GameState.stack gs)
@@ -2533,7 +2535,7 @@ secondPlacementPassSpec s registry =
 chaptersOnStackFrom :: ObjectId.ObjectId -> GameState.GameState -> [Natural]
 chaptersOnStackFrom oid gs =
   let from sid = case fmap Object.source (Game.lookupObject sid gs) of
-        Just (Source.OfTrigger srcId ability) | srcId == oid -> Saga.chapterOf ability
+        Just (Source.OfTrigger triggered) | TriggeredAbilitySource.source triggered == oid -> Saga.chapterOf (TriggeredAbilitySource.ability triggered)
         _ -> Nothing
    in Maybe.mapMaybe from (GameState.stack gs)
 

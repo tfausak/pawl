@@ -147,10 +147,10 @@ printingOfObject oid gs = case fmap Object.source (lookupObject oid gs) of
   Nothing -> Nothing
   Just (Source.OfCard pid) -> printingOf pid gs
   Just (Source.OfToken pid) -> printingOf pid gs
-  Just (Source.OfAbility _ _) -> Nothing
-  Just (Source.OfTrigger _ _) -> Nothing
+  Just (Source.OfAbility _) -> Nothing
+  Just (Source.OfTrigger _) -> Nothing
   Just (Source.OfEmblem pid) -> printingOf pid gs
-  Just (Source.OfInherentTrigger _ _) -> Nothing
+  Just (Source.OfInherentTrigger _) -> Nothing
 
 -- Reject-not-repair, as payment already does: only a genuine permutation of the
 -- offered indices is honoured. Anything else -- a short answer, a duplicate, an
@@ -365,10 +365,10 @@ cardOfSource gs mSource = case mSource of
   Just source -> case source of
     Source.OfCard pid -> cardOfPrinting pid gs
     Source.OfToken pid -> cardOfPrinting pid gs
-    Source.OfAbility _ _ -> Nothing
-    Source.OfTrigger _ _ -> Nothing
+    Source.OfAbility _ -> Nothing
+    Source.OfTrigger _ -> Nothing
     Source.OfEmblem pid -> cardOfPrinting pid gs
-    Source.OfInherentTrigger _ _ -> Nothing
+    Source.OfInherentTrigger _ -> Nothing
 
 cardOfPrinting :: PrintingId.PrintingId -> GameState -> Maybe Card
 cardOfPrinting pid gs = fmap Printing.card (printingOf pid gs)
@@ -659,10 +659,10 @@ isSpell oid gs = case lookupObject oid gs of
     Object.zone obj == Zone.Stack && case Object.source obj of
       Source.OfCard _ -> True
       Source.OfToken _ -> False
-      Source.OfAbility _ _ -> False
-      Source.OfTrigger _ _ -> False
+      Source.OfAbility _ -> False
+      Source.OfTrigger _ -> False
       Source.OfEmblem _ -> False
-      Source.OfInherentTrigger _ _ -> False
+      Source.OfInherentTrigger _ -> False
 
 -- CR 113.9: is this object an activated or triggered ability on the stack? The
 -- SIBLING of isSpell above and never its complement, asking the same two
@@ -684,10 +684,10 @@ isAbility oid gs = case lookupObject oid gs of
     Object.zone obj == Zone.Stack && case Object.source obj of
       Source.OfCard _ -> False
       Source.OfToken _ -> False
-      Source.OfAbility _ _ -> True
-      Source.OfTrigger _ _ -> True
+      Source.OfAbility _ -> True
+      Source.OfTrigger _ -> True
       Source.OfEmblem _ -> False
-      Source.OfInherentTrigger _ _ -> True
+      Source.OfInherentTrigger _ -> True
 
 -- CR 110.5: a permanent's tapped/untapped status. CR 110.5d gives status only
 -- to a permanent, so an unknown id -- and a card outside the battlefield -- is
@@ -711,10 +711,10 @@ sourceIsToken :: Source.Source -> Bool
 sourceIsToken source = case source of
   Source.OfToken _ -> True
   Source.OfCard _ -> False
-  Source.OfAbility _ _ -> False
-  Source.OfTrigger _ _ -> False
+  Source.OfAbility _ -> False
+  Source.OfTrigger _ -> False
   Source.OfEmblem _ -> False
-  Source.OfInherentTrigger _ _ -> False
+  Source.OfInherentTrigger _ -> False
 
 -- CR 104.2a: who is still in the game. Here rather than in
 -- Pawl.Engine.Departure because Departure imports Pawl.Engine.Monarch, which

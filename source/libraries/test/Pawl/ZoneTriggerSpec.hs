@@ -123,6 +123,7 @@ import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
 import qualified Pawl.Types.Zone as Zone
@@ -1956,7 +1957,7 @@ permanentLeavesTheBattlefieldSpec s registry =
       triggerSourcesOn gs =
         Maybe.mapMaybe
           ( \oid -> case fmap Object.source (Game.lookupObject oid gs) of
-              Just (Source.OfTrigger owner _) -> Just owner
+              Just (Source.OfTrigger triggered) -> Just (TriggeredAbilitySource.source triggered)
               _ -> Nothing
           )
           (GameState.stack gs)
@@ -4140,7 +4141,7 @@ screamsFromWithinSpec s registry =
             s
             "CR 113.6m the Aura's death trigger is on the stack"
             (fmap (\oid -> fmap Object.source (Game.lookupObject oid after)) (GameState.stack after))
-            (fmap (Just . Source.OfTrigger aura) (Face.triggeredAbilities (S.combinedFace screams)))
+            (fmap (\ab -> Just (Source.OfTrigger TriggeredAbilitySource.MkTriggeredAbilitySource {TriggeredAbilitySource.source = aura, TriggeredAbilitySource.ability = ab})) (Face.triggeredAbilities (S.combinedFace screams)))
           -- The preconditions the assertion above rests on, AFTER it so neither
           -- can absorb a mutation aimed at the clause.
           Spec.assertEqWith s "the enchanted Hill Giant really died" (Game.lookupObject enchanted after) Nothing
@@ -4164,7 +4165,7 @@ screamsFromWithinSpec s registry =
             s
             "CR 603.10a the Aura's death trigger is still on the stack"
             (fmap (\oid -> fmap Object.source (Game.lookupObject oid after)) (GameState.stack after))
-            (fmap (Just . Source.OfTrigger aura) (Face.triggeredAbilities (S.combinedFace screams)))
+            (fmap (\ab -> Just (Source.OfTrigger TriggeredAbilitySource.MkTriggeredAbilitySource {TriggeredAbilitySource.source = aura, TriggeredAbilitySource.ability = ab})) (Face.triggeredAbilities (S.combinedFace screams)))
           Spec.assertEqWith s "and both really left the battlefield in one batch" (fmap (`Game.lookupObject` after) [enchanted, aura]) [Nothing, Nothing]
         -- The over-rejection leg, and the reason the clause is a case on the
         -- CONDITION rather than an unconditional Nothing: Squee, Goblin Nabob's

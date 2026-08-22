@@ -166,6 +166,7 @@ import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
@@ -10262,7 +10263,7 @@ stateTriggers gs
     -- pair re-arm while the other's instance still sits there
     -- (TriggerSpec, "one instance leaving re-arms ITS ability").
     instancesOnStack srcId ab =
-      let isInstance sid = fmap Object.source (Game.lookupObject sid gs) == Just (Source.OfTrigger srcId ab)
+      let isInstance sid = fmap Object.source (Game.lookupObject sid gs) == Just (Source.OfTrigger TriggeredAbilitySource.MkTriggeredAbilitySource {TriggeredAbilitySource.source = srcId, TriggeredAbilitySource.ability = ab})
        in length (filter isInstance (GameState.stack gs))
     forOne oid = case Projection.controllerOfGiven grants Set.empty oid gs of
       Nothing -> []

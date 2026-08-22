@@ -49,6 +49,7 @@ import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
 import qualified Pawl.Types.Zone as Zone
@@ -149,7 +150,7 @@ finished gs = filter isFinished (Set.toList (GameState.command gs))
   where
     onStack oid = any (fromDungeon oid) (GameState.stack gs)
     fromDungeon oid stacked = case fmap Object.source (Game.lookupObject stacked gs) of
-      Just (Source.OfTrigger srcId _) -> srcId == oid
+      Just (Source.OfTrigger triggered) -> TriggeredAbilitySource.source triggered == oid
       _ -> False
     pending oid = any (aboutDungeon oid) (Event.unscannedEvents gs)
     aboutDungeon oid event = case event of

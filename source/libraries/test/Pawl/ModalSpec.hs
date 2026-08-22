@@ -423,7 +423,7 @@ triggerModalSpec s registry = Spec.describe s "M4h trigger modal (CR 700.2b/603.
           any
             ( \abilId -> case Game.lookupObject abilId placed of
                 Just obj -> case Object.source obj of
-                  Source.OfTrigger _ _ -> True
+                  Source.OfTrigger _ -> True
                   _ -> False
                 Nothing -> False
             )
