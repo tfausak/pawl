@@ -137,7 +137,9 @@ import qualified Pawl.Codec.ExpirySpec
 import qualified Pawl.Codec.ExtraPhaseSpec
 import qualified Pawl.Codec.FaceDownCharacteristicsSpec
 import qualified Pawl.Codec.FaceDownReasonSpec
+import qualified Pawl.Codec.FaceDownStateSpec
 import qualified Pawl.Codec.FaceSpec
+import qualified Pawl.Codec.FacingSpec
 import qualified Pawl.Codec.FightSpec
 import qualified Pawl.Codec.FilterSpec
 import qualified Pawl.Codec.ForEachSpec
@@ -582,7 +584,9 @@ spec s registry = do
   Pawl.Codec.ExtraPhaseSpec.spec s
   Pawl.Codec.FaceDownCharacteristicsSpec.spec s
   Pawl.Codec.FaceDownReasonSpec.spec s
+  Pawl.Codec.FaceDownStateSpec.spec s
   Pawl.Codec.FaceSpec.spec s
+  Pawl.Codec.FacingSpec.spec s
   Pawl.Codec.FightSpec.spec s
   Pawl.Codec.FilterSpec.spec s
   Pawl.Codec.ForEachSpec.spec s

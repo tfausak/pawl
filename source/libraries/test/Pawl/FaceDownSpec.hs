@@ -115,6 +115,7 @@ import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
+import qualified Pawl.Types.FaceDownState as FaceDownState
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
@@ -1689,7 +1690,7 @@ faceUpEffectSpec s registry = Spec.describe s "TurnFaceUp (CR 701.40g)" $ do
 -- disguise asserts the same thing about morph on the same board.
 disguiseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 disguiseSpec s registry =
-  let disguised = Facing.FaceDown FaceDownReason.Disguised FaceDownCharacteristics.disguisedValue
+  let disguised = Facing.FaceDown FaceDownState.MkFaceDownState {FaceDownState.reason = FaceDownReason.Disguised, FaceDownState.listed = FaceDownCharacteristics.disguisedValue}
       morphed = Facing.faceDown FaceDownReason.Morphed
       -- CR 702.21a's ward {2}, written as the trigger's cost is written, so the
       -- assertion reads the listing rather than restating it.

@@ -19,6 +19,7 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Discarded as Discarded
 import Pawl.Types.Face (Face)
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.FaceDownState as FaceDownState
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameEvent (GameEvent)
@@ -493,7 +494,7 @@ faceOf oid gs = faceOfObject gs =<< lookupObject oid gs
 -- Maybe: a third way for an object to be turned has to be classified here.
 faceOfObject :: GameState -> Object.Object -> Maybe (Face Card)
 faceOfObject gs obj = case Object.facing obj of
-  Facing.FaceDown _ listed -> Just (Card.faceDownFace listed)
+  Facing.FaceDown state -> Just (Card.faceDownFace (FaceDownState.listed state))
   Facing.FaceUp -> fmap (resolveFaceFor (Just obj)) (cardOfSource gs (Just (Object.source obj)))
 
 -- CR 201.1 / 709.4a: the names of the object an id names -- `faceOf`'s plural
@@ -505,7 +506,7 @@ faceOfObject gs obj = case Object.facing obj of
 -- object with no card behind it (CR 113.7a: an ability on the stack).
 namesOf :: ObjectId -> GameState -> Set.Set CardName.CardName
 namesOf oid gs = case fmap Object.facing (lookupObject oid gs) of
-  Just (Facing.FaceDown _ _) -> Set.empty
+  Just (Facing.FaceDown _) -> Set.empty
   _ -> maybe Set.empty (namesFor (lookupObject oid gs) . Printing.card) (printingOfObject oid gs)
 
 -- `faceOf` IGNORING CR 708.2's substitution: what the object's own card shows,
@@ -544,7 +545,7 @@ faceUpFaceOf oid gs = do
 -- mana value that falls out is CR 202.3a's 0.
 manaCostFaceOf :: ObjectId -> GameState -> Maybe (Face Card)
 manaCostFaceOf oid gs = case fmap Object.facing (lookupObject oid gs) of
-  Just (Facing.FaceDown _ listed) -> Just (Card.faceDownFace listed)
+  Just (Facing.FaceDown state) -> Just (Card.faceDownFace (FaceDownState.listed state))
   _ -> do
     printing <- printingOfObject oid gs
     let card = Printing.card printing
@@ -564,7 +565,7 @@ manaCostFaceOf oid gs = case fmap Object.facing (lookupObject oid gs) of
 -- revealed to all players as it goes.
 faceOfWithLastKnown :: ObjectId -> GameState -> Maybe (Face Card)
 faceOfWithLastKnown oid gs = case fmap Object.facing (lookupObject oid gs) of
-  Just (Facing.FaceDown _ listed) -> Just (Card.faceDownFace listed)
+  Just (Facing.FaceDown state) -> Just (Card.faceDownFace (FaceDownState.listed state))
   _ -> do
     card <- cardOfWithLastKnown oid gs
     Just (resolveFaceFor (lookupObject oid gs) card)
