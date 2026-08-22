@@ -1105,6 +1105,39 @@ data Keyword
     -- toxic ability the creature has (Pawl.Engine.Projection.totalToxic) --
     -- including two with the same N, which the projection counts separately.
     Toxic Natural.Natural
+  | -- | 702.168a: disguise [cost]. "You may cast this card as a 2\/2 face-down
+    -- creature with ward {2}, no name, no subtypes, and no mana cost by paying
+    -- {3} rather than paying its mana cost."
+    --
+    -- MORPH'S TWIN, and rule 702.168b is rule 702.37c word for word but for the
+    -- ward, so everything CR 702.37 buys is shared rather than duplicated: the
+    -- {3} is Pawl.Engine.Cost.faceDownCost (the rule's alternative cost, not the
+    -- card's), the cast is Pawl.Engine.Cast's face-down proposal, and CR
+    -- 702.168d's special action is Pawl.Engine.FaceDown's, at
+    -- TurnUpProcedure.Disguise.
+    --
+    -- A SIBLING CONSTRUCTOR and not a MorphVariant, which is the opposite call
+    -- from megamorph's and for the reason rule 702.37b gives there: "a megamorph
+    -- cost IS a morph cost", so every reader of morph must reach megamorph. Rule
+    -- 702.168 says no such thing -- CR 702.168d's subject is "a face-down
+    -- permanent you control with A DISGUISE ABILITY", a different sentence from
+    -- CR 702.37e's -- and the two list different characteristics, so a reader
+    -- that conflated them would let a morph card be turned up for a disguise
+    -- cost and hand a morph-cast creature ward {2}.
+    --
+    -- The COST is what CR 702.168d charges to turn the permanent face up, the
+    -- same role Morph's carries. What the face-down object IS lives on
+    -- Pawl.Types.FaceDownCharacteristics instead (CR 708.2), because rule
+    -- 702.168b's listing is the RULE's and identical on every printing, where
+    -- this cost differs on each.
+    --
+    -- Nothing is minted from it: rule 702.168a is one alternative cost and rule
+    -- 702.168d one special action, neither an ability on any object.
+    --
+    -- Not implemented: CR 702.168e's X in a disguise cost, which needs the value
+    -- chosen as the special action was taken to reach the permanent's other
+    -- abilities (#2056).
+    Disguise (Cost.Cost Keyword)
   | -- | 702.170a: plot [cost]. "Any time you have priority during your main phase
     -- while the stack is empty, you may exile this card from your hand and pay
     -- [cost]. It becomes a plotted card." CR 702.170b makes taking it CR 116.2k's

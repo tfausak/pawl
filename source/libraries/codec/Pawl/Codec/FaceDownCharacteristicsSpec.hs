@@ -34,4 +34,14 @@ spec s = Spec.describe s "Pawl.Codec.FaceDownCharacteristics" $ do
               }
         }
       " {\"typeLine\":{\"subtypes\":[{\"type\":\"Cyberman\"}],\"types\":[{\"type\":\"Artifact\"},{\"type\":\"Creature\"}]}} "
+  -- CR 702.168b's and CR 701.58a's ward {2}, the one listing in the rules that
+  -- names a keyword -- minted by
+  -- Pawl.Types.FaceDownCharacteristics.disguisedValue rather than by a card, and
+  -- on the wire so the record round-trips whole.
+  Spec.it s "a listed keyword writes that key alone" $
+    Common.assertCodec
+      s
+      FaceDownCharacteristics.codec
+      FaceDownCharacteristics.disguisedValue
+      " {\"keywords\":[{\"type\":\"Ward\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}}]} "
   Spec.it s "has a schema" $ Common.assertHasSchema s FaceDownCharacteristics.codec

@@ -2443,6 +2443,8 @@ keywordFilters keyword = case keyword of
   -- CR 702.170a: the plot cost, whose components may hold a Filter exactly as
   -- flashback's and entwine's may.
   Keyword.Plot cost -> costFilters cost
+  -- CR 702.168a: the disguise cost, reached the same way as morph's below.
+  Keyword.Disguise cost -> costFilters cost
   -- CR 702.143a: the foretell cost, reached the same way.
   Keyword.Foretell cost -> costFilters cost
   Keyword.Ward cost -> costFilters cost

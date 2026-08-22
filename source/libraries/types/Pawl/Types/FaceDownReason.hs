@@ -22,6 +22,16 @@ data FaceDownReason
   = -- | CR 702.37c: cast face down using a morph ability, "turn it face down and
     -- announce that you're using a morph ability".
     Morphed
+  | -- | CR 702.168b: cast face down using a disguise ability, "turn the card face
+    -- down and announce that you are using a disguise ability".
+    --
+    -- Its own arm and not Morphed reused, because the two allowers LIST different
+    -- characteristics -- CR 702.168b's list carries ward {2} and CR 702.37c's does
+    -- not -- and CR 708.2 makes the list the allower's. The listing rides
+    -- Facing.FaceDown beside this, so nothing reads the reason to find it; what
+    -- the distinction buys is CR 708.6's own question, which a player must be able
+    -- to answer about each of their face-down objects.
+    Disguised
   | -- | CR 701.40a: manifested, i.e. put onto the battlefield face down by the
     -- keyword action. The one reason that unlocks CR 701.40b's procedure.
     Manifested

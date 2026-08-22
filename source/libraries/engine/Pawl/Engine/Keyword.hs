@@ -250,6 +250,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Nightbound -> []
   Keyword.Decayed -> List.genericReplicate count decayed
   Keyword.Toxic _ -> []
+  Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
   Keyword.Foretell _ -> []
   -- CR 702.94a's linked triggered half, one per instance for CR 603.2's general
@@ -357,6 +358,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Compleated -> []
   Keyword.Training -> []
   Keyword.Toxic _ -> []
+  Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
   Keyword.Foretell _ -> []
   -- CR 702.94a's hand ability is TRIGGERED rather than activated, so it is
@@ -546,6 +548,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Compleated -> []
   Keyword.Training -> []
   Keyword.Toxic _ -> []
+  Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
   Keyword.Foretell _ -> []
   Keyword.Miracle _ -> []
@@ -785,6 +788,13 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Compleated -> []
   Keyword.Training -> []
   Keyword.Toxic _ -> []
+  -- CR 702.168a grants NO permission, and it is the near miss worth stating: the
+  -- ability "functions in any zone FROM WHICH YOU COULD PLAY THE CARD it's on",
+  -- so it widens no zone -- CR 702.168b's "you can use a disguise ability to cast
+  -- a card from any zone from which you could NORMALLY cast it" is the same fact
+  -- said the other way. What it does grant is an ALTERNATIVE COST, which is
+  -- Cost.faceDownCost's, and morph's arm below takes the same reading.
+  Keyword.Disguise _ -> []
   -- CR 702.170a is a static ability functioning in a HAND, and what it grants is
   -- CR 116.2k's special action rather than a cast. CR 702.170d's permission to cast
   -- from EXILE belongs to the PLOTTED card and not to the keyword, so it is object
@@ -864,8 +874,9 @@ flashbackCosts keywords =
 -- card has no morph ability. NOT the cost of the morph CAST, which rule 702.37a
 -- writes into the rule itself, so that one comes from Cost.faceDownCost.
 --
--- Asked of the card's PRINTED keywords: a face-down permanent projects no keywords
--- at all (CR 708.2a), so a projected read would find nothing to pay.
+-- Asked of the card's PRINTED keywords: a face-down permanent projects only what
+-- its allower listed (CR 708.2), so a projected read would find no morph ability
+-- to charge for.
 --
 -- CR 702.37b: MEGAMORPH REACHES HERE TOO, which is why Pawl.Types.Keyword's Morph
 -- carries a variant rather than having a sibling constructor -- the case below is
@@ -879,6 +890,29 @@ morphCost :: Set Keyword -> Maybe (Cost Keyword)
 morphCost keywords =
   let costOf keyword = case keyword of
         Keyword.Morph (Morph.MkMorph cost _) -> Just cost
+        _ -> Nothing
+   in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
+
+-- CR 702.168a / 702.168d: the DISGUISE cost -- what a face-down permanent's
+-- controller pays to turn it face up as CR 116.2b's special action -- or Nothing
+-- when the card has no disguise ability. NOT the cost of the disguise CAST,
+-- which rule 702.168a fixes at {3} for every printing, so that one comes from
+-- Cost.faceDownCost as morph's does.
+--
+-- Asked of the card's PRINTED keywords, morphCost's reason exactly: CR 702.168b
+-- leaves the face-down permanent with no keyword but the ward it lists, so a
+-- projected read would find no disguise ability to charge for.
+--
+-- A SEPARATE function from morphCost and not a widening of it, which is what
+-- keeps CR 702.168d's price apart from CR 702.37e's: a permanent with both
+-- abilities is turnable by either procedure at either cost, and one function
+-- answering for both would charge whichever the Set happened to hold first.
+--
+-- ONE cost per card (the ascending-least), morphCost's shape.
+disguiseCost :: Set Keyword -> Maybe (Cost Keyword)
+disguiseCost keywords =
+  let costOf keyword = case keyword of
+        Keyword.Disguise cost -> Just cost
         _ -> Nothing
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
@@ -1128,6 +1162,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Compleated -> []
   Keyword.Training -> []
   Keyword.Toxic _ -> []
+  Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
   Keyword.Foretell _ -> []
   -- CR 702.94a's static half is a PERMISSION to reveal, not a replacement: CR
@@ -1257,6 +1292,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Compleated -> []
   Keyword.Training -> []
   Keyword.Toxic _ -> []
+  Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
   Keyword.Foretell _ -> []
   Keyword.Miracle _ -> []
@@ -1311,6 +1347,7 @@ familyOf keyword = case keyword of
   Keyword.Rampage _ -> Just KeywordFamily.Rampage
   Keyword.Afflict _ -> Just KeywordFamily.Afflict
   Keyword.Toxic _ -> Just KeywordFamily.Toxic
+  Keyword.Disguise _ -> Just KeywordFamily.Disguise
   Keyword.Plot _ -> Just KeywordFamily.Plot
   Keyword.Foretell _ -> Just KeywordFamily.Foretell
   -- CR 702.94a's parameterized keyword: "a card with miracle" drops the cost.

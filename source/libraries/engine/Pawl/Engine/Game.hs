@@ -433,9 +433,10 @@ namesOf oid gs = case fmap Object.facing (lookupObject oid gs) of
 --
 -- Two rules want it, and both are about a face-down object without being about
 -- its characteristics. CR 702.37e reads "what the permanent's morph cost WOULD
--- BE if it were face up" -- a face-down permanent has no keywords for a
--- projected read to find, so the cost has to come from the card. CR 708.8's
--- turning face up then reverts the copiable values to these.
+-- BE if it were face up" -- a projected read finds only what the allower listed
+-- (CR 708.2), never the card's own keywords, so the cost has to come from the
+-- card. CR 702.168d asks the same of a disguise cost. CR 708.8's turning face up
+-- then reverts the copiable values to these.
 --
 -- Deliberately NOT the door any characteristic read may take: a reader that
 -- wants to know what an object IS wants faceOf.

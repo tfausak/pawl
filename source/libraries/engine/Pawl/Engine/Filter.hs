@@ -1221,6 +1221,12 @@ rewriteKeyword pairs keyword = case keyword of
   -- own step and the ability it arms is written in Pawl.Engine.Keyword.
   Keyword.Type.Decayed -> keyword
   Keyword.Type.Toxic _ -> keyword
+  -- CR 702.168a states a cost, so rewriteCost reaches it as morph's does. The
+  -- ward {2} rule 702.168b lists is NOT reached from here: that keyword is on the
+  -- face-down object's own characteristics (Pawl.Types.FaceDownCharacteristics),
+  -- and a text-changing effect that reached this ability would find no word in it
+  -- to swap either.
+  Keyword.Type.Disguise cost -> Keyword.Type.Disguise (rewriteCost pairs cost)
   -- CR 702.170a states a cost, so rewriteCost reaches it as flashback's does.
   Keyword.Type.Plot cost -> Keyword.Type.Plot (rewriteCost pairs cost)
   -- CR 702.143a states a cost too, so it is reached the same way.
