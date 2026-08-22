@@ -874,8 +874,9 @@ flashbackCosts keywords =
 -- card has no morph ability. NOT the cost of the morph CAST, which rule 702.37a
 -- writes into the rule itself, so that one comes from Cost.faceDownCost.
 --
--- Asked of the card's PRINTED keywords: a face-down permanent projects no keywords
--- at all (CR 708.2a), so a projected read would find nothing to pay.
+-- Asked of the card's PRINTED keywords: a face-down permanent projects only what
+-- its allower listed (CR 708.2), so a projected read would find no morph ability
+-- to charge for.
 --
 -- CR 702.37b: MEGAMORPH REACHES HERE TOO, which is why Pawl.Types.Keyword's Morph
 -- carries a variant rather than having a sibling constructor -- the case below is

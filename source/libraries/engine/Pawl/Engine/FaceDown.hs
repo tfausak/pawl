@@ -73,9 +73,11 @@ import qualified Pawl.Types.TypeLine as TypeLine
 --
 -- Read through Game.faceUpFaceOf, the one door that steps around CR 708.2's
 -- substitution, because that substitution is exactly what makes a projected read
--- useless here: a face-down permanent has no keywords at all (CR 708.2a), so
--- Projection.keywordsOf would answer Nothing for every morph creature ever
--- printed. The rule's counterfactual is what licenses it.
+-- useless here: a face-down permanent has none of the CARD's keywords (CR
+-- 708.2), so Projection.keywordsOf would answer Nothing for every morph creature
+-- ever printed. The rule's counterfactual is what licenses it. What a projected
+-- read does find is whatever the allower LISTED -- disguise's ward {2} (CR
+-- 702.168b) -- which is never a morph or disguise cost.
 --
 -- Not a projected read, therefore not affected by Humility: a face-down
 -- permanent under a layer-6 ability removal can still be turned face up, since
@@ -224,8 +226,9 @@ turnableFaceUp pid gs =
 --
 -- The UNPAID branch is quiet, and for a reason of its own: CR 702.37e's
 -- reject-not-repair restores the state the attempt began with, log and all, and
--- CR 708.2a leaves the still-face-down permanent with no ability that could have
--- seen an event anyway.
+-- CR 708.2 leaves the still-face-down permanent with no ability watching a
+-- payment anyway -- disguise's listed ward (CR 702.168b) watches CR 702.21a's
+-- targeting and nothing else.
 --
 -- Everything from the status write on is performTurnFaceUp below, which the
 -- effect road shares.
@@ -329,8 +332,8 @@ performTurnFaceUp procedure oid = do
       -- counterfactual: the permanent has its abilities back by now (CR
       -- 708.2a took them away only while it was face down), so
       -- Projection.replacementsAffecting simply sees the row. Running the
-      -- loop first would collect from a permanent with no abilities at all
-      -- and apply nothing.
+      -- loop first would collect from a permanent holding none of the card's
+      -- abilities and apply nothing.
       --
       -- BEFORE the event record, and that half is observable: a CR 614.1e
       -- ability and a CR 708.7 trigger on one card would otherwise be

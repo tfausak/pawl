@@ -1814,13 +1814,16 @@ disguiseSpec s registry =
           case board of
             Nothing -> Spec.assertFailure s "the disguise cast did not reach the battlefield"
             Just (permanent, onStack) -> do
+              -- THE BEHAVIOUR FIRST, ahead of every control below: with the stack
+              -- resolved down, a 5/5 is the Growth having resolved and a 2/2 is CR
+              -- 701.6a's countered spell.
+              let declined = S.runPure S.identityAnswer onStack (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop)
+              Spec.assertEqWith s "CR 702.21a bob declined, so the Growth was countered and it is still a 2/2" (S.powerToughnessOf permanent declined) (Just (2, 2))
+              Spec.assertEqWith s "CR 701.6a and the stack is empty" (length (GameState.stack declined)) 0
               -- The controls: the Growth really was cast (rule 702.21a is not a CR
               -- 115 targeting restriction), and the trigger really went on over it.
               Spec.assertEqWith s "CR 708.2 a 2/2 with the Growth unresolved" (S.powerToughnessOf permanent onStack) (Just (2, 2))
               Spec.assertEqWith s "the Growth and the ward trigger are both on the stack" (length (GameState.stack onStack)) 2
-              let declined = S.runPure S.identityAnswer onStack (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop)
-              Spec.assertEqWith s "CR 702.21a bob declined, so the Growth was countered and it is still a 2/2" (S.powerToughnessOf permanent declined) (Just (2, 2))
-              Spec.assertEqWith s "CR 701.6a and the stack is empty" (length (GameState.stack declined)) 0
 
         -- The same board and the same cast, differing in NOTHING but bob's answer.
         Spec.it s "CR 702.21a paying the listed ward cost leaves the spell to resolve" $ do
@@ -1829,8 +1832,12 @@ disguiseSpec s registry =
             Nothing -> Spec.assertFailure s "the disguise cast did not reach the battlefield"
             Just (permanent, onStack) -> do
               let paid = S.runPure (paysWard S.bob) onStack (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop)
-              Spec.assertEqWith s "CR 702.21a the Growth resolved on the 2/2" (S.powerToughnessOf permanent paid) (Just (5, 5))
-              Spec.assertEqWith s "and bob's Forests paid the ward on top of the Growth" (S.tappedCount S.bob paid) 3
+              -- THE DISCRIMINATING assertion first, and it is the mana rather than
+              -- the P\/T: a Growth that resolved because nothing triggered leaves
+              -- the same 5\/5, so only the two extra Forests say the ward cost was
+              -- charged and paid.
+              Spec.assertEqWith s "CR 702.21a bob paid the {2} on top of the Growth's {G}, so all three Forests are spent" (S.tappedCount S.bob paid) 3
+              Spec.assertEqWith s "and the Growth resolved on the 2/2" (S.powerToughnessOf permanent paid) (Just (5, 5))
 
         -- THE PAIR, and the case that makes the two above about the LISTING rather
         -- than about the board: the same three seats, the same Giant Growth, the

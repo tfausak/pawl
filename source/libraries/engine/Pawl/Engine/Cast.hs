@@ -889,9 +889,12 @@ castableSpells pid gs =
             -- the reason and the list (CR 708.2).
             --
             -- A SECOND ENTRY and not a widened first: a card with both abilities
-            -- offers two face-down casts, since the two objects differ (one has ward
-            -- {2}) and CR 702.168d's price for turning up is not CR 702.37e's. No
-            -- printing has both.
+            -- would offer two face-down casts, since the two objects differ (one has
+            -- ward {2}) and CR 702.168d's price for turning up is not CR 702.37e's.
+            -- Scryfall `keyword:morph keyword:disguise`, 2026-08-21, no hit -- a
+            -- printing with both would be the card that refutes it, and the rules
+            -- allow one (CR 701.58c and CR 701.58d put both procedures on one
+            -- permanent).
             <> [Facing.FaceDown FaceDownReason.Disguised FaceDownCharacteristics.disguisedValue | Maybe.isJust (Keyword.disguiseCost (Face.keywords face))]
       proposals oid =
         [ (oid, Face.name face, facing)

@@ -123,12 +123,14 @@ firstOffered candidates = case candidates of
   c : _ -> c
   [] -> unpayable
 
--- CR 702.37a: what a morph cast pays. An alternative cost (CR 118.9) stated by
--- the rule rather than by a card, which is why it is minted here and not read
--- off Keyword.Morph -- that constructor carries CR 702.37e's special-action
--- cost, a different amount on every printing. No additional costs ride along: CR
--- 702.37c measures the cast against the face-down characteristics, which CR
--- 708.2a leaves no text to print one in.
+-- CR 702.37a and CR 702.168a: what a face-down cast pays. Both rules fix it at
+-- {3}, so one value serves both. An alternative cost (CR 118.9) stated by the
+-- rule rather than by a card, which is why it is minted here and not read off
+-- Keyword.Morph or Keyword.Disguise -- those constructors carry CR 702.37e's and
+-- CR 702.168d's special-action costs, a different amount on every printing. No
+-- additional costs ride along: CR 702.37c and CR 702.168b measure the cast
+-- against the face-down characteristics, which neither rule's listing prints one
+-- in.
 faceDownCost :: Cost Keyword.Type.Keyword
 faceDownCost =
   Cost.MkCost
