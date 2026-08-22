@@ -60,13 +60,20 @@ import qualified Pawl.Types.Subtype as Subtype
 -- honours an enchant slot that narrows further for free. Admission and not target
 -- legality: CR 702.5a gives the enchant ability both jobs and this is the second,
 -- so rule 702's targeting restrictions do not reach here. CR 109.5's "you" on that
--- enchant slot is the AURA's controller, not the moving effect's. An Aura with
--- no enchant ability cannot arise -- the CardSpec lint holds the biconditional.
+-- enchant slot is the AURA's controller, not the moving effect's. An Aura with no
+-- enchant ability answers Nothing here rather than admitting everything: printed
+-- Auras cannot be in that shape (the CardSpec lint holds the biconditional), but a
+-- permanent that gained the Aura subtype without gaining enchant can be
+-- (Modification.AddSubtype without Modification.GainEnchant), and CR 303.4c gives
+-- such a permanent nothing it may legally enchant.
 --
--- Read through Game.faceOf, so CR 708.2a's substitution applies: a permanent that
--- is still face down has no enchant ability and no Aura subtype, and this answers
--- Nothing for every destination. That is not an edge case here but the content of
--- CR 303.4k -- see turnUpHosts below.
+-- Read off the PROJECTION rather than the printed face, which is what lets an
+-- enchant ability be GRANTED (CR 613.1f, Modification.GainEnchant, #1703) --
+-- exactly as the Aura subtype it is gated on already is. CR 708.2a's substitution
+-- still applies, since Projection.baseCharacteristics seeds this field through
+-- Game.faceOf: a permanent that is still face down has no enchant ability and no
+-- Aura subtype, and this answers Nothing for every destination. That is not an
+-- edge case here but the content of CR 303.4k -- see turnUpHosts below.
 --
 -- The Aura branch's first test is CR 303.4d's "an Aura that's also a creature
 -- can't enchant anything", whose state-based half is Sba.cannotBeAttached.
@@ -105,7 +112,7 @@ attachmentFor src destination gs
   | Set.member Subtype.Aura subtypes =
       if Projection.isCreatureOf src gs
         then Nothing
-        else case Game.faceOf src gs >>= Card.enchantTargetSlot of
+        else case Card.foldEnchant (Projection.enchantOf src gs) of
           Nothing -> Nothing
           Just slot ->
             List.find

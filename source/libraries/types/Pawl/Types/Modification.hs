@@ -10,6 +10,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.TargetSlot as TargetSlot
 
 -- | The open-half continuous-effect vocabulary: continuous-effect
 -- specifications, classified by layer, distinct from Effect. Within the RULES
@@ -33,6 +34,27 @@ import qualified Pawl.Types.Supertype as Supertype
 -- why.
 data Modification ability
   = GainKeyword Keyword.Keyword -- layer 6 (Serpent's Gift)
+  | -- | layer 6, CR 613.1f / CR 702.5a: this object gains an enchant ability --
+    -- "becomes an Aura enchantment WITH ENCHANT CREATURE", the clause every
+    -- printing that turns a permanent into an Aura carries (#1703).
+    --
+    -- Its own arm rather than GainAbility, and legitimately so: enchant is a rule
+    -- 702 keyword, hence a closed-half CITATION exactly as the Keyword GainKeyword
+    -- carries is. It cannot ride GainAbility in any case -- Pawl.Types.ModifyTarget
+    -- instantiates the ability variable at Void (#1642), and this is the arm a
+    -- RESOLUTION needs.
+    --
+    -- Carries a whole TargetSlot rather than a Filter, for Pawl.Types.Face.enchant's
+    -- reason: CR 702.5d's enchant-player Auras need the Pool axis, so the printed
+    -- field and the granted one are the same shape and
+    -- Pawl.Engine.Card.foldEnchant folds them together under CR 702.5c.
+    --
+    -- APPENDED to the projection's list rather than replacing it (CR 702.5c: "if
+    -- an Aura has multiple instances of enchant, all of them apply"), which is
+    -- also what keeps a granted instance off the copiable values: the seed carries
+    -- the printed instances alone (CR 707.2), the same posture activatedAbilities
+    -- takes.
+    GainEnchant TargetSlot.TargetSlot
   | -- | layer 6, CR 613.1f: this object gains a whole quoted ability, authored on
     -- the granting card (Presence of Gond's "Enchanted creature has '{T}: Create
     -- a 1/1 green Elf Warrior creature token.'", Sixth Sense's "Enchanted

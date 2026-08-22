@@ -65,6 +65,7 @@ import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
@@ -811,6 +812,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   replenishSpec s registry
   attachRestrictionSpec s registry
   couldEnchantSpec s registry
+  grantedEnchantSpec s registry
 
 -- Both of Convincing Mirage's prompts at once: its CR 303.4a enchant slot
 -- (Pool.Permanents narrowed to lands, so the recipient is tagged ToObject) and
@@ -2075,3 +2077,123 @@ couldEnchantSpec s registry = Spec.describe s "CouldEnchant" $ do
     -- CR 701.23b: a search stating a quality may find fewer, so the rejected Aura
     -- stayed where it was rather than being found and refused at the move.
     Spec.assertEqWith s "and the Aura it rejected is still in the library" (S.countByName consecrateName S.alice after) 1
+
+-- CR 613.1f / 702.5a: an enchant ability that arrives from an EFFECT rather than
+-- from a printing (Modification.GainEnchant), which is what a "becomes an Aura
+-- enchantment with enchant creature" clause needs. The two rule-702.5a jobs are
+-- split across the two cases: what the permanent may be ATTACHED to
+-- (Pawl.Engine.Attach.attachmentFor) and CR 303.4c's state-based re-check of
+-- whether it still is (Pawl.Engine.Sba.fallsOff).
+--
+-- The producer is a synthetic. Every printing that grants enchant needs a
+-- capability pawl lacks besides this one: the twelve Licids need single-named-
+-- ability removal (only Modification.LoseAllAbilities exists) and a Duration that
+-- ends when a player pays a cost; Bronzehide Lion, Old-Growth Troll and Harold
+-- and Bob, First Numens choose their host AS THEY RETURN, which needs an entrant
+-- already under a continuous effect; Cloudform, Lightform and Rageform need
+-- manifest as an authored effect; Necromancy's enchant filter names the Aura that
+-- put the creature onto the battlefield; and Last Voyage of the _____ is an
+-- un-set card. Scryfall o:"with enchant" and o:"becomes an Aura", 2026-08-22, are
+-- the sweep that found them.
+grantedEnchantSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+grantedEnchantSpec s registry = Spec.describe s "GrantedEnchant" $ do
+  -- CR 701.3a through a granted enchant ability: the permanent stops being a
+  -- creature (CR 205.1a), gains the Aura subtype (CR 205.1b), gains "enchant
+  -- creature" (CR 702.5a) and attaches itself -- all in one resolution, so CR
+  -- 613.7c gives the three continuous effects one timestamp and layer 4's two
+  -- are unordered against each other.
+  --
+  -- The card is not the Licid it is modelled on: it prints neither the
+  -- lose-this-ability clause nor the pay-to-end duration, so it is a DIFFERENT
+  -- card rather than a mis-modelled Licid.
+  Spec.it s "CR 702.5a whole card: a creature becomes an Aura with a granted enchant ability and attaches itself" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    parasite <- S.printingOf s registry "Synthetic Clinging Parasite"
+    case grantedEnchantBoard island piker mammoth parasite of
+      Nothing -> Spec.assertFailure s "the synthetic should print an activated ability"
+      Just (leech, host, after) -> do
+        -- FIRST, and the gameplay-level pair: the host is wearing the thing, and
+        -- the static ability riding CR 303.4m's attachment has landed on it. A
+        -- Piker prints no flying, so this reads only through the attachment.
+        Spec.assertEqWith
+          s
+          "the Piker is wearing exactly one permanent, and it is the parasite"
+          (filter (\o -> Object.attachedTo o == Just (Recipient.ToCreature host)) (Map.elems (GameState.objects after)))
+          (Maybe.maybeToList (Game.lookupObject leech after))
+        Spec.assertBool s (Projection.hasKeyword Keyword.Flying host after) "and the Piker has flying, which only the attachment can have given it"
+        -- The three layer reads the attach went through, after it rather than
+        -- before, so none of them absorbs the mutation above.
+        Spec.assertBool s (Set.member Subtype.Aura (Projection.subtypesOf leech after)) "CR 205.1b: the parasite gained the Aura subtype"
+        Spec.assertBool s (not (Projection.isCreatureOf leech after)) "CR 205.1a / 303.4d: and stopped being a creature, without which no Aura may enchant anything"
+        Spec.assertEqWith
+          s
+          "CR 702.5a: the projected enchant ability is the granted 'enchant creature'"
+          (Card.foldEnchant (Projection.enchantOf leech after))
+          (Just (TargetSlot.required Pool.Creatures Nothing))
+        Spec.assertBool s (Set.member leech (GameState.battlefield after)) "and CR 704.5m leaves it alone: it is attached to a host its enchant ability admits"
+  -- CR 704.5m through a GRANTED enchant ability, which is the clause
+  -- Pawl.Engine.Sba.fallsOff could not see while it read the printed face: the
+  -- synthetic's own card declares no enchant at all, so a printed-face read
+  -- answers Nothing and leaves a granted Aura on the battlefield attached to
+  -- something that is no longer there.
+  --
+  -- The pair differs in exactly one thing -- the lethal damage marked on the host
+  -- -- and the quantity asserted is the SIZE of alice's graveyard: two under the
+  -- projected read (host and Aura), one under the printed-face read. CR 704.5n
+  -- needs Equipment and CR 704.5p sees an Aura that is not a creature, so neither
+  -- of the other two attachment state-based actions absorbs the difference.
+  --
+  -- Two passes, per CR 704.3: the pass that buries the Piker judged the parasite
+  -- against a state in which the Piker was still there.
+  Spec.it s "CR 704.5m: the granted Aura is buried with its host" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    parasite <- S.printingOf s registry "Synthetic Clinging Parasite"
+    case grantedEnchantBoard island piker mammoth parasite of
+      Nothing -> Spec.assertFailure s "the synthetic should print an activated ability"
+      Just (leech, host, attached) -> do
+        -- Goblin Piker is a 2/1 and the parasite grants it only flying, so one
+        -- damage is lethal (CR 704.5g).
+        let pass1 = S.settleSba (S.markDamage host 1 attached)
+            pass2 = S.settleSba pass1
+        Spec.assertEqWith s "alice's graveyard holds the host AND the Aura that was on it" (length (Game.zoneMembers Zone.Graveyard S.alice pass2)) 2
+        Spec.assertBool s (not (Set.member leech (GameState.battlefield pass2))) "so the granted Aura is off the battlefield"
+        Spec.assertEqWith s "the host died on the first pass" (Game.lookupObject host pass1) Nothing
+        Spec.assertBool s (Set.member leech (GameState.battlefield pass1)) "and CR 704.3 kept the Aura through that pass, since it judged a board the host was still on"
+        -- The control, one thing different: with no damage marked the host lives
+        -- and the Aura stays, so the assertions above are not passing because it
+        -- was never on the battlefield.
+        Spec.assertBool s (Set.member leech (GameState.battlefield (S.settleSba attached))) "control: with the host alive the Aura is still there"
+        Spec.assertEqWith s "and alice's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice (S.settleSba attached))) 0
+
+-- The board grantedEnchantSpec's two cases share: alice's synthetic activates its
+-- ability targeting the Piker, with a War Mammoth on the battlefield as a second
+-- candidate so the CR 601.2c target prompt has more candidates than the count and
+-- cannot short-circuit. One Island pays the {U}; S.addCreature settles the
+-- parasite, so CR 302.6 lets the {T} half be paid. One seat suffices: the granted
+-- slot names no controller, and the second case reaches CR 704.5m by removing the
+-- host rather than by stealing it.
+--
+-- Answers through aimAtOffered, which FILTERS the offered set rather than
+-- building a recipient.
+grantedEnchantBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Maybe (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+grantedEnchantBoard island piker mammoth parasite =
+  let base0 = S.landsInPlay island 1
+      (host, base1) = S.addCreature piker S.alice base0
+      (_, base2) = S.addCreature mammoth S.alice base1
+      (leech, base3) = S.addCreature parasite S.alice base2
+      ready = base3 {GameState.priority = Just S.alice}
+   in case Face.activatedAbilities (S.combinedFace parasite) of
+        [] -> Nothing
+        ability : _ ->
+          let activated = snd (Engine.runGamePure (aimAtOffered host) ready (Activate.activateAbility S.alice leech ability))
+              resolved = snd (Engine.runGamePure (aimAtOffered host) activated Stack.resolveTop)
+           in Just (leech, host, S.settleSba resolved)

@@ -579,6 +579,11 @@ durationCounts duration = case duration of
 modificationCounts :: Projection.Modification -> [Count.Type.Count Quantity.Type.Quantity]
 modificationCounts modification = case modification of
   Modification.GainKeyword _ -> []
+  -- CR 702.5a's granted enchant carries a TargetSlot, whose Filter can nest a
+  -- Count -- but a Filter's Counts are reached through modificationFilters below
+  -- and countFilters, never through this sweep, which is the answer GainKeyword
+  -- gives above for the Filter inside its keyword.
+  Modification.GainEnchant _ -> []
   -- CR 613.1f's other grant carries a whole ability, so the sweep descends into
   -- it exactly as it does into a printed one, whichever of CR 113.3's kinds it is.
   Modification.GainAbility granted -> case granted of
@@ -2861,6 +2866,10 @@ durationFilters = countFilters . durationCounts
 modificationFilters :: Projection.Modification -> [Filter.Type.Filter Keyword.Keyword]
 modificationFilters modification = case modification of
   Modification.GainKeyword keyword -> keywordFilters keyword
+  -- CR 702.5a again: the granted slot's own Filter, which is card text like any
+  -- other and has to be swept. NOT [] -- this is the one grant arm below whose
+  -- right answer is non-empty.
+  Modification.GainEnchant slot -> targetSlotFilters slot
   -- Nothing HERE, and that is not a hole: a granted ability's Filters are swept
   -- by grantedActivatedAbilities and grantedTriggeredAbilities below, at the
   -- outer level, so they keep the Framing that a printed ability's do. Answering

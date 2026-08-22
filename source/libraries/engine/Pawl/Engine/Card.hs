@@ -1096,7 +1096,18 @@ enchantSlotMap face = case enchantTargetSlot face of
 -- and its CR 115.6 requirement ride along; CR 702.5a's "Enchant [object or
 -- player]" has no "up to" in it, so an enchant slot is always required.
 enchantTargetSlot :: Face.Face card -> Maybe TargetSlot
-enchantTargetSlot face = case Face.enchant face of
+enchantTargetSlot = foldEnchant . Face.enchant
+
+-- The fold itself, over the instances rather than over a face: CR 702.5c's
+-- conjunction has to answer the same way whether the instances were PRINTED or
+-- GRANTED (Modification.GainEnchant, #1703), and this is the one place either
+-- reaches. Pawl.Engine.Projection seeds ProjectedCharacteristics.enchant from
+-- Face.enchant and appends grants to it, so a projected object's list is what
+-- Pawl.Engine.Attach and Pawl.Engine.Sba fold; the cast path (enchantSlotMap
+-- above, Pawl.Engine.Cast) still reads the printed face, since CR 601.2c judges
+-- a spell on the stack, which no layer-6 grant in this pool reaches.
+foldEnchant :: [TargetSlot] -> Maybe TargetSlot
+foldEnchant slots = case slots of
   [] -> Nothing
   first : rest ->
     Just

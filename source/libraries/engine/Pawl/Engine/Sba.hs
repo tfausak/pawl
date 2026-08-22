@@ -254,9 +254,18 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
 -- "as defined by its enchant ability AND OTHER APPLICABLE EFFECTS", whose second
 -- half is Pawl.Engine.AttachRestriction.
 --
--- ABILITIES, plural, where CR 702.5c applies: Card.enchantTargetSlot is the
--- conjunction of every instance, so the third clause fires when the host stops
--- matching ANY of them. Nothing here has to know how many there were.
+-- ABILITIES, plural, where CR 702.5c applies: Card.foldEnchant is the conjunction
+-- of every instance, so the third clause fires when the host stops matching ANY of
+-- them. Nothing here has to know how many there were.
+--
+-- The instances come off the shared `pcs` pre-pass and not from Game.faceOf, for
+-- two reasons at once. The pre-pass is CR 704.3's simultaneity, the same read
+-- cannotBeAttached above takes. And the PROJECTED list is the only one that holds
+-- a GRANTED enchant (CR 613.1f, Modification.GainEnchant, #1703): reading the
+-- printed face instead would leave a permanent that became an Aura by effect
+-- permanently exempt from this rule, since its own card declares no enchant at
+-- all. Pawl.AuraSpec's "CR 704.5m ... the granted Aura is buried with its host"
+-- is what discriminates the two reads.
 --
 -- CR 303.4c's own wording splits that last clause differently, and both halves
 -- land in the SAME place here because a pool's candidate list already excludes
@@ -283,9 +292,9 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
 -- and consults neither indestructible (CR 702.12b) nor a regeneration shield (CR
 -- 701.19a).
 fallsOff :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> Bool
-fallsOff pcs gs oid = case Game.faceOf oid gs of
+fallsOff pcs gs oid = case Map.lookup oid pcs of
   Nothing -> False
-  Just face -> case Card.enchantTargetSlot face of
+  Just pc -> case Card.foldEnchant (PC.enchant pc) of
     Nothing -> False
     Just slot -> case Game.lookupObject oid gs of
       Nothing -> False

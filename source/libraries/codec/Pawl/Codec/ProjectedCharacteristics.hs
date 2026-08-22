@@ -18,6 +18,7 @@ import qualified Pawl.Codec.Loyalty as Loyalty
 import qualified Pawl.Codec.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Supertype as Supertype
+import qualified Pawl.Codec.TargetSlot as TargetSlot
 import qualified Pawl.Codec.TriggeredAbility as TriggeredAbility
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -43,6 +44,7 @@ codec = Fields.object $ do
   activatedAbilities <- Fields.defaulted "activatedAbilities" [] (Common.list (ActivatedAbility.codec Card.codec)) PC.activatedAbilities
   replacementEffects <- Fields.defaulted "replacementEffects" [] (Common.list (PrintedReplacement.codec (Effect.codec Card.codec))) PC.replacementEffects
   triggeredAbilities <- Fields.defaulted "triggeredAbilities" [] (Common.list (TriggeredAbility.codec Card.codec)) PC.triggeredAbilities
+  enchant <- Fields.defaulted "enchant" [] (Common.list TargetSlot.codec) PC.enchant
   subtypeWordChanges <- Fields.defaulted "subtypeWordChanges" [] (Common.list ChangeSubtypeWord.codec) PC.subtypeWordChanges
   pure
     PC.MkProjectedCharacteristics
@@ -61,5 +63,6 @@ codec = Fields.object $ do
         PC.activatedAbilities = activatedAbilities,
         PC.replacementEffects = replacementEffects,
         PC.triggeredAbilities = triggeredAbilities,
+        PC.enchant = enchant,
         PC.subtypeWordChanges = subtypeWordChanges
       }
