@@ -153,6 +153,8 @@ library codec
     Pawl.Codec.BlocksDeclaredSpec
     Pawl.Codec.CantBeBlockedBy
     Pawl.Codec.CantBeBlockedBySpec
+    Pawl.Codec.CantBeRegenerated
+    Pawl.Codec.CantBeRegeneratedSpec
     Pawl.Codec.Card
     Pawl.Codec.CardName
     Pawl.Codec.CardNameSpec
@@ -1084,6 +1086,7 @@ library types
     Pawl.Types.ActiveBlockRequirement
     Pawl.Types.ActivePlayerEffect
     Pawl.Types.ActiveReplacement
+    Pawl.Types.ActiveUnregeneratable
     Pawl.Types.AddActivationCost
     Pawl.Types.AddSpellCost
     Pawl.Types.Affected
@@ -1122,6 +1125,7 @@ library types
     Pawl.Types.CandidateCost
     Pawl.Types.CandidateId
     Pawl.Types.CantBeBlockedBy
+    Pawl.Types.CantBeRegenerated
     Pawl.Types.Card
     Pawl.Types.CardName
     Pawl.Types.CardType

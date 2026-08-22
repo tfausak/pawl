@@ -33,6 +33,7 @@ import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
+import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -1565,6 +1566,8 @@ rewriteEffect pairs effect = case effect of
   Effect.AffectPlayers {} -> effect
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration blocker attacker) ->
     Effect.RequireBlock (RequireBlock.MkRequireBlock (rewriteDuration pairs duration) (rewriteObjectRef pairs blocker) (rewriteObjectRef pairs attacker))
+  Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration ref) ->
+    Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
   -- CR 612.1 reaches the OBJECT axis's ref and not its player: a word swap
   -- changes card text, and the defender clause of Alluring Siren's sentence is
   -- "you" rather than any word a Filter could name.

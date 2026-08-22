@@ -89,6 +89,11 @@ representatives pcs gs candidates =
 -- condition, so nothing scans them because of a choice made here;
 -- GameState.extraTurns names players; and the turn, phase and priority fields
 -- describe the game rather than any object.
+--
+-- GameState.unregeneratables IS listed below, for the reason every other
+-- listed field is: a row names one object and not another (CR 701.19c), so two
+-- creatures alike in every characteristic are told apart by which of them a
+-- prohibition covers.
 quiet :: GameState -> Bool
 quiet gs =
   null (GameState.continuousEffects gs)
@@ -96,6 +101,7 @@ quiet gs =
     && null (GameState.playerEffects gs)
     && null (GameState.blockRequirements gs)
     && null (GameState.attackRequirements gs)
+    && null (GameState.unregeneratables gs)
     && null (GameState.ignoredAbilities gs)
     && Seq.null (GameState.delayedTriggers gs)
     && Seq.null (GameState.pendingPreventionRiders gs)

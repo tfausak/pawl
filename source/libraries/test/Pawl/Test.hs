@@ -46,6 +46,7 @@ import qualified Pawl.Codec.BlockRequirementSpec
 import qualified Pawl.Codec.BlockerDeclaredSpec
 import qualified Pawl.Codec.BlocksDeclaredSpec
 import qualified Pawl.Codec.CantBeBlockedBySpec
+import qualified Pawl.Codec.CantBeRegeneratedSpec
 import qualified Pawl.Codec.CardNameSpec
 import qualified Pawl.Codec.CardSpec
 import qualified Pawl.Codec.CardTypeSpec
@@ -669,6 +670,7 @@ spec s registry = do
   Pawl.Codec.ReplacementOriginSpec.spec s
   Pawl.Codec.RequireAttackSpec.spec s
   Pawl.Codec.RequireBlockSpec.spec s
+  Pawl.Codec.CantBeRegeneratedSpec.spec s
   Pawl.Codec.RevealCauseSpec.spec s
   Pawl.Codec.RevealSpec.spec s
   Pawl.Codec.RevealedSpec.spec s

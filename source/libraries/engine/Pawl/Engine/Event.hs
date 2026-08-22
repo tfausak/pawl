@@ -50,6 +50,7 @@ import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
+import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttackTarget as AttackTarget
@@ -2091,8 +2092,31 @@ resolveDamageBatch events = do
 -- batch's (Event.destroyInBatch).
 resolveDestruction :: Maybe GameState -> DestructionCause.DestructionCause -> Regenerability.Regenerability -> ObjectId -> Game (Maybe ObjectId)
 resolveDestruction asOf cause regenerability oid = do
-  outcome <- applyReplacementsIn asOf Set.empty (ProposedEvent.WouldBeDestroyed oid regenerability cause)
+  live <- State.get
+  let settledRegenerability = strengthen (Maybe.fromMaybe live asOf) oid regenerability
+  outcome <- applyReplacementsIn asOf Set.empty (ProposedEvent.WouldBeDestroyed oid settledRegenerability cause)
   pure (outcome >>= Replacement.asDestruction)
+
+-- CR 701.19c: a standing prohibition (Hurr Jackal) forbids regeneration of the
+-- permanent it names, so the destruction this funnel is about to propose is one
+-- that can't be regenerated whatever its cause supplied. The rule's own reading
+-- -- the shield is still created and simply "not applied" -- is what makes this
+-- the right seam: Replacement.admits refuses the candidate, so CR 616.1 never
+-- offers it and the shield is never spent.
+--
+-- One-directional. A prohibition can only turn Regenerable into
+-- CantBeRegenerated; nothing in CR 701.19 permits the converse, so Terror's
+-- clause survives an empty store.
+--
+-- Read off the board applyReplacementsIn is about to gather from -- `asOf` when
+-- the caller supplied one (CR 704.3's whole pass, Event.destroyInBatch), the
+-- live state otherwise -- so a CR 608.2f batch cannot see the prohibition and
+-- the replacement pass disagree about which board they are on.
+strengthen :: GameState -> ObjectId -> Regenerability.Regenerability -> Regenerability.Regenerability
+strengthen gs oid regenerability =
+  if any ((== oid) . ActiveUnregeneratable.object) (GameState.unregeneratables gs)
+    then Regenerability.CantBeRegenerated
+    else regenerability
 
 -- The single counter-PLACEMENT funnel for an OBJECT recipient (CR 122.6: counters
 -- as markers on a permanent -- not to be confused with `counter` below, CR 701.6's
