@@ -65,6 +65,14 @@ data Response
     -- point -- a transcript of a player DECIDING must not satisfy a prompt that
     -- asked randomness, which is CR 701.9b's distinction.
     SelectedOpponentAtRandom PlayerId.PlayerId
+  | -- | CR 706.1a: the face a die came up, for Pawl.Types.Effect's RollDie
+    -- (Ancient Copper Dragon's "roll a d20").
+    --
+    -- Its own constructor rather than ChoseX reused, though both carry one
+    -- Natural: this type's rule at the top, and here the difference is the whole
+    -- point -- a transcript of a player ANNOUNCING a number must not satisfy a
+    -- prompt that asked randomness, which is CR 701.9b's distinction.
+    RolledDie Natural.Natural
   | ChoseDiscard [ObjectId.ObjectId]
   | -- | CR 701.22a: the ordered partition a scrying player chose -- the cards
     -- going to the bottom, then the ones staying on top, each in the order the

@@ -234,6 +234,7 @@ import qualified Pawl.Codec.RequireBlockSpec
 import qualified Pawl.Codec.RevealCauseSpec
 import qualified Pawl.Codec.RevealSpec
 import qualified Pawl.Codec.RevealedSpec
+import qualified Pawl.Codec.RollDieSpec
 import qualified Pawl.Codec.RoomIndexSpec
 import qualified Pawl.Codec.RoundingSpec
 import qualified Pawl.Codec.SacrificeAnyNumberSpec
@@ -311,6 +312,7 @@ import qualified Pawl.DecideSpec
 import qualified Pawl.DecimalSpec
 import qualified Pawl.DepartureSpec
 import qualified Pawl.DetainSpec
+import qualified Pawl.DiceSpec
 import qualified Pawl.DungeonSpec
 import qualified Pawl.EngineSpec
 import qualified Pawl.EntryRestrictionSpec
@@ -674,6 +676,7 @@ spec s registry = do
   Pawl.Codec.RevealCauseSpec.spec s
   Pawl.Codec.RevealSpec.spec s
   Pawl.Codec.RevealedSpec.spec s
+  Pawl.Codec.RollDieSpec.spec s
   Pawl.Codec.RoomIndexSpec.spec s
   Pawl.Codec.RoundingSpec.spec s
   Pawl.Codec.SacrificeAnyNumberSpec.spec s
@@ -753,6 +756,7 @@ spec s registry = do
   Pawl.DecimalSpec.spec s
   Pawl.DepartureSpec.spec s registry
   Pawl.DetainSpec.spec s registry
+  Pawl.DiceSpec.spec s registry
   Pawl.EventSpec.spec s registry
   Pawl.EventTriggerSpec.spec s registry
   Pawl.ExileSpec.spec s registry

@@ -205,6 +205,7 @@ import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.RevealCause as RevealCause
+import qualified Pawl.Types.RollDie as RollDie
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
@@ -542,6 +543,8 @@ slotsOf effect = case effect of
   -- A DEFINITION too: chosen as this effect is applied (CR 608.2d), never read.
   Effect.ChooseOpponent _ -> Map.empty
   Effect.ChooseOpponentAtRandom _ -> Map.empty
+  -- A DEFINITION too: CR 706.1's die size is a literal, so nothing is read.
+  Effect.RollDie {} -> Map.empty
   Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn ref _) -> playerRefSlots ref
   -- Both halves may name a slot: what is shuffled, and whose library.
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named ref) -> joinTwo (maybe Map.empty playerRefSlots named) (objectRefSlots ref)
@@ -783,6 +786,7 @@ slotsAreExhaustive effect = case effect of
   -- PlaySubgame's answer: a definition reads no slot.
   Effect.ChooseOpponent _ -> True
   Effect.ChooseOpponentAtRandom _ -> True
+  Effect.RollDie {} -> True
   Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn _ _) -> True
   Effect.ShuffleIntoLibrary {} -> True
   Effect.OfferCast {} -> True
@@ -916,6 +920,7 @@ readsX = any effectReadsX
       Effect.PlaySubgame _ -> False
       Effect.ChooseOpponent _ -> False
       Effect.ChooseOpponentAtRandom _ -> False
+      Effect.RollDie {} -> False
       Effect.TakeExtraTurn {} -> False
       Effect.ShuffleIntoLibrary {} -> False
       Effect.OfferCast {} -> False
@@ -1017,6 +1022,7 @@ searchesLibrary effect = case effect of
   Effect.PlaySubgame _ -> False
   Effect.ChooseOpponent _ -> False
   Effect.ChooseOpponentAtRandom _ -> False
+  Effect.RollDie {} -> False
   -- CR 701.24 shuffles a library but never LOOKS at one (CR 701.23a).
   Effect.ShuffleIntoLibrary {} -> False
   -- CR 608.2g's other producer, and not a search: the cast names one known object.
@@ -1089,6 +1095,9 @@ boundSlots effect = case effect of
   -- CR 608.2d: the opponent this effect chose.
   Effect.ChooseOpponent slot -> Set.singleton slot
   Effect.ChooseOpponentAtRandom slot -> Set.singleton slot
+  -- CR 706.4: the number the die came up, for a later effect of this resolution
+  -- to read as Quantity.InSlot.
+  Effect.RollDie rollDie -> Set.singleton (RollDie.slot rollDie)
   -- Three slots CR 701.8's destruction may define: how many permanents it
   -- ACTUALLY destroyed, for a later "for each ... destroyed this way"; the cards
   -- it put into a graveyard, for a later clause that NAMES them (CR 400.7's
@@ -3307,6 +3316,35 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         answer <- Game.ask (Prompt.RandomOpponent offered)
         pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
     Monad.forM_ chosenOpponent $ \pid -> State.modify' (bindPlayerSlot resolving slot pid)
+  -- CR 706.1: roll a die of the stated kind, and bind CR 706.4's result at the
+  -- slot for a later effect of this same resolution to read (Ancient Copper
+  -- Dragon's "roll a d20. You create a number of Treasure tokens equal to the
+  -- result").
+  --
+  -- Bound on `source`, which is bindAmountSlot's own contract (CR 608.2h aims an
+  -- amount read at the effect's source) and the holder Destroy's "destroyed this
+  -- way" tally already uses. Unobservable on THIS producer, and the DiceSpec case
+  -- below does not prove it: Quantity.InSlot reads the source first and then the
+  -- object CR 603.3 put on the stack, which for a triggered ability is
+  -- `resolving`, so either holder answers here. Consistency, not a behaviour.
+  --
+  -- Game.ask and not Game.choose, since a die result is not CR 104.4b's optional
+  -- action: nobody is deciding, so there is nothing to usurp. The question goes
+  -- to the INTERPRETER -- the engine never rolls. Filtered rather than trusted,
+  -- against CR 706.1a's outcomes "numbered from 1 to N", BOTH ends included, so
+  -- an answer outside the range leaves the floor standing rather than a value no
+  -- die could show; the instruction is mandatory, so there is no third option.
+  --
+  -- With nothing in the pool that modifies a roll (#2083), CR 706.2's natural
+  -- result and result coincide, and this one binding is both.
+  --
+  -- Not implemented: any record that a roll happened, so nothing can trigger on
+  -- one (#2084). Not implemented: CR 706.1's other half, how MANY dice (#2085).
+  Effect.RollDie rollDie -> do
+    let sides = RollDie.sides rollDie
+    rolled <- Game.ask (Prompt.RollDie sides)
+    let result = if rolled >= 1 && rolled <= sides then rolled else 1
+    State.modify' (bindAmountSlot source (RollDie.slot rollDie) result)
   Effect.ControlPlayerNextTurn slot ->
     State.modify' $ \gs ->
       case legalOne slot legal of
