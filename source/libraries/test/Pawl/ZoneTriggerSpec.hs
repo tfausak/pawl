@@ -231,6 +231,11 @@ cyclingTriggerSpec s registry =
 -- scan cannot see it at all and CR 603.10's first sentence has to be answered
 -- from CR 608.2h last known information -- Event.eventTriggers'
 -- `arrivedInGraveyard`.
+--
+-- The last case turns that source around and proves its FILTER: Come Back Wrong
+-- buries a Meren of Clan Nel Toth and returns her in the same resolution, and CR
+-- 113.6k is what keeps her battlefield-only dies trigger from seeing the very
+-- death that buried her.
 graveyardTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 graveyardTriggerSpec s registry =
   let -- alice: one Island in play (Tome Scour's {U}), Tome Scour in hand, and a
@@ -268,6 +273,8 @@ graveyardTriggerSpec s registry =
       namesIn zone pid gs =
         Set.fromList (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
       narcomoebaName = CardName.MkCardName $ Text.pack "Narcomoeba"
+      merenName = CardName.MkCardName $ Text.pack "Meren of Clan Nel Toth"
+      experienceOf = S.playerCounterOf PlayerCounterKind.Experience
       -- Corpse Churn {1}{B} Instant, "Mill three cards, then you may return a
       -- creature card from your graveyard to your hand." (name, cost, type line
       -- and oracle text checked against Scryfall.)
@@ -392,6 +399,48 @@ graveyardTriggerSpec s registry =
               resolved = S.runPure returnsIt cast Stack.resolveTop
           Spec.assertBool s (Set.member narcomoebaName (namesIn Zone.Hand S.alice resolved)) "Narcomoeba left the graveyard for the hand"
           Spec.assertEqWith s "and nothing triggered -- it never arrived from a library in this batch" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped resolved) resolved))) []
+        -- The FILTER on that source, which is CR 113.6k itself: a departed
+        -- graveyard card is offered only the abilities that function in a
+        -- graveyard. Come Back Wrong ("Destroy target creature. If a creature
+        -- card is put into a graveyard this way, return it to the battlefield
+        -- under your control.") aimed at Meren of Clan Nel Toth is the board that
+        -- observes it -- one resolution in which a permanent DIES and then LEAVES
+        -- its graveyard, with no CR 117.5 boundary between the two, so the
+        -- graveyard incarnation is reachable by nothing but `arrivedInGraveyard`.
+        --
+        -- Meren's "whenever ANOTHER creature you control dies" functions only on
+        -- the battlefield (CR 113.6's default), and the death it would see is the
+        -- very move that buried her: CR 400.7 minted a fresh id for the graveyard
+        -- incarnation, so the printed "another" compares two different ids and
+        -- passes. Without the filter she takes an experience counter for her own
+        -- death. permanentDiesSpec below is where that same exclusion is proved
+        -- from the battlefield, where the two ids DO coincide.
+        Spec.it s "CR 113.6k a battlefield-only trigger on a card that arrived in a graveyard and left it is not offered" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          meren <- S.printingOf s registry "Meren of Clan Nel Toth"
+          comeBackWrong <- S.printingOf s registry "Come Back Wrong"
+          let (merenId, board) = S.addCreature meren S.alice (S.landsInPlay swamp 3)
+              (gs, spellId) = S.handOne comeBackWrong board
+              -- Pinned by FILTERING the offered set rather than building a
+              -- Recipient. Meren is the only creature, so this is the identity on
+              -- a set of one, and it cannot smuggle in a recipient CR 608.2b's
+              -- re-read would drop.
+              answer :: Prompt.Prompt r -> r
+              answer p = case p of
+                Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToCreature merenId) . snd) sets
+                _ -> S.identityAnswer p
+              cast = S.runPure answer gs (S.cast S.alice spellId)
+              resolved = S.runPure answer cast Stack.resolveTop
+              settled = S.runPure answer resolved Engine.settleForPriority
+              after = S.runPure answer settled Stack.resolveTop
+          Spec.assertEqWith s "CR 113.6k alice takes no experience counter: her Meren did not see her own death from the graveyard" (experienceOf S.alice after) 0
+          Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack settled)) 0
+          Spec.assertEqWith s "and the narrow scan of that batch offered nothing" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped resolved) resolved))) []
+          -- The board really is the one the case needs: she died, and she is not
+          -- in the graveyard the CR 117.5 boundary would have scanned.
+          Spec.assertEqWith s "CR 400.7 the permanent that died is gone" (Game.lookupObject merenId resolved) Nothing
+          Spec.assertBool s (Set.member merenName (namesIn Zone.Battlefield S.alice resolved)) "a fresh Meren stands on the battlefield: she really did leave the graveyard"
+          Spec.assertBool s (not (Set.member merenName (namesIn Zone.Graveyard S.alice resolved))) "with nothing of hers left in it"
 
 -- Gaea's Blessing {1}{G} Sorcery, "Target player shuffles up to three target
 -- cards from their graveyard into their library. Draw a card. When this card is
