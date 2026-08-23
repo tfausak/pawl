@@ -9,9 +9,10 @@ import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 
 -- | What a player with priority may do. The SPECIAL actions CR 116.2 lists that
 -- are here are CR 116.2a's land play, CR 116.2b's turning a face-down permanent
--- face up, CR 116.2d's ignoring a static ability's effect, CR 116.2e's Circling
--- Vultures discard, CR 116.2h's foretell, CR 116.2k's plot and CR 116.2m's
--- unlock cost; the tracker for the rest of rule 116.2 is #875. Grows.
+-- face up, CR 116.2c's paying to end a continuous effect, CR 116.2d's ignoring a
+-- static ability's effect, CR 116.2e's Circling Vultures discard, CR 116.2h's
+-- foretell, CR 116.2k's plot and CR 116.2m's unlock cost; the tracker for the
+-- rest of rule 116.2 is #875. Grows.
 data Action
   = Pass
   | -- | CR 305.1's special action: put this land card onto the battlefield. The
@@ -162,4 +163,24 @@ data Action
     -- with foretell" rather than a half. No printing has foretell on a
     -- multi-faced card.
     Foretell ObjectId.ObjectId
+  | -- | CR 116.2c: pay a cost an effect named to END that effect. "You may pay
+    -- {U} to end this effect", the clause every Licid prints. "A player can take
+    -- such an action any time they have priority, unless that effect specifies
+    -- another timing restriction", and it does not use the stack (CR 116.1) -- so
+    -- it is an Action rather than anything that goes through Pawl.Engine.Stack,
+    -- exactly as CR 116.2a's land play is.
+    --
+    -- Carries the effect's SOURCE, Ignore's shape above, because pawl gives a
+    -- stored continuous effect no id of its own. That is exact rather than
+    -- convenient: one printed sentence stores several effects at once and CR
+    -- 116.2c ends "that effect", the sentence -- so the payment must reach all of
+    -- them together, and the source is what they share. Two live pay-to-end
+    -- offers from one object cannot coexist, since a Licid that has activated has
+    -- lost the ability and can no longer activate it.
+    --
+    -- What it COSTS is not a choice: the effect named the price when it was
+    -- stored (Expiry.WhenPaid), so Pawl.Engine.EndEffect reads it off the stored
+    -- effect rather than the player naming it. WHO may take it is the effect
+    -- controller (CR 109.5's "you"), answered by Pawl.Engine.EndEffect.canEnd.
+    EndEffect ObjectId.ObjectId
   deriving (Eq, Ord, Show)

@@ -165,6 +165,7 @@ isActivateOf oid action = case action of
   A.Plot _ -> False
   A.Foretell _ -> False
   A.Ignore _ -> False
+  A.EndEffect _ -> False
   A.ActivateManaAbility _ -> False
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

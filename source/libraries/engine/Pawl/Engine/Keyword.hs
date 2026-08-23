@@ -390,7 +390,10 @@ cycling cost searchFor =
           (ModeSelection.ChooseExactly 1),
       ActivatedAbility.restrictions = [],
       -- CR 702.29a gives the card this ability outright, with no "as long as".
-      ActivatedAbility.condition = Nothing
+      ActivatedAbility.condition = Nothing,
+      -- Nothing on every keyword-minted ability: no clause of a card refers to
+      -- one, CR 702's own text being what mints it.
+      ActivatedAbility.name = Nothing
     }
   where
     -- The only difference between rule 702.29a and rule 702.29e: what the ability
@@ -439,7 +442,10 @@ reinforce n cost =
       -- CR 702.77a states no timing restriction, which leaves CR 117.1b's
       -- default, and gives the ability outright with no "as long as".
       ActivatedAbility.restrictions = [],
-      ActivatedAbility.condition = Nothing
+      ActivatedAbility.condition = Nothing,
+      -- Nothing on every keyword-minted ability: no clause of a card refers to
+      -- one, CR 702's own text being what mints it.
+      ActivatedAbility.name = Nothing
     }
   where
     slot = TargetSlot.required Pool.Creatures Nothing
@@ -599,7 +605,10 @@ crew n =
       ActivatedAbility.restrictions = [],
       -- CR 702.122a gives the permanent this ability outright, with no "as long
       -- as", cycling's answer.
-      ActivatedAbility.condition = Nothing
+      ActivatedAbility.condition = Nothing,
+      -- Nothing on every keyword-minted ability: no clause of a card refers to
+      -- one, CR 702's own text being what mints it.
+      ActivatedAbility.name = Nothing
     }
   where
     criterion =
@@ -639,7 +648,10 @@ levelUp cost =
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton gain))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
-      ActivatedAbility.condition = Nothing
+      ActivatedAbility.condition = Nothing,
+      -- Nothing on every keyword-minted ability: no clause of a card refers to
+      -- one, CR 702's own text being what mints it.
+      ActivatedAbility.name = Nothing
     }
   where
     gain = Effect.PutCounters (PutCounters.MkPutCounters CounterKind.Level (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource))
@@ -662,7 +674,10 @@ outlast cost =
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton grow))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
-      ActivatedAbility.condition = Nothing
+      ActivatedAbility.condition = Nothing,
+      -- Nothing on every keyword-minted ability: no clause of a card refers to
+      -- one, CR 702's own text being what mints it.
+      ActivatedAbility.name = Nothing
     }
   where
     grow = Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource))

@@ -228,7 +228,7 @@ populatedFace =
   baseFace
     { Face.keywords = Set.singleton Keyword.Deathtouch,
       Face.staticAbilities = [StaticAbility.MkStaticAbility Affected.Attached Nothing Set.empty Nothing (NonEmpty.singleton Modification.LoseAllAbilities)],
-      Face.activatedAbilities = [ActivatedAbility.MkActivatedAbility (Cost.MkCost (Just (ManaCost.MkManaCost [])) []) minimalModal [] Nothing],
+      Face.activatedAbilities = [ActivatedAbility.MkActivatedAbility (Cost.MkCost (Just (ManaCost.MkManaCost [])) []) minimalModal [] Nothing (Just (AbilityName.MkAbilityName (Text.pack "activated")))],
       Face.replacementEffects = [PrintedReplacement.MkPrintedReplacement Nothing (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.AsCopy (AsCopy.MkAsCopy (Filter.HasCardType CardType.Creature) [] False))))],
       Face.triggeredAbilities = [minimalTriggeredAbility],
       Face.castingPermissions = [CastingPermission.CastFromLibraryWhileSearching],
@@ -268,7 +268,7 @@ populatedFaceJson =
     <> "\"keywords\":[{\"type\":\"Deathtouch\"}],"
     <> "\"staticAbilities\":[{\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"LoseAllAbilities\"}]}],"
     <> "\"activatedAbilities\":[{\"cost\":{\"mana\":[]},"
-    <> "\"modal\":{\"modes\":[{}]}}],"
+    <> "\"modal\":{\"modes\":[{}]},\"name\":\"activated\"}],"
     <> "\"replacementEffects\":[{\"effect\":{\"type\":\"EntryR\",\"value\":{\"matching\":{\"type\":\"IsSource\"},\"rewrite\":{\"type\":\"AsCopy\",\"value\":{\"eligible\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}}}}}],"
     <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
     <> "\"modal\":{\"modes\":[{}]}}],"

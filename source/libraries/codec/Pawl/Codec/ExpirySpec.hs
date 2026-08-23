@@ -5,11 +5,16 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AfterTurn as AfterTurn
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -83,3 +88,12 @@ spec s = Spec.describe s "Pawl.Codec.Expiry" $ do
       s
       (Codec.encode Expiry.codec (Expiry.AtEndOf PhaseSelector.CombatPhase) /= Codec.encode Expiry.codec (Expiry.AtEndOf (PhaseSelector.Step (Phase.Combat CombatStep.EndOfCombat))))
       "the phase and its own end-of-combat step encode differently"
+  -- CR 116.2c, carrying the price the offer quotes. Distinct from Never, which
+  -- outlasts every window too: Pawl.Engine.EndEffect finds the effects a payment
+  -- ends by this arm, so the two cannot be collapsed.
+  Spec.it s "WhenPaid carries the cost" $
+    Common.assertCodec
+      s
+      Expiry.codec
+      (Expiry.WhenPaid (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Blue)])) []))
+      " {\"type\":\"WhenPaid\",\"value\":{\"mana\":[{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Blue\"}}}]}} "

@@ -70,6 +70,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
           )
           [ActivationRestriction.SorcerySpeed]
           Nothing
+          Nothing
       )
       " {\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]},\"modal\":{\"modes\":[{\"clauses\":[{\"effects\":[{\"type\":\"Attach\",\"value\":\"target\"}]}],\"targetSlots\":{\"target\":{\"pool\":{\"type\":\"Creatures\"},\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}}}}]},\"restrictions\":[{\"type\":\"SorcerySpeed\"}]} "
   -- CR 602.5's conjunction, in the JSON: two clauses in printed order, which is
@@ -86,6 +87,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
             ActivationRestriction.AttackedThisStep
           ]
           Nothing
+          Nothing
       )
       " {\"cost\":{\"mana\":null,\"components\":[{\"type\":\"TapThis\"}]},\"modal\":{\"modes\":[{}]},\"restrictions\":[{\"type\":\"DuringPhase\",\"value\":{\"window\":{\"type\":\"Step\",\"value\":{\"type\":\"Combat\",\"value\":{\"type\":\"DeclareAttackers\"}}},\"scope\":{\"type\":\"EachTurn\"}}},{\"type\":\"AttackedThisStep\"}]} "
   -- CR 602.2: no rider is the default for nearly every ability, so the key stays
@@ -99,6 +101,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
           (Cost.MkCost Nothing [])
           (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
           []
+          Nothing
           Nothing
       )
       " {\"cost\":{\"mana\":null},\"modal\":{\"modes\":[{}]}} "

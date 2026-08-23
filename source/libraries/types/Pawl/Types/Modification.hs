@@ -1,6 +1,7 @@
 module Pawl.Types.Modification where
 
 import qualified Data.Set as Set
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.Color as Color
@@ -96,6 +97,24 @@ data Modification ability
     -- instead, in Pawl.Types.GrantedAbility.
     GainAbility ability
   | LoseAllAbilities -- layer 6 (Humility)
+  | -- | layer 6, CR 613.1f: this object loses the abilities carrying this name
+    -- -- "this creature loses this ability", the clause every Licid prints ahead
+    -- of animating itself into an Aura.
+    --
+    -- A NAME and not an index, Pawl.Types.ActivatedAbility's own posture: that
+    -- type's header rules an index out for Action.Activate, and the same argument
+    -- rules it out here. The name is written on the ability by its own card
+    -- (ActivatedAbility.name) and joined back here, so the removal survives a
+    -- card whose list of abilities is reordered.
+    --
+    -- Only an ACTIVATED ability carries a name today, so that is all this
+    -- reaches. Not implemented: naming a triggered or static ability for removal
+    -- (#2134).
+    --
+    -- Distinct from LoseAllAbilities above, and observably so: a Licid keeps its
+    -- other printed ability ("Enchanted creature has flying") while losing the
+    -- one it activated, which a wipe gets wrong in both directions.
+    LoseNamedAbility AbilityName.AbilityName
   | SetBasePowerToughness SetBasePowerToughness.SetBasePowerToughness -- layer 7b (Humility 1/1; Opalescence mana value)
   | ModifyPowerToughness ModifyPowerToughness.ModifyPowerToughness -- layer 7c (Giant Growth +3/+3)
   | SetLandSubtype Subtype.Subtype -- layer 4, CR 305.7 set (Blood Moon -> Mountain)
@@ -185,8 +204,8 @@ data Modification ability
     --
     -- No REMOVAL arm beside it: no printed card takes a card type away without
     -- naming the one it becomes, so a remove would be a capability no card
-    -- exercises. A Licid stops being a Creature by becoming an Enchantment
-    -- (#1586).
+    -- exercises. Gliding Licid stops being a Creature by becoming an
+    -- Enchantment, which is this arm and not a removal.
     SetCardType CardType.CardType
   | -- | layer 4, CR 613.1d / 205.4b: this object gains a supertype (Leyline of
     -- Singularity's "All nonland permanents are legendary"). An ADD and never a

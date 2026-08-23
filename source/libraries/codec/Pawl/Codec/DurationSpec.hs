@@ -3,10 +3,15 @@ module Pawl.Codec.DurationSpec where
 import qualified Pawl.Codec.Duration as Duration
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Duration as Duration
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Quantity as Quantity
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -52,4 +57,11 @@ spec s = Spec.describe s "Pawl.Codec.Duration" $ do
       Duration.codec
       Duration.UntilEndOfCombat
       " {\"type\":\"UntilEndOfCombat\"} "
+  -- CR 611.2a / 116.2c: "You may pay {U} to end this effect" (Gliding Licid).
+  Spec.it s "UntilPaid carries the cost" $
+    Common.assertCodec
+      s
+      Duration.codec
+      (Duration.UntilPaid (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Blue)])) []))
+      " {\"type\":\"UntilPaid\",\"value\":{\"mana\":[{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Blue\"}}}]}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Duration.codec

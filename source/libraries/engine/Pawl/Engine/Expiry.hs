@@ -22,8 +22,10 @@ module Pawl.Engine.Expiry where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Condition as Condition
@@ -37,6 +39,7 @@ import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
 import qualified Pawl.Types.AfterTurn as AfterTurn
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import Pawl.Types.Duration (Duration)
 import qualified Pawl.Types.Duration as Duration
@@ -47,6 +50,7 @@ import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.IgnoredAbility as IgnoredAbility
+import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PhaseSelector (PhaseSelector)
@@ -99,6 +103,10 @@ arm players controller source duration gs = case duration of
   -- there is nothing about the game to bake in, because the sweep ends the
   -- effect at the first combat phase whose end it sees (#525).
   Duration.UntilEndOfCombat -> Just (Expiry.AtEndOf PhaseSelector.CombatPhase)
+  -- CR 116.2c: nothing about the game is baked in, because nothing about the game
+  -- ends this -- the PRICE is the whole of it, and it is carried through unchanged
+  -- so the offer below can quote it and the payment charge it.
+  Duration.UntilPaid cost -> Just (Expiry.WhenPaid cost)
 
 -- CR 514.2: "until end of turn" and "this turn" effects end during the cleanup
 -- step. Delete-and-recompute (design.md 2.5): dropping the stored entry makes
@@ -125,6 +133,8 @@ dropAtCleanup gs =
           AfterTurn.player afterTurn /= GameState.activePlayer gs
             || GameState.turnNumber gs <= AfterTurn.turn afterTurn
         Expiry.AtEndOf _ -> True
+        -- CR 116.2c: only a payment ends this, and the cleanup step is not one.
+        Expiry.WhenPaid _ -> True
       keepEffect eff = survives (ContinuousEffect.expiry eff)
       keepReplacement active = survives (ActiveReplacement.expiry active)
       keepPlayerEffect active = survives (ActivePlayerEffect.expiry active)
@@ -173,6 +183,8 @@ sweepConditional = do
         Expiry.AtTurnOf _ -> True
         Expiry.AtEndOfTurnOf _ -> True
         Expiry.AtEndOf _ -> True
+        -- CR 116.2c states a price, not a condition, so no board change ends it.
+        Expiry.WhenPaid _ -> True
       keepEffect eff = survives (ContinuousEffect.source eff) (ContinuousEffect.expiry eff)
       keepReplacement active = survives (ActiveReplacement.source active) (ActiveReplacement.expiry active)
       keepPlayerEffect active = survives (ActivePlayerEffect.source active) (ActivePlayerEffect.expiry active)
@@ -300,6 +312,10 @@ dropAtTurnOf pid gs =
         Expiry.While {} -> True
         Expiry.AtEndOfTurnOf afterTurn -> not (departed && AfterTurn.player afterTurn == pid)
         Expiry.AtEndOf _ -> True
+        -- CR 116.2c: no turn of anyone's ends it, and CR 800.4m does not reach it
+        -- either -- the offer goes away with the departed player's objects rather
+        -- than at a moment this sweep can name.
+        Expiry.WhenPaid _ -> True
       keepEffect eff = survives (ContinuousEffect.expiry eff)
       keepReplacement active = survives (ActiveReplacement.expiry active)
       keepPlayerEffect active = survives (ActivePlayerEffect.expiry active)
@@ -342,6 +358,8 @@ dropAtEndOf ending gs =
         Expiry.While {} -> True
         Expiry.AtTurnOf _ -> True
         Expiry.AtEndOfTurnOf _ -> True
+        -- CR 116.2c: no window of the turn ends it.
+        Expiry.WhenPaid _ -> True
       keepEffect eff = survives (ContinuousEffect.expiry eff)
       keepReplacement active = survives (ActiveReplacement.expiry active)
       keepPlayerEffect active = survives (ActivePlayerEffect.expiry active)
@@ -360,4 +378,83 @@ dropAtEndOf ending gs =
           GameState.ignoredAbilities = filter keepIgnored (GameState.ignoredAbilities gs),
           GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),
           GameState.objects = clearedPermissions (survives . ExilePlayPermission.expiry) gs
+        }
+
+-- CR 116.2c: every (source, cost) pair a payment could end right now. The one
+-- reader of Expiry.WhenPaid outside the sweeps, and the reason that arm is not
+-- Expiry.Never -- a duration nothing ends by time still has to be FINDABLE by
+-- the player who may end it.
+--
+-- Every carrier, not just the continuous effects: Pawl.Types.Duration is one
+-- vocabulary and any opcode taking a duration could print this one, so a carrier
+-- left out here would hold an effect that is offered to nobody and ends never.
+-- The pair is the source and the price, which is all CR 116.2c needs -- WHICH of
+-- the source's effects is not asked, since one printed sentence stores several
+-- and the rule ends the sentence.
+paidExpiries :: GameState -> [(ObjectId, Cost.Cost Keyword)]
+paidExpiries gs =
+  let paid (source, expiry) = case expiry of
+        Expiry.WhenPaid cost -> [(source, cost)]
+        Expiry.AtCleanup -> []
+        Expiry.Never -> []
+        Expiry.While {} -> []
+        Expiry.AtTurnOf _ -> []
+        Expiry.AtEndOfTurnOf _ -> []
+        Expiry.AtEndOf _ -> []
+   in concatMap paid (sourcedExpiries gs)
+
+-- Every stored expiry in the game, paired with the object it came from. Shared
+-- by the offer above and the sweep below so the two cannot disagree about which
+-- carriers exist.
+sourcedExpiries :: GameState -> [(ObjectId, Expiry)]
+sourcedExpiries gs =
+  fmap (\x -> (ContinuousEffect.source x, ContinuousEffect.expiry x)) (GameState.continuousEffects gs)
+    <> fmap (\x -> (ActiveReplacement.source x, ActiveReplacement.expiry x)) (GameState.replacements gs)
+    <> fmap (\x -> (ActivePlayerEffect.source x, ActivePlayerEffect.expiry x)) (GameState.playerEffects gs)
+    <> fmap (\x -> (ActiveBlockRequirement.source x, ActiveBlockRequirement.expiry x)) (GameState.blockRequirements gs)
+    <> fmap (\x -> (ActiveAttackRequirement.source x, ActiveAttackRequirement.expiry x)) (GameState.attackRequirements gs)
+    <> fmap (\x -> (ActiveUnregeneratable.source x, ActiveUnregeneratable.expiry x)) (GameState.unregeneratables gs)
+    <> fmap (\x -> (IgnoredAbility.source x, IgnoredAbility.expiry x)) (GameState.ignoredAbilities gs)
+    <> Maybe.mapMaybe (\x -> fmap ((,) (DelayedTrigger.source x)) (DelayedTrigger.expiry x)) (Foldable.toList (GameState.delayedTriggers gs))
+    <> Maybe.mapMaybe (fmap (\p -> (ExilePlayPermission.source p, ExilePlayPermission.expiry p)) . Object.playableFromExile) (Map.elems (GameState.objects gs))
+
+-- CR 116.2c's payment, made: end every effect this object stored under a
+-- pay-to-end duration. dropAtEndOf's shape, with the source in the test --
+-- delete-and-recompute, so the next projection reverts and nothing is explicitly
+-- undone (design.md 2.5).
+--
+-- ALL of them together, which is the rule's own grain: "that effect" is the
+-- printed sentence, and Gliding Licid's one sentence stores four. Two live sets
+-- from one object cannot coexist -- a Licid that has activated has lost the
+-- ability and stopped being a creature, so it cannot activate a second time --
+-- so the source is a sufficient key.
+dropWhenPaidBy :: ObjectId -> GameState -> GameState
+dropWhenPaidBy oid gs =
+  let survives source expiry = case expiry of
+        Expiry.WhenPaid _ -> source /= oid
+        Expiry.AtCleanup -> True
+        Expiry.Never -> True
+        Expiry.While {} -> True
+        Expiry.AtTurnOf _ -> True
+        Expiry.AtEndOfTurnOf _ -> True
+        Expiry.AtEndOf _ -> True
+      keepEffect x = survives (ContinuousEffect.source x) (ContinuousEffect.expiry x)
+      keepReplacement x = survives (ActiveReplacement.source x) (ActiveReplacement.expiry x)
+      keepPlayerEffect x = survives (ActivePlayerEffect.source x) (ActivePlayerEffect.expiry x)
+      keepBlockRequirement x = survives (ActiveBlockRequirement.source x) (ActiveBlockRequirement.expiry x)
+      keepAttackRequirement x = survives (ActiveAttackRequirement.source x) (ActiveAttackRequirement.expiry x)
+      keepUnregeneratable x = survives (ActiveUnregeneratable.source x) (ActiveUnregeneratable.expiry x)
+      keepIgnored x = survives (IgnoredAbility.source x) (IgnoredAbility.expiry x)
+      keepDelayed x = maybe True (survives (DelayedTrigger.source x)) (DelayedTrigger.expiry x)
+      keepPermission x = survives (ExilePlayPermission.source x) (ExilePlayPermission.expiry x)
+   in gs
+        { GameState.continuousEffects = filter keepEffect (GameState.continuousEffects gs),
+          GameState.replacements = filter keepReplacement (GameState.replacements gs),
+          GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs),
+          GameState.blockRequirements = filter keepBlockRequirement (GameState.blockRequirements gs),
+          GameState.attackRequirements = filter keepAttackRequirement (GameState.attackRequirements gs),
+          GameState.unregeneratables = filter keepUnregeneratable (GameState.unregeneratables gs),
+          GameState.ignoredAbilities = filter keepIgnored (GameState.ignoredAbilities gs),
+          GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),
+          GameState.objects = clearedPermissions keepPermission gs
         }

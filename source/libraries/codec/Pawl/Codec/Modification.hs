@@ -2,6 +2,7 @@ module Pawl.Codec.Modification where
 
 import qualified Data.Typeable as Typeable
 import qualified Data.Void as Void
+import qualified Pawl.Codec.AbilityName as AbilityName
 import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Codec.Color as Color
@@ -46,6 +47,7 @@ arms =
   [ Arm.payload "GainKeyword" Keyword.codec Modification.GainKeyword (\x -> case x of Modification.GainKeyword y -> Just y; _ -> Nothing),
     Arm.payload "GainEnchant" TargetSlot.codec Modification.GainEnchant (\x -> case x of Modification.GainEnchant y -> Just y; _ -> Nothing),
     Arm.nullary "LoseAllAbilities" Modification.LoseAllAbilities,
+    Arm.payload "LoseNamedAbility" AbilityName.codec Modification.LoseNamedAbility (\x -> case x of Modification.LoseNamedAbility y -> Just y; _ -> Nothing),
     Arm.payload "SetBasePowerToughness" SetBasePowerToughness.codec Modification.SetBasePowerToughness (\x -> case x of Modification.SetBasePowerToughness y -> Just y; _ -> Nothing),
     Arm.payload "ModifyPowerToughness" ModifyPowerToughness.codec Modification.ModifyPowerToughness (\x -> case x of Modification.ModifyPowerToughness y -> Just y; _ -> Nothing),
     Arm.payload "SetLandSubtype" Subtype.codec Modification.SetLandSubtype (\x -> case x of Modification.SetLandSubtype y -> Just y; _ -> Nothing),
