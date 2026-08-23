@@ -104,7 +104,7 @@ chooseNoModes p = case p of
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) [] Nothing
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) [] Nothing Nothing
 
 -- A single forced mode (ChooseExactly 1, M4g's non-modal shape) -- the fixture
 -- shape every pre-M4h single-mode ActivatedAbility now takes.
@@ -320,7 +320,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
                   },
               ActivatedAbility.modal = singleModeAbility [] Map.empty,
               ActivatedAbility.restrictions = [],
-              ActivatedAbility.condition = Nothing
+              ActivatedAbility.condition = Nothing,
+              ActivatedAbility.name = Nothing
             }
     Spec.assertBool s (not (Activate.activatable S.alice srcId costlyAbility gs1)) "one Mountain cannot pay {2}"
 
@@ -905,6 +906,7 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
                 (ModeSelection.ChooseExactly 1)
             )
             []
+            Nothing
             Nothing
         after = S.runPure chooseNoModes gs (Activate.activateAbility S.alice oid twoModes)
     Spec.assertEqWith s "the activation was rejected: nothing on the stack" (GameState.stack after) []
@@ -1661,7 +1663,7 @@ tovolarBackName = CardName.MkCardName (Text.pack "Tovolar, the Midnight Scourge"
 shownAbility :: ObjectId.ObjectId -> GameState.GameState -> ActivatedAbility.ActivatedAbility Card.Type.Card
 shownAbility oid gs = case Game.faceOf oid gs >>= Maybe.listToMaybe . Face.activatedAbilities of
   Just ab -> ab
-  Nothing -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) [] Nothing
+  Nothing -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) [] Nothing Nothing
 
 -- alice controls Tovolar showing his BACK face -- "{X}{R}{G}: Target Wolf or
 -- Werewolf you control gets +X/+0 and gains trample until end of turn" -- a
@@ -3432,6 +3434,7 @@ activationsIn =
         A.Plot _ -> False
         A.Foretell _ -> False
         A.Ignore _ -> False
+        A.EndEffect _ -> False
    in filter isActivation
 
 -- Action.legalActions threads ONE control-grant walk and ONE whole-board

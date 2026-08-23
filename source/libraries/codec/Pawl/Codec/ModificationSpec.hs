@@ -9,6 +9,7 @@ import qualified Pawl.Codec.Modification as Modification
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
@@ -61,6 +62,13 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       codec
       Modification.LoseAllAbilities
       " {\"type\":\"LoseAllAbilities\"} "
+  -- layer 6, CR 613.1f: the removal that names ONE ability (Gliding Licid).
+  Spec.it s "LoseNamedAbility carries the name" $
+    Common.assertCodec
+      s
+      codec
+      (Modification.LoseNamedAbility (AbilityName.MkAbilityName (Text.pack "animate")))
+      " {\"type\":\"LoseNamedAbility\",\"value\":\"animate\"} "
   -- layer 7b (Humility 1/1; Opalescence mana value).
   Spec.it s "SetBasePowerToughness" $
     Common.assertCodec
@@ -221,6 +229,7 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
                   (Cost.MkCost Nothing [CostComponent.TapThis])
                   (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
                   []
+                  Nothing
                   Nothing
               )
           )

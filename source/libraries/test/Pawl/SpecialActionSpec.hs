@@ -113,6 +113,7 @@ isPlay action = case action of
   Action.Type.Plot _ -> False
   Action.Type.Foretell _ -> False
   Action.Type.Ignore _ -> False
+  Action.Type.EndEffect _ -> False
   Action.Type.ActivateManaAbility _ -> False
 
 isDiscarded :: GameEvent.GameEvent -> Bool
@@ -207,6 +208,7 @@ playing wanted action = case action of
   Action.Type.Plot _ -> False
   Action.Type.Foretell _ -> False
   Action.Type.Ignore _ -> False
+  Action.Type.EndEffect _ -> False
   Action.Type.ActivateManaAbility _ -> False
 
 -- Is this the offer to cast THAT card face up?
@@ -222,6 +224,7 @@ casting wanted action = case action of
   Action.Type.Plot _ -> False
   Action.Type.Foretell _ -> False
   Action.Type.Ignore _ -> False
+  Action.Type.EndEffect _ -> False
   Action.Type.ActivateManaAbility _ -> False
 
 -- Pays CR 116.2d's cost by sacrificing the NAMED permanent, and answers every

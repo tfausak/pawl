@@ -32,9 +32,11 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.EndEffect as EndEffect
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -49,6 +51,8 @@ import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.AbilityName as AbilityName
+import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
@@ -62,6 +66,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
@@ -75,6 +80,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
+import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 301.5 / 702.6: Equipment. Shares the attachment substrate with Auras --
@@ -813,6 +819,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   attachRestrictionSpec s registry
   couldEnchantSpec s registry
   grantedEnchantSpec s registry
+  licidSpec s registry
 
 -- Both of Convincing Mirage's prompts at once: its CR 303.4a enchant slot
 -- (Pool.Permanents narrowed to lands, so the recipient is tagged ToObject) and
@@ -2091,12 +2098,11 @@ couldEnchantSpec s registry = Spec.describe s "CouldEnchant" $ do
 -- are the same card with a different keyword pair.
 --
 -- What the rest of the pool needs BESIDES this arm, from Scryfall o:"with enchant"
--- and o:"becomes an Aura", 2026-08-22: the twelve Licids need single-named-ability
--- removal (only Modification.LoseAllAbilities exists) and a Duration that ends
--- when a player pays a cost; Bronzehide Lion, Old-Growth Troll and Harold and Bob,
--- First Numens choose their host AS THEY RETURN (#2099); Necromancy's enchant
--- filter names the Aura that put the creature onto the battlefield; and Last
--- Voyage of the _____ is an un-set card.
+-- and o:"becomes an Aura", 2026-08-23: the twelve Licids are covered by licidSpec
+-- below, Gliding Licid being the one in data/cards/; Bronzehide Lion, Old-Growth
+-- Troll and Harold and Bob, First Numens choose their host AS THEY RETURN
+-- (#2099); Necromancy's enchant filter names the Aura that put the creature onto
+-- the battlefield; and Last Voyage of the _____ is an un-set card.
 grantedEnchantSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 grantedEnchantSpec s registry = Spec.describe s "GrantedEnchant" $ do
   -- One resolution, four effects: CR 205.1b's Aura subtype, CR 702.5a's enchant
@@ -2207,3 +2213,152 @@ cloudformBoard island piker cloudform =
           fmap
             (\manifested -> (cloud, manifested, after))
             (List.find (\oid -> oid /= cloud && nonLand oid) (Game.zoneMembers Zone.Battlefield S.alice after))
+
+-- CR 613.1f's NAMED ability removal and CR 116.2c's pay-to-end, which are one
+-- printed sentence: "This creature loses this ability and becomes an Aura
+-- enchantment with enchant creature. Attach it to target creature. You may pay
+-- {U} to end this effect."
+--
+-- Gliding Licid is the producer and the whole card. It is Cloudform's chain --
+-- CR 205.1b's Aura subtype, CR 702.5a's granted enchant, CR 701.3a's attach --
+-- plus three things that card has not got: CR 205.1a's card-type set, the
+-- layer-6 removal of the ability the effect came from
+-- (Modification.LoseNamedAbility), and a duration that is not a window of the
+-- turn (Duration.UntilPaid).
+--
+-- Its eleven siblings differ only in the static half: Calming's "can't attack"
+-- needs a combat restriction, Dominating's needs SetControllerToSource, and so
+-- on. Gliding's is GainKeyword Flying, already in the vocabulary and readable off
+-- the enchanted creature, which is what makes the removal's SCOPE observable --
+-- see the first case.
+--
+-- CR 704.3 never runs between the effects of one resolution, so the moment the
+-- Licid is an unattached Aura is not a moment CR 704.5m sees, exactly as
+-- grantedEnchantSpec's header says for Cloudform.
+licidSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+licidSpec s registry = Spec.describe s "Licid" $ do
+  -- The discrimination against Modification.LoseAllAbilities, which is the arm
+  -- that already existed: the two agree about the ability that was REMOVED and
+  -- disagree about the one that was KEPT. So the assertion that separates them is
+  -- the FLYING one, read off the enchanted creature, and it comes first.
+  Spec.it s "CR 613.1f: the Licid loses the ability it activated and keeps the other one" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    licid <- S.printingOf s registry "Gliding Licid"
+    case licidBoard island piker licid of
+      Nothing -> Spec.assertFailure s "Gliding Licid should print one activated ability"
+      Just (lic, host, after) -> do
+        -- FIRST, and the gameplay-level pair: the enchanted creature has the
+        -- keyword the Licid's OTHER printed ability grants, which it can only
+        -- have through the attachment. A wipe of every ability makes this false.
+        Spec.assertBool s (Projection.hasKeyword Keyword.Flying host after) "CR 303.4m: the enchanted creature has flying"
+        Spec.assertEqWith
+          s
+          "and the Licid is the Aura on it"
+          (fmap Object.attachedTo (Game.lookupObject lic after))
+          (Just (Just (Recipient.ToCreature host)))
+        -- Then the removal itself. A no-op removal makes THIS false while leaving
+        -- the pair above true, so the two halves of CR 613.1f's scope are
+        -- separately observable.
+        Spec.assertEqWith s "CR 613.1f: and the ability it activated is gone" (length (Projection.abilitiesOf lic after)) 0
+        -- The rest of the sentence, after the behaviour rather than before.
+        Spec.assertBool s (Set.member CardType.Enchantment (Projection.cardTypesOf lic after)) "CR 205.1a: the Licid is an Enchantment"
+        Spec.assertBool s (not (Set.member CardType.Creature (Projection.cardTypesOf lic after))) "and no longer a Creature"
+        Spec.assertBool s (Set.member Subtype.Aura (Projection.subtypesOf lic after)) "CR 205.1b: with the Aura subtype"
+        Spec.assertEqWith
+          s
+          "CR 702.5a: and the granted enchant ability is 'enchant creature'"
+          (Card.foldEnchant (Projection.enchantOf lic after))
+          (Just (TargetSlot.required Pool.Creatures Nothing))
+        Spec.assertBool s (Set.member lic (GameState.battlefield after)) "and CR 704.5m leaves it alone: its host is one its enchant ability admits"
+  -- The SCOPE of the removal, as a pair of boards differing in exactly one thing:
+  -- the NAME the removal carries. Gliding Licid's own resolution cannot show this
+  -- -- Modification.LoseAllAbilities in place of the named arm is observably
+  -- identical on that board, since the Licid's other printed ability is a static
+  -- one that CR 613.6 spares from a layer-6 strip (Projection.permanentParts'
+  -- `removed`) and the enchant the same sentence grants carries a later timestamp
+  -- than the removal, so CR 613.9's first Example lands it on top. So the arm's
+  -- narrowness is proved HERE instead, by a name that matches nothing.
+  --
+  -- Gameplay level on both boards: whether alice may activate the ability at all,
+  -- with the mana to pay for it either way, so a negative cannot pass for being
+  -- broke (CR 602.2).
+  Spec.it s "CR 613.1f the removal reads the NAME: one that matches nothing removes nothing" $ do
+    island <- S.printingOf s registry "Island"
+    licid <- S.printingOf s registry "Gliding Licid"
+    let base = S.landsInPlay island 3
+        (lic, placed) = S.addCreature licid S.alice base
+        ready = placed {GameState.priority = Just S.alice}
+        withRemoval name = S.withEffectAt lic (Timestamp.MkTimestamp 500) (Modification.LoseNamedAbility (AbilityName.MkAbilityName (Text.pack name))) ready
+        matching = withRemoval "animate"
+        mismatched = withRemoval "no ability has this name"
+        activatableOn gs = any (\ability -> Activate.activatable S.alice lic ability gs) (Projection.abilitiesOf lic gs)
+    -- The CONTROL first: with no removal at all the ability is there and usable,
+    -- so neither board below can be reading a Licid that never had it.
+    Spec.assertBool s (activatableOn ready) "CR 602.2: with no removal alice may activate it"
+    -- THE discriminating pair.
+    Spec.assertBool s (activatableOn mismatched) "and a removal naming no ability of this card leaves it activatable"
+    Spec.assertBool s (not (activatableOn matching)) "while the removal naming it takes it away"
+    Spec.assertEqWith s "which is one ability gone rather than every ability" (length (Projection.abilitiesOf lic matching)) 0
+    Spec.assertEqWith s "and none gone on the mismatched board" (length (Projection.abilitiesOf lic mismatched)) 1
+  -- CR 116.2c, both halves: the offer exists while the effect does, and paying
+  -- ends the WHOLE printed sentence rather than one of the four effects it
+  -- stored. An implementation that ended only the first would leave an unattached
+  -- Aura, which CR 704.5m bins -- a different, visible end state.
+  Spec.it s "CR 116.2c: paying the stated cost ends every effect that one sentence stored" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    licid <- S.printingOf s registry "Gliding Licid"
+    case licidBoard island piker licid of
+      Nothing -> Spec.assertFailure s "Gliding Licid should print one activated ability"
+      Just (lic, host, after) -> do
+        let ready = after {GameState.priority = Just S.alice}
+            paid = S.settleSba (S.runPure S.identityAnswer ready (EndEffect.endEffect S.alice lic))
+        -- The OFFER, which no printed permission grants: it rides the stored
+        -- effect, so it exists only because the ability resolved.
+        Spec.assertBool s (List.elem (Action.Type.EndEffect lic) (Action.legalActions S.alice ready)) "CR 116.2c: alice is offered the pay-to-end while the effect is live"
+        -- CR 109.5: "you may pay" is the effect's controller, and bob is not it.
+        -- Asked on the SAME board, and bob holds the same three Islands alice
+        -- does (licidBoard stocks both seats), so the only difference between the
+        -- two reads is the seat rather than the mana.
+        Spec.assertBool s (List.notElem (Action.Type.EndEffect lic) (Action.legalActions S.bob (ready {GameState.priority = Just S.bob}))) "and bob, who does not control the effect, is not"
+        -- FIRST after the payment, and the gameplay-level read: the creature the
+        -- Licid was enchanting has lost the keyword, which is the whole of what
+        -- the effect was doing to the board.
+        Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying host paid)) "and once it is paid the creature loses flying"
+        -- Then the Licid's own end state, which is what separates "ended all
+        -- four" from "ended the first": a Creature is not an Aura, so CR 704.5m
+        -- has nothing to bin and CR 704.5p only unattaches it.
+        Spec.assertBool s (Set.member CardType.Creature (Projection.cardTypesOf lic paid)) "CR 611.2a: the Licid is a Creature again"
+        Spec.assertEqWith s "CR 704.5p: unattached" (fmap Object.attachedTo (Game.lookupObject lic paid)) (Just Nothing)
+        Spec.assertBool s (Set.member lic (GameState.battlefield paid)) "and still on the battlefield rather than in the graveyard"
+        Spec.assertEqWith s "with the ability the removal took back again" (length (Projection.abilitiesOf lic paid)) 1
+        -- And the offer is gone with the effect: paying twice is not on the menu.
+        Spec.assertBool s (List.notElem (Action.Type.EndEffect lic) (Action.legalActions S.alice (paid {GameState.priority = Just S.alice}))) "and the offer is gone with the effect it ended"
+
+-- The board licidSpec's cases share: alice's Gliding Licid animates itself onto
+-- her own Goblin Piker off three Islands -- one for the activation, one for the
+-- pay-to-end, one spare so a mana shortfall cannot be what a negative assertion
+-- is reading. BOB holds three Islands too, and needs them: the negative half of
+-- CR 109.5's "you" is read on this same board, and a seat with no mana would fail
+-- Cost.canPay whatever the controller conjunct answered.
+--
+-- aimAtOffered rather than a hand-built recipient: the slot's pool is
+-- Pool.Creatures, which offers Recipient.ToCreature, and a ToObject of the same
+-- permanent is dropped by CR 608.2b's re-read with no error.
+licidBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Maybe (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+licidBoard island piker licid =
+  let base0 = S.landsFor island S.bob 3 (S.landsInPlay island 3)
+      (host, base1) = S.addCreature piker S.alice base0
+      (lic, base2) = S.addCreature licid S.alice base1
+      ready = base2 {GameState.priority = Just S.alice}
+   in case Face.activatedAbilities (S.combinedFace licid) of
+        [] -> Nothing
+        ability : _ ->
+          let activated = S.runPure (aimAtOffered host) ready (Activate.activateAbility S.alice lic ability)
+              after = S.runPure (aimAtOffered host) activated Stack.resolveTop
+           in Just (lic, host, after)

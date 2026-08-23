@@ -1,0 +1,227 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              }
+            ],
+            "mana": [
+              {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Blue"
+                  }
+                }
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "ModifyTarget",
+                        "value": {
+                          "duration": {
+                            "type": "UntilPaid",
+                            "value": {
+                              "mana": [
+                                {
+                                  "type": "OfType",
+                                  "value": {
+                                    "type": "Colored",
+                                    "value": {
+                                      "type": "Blue"
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          "modification": {
+                            "type": "LoseNamedAbility",
+                            "value": "animate"
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "self"
+                          }
+                        }
+                      },
+                      {
+                        "type": "ModifyTarget",
+                        "value": {
+                          "duration": {
+                            "type": "UntilPaid",
+                            "value": {
+                              "mana": [
+                                {
+                                  "type": "OfType",
+                                  "value": {
+                                    "type": "Colored",
+                                    "value": {
+                                      "type": "Blue"
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          "modification": {
+                            "type": "SetCardType",
+                            "value": {
+                              "type": "Enchantment"
+                            }
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "self"
+                          }
+                        }
+                      },
+                      {
+                        "type": "ModifyTarget",
+                        "value": {
+                          "duration": {
+                            "type": "UntilPaid",
+                            "value": {
+                              "mana": [
+                                {
+                                  "type": "OfType",
+                                  "value": {
+                                    "type": "Colored",
+                                    "value": {
+                                      "type": "Blue"
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          "modification": {
+                            "type": "AddSubtype",
+                            "value": {
+                              "type": "Aura"
+                            }
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "self"
+                          }
+                        }
+                      },
+                      {
+                        "type": "ModifyTarget",
+                        "value": {
+                          "duration": {
+                            "type": "UntilPaid",
+                            "value": {
+                              "mana": [
+                                {
+                                  "type": "OfType",
+                                  "value": {
+                                    "type": "Colored",
+                                    "value": {
+                                      "type": "Blue"
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          "modification": {
+                            "type": "GainEnchant",
+                            "value": {
+                              "pool": {
+                                "type": "Creatures"
+                              }
+                            }
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "self"
+                          }
+                        }
+                      },
+                      {
+                        "type": "Attach",
+                        "value": "target"
+                      }
+                    ]
+                  }
+                ],
+                "targetSlots": {
+                  "target": {
+                    "pool": {
+                      "type": "Creatures"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "name": "animate"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Gliding Licid",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Attached"
+          },
+          "modifications": [
+            {
+              "type": "GainKeyword",
+              "value": {
+                "type": "Flying"
+              }
+            }
+          ]
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Licid"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

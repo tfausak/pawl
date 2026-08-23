@@ -1043,6 +1043,7 @@ isActivation a = case a of
   A.Foretell _ -> False
   A.ActivateManaAbility _ -> False
   A.Ignore _ -> False
+  A.EndEffect _ -> False
 
 -- The life events the whole step logged, by player and amount. CR 701.12c makes
 -- the exchange a GAIN and a LOSS rather than two assignments, so this is what a

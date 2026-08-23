@@ -6,6 +6,7 @@ import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.EndEffect as EndEffect
 import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Foretell as Foretell
 import qualified Pawl.Engine.Game as Game
@@ -202,6 +203,16 @@ legalActions pid gs =
       -- one of several -- Damping Engine's two abilities come from one sentence,
       -- and its "this effect" is that sentence (#1267).
       ignores = fmap Action.Ignore (Ignore.ignorable pid gs)
+      -- CR 116.2c: the eighth special action, and the FOURTH ungated by phase and
+      -- by an empty stack -- "a player can take such an action any time they have
+      -- priority, unless that effect specifies another timing restriction", which
+      -- is CR 116.2b's window plus an escape clause no producer uses.
+      --
+      -- ONE ACTION PER SOURCE, not per stored effect: CR 116.2c ends "that
+      -- effect", the printed sentence, and Gliding Licid's one sentence stores
+      -- four continuous effects that must end together. Nothing is left for the
+      -- player to choose once the permanent is chosen.
+      endings = fmap Action.EndEffect (EndEffect.endable pid gs)
       -- CR 116.2k / 702.170a: the sixth special action, and the second whose
       -- window is CR 116.2a's rather than CR 116.2b's -- "any time you have
       -- priority during your main phase while the stack is empty". That gate is
@@ -293,4 +304,4 @@ legalActions pid gs =
       -- Pawl.ManaSpec's "the menu carries one activation per untapped source" is
       -- the proof.
       manaAbilityActivations = fmap Action.ActivateManaAbility manaSources
-   in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> ignores <> plots <> foretells <> activations <> manaAbilityActivations
+   in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> ignores <> endings <> plots <> foretells <> activations <> manaAbilityActivations

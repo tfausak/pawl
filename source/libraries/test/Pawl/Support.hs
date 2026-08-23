@@ -346,6 +346,7 @@ playLandAnswer p = case p of
           A.Plot _ -> False
           A.Foretell _ -> False
           A.Ignore _ -> False
+          A.EndEffect _ -> False
           A.ActivateManaAbility _ -> False
      in case filter isPlay actions of
           h : _ -> h
@@ -1692,6 +1693,7 @@ isCastOf oid action = case action of
   A.Plot _ -> False
   A.Foretell _ -> False
   A.Ignore _ -> False
+  A.EndEffect _ -> False
   A.ActivateManaAbility _ -> False
 
 -- bob's Piker on the battlefield; alice casts a Bolt at it under identityAnswer

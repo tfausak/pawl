@@ -490,7 +490,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
             { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
               ActivatedAbility.modal = singleModeAbility [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary Nothing)] Map.empty,
               ActivatedAbility.restrictions = [],
-              ActivatedAbility.condition = Nothing
+              ActivatedAbility.condition = Nothing,
+              ActivatedAbility.name = Nothing
             }
      in Spec.assertBool s (ManaAbility.isManaAbility ab) "mana ability"
 
@@ -503,7 +504,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
                   [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary Nothing)]
                   (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSlot.required Pool.AnyTarget Nothing)),
               ActivatedAbility.restrictions = [],
-              ActivatedAbility.condition = Nothing
+              ActivatedAbility.condition = Nothing,
+              ActivatedAbility.name = Nothing
             }
      in Spec.assertBool s (not (ManaAbility.isManaAbility ab)) "targets -> not mana"
 
@@ -516,7 +518,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
                   [Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x"))) (Quantity.Literal 1) Nothing Nothing)]
                   (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSlot.required Pool.AnyTarget Nothing)),
               ActivatedAbility.restrictions = [],
-              ActivatedAbility.condition = Nothing
+              ActivatedAbility.condition = Nothing,
+              ActivatedAbility.name = Nothing
             }
      in Spec.assertBool s (not (ManaAbility.isManaAbility ab)) "no mana produced -> not mana"
 
@@ -1308,6 +1311,7 @@ isManaActivation action = case action of
   Action.Type.Plot _ -> False
   Action.Type.Foretell _ -> False
   Action.Type.Ignore _ -> False
+  Action.Type.EndEffect _ -> False
   Action.Type.Pass -> False
 
 -- Activates a mana ability whenever one is offered, and passes once none is.
@@ -2855,6 +2859,7 @@ isActivateOf oid action = case action of
   Action.Type.Plot _ -> False
   Action.Type.Foretell _ -> False
   Action.Type.Ignore _ -> False
+  Action.Type.EndEffect _ -> False
   Action.Type.Pass -> False
 
 -- Whether alice is offered the cast of one card of this printing from her hand.
@@ -4624,7 +4629,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) [] Nothing
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) [] Nothing Nothing
 
 -- `printing` on the battlefield, settled and untapped, on a board of `n`
 -- `land`s -- the shape every board below wants and none of Support's helpers

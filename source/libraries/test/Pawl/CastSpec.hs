@@ -3065,6 +3065,7 @@ offeredPlays pid gs =
         A.Plot _ -> False
         A.Foretell _ -> False
         A.Ignore _ -> False
+        A.EndEffect _ -> False
         A.ActivateManaAbility _ -> False
    in filter isPlay (Action.legalActions pid gs)
 
