@@ -683,9 +683,10 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- Nullary too, and rule 508.3b's "one or more" is the EVENT's grouping rather
   -- than a number this condition counts.
   TriggerCondition.AttachedPlayerIsAttacked -> []
-  -- Nullary too, and rule 508.3d's "one or more" is the EVENT's grouping for
-  -- the arm above's reason, not a number this condition counts.
-  TriggerCondition.YouAttack -> []
+  -- A PlayerRelation holds no Count, and rule 508.3d's "one or more" is the
+  -- EVENT's grouping for the arm above's reason, not a number this condition
+  -- counts.
+  TriggerCondition.PlayerAttacks _ -> []
   -- CR 702.105a compares life totals rather than counting objects, so no Count.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> []
   TriggerCondition.SelfBlocks -> []
@@ -3030,9 +3031,10 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 508.3b names no quality of anything: its subject is the ability's own
   -- attachment, so there is no Filter here either.
   TriggerCondition.AttachedPlayerIsAttacked -> []
-  -- CR 508.3d names no quality of anything either: its subject is a player, and
-  -- the creatures it counts are the DECLARATION's rather than a Filter's.
-  TriggerCondition.YouAttack -> []
+  -- CR 508.3d names no quality of anything either: its subject is a player, its
+  -- payload is a PlayerRelation and not a Filter, and the creatures it counts
+  -- are the DECLARATION's.
+  TriggerCondition.PlayerAttacks _ -> []
   -- CR 702.105a names no quality of the attacker, only a fact about whom it
   -- attacked, so no Filter.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> []
@@ -4877,9 +4879,18 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- The other way a card can reach this: an onset naming an ability the
         -- card does not declare at all.
         dangling = face {Face.delayedAbilities = Map.empty}
+        -- CR 508.3d, the other condition whose answer turns on a payload rather
+        -- than on the constructor: CR 508.1 lets only the active player declare,
+        -- so "whenever YOU attack" can only happen on the controller's turn and
+        -- "whenever A PLAYER attacks" can happen on anyone's.
+        attacksWith relation ability = ability {TriggeredAbility.condition = TriggerCondition.PlayerAttacks relation}
+        youAttack = face {Face.delayedAbilities = fmap (attacksWith PlayerRelation.You) (Face.delayedAbilities face)}
+        anyoneAttacks = face {Face.delayedAbilities = fmap (attacksWith PlayerRelation.AnyPlayer) (Face.delayedAbilities face)}
     Spec.assertBool s (not (onsetOffends face)) "the real card, ControllersTurn, is accepted"
     Spec.assertBool s (onsetOffends widened) "EachTurn under an onset is rejected"
     Spec.assertBool s (onsetOffends dangling) "and so is an onset naming no declared ability"
+    Spec.assertBool s (not (onsetOffends youAttack)) "CR 508.3d \"whenever you attack\" is controller-scoped"
+    Spec.assertBool s (onsetOffends anyoneAttacks) "and \"whenever a player attacks\" is not"
     -- Not a check that fires for every card: one with no onset at all has
     -- nothing for this to reject, whatever its delayed abilities are scoped to.
     tidalWave <- S.printingOf s registry "Tidal Wave"

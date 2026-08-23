@@ -1631,10 +1631,10 @@ representativeEvents cond =
         TriggerCondition.AttachedPlayerIsAttacked -> one (GameEvent.BecameAttacked (AttackTarget.OfPlayer S.carol))
         -- CR 508.3d's third arity: the once-per-DECLARATION event, naming the
         -- player who declared. Nothing is bound off it -- rule 508.3d names a set
-        -- of creatures and CR 109.5's "you" -- so this pins an EMPTY floor,
-        -- which is the pin the two arms above would break if either grew a
-        -- binding here.
-        TriggerCondition.YouAttack -> one (GameEvent.AttackersDeclared S.carol)
+        -- of creatures rather than one -- so this pins an EMPTY floor, which is
+        -- the pin the two arms above would break if either grew a binding here.
+        -- carol serves every relation, the floor being empty either way.
+        TriggerCondition.PlayerAttacks _ -> one (GameEvent.AttackersDeclared S.carol)
         -- The same declaration event once more. Rule 702.105a binds NOTHING off
         -- it, SelfAttacksWithAnother's case: the player it compares is read from
         -- Combat.attackers and then never named again.
@@ -1878,7 +1878,9 @@ everyTriggerCondition =
     TriggerCondition.CreatureAttacksAlone (Filter.Type.And []),
     TriggerCondition.CreatureAttacksYou,
     TriggerCondition.AttachedPlayerIsAttacked,
-    TriggerCondition.YouAttack,
+    TriggerCondition.PlayerAttacks PlayerRelation.You,
+    TriggerCondition.PlayerAttacks PlayerRelation.Opponent,
+    TriggerCondition.PlayerAttacks PlayerRelation.AnyPlayer,
     TriggerCondition.SelfAttacksPlayerWithMostLife,
     TriggerCondition.SelfBlocks,
     TriggerCondition.SelfBlocksAtLeast 2,
