@@ -250,8 +250,8 @@ sectionSpec s registry = Spec.describe s "Level bar section" $ do
 --
 -- Goblin Piker on every seat: vanilla, so nothing else can move a number, and
 -- 2/1 rather than square, so a modification landing on one axis only could not
--- read as both. bob defends with NOTHING, so no blocker and no CR 704.5g
--- toughness removal can take the creature the assertions read off the board
+-- read as both. bob defends with NOTHING, so there is no blocker to deal the
+-- attackers damage and CR 704.5g cannot destroy the creature the assertions read
 -- before they read it.
 
 -- alice's four Settled Pikers and her Class, at the level given; bob empty.
