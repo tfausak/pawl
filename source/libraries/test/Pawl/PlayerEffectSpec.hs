@@ -300,6 +300,7 @@ isCast action = case action of
   Action.Type.Plot _ -> False
   Action.Type.Foretell _ -> False
   Action.Type.Ignore _ -> False
+  Action.Type.EndEffect _ -> False
   Action.Type.ActivateManaAbility _ -> False
   Action.Type.Pass -> False
 
@@ -2410,6 +2411,7 @@ isSilenceActivate action = case action of
   Action.Type.Plot _ -> False
   Action.Type.Foretell _ -> False
   Action.Type.Ignore _ -> False
+  Action.Type.EndEffect _ -> False
   Action.Type.ActivateManaAbility _ -> False
   Action.Type.Pass -> False
 
@@ -3503,6 +3505,7 @@ isActivateOf oid action = case action of
   Action.Type.Plot _ -> False
   Action.Type.Foretell _ -> False
   Action.Type.Ignore _ -> False
+  Action.Type.EndEffect _ -> False
   Action.Type.ActivateManaAbility _ -> False
   Action.Type.Pass -> False
 
@@ -3517,6 +3520,7 @@ isPlay action = case action of
   Action.Type.Plot _ -> False
   Action.Type.Foretell _ -> False
   Action.Type.Ignore _ -> False
+  Action.Type.EndEffect _ -> False
   Action.Type.ActivateManaAbility _ -> False
   Action.Type.Pass -> False
 
@@ -4038,6 +4042,7 @@ playing wanted action = case action of
   Action.Type.Plot _ -> False
   Action.Type.Foretell _ -> False
   Action.Type.Ignore _ -> False
+  Action.Type.EndEffect _ -> False
   Action.Type.ActivateManaAbility _ -> False
 
 -- Crucible of Worlds {3} Artifact: "You may play lands from your graveyard." The

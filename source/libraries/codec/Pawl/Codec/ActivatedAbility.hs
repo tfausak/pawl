@@ -3,6 +3,7 @@
 module Pawl.Codec.ActivatedAbility where
 
 import qualified Data.Typeable as Typeable
+import qualified Pawl.Codec.AbilityName as AbilityName
 import qualified Pawl.Codec.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Cost as Cost
@@ -25,10 +26,14 @@ codec cardCodec = Fields.object $ do
   -- CR 702.178a: emitted only for a GRANTED ability, so the absence of the key
   -- means the object simply has this ability.
   condition <- Fields.defaulted "condition" Nothing (Common.maybe Condition.codec) ActivatedAbility.condition
+  -- CR 613.1f: emitted only for an ability another clause of the same card refers
+  -- to, so the absence of the key means nothing names it.
+  name <- Fields.defaulted "name" Nothing (Common.maybe AbilityName.codec) ActivatedAbility.name
   pure
     ActivatedAbility.MkActivatedAbility
       { ActivatedAbility.cost = cost,
         ActivatedAbility.modal = modal,
         ActivatedAbility.restrictions = restrictions,
-        ActivatedAbility.condition = condition
+        ActivatedAbility.condition = condition,
+        ActivatedAbility.name = name
       }

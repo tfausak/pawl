@@ -168,6 +168,7 @@ widenModification m = case m of
   Modification.GainKeyword k -> Modification.GainKeyword k
   Modification.GainEnchant x -> Modification.GainEnchant x
   Modification.LoseAllAbilities -> Modification.LoseAllAbilities
+  Modification.LoseNamedAbility n -> Modification.LoseNamedAbility n
   Modification.SetBasePowerToughness x -> Modification.SetBasePowerToughness x
   Modification.ModifyPowerToughness x -> Modification.ModifyPowerToughness x
   Modification.SetLandSubtype x -> Modification.SetLandSubtype x
@@ -201,6 +202,9 @@ layer m = case m of
   Modification.GainEnchant _ -> Layer.Ability
   Modification.GainAbility _ -> Layer.Ability
   Modification.LoseAllAbilities -> Layer.Ability
+  -- CR 613.1f again, and the same layer as the wipe above: what differs is the
+  -- SCOPE of the removal, never when it applies.
+  Modification.LoseNamedAbility _ -> Layer.Ability
   Modification.SetBasePowerToughness {} -> Layer.SetPT
   Modification.ModifyPowerToughness {} -> Layer.ModifyPT
   Modification.SetLandSubtype _ -> Layer.Type
@@ -272,6 +276,16 @@ applyModification viewOf src gs oid m pc =
               -- dropping this line leaves the suite green.
               PC.enchant = []
             }
+        -- CR 613.1f layer 6, the wipe above narrowed to one name: every ability
+        -- the card gave this name goes, and every other ability stays. A Licid
+        -- keeps "Enchanted creature has flying" while losing the ability that
+        -- animated it, which is the whole difference between the two arms.
+        --
+        -- Reaches PC.activatedAbilities alone, that being the only list whose
+        -- members carry a name (#2134). Nothing else is emptied -- not the
+        -- keywords, not the CDA -- because the clause names one ability.
+        Modification.LoseNamedAbility n ->
+          pc {PC.activatedAbilities = filter ((/= Just n) . ActivatedAbility.name) (PC.activatedAbilities pc)}
         Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) ->
           pc
             { PC.power = setPT (PC.power pc) (Quantity.evaluate viewOf context gs oid p),
@@ -1158,6 +1172,7 @@ freezeQuantities gs announcedOn source you m =
         -- variable in this effect, not in a quoted ability's own future one.
         Modification.GainAbility _ -> Just m
         Modification.LoseAllAbilities -> Just m
+        Modification.LoseNamedAbility _ -> Just m
         Modification.SetLandSubtype _ -> Just m
         Modification.SetLandSubtypeToChosen -> Just m
         Modification.AddLandSubtype _ -> Just m
@@ -1191,6 +1206,7 @@ quantitiesOf m = case m of
   -- The layer fold evaluates nothing inside a quoted ability.
   Modification.GainAbility _ -> []
   Modification.LoseAllAbilities -> []
+  Modification.LoseNamedAbility _ -> []
   Modification.SetLandSubtype _ -> []
   Modification.SetLandSubtypeToChosen -> []
   Modification.AddLandSubtype _ -> []
@@ -1248,6 +1264,7 @@ setsLandSubtype m = case m of
   -- CR 612 swaps one word for another inside rules text; it sets no subtype.
   Modification.ChangeSubtypeWord {} -> False
   Modification.LoseAllAbilities -> False
+  Modification.LoseNamedAbility _ -> False
   Modification.SetBasePowerToughness {} -> False
   Modification.ModifyPowerToughness {} -> False
   Modification.SwitchPowerToughness -> False
@@ -1478,6 +1495,8 @@ rewriteModificationWith rewriteAbility pairs m =
         Modification.SetControllerToSource -> acc
         -- An ability wipe names nothing at all, and neither does a P/T switch.
         Modification.LoseAllAbilities -> acc
+        -- Names an ABILITY of the same card, which is no subtype word.
+        Modification.LoseNamedAbility _ -> acc
         Modification.SwitchPowerToughness -> acc
         -- CR 612.1 through both boxes: a Quantity.Count carries a Filter, so a
         -- hacked Aspect of Wolf counts the new type. rewriteQuantity is the same
@@ -2069,6 +2088,11 @@ rewriteDuration pairs duration = case duration of
   Duration.UntilYourNextTurn -> duration
   Duration.UntilEndOfYourNextTurn -> duration
   Duration.UntilEndOfCombat -> duration
+  -- CR 116.2c's price, which is a Cost and not a Condition. An activated
+  -- ability's own cost is left alone by this descent for the same reason: no
+  -- Cost arm carries a subtype word outside a Filter, and the Filters a cost's
+  -- non-mana components hold are matched where the cost is paid.
+  Duration.UntilPaid _ -> duration
 
 -- CR 612.1 through a Quantity: a Count's Filter is where the subtype word hides,
 -- and its Aggregation may name a further Quantity. Every remaining arm is a leaf.
@@ -2610,6 +2634,9 @@ abilityRemovalAfter gs =
 removesAbilities :: Modification -> Bool
 removesAbilities m = case m of
   Modification.LoseAllAbilities -> True
+  -- CR 613.1f: a removal that names one ability is a removal all the same, so CR
+  -- 613.9's dependency between a grant and a wipe sees it too.
+  Modification.LoseNamedAbility _ -> True
   Modification.GainKeyword _ -> False
   -- A grant, the other direction of CR 613.1f, exactly as GainKeyword above and
   -- GainAbility below.
@@ -3013,6 +3040,12 @@ modificationWrites m = case m of
   -- because it also empties the map.
   Modification.GainAbility _ -> Set.empty
   Modification.LoseAllAbilities -> Set.singleton Keywords
+  -- Writes ProjectedCharacteristics.activatedAbilities, which Aspect has no finer
+  -- grain for than Keywords -- Filter.HasNonManaActivatedAbility, the atom that
+  -- reads it, declares Keywords. A REGRESSION FENCE rather than a proved
+  -- behaviour: no board in the pool makes another effect's affected set depend on
+  -- a named removal, so Set.empty here leaves the suite green.
+  Modification.LoseNamedAbility _ -> Set.singleton Keywords
   Modification.SetBasePowerToughness {} -> Set.singleton PowerA
   Modification.ModifyPowerToughness {} -> Set.singleton PowerA
   Modification.SwitchPowerToughness -> Set.singleton PowerA
@@ -3055,6 +3088,8 @@ modificationReads m = case m of
   -- A quoted ability's quantities are read at ITS resolution.
   Modification.GainAbility _ -> Set.empty
   Modification.LoseAllAbilities -> Set.empty
+  -- Carries a name, which is not a Quantity.
+  Modification.LoseNamedAbility _ -> Set.empty
   Modification.SwitchPowerToughness -> Set.empty
   Modification.SetLandSubtype _ -> Set.empty
   Modification.SetLandSubtypeToChosen -> Set.empty
@@ -3777,6 +3812,7 @@ grantsKeywordWhere p m = case m of
   -- Hands out an ability but never a KEYWORD, which is all the callers ask about.
   Modification.GainAbility _ -> False
   Modification.LoseAllAbilities -> False
+  Modification.LoseNamedAbility _ -> False
   Modification.SetBasePowerToughness {} -> False
   Modification.ModifyPowerToughness {} -> False
   Modification.SetLandSubtype _ -> False

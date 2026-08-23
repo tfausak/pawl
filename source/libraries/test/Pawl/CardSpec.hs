@@ -61,6 +61,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
@@ -574,6 +575,10 @@ durationCounts duration = case duration of
   Duration.UntilEndOfYourNextTurn -> []
   Duration.ForAsLongAs condition -> conditionCounts condition
   Duration.UntilEndOfCombat -> []
+  -- CR 116.2c's price is a Cost, whose Filters are swept by durationFilters
+  -- below and never through a Count -- an activated ability's own cost takes
+  -- exactly that split (activatedAbilityCounts against activatedAbilityFilters).
+  Duration.UntilPaid _ -> []
 
 -- Every Count reachable from a Modification: only its P/T quantities
 -- (layers 7b/7c) carry one.
@@ -591,6 +596,8 @@ modificationCounts modification = case modification of
     GrantedAbility.Activated ability -> activatedAbilityCounts ability
     GrantedAbility.Triggered ability -> triggeredAbilityCounts ability
   Modification.LoseAllAbilities -> []
+  -- Carries a name, which reaches no Count.
+  Modification.LoseNamedAbility _ -> []
   Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> quantityCounts p <> quantityCounts t
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityCounts p <> quantityCounts t
   Modification.SetLandSubtype _ -> []
@@ -2000,7 +2007,8 @@ oneEffectActivated mana effect =
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       ActivatedAbility.restrictions = [],
-      ActivatedAbility.condition = Nothing
+      ActivatedAbility.condition = Nothing,
+      ActivatedAbility.name = Nothing
     }
 
 -- One CR 700.2 mode for the fixtures below: the effects it runs and the target
@@ -2022,7 +2030,8 @@ modalActivated modes =
     { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
       ActivatedAbility.modal = Modal.MkModal (Seq.fromList modes) (ModeSelection.ChooseExactly 1),
       ActivatedAbility.restrictions = [],
-      ActivatedAbility.condition = Nothing
+      ActivatedAbility.condition = Nothing,
+      ActivatedAbility.name = Nothing
     }
 
 -- modalActivated's TRIGGERED twin, so the per-mode lint can be shown to hand
@@ -2873,8 +2882,18 @@ handActionFilters action =
   concatMap effectFilters (HandAction.effects action)
     <> unframed (concatMap conditionFilters (Maybe.maybeToList (HandAction.condition action)))
 
+-- A Duration reaches a Filter two ways: through a CR 611.2b clause's Count, and
+-- through the non-mana components of CR 116.2c's price.
 durationFilters :: Duration.Duration -> [Filter.Type.Filter Keyword.Keyword]
-durationFilters = countFilters . durationCounts
+durationFilters duration =
+  countFilters (durationCounts duration) <> case duration of
+    Duration.UntilPaid cost -> costFilters cost
+    Duration.UntilEndOfTurn -> []
+    Duration.Indefinite -> []
+    Duration.UntilYourNextTurn -> []
+    Duration.UntilEndOfYourNextTurn -> []
+    Duration.ForAsLongAs _ -> []
+    Duration.UntilEndOfCombat -> []
 
 -- A Modification reaches a Filter two ways: through its layer-7 quantities (a
 -- Count) and through the keyword a layer-6 grant hands out (CR 702.29e again).
@@ -2895,6 +2914,7 @@ modificationFilters modification = case modification of
   Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> quantityFilters p <> quantityFilters t
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityFilters p <> quantityFilters t
   Modification.LoseAllAbilities -> []
+  Modification.LoseNamedAbility _ -> []
   Modification.SetLandSubtype _ -> []
   Modification.SetLandSubtypeToChosen -> []
   Modification.AddLandSubtype _ -> []
@@ -4732,6 +4752,18 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let cardOffends card = not (Map.null (Map.restrictKeys (Face.delayedAbilities card) (Map.keysSet Keyword.Engine.mintedDelayedAbilities)))
         offenders = filter (anyFace cardOffends . Printing.card) ps
     Spec.assertEqWith s "no card shadows a minted delayed ability" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The OTHER AbilityName join (CR 613.1f), the delayed-ability lint's shape one
+  -- rule over: a Modification.LoseNamedAbility naming an ability its face does
+  -- not declare is a FAILING TEST, never a removal that silently removes nothing.
+  -- Equality, not subset: a named ability nothing removes is a name for nobody.
+  --
+  -- Per FACE, because the name is written on one face's ability and read by that
+  -- same face's text -- so two faces may reuse a name without colliding.
+  Spec.it s "CR 613.1f every named removal names an ability its face declares, and every named ability is removed" $ do
+    ps <- S.allPrintings s
+    let faceOffends face = namedRemovals face /= declaredAbilityNames face
+        offenders = filter (anyFace faceOffends . Printing.card) ps
+    Spec.assertEqWith s "no dangling or unused ability names" (fmap (S.nameOf . Printing.card) offenders) []
   -- Every slot a delayed ability READS must be one the arming card DEFINES:
   -- the reserved trigger-source slot, a token bound by a Create, the
   -- incarnation a MoveToZone bound at its destination (Meandering Towershell's
@@ -6768,3 +6800,30 @@ castHalf land printing half =
           [only] -> Just only
           _ -> Nothing
       )
+
+-- Every AbilityName a face's layer-6 removals refer to. Both carriers of a
+-- Modification are swept: the printed ones on Face.staticAbilities, and the
+-- stored ones a resolution creates, which reach a Modification only through
+-- Effect.ModifyTarget.
+--
+-- The WILDCARD on Effect is deliberate and is the one hole here: ModifyTarget is
+-- the sole Effect arm carrying a Modification, so a second one added later would
+-- escape this lint without breaking the build.
+namedRemovals :: Face.Face Card.Type.Card -> Set.Set AbilityName.AbilityName
+namedRemovals face =
+  let stored effect = case effect of
+        Effect.ModifyTarget modify -> [Projection.widenModification (ModifyTarget.modification modify)]
+        _ -> []
+      printed ability = Foldable.toList (StaticAbility.modifications ability)
+      removals modification = case modification of
+        Modification.LoseNamedAbility name -> [name]
+        _ -> []
+   in Set.fromList
+        ( concatMap removals (concatMap printed (Face.staticAbilities face))
+            <> concatMap removals (concatMap stored (cardAuthoredEffects face))
+        )
+
+-- Every AbilityName a face's activated abilities declare -- the other side of the
+-- join above.
+declaredAbilityNames :: Face.Face Card.Type.Card -> Set.Set AbilityName.AbilityName
+declaredAbilityNames = Set.fromList . Maybe.mapMaybe ActivatedAbility.name . Face.activatedAbilities

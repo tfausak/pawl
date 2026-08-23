@@ -43,11 +43,13 @@ import qualified Pawl.Types.AfterTurn as AfterTurn
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -61,7 +63,10 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana.Type
+import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaFilter as ManaFilter
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Moved as Moved
@@ -1710,6 +1715,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Expiry" $ do
   handoffSpec s
   conditionalSpec s registry
   untilEndOfCombatSpec s registry
+  whenPaidSpec s
   masterThiefSpec s registry
   monarchSpec s registry
   garlandSpec s registry
@@ -1719,3 +1725,42 @@ spec s registry = Spec.describe s "Pawl.Engine.Expiry" $ do
   dovinSpec s registry
   oldFatSpiderSpec s registry
   lingeringSpec s registry
+
+-- CR 116.2c's duration, which no sweep of this module ends: the unit-level half
+-- of Pawl.AuraSpec's Gliding Licid pair. The offer that DOES end it is
+-- Pawl.Engine.EndEffect's, and it is proved there at gameplay level.
+--
+-- The cost {U} is arbitrary here and is asserted to travel unchanged, which is
+-- the whole of what arming does to this arm -- there is nothing about the game to
+-- bake in, and the price is what the offer later quotes.
+whenPaidSpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
+whenPaidSpec s = Spec.describe s "WhenPaid" $ do
+  Spec.it s "CR 611.2a / 116.2c a pay-to-end duration arms to WhenPaid, carrying the price" $
+    Spec.assertEqWith
+      s
+      "armed"
+      (Expiry.arm Map.empty S.alice S.noSource (Duration.UntilPaid blueCost) armGs)
+      (Just (Expiry.Type.WhenPaid blueCost))
+  -- All four time sweeps, on one board. Never answers True in all four too, so
+  -- this case does not distinguish the two arms -- what does is that a WhenPaid
+  -- entry can be FOUND, which the case below asserts and Never could not satisfy.
+  Spec.it s "CR 116.2c no sweep of the turn's structure ends it" $ do
+    let armed = effectWith (Expiry.Type.WhenPaid blueCost) (Setup.emptyGame S.bothPlayers)
+        conditional = S.runPure S.identityAnswer armed Expiry.sweepConditional
+    Spec.assertEqWith s "cleanup leaves it" (length (GameState.continuousEffects (Expiry.dropAtCleanup armed))) 1
+    Spec.assertEqWith s "a turn handoff leaves it" (length (GameState.continuousEffects (Expiry.dropAtTurnOf S.alice armed))) 1
+    Spec.assertEqWith s "the end of a phase leaves it" (length (GameState.continuousEffects (Expiry.dropAtEndOf PhaseSelector.CombatPhase armed))) 1
+    Spec.assertEqWith s "and the conditional sweep leaves it" (length (GameState.continuousEffects conditional)) 1
+  -- The IDENTITY the arm exists for, and the reason Expiry.Never is not it: the
+  -- effect is findable by its source, so a payment knows what to end.
+  Spec.it s "CR 116.2c the stored effect is findable by its source, with its price" $ do
+    let armed = effectWith (Expiry.Type.WhenPaid blueCost) (Setup.emptyGame S.bothPlayers)
+        never = effectWith Expiry.Type.Never (Setup.emptyGame S.bothPlayers)
+    Spec.assertEqWith s "the offer names the source and the price" (Expiry.paidExpiries armed) [(effectSource, blueCost)]
+    Spec.assertEqWith s "an indefinite effect from the same source offers nothing" (Expiry.paidExpiries never) []
+    Spec.assertEqWith s "and paying ends it" (GameState.continuousEffects (Expiry.dropWhenPaidBy effectSource armed)) []
+    Spec.assertEqWith s "while another object's payment does not" (length (GameState.continuousEffects (Expiry.dropWhenPaidBy S.noSource armed))) 1
+
+-- {U}, the price every Licid prints.
+blueCost :: Cost.Type.Cost Keyword.Keyword
+blueCost = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Blue)])) []

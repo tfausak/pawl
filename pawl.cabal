@@ -800,6 +800,7 @@ library engine
     Pawl.Engine.Detain
     Pawl.Engine.Dungeon
     Pawl.Engine.EffectZone
+    Pawl.Engine.EndEffect
     Pawl.Engine.Engine
     Pawl.Engine.EntryRestriction
     Pawl.Engine.Event

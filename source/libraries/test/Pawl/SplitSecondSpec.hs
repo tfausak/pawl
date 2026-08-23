@@ -118,6 +118,7 @@ isCast action = case action of
   A.Plot _ -> False
   A.Foretell _ -> False
   A.Ignore _ -> False
+  A.EndEffect _ -> False
   A.ActivateManaAbility _ -> False
 
 isActivate :: A.Action -> Bool
@@ -132,6 +133,7 @@ isActivate action = case action of
   A.Plot _ -> False
   A.Foretell _ -> False
   A.Ignore _ -> False
+  A.EndEffect _ -> False
   A.ActivateManaAbility _ -> False
 
 isManaAbility :: A.Action -> Bool
@@ -147,6 +149,7 @@ isManaAbility action = case action of
   A.Plot _ -> False
   A.Foretell _ -> False
   A.Ignore _ -> False
+  A.EndEffect _ -> False
 
 castOf :: ObjectId.ObjectId -> Printing.Printing -> A.Action
 castOf oid printing = A.Cast oid (S.printingName printing) Facing.FaceUp

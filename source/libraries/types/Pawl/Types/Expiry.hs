@@ -1,6 +1,8 @@
 module Pawl.Types.Expiry where
 
 import qualified Pawl.Types.AfterTurn as AfterTurn
+import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.While as While
@@ -54,4 +56,20 @@ data Expiry
     -- Only the CombatPhase arm has a printed producer today
     -- (Duration.UntilEndOfCombat, Jade Statue); the others cost nothing.
     AtEndOf PhaseSelector.PhaseSelector
+  | -- | CR 611.2a / 116.2c: ends when a player pays this cost, which they may do
+    -- "any time they have priority ... for as long as the effect allows it". The
+    -- stored counterpart of Duration.UntilPaid.
+    --
+    -- Survives every sweep in Pawl.Engine.Expiry, as Never does -- no window of
+    -- the turn ends it. It is a separate arm from Never all the same, and the
+    -- reason is IDENTITY rather than lifetime: Pawl.Engine.EndEffect has to find
+    -- the stored effects one payment ends, and it finds them by this arm plus the
+    -- effect's source. A Never entry names no price and belongs to no offer, so
+    -- it cannot be told from any other end-of-game effect the same object made.
+    --
+    -- Carries the COST for the same reason Duration.UntilPaid does: it is what
+    -- the offer quotes and what the payment charges. Both halves of one printed
+    -- sentence therefore end together -- every effect the resolution stored
+    -- carries this same arm and the same source.
+    WhenPaid (Cost.Cost Keyword.Keyword)
   deriving (Eq, Ord, Show)

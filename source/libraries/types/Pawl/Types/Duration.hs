@@ -1,6 +1,8 @@
 module Pawl.Types.Duration where
 
 import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.Keyword as Keyword
 
 -- | How long a stored continuous effect lasts, as the CARD says it (CR 611.2).
 -- PRINTED data: this is what appears in card JSON. The game stores
@@ -38,4 +40,22 @@ data Duration
     -- producer can only be activated during combat, so that is the phase the
     -- effect was created in. One armed OUTSIDE combat is unspecified here (#525).
     UntilEndOfCombat
+  | -- | CR 611.2a: "You may pay {U} to end this effect", the clause every Licid
+    -- prints. The duration a spell or ability states need not be a window of the
+    -- turn at all -- this one ends when a player takes CR 116.2c's special
+    -- action, which Pawl.Types.Action's EndEffect carries and
+    -- Pawl.Engine.EndEffect performs.
+    --
+    -- The COST rides here because CR 116.2c fixes neither price nor timing: "for
+    -- as long as the effect allows it", and the effect is this. All twelve Licids
+    -- say one mana symbol, but the field is a whole Pawl.Types.Cost --
+    -- SpecialAction.IgnoreThisUntilEndOfTurn's shape one rule over, so the two
+    -- pay-to-take actions are paid through one Pawl.Engine.Cost call.
+    --
+    -- No sweep of Pawl.Engine.Expiry ends it: the stored counterpart
+    -- (Expiry.WhenPaid) is what the special action looks for, and nothing about
+    -- the turn's structure ends it. Indefinite is therefore the WRONG arm for a
+    -- Licid even though both outlast every window -- an Expiry.Never cannot be
+    -- keyed on, so the performer could not find the effects the payment ends.
+    UntilPaid (Cost.Cost Keyword.Keyword)
   deriving (Eq, Ord, Show)

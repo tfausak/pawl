@@ -41,6 +41,7 @@ spec s = Spec.describe s "Pawl.Codec.GrantedAbility" $ do
               emptyModal
               []
               Nothing
+              Nothing
           )
       )
       " {\"type\":\"Activated\",\"value\":{\"cost\":{\"mana\":null,\"components\":[{\"type\":\"TapThis\"}]},\"modal\":{\"modes\":[{}]}}} "

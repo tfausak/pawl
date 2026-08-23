@@ -582,6 +582,10 @@ durationSlots duration = case duration of
   Duration.UntilYourNextTurn -> Map.empty
   Duration.UntilEndOfYourNextTurn -> Map.empty
   Duration.ForAsLongAs condition -> conditionSlots condition
+  -- A Cost reads no slot: the activation cost of an ability is not walked by
+  -- modeSlots either, and CR 116.2c's price is paid outside any resolution, so
+  -- there is no binding environment for it to name.
+  Duration.UntilPaid _ -> Map.empty
   Duration.UntilEndOfCombat -> Map.empty
 
 -- Every slot a whole MODE reads: its effects', every payer CR 118.12a's "unless
@@ -824,6 +828,8 @@ durationSlotsAreExhaustive duration = case duration of
   Duration.UntilYourNextTurn -> True
   Duration.UntilEndOfYourNextTurn -> True
   Duration.ForAsLongAs condition -> conditionSlotsAreExhaustive condition
+  -- durationSlots' answer: a Cost reads no slot, so its enumeration is complete.
+  Duration.UntilPaid _ -> True
   Duration.UntilEndOfCombat -> True
 
 -- conditionSlots' mirror: both sides are a Quantity.

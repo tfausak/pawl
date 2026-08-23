@@ -138,6 +138,7 @@ landPlays actions =
         A.Plot _ -> Nothing
         A.Foretell _ -> Nothing
         A.Ignore _ -> Nothing
+        A.EndEffect _ -> Nothing
         A.ActivateManaAbility _ -> Nothing
    in Maybe.mapMaybe playOf actions
 

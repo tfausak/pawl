@@ -41,6 +41,8 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 -- Pawl.Types.Action aliased Action.Type: Pawl.Engine.Action already claims the
 -- alias Action above (the same phase exception Filter takes).
+
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
@@ -512,6 +514,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "layer classification matches CR 613.1" $ do
     Spec.assertEqWith s "grant is layer 6" (Projection.layer (Modification.GainKeyword Keyword.Deathtouch)) Layer.Ability
     Spec.assertEqWith s "lose-all is layer 6" (Projection.layer Modification.LoseAllAbilities) Layer.Ability
+    -- CR 613.1f puts the NAMED removal in the same layer as the wipe: what
+    -- differs between the two arms is scope, never when they apply.
+    Spec.assertEqWith s "lose-named is layer 6 too" (Projection.layer (Modification.LoseNamedAbility (AbilityName.MkAbilityName (Text.pack "animate")))) Layer.Ability
     Spec.assertEqWith s "set base is 7b" (Projection.layer (Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)))) Layer.SetPT
     Spec.assertEqWith s "modify is 7c" (Projection.layer (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3)))) Layer.ModifyPT
 
@@ -3690,6 +3695,7 @@ isActivateOfOgre oid action = case action of
   Action.Type.Plot _ -> False
   Action.Type.Foretell _ -> False
   Action.Type.Ignore _ -> False
+  Action.Type.EndEffect _ -> False
   Action.Type.ActivateManaAbility _ -> False
 
 -- The single activated ability of a printing. Total: every caller below names a

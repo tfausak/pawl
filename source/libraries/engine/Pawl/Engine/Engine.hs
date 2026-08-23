@@ -24,6 +24,7 @@ import qualified Pawl.Engine.Daytime as Daytime
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Dungeon as Dungeon
+import qualified Pawl.Engine.EndEffect as EndEffect
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.FaceDown as FaceDown
@@ -1121,6 +1122,15 @@ priorityLoop = do
                               -- CR 116.2h / 702.143b: a special action too.
                               Action.Type.Foretell oid -> do
                                 Foretell.foretell p oid
+                                State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                                settleForPriority
+                                loop
+                              -- CR 116.2c: a special action too, and the one whose
+                              -- permission came from a resolution rather than
+                              -- from printed text. CR 613.1's next projection is
+                              -- what makes the ending visible; nothing is undone.
+                              Action.Type.EndEffect oid -> do
+                                EndEffect.endEffect p oid
                                 State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
                                 loop
