@@ -44,6 +44,7 @@ import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
+import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Count as Count.Type
@@ -1814,6 +1815,40 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "and the Piker is its printed 2/1" (Projection.powerOf pikerId refused, Projection.toughnessOf pikerId refused) (Just 2, Just 1)
     Spec.assertEqWith s "the same call with two Literals DOES store one -- the refusal is what did it" (length (GameState.continuousEffects stored)) 1
     Spec.assertEqWith s "and pumps the Piker to 5/4" (Projection.powerOf pikerId stored, Projection.toughnessOf pikerId stored) (Just 5, Just 4)
+  -- The OTHER half of the same freeze: a quantity that IS answerable, but only
+  -- against the resolution's own slot bindings. Rush of Blood's X is
+  -- Quantity.AgainstSlot "target", which reads Filter.slotObjects -- so a freeze
+  -- handed a bare Filter.contextFor sees an empty slot map, answers Nothing, and
+  -- the arm above stores no continuous effect at all. The card would resolve, go
+  -- to the graveyard, and silently do nothing.
+  --
+  -- Rabid Bite is the existing precedent for the same AgainstSlot/Power pair
+  -- against a target slot, through Effect.DealDamage -- which already evaluates
+  -- via effectContext, which is why nothing was red.
+  --
+  -- A Goblin Piker (2/1) rather than a vanilla 1/1: the buggy answer (2) and a
+  -- "default the slot to 0" partial fix (also 2) must both differ from the right
+  -- one (4), and the toughness assertion then separates +X/+0 (4/1) from +X/+X
+  -- (4/3). It is the only creature on the board, so CR 601.2c leaves one legal
+  -- target and no answerer picks it.
+  Spec.it s "CR 608.2h/611.2d Rush of Blood's X is the power of the creature in its own target slot" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    rushOfBlood <- S.printingOf s registry "Rush of Blood"
+    -- Exactly three Mountains, the minimum that pays {2}{R}, so no spare mana
+    -- can pay for a second read.
+    let (pikerId, withPiker) = S.addCreature piker S.alice (S.landsInPlay mountain 3)
+        (gs, spellId) = S.handOne rushOfBlood withPiker
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
+        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+    Spec.assertEqWith s "power 2 + its own 2" (Projection.powerOf pikerId resolved) (Just 4)
+    Spec.assertEqWith s "toughness untouched at 1 -- +X/+0, not +X/+X" (Projection.toughnessOf pikerId resolved) (Just 1)
+    Spec.assertEqWith
+      s
+      "and what was STORED is the frozen pair, not the raw AgainstSlot"
+      (fmap ContinuousEffect.modification (GameState.continuousEffects resolved))
+      [Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 2) (Quantity.Literal 0))]
+    Spec.assertEqWith s "the Piker is still its printed 2/1 while the spell is on the stack" (Projection.powerOf pikerId cast, Projection.toughnessOf pikerId cast) (Just 2, Just 1)
 
 -- Add n Mountains to pid's battlefield, discarding the ids (used to bulk up a
 -- pool of owned cards). replicate n () avoids a list comprehension (CLAUDE.md).

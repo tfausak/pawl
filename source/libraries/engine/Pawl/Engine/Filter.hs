@@ -554,14 +554,23 @@ data Context = MkContext
     -- directly. An EMPTY set never appears -- a slot naming nothing is an absent
     -- key -- so `Map.member` and "names something" are the same question.
     --
-    -- EMPTY everywhere but a resolution, CR 603.4's intervening-"if" checks and a
-    -- floating replacement row's own patterns, which is the honest answer rather
-    -- than a forgotten filler: elsewhere there are no slots. Pawl.Engine.Resolve's
-    -- effectContext, Pawl.Engine.Event.interveningHolds, Pawl.Engine.Stack and
-    -- Pawl.Engine.Replacement.candidateContext are the non-empty producers -- the
-    -- last of them off the snapshot ActiveReplacement.slots holds, the resolution
-    -- that installed the row being over -- and all four go through
+    -- Non-empty only where the caller supplies it. Pawl.Engine.Resolve's
+    -- effectContext, Pawl.Engine.Event.interveningHolds (CR 603.4's
+    -- intervening-"if"), Pawl.Engine.Stack (CR 608.2a's re-check of that same
+    -- clause) and Pawl.Engine.Replacement.candidateContext are the producers --
+    -- the last of them off the snapshot ActiveReplacement.slots holds, the
+    -- resolution that installed the row being over -- and all four go through
     -- contextWithSlots below.
+    --
+    -- Outside those, contextFor leaves it empty, and every atom that reads it
+    -- (IsBound, SameNameAsBound, IsControllerOfBound, ControlledByBound,
+    -- Quantity.AgainstSlot) is then vacuously False or Nothing rather than
+    -- raising. That is honest wherever no announcement is in flight -- the layer
+    -- fold, trigger matching, cost payment, combat declarations, duration expiry
+    -- -- but it was NOT honest of every in-resolution caller: four of them build a
+    -- bare contextFor while a resolution's bindings do exist (#2141), and
+    -- Pawl.Engine.Projection.freezeQuantities was a fifth until it took its
+    -- context from the caller.
     slotObjects :: Map.Map SlotName.SlotName (Set.Set ObjectId.ObjectId),
     -- CR 201.1 / 709.4a: the NAMES of the objects the surrounding announcement's
     -- slots hold, for the one atom that compares a candidate's against them

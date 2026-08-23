@@ -3042,7 +3042,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- CR 601.2b's announced X is read off `resolving` instead, since
             -- only the ability object holds it. A quantity that cannot be
             -- evaluated now is undetermined for good, so nothing is stored.
-            case Projection.freezeQuantities gs resolving source (Just controller) modification of
+            --
+            -- Through effectContext and NOT Filter.contextFor, so the resolution's
+            -- own slot bindings ride along: Rush of Blood's X is the power of the
+            -- creature in its own target slot, and a slotless context answers
+            -- Nothing and stores nothing at all.
+            case Projection.freezeQuantities gs resolving source (effectContext controller source legal (slotGroups resolving gs)) modification of
               Nothing -> gs
               Just frozen ->
                 let (ts, gs1) = Game.freshTimestamp gs

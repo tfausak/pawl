@@ -1157,10 +1157,16 @@ baseView gs oid =
 -- resolution, and CR 604.2's effect is regenerated per projection), nor to what
 -- frozenStaticParts hands over as a permanent leaves. Nothing when a quantity
 -- cannot be evaluated at store time: it cannot be determined later either.
-freezeQuantities :: GameState -> ObjectId -> ObjectId -> Maybe PlayerId.PlayerId -> Modification.Modification ability -> Maybe (Modification.Modification ability)
-freezeQuantities gs announcedOn source you m =
+--
+-- The CONTEXT comes from the caller rather than being built here, because a
+-- Filter.contextFor built here would carry no slot bindings: Quantity.AgainstSlot
+-- reads Filter.slotObjects, so against an empty map it answers Nothing, the
+-- freeze answers Nothing, and Resolve stores no continuous effect at all. Rush of
+-- Blood's "+X/+0 ... where X is its power" is the producer, and
+-- Pawl.Engine.Resolve.effectContext is the one engine caller's spelling.
+freezeQuantities :: GameState -> ObjectId -> ObjectId -> Filter.Context -> Modification.Modification ability -> Maybe (Modification.Modification ability)
+freezeQuantities gs announcedOn source context m =
   let viewOf = fullView gs
-      context = Filter.contextFor you (Just source)
       freeze q = fmap Quantity.Type.Literal (Quantity.evaluateFor viewOf context gs announcedOn source q)
    in case m of
         Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> fmap Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness <$> freeze p <*> freeze t)
