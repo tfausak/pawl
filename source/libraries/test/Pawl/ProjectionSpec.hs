@@ -685,7 +685,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         freeze :: Projection.Modification -> Maybe Projection.Modification
         -- One object twice: the SPELL case, where CR 601.2b's announcer and CR
         -- 113.7a's source are the same id. Pawl.ActivateSpec is where they part.
-        freeze = Projection.freezeQuantities gs pikerId pikerId (Just S.alice)
+        --
+        -- A SLOTLESS context deliberately: this case is about the freeze's own
+        -- answer for quantities that name no slot. Resolve's caller supplies the
+        -- resolution's own bindings instead, which Pawl.ResolveSpec's Rush of
+        -- Blood case is the gameplay-level proof of.
+        freeze = Projection.freezeQuantities gs pikerId pikerId (Filter.contextFor (Just S.alice) (Just pikerId))
     Spec.assertEqWith
       s
       "read against the SOURCE, the Piker's power locks in at 2"

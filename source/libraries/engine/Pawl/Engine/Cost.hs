@@ -2262,7 +2262,7 @@ payComponent pid oid component = case component of
   -- TapThis' route.
   --
   -- Binds Binding.tappedPermanent, the second component to bind a slot at all
-  -- (CR 601.2f): Unerring Sling's "damage equal to the tapped creature's power"
+  -- (CR 601.2h): Unerring Sling's "damage equal to the tapped creature's power"
   -- needs a name for what its own cost tapped. Unlike Sacrifice's arm the object
   -- is still on the battlefield, so the read is CR 608.2h's CURRENT information
   -- rather than last known.
