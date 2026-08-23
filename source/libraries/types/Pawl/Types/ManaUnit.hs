@@ -14,7 +14,8 @@ import qualified Pawl.Types.ProductionTag as ProductionTag
 -- caused you to lose life" -- observable facts about the production event that
 -- the engine determines with no card knowledge.
 --
--- Pawl.Types.ManaRetention is a DURATION something must end (CR 514.2) rather
+-- Pawl.Types.ManaRetention is a DURATION something must end (CR 514.2, CR
+-- 500.5a) rather
 -- than such a fact, and it comes from the wording of the effect that added the
 -- mana rather than from any property of its source -- which is why it is a field
 -- of its own and not a production tag.

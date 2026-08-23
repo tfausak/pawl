@@ -3015,17 +3015,17 @@ boggartPranksterSpec s registry =
 -- this mana as steps end. {R}{R}{R}: Target creature gets +3/+0 until end of
 -- turn."
 --
--- Not implemented: the retention sentence. ManaRetention has no
--- until-end-of-combat arm (#2155), so pawl's Roku loses the mana as the declare
--- attackers step ends (CR 500.5) -- STRICTER than printed, never weaker.
+-- Nothing is omitted from the card. The retention sentence is CR 500.5a's
+-- ManaRetention.UntilEndOfCombat, and Pawl.ManaSpec's group of the same name is
+-- what proves it; this group is about the trigger's payload alone.
 --
--- That omission is also why the assertion is Roku's POWER and not its pool: CR
--- 500.5 empties the pool at the end of the step under every reading of the
--- trigger, so a pool assertion could not discriminate. The mana is read through
--- what it BOUGHT instead. alice holds no lands, so the {R}{R}{R} activation is
--- affordable only through the trigger, and six {R} pays for exactly two
--- activations -- the answerer takes every activation offered and the MANA bounds
--- it, so a trigger adding the wrong amount would show as the wrong power.
+-- The assertion here is Roku's POWER and not its pool, which the retention does
+-- not change: alice holds no lands, so the {R}{R}{R} activation is affordable
+-- only through the trigger, and six {R} pays for exactly two activations. The
+-- answerer takes every activation offered and the MANA bounds it, so a trigger
+-- adding the wrong amount shows as the wrong power -- and the pool is empty at
+-- the moment this group reads it under every reading of the trigger, retained or
+-- not.
 --
 -- One fixture, and the two discriminating boards differ in exactly one thing:
 -- who is active.

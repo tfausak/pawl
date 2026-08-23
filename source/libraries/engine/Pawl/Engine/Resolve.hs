@@ -5424,9 +5424,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           cleared = case phase of
             Phase.Combat _ -> Combat.clearCombat gs
             _ -> gs
+          -- Both sweeps, for the same reason: a mana unit's "until end of combat"
+          -- retention carries no Expiry, so Expiry.dropAtEndOf cannot reach it
+          -- (CR 500.5a). The mana itself is taken by the CR 500.5 sweep this
+          -- step's own end runs in Engine.runStepThatBegan, once this has made
+          -- the units ordinary.
           expired = case phase of
             Phase.Ending _ -> cleared
-            _ -> maybe cleared (`Expiry.dropAtEndOf` cleared) (Turn.wholePhaseOf phase)
+            _ -> maybe cleared (\ending -> Mana.endRetentionAtEndOf ending (Expiry.dropAtEndOf ending cleared)) (Turn.wholePhaseOf phase)
           jumped = case phase of
             Phase.Ending EndingStep.Cleanup -> Turn.spliceExtraCleanup (GameState.remaining gs)
             _ -> Turn.jumpToCleanup (GameState.remaining gs)
@@ -5492,7 +5497,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         State.modify' $ \gs ->
           let cleared = Combat.clearCombat gs
               skipped = cleared {GameState.remaining = Turn.dropRestOfPhase phase (GameState.remaining gs)}
-           in Expiry.dropAtEndOf PhaseSelector.CombatPhase skipped
+           in -- Both sweeps, the CR 724.1d arm's reason above: an "until end of
+              -- combat" mana retention rides the UNIT and carries no Expiry, so
+              -- the phase ending here has to end it too. The mana goes with this
+              -- step's own CR 500.5 sweep in Engine.runStepThatBegan.
+              Mana.endRetentionAtEndOf PhaseSelector.CombatPhase (Expiry.dropAtEndOf PhaseSelector.CombatPhase skipped)
         -- CR 724.2f: no player gets priority during this process. The SAME signal
         -- CR 724.1f raises, because the two rules want the same thing of
         -- Engine.priorityLoop -- return without settling and without granting

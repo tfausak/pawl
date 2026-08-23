@@ -49,6 +49,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterName as CounterName
@@ -3190,6 +3191,100 @@ poolOf :: PlayerId.PlayerId -> GameState.GameState -> [ManaUnit.ManaUnit]
 poolOf pid gs = case Game.poolOf pid gs of
   Mana.Type.MkMana units -> units
 
+-- CR 500.5a's unit-axis half, and ManaRetention's second non-Ordinary arm.
+-- Avatar Roku, Firebender ({3}{R}{R}{R} Legendary Creature -- Human Avatar 6/6,
+-- "Whenever a player attacks, add six {R}. Until end of combat, you don't lose
+-- this mana as steps end. {R}{R}{R}: Target creature gets +3/+0 until end of
+-- turn") is the printing. Nothing is omitted from the card, so pawl's Roku is
+-- neither stricter nor weaker than printed; Pawl.EventTriggerSpec's group of the
+-- same name covers the OTHER sentence, CR 508.3d's "a player" payload.
+--
+-- The retention rides the UNIT and not CR 613.11's player axis, for Shizuko's
+-- reason above: "this mana" is the six units this ability added, and a seventh
+-- red in the same pool is lost at the first step end.
+--
+-- THREE MOMENTS, because a shorter board admits two wrong implementations:
+--
+--   * the declare blockers step separates the arm from ManaRetention.Ordinary,
+--     which is what this card carried while the arm did not exist -- CR 500.5
+--     takes the pool as the declare attackers step ends.
+--   * the end of combat step separates it from a retention ended at a combat
+--     STEP's end. CR 500.5a's own sentence is that the effect lasts through that
+--     step, and Pawl.ExpirySpec's "the end of combat STEP ending does not expire
+--     it; the PHASE ending does" is the stored-effect twin.
+--   * the postcombat main phase separates it from ManaRetention.UntilEndOfTurn,
+--     and nothing earlier can. Without it the board proves only "longer than one
+--     step".
+--
+-- Read as a LEGALITY (design.md section 4) with the pool's exact contents
+-- alongside, and then SPENT in the second case, because presence is not
+-- spendability. alice holds no land and bob no mana source at all, so the
+-- trigger's six {R} is the only mana in the game.
+avatarRokuSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+avatarRokuSpec s registry =
+  let withPriority gs = gs {GameState.priority = Just S.alice}
+      -- Declares attackers and blockers and PASSES on every action (identityAnswer
+      -- answers Prompt.ChooseAction with Pass, and aggressiveAnswer defers to it),
+      -- so nothing is spent and each moment's pool is read clean.
+      passing :: Prompt.Prompt r -> r
+      passing = S.aggressiveAnswer
+      fixture = do
+        roku <- S.printingOf s registry "Avatar Roku, Firebender"
+        piker <- S.printingOf s registry "Goblin Piker"
+        case S.combatBoardOf [roku] [piker] of
+          (gs, [rokuId], [pikerId]) -> pure (Just (rokuId, pikerId, gs))
+          _ -> pure Nothing
+   in Spec.describe s "Avatar Roku, Firebender" $ do
+        Spec.it s "CR 500.5a the retained {R} outlive every step of the combat phase, and the phase's end takes them" $ do
+          built <- fixture
+          case built of
+            Just (rokuId, _, gs) -> do
+              let blockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) passing gs
+                  endOfCombat = S.runToStep (Phase.Combat CombatStep.EndOfCombat) passing blockers
+                  postcombat = S.runPure passing endOfCombat Engine.runStep
+                  offered g = any (isActivationOf rokuId) (Action.legalActions S.alice (withPriority g))
+              -- S.runToStep stops silently once combat is left, so each moment
+              -- says which step it is before anything is read off it. None of the
+              -- three depends on the retention, so none can absorb a mutation to it.
+              Spec.assertEqWith s "the first moment is the declare blockers step" (GameState.phase blockers) (Phase.Combat CombatStep.DeclareBlockers)
+              Spec.assertEqWith s "the second is the end of combat step" (GameState.phase endOfCombat) (Phase.Combat CombatStep.EndOfCombat)
+              Spec.assertEqWith s "and the third is the postcombat main phase" (GameState.phase postcombat) Phase.PostcombatMain
+              Spec.assertBool s (offered blockers) "alice may activate Roku once the declare attackers step has ended"
+              Spec.assertBool s (offered endOfCombat) "and still may once the combat damage step has ended"
+              Spec.assertBool s (not (offered postcombat)) "and no longer may in the postcombat main phase"
+              Spec.assertEqWith s "exactly the six the trigger added, retained" (poolOf S.alice blockers) (replicate 6 retainedRed)
+              Spec.assertEqWith s "all six still there as the end of combat step begins" (poolOf S.alice endOfCombat) (replicate 6 retainedRed)
+              Spec.assertEqWith s "and none once the combat phase has ended" (poolOf S.alice postcombat) []
+            Nothing -> Spec.assertFailure s "fixture should give alice a Roku and bob a Piker"
+
+        -- Presence is not spendability, and only spending reaches CR 106.4's
+        -- "used to pay costs". alice takes every activation offered in the
+        -- DECLARE BLOCKERS step -- a step whose start is already past the end
+        -- that CR 500.5 would have emptied the pool at -- and six {R} pays for
+        -- exactly two, so Roku is a 12/6. Ordinary retention leaves it its
+        -- printed 6/6.
+        Spec.it s "CR 106.4 the retained mana pays for two activations in a LATER step" $ do
+          built <- fixture
+          case built of
+            Just (rokuId, _, gs) -> do
+              let activating :: Prompt.Prompt r -> r
+                  activating p = case p of
+                    Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToCreature rokuId) . snd) sets
+                    Prompt.ChooseAction _ _ options -> case filter (isActivationOf rokuId) options of
+                      a : _ -> a
+                      [] -> Action.Type.Pass
+                    _ -> S.aggressiveAnswer p
+                  blockers = withPriority (S.runToStep (Phase.Combat CombatStep.DeclareBlockers) passing gs)
+                  after = S.runPure activating blockers Engine.runStep
+              Spec.assertEqWith s "Roku is its printed 6/6 as the step begins" (S.powerToughnessOf rokuId blockers) (Just (6, 6))
+              Spec.assertEqWith s "and a 12/6 once the step has run, off two activations" (S.powerToughnessOf rokuId after) (Just (12, 6))
+              Spec.assertEqWith s "which is the whole pool spent" (poolOf S.alice after) []
+            Nothing -> Spec.assertFailure s "fixture should give alice a Roku and bob a Piker"
+
+-- Roku's {R}, which the trigger's ManaAddition stamps UntilEndOfCombat onto.
+retainedRed :: ManaUnit.ManaUnit
+retainedRed = plainRed {ManaUnit.retention = ManaRetention.UntilEndOfCombat}
+
 -- CR 106.6: mana that carries a restriction on what it may be spent on. Geosurge
 -- ({R}{R}{R}{R} Sorcery, "Add {R}{R}{R}{R}{R}{R}{R}. Spend this mana only to cast
 -- artifact or creature spells") is the printing, and the whole card is that one
@@ -3551,6 +3646,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   chromaticSpec s registry
   burningTreeSpec s registry
   shizukoSpec s registry
+  avatarRokuSpec s registry
   geosurgeSpec s registry
   quirionSpec s registry
   celestialDawnSpec s registry
