@@ -946,9 +946,13 @@ data Effect card
     -- read through Pawl.Types.Quantity's InSlot (Ancient Copper Dragon's "roll a
     -- d20. You create a number of Treasure tokens equal to the result").
     --
-    -- CR 706.4's half of CR 706: no results table, so the number itself is the
-    -- whole outcome and the card's own later text says what to do with it. What
-    -- a table would select between is #2082.
+    -- CR 706.4's half of CR 706 needs nothing more: no results table, so the
+    -- number itself is the whole outcome and the card's own later text says what
+    -- to do with it. CR 706.3's table needs nothing more EITHER, and gets no arm
+    -- here: a striation is one Pawl.Types.Clause of the same mode, gated by its
+    -- `condition` on a Condition.Compares over this slot, which CR 706.3b's "all
+    -- part of one ability" is exactly. Djinni Windseer in Pawl.DiceSpec is what
+    -- proves it. Not implemented: CR 706.3c's "Roll again" (#2124).
     --
     -- ChooseOpponentAtRandom's posture, one type over: Pawl.Types.Prompt's
     -- RollDie carries no Pawl.Types.Decider and no PlayerId, because a die
