@@ -17,10 +17,17 @@ import qualified Pawl.Types.SlotName as SlotName
 -- one of a shared record's users turns the field's absence back into how a reader
 -- tells which arm it is looking at. Pawl.Types.Mill is the same spin-out.
 --
--- The ids bound are the ones the CR 400.7 funnel ARRIVED at, since rule 121.1
--- puts the card into the hand and a later clause names it there -- Mill's
--- posture, and for rule 701.17c's reason restated: the card a clause names is the
--- card in the zone it moved to.
+-- The ids bound are the ones the CR 400.7 funnel ARRIVED at -- rule 121.1 puts
+-- the card into the hand, rule 400.7 makes that a new object, and a later clause
+-- names the card in the zone it moved to. Mill's posture.
+--
+-- What lets a clause find it there is CR 701.20a rather than CR 400.7j: the hand
+-- is a HIDDEN zone (CR 400.2), so rule 400.7j's "public zone" allowance does not
+-- reach it, and it is the printed "and reveal it" that keeps the card findable --
+-- rule 701.20a leaves a revealed card revealed "for as long as necessary to
+-- complete the parts of the effect that card is relevant to". A draw with no
+-- reveal beside it has no business writing this slot, and no printing in the
+-- corpus does.
 --
 -- ACROSS drawers and across the individual draws CR 121.2 breaks an instruction
 -- into, since the slot is one name and no reader is per-player. One card drawn

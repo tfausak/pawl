@@ -5478,11 +5478,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- a predicate over the table rather than a name for one seat.
           PlayerRef.Attacking _ -> False
         -- Every opcode that binds a batch under a name of the card's own: a
-        -- move, CR 701.20e's look, CR 701.20a's reveal, CR 701.17c's mill and
-        -- CR 701.8's two look-back slots. The first four dispatch on how many
-        -- objects arrived, so each can leave the group binding a singular
-        -- reader cannot see; the destruction's two are group bindings
-        -- unconditionally, so they are plural at any size of sweep.
+        -- move, CR 701.20e's look, CR 701.20a's reveal, CR 701.17c's mill, CR
+        -- 121.1's draw and CR 701.8's two look-back slots. The first five
+        -- dispatch on how many objects arrived, so each can leave the group
+        -- binding a singular reader cannot see; the destruction's two are group
+        -- bindings unconditionally, so they are plural at any size of sweep.
         boundPlurally effect = case effect of
           Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ mSlot _ _) | not (movesAtMostOne ref) -> Maybe.maybeToList mSlot
           Effect.LookAt (LookAt.MkLookAt ref slot) | not (movesAtMostOne ref) -> [slot]
@@ -5493,7 +5493,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- The depth is per miller, so a ref naming several seats is plural at
           -- any depth -- movesAtMostOne's own reading of a TopOfLibrary.
           Effect.Mill (Mill.MkMill player quantity _ mSlot)
-            | not (millsAtMostOne player quantity) ->
+            | not (takesAtMostOne player quantity) ->
+                Maybe.maybeToList mSlot
+          -- CR 121.1's slot, whose plurality is read exactly as the mill's is:
+          -- Pawl.Engine.Resolve's Draw arm binds the singular shape only when one
+          -- card was drawn across every drawer.
+          Effect.Draw (Draw.MkDraw player quantity mSlot)
+            | not (takesAtMostOne player quantity) ->
                 Maybe.maybeToList mSlot
           -- No ref test: Pawl.Engine.Resolve's Destroy arm writes both through
           -- bindObjectsSlot however few permanents it destroyed, so neither is
@@ -5501,7 +5507,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           Effect.Destroy (Destroy.MkDestroy _ _ _ mBuried mPermanents) ->
             Maybe.maybeToList mBuried <> Maybe.maybeToList mPermanents
           _ -> []
-        millsAtMostOne player quantity = case quantity of
+        takesAtMostOne player quantity = case quantity of
           Quantity.Type.Literal n -> n <= 1 && namesOneSeat player
           _ -> False
         readSingly effect = case effect of
