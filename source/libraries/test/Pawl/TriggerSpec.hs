@@ -201,7 +201,7 @@ scanSpec s registry =
     Spec.it s "CR 603.2b the active player rides a step trigger in the reserved slot" $ do
       let upkeepOf pid = GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Beginning BeginningStep.Upkeep) pid)
           cond = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.EachTurn)
-          boundOf pid = Binding.targetsOf (Event.eventBindings cond (upkeepOf pid))
+          boundOf pid = Binding.targetsOf (Event.eventBindings Nothing cond (upkeepOf pid))
       Spec.assertEqWith s "carol's upkeep binds carol under thatPlayer" (boundOf S.carol) (Map.singleton Binding.triggerPlayer (Set.singleton (Recipient.ToPlayer S.carol)))
       Spec.assertEqWith s "and bob's binds bob" (boundOf S.bob) (Map.singleton Binding.triggerPlayer (Set.singleton (Recipient.ToPlayer S.bob)))
       -- The same slot under the OTHER TurnScope, which eventBindingSlots'
@@ -210,7 +210,7 @@ scanSpec s registry =
       Spec.assertEqWith
         s
         "a ControllersTurn step binds it too"
-        (Binding.targetsOf (Event.eventBindings (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn)) (upkeepOf S.alice)))
+        (Binding.targetsOf (Event.eventBindings Nothing (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn)) (upkeepOf S.alice)))
         (Map.singleton Binding.triggerPlayer (Set.singleton (Recipient.ToPlayer S.alice)))
     -- CR 603.3a / 109.5: "your upkeep" is the ABILITY CONTROLLER's (603.3a
     -- controls the ability; 109.5 makes "your" mean that controller), so the

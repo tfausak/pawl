@@ -80,7 +80,7 @@
                           },
                           "ref": {
                             "type": "InSlot",
-                            "value": "self"
+                            "value": "became"
                           },
                           "zone": {
                             "type": "Battlefield"
