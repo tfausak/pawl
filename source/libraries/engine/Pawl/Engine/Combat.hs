@@ -60,6 +60,8 @@ emptyCombat =
       Combat.attacked = Set.empty,
       Combat.declaredAttacked = Set.empty,
       Combat.declaredAttackedThisStep = Set.empty,
+      Combat.declaredAttackers = Set.empty,
+      Combat.declaredBlockers = Set.empty,
       Combat.blockersDeclared = False,
       Combat.defender = Nothing
     }
@@ -1141,6 +1143,22 @@ attemptAttackDeclaration pid defender rejected = do
         -- CR 508.1's preamble, captured here: everything from this line on is
         -- undone together if the payment below cannot be made.
         before <- State.get
+        -- CR 508.1a's chosen creatures, recorded as DECLARED -- here and not
+        -- beside CR 508.1k's `attach` below, because the whole point of the
+        -- field is to be readable DURING CR 508.1j's payment: Hollow Warrior's
+        -- toll asks which creatures were declared this combat, and its
+        -- co-attackers do not become attacking creatures until after it is
+        -- paid. Inside `before`'s span, so an unpayable toll unwrites it.
+        --
+        -- Unioned, never overwritten, for Combat.attacked's reason: CR 508.8's
+        -- second clause means the record is not this declaration's alone.
+        State.modify' $ \g ->
+          g
+            { GameState.combat =
+                (GameState.combat g)
+                  { Combat.declaredAttackers = Set.union (Set.fromList attacking) (Combat.declaredAttackers (GameState.combat g))
+                  }
+            }
         -- CR 508.1f, and ONLY 508.1f: 508.1f taps, 508.1h-j determine and pay, and
         -- only 508.1k makes the creatures attacking. The order is observable -- a
         -- Birds of Paradise just declared as an attacker is tapped, so it is no
@@ -1455,6 +1473,18 @@ declareBlockers = do
           unblocked = filter (\oid -> not (Map.member oid (Combat.blockers c))) (Map.keys (Combat.attackers c))
        in List.foldl' (\h oid -> Event.recordEvent (GameEvent.AttackerUnblocked oid) h) g unblocked
 
+-- CR 509.1a's record of WHICH creatures were declared as blockers this combat
+-- phase, unioned in. Shared by attemptBlockDeclaration's two writers so the
+-- in-flight write and the one that stands cannot disagree about the field.
+recordDeclaredBlockers :: Set ObjectId -> GameState -> GameState
+recordDeclaredBlockers oids g =
+  g
+    { GameState.combat =
+        (GameState.combat g)
+          { Combat.declaredBlockers = Set.union oids (Combat.declaredBlockers (GameState.combat g))
+          }
+    }
+
 -- One attempt at CR 509.1's declaration, plus the preamble's retry --
 -- attemptAttackDeclaration's twin, and for the same reason: CR 509.1's preamble
 -- is word for word CR 508.1's, and CR 509.1b/509.1c both end "the declaration of
@@ -1499,6 +1529,19 @@ attemptBlockDeclaration pid attacking rejected = do
         -- -- this `let`. Asking BlockCost.totalCost a second time is what the rule
         -- forbids, which is why that function leaves locking to its caller.
         let owed = BlockCost.totalCost legal gs1
+        -- CR 509.1's preamble, captured here for the one thing this function does
+        -- write ahead of the payment. Everything else it writes is below.
+        before <- State.get
+        -- CR 509.1a's chosen creatures, recorded as DECLARED before CR 509.1f
+        -- pays -- the attacker side's twin, and the side the pool can see: CR
+        -- 509.1g makes them blocking only after the payment and CR 509 has no
+        -- analogue of CR 508.1f's tapping, so without this a fellow creature
+        -- chosen in the SAME declaration still looks untapped and unblocking to
+        -- Hollow Warrior's toll. Blockers with no attacker chosen for them are
+        -- left out: CR 509.1a pairs every chosen creature with one.
+        --
+        -- Unioned, never overwritten, for Combat.attacked's reason.
+        State.modify' (recordDeclaredBlockers (Map.keysSet (Map.filter (not . Set.null) legal)))
         -- CR 509.1e's mana-ability window and CR 509.1f's all-costs-or-nothing
         -- payment are both Cost.payToll, which restores the entry state rather
         -- than spending half of it. Skipped outright when nothing is owed, which
@@ -1509,21 +1552,28 @@ attemptBlockDeclaration pid attacking rejected = do
         -- CR 509.1c's excuse from paying is exercised one step earlier, at the
         -- Prompt.DeclareBlockers above, by NOT DECLARING the creature.
         --
-        -- BEFORE the record is written, which is the rules' own order and the
+        -- BEFORE the blocks are recorded, which is the rules' own order and the
         -- reverse of declareAttackers': CR 508.1f taps the chosen creatures before
         -- their cost is determined, while CR 509.1g makes the chosen creatures
-        -- blocking only after CR 509.1f's payment.
+        -- blocking only after CR 509.1f's payment. Combat.declaredBlockers above
+        -- is the one thing written earlier, and CR 509.1a rather than CR 509.1g is
+        -- why it may be.
         paid <-
           if null owed
             then pure True
             else Cost.payToll pid owed
         -- CR 509.1's preamble: a declaration the defending player cannot pay for
-        -- is illegal and the game returns to the moment before it. Nothing needs
-        -- undoing -- the record is written below, and Cost.payToll restores what a
-        -- half-paid toll spent -- so the rewind is the declaration being made
-        -- again. CombatEffectSpec's "CR 509.1 the rewound declaration is made
-        -- again: the taxed blocker is dropped and the free one blocks" is the
-        -- proof; the case beside it is what a repeated answer does instead.
+        -- is illegal and the game returns to the moment before it. That is
+        -- `before` and no more: Cost.payToll restores what a half-paid toll
+        -- spent, and the blocks themselves are recorded below, so the only thing
+        -- this undoes is the declaredBlockers write above -- which has to go,
+        -- since the retry and the CR 509.1c degradation both ask the same toll
+        -- again and would otherwise see stale ids. Then the rewind is the
+        -- declaration being made again. CombatEffectSpec's "CR 509.1 the rewound
+        -- declaration is made again: the taxed blocker is dropped and the free
+        -- one blocks" is the proof; the case beside it is what a repeated answer
+        -- does instead.
+        Monad.unless paid (State.put before)
         gs2 <- State.get
         if not paid && again
           then attemptBlockDeclaration pid attacking (Set.insert chosen rejected)
@@ -1541,6 +1591,12 @@ attemptBlockDeclaration pid attacking rejected = do
                   -- 509.1a). Unioned, the attackers' entries being already in this map.
                   joined = Map.union (Map.fromList (fmap (\(b, _) -> (b, pid)) pairs)) (Combat.joinedUnder (GameState.combat gs2))
               State.modify' $ \g -> g {GameState.combat = (GameState.combat g) {Combat.blockers = merged, Combat.joinedUnder = joined}}
+              -- CR 509.1a again, for the declaration that actually stands. A
+              -- second write and not a duplicate of the one above: on the
+              -- CR 509.1c degradation path `declaration` is
+              -- forcedBlockDeclaration's rather than `legal`, and the rewind
+              -- above has already unwritten `legal`.
+              State.modify' (recordDeclaredBlockers (Set.fromList (fmap fst pairs)))
               -- CR 509.1i: the declaration is a trigger event, and CR 509.2a puts what
               -- it fires onto the stack before the active player gets priority.
               -- Recorded AFTER the state is written, and over `declaration` rather

@@ -50,6 +50,8 @@ blackCreature =
       Filter.blocking = False,
       Filter.blocked = False,
       Filter.attackedThisTurn = False,
+      Filter.declaredAttackerThisCombat = False,
+      Filter.declaredBlockerThisCombat = False,
       Filter.milledThisTurn = False,
       Filter.dealtDamageThisTurn = False,
       Filter.attachedToView = Nothing,
@@ -92,6 +94,8 @@ devoidBigCreature =
       Filter.blocking = False,
       Filter.blocked = False,
       Filter.attackedThisTurn = False,
+      Filter.declaredAttackerThisCombat = False,
+      Filter.declaredBlockerThisCombat = False,
       Filter.milledThisTurn = False,
       Filter.dealtDamageThisTurn = False,
       Filter.attachedToView = Nothing,
@@ -747,6 +751,62 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- player is not one.
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.AttackedThisTurn)) "player"
+
+  Spec.describe s "DeclaredAttackerThisCombat" $ do
+    Spec.it s "matches a view whose combat record says so" $ do
+      Spec.assertBool s (Filter.matches self (blackCreature {Filter.declaredAttackerThisCombat = True}) Filter.Type.DeclaredAttackerThisCombat) "declared"
+
+    Spec.it s "does not match a creature nobody declared" $ do
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.DeclaredAttackerThisCombat)) "not declared"
+
+    -- Independent of IsAttacking in BOTH directions, which is why the atom
+    -- exists rather than being spelled Not IsAttacking. CR 508.1k makes a
+    -- chosen creature attacking only after CR 508.1j's payment, so mid-payment
+    -- it is declared and not attacking; CR 508.4's creature put onto the
+    -- battlefield attacking is attacking and never declared, and so is one CR
+    -- 506.4 has not yet removed from combat.
+    Spec.it s "is not implied by attacking right now" $ do
+      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.attacking = True}) Filter.Type.DeclaredAttackerThisCombat)) "attacking does not imply declared"
+
+    Spec.it s "does not imply attacking right now" $ do
+      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.declaredAttackerThisCombat = True}) Filter.Type.IsAttacking)) "declared does not imply attacking"
+
+    -- And independent of the TURN-scoped atom, the distinction CR 500.8's
+    -- additional combat phase makes observable: CR 511.3 empties the combat
+    -- record while the turn's event log stands.
+    Spec.it s "is not the same axis as AttackedThisTurn" $ do
+      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.attackedThisTurn = True}) Filter.Type.DeclaredAttackerThisCombat)) "attacked this turn does not imply declared this combat"
+      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.declaredAttackerThisCombat = True}) Filter.Type.AttackedThisTurn)) "and the other way round"
+
+    -- CR 506.3: only a creature is ever declared as an attacker.
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.DeclaredAttackerThisCombat)) "player"
+
+  Spec.describe s "DeclaredBlockerThisCombat" $ do
+    Spec.it s "matches a view whose combat record says so" $ do
+      Spec.assertBool s (Filter.matches self (blackCreature {Filter.declaredBlockerThisCombat = True}) Filter.Type.DeclaredBlockerThisCombat) "declared"
+
+    Spec.it s "does not match a creature nobody declared" $ do
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.DeclaredBlockerThisCombat)) "not declared"
+
+    -- CR 509.1g against CR 509.1f: the pair above's independence, on the
+    -- blocking side.
+    Spec.it s "is not implied by blocking right now" $ do
+      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.blocking = True}) Filter.Type.DeclaredBlockerThisCombat)) "blocking does not imply declared"
+
+    Spec.it s "does not imply blocking right now" $ do
+      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.declaredBlockerThisCombat = True}) Filter.Type.IsBlocking)) "declared does not imply blocking"
+
+    -- CR 508 and CR 509 are two turn-based actions, so the two atoms are two
+    -- axes -- which is what makes Hollow Warrior's criterion a conjunction of
+    -- two Nots rather than one atom meaning "in combat".
+    Spec.it s "is a separate axis from the attacking declaration" $ do
+      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.declaredAttackerThisCombat = True}) Filter.Type.DeclaredBlockerThisCombat)) "attacker does not imply blocker"
+      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.declaredBlockerThisCombat = True}) Filter.Type.DeclaredAttackerThisCombat)) "and the other way round"
+
+    -- CR 506.3 again, for CR 509.1a's half.
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.DeclaredBlockerThisCombat)) "player"
 
   Spec.describe s "MilledThisTurn" $ do
     Spec.it s "matches a view whose history says so" $ do
