@@ -56,6 +56,7 @@ codec =
       -- reference.
       Arm.payload "IsMonarch" PlayerRef.codec Quantity.IsMonarch (\x -> case x of Quantity.IsMonarch y -> Just y; _ -> Nothing),
       Arm.payload "IsStartingPlayer" PlayerRef.codec Quantity.IsStartingPlayer (\x -> case x of Quantity.IsStartingPlayer y -> Just y; _ -> Nothing),
+      Arm.payload "IsActivePlayer" PlayerRef.codec Quantity.IsActivePlayer (\x -> case x of Quantity.IsActivePlayer y -> Just y; _ -> Nothing),
       Arm.payload "PlayerCounters" PlayerCounterTally.codec Quantity.PlayerCounters (\x -> case x of Quantity.PlayerCounters y -> Just y; _ -> Nothing),
       -- CR 122.1's OBJECT reading: only a kind on the wire, since the object is
       -- whichever one the quantity is evaluated against (Pawl.Types.Quantity).
