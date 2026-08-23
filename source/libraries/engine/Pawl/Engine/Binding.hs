@@ -455,7 +455,7 @@ blockingCreature = SlotName.MkSlotName (Text.pack "thatBlocker")
 
 -- CR 509.3b: `blockingCreature`'s mirror -- the reserved slot under which the
 -- CREATURE THE BEARER BLOCKED is bound, Loyal Sentry's "that creature". Stamped
--- by Pawl.Engine.Event.eventBindings off the same GameEvent.BlockerDeclared,
+-- by Pawl.Engine.Event.eventBindings off the same GameEvent.BecameBlocking,
 -- read from the BLOCKING side, so the bearer is the blocker and this names the
 -- attacker.
 --

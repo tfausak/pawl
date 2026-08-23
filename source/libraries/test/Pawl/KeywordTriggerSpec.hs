@@ -823,7 +823,7 @@ selfBlocksSpec s registry =
         -- Rule 509.3a's "even if it blocks multiple creatures", now that a
         -- creature can. A High Ground gives bob's team the arity, the Guardian
         -- blocks both Pikers, and the gain is 3 once rather than 3 twice. The
-        -- falsifier is a match on the PAIRWISE GameEvent.BlockerDeclared, which
+        -- falsifier is a match on the PAIRWISE GameEvent.BecameBlocking, which
         -- fires per attacker blocked: 26.
         Spec.it s "CR 509.3a blocking TWO creatures still gains 3 once" $ do
           (gs, _, theirs) <- board ["Goblin Piker", "Goblin Piker"] ["Pride Guardian", "High Ground"]
@@ -1041,7 +1041,7 @@ selfBlocksOneOrMoreSpec s registry =
         -- Rule 509.3e's "one or more" is ONE trigger however many admitted
         -- creatures were blocked. A High Ground gives bob the arity, the
         -- Inquisitors blocks both Wraiths, and the answer is 5/3 rather than 7/3.
-        -- The falsifier is a match on the pairwise GameEvent.BlockerDeclared,
+        -- The falsifier is a match on the pairwise GameEvent.BecameBlocking,
         -- which is CR 509.3b's arity: that fires twice.
         Spec.it s "CR 509.3e blocking TWO black creatures is +2/+0 once" $ do
           (gs, _, theirs) <- board ["Bog Wraith", "Bog Wraith"] ["Serra Inquisitors", "High Ground"]
@@ -1068,7 +1068,7 @@ selfBlocksOneOrMoreSpec s registry =
             _ -> Spec.assertFailure s "fixture should give alice one Serra Inquisitors on each board"
         -- The attacking half's arity, which is what separates this condition from
         -- SelfBecomesBlockedBy: two Wraiths block the one Inquisitors, so two
-        -- GameEvent.BlockerDeclared are recorded and exactly one
+        -- GameEvent.BecameBlocking are recorded and exactly one
         -- GameEvent.AttackerBlocked. The falsifier is a match on the pairwise
         -- event: that fires twice, for 7/3.
         Spec.it s "CR 509.3e becoming blocked by TWO black creatures is +2/+0 once" $ do
@@ -1232,7 +1232,7 @@ creatureBecomesBlockedByAtLeastSpec s registry =
         -- gameplay level, because this card cannot show the difference -- a
         -- second grant of deathtouch to the same creature is indistinguishable
         -- from the first. The falsifier is a match on the pairwise
-        -- GameEvent.BlockerDeclared, which is CR 509.3d's arity: that fires twice.
+        -- GameEvent.BecameBlocking, which is CR 509.3d's arity: that fires twice.
         Spec.it s "CR 509.3e two blockers fire it once, not once each" $ do
           (gs, mine, theirs) <- board ["Llanowar Elves", "Seifer, Balamb Rival"] ["Hill Giant", "Hill Giant"]
           case (mine, theirs) of
@@ -1282,7 +1282,7 @@ selfBecomesBlockedSpec s registry =
             _ -> Spec.assertFailure s "fixture should give alice one Sacred Prey"
         -- CR 509.3c's "only once each combat for that creature, even if it's
         -- blocked by multiple creatures". Two Pikers block the one Prey, so two
-        -- GameEvent.BlockerDeclared are recorded and exactly one
+        -- GameEvent.BecameBlocking are recorded and exactly one
         -- GameEvent.AttackerBlocked. The falsifier is a condition matched against
         -- the declaration's pairs instead: that fires twice, for 22.
         Spec.it s "CR 509.3c two blockers on one attacker still gain 1, not 2" $ do
@@ -1299,7 +1299,7 @@ selfBecomesBlockedSpec s registry =
           Spec.assertEqWith s "the blocker's controller gained 3" (S.lifeOf S.bob after) (Just 23)
         -- The converse, and CR 509.3c's own words: a creature that BLOCKS does not
         -- become blocked. Here the Prey is bob's and blocking a Piker; the
-        -- falsifier is an arm that matched GameEvent.BlockerDeclared, which would
+        -- falsifier is an arm that matched GameEvent.BecameBlocking, which would
         -- put bob at 21.
         Spec.it s "CR 509.3c blocking is not becoming blocked, so a blocking Sacred Prey gains nothing" $ do
           (gs, _, _) <- board ["Goblin Piker"] ["Sacred Prey"]

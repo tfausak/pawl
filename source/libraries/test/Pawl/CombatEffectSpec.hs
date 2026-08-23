@@ -38,6 +38,7 @@ import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.BecameBlocking as BecameBlocking
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -3611,11 +3612,19 @@ declineBlocks p = case p of
   Prompt.DeclareBlockers {} -> Map.empty
   _ -> S.aggressiveAnswer p
 
--- CR 509.1i's blocker-side event, which CR 509.3d's "becomes blocked by a
--- creature" reads: recorded by the declaration and by nothing else.
+-- CR 509.1g's blocker-side event as a DECLARATION recorded it. CR 509.4's entry
+-- records the same event with the flag set, and the flag is exactly what keeps
+-- CR 509.3b off it, so a test asking "was anything declared" has to read the
+-- flag rather than the constructor.
 blockerWasDeclared :: GameEvent.GameEvent -> Bool
 blockerWasDeclared e = case e of
-  GameEvent.BlockerDeclared _ -> True
+  GameEvent.BecameBlocking b -> not (BecameBlocking.putOntoBattlefield b)
+  _ -> False
+
+-- Its complement: CR 509.4's own producer, which CR 509.3d fires off.
+blockerEnteredBlocking :: GameEvent.GameEvent -> Bool
+blockerEnteredBlocking e = case e of
+  GameEvent.BecameBlocking b -> BecameBlocking.putOntoBattlefield b
   _ -> False
 
 -- CR 509.1h's escape clause: "an effect says that it becomes blocked". Curtain
@@ -3718,6 +3727,23 @@ foliageBoard forest thopter prey foliage =
       (foliageId, withCard) = S.addHandCard foliage S.bob lands
       stocked = snd (S.addLibraryCard forest S.bob withCard)
    in (stocked, ours, foliageId)
+
+-- foliageBoard with ONE attacker of the caller's choosing and everything else
+-- held fixed: the three Forests that pay {2}{G}, Flash Foliage in hand, a card
+-- left in the library for its draw, and no creature for bob, so the token's
+-- arrival is the only way anything becomes a blocking creature. Returns the
+-- attacker.
+soloFoliageBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState, [ObjectId.ObjectId])
+soloFoliageBoard forest attacker foliage =
+  let (gs0, ours, _) = S.combatBoardOf [attacker] []
+      lands = List.foldl' (\g _ -> snd (S.addCreature forest S.bob g)) gs0 [1 :: Int, 2, 3]
+      (_, withCard) = S.addHandCard foliage S.bob lands
+      stocked = snd (S.addLibraryCard forest S.bob withCard)
+   in (stocked, ours)
 
 -- Decline every block -- bob has nothing to declare anyway -- cast whatever is
 -- castable, and aim the target at `victim`. The offered set is FILTERED rather
@@ -3840,6 +3866,52 @@ putOntoBattlefieldBlockingSpec s registry = Spec.describe s "PutOntoBattlefieldB
         Spec.assertEqWith s "control: nothing is blocking anything" (Combat.Type.blockers (GameState.combat uncast)) Map.empty
         Spec.assertEqWith s "control: bob's library is untouched" (length (Game.zoneMembers Zone.Library S.bob uncast)) 1
       _ -> Spec.assertFailure s "fixture should have two attackers"
+  -- CR 509.3d's third sentence -- "In addition, it will trigger if a creature is
+  -- put onto the battlefield blocking that creature" -- the one form of CR 509.3
+  -- that CR 509.4's "never blocked" leaves standing. Rules 509.3a and 509.3b
+  -- each end "It won't trigger if the creature is put onto the battlefield
+  -- blocking", and this rule says the opposite in as many words.
+  --
+  -- CR 702.25a's flanking is the observer, and Benalish Cavalry {1}{W} 2/2
+  -- carries it and nothing else. The control is Pawl.KeywordTriggerSpec's own:
+  -- Icehide Golem, the same 2/2 without the keyword, so the pair differs in
+  -- exactly one thing -- and both boards are the DECLARATION-free one, bob
+  -- holding no creature to declare, so what fires the trigger can only be the
+  -- entry.
+  --
+  -- Read at the combat damage step, before damage is dealt: CR 509.2a resolves
+  -- these triggers in the declare blockers step, so a dead Saproling there is
+  -- flanking's and never combat's.
+  Spec.it s "CR 509.3d a creature put onto the battlefield blocking it triggers the attacker's becomes-blocked-by ability" $ do
+    forest <- S.printingOf s registry "Forest"
+    cavalry <- S.printingOf s registry "Benalish Cavalry"
+    golem <- S.printingOf s registry "Icehide Golem"
+    foliage <- S.printingOf s registry "Flash Foliage"
+    case (soloFoliageBoard forest cavalry foliage, soloFoliageBoard forest golem foliage) of
+      ((flankerBoard, [flanker]), (plainBoard, [plain])) -> do
+        let toDamage victim board =
+              S.runToStep
+                (Phase.Combat CombatStep.CombatDamage)
+                (castFoliage victim)
+                (S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer board)
+            struck = toDamage flanker flankerBoard
+            control = toDamage plain plainBoard
+        -- GAMEPLAY FIRST, and the two legs read the same way: what the token is
+        -- worth on the board. The flanker's Saproling took CR 702.25a's -1/-1,
+        -- went to 0/0 and CR 704.5a buried it; the control's is untouched.
+        Spec.assertEqWith s "CR 509.3d: flanking fired off the entry, so the 1/1 Saproling is gone before damage" (fmap (`S.powerToughnessOf` struck) (S.tokensOf struck)) []
+        Spec.assertEqWith s "control: the same token, blocking the same 2/2 without flanking, is untouched" (fmap (`S.powerToughnessOf` control) (S.tokensOf control)) [Just (1, 1)]
+        -- Anti-vacuity: the token did enter blocking on the leg where it is
+        -- gone, so its absence is the trigger rather than a spell that fizzled.
+        -- CR 509.1h keeps the attacker blocked with its blocker gone.
+        Spec.assertBool s (Combat.isBlocked flanker struck) "CR 509.1h: the flanker is a blocked creature, so a token really did block it"
+        Spec.assertBool s (Combat.isBlocked plain control) "and so is the control's attacker"
+        -- CR 509.4's two roads, told apart on the board that took the second: no
+        -- creature was DECLARED here, and the event CR 509.3d matched carries the
+        -- flag that keeps CR 509.3b off it.
+        Spec.assertBool s (not (any (blockerWasDeclared . LoggedEvent.event) (GameState.events struck))) "CR 509.4: nothing was declared as a blocker on this board"
+        Spec.assertBool s (any (blockerEnteredBlocking . LoggedEvent.event) (GameState.events struck)) "and the event that fired the trigger is the entry's own"
+      _ -> Spec.assertFailure s "fixture should have one attacker per board"
 
 -- CR 506.7b's window, "only during combat after blockers are declared", proved
 -- step by step on ONE board.

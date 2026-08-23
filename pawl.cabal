@@ -146,6 +146,8 @@ library codec
     Pawl.Codec.BattlefieldCandidate
     Pawl.Codec.BattlefieldCandidateSpec
     Pawl.Codec.BecameAttached
+    Pawl.Codec.BecameBlocking
+    Pawl.Codec.BecameBlockingSpec
     Pawl.Codec.BecameDesignated
     Pawl.Codec.BecameDesignatedSpec
     Pawl.Codec.BecameTarget
@@ -157,8 +159,6 @@ library codec
     Pawl.Codec.BindingSpec
     Pawl.Codec.BlockCost
     Pawl.Codec.BlockCostSpec
-    Pawl.Codec.BlockerDeclared
-    Pawl.Codec.BlockerDeclaredSpec
     Pawl.Codec.BlockPermission
     Pawl.Codec.BlockPermissionSpec
     Pawl.Codec.BlockRequirement
@@ -1210,13 +1210,13 @@ library types
     Pawl.Types.AttackTarget
     Pawl.Types.BattlefieldCandidate
     Pawl.Types.BecameAttached
+    Pawl.Types.BecameBlocking
     Pawl.Types.BecameDesignated
     Pawl.Types.BecameTarget
     Pawl.Types.BecomeCopy
     Pawl.Types.BeginningStep
     Pawl.Types.Binding
     Pawl.Types.BlockCost
-    Pawl.Types.BlockerDeclared
     Pawl.Types.BlockPermission
     Pawl.Types.BlockRequirement
     Pawl.Types.BlocksDeclared

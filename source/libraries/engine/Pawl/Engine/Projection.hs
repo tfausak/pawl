@@ -879,7 +879,7 @@ viewOfCharacteristics peers oid pc controller counters gs =
       Filter.attackedThisTurn = any (declaredIt oid . LoggedEvent.event) (GameState.events gs),
       -- CR 508.1a / 509.1a: from the COMBAT record, which CR 511.3 does clear --
       -- and not from that same log, which cannot answer it. CR 508.1k and CR
-      -- 509.1g put the AttackerDeclared and BlockerDeclared events after the
+      -- 509.1g put the AttackerDeclared and BecameBlocking events after the
       -- payment these two are read during, so a fold over them would be False
       -- for exactly the creatures being declared.
       Filter.declaredAttackerThisCombat = Set.member oid (Combat.declaredAttackers (GameState.combat gs)),
