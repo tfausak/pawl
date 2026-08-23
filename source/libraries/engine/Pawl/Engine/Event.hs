@@ -9422,10 +9422,12 @@ eventTriggers events gs =
       -- Traveler would be offered its dies trigger from a graveyard, and a
       -- "whenever another creature dies" watcher would be offered ITS trigger for
       -- the very move that buried it -- CR 400.7 having minted a fresh id, the
-      -- "another" test compares two different ids and passes. A regression fence
-      -- rather than a proved behaviour: removing it leaves the suite green, since
-      -- observing it needs a permanent that dies and leaves its graveyard in one
-      -- batch, and no card in the pool does both (gap #1751).
+      -- "another" test compares two different ids and passes. Proved by
+      -- Pawl.ZoneTriggerSpec's "CR 113.6k a battlefield-only trigger on a card
+      -- that arrived in a graveyard and left it is not offered": Come Back Wrong
+      -- destroys a Meren of Clan Nel Toth and returns her in one resolution, and
+      -- removing this filter hands her controller an experience counter for her
+      -- own death.
       --
       -- Disjoint from `inGraveyards` by construction, not by Map.unions' bias: an
       -- id in `lastKnown` is one the same write deleted from GameState.objects,
