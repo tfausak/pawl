@@ -31,7 +31,7 @@ import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
-import qualified Pawl.Types.BlockerDeclared as BlockerDeclared
+import qualified Pawl.Types.BecameBlocking as BecameBlocking
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
@@ -878,7 +878,10 @@ isBlocked oid gs = Map.member oid (Combat.blockers (GameState.combat gs))
 -- regression fences -- neutralizing either leaves the suite green.
 --
 -- The event is declareBlockers' AttackerBlocked, CR 509.3c firing the same trigger
--- on the effect as on the declaration. NOT BlockerDeclared, which is CR 509.3d.
+-- on the effect as on the declaration. NOT BecameBlocking: no creature became a
+-- blocking creature here, and rule 509.3d's last sentence says so in as many
+-- words ("It won't trigger if the creature becomes blocked by an effect rather
+-- than a creature").
 becomeBlocked :: ObjectId -> GameState -> GameState
 becomeBlocked oid gs =
   let c = GameState.combat gs
@@ -1347,9 +1350,13 @@ putOntoBattlefieldAttacking oid = do
 -- attemptBlockDeclaration is the same shape as that function's from
 -- declareAttackers. The creature was never DECLARED, so:
 --
---   * neither GameEvent.BlockerDeclared nor GameEvent.BlocksDeclared is
---     recorded, which is CR 509.3a's and CR 509.3b's last sentence in both cases
---     ("It won't trigger if the creature is put onto the battlefield blocking");
+--   * no GameEvent.BlocksDeclared is recorded, which is CR 509.3a's last
+--     sentence ("It won't trigger if the creature is put onto the battlefield
+--     blocking"), and the GameEvent.BecameBlocking that IS recorded carries
+--     BecameBlocking.putOntoBattlefield, which is CR 509.3b's identical last
+--     sentence: rule 509.3d's "In addition, it will trigger if a creature is put
+--     onto the battlefield blocking that creature" is why the event is recorded
+--     at all, and that flag is what keeps rule 509.3b off it;
 --   * no CR 509.1b restriction and no CR 509.1c requirement is checked, and
 --     canBlock is never asked, per CR 509.4b in as many words -- so a Saproling
 --     put onto the battlefield blocking a flier really does block it (CR
@@ -1414,6 +1421,17 @@ putOntoBattlefieldBlocking oid attacker = do
                       Combat.joinedUnder = Map.insert oid controller (Combat.joinedUnder c)
                     }
               }
+          -- CR 509.3d's third producer, in that rule's own words: "In addition,
+          -- it will trigger if a creature is put onto the battlefield blocking
+          -- that creature." No guard of its own -- the rule states none, where
+          -- its "an effect causes a creature to block" clause carries one --
+          -- and unconditional on wasBlocked, since another creature already
+          -- blocking this attacker does not make this creature's arrival any
+          -- less a blocker for it.
+          --
+          -- The flag is CR 509.4's exclusion: rule 509.3b reads the same event
+          -- and must NOT fire off this one.
+          State.modify' (Event.recordEvent (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = oid, BecameBlocking.attacker = attacker, BecameBlocking.putOntoBattlefield = True})))
           -- CR 509.3c: the attacker became a blocked creature. The defending
           -- player rides the event as it does off the declaration; the guard
           -- above has already settled that it is this creature's controller.
@@ -1601,12 +1619,13 @@ attemptBlockDeclaration pid attacking rejected = do
               -- it fires onto the stack before the active player gets priority.
               -- Recorded AFTER the state is written, and over `declaration` rather
               -- than `merged`, since CR 509.4 makes a creature put onto the
-              -- battlefield blocking never "blocked".
+              -- battlefield blocking never "blocked" -- which is what the
+              -- putOntoBattlefield flag below says of the other producer.
               --
               -- TWO events per declaration, split by CR 509.3a against CR 509.3b: one
-              -- BlockerDeclared per PAIR, and one BlocksDeclared per BLOCKING CREATURE.
+              -- BecameBlocking per PAIR, and one BlocksDeclared per BLOCKING CREATURE.
               -- The count it carries is CR 509.3e's.
-              State.modify' $ \g -> List.foldl' (\h (blocker, attacker) -> Event.recordEvent (GameEvent.BlockerDeclared (BlockerDeclared.MkBlockerDeclared blocker attacker)) h) g pairs
+              State.modify' $ \g -> List.foldl' (\h (blocker, attacker) -> Event.recordEvent (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = blocker, BecameBlocking.attacker = attacker, BecameBlocking.putOntoBattlefield = False})) h) g pairs
               State.modify' $ \g -> List.foldl' (\h (blocker, attackers) -> Event.recordEvent (GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared blocker (Natural.length attackers))) h) g (filter (not . Set.null . snd) (Map.toList declaration))
               -- CR 509.1h: the same declaration makes each attacker it named a BLOCKED
               -- creature. One event per attacker rather than per pair, which is CR

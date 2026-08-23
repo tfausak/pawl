@@ -801,7 +801,7 @@ castOf event = case event of
   GameEvent.Drew {} -> Nothing
   GameEvent.Revealed {} -> Nothing
   GameEvent.AttackerDeclared {} -> Nothing
-  GameEvent.BlockerDeclared {} -> Nothing
+  GameEvent.BecameBlocking {} -> Nothing
   GameEvent.BlocksDeclared {} -> Nothing
   GameEvent.AttackerBlocked {} -> Nothing
   GameEvent.AttackerUnblocked _ -> Nothing
@@ -861,7 +861,7 @@ discardOf event = case event of
   GameEvent.BecameMonarch _ -> Nothing
   GameEvent.Revealed {} -> Nothing
   GameEvent.AttackerDeclared {} -> Nothing
-  GameEvent.BlockerDeclared {} -> Nothing
+  GameEvent.BecameBlocking {} -> Nothing
   GameEvent.BlocksDeclared {} -> Nothing
   GameEvent.AttackerBlocked {} -> Nothing
   GameEvent.AttackerUnblocked _ -> Nothing
@@ -919,7 +919,7 @@ enteredBattlefield event = case event of
   GameEvent.BecameMonarch _ -> Nothing
   GameEvent.Revealed {} -> Nothing
   GameEvent.AttackerDeclared {} -> Nothing
-  GameEvent.BlockerDeclared {} -> Nothing
+  GameEvent.BecameBlocking {} -> Nothing
   GameEvent.BlocksDeclared {} -> Nothing
   GameEvent.AttackerBlocked {} -> Nothing
   GameEvent.AttackerUnblocked _ -> Nothing
@@ -994,7 +994,7 @@ damageRecipient event = case event of
   GameEvent.BecameMonarch _ -> Nothing
   GameEvent.Revealed {} -> Nothing
   GameEvent.AttackerDeclared {} -> Nothing
-  GameEvent.BlockerDeclared {} -> Nothing
+  GameEvent.BecameBlocking {} -> Nothing
   GameEvent.BlocksDeclared {} -> Nothing
   GameEvent.AttackerBlocked {} -> Nothing
   GameEvent.AttackerUnblocked _ -> Nothing

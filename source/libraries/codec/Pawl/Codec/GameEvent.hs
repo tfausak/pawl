@@ -11,9 +11,9 @@ import qualified Pawl.Codec.AttackTarget as AttackTarget
 import qualified Pawl.Codec.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Codec.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Codec.BecameAttached as BecameAttached
+import qualified Pawl.Codec.BecameBlocking as BecameBlocking
 import qualified Pawl.Codec.BecameDesignated as BecameDesignated
 import qualified Pawl.Codec.BecameTarget as BecameTarget
-import qualified Pawl.Codec.BlockerDeclared as BlockerDeclared
 import qualified Pawl.Codec.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Codec.ControlChanged as ControlChanged
 import qualified Pawl.Codec.CounterChange as CounterChange
@@ -54,7 +54,7 @@ codec =
       Arm.payload "AttackerDeclared" AttackerDeclared.codec GameEvent.AttackerDeclared (\x -> case x of GameEvent.AttackerDeclared y -> Just y; _ -> Nothing),
       Arm.payload "BecameAttacked" AttackTarget.codec GameEvent.BecameAttacked (\x -> case x of GameEvent.BecameAttacked y -> Just y; _ -> Nothing),
       Arm.payload "AttackersDeclared" PlayerId.codec GameEvent.AttackersDeclared (\x -> case x of GameEvent.AttackersDeclared y -> Just y; _ -> Nothing),
-      Arm.payload "BlockerDeclared" BlockerDeclared.codec GameEvent.BlockerDeclared (\x -> case x of GameEvent.BlockerDeclared y -> Just y; _ -> Nothing),
+      Arm.payload "BecameBlocking" BecameBlocking.codec GameEvent.BecameBlocking (\x -> case x of GameEvent.BecameBlocking y -> Just y; _ -> Nothing),
       Arm.payload "AttackerBlocked" AttackerBlocked.codec GameEvent.AttackerBlocked (\x -> case x of GameEvent.AttackerBlocked y -> Just y; _ -> Nothing),
       Arm.payload "AttackerUnblocked" ObjectId.codec GameEvent.AttackerUnblocked (\x -> case x of GameEvent.AttackerUnblocked y -> Just y; _ -> Nothing),
       Arm.payload "BlocksDeclared" BlocksDeclared.codec GameEvent.BlocksDeclared (\x -> case x of GameEvent.BlocksDeclared y -> Just y; _ -> Nothing),

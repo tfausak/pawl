@@ -631,7 +631,7 @@ abilityTriggeredOf event = case event of
   GameEvent.Drew {} -> Nothing
   GameEvent.Revealed {} -> Nothing
   GameEvent.AttackerDeclared {} -> Nothing
-  GameEvent.BlockerDeclared {} -> Nothing
+  GameEvent.BecameBlocking {} -> Nothing
   GameEvent.BlocksDeclared {} -> Nothing
   GameEvent.AttackerBlocked {} -> Nothing
   GameEvent.AttackerUnblocked _ -> Nothing

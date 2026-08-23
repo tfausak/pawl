@@ -519,7 +519,7 @@ snapshotView gs shape event = case event of
   -- The same reason, with no snapshot to offer either: no EventShape names an
   -- attacker being declared (CR 508.2b).
   GameEvent.AttackerDeclared {} -> Nothing
-  GameEvent.BlockerDeclared {} -> Nothing
+  GameEvent.BecameBlocking {} -> Nothing
   GameEvent.BlocksDeclared {} -> Nothing
   GameEvent.AttackerBlocked {} -> Nothing
   GameEvent.AttackerUnblocked _ -> Nothing

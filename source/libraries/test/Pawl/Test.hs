@@ -43,6 +43,7 @@ import qualified Pawl.Codec.AttackerBlockedSpec
 import qualified Pawl.Codec.AttackerDeclaredSpec
 import qualified Pawl.Codec.AttackingPlayersSpec
 import qualified Pawl.Codec.BattlefieldCandidateSpec
+import qualified Pawl.Codec.BecameBlockingSpec
 import qualified Pawl.Codec.BecameDesignatedSpec
 import qualified Pawl.Codec.BecomeCopySpec
 import qualified Pawl.Codec.BeginningStepSpec
@@ -50,7 +51,6 @@ import qualified Pawl.Codec.BindingSpec
 import qualified Pawl.Codec.BlockCostSpec
 import qualified Pawl.Codec.BlockPermissionSpec
 import qualified Pawl.Codec.BlockRequirementSpec
-import qualified Pawl.Codec.BlockerDeclaredSpec
 import qualified Pawl.Codec.BlocksDeclaredSpec
 import qualified Pawl.Codec.CandidateIdSpec
 import qualified Pawl.Codec.CantBeBlockedBySpec
@@ -543,7 +543,7 @@ spec s registry = do
   Pawl.Codec.BlockCostSpec.spec s
   Pawl.Codec.BlockPermissionSpec.spec s
   Pawl.Codec.BlockRequirementSpec.spec s
-  Pawl.Codec.BlockerDeclaredSpec.spec s
+  Pawl.Codec.BecameBlockingSpec.spec s
   Pawl.Codec.BlocksDeclaredSpec.spec s
   Pawl.Codec.CandidateIdSpec.spec s
   Pawl.Codec.CantBeBlockedBySpec.spec s
