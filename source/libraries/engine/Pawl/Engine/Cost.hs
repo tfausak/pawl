@@ -1260,14 +1260,18 @@ canPay pid oid cost gs = case Cost.mana cost of
 -- than through this function: asking back through the plain capacity would not
 -- terminate -- Transmogrant Altar's "{B}, {T}, Sacrifice a creature" would ask
 -- whether its own {B} is payable by a walk that asks the same of the Altar --
--- and the supply capacity answers 0 for exactly the routes that would ask again.
+-- and the supply capacity asks with the mana part EMPTIED, which lands on
+-- `manaPartPayable`'s empty arm and walks nothing.
 --
 -- CR 118.3 wants that read, the same sentence Mana.manaSourcesGiven applies to a
 -- Phyrexian Tower with no creature to give: an activation whose mana part
 -- nothing on the board pays is not an offer, and offering it costs a player a
--- priority action that changes nothing. UNDERSTATING, since the walk under it
--- refuses a mana-eating route as supply, so the {B} of one Altar cannot be paid
--- by another's yield.
+-- priority action that changes nothing. The walk under it counts a mana-eating
+-- route as a supply that also carries a demand, so one Altar's {B} may be paid
+-- out of another's yield here -- while `payManaExcept`'s in-payment window will
+-- not offer that second Altar (#2094). No board in `data/cards/` tells them
+-- apart: the Altar's {C}{C}{C} pays no {B}, and Grinning Ignus's {R} reaches
+-- another Ignus's {R} only beside a Mountain that would have paid it anyway.
 --
 -- The CLAIMS and the LIFE ride along with the count, which alone is a fact about
 -- this source in isolation: two sources whose costs both sacrifice a creature
@@ -1328,10 +1332,10 @@ manaActivationsGiven effects pcs pid oid printedCost restrictions gs =
         then
           Activations.MkActivations
             { -- The PRINTED mana part, which is what `repeatsOf` reads: a
-              -- reduction that emptied it would make the route repeatable and
-              -- free supply, and Mana.supplyCapacity reads the printed cost too,
-              -- so counting it here would put the gate and the supply walk at
-              -- odds. Understating, #2095's direction.
+              -- reduction that emptied it would make the route repeatable where
+              -- every activation still has to find that mana again.
+              -- Mana.supplyCapacity hands this function an emptied mana part on
+              -- purpose and caps the count at 1 itself, so the two agree.
               Activations.times = repeatsOf pid oid cost gs,
               Activations.claims = claimsOf pid oid (Cost.components cost) gs,
               Activations.life = lifeOwedBy (Cost.components cost)
@@ -1397,11 +1401,11 @@ manaPartPayable effects adjustments pid oid cost gs = case Cost.mana cost of
 -- by `lifeOwedBy`.
 --
 -- Anything else caps the answer at 1 (`uncountedCeiling`), and so does a MANA
--- part, repeating which would spend mana this walk has not measured. That arm is
--- unobservable: Mana.supplyCapacity answers 0 for a route whose cost holds mana,
--- so no supply walk reaches this count for one, and the offer paths
--- (Mana.manaSourcesGiven, tapForMana) read only whether it exceeds 0. Kept
--- because the sentence is true of the count itself, not as coverage.
+-- part, repeating which would spend mana this function has not measured. The
+-- offer paths (Mana.manaSourcesGiven, tapForMana) read only whether the count
+-- exceeds 0, so that arm decides nothing for them; the SUPPLY walk hands this
+-- function a mana part it has emptied and applies the same cap of 1 itself
+-- (Mana.supplyCapacity), which is where the sentence is load-bearing.
 -- Understating is the safe direction, and why the uncounted components cap
 -- rather than divide: a supply too large offers a cast that then cannot be paid,
 -- and an offer that changes nothing is offered again forever.
@@ -1504,16 +1508,18 @@ canPaySomeCompletion casting spending pid oid total_ cost gs =
 --
 -- Action.legalActions' ActivateManaAbility offers are this list and nothing
 -- else. It is NOT the list a payability GATE is judged against; that one is
--- supplyManaSourcesGiven below, and the two differ on exactly a permanent whose
--- every mana route holds mana in its own cost.
+-- supplyManaSourcesGiven below, and it is the SUPERSET -- see there.
 activationManaSourcesGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> [ObjectId]
 activationManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven (manaActivationsGiven (PlayerEffect.applyingTo pid gs)) grants pcs pid gs
 
 -- The mana sources a payability GATE is judged against -- the same sweep under
 -- Mana.supplyCapacity, which is the invariant Mana.payableResolutionsGiven
--- states and its type cannot. A SUBSET of the offer list above: the supply
--- capacity is the offer capacity on a route whose mana part is empty and 0
--- otherwise, so a supply source is an offer source.
+-- states and its type cannot. A SUPERSET of the offer list above: the supply
+-- capacity is the offer capacity asked with the route's mana part emptied, so
+-- every offer source is a supply source and Transmogrant Altar beside no Swamp
+-- is a supply source that is no offer. Nothing is overstated by the difference
+-- -- such a permanent's option carries the mana part as a DEMAND the board must
+-- then serve, and taking it zero times is always among its options.
 supplyManaSourcesGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> [ObjectId]
 supplyManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven (Mana.supplyCapacity (manaActivationsGiven (PlayerEffect.applyingTo pid gs))) grants pcs pid gs
 
@@ -1970,8 +1976,8 @@ orderSensitive component = case component of
 --
 -- Not implemented: CR 605.3a's window in full. Two narrowings apply while
 -- `activating` is Just -- the permanent itself is off the candidate list, and
--- what is left is supplyManaSourcesGiven taken by a mana-free route -- so a mana
--- ability whose cost holds mana cannot pay another one's (#2094).
+-- what is left is a permanent with a MANA-FREE route (Mana.manaFreeCapacity) --
+-- so a mana ability whose cost holds mana cannot pay another one's (#2094).
 payManaExcept :: Maybe ObjectId -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
 payManaExcept activating casting spending pid cost = do
   before <- State.get
@@ -1985,7 +1991,7 @@ payManaExcept activating casting spending pid cost = do
     -- that player controls, so the capacity's own `pid` is this one.
     windowCapacityOn gs = case activating of
       Nothing -> hoisted
-      Just _ -> Mana.supplyCapacity hoisted
+      Just _ -> Mana.manaFreeCapacity hoisted
       where
         hoisted = manaActivationsGiven (PlayerEffect.applyingTo pid gs)
     -- What the pool would leave if the cost were paid out of it right now.
@@ -2107,7 +2113,7 @@ tapForMana = tapForManaVia manaActivations
 
 -- The same activation with the ROUTES narrowed, which is payManaExcept's second
 -- guard: inside a mana ability's own payment window `capacity` is
--- Mana.supplyCapacity manaActivations, so only a route whose own cost holds no
+-- Mana.manaFreeCapacity manaActivations, so only a route whose own cost holds no
 -- mana may be taken and the recursion bottoms out one level down; see #2094 for
 -- what that narrowing elides. CR 605.3a's priority window narrows nothing and
 -- takes the plain capacity above.
