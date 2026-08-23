@@ -2990,7 +2990,9 @@ boggartPranksterSpec s registry =
             Nothing -> Spec.assertFailure s "fixture should give alice a Prankster and a Piker"
         -- No declaration at all, on the same board: rule 508.3d's "one or more",
         -- and the falsifier for an event recorded per STEP rather than per
-        -- declaration.
+        -- declaration. A REGRESSION FENCE rather than a proof -- the two
+        -- readings agree here, because a trigger that did fire would find no
+        -- attacking Goblin to target and CR 603.3d would remove it.
         Spec.it s "CR 508.3d a declare attackers step with no attackers is not attacking" $ do
           built <- plainBoard
           case built of

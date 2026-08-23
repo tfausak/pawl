@@ -186,9 +186,10 @@ data TriggerCondition
     -- the field the event carries, so this reads the event and never the board.
     -- The attacker is bound under Pawl.Engine.Binding.attackingCreature.
     --
-    -- CR 508.3b's "[a player] is attacked" is the once-per-DECLARATION sibling,
+    -- CR 508.3b's "[a player] is attacked" is a once-per-DECLARATION sibling,
     -- AttachedPlayerIsAttacked below, and two creatures attacking one player tell
-    -- the two arities apart.
+    -- the two arities apart. CR 508.3d's "[a player] attacks" is the other,
+    -- YouAttack, which is once per declaration outright rather than per target.
     CreatureAttacksYou
   | -- | CR 508.3b: "whenever enchanted player is attacked" (Curse of Vitality).
     -- CreatureAttacksYou's grouping sibling -- against

@@ -4980,7 +4980,8 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   --
   -- No Filter over the attacker and no count: CR 508.1a admits only creatures, and
   -- this fires once per declared attacker (CR 508.3a), not once per declaration --
-  -- which is AttachedPlayerIsAttacked below, against a different event.
+  -- which is YouAttack (CR 508.3d) and AttachedPlayerIsAttacked (CR 508.3b)
+  -- below, each against its own event.
   TriggerCondition.CreatureAttacksYou -> case event of
     GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared _ defending _) -> defending == you
     GameEvent.BlockerDeclared {} -> False
@@ -5040,6 +5041,15 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- player, so the bearer only frames whose declaration this is --
   -- CreatureAttacksAlone's bystanding posture. A Boggart Prankster held out of
   -- combat still triggers on its controller's attack.
+  --
+  -- The comparison is a REGRESSION FENCE rather than a proven behaviour: nothing
+  -- observes it going the other way. Deleting it leaves the whole suite green,
+  -- because Boggart Prankster -- the pool's only writer of this condition -- can
+  -- only ever pump an attacking Goblin ITS OWN controller controls, and CR 508.1
+  -- lets only the active player declare attackers; so on every board where a
+  -- non-controller declares, the trigger has no legal target and CR 603.3d
+  -- removes it. A CR 508.3d card whose payload does not need its controller to
+  -- have an attacker is what would observe it.
   TriggerCondition.YouAttack -> case event of
     GameEvent.AttackersDeclared attacker -> attacker == you
     GameEvent.AttackerDeclared {} -> False
