@@ -56,6 +56,7 @@ import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
+import qualified Pawl.Types.BattlefieldCandidate as BattlefieldCandidate
 import qualified Pawl.Types.BecameAttached as BecameAttached
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
@@ -95,7 +96,6 @@ import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
-import Pawl.Types.EventGroup (EventGroup)
 import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.EventShape as EventShape
 import qualified Pawl.Types.Face as Face
@@ -112,6 +112,7 @@ import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeChange as LifeChange
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Modification as Modification
@@ -205,7 +206,7 @@ recordEvent :: GameEvent -> GameState -> GameState
 recordEvent event gs =
   let group = GameState.nextEventGroup gs
    in gs
-        { GameState.events = GameState.events gs Seq.|> (group, event),
+        { GameState.events = GameState.events gs Seq.|> LoggedEvent.MkLoggedEvent {LoggedEvent.group = group, LoggedEvent.event = event},
           GameState.nextEventGroup =
             if GameState.eventGroupDepth gs == 0
               then EventGroup.next group
@@ -226,7 +227,7 @@ recordEvent event gs =
 --
 -- Projected ONCE for the whole board rather than per permanent, Projection.project
 -- rerunning the whole-board gather fold on every call.
-battlefieldCandidates :: GameState -> Map.Map ObjectId (PlayerId, PC.ProjectedCharacteristics)
+battlefieldCandidates :: GameState -> Map.Map ObjectId (BattlefieldCandidate.BattlefieldCandidate PC.ProjectedCharacteristics)
 battlefieldCandidates gs =
   let projected = Projection.projectAll gs
       grants = Projection.controlGrants gs
@@ -236,7 +237,7 @@ battlefieldCandidates gs =
                 -- Unreachable: projectAll is keyed on the same battlefield set this
                 -- list walks, so every oid drawn from it has an entry.
                 Nothing -> Nothing
-                Just pc -> fmap (\ctrl -> (oid, (ctrl, pc))) (Projection.controllerOfGiven grants Set.empty oid gs)
+                Just pc -> fmap (\ctrl -> (oid, BattlefieldCandidate.MkBattlefieldCandidate {BattlefieldCandidate.controller = ctrl, BattlefieldCandidate.characteristics = pc})) (Projection.controllerOfGiven grants Set.empty oid gs)
             )
             (Set.toAscList (GameState.battlefield gs))
         )
@@ -535,20 +536,20 @@ revealOf event = case event of
 -- The drop counts ELEMENTS, not groups, and must keep doing so: the two
 -- watermarks drain this log at different cadences, so a group can be half
 -- consumed.
-unscannedGrouped :: GameState -> [(EventGroup, GameEvent)]
+unscannedGrouped :: GameState -> [LoggedEvent.LoggedEvent]
 unscannedGrouped gs =
   Foldable.toList (Seq.drop (Natural.toIntSaturating (GameState.scannedThrough gs)) (GameState.events gs))
 
 -- CR 117.5: the events the trigger scan has not yet consumed.
 unscannedEvents :: GameState -> [GameEvent]
-unscannedEvents = fmap snd . unscannedGrouped
+unscannedEvents = fmap LoggedEvent.event . unscannedGrouped
 
 -- The events the STATE-BASED ACTION check has not yet consumed -- CR 704.5h's
 -- "since the last state-based action check", and the same boundary CR 903.9a
 -- names. Pawl.Engine.Commander.returnable is the other reader.
 unscannedSbaEvents :: GameState -> [GameEvent]
 unscannedSbaEvents gs =
-  fmap snd (Foldable.toList (Seq.drop (Natural.toIntSaturating (GameState.damageScannedThrough gs)) (GameState.events gs)))
+  fmap LoggedEvent.event (Foldable.toList (Seq.drop (Natural.toIntSaturating (GameState.damageScannedThrough gs)) (GameState.events gs)))
 
 -- CR 704.5h: the damage the state-based-action check has not yet consumed.
 unscannedDamage :: GameState -> [DamageEvent]
@@ -3890,7 +3891,7 @@ declarationsOf bearer gs =
   let declaredIt event = case event of
         GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _) -> oid == bearer
         _ -> False
-   in length (Seq.filter (declaredIt . snd) (GameState.events gs))
+   in length (Seq.filter (declaredIt . LoggedEvent.event) (GameState.events gs))
 
 -- Clarion Spirit's "your SECOND spell each turn": which of the turn's matching
 -- casts this one is, counting from one.
@@ -3926,12 +3927,12 @@ declarationsOf bearer gs =
 castOrdinal :: Filter.Context -> Filter.Type.Filter Keyword.Type.Keyword -> Maybe Zone -> ObjectId -> GameState -> Natural
 castOrdinal context predicate fromZone spell gs =
   let isThisCast cast = SpellWasCast.spell cast == spell
-      earlier = Seq.takeWhileL (maybe True (not . isThisCast) . Game.castOf . snd) (GameState.events gs)
-      counted (_, event) = case Game.castOf event of
+      earlier = Seq.takeWhileL (maybe True (not . isThisCast) . Game.castOf . LoggedEvent.event) (GameState.events gs)
+      counted entry = case Game.castOf (LoggedEvent.event entry) of
         Nothing -> False
         Just cast ->
           maybe True (\z -> SpellWasCast.zone cast == Just z) fromZone
-            && maybe False (\view -> Filter.matches context view predicate) (Count.snapshotView gs EventShape.SpellCast event)
+            && maybe False (\view -> Filter.matches context view predicate) (Count.snapshotView gs EventShape.SpellCast (LoggedEvent.event entry))
    in 1 + Natural.length (Seq.filter counted earlier)
 
 -- CR 102.1: does this turn belong to the scope? `active` is "the player whose
@@ -8988,7 +8989,7 @@ looksBack condition = case condition of
 -- Events outer, permanents inner (ascending by id): the deterministic canonical
 -- order the CR 603.3b ordering prompt indexes into. Groups do not disturb it --
 -- they decide which permanents an event is offered, never in what order.
-eventTriggers :: [(EventGroup, GameEvent)] -> GameState -> [PendingTrigger]
+eventTriggers :: [LoggedEvent.LoggedEvent] -> GameState -> [PendingTrigger]
 eventTriggers events gs =
   let -- CR 702.70a: a keyword can BE a triggered ability, so a permanent's
       -- abilities are its printed-and-granted ones plus the ones rule 702 mints
@@ -9044,9 +9045,12 @@ eventTriggers events gs =
       -- is the only one there is. Lazy, so a scan whose every group is sampled
       -- never projects it.
       liveBattlefield = battlefieldCandidates gs
+      -- Out of the record and into the pair the rest of the scan's unions use.
+      -- Only the STORED shape is named (#126); `candidates` below unions this
+      -- with six sibling maps that are computed here and never serialized.
       onBattlefieldAt group =
         Map.map
-          (fmap battlefieldAbilitiesOf)
+          (\candidate -> (BattlefieldCandidate.controller candidate, battlefieldAbilitiesOf (BattlefieldCandidate.characteristics candidate)))
           (Map.findWithDefault liveBattlefield group (GameState.battlefieldWhenTriggered gs))
       -- The permanent this event took OFF the battlefield, read from
       -- CR 608.2h last known information -- both the abilities and the objects'
@@ -9152,8 +9156,8 @@ eventTriggers events gs =
       -- non-decreasing along the log (Event.recordEvent only mints a fresh one or
       -- repeats the frozen one), so the members of one event are contiguous and
       -- an adjacent grouping is exact rather than approximate.
-      groups = List.groupBy (\a b -> fst a == fst b) events
-      departuresIn block = Map.unions (fmap (departedFrom battlefieldAbilitiesOf . snd) block)
+      groups = List.groupBy (\a b -> LoggedEvent.group a == LoggedEvent.group b) events
+      departuresIn block = Map.unions (fmap (departedFrom battlefieldAbilitiesOf . LoggedEvent.event) block)
       -- CR 603.10's first sentence, per EVENT GROUP: the permanents still on the
       -- battlefield when each event happened that have left by the CR 117.5
       -- boundary. Entry i is the union of `leftBattlefield` over the events at a
@@ -9194,7 +9198,7 @@ eventTriggers events gs =
       -- The ids a graveyard arrival in this block minted, keyed by the ARRIVING
       -- incarnation -- ZoneChange.object, the key `inGraveyards` would hold them
       -- under, `arrivedInGraveyard` below arguing that the two ids coincide.
-      arrivalsIn block = Set.fromList (Maybe.mapMaybe (arrivedInGraveyardAt . snd) block)
+      arrivalsIn block = Set.fromList (Maybe.mapMaybe (arrivedInGraveyardAt . LoggedEvent.event) block)
       arrivedInGraveyardAt event = case movedOf event of
         Just zc | ZoneChange.to zc == Zone.Graveyard -> Just (ZoneChange.object zc)
         _ -> Nothing
@@ -9667,7 +9671,7 @@ eventTriggers events gs =
       -- group with no events cannot occur -- List.groupBy yields no empty block.
       scanBlock block later same arrivedAfter = case block of
         [] -> []
-        (group, _) : _ -> concatMap (scanOne (onBattlefieldAt group) later same arrivedAfter . snd) block
+        entry : _ -> concatMap (scanOne (onBattlefieldAt (LoggedEvent.group entry)) later same arrivedAfter . LoggedEvent.event) block
    in concat (List.zipWith4 scanBlock groups laterGroups sameGroup arrivedLater)
 
 -- CR 113.6m, read off a TRIGGERED ability: "an ability whose cost or effect
@@ -10576,9 +10580,9 @@ settleOnsets gs =
 -- Takes the GROUPED events, because eventTriggers is the one gatherer whose
 -- answer depends on which of them were simultaneous (CR 603.10a). The other two
 -- take the events alone.
-gatherTriggers :: [(EventGroup, GameEvent)] -> GameState -> ([PendingTrigger], Seq.Seq DelayedTrigger)
+gatherTriggers :: [LoggedEvent.LoggedEvent] -> GameState -> ([PendingTrigger], Seq.Seq DelayedTrigger)
 gatherTriggers grouped gs =
-  let events = fmap snd grouped
+  let events = fmap LoggedEvent.event grouped
       -- Already CR 603.4-filtered: delayedPending has to run the check itself,
       -- since which entries survive in its second component depends on the
       -- answer. Running it over these again would be a redundant no-op, the
@@ -10595,7 +10599,7 @@ gatherTriggers grouped gs =
 -- match no event at all, so a second call would duplicate every one of them; and
 -- the CR 603.7 delayed store's watermark is spent by the same one call, so
 -- re-running it would consume entries against events they never matched.
-reactionTriggers :: [(EventGroup, GameEvent)] -> GameState -> [PendingTrigger]
+reactionTriggers :: [LoggedEvent.LoggedEvent] -> GameState -> [PendingTrigger]
 reactionTriggers events gs = filter (interveningHolds gs) (eventTriggers events gs)
 
 -- CR 603.4: the ability doesn't trigger at all when its intervening "if" is false

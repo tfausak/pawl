@@ -75,6 +75,7 @@ import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Modal as Modal.Type
 import qualified Pawl.Types.Mode as Mode
@@ -587,7 +588,7 @@ reactions incoming = do
 -- a trigger condition are one key, so an unlimited one firing can spend a
 -- limited one's turn (#1664).
 withinTurnLimit :: GameState -> [PendingTrigger.PendingTrigger] -> [PendingTrigger.PendingTrigger]
-withinTurnLimit gs = go (Set.fromList (Maybe.mapMaybe (fmap spentKey . abilityTriggeredOf . snd) (Foldable.toList (GameState.events gs))))
+withinTurnLimit gs = go (Set.fromList (Maybe.mapMaybe (fmap spentKey . abilityTriggeredOf . LoggedEvent.event) (Foldable.toList (GameState.events gs))))
   where
     spentKey record = (AbilityTriggered.source record, AbilityTriggered.condition record)
     go _ [] = []

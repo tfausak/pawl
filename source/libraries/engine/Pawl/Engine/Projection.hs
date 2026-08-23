@@ -92,6 +92,7 @@ import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import Pawl.Types.Layer (Layer)
 import qualified Pawl.Types.Layer as Layer
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.Mana as Mana
@@ -845,9 +846,9 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- once every creature blocking it has left combat.
       Filter.blocked = Map.member oid (Combat.blockers (GameState.combat gs)),
       -- CR 608.2i: from the turn's event log, which CR 511.3 does not clear.
-      Filter.attackedThisTurn = any (declaredIt oid . snd) (GameState.events gs),
+      Filter.attackedThisTurn = any (declaredIt oid . LoggedEvent.event) (GameState.events gs),
       -- CR 701.17a / 608.2i: the same log, read for the mills.
-      Filter.milledThisTurn = any (milledIt oid . snd) (GameState.events gs),
+      Filter.milledThisTurn = any (milledIt oid . LoggedEvent.event) (GameState.events gs),
       -- CR 701.3a: not a characteristic, so the attachment comes off
       -- Object.attachedTo -- but the HOST's characteristics are projected, so it
       -- arrives as a view of its own read through `peers` (CR 613.1). CR 303.4 /
