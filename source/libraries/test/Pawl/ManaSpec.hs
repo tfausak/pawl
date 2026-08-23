@@ -2022,6 +2022,10 @@ workhorseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n
 workhorseSpec s registry = Spec.describe s "Workhorse" $ do
   -- ONE board for both halves, so what separates {4} from {5} is only how many
   -- activations the supply model counted.
+  --
+  -- FOUR and not three, even though the fourth leaves a 0/0: CR 704.3 checks
+  -- state-based actions when a player would receive priority, and CR 601.2g's
+  -- window is not such a moment, so the last counter is spendable.
   Spec.it s "CR 118.3 four +1/+1 counters supply four mana" $ do
     horse <- S.printingOf s registry "Workhorse"
     let (_, board) = workhorseBoard horse 4

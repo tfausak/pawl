@@ -126,8 +126,8 @@ type Capacity = Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Obje
 --
 -- CAPPED AT ONE activation, because Pawl.Engine.Cost.repeatsOf reads the cost it
 -- is handed: an emptied mana part reaches that function's claim, life and
--- counter ceilings, which would make a route repeatable that has to find its mana again
--- every time. A REGRESSION FENCE and not a proven line: exact for `data/cards/`,
+-- counter ceilings, which would make a route repeatable that has to find its
+-- mana again every time. A REGRESSION FENCE and not a proven line: exact for `data/cards/`,
 -- where the Altar's {T} and Grinning Ignus's return each bound the claim ceiling
 -- at 1 anyway, so lifting the cap leaves the suite green. A repeatable
 -- mana-eating route is what would observe it.
