@@ -205,22 +205,22 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
   -- CR 508.3d. All THREE relations, unlike PlayerCycles' two: rule 508.3d's
   -- "[a player]" is printed as "you" (Boggart Prankster), as "a player" (Avatar
   -- Roku, Firebender) and as "an opponent" (Ever-Watching Threshold).
-  Spec.it s "YouAttack round-trips all three relations" $ do
+  Spec.it s "PlayerAttacks round-trips all three relations" $ do
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.YouAttack PlayerRelation.You)
-      " {\"type\":\"YouAttack\",\"value\":{\"type\":\"You\"}} "
+      (TriggerCondition.PlayerAttacks PlayerRelation.You)
+      " {\"type\":\"PlayerAttacks\",\"value\":{\"type\":\"You\"}} "
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.YouAttack PlayerRelation.Opponent)
-      " {\"type\":\"YouAttack\",\"value\":{\"type\":\"Opponent\"}} "
+      (TriggerCondition.PlayerAttacks PlayerRelation.Opponent)
+      " {\"type\":\"PlayerAttacks\",\"value\":{\"type\":\"Opponent\"}} "
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.YouAttack PlayerRelation.AnyPlayer)
-      " {\"type\":\"YouAttack\",\"value\":{\"type\":\"AnyPlayer\"}} "
+      (TriggerCondition.PlayerAttacks PlayerRelation.AnyPlayer)
+      " {\"type\":\"PlayerAttacks\",\"value\":{\"type\":\"AnyPlayer\"}} "
   -- CR 508.3b, nullary for the sibling above's reason and one of its own: the
   -- subject is whom the ability's own source is attached to.
   Spec.it s "AttachedPlayerIsAttacked" $

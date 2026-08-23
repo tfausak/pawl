@@ -686,7 +686,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- A PlayerRelation holds no Count, and rule 508.3d's "one or more" is the
   -- EVENT's grouping for the arm above's reason, not a number this condition
   -- counts.
-  TriggerCondition.YouAttack _ -> []
+  TriggerCondition.PlayerAttacks _ -> []
   -- CR 702.105a compares life totals rather than counting objects, so no Count.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> []
   TriggerCondition.SelfBlocks -> []
@@ -3033,7 +3033,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 508.3d names no quality of anything either: its subject is a player, its
   -- payload is a PlayerRelation and not a Filter, and the creatures it counts
   -- are the DECLARATION's.
-  TriggerCondition.YouAttack _ -> []
+  TriggerCondition.PlayerAttacks _ -> []
   -- CR 702.105a names no quality of the attacker, only a fact about whom it
   -- attacked, so no Filter.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> []
@@ -4882,7 +4882,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- than on the constructor: CR 508.1 lets only the active player declare,
         -- so "whenever YOU attack" can only happen on the controller's turn and
         -- "whenever A PLAYER attacks" can happen on anyone's.
-        attacksWith relation ability = ability {TriggeredAbility.condition = TriggerCondition.YouAttack relation}
+        attacksWith relation ability = ability {TriggeredAbility.condition = TriggerCondition.PlayerAttacks relation}
         youAttack = face {Face.delayedAbilities = fmap (attacksWith PlayerRelation.You) (Face.delayedAbilities face)}
         anyoneAttacks = face {Face.delayedAbilities = fmap (attacksWith PlayerRelation.AnyPlayer) (Face.delayedAbilities face)}
     Spec.assertBool s (not (onsetOffends face)) "the real card, ControllersTurn, is accepted"

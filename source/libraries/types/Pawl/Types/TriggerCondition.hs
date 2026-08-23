@@ -189,7 +189,7 @@ data TriggerCondition
     -- CR 508.3b's "[a player] is attacked" is a once-per-DECLARATION sibling,
     -- AttachedPlayerIsAttacked below, and two creatures attacking one player tell
     -- the two arities apart. CR 508.3d's "[a player] attacks" is the other,
-    -- YouAttack, which is once per declaration outright rather than per target.
+    -- PlayerAttacks, which is once per declaration outright rather than per target.
     CreatureAttacksYou
   | -- | CR 508.3b: "whenever enchanted player is attacked" (Curse of Vitality).
     -- CreatureAttacksYou's grouping sibling -- against
@@ -243,7 +243,7 @@ data TriggerCondition
     -- (#2154). Nor CR 508.3c's "whenever [a player] attacks with [a creature]",
     -- this subject at CR 508.3a's arity and binding the creature (#2140), nor CR
     -- 508.3e's "attacks [another player]" (#538).
-    YouAttack PlayerRelation.PlayerRelation
+    PlayerAttacks PlayerRelation.PlayerRelation
   | -- | CR 702.105a: dethrone -- SelfAttacks narrowed by whom the bearer
     -- attacked. The attacked player comes from Combat.attackers rather than the
     -- event, and that is the whole narrowing: the event carries CR 508.5's

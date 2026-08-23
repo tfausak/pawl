@@ -4981,7 +4981,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   --
   -- No Filter over the attacker and no count: CR 508.1a admits only creatures, and
   -- this fires once per declared attacker (CR 508.3a), not once per declaration --
-  -- which is YouAttack (CR 508.3d) and AttachedPlayerIsAttacked (CR 508.3b)
+  -- which is PlayerAttacks (CR 508.3d) and AttachedPlayerIsAttacked (CR 508.3b)
   -- below, each against its own event.
   TriggerCondition.CreatureAttacksYou -> case event of
     GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared _ defending _) -> defending == you
@@ -5057,7 +5057,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- 603.3d removes it either way. What would observe it is a card printing
   -- "whenever you attack" whose payload does not need its controller to have an
   -- attacker.
-  TriggerCondition.YouAttack relation -> case event of
+  TriggerCondition.PlayerAttacks relation -> case event of
     GameEvent.AttackersDeclared attacker -> PlayerRelation.holds relation you attacker
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared {} -> False
@@ -7979,7 +7979,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.CreatureAttacksAlone _ -> False
   TriggerCondition.CreatureAttacksYou -> False
   TriggerCondition.AttachedPlayerIsAttacked -> False
-  TriggerCondition.YouAttack _ -> False
+  TriggerCondition.PlayerAttacks _ -> False
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature _ -> False
@@ -8701,7 +8701,7 @@ eventBindingSlots cond = case cond of
   -- Not implemented: the declaring player as a bound slot, which "that player"
   -- and "the attacking player" need (#2154). Both must move together with
   -- eventBindings, which Pawl.ZoneTriggerSpec pins against this.
-  TriggerCondition.YouAttack _ -> Set.empty
+  TriggerCondition.PlayerAttacks _ -> Set.empty
   -- NOTHING, for SelfAttacksWithAnother's reason: rule 702.105a's payload names
   -- only "this creature", so the attacked player is compared and then never
   -- pointed at. That is also why this condition needs no arm in eventBindings.
@@ -9112,7 +9112,7 @@ looksBack condition = case condition of
   TriggerCondition.CreatureAttacksAlone _ -> False
   TriggerCondition.CreatureAttacksYou -> False
   TriggerCondition.AttachedPlayerIsAttacked -> False
-  TriggerCondition.YouAttack _ -> False
+  TriggerCondition.PlayerAttacks _ -> False
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature _ -> False
@@ -10176,7 +10176,7 @@ zonesTriggeredFrom cond = case cond of
   TriggerCondition.CreatureAttacksAlone _ -> battlefield
   TriggerCondition.CreatureAttacksYou -> battlefield
   TriggerCondition.AttachedPlayerIsAttacked -> battlefield
-  TriggerCondition.YouAttack _ -> battlefield
+  TriggerCondition.PlayerAttacks _ -> battlefield
   TriggerCondition.SelfAttacksPlayerWithMostLife -> battlefield
   TriggerCondition.SelfBlocks -> battlefield
   TriggerCondition.SelfBlocksCreature _ -> battlefield
@@ -10433,7 +10433,7 @@ controllerTurnScoped cond = case cond of
   -- pins nothing. SelfAttacks answers False because it pins the CREATURE and not
   -- the declarer -- a stolen creature attacks on its thief's turn -- which is
   -- the comparison this arm does make.
-  TriggerCondition.YouAttack relation -> relation == PlayerRelation.You
+  TriggerCondition.PlayerAttacks relation -> relation == PlayerRelation.You
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature _ -> False
@@ -10605,7 +10605,7 @@ stateTriggers gs
               TriggerCondition.CreatureAttacksAlone _ -> False
               TriggerCondition.CreatureAttacksYou -> False
               TriggerCondition.AttachedPlayerIsAttacked -> False
-              TriggerCondition.YouAttack _ -> False
+              TriggerCondition.PlayerAttacks _ -> False
               TriggerCondition.SelfAttacksPlayerWithMostLife -> False
               TriggerCondition.SelfBlocks -> False
               TriggerCondition.SelfBlocksCreature _ -> False

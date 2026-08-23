@@ -1634,7 +1634,7 @@ representativeEvents cond =
         -- of creatures rather than one -- so this pins an EMPTY floor, which is
         -- the pin the two arms above would break if either grew a binding here.
         -- carol serves every relation, the floor being empty either way.
-        TriggerCondition.YouAttack _ -> one (GameEvent.AttackersDeclared S.carol)
+        TriggerCondition.PlayerAttacks _ -> one (GameEvent.AttackersDeclared S.carol)
         -- The same declaration event once more. Rule 702.105a binds NOTHING off
         -- it, SelfAttacksWithAnother's case: the player it compares is read from
         -- Combat.attackers and then never named again.
@@ -1878,9 +1878,9 @@ everyTriggerCondition =
     TriggerCondition.CreatureAttacksAlone (Filter.Type.And []),
     TriggerCondition.CreatureAttacksYou,
     TriggerCondition.AttachedPlayerIsAttacked,
-    TriggerCondition.YouAttack PlayerRelation.You,
-    TriggerCondition.YouAttack PlayerRelation.Opponent,
-    TriggerCondition.YouAttack PlayerRelation.AnyPlayer,
+    TriggerCondition.PlayerAttacks PlayerRelation.You,
+    TriggerCondition.PlayerAttacks PlayerRelation.Opponent,
+    TriggerCondition.PlayerAttacks PlayerRelation.AnyPlayer,
     TriggerCondition.SelfAttacksPlayerWithMostLife,
     TriggerCondition.SelfBlocks,
     TriggerCondition.SelfBlocksAtLeast 2,
