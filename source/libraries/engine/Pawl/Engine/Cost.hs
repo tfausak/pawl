@@ -901,7 +901,9 @@ zoneOfComponent component = case component of
   CostComponent.UntapThis -> Nothing
   -- CR 113.6m again, and Nothing for SacrificeThis' reason above: it moves the
   -- object off the BATTLEFIELD, where CR 113.6's default already had it, so
-  -- naming the zone would be redundant rather than wrong.
+  -- naming the zone would be redundant rather than wrong. A FENCE and not proven
+  -- behaviour, for exactly that reason -- answering Just Zone.Battlefield leaves
+  -- the suite green, the two readings agreeing wherever CR 113.6's default holds.
   CostComponent.ReturnThis -> Nothing
   CostComponent.SacrificeThis -> Nothing
   CostComponent.PayLife _ -> Nothing
@@ -1091,6 +1093,11 @@ claimOf pid oid component gs = case component of
   -- hand is as gone from the battlefield as one sacrificed -- and WITHOUT CR
   -- 101.2's prohibition, `canPayComponent`'s reading below and for its reason.
   -- The two answers have to agree.
+  --
+  -- A FENCE and not proven behaviour: Grinning Ignus is the one card printing
+  -- this component, its cost states one component and a non-empty mana part, so
+  -- `repeatsOf` settles at 1 before any axis matters. Keying it ClaimAxis.Tapping
+  -- instead leaves the suite green.
   CostComponent.ReturnThis ->
     claim
       (ClaimAxis.Removal Zone.Battlefield)
