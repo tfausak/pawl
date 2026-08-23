@@ -2302,6 +2302,60 @@ grinningIgnusSpec s registry = Spec.describe s "Grinning Ignus" $ do
     Spec.assertBool s (not (holding alone)) "CR 605.3c the {R} it would add is not there to pay the {R} it costs"
     Spec.assertBool s (holding withLand) "and a Mountain is what makes the same {1} castable"
 
+  -- CR 601.2a against CR 307.5, which is the one rider whose window CLOSES
+  -- between the gate and the payment: CR 601.2a puts the spell on the stack
+  -- BEFORE CR 601.2f-h totals and pays the cost, so no cast's payment ever has
+  -- the empty stack CR 307.5 requires. A gate counting the Ignus's {C}{C}{R}
+  -- therefore offered a cast whose own payment could not reach that mana, and CR
+  -- 601.2 then rewound it (#2005).
+  --
+  -- The BOARD is ignusBoard plus a Boggart Brute in hand: {2}{R} against a
+  -- Mountain and an Ignus, so the three mana are exactly the Ignus's net yield
+  -- and nothing else on the board can pay them.
+  --
+  -- The two boards are ONE ACTIVATION apart and nothing else -- same phase, same
+  -- Brute, same Mountain. Floating the mana first, with the stack still empty, is
+  -- what the rules leave the player (CR 605.3a's priority window, which
+  -- Action.legalActions goes on offering), and the same Brute is castable there.
+  -- So the refusal is about the window and not about the {2}{R}.
+  Spec.it s "CR 601.2a no cast is offered off the sorcery-speed source, the proposal itself closing CR 307.5's window" $ do
+    ignus <- S.printingOf s registry "Grinning Ignus"
+    mountain <- S.printingOf s registry "Mountain"
+    brute <- S.printingOf s registry "Boggart Brute"
+    let (ignusId, board) = ignusBoard ignus mountain
+        (held, bruteId) = S.handOne brute board
+        floated = snd (State.evalState (Engine.runGame (takesIgnusOnce ignusId) held Engine.priorityLoop) (0 :: Int))
+        offers gs = filter (S.isCastOf bruteId) (Action.legalActions S.alice gs)
+    Spec.assertEqWith s "CR 601.2a the Ignus is no supply for a cast, whose payment the proposal has already put a spell on the stack for" (length (offers held)) 0
+    Spec.assertEqWith s "CR 605.3a the same Brute off the same board is castable once that mana is floated with the stack still empty" (length (offers floated)) 1
+    Spec.assertEqWith s "and the float is the Ignus's own {C}{C}{R}" (poolTypes S.alice floated) [ManaType.Colorless, ManaType.Colorless, ManaType.Colored Color.Red]
+    Spec.assertEqWith s "CR 307.1 both boards are the same sorcery-speed window, so the phase decides neither" (GameState.phase floated) Phase.PrecombatMain
+
+  -- CR 602.2a is CR 601.2a's rule for an ACTIVATION -- the ability goes on the
+  -- stack, and only then does CR 602.2b send the cost through CR 601.2f-h -- so
+  -- the same gate, reached by the other road, must count the Ignus the same way.
+  -- Maskwood Nexus's "{3}, {T}: Create a 1/1 blue Shapeshifter creature token
+  -- with changeling" is the producer: an ARTIFACT, so CR 302.6 gates nothing, and
+  -- three generic mana is exactly the Ignus's net yield again.
+  Spec.it s "CR 602.2a nor is an activation, the ability going on the stack before CR 602.2b pays for it" $ do
+    ignus <- S.printingOf s registry "Grinning Ignus"
+    mountain <- S.printingOf s registry "Mountain"
+    nexus <- S.printingOf s registry "Maskwood Nexus"
+    let (ignusId, board) = ignusBoard ignus mountain
+        (nexusId, held) = S.addCreature nexus S.alice board
+        floated = snd (State.evalState (Engine.runGame (takesIgnusOnce ignusId) held Engine.priorityLoop) (0 :: Int))
+        offers gs = filter (isActivationOf nexusId) (Action.legalActions S.alice gs)
+    Spec.assertEqWith s "CR 602.2a the Ignus is no supply for an activation either" (length (offers held)) 0
+    Spec.assertEqWith s "CR 605.3a and the same ability is offered once that mana is floated" (length (offers floated)) 1
+
+-- Is this action an activation of that object's ability? The activation half of
+-- Pawl.Support.isCastOf, local because CR 605.3b's mana abilities ride a
+-- different constructor and no other spec wants the distinction.
+isActivationOf :: ObjectId.ObjectId -> Action.Type.Action -> Bool
+isActivationOf oid action = case action of
+  Action.Type.Activate o _ -> o == oid
+  _ -> False
+
 -- alice, active, in her precombat main phase and going nowhere: one Grinning
 -- Ignus and one Mountain, and nothing else on the board or in her hand.
 ignusBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)

@@ -1520,8 +1520,41 @@ activationManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven (manaActiva
 -- is a supply source that is no offer. Nothing is overstated by the difference
 -- -- such a permanent's option carries the mana part as a DEMAND the board must
 -- then serve, and taking it zero times is always among its options.
+--
+-- `stackedManaActivations` and not `manaActivations` for the same reason, and it
+-- is the whole of what both gates below are: every caller is gating an action CR
+-- 601.2a or CR 602.2a puts on the stack BEFORE its cost is paid.
 supplyManaSourcesGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> [ObjectId]
-supplyManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven (Mana.supplyCapacity (manaActivationsGiven (PlayerEffect.applyingTo pid gs))) grants pcs pid gs
+supplyManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven (Mana.supplyCapacity (stackedManaActivations (PlayerEffect.applyingTo pid gs))) grants pcs pid gs
+
+-- `manaActivationsGiven` narrowed to the routes a payment made AFTER its object
+-- reached the stack may take -- which is every cast (CR 601.2a) and every
+-- activation (CR 602.2a), both rules putting the object on the stack a step
+-- before CR 601.2f-h totals and pays the cost.
+--
+-- CR 307.5's empty-stack conjunct is the only window that move closes, and
+-- ActivationRestriction.needsEmptyStack is what reports it. Asked of the RIDER
+-- and not of the board: this runs one step ahead of the move, so the live
+-- GameState.stack is the wrong stack to read -- an empty one here says nothing
+-- about the payment, and reading it counted Grinning Ignus's "{R}, Return this
+-- creature to its owner's hand: Add {C}{C}{R}. Activate only as a sorcery" as a
+-- supply for a cast whose own proposal had already closed its window, so the cast
+-- was offered and then rewound under CR 601.2 (#2005).
+--
+-- NOT A LOSS OF THE PLAY: CR 605.3a's priority window is untouched
+-- (activationManaSourcesGiven above), so the mana is floated first with the stack
+-- still empty and then spent out of the pool, which is what the rules leave the
+-- player and what the Ignus is printed to do.
+--
+-- The IN-PAYMENT window needs no arm of its own: Cost.payMana and payManaExcept
+-- run with the object already on the stack, so ActivationRestriction.restrictionsOk
+-- reads the real stack there and refuses the same routes. The gate and the
+-- payment agree because this function states exactly the move between them.
+stackedManaActivations :: [PlayerEffect.Type.PlayerEffect] -> Mana.Capacity
+stackedManaActivations effects pcs pid oid cost restrictions gs =
+  if any ActivationRestriction.needsEmptyStack restrictions
+    then Mana.noActivations
+    else manaActivationsGiven effects pcs pid oid cost restrictions gs
 
 -- The same question given a board the CALLER has already walked; handing the
 -- board in changes no answer. Build `sources` with supplyManaSourcesGiven
@@ -1535,8 +1568,15 @@ canPaySomeCompletionGiven casting spending sources pcs pid oid total_ cost gs = 
     let outside = lifeOwedBy (Cost.components cost)
         claimed = claimsOf pid oid (Cost.components cost) gs
         -- One player-effect gather for the whole question, shared by every
-        -- source Mana.manaSuppliesGiven measures under it (manaActivationsGiven).
-        hoisted = manaActivationsGiven (PlayerEffect.applyingTo pid gs)
+        -- source Mana.manaSuppliesGiven measures under it.
+        --
+        -- `stackedManaActivations` and NOT `manaActivationsGiven`: both callers
+        -- gate an action CR 601.2a or CR 602.2a puts on the stack before its cost
+        -- is paid. It must also MATCH what `sources` was built under
+        -- (supplyManaSourcesGiven) -- a source listed there whose every route this
+        -- capacity refuses offers nothing, and Mana.payableResolutionsGiven's
+        -- product turns one of those into no board at all.
+        hoisted = stackedManaActivations (PlayerEffect.applyingTo pid gs)
         payable (completed, life) =
           any
             (\totalled -> Mana.canPayCommittingGiven casting hoisted spending sources pcs pid (outside + life) claimed totalled gs)
