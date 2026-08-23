@@ -37,9 +37,6 @@
 --
 -- What is NOT proven here, because Paladin Class cannot reach it:
 --
---   * CR 716.2b's "levels are not a copiable characteristic", which falls out by
---     construction, a copy effect's payload being a ProjectedCharacteristics and
---     never an Object (see Object.classLevel's own note). No producer (gap #2165).
 --   * CR 716.2c's "to gain a Class level", which only Sorcerer Class prints (gap
 --     #1948), and CR 716's "when this Class becomes level N" triggers (gap
 --     #1944).
@@ -70,6 +67,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Subtype as Subtype
 
@@ -261,7 +259,7 @@ ladderSpec s registry = Spec.describe s "Level bar activation" $ do
 -- CR 716.2b: "A level is a designation that any permanent can have. A Class
 -- retains its level even if it stops being a Class."
 --
--- Song of the Dryads is the second card this file needs: "Enchanted
+-- Song of the Dryads is what makes a Class stop being one: "Enchanted
 -- permanent is a colorless Forest land" is a Modification.SetCardType, and CR
 -- 205.1a's third clause then takes the Class subtype away with the Enchantment
 -- card type it correlates with (CR 205.3h). It and Gliding Licid are the corpus's
@@ -310,7 +308,65 @@ retentionBoards paladinClass plains piker mountain song =
       enchanted = S.settleSba (S.attachTo songId (Recipient.ToObject classId) unattached)
    in (classId, pikerId, unattached, enchanted, S.attachTo songId (Recipient.ToObject mountainId) enchanted)
 
-designationSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+-- CR 716.2b's last sentence: "Levels are not a copiable characteristic." CR 707.2
+-- is the list this is an exclusion from -- the copiable values are the ones
+-- derived from the printed text -- and CR 716.2d is what the copy reads instead,
+-- a permanent with no level being treated as level 1.
+--
+-- Copy Enchantment {2}{U} ("You may have this enchantment enter as a copy of any
+-- enchantment on the battlefield") is the producer: its EntryR AsCopy carries
+-- `eligible = HasCardType Enchantment`, so a Class on the battlefield is offered
+-- where Clone's "any creature" would not offer one.
+--
+-- The OBSERVABLE is CR 716.2a's activated half rather than its static one: which
+-- level bar the copy may activate, and the level that activation lands on. The
+-- original is levelled to 2 FIRST, so the two readings come apart -- a copy at CR
+-- 716.2d's default of 1 is offered the {2}{W} bar and reaches level 2, while a
+-- copy carrying the original's level would be offered the {4}{W} bar and reach
+-- level 3. On an UNLEVELLED original both readings say the same thing, which is
+-- why the level is written before the copy is made.
+--
+-- Not implemented: a copy does not acquire the copied object's STATIC abilities
+-- (CR 707.2a) -- Pawl.Types.ProjectedCharacteristics carries the other three
+-- ability lists and no static one, so Pawl.Engine.Projection.permanentParts reads
+-- Face.staticAbilities off the PRINTED face (#2177). That is why the level-2
+-- section's +1/+1 is not what this case reads: the copy grants nothing whatever
+-- its level says. The Piker's P/T is asserted anyway, as a fence rather than as
+-- coverage -- it is the right answer for rule 716.2b's reason as well, and it
+-- becomes load-bearing the moment #2177 lands.
+
+-- CR 707.5's copy choice, pinned to one named permanent rather than searched --
+-- Pawl.CopySpec's copyNamed. An answerer that hunted for a legal enchantment
+-- would find the Class again after a mutation and repair the assertion.
+copyNamed :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+copyNamed wanted p = case p of
+  Prompt.ChooseCopyTarget {} -> Just wanted
+  _ -> S.identityAnswer p
+
+-- The levelled board and the same board after alice's Copy Enchantment has
+-- resolved as a copy of the Class, plus whatever entered the battlefield in
+-- between -- a set difference rather than a name match, so an entry that split
+-- into two permanents could not be mistaken for the one copy.
+--
+-- Put on the stack and resolved rather than cast: CR 707.5's choice is made as
+-- the permanent ENTERS (CR 614.12a), which Stack.resolveTop reaches, and paying
+-- {2}{U} from Plains would need a second colour on a board whose whole mana
+-- supply is there to make the level bars affordable.
+copyBoards ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState, GameState.GameState)
+copyBoards paladinClass plains piker copyEnchantment =
+  let (classId, pikerId, gs) = board paladinClass plains piker
+      levelled = gainLevel classId gs
+      (_, staged) = S.spellOnStack copyEnchantment S.alice levelled
+      copied = S.settleSba (S.runPure (copyNamed classId) staged Stack.resolveTop)
+      entered = Set.toList (Set.difference (GameState.battlefield copied) (GameState.battlefield levelled))
+   in (classId, pikerId, entered, levelled, copied)
+
+designationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 designationSpec s registry = Spec.describe s "Level designation" $ do
   Spec.it s "CR 716.2b a Class retains its level even if it stops being a Class" $ do
     paladinClass <- S.printingOf s registry "Paladin Class"
@@ -332,3 +388,28 @@ designationSpec s registry = Spec.describe s "Level designation" $ do
     Spec.assertEqWith s "CR 305.7: the section is off while it is a Forest land because its abilities are stripped" (S.powerToughnessOf pikerId enchanted) (Just (2, 1))
     Spec.assertEqWith s "CR 716.2b: and NOT because the level went anywhere" (levelOf classId enchanted) (Just (ClassLevel.MkClassLevel 2))
     Spec.assertEqWith s "with the Aura gone it is an Enchantment -- Class once more" (Projection.cardTypesOf classId moved, Projection.subtypesOf classId moved) (Set.singleton CardType.Enchantment, Set.singleton Subtype.Class)
+  Spec.it s "CR 716.2b levels are not a copiable characteristic" $ do
+    paladinClass <- S.printingOf s registry "Paladin Class"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    copyEnchantment <- S.printingOf s registry "Copy Enchantment"
+    let (classId, pikerId, entered, levelled, copied) = copyBoards paladinClass plains piker copyEnchantment
+    case entered of
+      [copyId] -> do
+        -- The gameplay-level assertion the case exists for, first: the bar the
+        -- copy is offered is the one a level-1 Class has, and activating it lands
+        -- on 2. A copy that had inherited the original's level 2 would be offered
+        -- the {4}{W} bar instead and land on 3.
+        Spec.assertEqWith s "CR 716.2d the copy's own first bar takes it to level 2, not to 3" (levelOf copyId (gainLevel copyId copied)) (Just (ClassLevel.MkClassLevel 2))
+        Spec.assertEqWith s "CR 716.2b: and no level designation came across with the copy" (levelOf copyId copied) Nothing
+        Spec.assertEqWith s "CR 707.2b: the original still holds the level it gained" (levelOf classId copied) (Just (ClassLevel.MkClassLevel 2))
+        -- The preconditions the assertions above rest on: the copy really is a
+        -- Paladin Class, with a bar to offer at all. Without them a Copy
+        -- Enchantment that copied NOTHING would read the same way.
+        Spec.assertEqWith s "the copy IS an Enchantment -- Class (CR 205.3h)" (Projection.cardTypesOf copyId copied, Projection.subtypesOf copyId copied) (Set.singleton CardType.Enchantment, Set.singleton Subtype.Class)
+        Spec.assertEqWith s "and exactly one bar is offered on it" (barsOffered copyId copied) 1
+        -- The fence #2177 will make load-bearing; see the note above. One
+        -- level-2 section is granting +1/+1 here, not two.
+        Spec.assertEqWith s "the Piker is 3/2, not 4/3" (S.powerToughnessOf pikerId copied) (Just (3, 2))
+      _ -> Spec.assertFailure s "the Copy Enchantment did not enter the battlefield as the one new permanent"
+    Spec.assertEqWith s "before the copy: the levelled Class alone already makes the Piker 3/2" (S.powerToughnessOf pikerId levelled) (Just (3, 2))
