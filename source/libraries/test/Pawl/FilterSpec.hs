@@ -51,6 +51,7 @@ blackCreature =
       Filter.blocked = False,
       Filter.attackedThisTurn = False,
       Filter.milledThisTurn = False,
+      Filter.dealtDamageThisTurn = False,
       Filter.attachedToView = Nothing,
       Filter.attachedViews = [],
       Filter.attachedTo = Nothing,
@@ -92,6 +93,7 @@ devoidBigCreature =
       Filter.blocked = False,
       Filter.attackedThisTurn = False,
       Filter.milledThisTurn = False,
+      Filter.dealtDamageThisTurn = False,
       Filter.attachedToView = Nothing,
       Filter.attachedViews = [],
       Filter.attachedTo = Nothing,
@@ -761,6 +763,24 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- CR 701.17a mills CARDS, and a player is not one.
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.MilledThisTurn)) "player"
+
+  Spec.describe s "DealtDamageThisTurn" $ do
+    Spec.it s "matches a view whose history says so" $ do
+      Spec.assertBool s (Filter.matches self (blackCreature {Filter.dealtDamageThisTurn = True}) Filter.Type.DealtDamageThisTurn) "damaged"
+
+    Spec.it s "does not match a creature nothing has damaged" $ do
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.DealtDamageThisTurn)) "not damaged"
+
+    -- Independent of the two other look-back atoms, which read the same log for
+    -- different entries: CR 510.1a has an attacker deal combat damage, but being
+    -- declared as one is not being dealt any.
+    Spec.it s "is not implied by having attacked" $ do
+      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.attackedThisTurn = True}) Filter.Type.DealtDamageThisTurn)) "attacked does not imply damaged"
+
+    -- CR 120.1 lets a player be dealt damage, so this one is vacuous rather than
+    -- rules-enforced: Filter.playerView holds no board to fold (#2157).
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.DealtDamageThisTurn)) "player"
 
   Spec.describe s "AttachedTo" $ do
     -- Miracle Worker's "target Aura attached to a creature you control", which is

@@ -942,15 +942,16 @@ enteredBattlefield event = case event of
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
 
--- The PLAYER an event describes being dealt damage, if it describes one. CR
--- 120.1's damage with a Recipient.ToPlayer, which is the only recipient CR 120.3a
--- calls a player: damage to a permanent a player controls -- their creature, their
--- planeswalker, a battle they protect -- is not damage to them, and CR 120.3c and
--- CR 120.3h are what it is instead.
+-- The RECIPIENT an event describes damage being dealt to, if it describes one --
+-- CR 120.1's four recipients, undivided. damagedPlayer and damagedObject below
+-- split this answer along CR 120.1's own line with Recipient.playerOf and
+-- Recipient.objectOf, so the exhaustive GameEvent case and CR 120.8's fence are
+-- written once and neither reader can drift from the other.
 --
 -- castOf's, discardOf's and enteredBattlefield's sibling, and here for their
--- import-graph reason: the caller is Pawl.Engine.Quantity's
--- PlayersDealtDamageThisTurn arm.
+-- import-graph reason: the callers are Pawl.Engine.Quantity's
+-- PlayersDealtDamageThisTurn arm and Pawl.Engine.Projection's fold for
+-- Filter.DealtDamageThisTurn.
 --
 -- The `amount > 0` test is CR 120.8 -- "if a source would deal 0 damage, it does
 -- not deal damage at all" -- and a FENCE rather than a reachable filter on the
@@ -964,16 +965,11 @@ enteredBattlefield event = case event of
 -- 120.3a makes the life loss a RESULT of the damage rather than the damage, so
 -- reading it would count an effect's bare "loses 2 life" as damage; and CR 120.3b's
 -- infect damage causes no life loss at all, yet it is damage dealt to that player.
-damagedPlayer :: GameEvent -> Maybe PlayerId
-damagedPlayer event = case event of
+damageRecipient :: GameEvent -> Maybe Recipient.Recipient
+damageRecipient event = case event of
   GameEvent.DamageDealt ev ->
     if DamageEvent.amount ev > 0
-      then case DamageEvent.target ev of
-        Recipient.ToPlayer pid -> Just pid
-        Recipient.ToCreature _ -> Nothing
-        Recipient.ToPlaneswalker _ -> Nothing
-        Recipient.ToBattle _ -> Nothing
-        Recipient.ToObject _ -> Nothing
+      then Just (DamageEvent.target ev)
       else Nothing
   -- CR 615.13's record of damage that did NOT happen, which is the opposite fact.
   GameEvent.DamagePrevented {} -> Nothing
@@ -1018,3 +1014,24 @@ damagedPlayer event = case event of
   GameEvent.Exerted _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
+
+-- The PLAYER an event describes being dealt damage, if it describes one. CR
+-- 120.1's damage with a Recipient.ToPlayer, which is the only recipient CR 120.3a
+-- calls a player: damage to a permanent a player controls -- their creature, their
+-- planeswalker, a battle they protect -- is not damage to them, and CR 120.3c and
+-- CR 120.3h are what it is instead.
+damagedPlayer :: GameEvent -> Maybe PlayerId
+damagedPlayer event = damageRecipient event >>= Recipient.playerOf
+
+-- The OBJECT an event describes being dealt damage, if it describes one --
+-- damagedPlayer's twin over CR 120.1's other three recipients, read by
+-- Pawl.Engine.Projection to fill Filter.dealtDamageThisTurn.
+--
+-- Recipient.objectOf rather than a ToCreature-only case: CR 120.1 has an object
+-- deal damage to a battle, a creature or a planeswalker alike, and the question
+-- this answers is whether the object was dealt damage rather than which card
+-- type it had when it was. CR 120.1a bounds the set to those three, so
+-- Recipient.ToObject reaching here would be one of them under a tag that has not
+-- been narrowed rather than a fourth kind of recipient.
+damagedObject :: GameEvent -> Maybe ObjectId
+damagedObject event = damageRecipient event >>= Recipient.objectOf
