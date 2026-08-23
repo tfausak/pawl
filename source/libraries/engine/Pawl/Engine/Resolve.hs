@@ -3107,9 +3107,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 PlayerRef.Candidate -> [searcher]
                 _ -> inApnapOrder ownerRef
               -- How many cards this search may find (CR 701.23a), evaluated ONCE
-              -- before the loop: one instruction names one count, and CR 701.23h
-              -- makes an instruction naming several zones one search rather than
-              -- one search each. An unevaluable or non-positive quantity comes
+              -- before the loop: the card prints one instruction with one count
+              -- however many zones it names, so a two-zone search caps the two
+              -- together. An unevaluable or non-positive quantity comes
               -- out as 0. A search that states no count at all -- Mana Severance's
               -- "any number of land cards" -- comes out as Nothing, and is bounded
               -- by what the searched zones hold, which is CR 701.23a's "all cards
@@ -3145,12 +3145,17 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- your library" makes the offer the SEARCHER's, only where the
                   -- library being searched is their own, and only where a LIBRARY
                   -- is among the zones at all.
+                  --
+                  -- That last conjunct is a REGRESSION FENCE rather than a proven
+                  -- behaviour: every card in the pool naming a zone also names a
+                  -- library, so removing it reddens nothing. A graveyard-only
+                  -- search would be its observer.
                   Monad.when (searcher == owner && Set.member Zone.Library searchedZones) (Cast.castWhileSearching searcher)
                   gs <- State.get
-                  -- ONE prompt over the union, not one per zone: CR 701.23h makes
-                  -- an instruction naming several zones a single search with a
-                  -- single count. The zone is kept alongside its candidates
-                  -- because CR 701.23b's permission is a property of the ZONE.
+                  -- ONE prompt over the union, not one per zone: the card prints
+                  -- one instruction with one count, and asking per zone would cap
+                  -- per zone. The zone is kept alongside its candidates because
+                  -- CR 701.23b's permission is a property of the ZONE.
                   let byZone = fmap (\zone -> (zone, filter (matches1 gs) (Game.zoneMembers zone owner gs))) (Set.toAscList searchedZones)
                       matches = concatMap snd byZone
                       -- CR 701.23a bounds an unbounded search by the zones: every
@@ -3170,20 +3175,28 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- the searcher passed over in the zones that may NOT be
                   -- declined.
                   --
-                  -- Within a hidden zone the three ways to decline are
-                  -- Filter.statesAQuality (CR 701.23b), Search.upTo -- a card's
-                  -- own "up to" over a filter stating no quality -- and a search
-                  -- stating no quantity, which CR 701.23d cannot reach because it
-                  -- is not "simply for a quantity of cards". That last disjunct is
-                  -- a REGRESSION FENCE rather than a proven behaviour: every
-                  -- printing of "for any number of cards" also states a quality,
-                  -- so the first disjunct answers for all of them and removing
-                  -- this one reddens nothing (Scryfall o:"for any number of
-                  -- cards", 2026-08-23, 25 hits, every one of them qualified --
-                  -- "named X", "with the chosen name", "that have mana value 9").
-                  -- A card that said "search your library for any number of
-                  -- cards" would refute that.
-                  let mayDecline zone = isHidden zone && (Filter.statesAQuality filter_ || upTo || Maybe.isNothing cap)
+                  -- Only the FIRST of the three ways to decline is the rule's
+                  -- and so scoped to a hidden zone: CR 701.23b's "isn't required
+                  -- to find" for a filter stating a quality. Search.upTo -- a
+                  -- card's own "up to" over a quality-free filter -- and a search
+                  -- stating no quantity are the CARD's own permissions, printed
+                  -- over the whole instruction, so they hold in a public zone
+                  -- too; CR 701.23d cannot force the second either, a search
+                  -- stating no quantity not being one "simply for a quantity of
+                  -- cards".
+                  --
+                  -- Those two are REGRESSION FENCES rather than proven behaviour,
+                  -- twice over. No card in the pool prints "up to" or "any number
+                  -- of" over a zone that is not a library, so their zone scoping
+                  -- is unobservable; and every printing of "for any number of
+                  -- cards" also states a quality, so the first disjunct answers
+                  -- for all of them and removing the third reddens nothing
+                  -- (Scryfall o:"for any number of cards", 2026-08-23, 25 hits,
+                  -- every one of them qualified -- "named X", "with the chosen
+                  -- name", "that have mana value 9"). A card that said "search
+                  -- your library and graveyard for any number of cards" would
+                  -- refute both.
+                  let mayDecline zone = upTo || Maybe.isNothing cap || (isHidden zone && Filter.statesAQuality filter_)
                       picked = List.genericTake capHere . List.nub $ filter (\oid -> List.elem oid matches) answer
                       forced = concatMap snd (filter (not . mayDecline . fst) byZone)
                       filler = filter (\oid -> List.notElem oid picked) forced
@@ -3201,6 +3214,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- Read off the card's own zones rather than searchedZones, since CR
             -- 101.2's prohibition stops the looking and not the card's other
             -- instructions.
+            --
+            -- A REGRESSION FENCE for castWhileSearching's reason above: no card
+            -- in the pool searches without naming a library, so removing this
+            -- guard reddens nothing.
             Monad.when (Set.member Zone.Library zones) $ do
               lib <- State.gets (Game.zoneMembers Zone.Library owner)
               shuffleAnswer <- Game.ask (Prompt.Shuffle lib)
@@ -5789,7 +5806,7 @@ putFound searcher source destination cardId = case destination of
         Monad.void
           (Event.changeZoneAttaching Nothing Set.empty cardId Zone.Battlefield LibraryPosition.defaultValue (Just seed) TapState.Untapped Map.empty (Just searcher) Nothing Facing.FaceUp False)
 
--- Put a library card onto the battlefield tapped (CR 701.23's Evolving Wilds
+-- Put a found card onto the battlefield tapped (CR 701.23's Evolving Wilds
 -- shape). changeZone mints a new object; tap it by id after the move.
 putTapped :: ObjectId -> Game ()
 putTapped cardId = do

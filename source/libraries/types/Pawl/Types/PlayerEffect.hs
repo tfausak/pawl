@@ -409,9 +409,11 @@ data PlayerEffect
     -- Pawl.Types.Modification.
     --
     -- WHICH library is not carried, and Leonin Arbiter's sentence names none
-    -- either: it stops the player from searching, whoever owns the library, which
-    -- is exactly what an unqualified prohibition on the SEARCHER does. A card
-    -- that prohibited searching only some libraries would want a filter here
+    -- either: it stops the player from searching a library, whoever owns it,
+    -- which is exactly what an unqualified prohibition on the SEARCHER does. It
+    -- is a prohibition on LIBRARIES, so Pawl.Engine.Resolve removes that one zone
+    -- from a Search.zones naming others rather than stopping the instruction. A
+    -- card that prohibited searching only some libraries would want a filter here
     -- (#1269).
     --
     -- WHOSE searching is the carrier's PlayerScope, as for every arm here:

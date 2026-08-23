@@ -1026,6 +1026,16 @@ perCreatureCounts perCreature = case perCreature of
 cardResolutionEffects :: Face.Face Card.Type.Card -> [Effect.Effect Card.Type.Card]
 cardResolutionEffects = concatMap effectWithNested . cardCarrierEffects
 
+-- The zone set of every search a face authors (CR 701.23a). A wildcard rather
+-- than one arm per effect, as storedPlayerScope takes: Pawl.Types.Effect is the
+-- open half's alphabet, and a new opcode is not a new search.
+searchZoneSets :: Face.Face Card.Type.Card -> [Set.Set Zone.Zone]
+searchZoneSets = Maybe.mapMaybe zonesOf . cardResolutionEffects
+  where
+    zonesOf effect = case effect of
+      Effect.Search search -> Just (Search.zones search)
+      _ -> Nothing
+
 -- One effect and everything nested inside it, transitively. Terminates on card
 -- data of any shape: Pawl.Types.Effect nests structurally and a JSON document is
 -- finite, so the depth is whatever the card printed.
@@ -6072,6 +6082,24 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- nothing.
     let positions = concatMap (cardFilters . S.combinedFace) ps
     Spec.assertBool s (length (filter ((== SearchFramed) . fst) positions) > 5) "the pool gives the accepted side search filters to be about"
+  -- CR 701.23a: a search looks through a zone, so one naming none can find
+  -- nothing. Nothing else catches an empty set. Search.zones is defaulted-absent
+  -- to the library, so a card file has to write "zones": [] on purpose -- and the
+  -- result decodes, resolves, finds nothing and shuffles nothing, which reads
+  -- exactly like a search whose filter matched nothing.
+  Spec.it s "CR 701.23a every search names at least one zone" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace (any Set.null . searchZoneSets) . Printing.card) ps
+    Spec.assertEqWith s "no card's search names an empty zone set" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous: the pool authors searches, and the one naming two zones is
+    -- read here rather than skipped.
+    moogle <- S.printingOf s registry "Delivery Moogle"
+    Spec.assertEqWith
+      s
+      "Delivery Moogle's search names its library and its graveyard"
+      (searchZoneSets (S.combinedFace moogle))
+      [Set.fromList [Zone.Library, Zone.Graveyard]]
+    Spec.assertBool s (length (concatMap (searchZoneSets . S.combinedFace) ps) > 5) "and the pool gives the sweep other searches to be about"
   -- CR 709.4a's Filter.SameNameAsBound is in CR 701.3a's position one axis over:
   -- answerable only where Filter.Context.slotNames is filled, which is a MODE's
   -- target slot and nothing else. See sameNameAsBoundOffends for the two offences

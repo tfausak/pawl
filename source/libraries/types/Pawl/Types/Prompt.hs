@@ -347,9 +347,9 @@ data Prompt r where
   -- gives it -- the zones, not a number the card names.
   --
   -- ONE prompt over the union rather than one per zone, and no zone in the
-  -- payload: CR 701.23h makes an instruction naming several zones a single
-  -- search with a single count, and where a short answer is completed from is
-  -- Pawl.Engine.Resolve's to settle from Search.zones.
+  -- payload: the card prints one instruction with one count over the zones it
+  -- names, and where a short answer is completed from is Pawl.Engine.Resolve's
+  -- to settle from Search.zones.
   --
   -- Answering with fewer is legal for a search of a HIDDEN zone (CR 400.2)
   -- stating a quality (CR 701.23b's "some or all"), for one printing "up to"

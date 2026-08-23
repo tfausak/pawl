@@ -143,9 +143,9 @@ data Effect card
     -- than stored, CR 701.23b letting a search STATING A QUALITY find fewer where
     -- CR 701.23d makes a bare quantity find that many. Filter.statesAQuality
     -- classifies; Search.upTo and an absent count are the two cases it cannot
-    -- reach, both of which land in CR 701.23b's branch. All three are scoped to a
-    -- HIDDEN zone (CR 400.2), so the classification is applied per zone in
-    -- Search.zones rather than once per search.
+    -- reach, both of which land in CR 701.23b's branch. CR 701.23b is scoped to a
+    -- HIDDEN zone (CR 400.2), so its classification is applied per zone in
+    -- Search.zones; the two the card prints itself hold in every zone it names.
     Search Search.Search
   | -- | CR 701.13 / Rest in Peace: exile every card in every graveyard.
     -- Targetless and bulk; a general exile-from-zone is future.

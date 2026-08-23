@@ -24,6 +24,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Setup as Setup
@@ -1435,10 +1436,10 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
       (Set.fromList (Game.zoneMembers Zone.Library S.alice settled))
       (Set.fromList [moogleStar board, moogleCrucible board])
   -- The ordinary path, and the control for the first case: the same board, the
-  -- searcher naming the LIBRARY card. CR 701.23h makes the two zones one search
-  -- with one count, so filling the cap from the library leaves the graveyard
-  -- match where it is.
-  Spec.it s "CR 701.23h whole card: Delivery Moogle's two zones are ONE search with one count" $ do
+  -- searcher naming the LIBRARY card. The card prints one instruction with one
+  -- count over both zones, so filling the cap from the library leaves the
+  -- graveyard match where it is.
+  Spec.it s "CR 701.23a whole card: Delivery Moogle's two zones share one count" $ do
     board <- moogleBoard s registry ["Bonesplitter"]
     let settled = resolveMoogle (findPinned [moogleStar board]) board
     Spec.assertEqWith
@@ -1456,6 +1457,27 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
       "and only the card the filter rejected is left in the library"
       (Game.zoneMembers Zone.Library S.alice settled)
       [moogleCrucible board]
+  -- The same board plus Leonin Arbiter, which is CR 101.2's "players can't
+  -- search libraries". The prohibition names LIBRARIES, so it removes that one
+  -- zone from the instruction rather than the instruction: alice still looks
+  -- through her graveyard, and CR 400.2 still forces the find there. She names
+  -- the LIBRARY card, which is not offered at all, so what reaches her hand is
+  -- the graveyard's -- an engine gating the whole search on the prohibition
+  -- leaves her hand empty.
+  Spec.it s "CR 101.2 whole card: Leonin Arbiter stops Delivery Moogle's library half, not its graveyard half" $ do
+    board <- moogleBoard s registry ["Bonesplitter"] >>= withArbiter s registry
+    let settled = resolveMoogle (findPinned [moogleStar board]) board
+    Spec.assertEqWith
+      s
+      "she cannot search her library, but the graveyard find still happens"
+      (namesIn Zone.Hand S.alice settled)
+      [Just (CardName.MkCardName (Text.pack "Bonesplitter"))]
+    Spec.assertBool s (PlayerEffect.prohibitsSearching S.alice settled) "alice never paid the Arbiter's {2}, so she was prohibited throughout"
+    Spec.assertEqWith
+      s
+      "and the library she could not search is untouched"
+      (Set.fromList (Game.zoneMembers Zone.Library S.alice settled))
+      (Set.fromList [moogleStar board, moogleCrucible board])
   Spec.it s "CR 603/608.2n Rest in Peace's ETB exiles graveyards and ceases" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -2205,6 +2227,15 @@ moogleBoard s registry graveyardNames = do
       g3 = List.foldl' bury g2 buried
       (gs, spellId) = S.handOne moogle g3
   pure (MkMoogleBoard gs spellId starId crucibleId)
+
+-- The same board with Leonin Arbiter under bob, so the two CR 101.2 cases differ
+-- in exactly the prohibition. Added after the fact rather than threaded through
+-- moogleBoard: the Arbiter is a separate permanent and touches nothing the
+-- builder places.
+withArbiter :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> MoogleBoard -> m MoogleBoard
+withArbiter s registry board = do
+  arbiter <- S.printingOf s registry "Leonin Arbiter"
+  pure board {moogleState = snd (S.addCreature arbiter S.bob (moogleState board))}
 
 resolveMoogle :: (forall r. Prompt.Prompt r -> r) -> MoogleBoard -> GameState.GameState
 resolveMoogle answer board =

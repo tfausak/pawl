@@ -33,9 +33,10 @@ data Search = MkSearch
     -- them owned by `owner` -- Delivery Moogle's "your library and/or
     -- graveyard".
     --
-    -- A Set rather than one Zone, and rather than a list of searches: CR 701.23h
-    -- makes several looks before one shuffle a SINGLE search, so a card naming
-    -- two zones asks its searcher once, over the union. A Set rather than an
+    -- A Set rather than one Zone, and rather than a list of searches: the card
+    -- prints ONE instruction with one count over the zones it names, so its
+    -- searcher is asked once, over the union -- a list of searches would ask
+    -- twice and cap twice. A Set rather than an
     -- ordered NonEmpty because CR 701.23a orders nothing within a search --
     -- "library and/or graveyard" and "graveyard, hand, and library" differ only
     -- in membership.

@@ -151,9 +151,9 @@ modeAtIndex (ModeIndex.MkModeIndex n) m = Seq.lookup (Natural.toIntSaturating n)
 
 -- CR 608.2c/700.2: only the CHOSEN modes' effects, flattened in ModeIndex then
 -- written order, with a mode chosen twice contributing its effects twice (CR
--- 700.2d). A CLASSIFICATION read (does any of this search a library?), where
--- optionality is not part of the question; resolution goes through chosenModes
--- instead.
+-- 700.2d). A CLASSIFICATION read -- what effects these modes hold, of the kind
+-- Pawl.Engine.ManaAbility asks -- where optionality is not part of the question;
+-- resolution goes through chosenModes instead.
 modesEffects :: Seq.Seq ModeIndex.ModeIndex -> Modal.Modal card -> [Effect card]
 modesEffects chosen m = concatMap (Foldable.toList . Mode.allEffects . snd) (chosenModes chosen m)
 
