@@ -412,6 +412,8 @@ cycling cost searchFor =
           Search.MkSearch
             { Search.searcher = PlayerRef.Relative PlayerRelation.You,
               Search.owner = PlayerRef.Relative PlayerRelation.You,
+              -- CR 702.29e prints "your library" and no other zone.
+              Search.zones = Set.singleton Zone.Library,
               Search.quantity = Just (Quantity.Literal 1),
               Search.filter = filter_,
               -- CR 702.29e prints no "up to", and its quality-stating filter puts

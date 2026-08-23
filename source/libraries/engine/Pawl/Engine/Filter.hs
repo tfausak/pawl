@@ -462,7 +462,8 @@ playerView pid =
       -- CR 303.4b again: an Aura attached to a player enchants them, so the
       -- question CAN be asked of a player candidate (CR 702.5d) -- but not here,
       -- since the only site that fills this field is Pawl.Engine.Resolve's
-      -- Effect.Search arm, whose candidates are library cards.
+      -- Effect.Search arm, whose candidates are cards in a library, a graveyard
+      -- or a hand.
       canAttachToSubject = False,
       -- CR 111.1: a token represents a PERMANENT, and a player is not one.
       token = False,

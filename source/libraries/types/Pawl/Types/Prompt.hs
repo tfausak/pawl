@@ -338,21 +338,27 @@ data Prompt r where
   -- fixing the five types. No SlotName -- the answer is written to
   -- Object.chosenSubtype rather than bound into a slot.
   ChooseBasicLandType :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt Subtype.Subtype
-  -- | CR 701.23 / 701.23b. The [ObjectId] is the library cards MATCHING the
-  -- criterion (engine-pre-filtered), and the PlayerId is the player SEARCHING,
-  -- who need not own the library. The Natural is how many the search may find.
-  -- A search that states no count at all (Mana Severance's "any number of land
-  -- cards", a Nothing on Search.quantity) arrives here as the number of MATCHING
-  -- cards, which is the bound CR 701.23a gives it -- the zone, not a number the
-  -- card names.
+  -- | CR 701.23 / 701.23b. The [ObjectId] is the MATCHING cards
+  -- (engine-pre-filtered) across every zone Search.zones names, and the PlayerId
+  -- is the player SEARCHING, who need not own those zones. The Natural is how
+  -- many the search may find. A search that states no count at all (Mana
+  -- Severance's "any number of land cards", a Nothing on Search.quantity)
+  -- arrives here as the number of MATCHING cards, which is the bound CR 701.23a
+  -- gives it -- the zones, not a number the card names.
   --
-  -- Answering with fewer is legal for a search stating a quality (CR 701.23b's
-  -- "some or all"), for one printing "up to" (Search.upTo) and for one stating
-  -- no count; the empty answer is "fail to find". A bare quantity with none of
-  -- the three is CR 701.23d, where
-  -- Pawl.Engine.Resolve completes a short answer instead. A LIST rather than a
+  -- ONE prompt over the union rather than one per zone, and no zone in the
+  -- payload: the card prints one instruction with one count over the zones it
+  -- names, and where a short answer is completed from is Pawl.Engine.Resolve's
+  -- to settle from Search.zones.
+  --
+  -- Answering with fewer is legal for a search of a HIDDEN zone (CR 400.2)
+  -- stating a quality (CR 701.23b's "some or all"), for one printing "up to"
+  -- (Search.upTo) and for one stating no count; the empty answer is "fail to
+  -- find". A bare quantity with none of the three is CR 701.23d, and a public
+  -- zone is under none of the three rules at all, so Pawl.Engine.Resolve
+  -- completes a short answer from those zones instead. A LIST rather than a
   -- repeated prompt, CR 701.23a's find being one look at the whole zone.
-  SearchLibrary :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt [ObjectId.ObjectId]
+  Search :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt [ObjectId.ObjectId]
   -- | CR 608.2g: the re-entrant cast opportunity during a library search
   -- (Panglacial Wurm), following CR 601.2a-i except that no player receives
   -- priority afterwards. Nothing declines. Offered in a loop before the search

@@ -823,7 +823,7 @@ oreskosExplorerSpec s registry =
 -- the same Plains again after a mutation and repair the assertion.
 findsWhatItCan :: Prompt.Prompt r -> r
 findsWhatItCan p = case p of
-  Prompt.SearchLibrary _ _ matches cap -> List.genericTake cap matches
+  Prompt.Search _ _ matches cap -> List.genericTake cap matches
   _ -> S.identityAnswer p
 
 -- CR 608.2i read over CR 601.2i's record of a CAST, with a SUPERTYPE in the

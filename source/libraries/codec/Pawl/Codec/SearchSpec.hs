@@ -1,5 +1,6 @@
 module Pawl.Codec.SearchSpec where
 
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Search as Search
 import qualified Pawl.JsonCodec.Common as Common
@@ -12,6 +13,7 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Search" $ do
@@ -26,23 +28,27 @@ spec s = Spec.describe s "Pawl.Codec.Search" $ do
       ( Search.MkSearch
           { Search.searcher = PlayerRef.Relative PlayerRelation.You,
             Search.owner = PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "player")),
+            Search.zones = Set.fromList [Zone.Library, Zone.Graveyard],
             Search.quantity = Just (Quantity.Literal 1),
             Search.filter = Filter.HasCardType CardType.Land,
             Search.upTo = True,
             Search.destination = SearchDestination.BattlefieldTapped
           }
       )
-      " {\"searcher\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"owner\":{\"type\":\"InSlot\",\"value\":\"player\"},\"quantity\":{\"type\":\"Literal\",\"value\":1},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},\"upTo\":true,\"destination\":{\"type\":\"BattlefieldTapped\"}} "
+      " {\"searcher\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"owner\":{\"type\":\"InSlot\",\"value\":\"player\"},\"zones\":[{\"type\":\"Library\"},{\"type\":\"Graveyard\"}],\"quantity\":{\"type\":\"Literal\",\"value\":1},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},\"upTo\":true,\"destination\":{\"type\":\"BattlefieldTapped\"}} "
   -- The other reading of the same count: no "upTo" key means the quantity is a
-  -- quota. Paired with the case above so the key's absence is asserted, not just
-  -- its presence -- a required key would have made every card file rewrite.
-  Spec.it s "an absent upTo decodes as False and is not written back" $
+  -- quota. Paired with the case above so each key's absence is asserted, not
+  -- just its presence -- a required key would have made every card file
+  -- rewrite. "zones" is the same shape: absent means the library alone, which is
+  -- what every card file written before Delivery Moogle says.
+  Spec.it s "an absent upTo and an absent zones take their defaults and are not written back" $
     Common.assertCodec
       s
       Search.codec
       ( Search.MkSearch
           { Search.searcher = PlayerRef.Relative PlayerRelation.You,
             Search.owner = PlayerRef.Relative PlayerRelation.You,
+            Search.zones = Set.singleton Zone.Library,
             Search.quantity = Just (Quantity.Literal 1),
             Search.filter = Filter.HasCardType CardType.Land,
             Search.upTo = False,
@@ -61,6 +67,7 @@ spec s = Spec.describe s "Pawl.Codec.Search" $ do
       ( Search.MkSearch
           { Search.searcher = PlayerRef.Relative PlayerRelation.You,
             Search.owner = PlayerRef.Relative PlayerRelation.You,
+            Search.zones = Set.singleton Zone.Library,
             Search.quantity = Nothing,
             Search.filter = Filter.HasCardType CardType.Land,
             Search.upTo = False,
