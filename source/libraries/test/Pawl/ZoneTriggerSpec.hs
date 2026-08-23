@@ -1791,6 +1791,10 @@ representativeEvents cond =
         -- with below is the trivial one, which admits whatever that id resolves
         -- to.
         TriggerCondition.SelfBecomesAttachedBy _ -> one (GameEvent.BecameAttached (BecameAttached.MkBecameAttached arrived (Recipient.ToCreature departed)))
+        -- CR 603.12: a reflexive matches no log entry at all
+        -- (Event.matchesTrigger's Reflexive arm answers False for every event),
+        -- so any event is as representative as any other -- StateIs' arm above.
+        TriggerCondition.Reflexive -> one (GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice))
 
 -- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
 -- eventBindings and eventBindingSlots both ignore them, which is itself part of
@@ -1906,7 +1910,8 @@ everyTriggerCondition =
     TriggerCondition.SelfBecomesPlotted,
     TriggerCondition.PermanentExplores (Filter.Type.And []),
     TriggerCondition.SelfExerted,
-    TriggerCondition.SelfBecomesAttachedBy (Filter.Type.And [])
+    TriggerCondition.SelfBecomesAttachedBy (Filter.Type.And []),
+    TriggerCondition.Reflexive
   ]
 
 -- CR 603.6c's first written form read by a BYSTANDER -- Super Shredder {1}{B}
