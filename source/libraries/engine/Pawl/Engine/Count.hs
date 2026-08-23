@@ -282,6 +282,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.HasDesignation _ -> predicate
   Filter.Type.HasCounters _ -> predicate
   Filter.Type.HasNonManaActivatedAbility -> predicate
+  Filter.Type.IsInZone _ -> predicate
   where
     recur = bakePerspective viewOf context gs candidate
 
@@ -599,6 +600,10 @@ viewOfSnapshot mController isToken snapshot =
       -- one the fact does not change, and the Moved arm's CR 608.2h record would
       -- be the place to keep it, but no field of it holds one (#1069).
       Filter.owner = Nothing,
+      -- CR 400.1: a snapshot records characteristics (CR 608.2h) and no zone, and
+      -- the object it was taken of has since moved or ceased to exist, so IsInZone
+      -- is vacuously False against one.
+      Filter.zone = Nothing,
       Filter.identity = Nothing,
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,

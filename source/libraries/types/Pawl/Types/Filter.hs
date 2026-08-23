@@ -12,6 +12,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.Zone as Zone
 
 -- | A first-order predicate over one candidate -- an object, or (CR 115.1) a
 -- player, since a target may be either -- expressed as data and evaluated by one
@@ -830,6 +831,34 @@ data Filter keyword
     -- activated only from a hand, and this atom is the reader those two rules
     -- were written for.
     HasNonManaActivatedAbility
+  | -- | CR 400.1: the candidate OBJECT is in this zone. Drannith Magistrate's
+    -- "your opponents can't cast spells from anywhere other than their hands" is
+    -- `Not (IsInZone Hand)` under PlayerEffect.CantCastMatching -- one relation,
+    -- one spelling, the posture IsToken's comment states (#163).
+    --
+    -- What makes it a CAST-side atom is CR 601.2's "take it from where it is":
+    -- the zone a spell is cast FROM is the zone its card is in when the cast is
+    -- proposed, and Pawl.Engine.Cast.castable gates before CR 601.2a moves the
+    -- card to the stack, so the object this atom reads is still in that zone. A
+    -- prohibition asked after the move would read Stack and match nothing.
+    --
+    -- NAMES A ZONE AND NOT WHOSE, where Pawl.Types.InZone names both: CR 400.1
+    -- gives four of its seven zones no per-player copy, so a shared zone has no
+    -- owner to name, and the two per-player readings a card wants -- "in your
+    -- graveyard", "in an opponent's hand" -- are an OwnedBy conjunct beside this
+    -- atom rather than a payload inside it. Pawl.Types.InZone carries the
+    -- PlayerRef because a COUNT has to be told which pile to size; a predicate
+    -- about one candidate does not.
+    --
+    -- Uncharacteristic, for IsTapped's reason: CR 109.3 counts no zone among an
+    -- object's characteristics, so nothing in CR 613 writes it and
+    -- Pawl.Engine.Projection.filterReads declares this atom as reading nothing.
+    --
+    -- Vacuously False where there is no OBJECT to ask -- a player view, an event
+    -- snapshot, and a printed card being matched by a library search, which CR
+    -- 109.1 makes an object of nothing -- the posture ControlledBy and IsSource
+    -- already take.
+    IsInZone Zone.Zone
   | And [Filter keyword]
   | Or [Filter keyword]
   | Not (Filter keyword)

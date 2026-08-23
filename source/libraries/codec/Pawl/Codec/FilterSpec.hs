@@ -19,6 +19,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.Zone as Zone
 
 -- | The `keyword` parameter is instantiated at 'Keyword.Keyword', the only
 -- concrete instantiation anywhere in the pool, so HasKeyword's case pins a real
@@ -329,6 +330,20 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.HasNonManaActivatedAbility
       " {\"type\":\"HasNonManaActivatedAbility\"} "
+  Spec.it s "IsInZone Graveyard" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.IsInZone Zone.Graveyard)
+      " {\"type\":\"IsInZone\",\"value\":{\"type\":\"Graveyard\"}} "
+  -- The spelling Drannith Magistrate's "from anywhere other than their hands"
+  -- takes, nested under Not, since that is the only shape in the pool.
+  Spec.it s "Not (IsInZone Hand)" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.Not (Filter.IsInZone Zone.Hand))
+      " {\"type\":\"Not\",\"value\":{\"type\":\"IsInZone\",\"value\":{\"type\":\"Hand\"}}} "
   Spec.it s "HasDesignation Renowned" $
     Common.assertCodec
       s
