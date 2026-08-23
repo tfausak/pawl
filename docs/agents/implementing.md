@@ -44,7 +44,7 @@ caught it.
 
 ## Running the suite
 
-    cabal test --test-options '--timeout 5s --hide-successes'
+    cabal test --test-options '--timeout 15s --hide-successes'
 
 While iterating, run only the subtree you are in --- add `-p Detain`, a tasty
 pattern over the `Spec.describe` group names --- and the whole suite before
@@ -59,7 +59,8 @@ The timeout catches infinite loops; it is not an assertion about speed. A few
 cases run 1-2s unloaded and the machine is shared, so a lone TIMEOUT is
 background noise --- re-run it unloaded first; a real hang fails at any budget.
 Two subtrees carry their own budgets via `Tasty.localOption` in `Pawl.Test`; CI
-sets 5s suite-wide through `flake.nix`'s `testFlags`.
+sets 15s suite-wide through `flake.nix`'s `testFlags`, so a tighter local budget
+manufactures TIMEOUTs CI never sees.
 
 ## Enumerate the edit sites in one pass
 
