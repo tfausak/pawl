@@ -1170,10 +1170,11 @@ towerBoard tower victim =
 -- one thing that differs. That is what makes the pair a proof about the rider
 -- rather than about the fixture -- and the phase, unlike CR 307.5's sorcery
 -- window, cannot change under a caster's feet between the offer and the payment
--- (CR 500.12). SorcerySpeed is the arm that can; grinningIgnusSpec below reaches
--- it at the offer, and the divergence #2005 names is now within reach of a board
--- there -- the cast gate counts the Ignus's yield, so it can offer a cast whose
--- payment window CR 307.5 has since closed.
+-- (CR 500.12). SorcerySpeed is the arm that CAN, since CR 601.2a's and CR
+-- 602.2a's move puts an object on the stack between the two; the gates ask
+-- Pawl.Engine.ActivationRestriction.needsEmptyStack about that arm rather than
+-- reading the stack of the wrong moment, and grinningIgnusSpec below is where
+-- both roads are proved.
 riderWindowSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 riderWindowSpec s registry = Spec.describe s "CR 605.3a a printed rider gates both windows" $ do
   Spec.it s "CR 500.1 the priority window offers the source only inside the rider's step" $ do
@@ -2310,8 +2311,9 @@ grinningIgnusSpec s registry = Spec.describe s "Grinning Ignus" $ do
   -- 601.2 then rewound it (#2005).
   --
   -- The BOARD is ignusBoard plus a Boggart Brute in hand: {2}{R} against a
-  -- Mountain and an Ignus, so the three mana are exactly the Ignus's net yield
-  -- and nothing else on the board can pay them.
+  -- Mountain and an Ignus, whose three mana are exactly the Mountain's one and
+  -- the Ignus's net two -- so nothing pays the Brute without the Ignus, and the
+  -- Mountain alone is not the reason either way.
   --
   -- The two boards are ONE ACTIVATION apart and nothing else -- same phase, same
   -- Brute, same Mountain. Floating the mana first, with the stack still empty, is
@@ -2334,9 +2336,9 @@ grinningIgnusSpec s registry = Spec.describe s "Grinning Ignus" $ do
   -- CR 602.2a is CR 601.2a's rule for an ACTIVATION -- the ability goes on the
   -- stack, and only then does CR 602.2b send the cost through CR 601.2f-h -- so
   -- the same gate, reached by the other road, must count the Ignus the same way.
-  -- Maskwood Nexus's "{3}, {T}: Create a 1/1 blue Shapeshifter creature token
-  -- with changeling" is the producer: an ARTIFACT, so CR 302.6 gates nothing, and
-  -- three generic mana is exactly the Ignus's net yield again.
+  -- Maskwood Nexus's "{3}, {T}: Create a 2/2 blue Shapeshifter creature token
+  -- with changeling" is the producer: an ARTIFACT, so its {T} meets no CR 302.6
+  -- gate, and three generic mana is the same Mountain-plus-Ignus total again.
   Spec.it s "CR 602.2a nor is an activation, the ability going on the stack before CR 602.2b pays for it" $ do
     ignus <- S.printingOf s registry "Grinning Ignus"
     mountain <- S.printingOf s registry "Mountain"

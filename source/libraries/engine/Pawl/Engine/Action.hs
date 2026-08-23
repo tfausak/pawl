@@ -263,11 +263,14 @@ legalActions pid gs =
       -- now (`manaSources`), while the cost gate is judged against what the
       -- supply walk can count (`supplySources`, Mana.supplyCapacity), which asks
       -- each route with its own mana part emptied and carries that mana as a
-      -- demand instead. They part on exactly a permanent whose every mana route
-      -- holds mana in its own cost that this board cannot pay -- in `data/cards/`
-      -- a Transmogrant Altar beside no black source, which is a supply source and
-      -- no offer. The gate must take the supply list; taking the offer list would
-      -- drop the demand-carrying options Mana.payableResolutionsGiven weighs.
+      -- demand instead, and which drops what CR 601.2a's and CR 602.2a's move
+      -- puts out of reach (Cost.stackedManaActivations). NEITHER list contains
+      -- the other: in `data/cards/` a Transmogrant Altar beside no black source
+      -- is a supply source and no offer, and a Grinning Ignus in CR 307.5's
+      -- window is an offer and no supply. The gate must take the supply list;
+      -- taking the offer list would drop the demand-carrying options
+      -- Mana.payableResolutionsGiven weighs and count a source its own payment
+      -- could not reach.
       manaSources = Cost.activationManaSourcesGiven grants pcs pid gs
       supplySources = Cost.supplyManaSourcesGiven grants pcs pid gs
       -- ONE set of base target pools for the whole enumeration, for the same

@@ -1270,8 +1270,9 @@ canPay pid oid cost gs = case Cost.mana cost of
 -- route as a supply that also carries a demand, so one Altar's {B} may be paid
 -- out of another's yield here -- while `payManaExcept`'s in-payment window will
 -- not offer that second Altar (#2094). No board in `data/cards/` tells them
--- apart: the Altar's {C}{C}{C} pays no {B}, and Grinning Ignus's {R} reaches
--- another Ignus's {R} only beside a Mountain that would have paid it anyway.
+-- apart: the Altar's {C}{C}{C} pays no {B}, and the pool's one other mana-eating
+-- route is Grinning Ignus's, which `stackedManaActivations` below keeps off both
+-- of the gates that would weigh it.
 --
 -- The CLAIMS and the LIFE ride along with the count, which alone is a fact about
 -- this source in isolation: two sources whose costs both sacrifice a creature
@@ -1508,22 +1509,25 @@ canPaySomeCompletion casting spending pid oid total_ cost gs =
 --
 -- Action.legalActions' ActivateManaAbility offers are this list and nothing
 -- else. It is NOT the list a payability GATE is judged against; that one is
--- supplyManaSourcesGiven below, and it is the SUPERSET -- see there.
+-- supplyManaSourcesGiven below, and NEITHER contains the other -- see there.
 activationManaSourcesGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> [ObjectId]
 activationManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven (manaActivationsGiven (PlayerEffect.applyingTo pid gs)) grants pcs pid gs
 
 -- The mana sources a payability GATE is judged against -- the same sweep under
 -- Mana.supplyCapacity, which is the invariant Mana.payableResolutionsGiven
--- states and its type cannot. A SUPERSET of the offer list above: the supply
--- capacity is the offer capacity asked with the route's mana part emptied, so
--- every offer source is a supply source and Transmogrant Altar beside no Swamp
--- is a supply source that is no offer. Nothing is overstated by the difference
--- -- such a permanent's option carries the mana part as a DEMAND the board must
--- then serve, and taking it zero times is always among its options.
+-- states and its type cannot. NEITHER list contains the other, and the two
+-- wrappers are why:
 --
--- `stackedManaActivations` and not `manaActivations` for the same reason, and it
--- is the whole of what both gates below are: every caller is gating an action CR
--- 601.2a or CR 602.2a puts on the stack BEFORE its cost is paid.
+--   * Mana.supplyCapacity is the offer capacity asked with the route's mana part
+--     emptied, which only ADDS sources -- Transmogrant Altar beside no Swamp is a
+--     supply source that is no offer. Nothing is overstated by it: such a
+--     permanent's option carries the mana part as a DEMAND the board must then
+--     serve, and taking it zero times is always among its options.
+--
+--   * `stackedManaActivations` only REMOVES them, and it is the whole of what
+--     both gates below are: every caller is gating an action CR 601.2a or CR
+--     602.2a puts on the stack BEFORE its cost is paid, which closes CR 307.5's
+--     window. Grinning Ignus in that window is an offer that is no supply.
 supplyManaSourcesGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> [ObjectId]
 supplyManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven (Mana.supplyCapacity (stackedManaActivations (PlayerEffect.applyingTo pid gs))) grants pcs pid gs
 
@@ -1576,6 +1580,16 @@ canPaySomeCompletionGiven casting spending sources pcs pid oid total_ cost gs = 
         -- (supplyManaSourcesGiven) -- a source listed there whose every route this
         -- capacity refuses offers nothing, and Mana.payableResolutionsGiven's
         -- product turns one of those into no board at all.
+        --
+        -- A FENCE on this half and not proven behaviour: the source list is
+        -- narrowed the same way, so the one permanent this refuses is already off
+        -- it, and unstacking THIS capacity alone leaves the suite green. What
+        -- would observe it is a permanent with TWO mana routes, only one carrying
+        -- the rider -- a source on the free route, which this must still refuse
+        -- the ridden one of. In `data/cards/` the two sets do not meet: Grinning
+        -- Ignus, Lavinia and Synthetic Ember Spring carry the pool's three riders
+        -- on a mana ability and each has one route, while Gemstone Caverns,
+        -- Muraganda Raceway and Phyrexian Tower have two routes and no rider.
         hoisted = stackedManaActivations (PlayerEffect.applyingTo pid gs)
         payable (completed, life) =
           any
