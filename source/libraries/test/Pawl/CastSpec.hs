@@ -3642,6 +3642,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   upToOneTargetSpec s registry
   multiTargetCastSpec s registry
   soulImmolationSpec s registry
+  drannithMagistrateSpec s registry
+  grafdiggersCageCastSpec s registry
 
 -- CR 115.6's "up to one target", read at cast time. Rat Out {B} Instant is "Up
 -- to one target creature gets -1/-1 until end of turn. You create a 1/1 black
@@ -3909,3 +3911,141 @@ soulImmolationSpec s registry = Spec.describe s "Soul Immolation" $ do
     -- creature the prompt was answered with rather than on the first candidate.
     Spec.assertEqWith s "two -1/-1 counters on the Palace Guard" (S.counterOf CounterKind.MinusOneMinusOne guardId after) 2
     Spec.assertEqWith s "and none on the Goblin Piker" (S.counterOf CounterKind.MinusOneMinusOne pikerId after) 0
+
+-- Drannith Magistrate {1}{W} Creature -- Human Wizard 1/3 (IKO 12): "Your
+-- opponents can't cast spells from anywhere other than their hands." CR 601.3's
+-- prohibit half scoped to a ZONE, which PlayerEffect.CantCastMatching's Filter
+-- states through Filter.IsInZone.
+--
+-- "From anywhere other than their hands" is `Not (IsInZone Hand)`, read at the
+-- cast gate against the card WHERE IT LIES: CR 601.2 casts a spell "from where it
+-- is", and Pawl.Engine.Cast.castable runs before CR 601.2a moves the card to the
+-- stack.
+--
+-- "THEIR hands" is the caster's own, which is Hand simply: pawl's hand is indexed
+-- by owner (Pawl.Engine.Game.zoneMembers, CR 108.3) and Pawl.Engine.Cast's
+-- zoneCandidates offers a player only their own, so no cast from another player's
+-- hand exists to tell the two readings apart. Not implemented: the possessive,
+-- which wants an OwnedBy conjunct beside the zone atom and a card granting such a
+-- cast (#2169).
+--
+-- Think Twice {1}{U} Instant "Draw a card." / "Flashback {2}{U}" is the spell,
+-- and an INSTANT so that neither seat's cast turns on whose turn it is. SIX
+-- Islands per seat, which is what keeps the mana from being the reason any cast
+-- is refused: three pay the flashback {2}{U} and three more are left over, so the
+-- graveyard copy stays affordable after a seat has already cast the hand one --
+-- without the spare the last case's negative would hold for want of mana.
+drannithMagistrateSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+drannithMagistrateSpec s registry = Spec.describe s "Drannith Magistrate" $ do
+  -- THE PROVING CASE, and it needs all three readings at once: the same spell is
+  -- refused to bob from his graveyard, allowed to him from his hand, and allowed
+  -- to alice from her graveyard. An implementation that prohibited every cast
+  -- passes the first assertion alone; one that ignored the zone passes the third
+  -- alone.
+  Spec.it s "CR 601.3 an opponent's cast from a graveyard is refused, from a hand is not, and the controller's own graveyard cast stands" $ do
+    magistrate <- S.printingOf s registry "Drannith Magistrate"
+    island <- S.printingOf s registry "Island"
+    thinkTwice <- S.printingOf s registry "Think Twice"
+    let (bobGrave, bobHand, aliceGrave, carolGrave, open) = drannithBoard island thinkTwice
+        board = withMagistrate magistrate open
+        casting pid oid = elem (A.Cast oid (S.printingName thinkTwice) Facing.FaceUp) (offeredTo pid board)
+    Spec.assertBool s (not (casting S.bob bobGrave)) "bob may not flash it back: the graveyard is not his hand"
+    Spec.assertBool s (casting S.bob bobHand) "but the same card in his hand is still castable, off the same Islands"
+    Spec.assertBool s (casting S.alice aliceGrave) "and alice, who controls the Magistrate, is no opponent of her own"
+    Spec.assertBool s (not (casting S.carol carolGrave)) "while carol, the third seat, is prohibited exactly as bob is"
+  -- The paired board, differing in exactly one permanent: without the Magistrate
+  -- bob's flashback is offered, so neither his mana nor the timing was ever the
+  -- reason it was refused above.
+  Spec.it s "CR 601.3 the pair: with no Magistrate on the battlefield the same flashback is offered" $ do
+    magistrate <- S.printingOf s registry "Drannith Magistrate"
+    island <- S.printingOf s registry "Island"
+    thinkTwice <- S.printingOf s registry "Think Twice"
+    let (bobGrave, _, _, _, open) = drannithBoard island thinkTwice
+        board = withMagistrate magistrate open
+        offered gs = elem (A.Cast bobGrave (S.printingName thinkTwice) Facing.FaceUp) (offeredTo S.bob gs)
+    Spec.assertBool s (offered open) "no Magistrate, so the flashback is legal"
+    Spec.assertBool s (not (offered board)) "and the one permanent is the whole difference"
+  -- The prohibition is a LIVE read rather than a one-shot: bob takes the cast he
+  -- is allowed, and the one he is not is still refused with his own spell on the
+  -- stack. The first assertion is a control and not a gate -- S.cast calls
+  -- Pawl.Engine.Cast.castSpell, which performs the cast rather than asking
+  -- `castable` -- so the second is what this case proves.
+  Spec.it s "CR 601.3 the prohibition still stands while the opponent's own hand cast is on the stack" $ do
+    magistrate <- S.printingOf s registry "Drannith Magistrate"
+    island <- S.printingOf s registry "Island"
+    thinkTwice <- S.printingOf s registry "Think Twice"
+    let (bobGrave, bobHand, _, _, open) = drannithBoard island thinkTwice
+        board = withMagistrate magistrate open
+        cast = S.runPure S.identityAnswer board (S.cast S.bob bobHand)
+    Spec.assertEqWith s "the hand cast is on the stack" (length (GameState.stack cast)) 1
+    Spec.assertBool s (not (S.castable S.bob bobGrave cast)) "and the graveyard copy is still refused with it there"
+
+-- Grafdigger's Cage {1} Artifact (DKA 150): "Creature cards in graveyards and
+-- libraries can't enter the battlefield. / Players can't cast spells from
+-- graveyards or libraries." The SECOND sentence, which Filter.IsInZone is what
+-- makes writable -- the first is Pawl.EntryRestrictionSpec's.
+--
+-- The pair with Drannith Magistrate above is the point of putting it here: the
+-- two sentences differ in the SCOPE and in nothing else, so one board tells
+-- PlayerScope.EachPlayer from PlayerScope.Opponents. "Players" includes the Cage's
+-- own controller (CR 109.5 has no "you" in that sentence to exclude her).
+--
+-- The LIBRARY half has its own case below, off the one cast from a library CR
+-- 601.3 allows: Panglacial Wurm's, offered while its controller searches
+-- (Pawl.Engine.Cast.castableWhileSearching). Or is written for both zones because
+-- the printed sentence names both, and each disjunct is proved on its own board.
+grafdiggersCageCastSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+grafdiggersCageCastSpec s registry = Spec.describe s "Grafdigger's Cage" $ do
+  Spec.it s "CR 601.3 no player may cast from a graveyard, the Cage's own controller included, and a hand cast is untouched" $ do
+    cage <- S.printingOf s registry "Grafdigger's Cage"
+    magistrate <- S.printingOf s registry "Drannith Magistrate"
+    island <- S.printingOf s registry "Island"
+    thinkTwice <- S.printingOf s registry "Think Twice"
+    let (bobGrave, bobHand, aliceGrave, _, open) = drannithBoard island thinkTwice
+        board = snd (S.addCreature cage S.alice open)
+        casting pid oid gs = elem (A.Cast oid (S.printingName thinkTwice) Facing.FaceUp) (offeredTo pid gs)
+    Spec.assertBool s (not (casting S.alice aliceGrave board)) "alice controls the Cage and is prohibited by it anyway"
+    Spec.assertBool s (not (casting S.bob bobGrave board)) "and so is bob, on the same board"
+    Spec.assertBool s (casting S.bob bobHand board) "while the hand cast the sentence does not name is still offered"
+    Spec.assertBool s (casting S.alice aliceGrave open) "the pair: with no Cage on the battlefield alice's flashback is legal"
+    -- The scope is what separates the two cards: Drannith Magistrate's
+    -- PlayerScope.Opponents leaves its controller alone where this leaves nobody
+    -- alone, on the same board and the same graveyard cast.
+    Spec.assertBool s (casting S.alice aliceGrave (withMagistrate magistrate open)) "and the Magistrate's PlayerScope.Opponents, on the same board, spares her"
+  -- The Or's second disjunct, on the only board that can show it: CR 601.3's
+  -- library cast is Panglacial Wurm's mid-search offer, and the Cage is the one
+  -- permanent between the two readings.
+  Spec.it s "CR 601.3 the library disjunct: a mid-search cast is refused too" $ do
+    cage <- S.printingOf s registry "Grafdigger's Cage"
+    forest <- S.printingOf s registry "Forest"
+    wurm <- S.printingOf s registry "Panglacial Wurm"
+    let (_, open) = S.addLibraryCard wurm S.alice (S.landsInPlay forest 7)
+        caged = snd (S.addCreature cage S.alice open)
+    Spec.assertEqWith s "without the Cage the mid-search cast is offered" (length (Cast.castableWhileSearching S.alice open)) 1
+    Spec.assertEqWith s "with it the same offer is gone, off the same seven Forests" (length (Cast.castableWhileSearching S.alice caged)) 0
+
+-- Three seats, six Islands each, and one Think Twice in each of alice's, bob's and
+-- carol's graveyards plus one in bob's hand. No Magistrate yet --
+-- `withMagistrate` adds it, so the two boards differ in exactly that permanent.
+drannithBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+drannithBoard island thinkTwice =
+  let gs1 = S.landsFor island S.alice 6 S.threePlayerGame
+      gs2 = S.landsFor island S.bob 6 gs1
+      gs3 = S.landsFor island S.carol 6 gs2
+      (bobGrave, gs4) = S.addGraveyardCard thinkTwice S.bob gs3
+      (bobHand, gs5) = S.addHandCard thinkTwice S.bob gs4
+      (aliceGrave, gs6) = S.addGraveyardCard thinkTwice S.alice gs5
+      (carolGrave, gs7) = S.addGraveyardCard thinkTwice S.carol gs6
+   in (bobGrave, bobHand, aliceGrave, carolGrave, aliceOnTurn gs7)
+
+withMagistrate :: Printing.Printing -> GameState.GameState -> GameState.GameState
+withMagistrate magistrate gs = snd (S.addCreature magistrate S.alice gs)
+
+-- What this player is offered with priority in hand, the shape
+-- Pawl.SpecialActionSpec's Damping Engine cases use: legalActions answers for the
+-- player holding priority, and every seat here is asked the same question.
+offeredTo :: PlayerId.PlayerId -> GameState.GameState -> [A.Action]
+offeredTo pid gs = Action.legalActions pid (gs {GameState.priority = Just pid})

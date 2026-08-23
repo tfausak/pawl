@@ -24,6 +24,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.Zone as Zone
 
 -- A projected black creature controlled by player 0.
 blackCreature :: Filter.View
@@ -44,6 +45,10 @@ blackCreature =
       -- Kidnapper's stolen creature). A view where the two agreed would satisfy
       -- either reading of the atom.
       Filter.owner = Just (PlayerId.MkPlayerId 1),
+      -- CR 400.1: a permanent, so the battlefield -- which is what lets the
+      -- IsInZone cases below tell a matching zone from a non-matching one off one
+      -- view.
+      Filter.zone = Just Zone.Battlefield,
       Filter.identity = Just (ObjectId.MkObjectId 7),
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
@@ -88,6 +93,7 @@ devoidBigCreature =
       Filter.manaValue = Just 5,
       Filter.controller = Nothing,
       Filter.owner = Nothing,
+      Filter.zone = Nothing,
       Filter.identity = Nothing,
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
@@ -1102,6 +1108,30 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- but the ones Pawl.Engine.Resolve's Effect.Search arm builds.
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.CanAttachToSubject)) "player"
+
+  -- CR 400.1. The gameplay-level proof that this is the zone a spell is CAST
+  -- FROM -- CR 601.2's "from where it is" -- is Pawl.CastSpec's Drannith
+  -- Magistrate group; these cases pin the atom itself.
+  Spec.describe s "IsInZone" $ do
+    Spec.it s "matches the zone the candidate is in and no other" $ do
+      Spec.assertBool s (Filter.matches self blackCreature (Filter.Type.IsInZone Zone.Battlefield)) "the view's own zone"
+      Spec.assertBool s (not (Filter.matches self blackCreature (Filter.Type.IsInZone Zone.Graveyard))) "and not a different one"
+
+    -- Drannith Magistrate's "from anywhere other than their hands" is spelled
+    -- `Not (IsInZone Hand)`, the one-relation-one-spelling posture IsToken's
+    -- cases below state (#163). The pair is what makes it discriminating: the
+    -- negation must be true of the battlefield view and false of a hand one, off
+    -- boards differing in the zone alone.
+    Spec.it s "Not IsInZone is how 'anywhere other than' is written" $ do
+      Spec.assertBool s (Filter.matches self blackCreature (Filter.Type.Not (Filter.Type.IsInZone Zone.Hand))) "a battlefield card is somewhere other than a hand"
+      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.zone = Just Zone.Hand}) (Filter.Type.Not (Filter.Type.IsInZone Zone.Hand)))) "and a card in a hand is not"
+
+    -- Vacuously False with no object to ask: CR 400.1 puts OBJECTS in zones, and
+    -- CR 109.1 makes a player none. `Not` is then vacuously TRUE there, which is
+    -- why the prohibition reading it is asked only of a spell's own object.
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self aPlayer (Filter.Type.IsInZone Zone.Hand))) "player"
+      Spec.assertBool s (not (Filter.matches self devoidBigCreature (Filter.Type.IsInZone Zone.Hand))) "and so is a view with no zone recorded"
 
   Spec.describe s "IsToken" $ do
     Spec.it s "matches a view whose object is a token" $ do

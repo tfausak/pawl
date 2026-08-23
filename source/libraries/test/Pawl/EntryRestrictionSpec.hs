@@ -7,20 +7,20 @@
 --
 -- Grafdigger's Cage is the fixture: "Creature cards in graveyards and libraries
 -- can't enter the battlefield." Its second sentence ("players can't cast spells
--- from graveyards or libraries") is NOT on pawl's card, so this printing runs
--- weaker than the real one (gap #2064); nothing here reads that clause.
+-- from graveyards or libraries") is on the card too, as a player ability; nothing
+-- here reads it, and Pawl.CastSpec's Grafdigger's Cage group is where it is
+-- proved.
 --
 -- THE BOARD SHAPE that makes these cases discriminating:
 --
 --   * TWO GRAVEYARDS, not one. The prohibition is symmetric and names no
 --     controller, so a one-seat board would leave "does it reach the opponent's
 --     graveyard" untested.
---   * A HARDCAST CREATURE SPELL beside the graveyard cards. Pawl.Types.Filter has
---     no zone atom, so an implementation that spelled the Cage as
---     Affected.MatchingOffBattlefield alone would also match a creature spell on
---     the STACK and refuse an ordinary hardcast. That is what
---     EntryRestriction.origins exists for, and the hardcast leg is the only thing
---     that proves it.
+--   * A HARDCAST CREATURE SPELL beside the graveyard cards. An implementation
+--     that spelled the Cage as Affected.MatchingOffBattlefield alone would also
+--     match a creature spell on the STACK and refuse an ordinary hardcast. That
+--     is what EntryRestriction.origins exists for, and the hardcast leg is the
+--     only thing that proves it.
 --   * A CREATURE card on top of the library for the manifest case. The Cage's
 --     filter is HasCardType Creature, so a noncreature top card would make a
 --     working implementation and a broken one agree.

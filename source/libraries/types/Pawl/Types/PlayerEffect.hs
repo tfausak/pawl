@@ -461,6 +461,14 @@ data PlayerEffect
     -- fall out: a morph proposal is stamped face down before this is asked, so a
     -- prohibition on creature spells stops the face-up cast of a creature card and
     -- not its 2/2 face-down one.
+    --
+    -- The quality may be the ZONE the spell is cast FROM, which Filter.IsInZone
+    -- states -- Drannith Magistrate's "from anywhere other than their hands",
+    -- Grafdigger's Cage's "from graveyards or libraries". That works because CR
+    -- 601.2 casts a spell "from where it is" and this is asked before CR 601.2a
+    -- moves the card to the stack, so the object still lies in the zone the cast
+    -- is from. No second constructor for the zone axis: the prohibition is the
+    -- same one, and CR 601.3a reads whatever quality the sentence names.
     CantCastMatching (Filter.Filter Keyword.Keyword)
   | -- | CR 305.1 / Damping Engine: this player can't play lands.
     --
@@ -560,9 +568,11 @@ data PlayerEffect
     -- under this grant may still sacrifice two Mountains instead.
     --
     -- THE HAND is in the constructor and not in the Filter, for the reason
-    -- CastFromGraveyard names its zone: Pawl.Types.Filter has no zone atom, and
-    -- a grant read in every zone would make Yawgmoth's Will's graveyard casts
-    -- free -- WEAKER than either printing, which is the disqualifying direction.
+    -- CastFromGraveyard names its zone. Filter.IsInZone could spell it
+    -- (`And [criterion, IsInZone Hand]`), and does not, because the zone is the
+    -- GRANT's and not the card's: a printing that left the conjunct out would
+    -- then be read in every zone and make Yawgmoth's Will's graveyard casts free
+    -- -- WEAKER than either printing, which is the disqualifying direction.
     --
     -- CR 107.3b's "the only legal choice for X is 0" needs no clause here. The
     -- cost this grant offers is Pawl.Engine.Cost.withoutPayingManaCost, an empty

@@ -1818,6 +1818,9 @@ stubView table oid =
                 -- pool filters by one, so this stub answers Nothing and OwnedBy
                 -- is vacuously False against it.
                 Filter.owner = Nothing,
+                -- CR 400.1: the table registers no zone, and no Count in the pool
+                -- filters by one, so IsInZone is vacuously False against this stub.
+                Filter.zone = Nothing,
                 Filter.identity = Just o,
                 Filter.playerIdentity = Nothing,
                 Filter.attacking = False,
