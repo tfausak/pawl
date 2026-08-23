@@ -2163,11 +2163,17 @@ transmograntAltarSpec s registry = Spec.describe s "Transmogrant Altar" $ do
     splitter <- S.printingOf s registry "Bonesplitter"
     crucible <- S.printingOf s registry "Crucible of Worlds"
     statue <- S.printingOf s registry "Jade Statue"
+    ancestor <- S.printingOf s registry "Disowned Ancestor"
     let holding printing = case altarSupplyBoard altar piker (Just swamp) (Just printing) of
           (_, board, Just oid) -> S.castable S.alice oid board
           (_, _, Nothing) -> False
     Spec.assertBool s (holding crucible) "CR 602.2b the Swamp pays the Altar's {B} and the {C}{C}{C} it adds pays a {3}"
     Spec.assertBool s (not (holding statue)) "CR 118.3 and not a {4}: the {B} the Altar eats is a demand the same board must serve"
+    -- The {B} is the DECLINED half: the one Swamp cannot both pay the Altar and
+    -- pay this spell, so the only board that casts it is the one that never
+    -- activates the Altar at all. CR 605.3a offers the window; it does not
+    -- oblige anyone to use it.
+    Spec.assertBool s (holding ancestor) "CR 605.3a and a {B} she casts by declining the Altar, the one Swamp being both payments"
     Spec.assertBool s (holding splitter) "and a {1} the Swamp alone covers is still castable"
 
 -- alice, active, in her precombat main phase: one Transmogrant Altar, one Goblin
