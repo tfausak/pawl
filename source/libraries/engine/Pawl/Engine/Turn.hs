@@ -180,9 +180,12 @@ inWindow selector phase = selector == PhaseSelector.Step phase || wholePhaseOf p
 -- grains: "until end of combat" expires at the end of the combat phase, not at
 -- the start of the end of combat step.
 --
--- Answers from the step alone, so a phase whose last step never runs --
--- skipped, or dropped with the rest of the phase -- never reports its end
--- (#526).
+-- Answers from the step alone, so a phase whose last step never runs never
+-- reports its end here. Two of the three ways that happens are covered
+-- elsewhere: Pawl.Engine.Resolve's CR 724.1 and CR 724.2 arms sweep the phase
+-- they end themselves, and a phase skipped whole never ends at all (CR 500.11,
+-- at Engine.skipWholePhase). Not implemented: the third, a CR 614.1b skip of
+-- the last step ALONE (#2126).
 phaseEndingAt :: Phase -> Maybe PhaseSelector
 phaseEndingAt phase = if lastStepOf phase == Just phase then wholePhaseOf phase else Nothing
 

@@ -1145,6 +1145,17 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       Effect.EndTurn
       " {\"type\":\"EndTurn\"} "
+  -- CR 724.2: nullary for the same reason, and hand-written for the reason every
+  -- arm here is -- Arm.tagged's list ends in `_ -> Nothing`, so a constructor
+  -- with no arm encodes to nothing and decodes from nothing without a warning
+  -- (#1715).
+  Spec.it s "EndCombatPhase" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Effect.EndCombatPhase
+      " {\"type\":\"EndCombatPhase\"} "
   Spec.it s "GainControl round-trips both ObjectRef arms" $ do
     Common.assertJsonCodec
       s

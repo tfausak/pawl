@@ -321,10 +321,12 @@ dropAtTurnOf pid gs =
         }
 
 -- CR 500.5's first clause: effects lasting until the end of a step or phase
--- expire as it ends. The window that is ending is passed in, because only
--- Engine.runStepThatBegan knows which one it is -- and at the end of the last
--- step of a stepped phase there are TWO, the step and the phase, so it calls
--- this twice.
+-- expire as it ends. The window that is ending is passed in, because only the
+-- caller knows which one it is -- Engine.runStepThatBegan for a step that ended
+-- by itself, and at the end of the last step of a stepped phase there are TWO,
+-- the step and the phase, so it calls this twice. Pawl.Engine.Resolve's CR 724.1
+-- and CR 724.2 arms are the other callers, for a PHASE ended part-way through,
+-- where no last step runs to ask.
 --
 -- EQUALITY on the selector, not containment: CR 500.5a (repeated by CR 511.2)
 -- is precisely the claim that an "until end of combat" effect does NOT expire

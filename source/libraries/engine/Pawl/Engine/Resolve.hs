@@ -175,6 +175,7 @@ import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PendingEntryEffect as PendingEntryEffect
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
@@ -529,6 +530,7 @@ slotsOf effect = case effect of
   Effect.PhaseOut ref -> objectRefSlots ref
   Effect.AddPhases _ -> Map.empty
   Effect.EndTurn -> Map.empty
+  Effect.EndCombatPhase -> Map.empty
   Effect.GainControl (DurationRef.MkDurationRef _ ref) -> objectRefSlots ref
   Effect.ArmDelayedTrigger {} -> Map.empty
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers _ affected _) -> affectedPlayersSlots affected
@@ -762,6 +764,7 @@ slotsAreExhaustive effect = case effect of
   Effect.PhaseOut _ -> True
   Effect.AddPhases _ -> True
   Effect.EndTurn -> True
+  Effect.EndCombatPhase -> True
   -- slotsOf's arm drops this Duration, so the slotless test is made here.
   Effect.GainControl (DurationRef.MkDurationRef duration _) ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
@@ -914,6 +917,7 @@ readsX = any effectReadsX
       Effect.PhaseOut _ -> False
       Effect.AddPhases _ -> False
       Effect.EndTurn -> False
+      Effect.EndCombatPhase -> False
       Effect.GainControl (DurationRef.MkDurationRef _ _) -> False
       Effect.ArmDelayedTrigger {} -> False
       Effect.AffectPlayers {} -> False
@@ -1017,6 +1021,7 @@ searchesLibrary effect = case effect of
   Effect.PhaseOut _ -> False
   Effect.AddPhases _ -> False
   Effect.EndTurn -> False
+  Effect.EndCombatPhase -> False
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> False
   Effect.ArmDelayedTrigger {} -> False
   Effect.AffectPlayers {} -> False
@@ -1203,6 +1208,7 @@ boundSlots effect = case effect of
   Effect.PhaseOut _ -> Set.empty
   Effect.AddPhases _ -> Set.empty
   Effect.EndTurn -> Set.empty
+  Effect.EndCombatPhase -> Set.empty
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> Set.empty
   Effect.ArmDelayedTrigger {} -> Set.empty
   Effect.AffectPlayers {} -> Set.empty
@@ -5416,23 +5422,93 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- 703.4q's mana emptying and CR 704.3 for the step exactly as it would for a
     -- step that ended by itself. Nothing of that is duplicated here.
     --
-    -- Not implemented: the PHASE-scoped expiries of a phase ended part-way
-    -- through, so an "until end of combat" effect survives a turn ended during
-    -- combat -- Turn.phaseEndingAt answers from the last step alone (#526).
+    -- The PHASE-scoped half of CR 500.5 is taken here and not there, on rule
+    -- 724.1d's "the current phase and/or step ends": Turn.phaseEndingAt answers
+    -- from the last step alone, and the step this ends is not it, so an "until
+    -- end of combat" effect would otherwise outlive a turn ended during combat.
+    -- The phase does NOT end when the jump stays inside it -- CR 512.1 puts the
+    -- cleanup step in the ending phase, so ending the turn during the end step
+    -- leaves that phase still under way.
     State.modify' $ \gs ->
       let phase = GameState.phase gs
           cleared = case phase of
             Phase.Combat _ -> Combat.clearCombat gs
             _ -> gs
+          expired = case phase of
+            Phase.Ending _ -> cleared
+            _ -> maybe cleared (`Expiry.dropAtEndOf` cleared) (Turn.wholePhaseOf phase)
           jumped = case phase of
             Phase.Ending EndingStep.Cleanup -> Turn.spliceExtraCleanup (GameState.remaining gs)
             _ -> Turn.jumpToCleanup (GameState.remaining gs)
-       in cleared {GameState.remaining = jumped}
+       in expired {GameState.remaining = jumped}
     -- CR 724.1f: no player gets priority during this process. Engine.priorityLoop
     -- reads this and returns without settling and without granting another round,
     -- so the exiles above stay unscanned until the cleanup step's own CR 514.3a
     -- settle puts them on the stack. Engine.runStep lowers it there.
     State.modify' (\gs -> gs {GameState.endTurnSignal = EndTurnSignal.Ended})
+  -- CR 724.2: end the combat phase (Mandate of Peace). Rule 724.2's seven steps,
+  -- in its own order, and deliberately NOT the CR 608 process around it. The arm
+  -- above is its sibling and not its implementation: the two agree on 724.2a-c
+  -- and differ on what 724.2d leaves at the head of the schedule.
+  Effect.EndCombatPhase -> do
+    phase <- State.gets GameState.phase
+    case phase of
+      -- CR 724.2g: attempted at a time that is not a combat phase, nothing
+      -- happens -- not even the exile of the stack, since rule 724.2's steps are
+      -- the whole of what "ends the combat phase" does. Reachable despite the
+      -- card's own "cast this spell only during combat": CR 608.2 re-reads the
+      -- board at resolution, and an added phase (CR 500.8) or a copy cast under
+      -- another permission can put the resolution outside one.
+      Phase.Combat _ -> do
+        -- CR 724.2a, exactly as CR 724.1a: a watermark bump rather than a queue
+        -- flush, which is also what makes 724.2f's exception fall out. UNOBSERVED
+        -- for the same reason the arm above says: resolution follows a settle, so
+        -- nothing is pending here.
+        State.modify' $ \gs ->
+          gs
+            { GameState.scannedThrough = Natural.length (GameState.events gs),
+              GameState.battlefieldWhenTriggered = Map.empty
+            }
+        -- CR 724.2b: exile every object on the stack, the resolving one included.
+        -- Shared with the arm above down to the CR 400.7 detail that leaves
+        -- finishSpell a no-op afterwards.
+        onStack <- State.gets GameState.stack
+        Foldable.traverse_ exileOrCease onStack
+        -- CR 724.2c: check state-based actions, granting no priority and putting
+        -- no triggered ability on the stack. To a fixpoint on CR 704.3's
+        -- authority, as above.
+        let checkToFixpoint = do
+              performed <- Sba.performStateBasedActions
+              Monad.when performed checkToFixpoint
+        checkToFixpoint
+        -- CR 724.2d, in the rule's own sentence order: the phase ends, creatures
+        -- and planeswalkers leave combat, "until end of combat" effects expire,
+        -- and the game skips the steps between here and the next phase.
+        --
+        -- The expiry is this rule's, not CR 500.5's through
+        -- Engine.runStepThatBegan: that sweep asks Turn.phaseEndingAt, which
+        -- answers from the phase's last step, and CR 724.2e is precisely the
+        -- claim that the end of combat step never runs. EQUALITY on
+        -- PhaseSelector.CombatPhase, so an "until end of turn" effect installed
+        -- by the same card survives (Expiry.dropAtEndOf says why).
+        --
+        -- Where the game lands is whatever `remaining` holds after this phase --
+        -- CR 724.2d's "usually the postcombat main phase", and a CR 500.8 extra
+        -- combat phase later in the turn is untouched, Turn.dropRestOfPhase being
+        -- positional.
+        State.modify' $ \gs ->
+          Expiry.dropAtEndOf
+            PhaseSelector.CombatPhase
+            (Combat.clearCombat gs) {GameState.remaining = Turn.dropRestOfPhase phase (GameState.remaining gs)}
+        -- CR 724.2f: no player gets priority during this process. The SAME signal
+        -- CR 724.1f raises, because the two rules want the same thing of
+        -- Engine.priorityLoop -- return without settling and without granting
+        -- another round -- and differ only in which step Engine.runStep lowers it
+        -- at. CR 724.1d leaves the cleanup step at the head of the schedule and
+        -- CR 724.2d the following phase, so "the abilities that triggered during
+        -- this process are put onto the stack there" is one mechanism, not two.
+        State.modify' (\gs -> gs {GameState.endTurnSignal = EndTurnSignal.Ended})
+      _ -> pure ()
   Effect.GainControl (DurationRef.MkDurationRef duration ref) ->
     State.modify' $ \gs ->
       -- Enumerated ONCE by the shared sweep; a player recipient, an illegal slot

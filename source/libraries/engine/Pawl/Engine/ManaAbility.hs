@@ -180,6 +180,7 @@ manaProduced effect = case effect of
   Effect.PhaseOut _ -> Nothing
   Effect.AddPhases _ -> Nothing
   Effect.EndTurn -> Nothing
+  Effect.EndCombatPhase -> Nothing
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> Nothing
   Effect.ArmDelayedTrigger {} -> Nothing
   Effect.AffectPlayers {} -> Nothing
@@ -359,6 +360,7 @@ movesLibraryCard effect = case effect of
   -- the extra turn below.
   Effect.AddPhases _ -> False
   Effect.EndTurn -> False
+  Effect.EndCombatPhase -> False
   Effect.TakeExtraTurn {} -> False
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> False
   -- The armed ability is a SEPARATE ability (CR 603.7a), so what it later does
