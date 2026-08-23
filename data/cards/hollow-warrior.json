@@ -1,0 +1,160 @@
+{
+  "faces": [
+    {
+      "attackCosts": [
+        {
+          "perAttacker": {
+            "type": "Fixed",
+            "value": {
+              "components": [
+                {
+                  "type": "TapPermanents",
+                  "value": {
+                    "count": 1,
+                    "whichPermanents": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Creature"
+                          }
+                        },
+                        {
+                          "type": "ControlledBy",
+                          "value": {
+                            "type": "You"
+                          }
+                        },
+                        {
+                          "type": "Not",
+                          "value": {
+                            "type": "IsTapped"
+                          }
+                        },
+                        {
+                          "type": "Not",
+                          "value": {
+                            "type": "DeclaredAttackerThisCombat"
+                          }
+                        },
+                        {
+                          "type": "Not",
+                          "value": {
+                            "type": "DeclaredBlockerThisCombat"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
+              "mana": []
+            }
+          },
+          "scope": {
+            "type": "EveryAttack"
+          },
+          "subject": {
+            "type": "Matching",
+            "value": {
+              "type": "IsSource"
+            }
+          }
+        }
+      ],
+      "blockCosts": [
+        {
+          "perBlocker": {
+            "type": "Fixed",
+            "value": {
+              "components": [
+                {
+                  "type": "TapPermanents",
+                  "value": {
+                    "count": 1,
+                    "whichPermanents": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Creature"
+                          }
+                        },
+                        {
+                          "type": "ControlledBy",
+                          "value": {
+                            "type": "You"
+                          }
+                        },
+                        {
+                          "type": "Not",
+                          "value": {
+                            "type": "IsTapped"
+                          }
+                        },
+                        {
+                          "type": "Not",
+                          "value": {
+                            "type": "DeclaredAttackerThisCombat"
+                          }
+                        },
+                        {
+                          "type": "Not",
+                          "value": {
+                            "type": "DeclaredBlockerThisCombat"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
+              "mana": []
+            }
+          },
+          "subject": {
+            "type": "Matching",
+            "value": {
+              "type": "IsSource"
+            }
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        }
+      ],
+      "name": "Hollow Warrior",
+      "power": {
+        "type": "Literal",
+        "value": 4
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 4
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Golem"
+          },
+          {
+            "type": "Warrior"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          },
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

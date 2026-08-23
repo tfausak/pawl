@@ -23,6 +23,8 @@ empty =
       Combat.attacked = Set.empty,
       Combat.declaredAttacked = Set.empty,
       Combat.declaredAttackedThisStep = Set.empty,
+      Combat.declaredAttackers = Set.empty,
+      Combat.declaredBlockers = Set.empty,
       Combat.blockersDeclared = False,
       Combat.defender = Nothing
     }
@@ -32,6 +34,7 @@ emptyJson :: String
 emptyJson =
   "{\"attackers\":{},\"blockers\":{},\"struckFirst\":null,\"joinedUnder\":{}"
     <> ",\"attacked\":[],\"declaredAttacked\":[],\"declaredAttackedThisStep\":[]"
+    <> ",\"declaredAttackers\":[],\"declaredBlockers\":[]"
     <> ",\"blockersDeclared\":false,\"defender\":null}"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -55,6 +58,11 @@ spec s = Spec.describe s "Pawl.Codec.Combat" $ do
           Combat.attacked = Set.singleton (AttackTarget.OfPlayer (PlayerId.MkPlayerId 2)),
           Combat.declaredAttacked = Set.singleton (AttackTarget.OfPlaneswalker (ObjectId.MkObjectId 8)),
           Combat.declaredAttackedThisStep = Set.singleton (AttackTarget.OfBattle (ObjectId.MkObjectId 9)),
+          -- CR 508.1a / 509.1a: keyed by the CREATURE, where the three sets
+          -- above are keyed by what was attacked, and distinct ids again so
+          -- neither half can be read off the other.
+          Combat.declaredAttackers = Set.singleton (ObjectId.MkObjectId 11),
+          Combat.declaredBlockers = Set.singleton (ObjectId.MkObjectId 12),
           Combat.blockersDeclared = True,
           Combat.defender = Just (PlayerId.MkPlayerId 10)
         }
@@ -65,6 +73,7 @@ spec s = Spec.describe s "Pawl.Codec.Combat" $ do
           <> ",\"attacked\":[{\"type\":\"OfPlayer\",\"value\":2}]"
           <> ",\"declaredAttacked\":[{\"type\":\"OfPlaneswalker\",\"value\":8}]"
           <> ",\"declaredAttackedThisStep\":[{\"type\":\"OfBattle\",\"value\":9}]"
+          <> ",\"declaredAttackers\":[11],\"declaredBlockers\":[12]"
           <> ",\"blockersDeclared\":true,\"defender\":10} "
       )
   -- CR 510.4's two ABSENT-looking states, which are not the same state. Nothing
@@ -83,6 +92,6 @@ spec s = Spec.describe s "Pawl.Codec.Combat" $ do
       s
       Combat.codec
       empty {Combat.struckFirst = Just Set.empty}
-      " {\"attackers\":{},\"blockers\":{},\"struckFirst\":[],\"joinedUnder\":{},\"attacked\":[],\"declaredAttacked\":[],\"declaredAttackedThisStep\":[],\"blockersDeclared\":false,\"defender\":null} "
+      " {\"attackers\":{},\"blockers\":{},\"struckFirst\":[],\"joinedUnder\":{},\"attacked\":[],\"declaredAttacked\":[],\"declaredAttackedThisStep\":[],\"declaredAttackers\":[],\"declaredBlockers\":[],\"blockersDeclared\":false,\"defender\":null} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Combat.codec

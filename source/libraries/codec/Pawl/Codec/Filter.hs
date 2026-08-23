@@ -73,6 +73,8 @@ codec keywordCodec =
       Arm.nullary "IsBlocking" Filter.IsBlocking,
       Arm.nullary "IsBlocked" Filter.IsBlocked,
       Arm.nullary "AttackedThisTurn" Filter.AttackedThisTurn,
+      Arm.nullary "DeclaredAttackerThisCombat" Filter.DeclaredAttackerThisCombat,
+      Arm.nullary "DeclaredBlockerThisCombat" Filter.DeclaredBlockerThisCombat,
       Arm.nullary "MilledThisTurn" Filter.MilledThisTurn,
       Arm.nullary "DealtDamageThisTurn" Filter.DealtDamageThisTurn,
       -- Recursive for ControlsMoreThanYou's reason: the payload describes the
