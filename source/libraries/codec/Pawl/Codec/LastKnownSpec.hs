@@ -39,7 +39,7 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
       ( " {\"characteristics\":"
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
           <> ",\"controller\":1,\"source\":{\"type\":\"OfCard\",\"value\":2}"
-          <> ",\"counters\":[{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"count\":3}]"
+          <> ",\"counters\":[{\"key\":{\"type\":\"PlusOnePlusOne\"},\"value\":3}]"
           <> ",\"copiable\":"
           <> minimalJson
           <> ",\"attachedTo\":{\"type\":\"ToCreature\",\"value\":8}} "

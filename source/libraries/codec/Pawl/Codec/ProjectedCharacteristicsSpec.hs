@@ -55,7 +55,7 @@ testCharacteristics =
 
 testCharacteristicsJson :: String
 testCharacteristicsJson =
-  "{\"names\":[\"Test Creature\"],\"supertypes\":[{\"type\":\"Legendary\"}],\"keywords\":[{\"type\":\"Flying\"}],"
+  "{\"names\":[\"Test Creature\"],\"supertypes\":[{\"type\":\"Legendary\"}],\"keywords\":[{\"key\":{\"type\":\"Flying\"},\"value\":1}],"
     <> "\"colors\":[{\"type\":\"Blue\"}],\"manaValue\":3,\"power\":1,\"toughness\":2,"
     <> "\"cardTypes\":[{\"type\":\"Creature\"}],\"subtypes\":[{\"type\":\"Human\"}],"
     <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
