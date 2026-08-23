@@ -2037,6 +2037,8 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PermanentExplores f -> TriggerCondition.PermanentExplores (Filter.rewrite pairs f)
   TriggerCondition.SelfExerted -> condition
   TriggerCondition.SelfBecomesAttachedBy f -> TriggerCondition.SelfBecomesAttachedBy (Filter.rewrite pairs f)
+  -- CR 603.12's reflexive carries nothing at all, so there is no subtype to swap.
+  TriggerCondition.Reflexive -> condition
 
 -- CR 612.1 through Condition's predicate vocabulary. A Condition reached through
 -- a CR 611.2b duration comes here by way of rewriteDuration below.

@@ -1,6 +1,99 @@
 {
   "faces": [
     {
+      "delayedAbilities": {
+        "grant flashback": {
+          "condition": {
+            "type": "Reflexive"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "ModifyTarget",
+                        "value": {
+                          "duration": {
+                            "type": "UntilEndOfTurn"
+                          },
+                          "modification": {
+                            "type": "GainKeyword",
+                            "value": {
+                              "type": "Flashback",
+                              "value": {
+                                "mana": [
+                                  {
+                                    "type": "Generic",
+                                    "value": 2
+                                  },
+                                  {
+                                    "type": "OfType",
+                                    "value": {
+                                      "type": "Colored",
+                                      "value": {
+                                        "type": "Red"
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "type": "OfType",
+                                    "value": {
+                                      "type": "Colored",
+                                      "value": {
+                                        "type": "Green"
+                                      }
+                                    }
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "targetSlots": {
+                  "target": {
+                    "filter": {
+                      "type": "Or",
+                      "value": [
+                        {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Instant"
+                          }
+                        },
+                        {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Sorcery"
+                          }
+                        }
+                      ]
+                    },
+                    "pool": {
+                      "type": "CardsInGraveyard",
+                      "value": {
+                        "type": "Scoped",
+                        "value": {
+                          "type": "You"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
       "manaCost": [
         {
           "type": "Generic",
@@ -138,47 +231,9 @@
                   {
                     "effects": [
                       {
-                        "type": "ModifyTarget",
+                        "type": "ArmDelayedTrigger",
                         "value": {
-                          "duration": {
-                            "type": "UntilEndOfTurn"
-                          },
-                          "modification": {
-                            "type": "GainKeyword",
-                            "value": {
-                              "type": "Flashback",
-                              "value": {
-                                "mana": [
-                                  {
-                                    "type": "Generic",
-                                    "value": 2
-                                  },
-                                  {
-                                    "type": "OfType",
-                                    "value": {
-                                      "type": "Colored",
-                                      "value": {
-                                        "type": "Red"
-                                      }
-                                    }
-                                  },
-                                  {
-                                    "type": "OfType",
-                                    "value": {
-                                      "type": "Colored",
-                                      "value": {
-                                        "type": "Green"
-                                      }
-                                    }
-                                  }
-                                ]
-                              }
-                            }
-                          },
-                          "ref": {
-                            "type": "InSlot",
-                            "value": "target"
-                          }
+                          "name": "grant flashback"
                         }
                       }
                     ],
@@ -209,37 +264,7 @@
                       }
                     }
                   }
-                ],
-                "targetSlots": {
-                  "target": {
-                    "filter": {
-                      "type": "Or",
-                      "value": [
-                        {
-                          "type": "HasCardType",
-                          "value": {
-                            "type": "Instant"
-                          }
-                        },
-                        {
-                          "type": "HasCardType",
-                          "value": {
-                            "type": "Sorcery"
-                          }
-                        }
-                      ]
-                    },
-                    "pool": {
-                      "type": "CardsInGraveyard",
-                      "value": {
-                        "type": "Scoped",
-                        "value": {
-                          "type": "You"
-                        }
-                      }
-                    }
-                  }
-                }
+                ]
               }
             ]
           }

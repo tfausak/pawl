@@ -698,6 +698,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.SelfExerted
       " {\"type\":\"SelfExerted\"} "
+  -- CR 603.12's reflexive, nullary for SelfExerted's reason: the whole condition
+  -- is the word "when you do", and what it says about is the entry's existence.
+  Spec.it s "Reflexive round-trips" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.Reflexive
+      " {\"type\":\"Reflexive\"} "
   -- CR 701.3a read from the host. The Filter is over the ATTACHMENT, and Bramble
   -- Elemental's narrows to Auras, so the payload is a real HasSubtype rather than
   -- the trivial `And []`.

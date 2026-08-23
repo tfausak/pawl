@@ -883,4 +883,31 @@ data TriggerCondition
     -- Energy Blade), which needs its own constructor and a binding for "that
     -- creature" (gap #1837).
     SelfBecomesAttachedBy (Filter.Filter Keyword.Keyword)
+  | -- | CR 603.12's reflexive triggered ability: "you may sacrifice a Clue. WHEN
+    -- YOU DO, target instant or sorcery card in your graveyard gains flashback"
+    -- (The Fugitive Doctor). Nullary, and it matches no GameEvent at all.
+    --
+    -- CR 603.12 routes a reflexive through rule 603.7, so its carrier is a
+    -- delayed entry -- but with the exception that it is "checked immediately
+    -- after being created" and triggers "based on whether the trigger event or
+    -- events occurred earlier during the resolution of the spell or ability that
+    -- created them". Both halves are discharged STRUCTURALLY rather than by
+    -- re-reading the log: an Effect.ArmDelayedTrigger naming it sits inside the
+    -- branch of a CR 118.12 pay gate, which runs exactly when that branch's
+    -- answer was given, so by the time an entry with this condition exists its
+    -- trigger event has already occurred. Pawl.Engine.Event.delayedPending therefore fires it once, on no
+    -- event, at the next gather -- which is CR 603.3's "the next time a player
+    -- would receive priority", so its targets are chosen (CR 603.3d) after the
+    -- payment rather than as the creating ability went on the stack.
+    --
+    -- CR 603.12a's "paying that cost one or more times causes the reflexive
+    -- triggered ability to trigger only once" holds by construction: one clause
+    -- arms one entry, and an entry with no stated duration is spent by its one
+    -- firing (CR 603.7b).
+    --
+    -- Not implemented: CR 603.12a's FIRST sentence, "once for each of those
+    -- times", which rule 603.12's other printed form ("when [something happens]
+    -- this way") reaches -- that event is no payment and can occur several times
+    -- in one resolution, where this fires once (#2121).
+    Reflexive
   deriving (Eq, Ord, Show)
