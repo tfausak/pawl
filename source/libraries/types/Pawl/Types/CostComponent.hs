@@ -249,10 +249,10 @@ data CostComponent keyword
     -- ExileThisFromGraveyard and ExileCardsFromGraveyard already document.
     --
     -- +1\/+1 SPECIFICALLY and no CounterKind payload, PutPlusOneCountersOnThis'
-    -- call below verbatim: loyalty is the only other counter any cost touches on
-    -- the object it is on and RemoveLoyaltyFromThis above already has it, while a
-    -- CounterKind payload would pull a Keyword -- and through it a Filter -- into
-    -- every traversal of this type, for a kind no card asks for.
+    -- call below verbatim: a CounterKind payload would pull a Keyword -- and
+    -- through it a Filter -- into every traversal of this type, for a kind no card
+    -- asks for. Loyalty is the only other counter any cost REMOVES from the object
+    -- it is on, and RemoveLoyaltyFromThis above already has it.
     --
     -- NOT RemoveLoyaltyFromThis with another kind, and the difference is a whole
     -- subsystem rather than a number: that one spells CR 606.4's loyalty symbol,

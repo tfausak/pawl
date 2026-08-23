@@ -854,7 +854,8 @@ loyaltyAmountOf component = case component of
   -- loyalty symbol is what CR 606.2 reads to call an ability a loyalty ability,
   -- and a Just here would ration Barkhide Troll's ability to once a turn (CR
   -- 606.3), gate it on the sorcery window and feed it to `combineLoyalty` (CR
-  -- 606.5). Removing a +1\/+1 counter is none of that.
+  -- 606.5). Removing a +1\/+1 counter is none of that. Proven, not a fence:
+  -- Pawl.CostSpec's Barkhide Troll cases both redden on a Just here.
   CostComponent.RemovePlusOneCountersFromThis _ -> Nothing
   CostComponent.PutPlusOneCountersOnThis _ -> Nothing
   CostComponent.Blight _ -> Nothing
