@@ -53,6 +53,7 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Count as Count.Type
+import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Departure as Departure
@@ -67,6 +68,7 @@ import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Hybrid as Hybrid
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSpending as ManaSpending
@@ -1719,6 +1721,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   springleafDrumSpec s registry
   morcantSpec s registry
   unerringSlingSpec s registry
+  barkhideTrollSpec s registry
 
 -- alice holds `card` and controls `n` untapped Mountains, plus Omniscience when
 -- `granted` is True, with priority in her own precombat main phase so a sorcery
@@ -2657,3 +2660,96 @@ putridRaptorSpec s registry =
         Just (permanent, gs) -> do
           Spec.assertEqWith s "CR 708.2a a 2/2 while face down" (S.powerToughnessOf permanent gs) (Just (2, 2))
           Spec.assertEqWith s "CR 702.37e the action is withheld" (FaceDown.turnableFaceUp S.alice gs) []
+
+-- alice active with priority in her own precombat main phase: one Barkhide Troll
+-- settled on the battlefield carrying exactly ONE +1/+1 counter, and TWO
+-- untapped Forests. Nothing else, and no board for the second seat -- nothing in
+-- this rule reads an opponent.
+--
+-- TWO lands and not one, which is the element that makes the re-offer assertion
+-- discriminate: both readings spend {1} on the first activation, so with one land
+-- the ability is refused a second time for want of mana whatever the counter did,
+-- and the assertion would pass under a payment that removed nothing. With two the
+-- mana is there and the counter is the only thing left that can refuse.
+--
+-- Exactly ONE counter and not two, which closes the same hole from the other
+-- side: two would leave a CORRECT payment with a counter still on, so the ability
+-- would be re-offered and the Troll would still be bigger than its printed 2/2.
+--
+-- Forests rather than any land: the cost is {1}, which any land pays, but a green
+-- source keeps the fixture honest for the cast case below.
+trollBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+trollBoard troll forest =
+  let (trollId, gs) = S.addCreature troll S.alice (S.landsInPlay forest 2)
+   in ( trollId,
+        (S.addCounter CounterKind.PlusOnePlusOne 1 trollId gs)
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- The CR 122 removals a run recorded. Pawl.Support has zoneChangesOf,
+-- damageEventsOf and revealsOf and no counter sibling, so this group keeps its
+-- own -- and it reads the CONTENTS rather than a length, since
+-- Event.removeCounters records nothing at all when there was nothing to remove.
+counterRemovalsOf :: GameState.GameState -> [CounterChange.CounterChange]
+counterRemovalsOf gs = Maybe.mapMaybe removal (S.eventsOf gs)
+  where
+    removal e = case e of
+      GameEvent.CountersRemoved change -> Just change
+      _ -> Nothing
+
+-- Barkhide Troll {G}{G} Creature -- Troll 2/2 (Oracle text checked against
+-- Scryfall): "This creature enters with a +1/+1 counter on it. {1}, Remove a
+-- +1/+1 counter from this creature: This creature gains hexproof until end of
+-- turn."
+--
+-- The producer for CostComponent.RemovePlusOneCountersFromThis, CR 118.1's
+-- counter removal as an activation cost. The counter is what CR 613.4c's layer 7c
+-- reads, so the payment is observable as a SIZE and not only as a map entry: an
+-- implementation that does not remove it leaves a 3/3 that can pay again.
+barkhideTrollSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+barkhideTrollSpec s registry =
+  Spec.describe s "Barkhide Troll" $ do
+    -- The gameplay-level assertion is the SIZE, and it comes first: the re-offer
+    -- count below it is a proxy a wrong payment reddens too.
+    Spec.it s "CR 118.1 / 613.4c the cost removes the +1/+1 counter, so the 3/3 becomes a 2/2 that cannot pay again" $ do
+      troll <- S.printingOf s registry "Barkhide Troll"
+      forest <- S.printingOf s registry "Forest"
+      let (trollId, gs) = trollBoard troll forest
+          ability = theAbility troll
+          activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice trollId ability)
+          after = S.runPure S.identityAnswer activated Stack.resolveTop
+      Spec.assertEqWith s "CR 613.4c the counter makes it a 3/3 before any of this" (S.powerToughnessOf trollId gs) (Just (3, 3))
+      Spec.assertEqWith s "CR 613.4c the cost spent the counter, so the printed 2/2 is back" (S.powerToughnessOf trollId after) (Just (2, 2))
+      Spec.assertEqWith s "CR 122.1 and no +1/+1 counter is left on it" (S.counterOf CounterKind.PlusOnePlusOne trollId after) 0
+      Spec.assertEqWith s "CR 118.3 so the ability is not offered again, though a second Forest is still untapped" (length (filter (isActivateOf trollId) (Action.legalActions S.alice after))) 0
+      -- SEPARATE from the three above, and that is the point: a payment that
+      -- edited Object.counters directly would leave them green and only this red.
+      Spec.assertEqWith s "CR 122 the removal went through Event.removeCounters, 1 -> 0" (counterRemovalsOf after) [CounterChange.MkCounterChange trollId CounterKind.PlusOnePlusOne 1 0]
+      Spec.assertBool s (Projection.hasKeyword (Keyword.Hexproof Nothing) trollId after) "and the ability resolved, granting hexproof"
+    -- The board it was offered on, so the refusal above is a refusal and not an
+    -- ability that was never on the menu.
+    Spec.it s "CR 118.3 with the counter on it the ability IS offered" $ do
+      troll <- S.printingOf s registry "Barkhide Troll"
+      forest <- S.printingOf s registry "Forest"
+      let (trollId, gs) = trollBoard troll forest
+      Spec.assertBool s (Activate.activatable S.alice trollId (theAbility troll) gs) "activatable"
+      Spec.assertEqWith s "and menued exactly once" (length (filter (isActivateOf trollId) (Action.legalActions S.alice gs))) 1
+    -- The card's OTHER printed line, which the fixture above sets by hand: cast
+    -- the Troll and it arrives already carrying the counter (CR 614.1c through
+    -- EntryRewrite.WithCounters), so the 3/3 the case above starts from is the
+    -- card's own doing.
+    Spec.it s "CR 614.1c Barkhide Troll enters with a +1/+1 counter, so it arrives a 3/3" $ do
+      troll <- S.printingOf s registry "Barkhide Troll"
+      forest <- S.printingOf s registry "Forest"
+      let (withSpell, spellId) = S.handOne troll (S.landsInPlay forest 2)
+          cast = S.runPure S.identityAnswer withSpell (S.cast S.alice spellId)
+          resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+          entered = Set.toList (Set.difference (GameState.battlefield resolved) (GameState.battlefield withSpell))
+      case entered of
+        [trollId] -> do
+          Spec.assertEqWith s "CR 613.4c a 3/3 on arrival, not the printed 2/2" (S.powerToughnessOf trollId resolved) (Just (3, 3))
+          Spec.assertEqWith s "one +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne trollId resolved) 1
+        _ -> Spec.assertFailure s "Barkhide Troll should have resolved onto the battlefield"

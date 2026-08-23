@@ -2217,8 +2217,9 @@ putOwnCountersIn batch oid kind n = do
 -- CR 122: take counters off an object, recording a CountersRemoved event from
 -- the before/after pair so a trigger can read the crossing. That event's other
 -- producer is CR 120.3h's and CR 120.3c's damage to a battle or a planeswalker;
--- it belongs to no one rule in particular. CR 606.4's loyalty cost comes through
--- this door (Pawl.Engine.Cost's RemoveLoyaltyFromThis arm).
+-- it belongs to no one rule in particular. Two costs come through this door as
+-- well: CR 606.4's loyalty (Pawl.Engine.Cost's RemoveLoyaltyFromThis arm) and CR
+-- 118.1's +1\/+1 removal (its RemovePlusOneCountersFromThis arm).
 --
 -- NO CR 614.16 loop, unlike putCounters above, and that asymmetry is the rule's
 -- rather than a shortcut: 614.16 replaces a PLACEMENT -- "if an effect would put

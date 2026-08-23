@@ -233,6 +233,43 @@ data CostComponent keyword
     -- which Pawl.Engine.Cost.canPayComponent answers by counting
     -- CounterKind.Loyalty on the source.
     RemoveLoyaltyFromThis Natural.Natural
+  | -- | CR 118.1 as a cost: remove this many +1\/+1 counters from the permanent
+    -- the cost is on -- Barkhide Troll's "{1}, Remove a +1\/+1 counter from this
+    -- creature: This creature gains hexproof until end of turn". CR 601.2f's list
+    -- of what a cost may include ends in "and so on" and never names removing
+    -- counters, so this is a cost by CR 118.1's general reading -- "an action or
+    -- payment necessary to take another action" -- exactly as ReturnThis above
+    -- and ExileThisFromGraveyard below are.
+    --
+    -- SacrificeThis' shape, and the "This" suffix with it: CR 602.1a's activation
+    -- cost names ONE object, the object the cost is on, and offers nothing to
+    -- choose, so folding it into a count-plus-criterion form would invent a CR
+    -- 601.2h prompt the rules do not have. A cost removing a counter from some
+    -- OTHER permanent (Sage of Fables) is a second constructor, the call
+    -- ExileThisFromGraveyard and ExileCardsFromGraveyard already document.
+    --
+    -- +1\/+1 SPECIFICALLY and no CounterKind payload, PutPlusOneCountersOnThis'
+    -- call below verbatim: a CounterKind payload would pull a Keyword -- and
+    -- through it a Filter -- into every traversal of this type, for a kind no card
+    -- asks for. Loyalty is the only other counter any cost REMOVES from the object
+    -- it is on, and RemoveLoyaltyFromThis above already has it.
+    --
+    -- NOT RemoveLoyaltyFromThis with another kind, and the difference is a whole
+    -- subsystem rather than a number: that one spells CR 606.4's loyalty symbol,
+    -- which CR 606.2 makes the ability a loyalty ability, CR 606.3 rations to one
+    -- a turn and CR 606.5 combines. This is an ordinary activation cost and must
+    -- stay out of all three, which is what Pawl.Engine.Cost.loyaltyAmountOf's
+    -- Nothing here keeps it out of.
+    --
+    -- ANNOUNCEMENT-TIME only, which Blight below is not: CR 602.2b routes it
+    -- through CR 601.2h, so CR 614.16 does not arise -- and rule 614.16 is about
+    -- PLACING counters anyway. CR 122.1's marker is not an object and CR 122.2
+    -- says counters "simply cease to exist" rather than travelling, so nothing
+    -- moves out of a zone and CR 113.6m does not reach this either; see
+    -- Pawl.Engine.Cost.zoneOfComponent.
+    --
+    -- A Natural and not a Quantity, for PayLife's reason.
+    RemovePlusOneCountersFromThis Natural.Natural
   | -- | CR 118.12's counter-placing cost: put this many +1/+1 counters on the
     -- permanent the cost is on. CR 701.63a's endure -- "creates an N/N white
     -- Spirit creature token UNLESS THEY PUT N +1/+1 COUNTERS ON THAT PERMANENT"
