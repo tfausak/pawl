@@ -47,7 +47,10 @@ costToEnd oid gs = List.lookup oid (Expiry.paidExpiries gs)
 --     read (Projection.controllerOf). That is the same object whose ability
 --     created the effect and, for every producer, the same seat -- a Licid
 --     animating itself is its own source, so a control-change moves the offer
---     with the permanent, which is CR 613.1's answer rather than a special case;
+--     with the permanent. Not implemented: an effect whose controller is not its
+--     source's current controller, which needs a controller on
+--     Pawl.Types.ContinuousEffect and has no producer while the Licids are the
+--     only ones (#2137);
 --   * the cost is payable. An action the player cannot take is not offered,
 --     Pawl.Engine.Action.legalActions' posture throughout.
 --
@@ -66,11 +69,12 @@ canEnd pid oid gs = case costToEnd oid gs of
 -- Every object whose effect this player may pay to end right now, in object
 -- order -- what Action.EndEffect is built from, Ignore.ignorable's shape.
 --
--- Read off the offers rather than off the battlefield, which is where this
--- differs from every other special action: an effect outlives the zone change
--- that would take its source off the battlefield only until CR 704.5e bins the
--- source, but the offer is a property of the stored effect and so is enumerated
--- from there.
+-- Read off the STORED EFFECTS rather than off the battlefield, which is where
+-- this differs from every other special action: CR 116.2c's permission belongs
+-- to the effect, not to a permanent's printed text, and a stored effect outlives
+-- its source leaving the battlefield (CR 611.2's duration is what ends it).
+-- canEnd's controller conjunct is then what declines to offer one whose source
+-- has no controller to read.
 endable :: PlayerId -> GameState -> [ObjectId]
 endable pid gs = filter (\oid -> canEnd pid oid gs) (List.nub (fmap fst (Expiry.paidExpiries gs)))
 

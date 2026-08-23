@@ -2277,7 +2277,7 @@ licidSpec s registry = Spec.describe s "Licid" $ do
   -- identical on that board, since the Licid's other printed ability is a static
   -- one that CR 613.6 spares from a layer-6 strip (Projection.permanentParts'
   -- `removed`) and the enchant the same sentence grants carries a later timestamp
-  -- than the removal, so CR 613.9's first Example restores it. So the arm's
+  -- than the removal, so CR 613.9's first Example lands it on top. So the arm's
   -- narrowness is proved HERE instead, by a name that matches nothing.
   --
   -- Gameplay level on both boards: whether alice may activate the ability at all,

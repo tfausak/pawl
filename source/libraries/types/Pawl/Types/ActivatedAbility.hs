@@ -71,7 +71,7 @@ data ActivatedAbility card = MkActivatedAbility
     -- and validates by membership, so no index into a face's list is a reference
     -- the rules could follow -- and a required name would put a made-up string on
     -- every ability in data/cards/ to serve the handful that are referred to.
-    -- Pawl.Types.Search.count takes the same fork one type over: absent means "no
+    -- Pawl.Types.Search.quantity takes the same fork one type over: absent means "no
     -- such clause was printed", which is a different fact from any name.
     --
     -- NOT an identity: two abilities may share a name, and a removal naming it
