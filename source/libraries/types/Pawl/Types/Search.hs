@@ -59,8 +59,8 @@ data Search = MkSearch
     -- A Bool beside the Quantity rather than a Quantity arm: "up to" is a
     -- permission attached to a count, not a different count. An unbounded "any
     -- number of cards" is the other axis, and is spelled by the absence of the
-    -- count itself; the two compose, though no printed card prints "up to any
-    -- number of".
+    -- count itself -- over which this flag is unobservable, both readings
+    -- landing in CR 701.23b's branch.
     upTo :: Bool,
     destination :: SearchDestination.SearchDestination
   }
