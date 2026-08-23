@@ -1395,11 +1395,17 @@ manaPartPayable effects adjustments pid oid cost gs = case Cost.mana cost of
 -- -- what makes Ashnod's Altar beside two creatures two mana activations, and
 -- Treasonous Ogre ("Pay 3 life: Add {R}") at 20 life six.
 --
--- The SMALLEST ceiling the cost's resources impose (CR 118.3's "fully"). Two are
--- counted, each totalled over the WHOLE cost: OBJECTS, through
+-- The SMALLEST ceiling the cost's resources impose (CR 118.3's "fully"). Three
+-- are counted, each totalled over the WHOLE cost: OBJECTS, through
 -- Pawl.Engine.Claim.repeats, so two components drawing on one pool do not each
--- get it; and LIFE, through CR 119.4, so the ceiling is the life total divided
--- by `lifeOwedBy`.
+-- get it; LIFE, through CR 119.4, so the ceiling is the life total divided by
+-- `lifeOwedBy`; and the +1\/+1 COUNTERS on the source, CR 122.1's marker, so the
+-- ceiling is what it carries divided by `plusOneCountersOwedBy` -- Workhorse's
+-- four counters are four activations and four mana.
+--
+-- Each totalled and then DIVIDED for one reason: two components spending the same
+-- resource would each get the whole of it if they were asked separately, which
+-- would OVERSTATE, and this function's whole direction is the other way.
 --
 -- Anything else caps the answer at 1 (`uncountedCeiling`), and so does a MANA
 -- part, repeating which would spend mana this function has not measured. The
@@ -1427,15 +1433,18 @@ repeatsOf pid oid cost gs = case Cost.mana cost of
     lifeCeiling = case lifeOwedBy components of
       0 -> []
       owed -> [div (lifeTotalOf pid gs) owed]
-    ceilings = objectCeiling <> lifeCeiling <> Maybe.mapMaybe uncountedCeiling components
+    counterCeiling = case plusOneCountersOwedBy components of
+      0 -> []
+      owed -> [div (countersOn CounterKind.PlusOnePlusOne oid gs) owed]
+    ceilings = objectCeiling <> lifeCeiling <> counterCeiling <> Maybe.mapMaybe uncountedCeiling components
 
--- The ceiling ONE component imposes that `repeatsOf`'s two totals do not already
--- carry, or Nothing where one of them does. 1 for every resource this module
--- cannot count, and for two it need not. EXACT
+-- The ceiling ONE component imposes that `repeatsOf`'s three totals do not
+-- already carry, or Nothing where one of them does. 1 for every resource this
+-- module cannot count, and for two it need not. EXACT
 -- for CR 107.5's {T}, CR 107.6's {Q} and CR 606.4's loyalty (CR 606.3 allows one
 -- loyalty ability per turn whatever the counters allow); an UNDERSTATEMENT for
 -- CR 107.14's energy, for a counter put on the source, and for the two
--- components that tap OTHER permanents (#1280).
+-- components that tap OTHER permanents (#2171).
 --
 -- EXHAUSTIVE with no wildcard, this module's posture, and -Werror makes it.
 uncountedCeiling :: CostComponent.CostComponent Keyword.Type.Keyword -> Maybe Natural
@@ -1463,10 +1472,12 @@ uncountedCeiling component = case component of
   CostComponent.PayEnergy _ -> Just 1
   CostComponent.AddLoyaltyToThis _ -> Just 1
   CostComponent.RemoveLoyaltyFromThis _ -> Just 1
-  -- An UNDERSTATEMENT, which the header licenses: the counters on the source are
-  -- a resource this module does not count, so a permanent carrying three could
-  -- pay three times.
-  CostComponent.RemovePlusOneCountersFromThis _ -> Just 1
+  -- Counted by `counterCeiling`, CR 122.1.
+  CostComponent.RemovePlusOneCountersFromThis _ -> Nothing
+  -- 1, and NOT folded into `counterCeiling`: this component PUTS counters on, so
+  -- it spends none of the resource that ceiling divides. An understatement --
+  -- repeating it is bounded by whatever else the cost spends, not by the
+  -- counters -- and the header's safe direction.
   CostComponent.PutPlusOneCountersOnThis _ -> Just 1
   -- An UNDERSTATEMENT: a player controlling a creature can blight as often as
   -- they can pay the rest of the cost.
@@ -1625,6 +1636,42 @@ lifeOwedByComponent component = case component of
   CostComponent.RemoveLoyaltyFromThis _ -> 0
   CostComponent.RemovePlusOneCountersFromThis _ -> 0
   CostComponent.PutPlusOneCountersOnThis _ -> 0
+  CostComponent.Blight _ -> 0
+  CostComponent.BlightX -> 0
+  CostComponent.ExileThisFromGraveyard -> 0
+  CostComponent.ExileCardsFromGraveyard {} -> 0
+  CostComponent.ExileTopFromGraveyard _ -> 0
+
+-- The +1\/+1 counters a cost takes OFF the object it is on, added up --
+-- `lifeOwedBy`'s counter sibling, and `repeatsOf`'s counterCeiling is what
+-- divides by it. Total for lifeOwedBy's reason: a new component spending these
+-- counters cannot be added without answering here.
+--
+-- Only the REMOVING component counts. CostComponent.PutPlusOneCountersOnThis
+-- moves the resource the other way, so folding it in would net two components
+-- that CR 122.1 never nets -- and CR 601.2h leaves the payment's ORDER to the
+-- payer, so a cost holding both has no fixed number of counters to divide.
+plusOneCountersOwedBy :: [CostComponent.CostComponent Keyword.Type.Keyword] -> Natural
+plusOneCountersOwedBy = sum . fmap plusOneCountersOwedByComponent
+
+plusOneCountersOwedByComponent :: CostComponent.CostComponent Keyword.Type.Keyword -> Natural
+plusOneCountersOwedByComponent component = case component of
+  CostComponent.RemovePlusOneCountersFromThis n -> n
+  CostComponent.PutPlusOneCountersOnThis _ -> 0
+  CostComponent.PayLife _ -> 0
+  CostComponent.PayLifeX -> 0
+  CostComponent.TapThis -> 0
+  CostComponent.UntapThis -> 0
+  CostComponent.SacrificeThis -> 0
+  CostComponent.ReturnThis -> 0
+  CostComponent.Sacrifice {} -> 0
+  CostComponent.TapForTotalPower {} -> 0
+  CostComponent.TapPermanents {} -> 0
+  CostComponent.DiscardCards {} -> 0
+  CostComponent.DiscardThis _ -> 0
+  CostComponent.PayEnergy _ -> 0
+  CostComponent.AddLoyaltyToThis _ -> 0
+  CostComponent.RemoveLoyaltyFromThis _ -> 0
   CostComponent.Blight _ -> 0
   CostComponent.BlightX -> 0
   CostComponent.ExileThisFromGraveyard -> 0

@@ -2007,6 +2007,84 @@ altarBoard :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameSta
 altarBoard altar piker victims =
   foldr (\p gs -> snd (S.addCreature p S.alice gs)) (Setup.emptyGame S.bothPlayers) (altar : replicate victims piker)
 
+-- CR 118.3's "fully" over a resource that is neither an object nor life: the
+-- +1/+1 counters on the source itself. Workhorse ({6} Artifact Creature -- Horse
+-- 0/0, Oracle text checked against Scryfall: "This creature enters with four
+-- +1/+1 counters on it. Remove a +1/+1 counter from this creature: Add {C}.") is
+-- the pool's first mana ability repeatable through counters -- no {T} for CR
+-- 107.5 to bar a second activation, no object claim, and no CR 119.4 life -- so
+-- counting the counters once read four mana as one and the cast was never
+-- offered (#1280).
+--
+-- alice controls nothing else on any of these boards, so every mana here comes
+-- through the Workhorse and no count below can be met another way.
+workhorseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+workhorseSpec s registry = Spec.describe s "Workhorse" $ do
+  -- ONE board for both halves, so what separates {4} from {5} is only how many
+  -- activations the supply model counted.
+  Spec.it s "CR 118.3 four +1/+1 counters supply four mana" $ do
+    horse <- S.printingOf s registry "Workhorse"
+    let (_, board) = workhorseBoard horse 4
+        pays n = Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.Generic n]) board
+    Spec.assertBool s (pays 4) "four activations pay {4}"
+    Spec.assertBool s (not (pays 5)) "and there is no fifth counter, so not {5}"
+
+  Spec.it s "CR 118.3 one counter is one activation" $ do
+    horse <- S.printingOf s registry "Workhorse"
+    let (_, board) = workhorseBoard horse 1
+        pays n = Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.Generic n]) board
+    Spec.assertBool s (pays 1) "{1} is what one activation adds"
+    Spec.assertBool s (not (pays 2)) "and nothing pays {2}"
+
+  -- The gameplay-level proof (design.md section 4). Crucible of Worlds is {3},
+  -- all generic, and targets nothing as it is cast, so the whole cast turns on
+  -- the counters being counted three times.
+  --
+  -- THREE and not four, which is what keeps the Workhorse readable afterwards: a
+  -- fourth activation would leave a 0/0 that CR 704.5f buries before any
+  -- assertion here runs.
+  --
+  -- The two boards differ in the counters and in nothing else, so the short one
+  -- fails for the counter rather than for want of anything else.
+  Spec.it s "CR 605.3a Crucible of Worlds is cast off three activations of one Workhorse" $ do
+    horse <- S.printingOf s registry "Workhorse"
+    crucible <- S.printingOf s registry "Crucible of Worlds"
+    let (horseId, board) = workhorseBoard horse 4
+        (shortId, shortBoard) = workhorseBoard horse 2
+        resolved = castFrom S.identityAnswer board crucible
+        short = castFrom S.identityAnswer shortBoard crucible
+        countOf name = S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack name) S.alice
+    Spec.assertEqWith s "the Crucible resolved" (countOf "Crucible of Worlds" resolved) 1
+    Spec.assertEqWith s "with two counters there is no {3} and the cast fails" (countOf "Crucible of Worlds" short) 0
+    Spec.assertEqWith s "CR 122.1 three of the four counters paid for it" (S.counterOf CounterKind.PlusOnePlusOne horseId resolved) 1
+    Spec.assertEqWith s "CR 122.1a so the 4/4 is a 1/1, and still there to be read" (S.powerToughnessOf horseId resolved) (Just (1, 1))
+    Spec.assertEqWith s "and CR 601.2h spent none of the short board's counters" (S.counterOf CounterKind.PlusOnePlusOne shortId short) 2
+
+  -- The card's OTHER printed line, which the boards above set by hand: cast the
+  -- Workhorse and it arrives already carrying the four counters (CR 614.1c
+  -- through EntryRewrite.WithCounters).
+  Spec.it s "CR 614.1c Workhorse enters with four +1/+1 counters, so it arrives a 4/4" $ do
+    horse <- S.printingOf s registry "Workhorse"
+    forest <- S.printingOf s registry "Forest"
+    let (withSpell, spellId) = S.handOne horse (S.landsInPlay forest 6)
+        cast = S.runPure S.identityAnswer withSpell (S.cast S.alice spellId)
+        resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+        entered = Set.toList (Set.difference (GameState.battlefield resolved) (GameState.battlefield withSpell))
+    case entered of
+      [horseId] -> do
+        Spec.assertEqWith s "CR 122.1a a 4/4 on arrival, not the printed 0/0" (S.powerToughnessOf horseId resolved) (Just (4, 4))
+        Spec.assertEqWith s "four +1/+1 counters" (S.counterOf CounterKind.PlusOnePlusOne horseId resolved) 4
+      _ -> Spec.assertFailure s "Workhorse should have resolved onto the battlefield"
+
+-- One Workhorse under alice's control carrying `counters` +1/+1 counters, and
+-- nothing else on the board. The counters are placed by hand rather than by CR
+-- 614.1c so that the two counts a case wants differ in the counters ALONE; the
+-- entry rewrite has its own case above.
+workhorseBoard :: Printing.Printing -> Natural -> (ObjectId.ObjectId, GameState.GameState)
+workhorseBoard horse counters =
+  let (horseId, gs) = S.addCreature horse S.alice (Setup.emptyGame S.bothPlayers)
+   in (horseId, S.addCounter CounterKind.PlusOnePlusOne counters horseId gs)
+
 -- The half #1128 gave up: WHICH mana each of a repeatable source's activations
 -- makes. Phyrexian Altar ({3} Artifact, "Sacrifice a creature: Add one mana of
 -- any color") is the pool's first mana ability that is both repeatable and offers
@@ -3704,6 +3782,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   phyrexianTowerSpec s registry
   bloodPetSpec s registry
   ashnodsAltarSpec s registry
+  workhorseSpec s registry
   phyrexianAltarSpec s registry
   transmograntAltarSpec s registry
   grinningIgnusSpec s registry
