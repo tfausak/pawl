@@ -30,8 +30,9 @@ import qualified Pawl.Types.TurnScope as TurnScope
 -- vocabularies do not coincide either: SorcerySpeed below is a clause only an ability can print,
 -- since for a spell CR 307.1 IS the window rather than a rider on it.
 data ActivationRestriction
-  = -- | CR 602.5d's "Activate only as a sorcery" (CR 702.6a's equip is the
-    -- pool's producer), and every other ability that carries the same phrase.
+  = -- | CR 602.5d's "Activate only as a sorcery" (CR 702.6a's equip mints it,
+    -- and Grinning Ignus prints the phrase itself), and every other ability that
+    -- carries the same phrase.
     --
     -- CR 307.5 defines it narrowly: the player must have priority, it must be
     -- during the main phase of their turn, and the stack must be empty. Its last
