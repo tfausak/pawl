@@ -837,10 +837,14 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "is not implied by having attacked" $ do
       Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.attackedThisTurn = True}) Filter.Type.DealtDamageThisTurn)) "attacked does not imply damaged"
 
-    -- CR 120.1 lets a player be dealt damage, so this one is vacuous rather than
-    -- rules-enforced: Filter.playerView holds no board to fold (#2157).
-    Spec.it s "a player candidate is vacuously false" $ do
-      Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.DealtDamageThisTurn)) "player"
+    -- CR 120.1 lets a player be dealt damage, so this atom is not vacuous for a
+    -- player the way the two above are: the fold reads the same field for either
+    -- shape of candidate, and Filter.playerView's False is a default a caller
+    -- with a board overwrites (Pawl.Engine.Count.playerView). Pawl.DamageSpec's
+    -- Needle Drop case is where a real board fills it.
+    Spec.it s "reads the same field for a player candidate" $ do
+      Spec.assertBool s (Filter.matches self (aPlayer {Filter.dealtDamageThisTurn = True}) Filter.Type.DealtDamageThisTurn) "a damaged player"
+      Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.DealtDamageThisTurn)) "and an undamaged one"
 
   Spec.describe s "AttachedTo" $ do
     -- Miracle Worker's "target Aura attached to a creature you control", which is

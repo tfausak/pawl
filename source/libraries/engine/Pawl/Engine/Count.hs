@@ -86,14 +86,14 @@ evaluate viewOf quantityOf context gs count = case Count.Type.scope count of
   -- unlike there, that IS observable: a departed player's zones were emptied,
   -- so naming them cost nothing, while naming the player costs one.
   --
-  -- Each candidate is seen through Filter.playerView rather than through the
+  -- Each candidate is seen through playerView below rather than through the
   -- injected ViewOf, which answers about OBJECTS (CR 109.1) and has no id to
   -- be asked with here. So the members are objectless, as InHistory's are, and
   -- an Aggregation.Greatest over this scope folds a per-OBJECT quantity against
   -- a player, which CR 208.1 and CR 202.3 give no answer to.
   --
   -- A per-PLAYER quantity DOES answer, and reaches the candidate through that
-  -- same view: Filter.playerView records the player's identity, and
+  -- same view: it records the player's identity, and
   -- Pawl.Types.PlayerRef.Candidate is what a card writes to read it -- Malignus'
   -- "the highest life total among your opponents". So nothing here carries the
   -- candidate beside the view: the view already names it.
@@ -102,7 +102,14 @@ evaluate viewOf quantityOf context gs count = case Count.Type.scope count of
     -- The predicate is baked PER CANDIDATE (see bakePerspective): CR 110.2's
     -- comparison is answered here, where the board is, and the match below is the
     -- same pure one every other scope makes.
-    let kept = fmap ((,) Nothing) (Maybe.mapMaybe (\pid -> keep (bakePerspective viewOf context gs pid predicate) context (Just (Filter.playerView pid))) pids)
+    --
+    -- playerView rather than Filter.playerView is a REGRESSION FENCE on this road
+    -- and a proof on the other: routing the fold through the board-aware builder
+    -- leaves the suite green, no card spelling Filter.DealtDamageThisTurn under a
+    -- count over players -- Quantity.PlayersDealtDamageThisTurn is how a card asks
+    -- that (#1577). The target road, which Pawl.DamageSpec's Needle Drop case
+    -- covers, is what pays for the builder.
+    let kept = fmap ((,) Nothing) (Maybe.mapMaybe (\pid -> keep (bakePerspective viewOf context gs pid predicate) context (Just (playerView gs pid))) pids)
     aggregate quantityOf aggregation kept
   where
     predicate = Count.Type.filter count
@@ -140,6 +147,31 @@ mapQuantity f count =
         Aggregation.Members -> Aggregation.Members
         Aggregation.DistinctCardTypes -> Aggregation.DistinctCardTypes
         Aggregation.Greatest quantity -> Aggregation.Greatest (f quantity)
+    }
+
+-- CR 109.1 / 120.1: THE player candidate's view -- Pawl.Engine.Filter.playerView
+-- with the one field a bare PlayerId cannot answer filled from the board.
+-- Pawl.Engine.Projection.viewOfCharacteristics fills Filter.dealtDamageThisTurn
+-- for an object off Game.damagedObject; this is its player half, off
+-- Game.wasDealtDamageThisTurn, so CR 120.1's four recipients are read back
+-- through one event reader (#2157).
+--
+-- Here rather than in Pawl.Engine.Filter, which holds no game state, and here
+-- rather than in Pawl.Engine.Projection, which sits above this module: the two
+-- callers are the Scope.OverPlayers fold above and
+-- Pawl.Engine.Target.admittedGiven's Recipient.ToPlayer arm, so this is the
+-- lowest module both can see. Every other field stays as Filter.playerView
+-- leaves it, and each says there why.
+--
+-- A BOARD-SHAPED atom still baked rather than filled: bakePerspective below
+-- rewrites the three that ask about a zone or a comparison, because none of them
+-- is a characteristic of the candidate. This one is -- "was dealt damage this
+-- turn" is asked of the candidate itself -- which is why it rides the view and
+-- so answers on the target path too, where nothing bakes.
+playerView :: GameState -> PlayerId -> Filter.View
+playerView gs pid =
+  (Filter.playerView pid)
+    { Filter.dealtDamageThisTurn = Game.wasDealtDamageThisTurn gs pid
     }
 
 -- CR 110.2 / 109.5: answer every perspective-reframing atom in a predicate
@@ -227,7 +259,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.DealtDamageThisTurn -> predicate
   -- NOT descended into, unlike And/Or/Not above, and that is the load-bearing
   -- call rather than an omission: `candidate` here is a PLAYER (the sole caller
-  -- folds this over Filter.playerView), and CR 303.4b makes a player enchanted by
+  -- folds this over playerView), and CR 303.4b makes a player enchanted by
   -- an Aura rather than attached to one, so Pawl.Engine.Filter answers this atom
   -- False for a player candidate whatever the nest says and never evaluates it.
   -- Baking the nest against this candidate would bake a question about the HOST
