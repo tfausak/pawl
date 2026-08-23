@@ -3243,7 +3243,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- An unbounded search is a fourth: CR 701.23d reaches a search
                   -- "simply for a quantity of cards", which one stating no
                   -- quantity is not, so a short answer stands whatever the filter
-                  -- says.
+                  -- says. That disjunct is a REGRESSION FENCE rather than a
+                  -- proven behaviour: every printing of "for any number of cards"
+                  -- also states a quality, so the first disjunct answers for all
+                  -- of them and removing this one reddens nothing (Scryfall
+                  -- o:"for any number of cards", 2026-08-23, 25 hits, every one
+                  -- of them qualified -- "named X", "with the chosen name",
+                  -- "that have mana value 9"). A card that said "search your
+                  -- library for any number of cards" would refute that.
                   let picked = List.genericTake capHere . List.nub $ filter (\oid -> List.elem oid matches) answer
                       filler = filter (\oid -> List.notElem oid picked) matches
                   pure $

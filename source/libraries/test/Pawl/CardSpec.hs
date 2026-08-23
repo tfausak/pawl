@@ -762,7 +762,8 @@ effectCounts effect = case effect of
   Effect.ChangeText {} -> []
   Effect.AddMana _ -> []
   -- The search's count is a Quantity like any other -- Explosive Vegetation's
-  -- "up to two" -- so its Counts are reachable from here.
+  -- "up to two" -- so its Counts are reachable from here. A search stating no
+  -- count (Mana Severance) has none to reach.
   Effect.Search (Search.MkSearch _ _ quantity _ _ _) -> foldMap quantityCounts quantity
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
