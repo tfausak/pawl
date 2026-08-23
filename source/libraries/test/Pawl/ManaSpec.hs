@@ -1160,8 +1160,7 @@ towerBoard tower victim =
 -- 2026-08-21: Grinning Ignus is the one printing whose mana ability names a
 -- STEP-or-phase window this vocabulary can say, and what it says is CR 307.5's
 -- "activate only as a sorcery" rather than a step -- grinningIgnusSpec below is
--- where that card is exercised. Its activation cost holds MANA besides, which
--- the supply model counts as no supply at all (#2095). Lavinia, Foil to
+-- where that card is exercised. Lavinia, Foil to
 -- Conspiracy is in the pool and gates these same two windows, but through CR
 -- 102.1's turn axis alone (laviniaTurnRiderSpec below), so she leaves the phase
 -- axis unexercised. Vivi Ornitier and every other hit ride on "only once each
@@ -1173,8 +1172,9 @@ towerBoard tower victim =
 -- rather than about the fixture -- and the phase, unlike CR 307.5's sorcery
 -- window, cannot change under a caster's feet between the offer and the payment
 -- (CR 500.12). SorcerySpeed is the arm that can; grinningIgnusSpec below reaches
--- it at the offer, and the divergence #2005 names stays out of reach while #2095
--- keeps the Ignus off the cast gate's supply entirely.
+-- it at the offer, and the divergence #2005 names is now within reach of a board
+-- there -- the cast gate counts the Ignus's yield, so it can offer a cast whose
+-- payment window CR 307.5 has since closed.
 riderWindowSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 riderWindowSpec s registry = Spec.describe s "CR 605.3a a printed rider gates both windows" $ do
   Spec.it s "CR 500.1 the priority window offers the source only inside the rider's step" $ do
@@ -2147,21 +2147,28 @@ transmograntAltarSpec s registry = Spec.describe s "Transmogrant Altar" $ do
     Spec.assertEqWith s "with a Swamp to pay the {B}, CR 605.3a offers the Altar" (length (offers withSwamp)) 1
     Spec.assertEqWith s "with none, CR 118.3 leaves nothing to offer" (length (offers noSwamp)) 0
 
-  -- The SUPPLY half. Mana.supplyCapacity counts a route whose own cost holds
-  -- mana as no supply at all, which is an understatement (#2095) and never an
-  -- overstatement: the walk measures the {C}{C}{C} the Altar yields and not the
-  -- {B} it eats, so counting it gross would offer a cast the payment then fails.
-  Spec.it s "CR 118.3 the Altar's yield is no supply the cast gate may count" $ do
+  -- The SUPPLY half. Mana.supplyCapacity counts the Altar's {C}{C}{C} as supply
+  -- AND its {B} as a demand the same board must serve, so the net is two mana.
+  --
+  -- A VECTOR and not one assertion, because three implementations agree on any
+  -- single generic cost. The board's supply is the Swamp's {B} plus the Altar's
+  -- three colorless and its demand is the Altar's own {B}: today's zero-supply
+  -- reading stops at {1}, the net reading reaches {3}, and a gross reading that
+  -- counted the yield without the {B} would reach {4}. So the {3} separates this
+  -- from the understatement and the refused {4} from the overstatement.
+  Spec.it s "CR 601.2g the Altar's yield is supply the cast gate counts, net of the {B} it eats" $ do
     altar <- S.printingOf s registry "Transmogrant Altar"
     piker <- S.printingOf s registry "Goblin Piker"
     swamp <- S.printingOf s registry "Swamp"
     splitter <- S.printingOf s registry "Bonesplitter"
-    crown <- S.printingOf s registry "Crown of the Ages"
+    crucible <- S.printingOf s registry "Crucible of Worlds"
+    statue <- S.printingOf s registry "Jade Statue"
     let holding printing = case altarSupplyBoard altar piker (Just swamp) (Just printing) of
           (_, board, Just oid) -> S.castable S.alice oid board
           (_, _, Nothing) -> False
-    Spec.assertBool s (holding splitter) "the Swamp pays a {1}, so a source the walk refuses does not take the rest of the board with it"
-    Spec.assertBool s (not (holding crown)) "CR 118.3 but a {2} is refused: the Altar's three colorless are not supply, its own {B} being unmeasured"
+    Spec.assertBool s (holding crucible) "CR 602.2b the Swamp pays the Altar's {B} and the {C}{C}{C} it adds pays a {3}"
+    Spec.assertBool s (not (holding statue)) "CR 118.3 and not a {4}: the {B} the Altar eats is a demand the same board must serve"
+    Spec.assertBool s (holding splitter) "and a {1} the Swamp alone covers is still castable"
 
 -- alice, active, in her precombat main phase: one Transmogrant Altar, one Goblin
 -- Piker for the sacrifice to take, and optionally a Swamp to pay the {B} and a
@@ -2262,6 +2269,33 @@ grinningIgnusSpec s registry = Spec.describe s "Grinning Ignus" $ do
         offers gs = filter (== Action.Type.ActivateManaAbility ignusId) (Action.legalActions S.alice gs)
     Spec.assertEqWith s "in her precombat main phase CR 605.3a offers it" (length (offers inMain)) 1
     Spec.assertEqWith s "in her upkeep CR 307.5 leaves nothing to offer" (length (offers inUpkeep)) 0
+
+  -- The supply walk's ACYCLICITY guard, and the Ignus is the pool's one board
+  -- that can show it: its "{R}, Return this creature to its owner's hand: Add
+  -- {C}{C}{R}" yields the very type its own activation cost eats. A supply model
+  -- that let a route's yield serve the route's own demand would read one Ignus on
+  -- an empty board as two spare colorless -- a {1} castable off no land at all.
+  --
+  -- CR 106.4 is why it may not: the mana an ability adds reaches the pool when
+  -- the ability RESOLVES, and CR 601.2g's window is before CR 601.2h's payment,
+  -- so the {R} is not there to pay the {R}. CR 605.3c says the same thing from
+  -- the other side -- the ability cannot be activated again before it resolves.
+  --
+  -- The MOUNTAIN is the one difference between the two boards, so the refusal
+  -- cannot be about the phase, the return, the rider or the sickness rules, each
+  -- of which is satisfied on both. It has to be built with NO land: with one the
+  -- two readings agree and the case proves nothing.
+  Spec.it s "CR 106.4 the Ignus's own yield is no supply for the {R} its activation eats" $ do
+    ignus <- S.printingOf s registry "Grinning Ignus"
+    mountain <- S.printingOf s registry "Mountain"
+    splitter <- S.printingOf s registry "Bonesplitter"
+    let (_, alone) = S.addCreature ignus S.alice (Setup.emptyGame S.bothPlayers)
+        withLand = snd (S.addCreature mountain S.alice alone)
+        holding gs =
+          let (board, oid) = S.handOne splitter (gs {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
+           in S.castable S.alice oid board
+    Spec.assertBool s (not (holding alone)) "CR 605.3c the {R} it would add is not there to pay the {R} it costs"
+    Spec.assertBool s (holding withLand) "and a Mountain is what makes the same {1} castable"
 
 -- alice, active, in her precombat main phase and going nowhere: one Grinning
 -- Ignus and one Mountain, and nothing else on the board or in her hand.
