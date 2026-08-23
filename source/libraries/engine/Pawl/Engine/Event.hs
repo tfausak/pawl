@@ -5026,7 +5026,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
-  -- CR 508.3d: this ability's controller declared one or more attackers. The
+  -- CR 508.3d: the player the payload names declared one or more attackers. The
   -- once-per-DECLARATION arity, matched against the once-per-declaration event --
   -- CreatureAttacksYou above reads the per-attacker one and
   -- AttachedPlayerIsAttacked below the per-target one, and no grouping happens
@@ -8693,11 +8693,14 @@ eventBindingSlots cond = case cond of
   -- "that player" and nothing about them.
   TriggerCondition.AttachedPlayerIsAttacked -> Set.singleton Binding.triggerPlayer
   -- NOTHING, and neither the attacker nor the player: rule 508.3d names a SET
-  -- of creatures, so there is no one attacker to point at, and the player it
-  -- does name is CR 109.5's "you" -- a slot would be a second name for a seat
-  -- the ability already has, which is why CreatureAttacksYou leaves the
-  -- defending player unbound too. Boggart Prankster's payload targets rather
-  -- than points. That is also why this condition needs no arm in eventBindings.
+  -- of creatures, so there is no one attacker to point at. Boggart Prankster's
+  -- and Avatar Roku, Firebender's payloads target or say "you" rather than
+  -- pointing at the declarer. That is also why this condition needs no arm in
+  -- eventBindings.
+  --
+  -- Not implemented: the declaring player as a bound slot, which "that player"
+  -- and "the attacking player" need (#2154). Both must move together with
+  -- eventBindings, which Pawl.ZoneTriggerSpec pins against this.
   TriggerCondition.YouAttack _ -> Set.empty
   -- NOTHING, for SelfAttacksWithAnother's reason: rule 702.105a's payload names
   -- only "this creature", so the attacked player is compared and then never

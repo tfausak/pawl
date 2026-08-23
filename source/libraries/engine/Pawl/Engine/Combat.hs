@@ -1251,11 +1251,13 @@ attemptAttackDeclaration pid defender rejected = do
               --
               -- Only for a non-empty declaration, which is rule 508.3d's "one or
               -- more creatures": a player who declined has not attacked, and this
-              -- block is reached with `attacking` empty whenever they did. A
-              -- REGRESSION FENCE rather than a proven behaviour -- dropping the
-              -- guard leaves the suite green, since Boggart Prankster targets an
-              -- attacking Goblin, and a declaration that named nobody leaves that
-              -- trigger no legal target for CR 603.3d to keep on the stack.
+              -- block is reached with `attacking` empty whenever they did. Proved
+              -- by Pawl.EventTriggerSpec's Avatar Roku, Firebender group, whose
+              -- trigger targets nothing: dropping the guard adds six {R} on an
+              -- empty declaration and shows as the wrong power. Boggart
+              -- Prankster's board cannot see it, targeting an attacking Goblin
+              -- that a declaration naming nobody does not supply, so CR 603.3d
+              -- removes that trigger either way.
               --
               -- Last of the three, the batch above's reason: CR 508.2b puts every
               -- trigger from this declaration on the stack together.
