@@ -160,8 +160,8 @@ mapQuantity f count =
 -- rather than in Pawl.Engine.Projection, which sits above this module: the two
 -- callers are the Scope.OverPlayers fold above and
 -- Pawl.Engine.Target.admittedGiven's Recipient.ToPlayer arm, so this is the
--- lowest module both can see. Every other field stays as playerView leaves it,
--- and each says there why.
+-- lowest module both can see. Every other field stays as Filter.playerView
+-- leaves it, and each says there why.
 --
 -- A BOARD-SHAPED atom still baked rather than filled: bakePerspective below
 -- rewrites the three that ask about a zone or a comparison, because none of them
