@@ -431,11 +431,15 @@ testTree registry =
     ( [Tasty.testGroup "spec" . Writer.execWriter $ spec tasty registry]
         -- These two subtrees are wired separately because their timeouts are
         -- tasty options and Pawl.Spec cannot express one. Every case now has
-        -- SOME budget under CI: flake.nix's testFlags pass --timeout 5s to the
+        -- SOME budget under CI: flake.nix's testFlags pass --timeout 15s to the
         -- `nix build` check phase, which used to run a bare `Setup test` and
-        -- leave tasty at NoTimeout. These two keep their own budgets anyway,
-        -- because localOption beats the command line -- so they hold whatever
-        -- an agent passes, and neither is tighter than the CI floor. Each is
+        -- leave tasty at NoTimeout. Read that figure off flake.nix and not off
+        -- here: it was 5s when #1446 added it and 15s since #1882, and a stale
+        -- copy of it in this comment is what sent #2113 chasing a timeout that
+        -- was not happening. These two keep their own budgets anyway, because
+        -- localOption beats the command line -- so they hold whatever an agent
+        -- passes, and ReplacementSpec's five seconds is now TIGHTER than that
+        -- floor, which costs nothing at 250x its slowest case. Each is
         -- at least 100x its group's slowest case measured 2026-08-09, rounded
         -- up to a round number: headroom for a loaded shared runner, not a
         -- speed assertion. The option is deliberately NOT hoisted onto the
