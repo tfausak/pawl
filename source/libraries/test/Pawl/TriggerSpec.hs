@@ -51,6 +51,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
@@ -72,6 +73,7 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -2540,6 +2542,87 @@ chaptersOnStackFrom oid gs =
         _ -> Nothing
    in Maybe.mapMaybe from (GameState.stack gs)
 
+-- CR 118.12's gate answered by SEVERAL seats, and read back plurally. The
+-- answer is bound under Pawl.Engine.Binding.gatePlayers, which holds every
+-- payer whose answer selected the clause's branch; PlayerRef.EachInSlot is the
+-- read that takes them all, where PlayerRef.InSlot takes one and so reads
+-- NOTHING out of a slot holding two.
+--
+-- Bellowing Mauler, {4}{B} Creature -- Ogre Warrior 4/6, whose entire text box
+-- is "At the beginning of your end step, each player loses 4 life unless they
+-- sacrifice a nontoken creature of their choice." CR 118.12a rewrites that
+-- "unless" into the offer, and CR 119.3 is the life loss.
+--
+-- THREE SEATS, each on a different limb of the rule, because two cannot tell
+-- the readings apart -- with two seats both declining, "the seats that did not
+-- pay" and "the whole table" name the same pair:
+--
+--   alice CAN pay (the Mauler is itself a nontoken creature) and DECLINES,
+--   bob PAYS, sacrificing one of his two Pikers,
+--   carol controls only a TOKEN creature, so CR 118.3 never offers her the cost.
+--
+-- The observable is the LIFE TRIPLE, and it separates three implementations:
+-- EachInSlot gives (16, 20, 16); InSlot's singular read gives (20, 20, 20),
+-- since Binding.onlyOne answers Nothing for the two seats in the slot; a naive
+-- EachPlayer gives (16, 16, 16), sweeping up the seat that paid. Nothing else
+-- on the board changes a life total, and no seat drops near zero, so no
+-- state-based action moves the reading between the resolution and the read.
+maulerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+maulerSpec s registry =
+  let endStep = Phase.Ending EndingStep.EndStep
+      -- alice's own end step: the trigger's scope is TurnScope.ControllersTurn
+      -- and she controls the Mauler.
+      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep, GameState.activePlayer = S.alice})
+      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
+      -- Payer-keyed: only bob pays. An answerer that ignored the payer would
+      -- collapse the board onto one answer and prove nothing. The Decider is
+      -- checked beside the player because CR 723.1 can part them; nothing here
+      -- controls anybody, so they must agree.
+      onlyBobPays :: Prompt.Prompt r -> r
+      onlyBobPays p = case p of
+        Prompt.ChooseToPay (Decider.MkDecider d) player _ _ _ _
+          | d == S.bob && player == S.bob ->
+              PaymentDecision.Pays
+        _ -> S.identityAnswer p
+      boardOf = do
+        mauler <- S.printingOf s registry "Bellowing Mauler"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (maulerId, g0) = S.addCreature mauler S.alice S.threePlayerGame
+            (bobFirst, g1) = S.addCreature piker S.bob g0
+            (bobSecond, g2) = S.addCreature piker S.bob g1
+            -- A token COPY of the same creature: identical but for CR 111.1's
+            -- tokenness, which is the one thing the cost's filter excludes.
+            (carolToken, g3) = S.addToken (Printing.card piker) S.carol g2
+        pure (maulerId, bobFirst, bobSecond, carolToken, settle (beginEndStep g3))
+   in Spec.describe s "CR 118.12 a gate offered to the whole table" $ do
+        Spec.it s "CR 118.12a only the seats that did not pay lose the life" $ do
+          (maulerId, bobFirst, bobSecond, carolToken, onStack) <- boardOf
+          let after = S.runPure onlyBobPays onStack Stack.resolveTop
+          -- THE BEHAVIOUR, first: alice declined and carol was never offered, so
+          -- both lost 4; bob paid, so he did not.
+          Spec.assertEqWith s "CR 119.3: alice and carol lost 4 and bob, who paid, did not" (lives after) (Just 16, Just 20, Just 16)
+          -- CR 701.21a: bob's payment really moved one of his own creatures, and
+          -- took exactly one of the two.
+          Spec.assertEqWith s "one of bob's two Pikers was sacrificed" (length (filter (\oid -> S.onBattlefield oid after) [bobFirst, bobSecond])) 1
+          -- The seats that did not pay paid nothing: alice kept the creature she
+          -- could have sacrificed, and carol's token was never a candidate.
+          Spec.assertBool s (S.onBattlefield maulerId after && S.onBattlefield carolToken after) "alice's Mauler and carol's token both stayed"
+          -- The controls, read off the board BEFORE the resolution so no
+          -- implementation of the read can reach them: the trigger really fired,
+          -- and the three seats really start level.
+          Spec.assertEqWith s "CR 603.2b: its end-step trigger is on the stack" (length (GameState.stack onStack)) 1
+          Spec.assertEqWith s "all three seats start at 20" (lives onStack) (Just 20, Just 20, Just 20)
+        -- The pair board, differing in exactly ONE thing: bob declines too. It
+        -- tells "bob was asked and his own answer spared him" apart from "bob is
+        -- excluded for some other reason", and shows the whole table CAN be in
+        -- the slot at once.
+        Spec.it s "CR 118.12a with nobody paying, every seat loses the life" $ do
+          (_, bobFirst, bobSecond, _, onStack) <- boardOf
+          let after = S.runPure S.identityAnswer onStack Stack.resolveTop
+          Spec.assertEqWith s "CR 119.3: all three seats lost 4" (lives after) (Just 16, Just 16, Just 16)
+          Spec.assertEqWith s "and bob kept both Pikers" (length (filter (\oid -> S.onBattlefield oid after) [bobFirst, bobSecond])) 2
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   logSpec s registry
@@ -2564,3 +2647,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   interveningSpec s registry
   enchantedHostTriggerSpec s registry
   tenRingsDrawSpec s registry
+  maulerSpec s registry

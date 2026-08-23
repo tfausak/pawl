@@ -1935,8 +1935,9 @@ playerRefPlayers legal controller gs ref = case ref of
     -- collapse -- Binding.mayPlayers, the seats a CR 603.5 "may" selected.
     -- Non-player recipients are dropped, as the arm above drops them.
     --
-    -- Binding.gatePlayers is the same shape one question over; not implemented:
-    -- no card's opcode reads THAT slot plurally yet (#1966).
+    -- Binding.gatePlayers is the same shape one question over, and Bellowing
+    -- Mauler's "each player loses 4 life unless they sacrifice a nontoken
+    -- creature of their choice" reads THAT slot plurally through the arm below.
   PlayerRef.EachInSlot slot -> Maybe.mapMaybe Recipient.playerOf (legalMany slot legal)
   PlayerRef.Relative PlayerRelation.You -> [controller]
   PlayerRef.Relative PlayerRelation.Opponent -> filter (PlayerRelation.holds PlayerRelation.Opponent controller) everyone
