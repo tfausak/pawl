@@ -2489,6 +2489,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsBlocked -> 0
   Filter.Type.AttackedThisTurn -> 0
   Filter.Type.MilledThisTurn -> 0
+  Filter.Type.DealtDamageThisTurn -> 0
   -- A DESCENT and not a zero, unlike every other atom here: CR 303.4's atom
   -- carries the host's description, which a card author writes exactly as they
   -- write any other filter. Zero would under-count against jsonAtoms, which counts

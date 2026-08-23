@@ -725,6 +725,11 @@ viewOfCard face =
           -- CR 701.17a mills an OBJECT; this builder describes a printed FACE.
           -- viewOfCharacteristics is the view that holds an id and answers.
           Filter.milledThisTurn = False,
+          -- CR 120.1a: damage is dealt to a battle, a creature or a
+          -- planeswalker, and this builder describes a printed FACE rather than
+          -- a permanent. viewOfCharacteristics is the view that holds an id and
+          -- answers.
+          Filter.dealtDamageThisTurn = False,
           Filter.attachedToView = Nothing,
           -- CR 303.4b's mirror, and Nothing for the same reason: a printed face
           -- is not an object, so no permanent's Object.attachedTo names it.
@@ -863,6 +868,11 @@ viewOfCharacteristics peers oid pc controller counters gs =
       Filter.attackedThisTurn = any (declaredIt oid . LoggedEvent.event) (GameState.events gs),
       -- CR 701.17a / 608.2i: the same log, read for the mills.
       Filter.milledThisTurn = any (milledIt oid . LoggedEvent.event) (GameState.events gs),
+      -- CR 120.1 / 608.2i: the same log again, read for the damage. Never
+      -- Object.damage -- CR 120.6 removes the marks on a regeneration and CR
+      -- 120.3d/120.3e mark none at all for wither or infect, and either creature
+      -- was still dealt damage this turn.
+      Filter.dealtDamageThisTurn = any ((== Just oid) . Game.damagedObject . LoggedEvent.event) (GameState.events gs),
       -- CR 701.3a: not a characteristic, so the attachment comes off
       -- Object.attachedTo -- but the HOST's characteristics are projected, so it
       -- arrives as a view of its own read through `peers` (CR 613.1). CR 303.4 /
@@ -2973,6 +2983,7 @@ filterReads f = case f of
   -- Reads nothing: no Modification writes GameState.events.
   Filter.Type.AttackedThisTurn -> Set.empty
   Filter.Type.MilledThisTurn -> Set.empty
+  Filter.Type.DealtDamageThisTurn -> Set.empty
   -- The nest's own reads, declared as if they were the CANDIDATE's even though
   -- they are the HOST's -- exactly right rather than merely safe, for the reason
   -- the note on Aspect above gives. The attachment itself reads nothing, for

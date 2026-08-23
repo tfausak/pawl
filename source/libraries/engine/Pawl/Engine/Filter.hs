@@ -144,6 +144,14 @@ data View = MkView
     -- of the same log `attackedThisTurn` above reads, and LAZY for that field's
     -- reason -- nothing forces it unless a Filter contains MilledThisTurn.
     milledThisTurn :: Bool,
+    -- CR 120.1 / 608.2i: was this candidate DEALT DAMAGE earlier this turn? The
+    -- same log the two fields above read, and LAZY for their reason -- nothing
+    -- forces it unless a Filter contains DealtDamageThisTurn.
+    --
+    -- Deliberately not Object.damage: CR 120.6 removes marked damage on a
+    -- regeneration and CR 120.3d/120.3e mark none at all for a wither or infect
+    -- source, so the marks are a strict subset of what was dealt.
+    dealtDamageThisTurn :: Bool,
     -- CR 303.4 / 110.1 / 701.3a: the HOST this candidate is attached to, viewed
     -- as a candidate in its own right, so that AttachedTo's nested Filter has
     -- something to be evaluated against. Not a characteristic either (CR 109.3):
@@ -437,6 +445,15 @@ playerView pid =
       attackedThisTurn = False,
       -- CR 701.17a mills CARDS, and a player is not one.
       milledThisTurn = False,
+      -- CR 120.1 lets a player BE dealt damage, so unlike the two fields above
+      -- this one asks a question a player candidate really can answer -- but not
+      -- here: this view is built from a PlayerId alone and holds no board whose
+      -- event log could be folded.
+      --
+      -- Not implemented: a player dealt damage this turn, which wants baking
+      -- against the game state at Pawl.Engine.Count.bakePerspective the way
+      -- ControlsMoreThanYou is (#2157).
+      dealtDamageThisTurn = False,
       -- CR 303.4b: a player an Aura is attached to is ENCHANTED by it; the
       -- player is not itself attached to anything, because Object.attachedTo is
       -- a field of the ATTACHED permanent, and a player is not one. So there is
@@ -858,6 +875,12 @@ matches context view predicate = case predicate of
   -- candidate can stop EXISTING -- CR 400.7 mints a new object the moment the
   -- milled card moves again, and the new one was not milled.
   Filter.MilledThisTurn -> milledThisTurn view
+  -- CR 120.1 / 608.2i: the same look-back again, over the damage events. Like
+  -- the two atoms above it cannot stop being true within a turn, and unlike
+  -- either it is not the reading CR 120.3e's marked damage would give -- CR
+  -- 120.6's regeneration and CR 120.3d's wither both leave a creature that was
+  -- dealt damage carrying nothing marked.
+  Filter.DealtDamageThisTurn -> dealtDamageThisTurn view
   -- CR 701.3a: a live read of Object.attachedTo and of the host's own projection,
   -- never a stamp on the candidate -- an Aura whose host stops being a creature
   -- stops matching, and CR 704.5m buries it on the next state-based-action pass.
@@ -1024,6 +1047,7 @@ rewrite pairs predicate = case predicate of
   Filter.IsBlocked -> predicate
   Filter.AttackedThisTurn -> predicate
   Filter.MilledThisTurn -> predicate
+  Filter.DealtDamageThisTurn -> predicate
   -- DESCENT, for ControlsMoreThanYou's reason above: the nested filter describes
   -- the HOST ("attached to a Swamp"), so CR 612.1's word swap reaches it exactly
   -- as it reaches the same description written at the top level.
@@ -1384,6 +1408,7 @@ bakeBound players predicate = case predicate of
   Filter.IsBlocked -> predicate
   Filter.AttackedThisTurn -> predicate
   Filter.MilledThisTurn -> predicate
+  Filter.DealtDamageThisTurn -> predicate
   -- DESCENT, for ControlsMoreThanYou's reason above: a ControlledByBound written
   -- into the HOST's description is baked exactly as the same atom written at the
   -- top level would be. Pawl.Engine.Filter.boundSlots descends to match, which is
@@ -1467,6 +1492,7 @@ manaValueThresholds predicate = case predicate of
   Filter.IsBlocked -> []
   Filter.AttackedThisTurn -> []
   Filter.MilledThisTurn -> []
+  Filter.DealtDamageThisTurn -> []
   -- Descended into, which OVER-reports for ControlsMoreThanYou's reason: the
   -- literals inside bound the HOST's mana value and never the candidate's. Only
   -- widening CR 601.3a's sample is the safe direction.
@@ -1559,6 +1585,7 @@ statesAQuality predicate = case predicate of
   Filter.IsBlocked -> True
   Filter.AttackedThisTurn -> True
   Filter.MilledThisTurn -> True
+  Filter.DealtDamageThisTurn -> True
   -- True whatever the nest says, for ControlsMoreThanYou's reason: "attached to
   -- something" is itself a stated quality under CR 701.23b, so even the trivial
   -- nest `And []` leaves this atom stating one and no descent could change it.
