@@ -11,6 +11,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.GameEvent as GameEvent.Codec
+import qualified Pawl.Codec.GameState as GameState.Codec
 import qualified Pawl.Codec.Printing as Printing.Codec
 import qualified Pawl.Engine.Card as Card
 -- Aliased Filter.Type, not Filter, for consistency with FilterSpec: the
@@ -36,13 +37,16 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Pool as Pool
+import qualified Pawl.Types.Printing as Printing.Type
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RevealCause as RevealCause
@@ -60,6 +64,7 @@ roundTrip s label enc dec x = Spec.assertEqWith s label (dec (enc x)) (Right x)
 
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
+  gameStateRoundTripSpec s registry
   -- Keyword's own per-constructor coverage, including the payload-bearing
   -- Landwalk/Cycling/Flashback/Entwine/Poisonous/Toxic arms, lives in
   -- Pawl.Codec.KeywordSpec now. CounterKind's own per-constructor coverage,
@@ -276,3 +281,60 @@ noZombiesOnBattlefield =
         Comparison.Exactly
         (Quantity.Literal 0)
     )
+
+-- CR 608.2i and the rest of a game in progress, through JSON and back (#126).
+--
+-- The acceptance criterion is EXACTNESS: decode (encode gs) == gs, over states
+-- built by the same fixtures the rest of the suite plays with, rather than
+-- against a hand-written literal. A whole GameState's literal would be tens of
+-- thousands of characters and would have to be rewritten by hand every time a
+-- field is added -- and a literal nobody can read is not a proof anybody checks.
+--
+-- The per-field shapes ARE pinned by literals, in the 110-odd Pawl.Codec.XSpec
+-- modules. What these cases add is the one thing those cannot: that every field
+-- is carried, in a state the engine really built.
+gameStateRoundTripSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+gameStateRoundTripSpec s registry = do
+  let roundTrips label gs = do
+        Common.assertMatchesSchema s GameState.Codec.codec gs
+        Spec.assertEqWith s label (Codec.decode GameState.Codec.codec (Codec.encode GameState.Codec.codec gs)) (Right gs)
+
+  Spec.it s "a plain board round trips" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    roundTrips "a board of lands" (S.oneMountainState mountain Phase.PrecombatMain)
+
+  -- Combat is the widest single record in the state, and the only one holding a
+  -- Maybe (Set ObjectId) whose Nothing and Just empty differ (CR 510.1).
+  Spec.it s "a board mid-combat round trips" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, _, _) = S.combatBoard piker 2 1
+    roundTrips "a declared attack" gs
+
+  Spec.it s "a non-empty stack round trips" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (_, gs) = S.spellOnStack bolt S.alice (S.oneMountainState mountain Phase.PrecombatMain)
+    roundTrips "a spell on the stack" gs
+
+  -- The two INLINE printing cases: a token's card is built at runtime and an
+  -- emblem's is a function of the temptation count, so neither is in the
+  -- registry and neither could be named rather than written out.
+  Spec.it s "a token round trips" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, gs) = S.addToken (Printing.Type.card piker) S.alice (S.oneMountainState mountain Phase.PrecombatMain)
+    roundTrips "a token on the battlefield" gs
+
+  Spec.it s "the monarch round trips" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    roundTrips "a state with a monarch" (S.withMonarch S.bob (S.oneMountainState mountain Phase.PrecombatMain))
+
+  -- printingIds is DERIVED on decode rather than written, so this is the case
+  -- that says the derivation is exact: the state carries two distinct printings,
+  -- and a decode that rebuilt the table wrongly would not equal the original.
+  Spec.it s "the intern table survives, though only half of it is written" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, gs) = S.addCreature piker S.alice (S.oneMountainState mountain Phase.PrecombatMain)
+    Spec.assertBool s (Map.size (GameState.printings gs) >= 2) "the fixture should hold two printings"
+    roundTrips "two interned printings" gs
