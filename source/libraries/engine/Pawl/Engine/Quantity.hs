@@ -22,6 +22,7 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.InZone as InZone
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaCount as ManaCount.Type
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -386,7 +387,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- record does: nobody having discarded is an answered question. What is
   -- unanswered is only the reference.
   Quantity.CardsDiscardedThisTurn ref -> case playersOf ref of
-    Just [pid] -> Just (toInteger (length (filter ((== Just pid) . Game.discardOf . snd) (Foldable.toList (GameState.events gs)))))
+    Just [pid] -> Just (toInteger (length (filter ((== Just pid) . Game.discardOf . LoggedEvent.event) (Foldable.toList (GameState.events gs)))))
     _ -> Nothing
   -- CR 120.1 / 608.2i: how many of the players this reference names were dealt
   -- damage this turn. CardsDiscardedThisTurn's arm in footing -- a live fold over
@@ -435,7 +436,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- turn is 0, which is a number and not a failure.
   Quantity.EnteredThisTurn ->
     fmap
-      (\oid -> if any ((== Just oid) . Game.enteredBattlefield . snd) (GameState.events gs) then 1 else 0)
+      (\oid -> if any ((== Just oid) . Game.enteredBattlefield . LoggedEvent.event) (GameState.events gs) then 1 else 0)
       mOid
   -- CR 509.1h's declaration, counted beyond the first: how many creatures are
   -- blocking the object this evaluation is aimed at, less one, floored at 0 for
@@ -459,7 +460,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
     -- Was this player dealt damage this turn? Game.damagedPlayer is what makes a
     -- DamageDealt event name a player at all; see it for CR 120.3a's recipient and
     -- for CR 120.8's zero.
-    wasDealtDamage pid = any ((== Just pid) . Game.damagedPlayer . snd) (GameState.events gs)
+    wasDealtDamage pid = any ((== Just pid) . Game.damagedPlayer . LoggedEvent.event) (GameState.events gs)
     -- CR 102.1's reference, resolved by Count.playersFor for every arm but the
     -- fold's own candidate. That one is answered HERE because this is where the
     -- candidate is: Count.evaluate's Scope.OverPlayers arm hands each candidate

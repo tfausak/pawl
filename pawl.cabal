@@ -133,6 +133,8 @@ library codec
     Pawl.Codec.AttackRequirementSpec
     Pawl.Codec.AttackTarget
     Pawl.Codec.AttackTargetSpec
+    Pawl.Codec.BattlefieldCandidate
+    Pawl.Codec.BattlefieldCandidateSpec
     Pawl.Codec.BecameAttached
     Pawl.Codec.BecameDesignated
     Pawl.Codec.BecameDesignatedSpec
@@ -321,6 +323,8 @@ library codec
     Pawl.Codec.EntryRiders
     Pawl.Codec.EntryRidersSpec
     Pawl.Codec.EntryRSpec
+    Pawl.Codec.EventGroup
+    Pawl.Codec.EventGroupSpec
     Pawl.Codec.EventShape
     Pawl.Codec.EventShapeSpec
     Pawl.Codec.ExcessDestination
@@ -392,6 +396,8 @@ library codec
     Pawl.Codec.LifeChangeSpec
     Pawl.Codec.LimitUnless
     Pawl.Codec.LimitUnlessSpec
+    Pawl.Codec.LoggedEvent
+    Pawl.Codec.LoggedEventSpec
     Pawl.Codec.LookAt
     Pawl.Codec.LookAtSpec
     Pawl.Codec.Loyalty
@@ -1148,6 +1154,7 @@ library types
     Pawl.Types.AttackingPlayers
     Pawl.Types.AttackRequirement
     Pawl.Types.AttackTarget
+    Pawl.Types.BattlefieldCandidate
     Pawl.Types.BecameAttached
     Pawl.Types.BecameDesignated
     Pawl.Types.BecameTarget
@@ -1308,6 +1315,7 @@ library types
     Pawl.Types.LibraryPosition
     Pawl.Types.LifeChange
     Pawl.Types.LimitUnless
+    Pawl.Types.LoggedEvent
     Pawl.Types.LookAt
     Pawl.Types.Loyalty
     Pawl.Types.Mana

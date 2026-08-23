@@ -63,6 +63,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
 import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
@@ -306,7 +307,7 @@ scanSpec s registry =
       let (ghoul1, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
           (ghoul2, gs1) = S.addCreature khabalGhoul S.alice gs0
           event = GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice)
-          triggers = fst (Event.gatherTriggers [(EventGroup.first, event)] gs1)
+          triggers = fst (Event.gatherTriggers [LoggedEvent.MkLoggedEvent {LoggedEvent.group = EventGroup.first, LoggedEvent.event = event}] gs1)
       Spec.assertBool s (ghoul1 < ghoul2) "ghoul1 has the lower id"
       Spec.assertEqWith s "both triggers fired" (length triggers) 2
       Spec.assertEqWith s "sources in ascending ObjectId order" (fmap PendingTrigger.source triggers) (fmap TriggerSource.OfObject [ghoul1, ghoul2])

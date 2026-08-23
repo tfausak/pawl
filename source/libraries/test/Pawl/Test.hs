@@ -37,6 +37,7 @@ import qualified Pawl.Codec.AttackTargetSpec
 import qualified Pawl.Codec.AttackerBlockedSpec
 import qualified Pawl.Codec.AttackerDeclaredSpec
 import qualified Pawl.Codec.AttackingPlayersSpec
+import qualified Pawl.Codec.BattlefieldCandidateSpec
 import qualified Pawl.Codec.BecameDesignatedSpec
 import qualified Pawl.Codec.BecomeCopySpec
 import qualified Pawl.Codec.BeginningStepSpec
@@ -130,6 +131,7 @@ import qualified Pawl.Codec.EntryRSpec
 import qualified Pawl.Codec.EntryRestrictionSpec
 import qualified Pawl.Codec.EntryRewriteSpec
 import qualified Pawl.Codec.EntryRidersSpec
+import qualified Pawl.Codec.EventGroupSpec
 import qualified Pawl.Codec.EventShapeSpec
 import qualified Pawl.Codec.ExcessDestinationSpec
 import qualified Pawl.Codec.ExchangeSidesSpec
@@ -165,6 +167,7 @@ import qualified Pawl.Codec.LibraryPlacementSpec
 import qualified Pawl.Codec.LibraryPositionSpec
 import qualified Pawl.Codec.LifeChangeSpec
 import qualified Pawl.Codec.LimitUnlessSpec
+import qualified Pawl.Codec.LoggedEventSpec
 import qualified Pawl.Codec.LookAtSpec
 import qualified Pawl.Codec.LoyaltySpec
 import qualified Pawl.Codec.ManaAdditionSpec
@@ -500,6 +503,7 @@ spec s registry = do
   Pawl.Codec.AttackTargetSpec.spec s
   Pawl.Codec.AttackingPlayersSpec.spec s
   Pawl.Codec.AttackerDeclaredSpec.spec s
+  Pawl.Codec.BattlefieldCandidateSpec.spec s
   Pawl.Codec.BecameDesignatedSpec.spec s
   Pawl.Codec.BecomeCopySpec.spec s
   Pawl.Codec.BeginningStepSpec.spec s
@@ -591,6 +595,7 @@ spec s registry = do
   Pawl.Codec.EntryRSpec.spec s
   Pawl.Codec.EntryRewriteSpec.spec s
   Pawl.Codec.EntryRidersSpec.spec s
+  Pawl.Codec.EventGroupSpec.spec s
   Pawl.Codec.EventShapeSpec.spec s
   Pawl.Codec.ExchangeSidesSpec.spec s
   Pawl.Codec.ExcessDestinationSpec.spec s
@@ -626,6 +631,7 @@ spec s registry = do
   Pawl.Codec.LibraryPositionSpec.spec s
   Pawl.Codec.LifeChangeSpec.spec s
   Pawl.Codec.LimitUnlessSpec.spec s
+  Pawl.Codec.LoggedEventSpec.spec s
   Pawl.Codec.LookAtSpec.spec s
   Pawl.Codec.LoyaltySpec.spec s
   Pawl.Codec.ManaCostSpec.spec s

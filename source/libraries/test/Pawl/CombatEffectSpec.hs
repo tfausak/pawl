@@ -49,6 +49,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -3532,7 +3533,7 @@ becomesBlockedSpec s registry = Spec.describe s "BecomesBlocked" $ do
         -- effect rather than a creature". The event that condition reads is the
         -- one the declaration leg below does record, so this pair is what says
         -- the effect records the attacking side and only that.
-        Spec.assertBool s (not (any (blockerWasDeclared . snd) (GameState.events cast))) "no blocker was declared for it"
+        Spec.assertBool s (not (any (blockerWasDeclared . LoggedEvent.event) (GameState.events cast))) "no blocker was declared for it"
         -- Never blocked: the trigger is silent and the Prey connects.
         Spec.assertBool s (not (Combat.isBlocked attacker uncast)) "control: with no spell the attacker is unblocked"
         Spec.assertEqWith s "control: so bob takes the Prey's 1" (S.lifeOf S.bob uncast) (Just 19)
@@ -3544,7 +3545,7 @@ becomesBlockedSpec s registry = Spec.describe s "BecomesBlocked" $ do
         Spec.assertEqWith s "declaration leg: but the Piker is what is blocking it" (Combat.blockersOf attacker declared) (Set.singleton blocker)
         Spec.assertEqWith s "declaration leg: the same trigger fires" (S.lifeOf S.alice declared) (Just 21)
         Spec.assertBool s (not (S.onBattlefield attacker declared) && not (S.onBattlefield blocker declared)) "declaration leg: and the two creatures trade"
-        Spec.assertBool s (any (blockerWasDeclared . snd) (GameState.events declared)) "declaration leg: and CR 509.3d's event IS recorded there"
+        Spec.assertBool s (any (blockerWasDeclared . LoggedEvent.event) (GameState.events declared)) "declaration leg: and CR 509.3d's event IS recorded there"
       _ -> Spec.assertFailure s "fixture should have one attacker and one blocker"
   Spec.it s "CR 509.1h a creature already blocked is not a legal target" $ do
     -- CR 509.1h again, read through the card's own committed target slot:
@@ -3668,7 +3669,7 @@ putOntoBattlefieldBlockingSpec s registry = Spec.describe s "PutOntoBattlefieldB
           other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
         -- CR 509.3a and CR 509.3b's last sentence, at event level: the entry
         -- records no declaration.
-        Spec.assertBool s (not (any (blockerWasDeclared . snd) (GameState.events atEnd))) "CR 509.3a / CR 509.3b: no blocker was declared"
+        Spec.assertBool s (not (any (blockerWasDeclared . LoggedEvent.event) (GameState.events atEnd))) "CR 509.3a / CR 509.3b: no blocker was declared"
         -- Both traded: the Thopter's 1 toughness took the Saproling's 1, and the
         -- Saproling's 1 toughness took the Thopter's 2. That is CR 510.1c damage
         -- being assigned in both directions, which only a real blocker gets.
@@ -3696,7 +3697,7 @@ putOntoBattlefieldBlockingSpec s registry = Spec.describe s "PutOntoBattlefieldB
         Spec.assertEqWith s "CR 510.1c: so the Prey's 1 was assigned to the token and bob takes only the Thopter's 2" (S.lifeOf S.bob atEnd) (Just 18)
         Spec.assertEqWith s "CR 509.4: the Saproling is blocking the Prey" (Combat.blockersOf ground blocking) (Set.fromList (S.tokensOf blocking))
         Spec.assertEqWith s "and nothing is blocking the Thopter" (Combat.blockersOf flier blocking) Set.empty
-        Spec.assertBool s (not (any (blockerWasDeclared . snd) (GameState.events atEnd))) "CR 509.3a / CR 509.3b: no blocker was declared here either"
+        Spec.assertBool s (not (any (blockerWasDeclared . LoggedEvent.event) (GameState.events atEnd))) "CR 509.3a / CR 509.3b: no blocker was declared here either"
         Spec.assertBool s (S.onBattlefield flier atEnd) "the unblocked Thopter is untouched"
         Spec.assertBool s (not (S.onBattlefield ground atEnd)) "and the Prey traded with the Saproling"
         -- The control leg, differing from the first only in whether the spell is
