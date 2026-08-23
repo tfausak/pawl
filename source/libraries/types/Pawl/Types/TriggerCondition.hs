@@ -215,6 +215,35 @@ data TriggerCondition
     -- already carries the permanent an arm for them would read -- and CR 508.3e's
     -- "[a player] attacks [another player]" (#538).
     AttachedPlayerIsAttacked
+  | -- | CR 508.3d: "whenever you attack" (Boggart Prankster) -- once per
+    -- DECLARATION, by the ability's controller, against
+    -- GameEvent.AttackersDeclared, which Pawl.Engine.Combat.declareAttackers
+    -- records once per CR 508.1 declaration and only for a non-empty one.
+    --
+    -- The third of CR 508.3's arities, and the two arms above are the others:
+    -- SelfAttacks and CreatureAttacksYou fire per declared attacker (CR 508.3a),
+    -- AttachedPlayerIsAttacked per distinct target (CR 508.3b). Two creatures
+    -- declared together part this from the first; one declaration split across a
+    -- player and a planeswalker that player controls parts it from the second,
+    -- which is why neither of their events could carry it.
+    --
+    -- The BEARER need not attack, and need not be a creature: rule 508.3d asks
+    -- only that its controller declared one or more attackers. CreatureAttacksAlone's
+    -- bystanding posture, not SelfAttacks' self-scoping.
+    --
+    -- Nullary: rule 508.3d's "[a player]" is CR 109.5's "you" on every printing
+    -- of the shape -- Scryfall o:"whenever you attack," 2026-08-23, and every hit
+    -- reads "you". A PlayerRelation payload would be speculative,
+    -- AttachedPlayerIsAttacked's posture.
+    --
+    -- Nothing is bound. Rule 508.3d names a SET of creatures rather than one, so
+    -- there is no attacker to point at, and the player it does name is the
+    -- ability's own controller.
+    --
+    -- Not implemented: CR 508.3c's "whenever [a player] attacks with [a
+    -- creature]", this subject at CR 508.3a's arity and binding the creature
+    -- (#2140), and CR 508.3e's "attacks [another player]" (#538).
+    YouAttack
   | -- | CR 702.105a: dethrone -- SelfAttacks narrowed by whom the bearer
     -- attacked. The attacked player comes from Combat.attackers rather than the
     -- event, and that is the whole narrowing: the event carries CR 508.5's

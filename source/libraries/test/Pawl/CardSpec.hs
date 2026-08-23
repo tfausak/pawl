@@ -676,6 +676,9 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- Nullary too, and rule 508.3b's "one or more" is the EVENT's grouping rather
   -- than a number this condition counts.
   TriggerCondition.AttachedPlayerIsAttacked -> []
+  -- Nullary too, and rule 508.3d's "one or more" is the EVENT's grouping for
+  -- the arm above's reason, not a number this condition counts.
+  TriggerCondition.YouAttack -> []
   -- CR 702.105a compares life totals rather than counting objects, so no Count.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> []
   TriggerCondition.SelfBlocks -> []
@@ -2995,6 +2998,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 508.3b names no quality of anything: its subject is the ability's own
   -- attachment, so there is no Filter here either.
   TriggerCondition.AttachedPlayerIsAttacked -> []
+  -- CR 508.3d names no quality of anything either: its subject is a player, and
+  -- the creatures it counts are the DECLARATION's rather than a Filter's.
+  TriggerCondition.YouAttack -> []
   -- CR 702.105a names no quality of the attacker, only a fact about whom it
   -- attacked, so no Filter.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> []

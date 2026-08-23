@@ -254,6 +254,36 @@ data GameEvent
     -- player]" is the shape that needs one, and no trigger condition writes it
     -- (#538).
     BecameAttacked AttackTarget.AttackTarget
+  | -- | CR 508.3d: a player DECLARED ATTACKERS -- ONE event per CR 508.1
+    -- declaration, naming the attacking player, appended by
+    -- Pawl.Engine.Combat.declareAttackers alone.
+    --
+    -- The third of CR 508.3's three arities, and the two above are the others:
+    -- AttackerDeclared is per attacking creature (CR 508.3a) and BecameAttacked
+    -- per distinct target (CR 508.3b), where rule 508.3d asks only whether "one
+    -- or more creatures that player controls are declared as attackers". A
+    -- declaration splitting five creatures across a player and a planeswalker is
+    -- five of the first, two of the second and ONE of this.
+    -- Pawl.Engine.Event.matchesTrigger sees one event at a time, so the grouping
+    -- is built here rather than deduplicated by a reader.
+    --
+    -- Recorded only for a declaration that named at least one creature, which is
+    -- rule 508.3d's "one or more": a player who declines to attack has not
+    -- attacked, and the event log would otherwise say they did.
+    --
+    -- The PlayerId is the ATTACKING player -- CR 508.1's active player -- where
+    -- AttackerDeclared carries CR 508.5's defending player instead. Rule 508.3d's
+    -- subject is whoever declared.
+    --
+    -- Rule 508.3d states no exclusion for a creature put onto the battlefield
+    -- attacking, but one holds by construction for BecameAttacked's reason:
+    -- Combat.putOntoBattlefieldAttacking records nothing, and CR 508.4 says such
+    -- a creature was never declared.
+    --
+    -- Carries no attacked target. CR 508.3e's "[a player] attacks [another
+    -- player]" is the shape that wants one beside this player, and no trigger
+    -- condition writes it (#538).
+    AttackersDeclared PlayerId.PlayerId
   | -- | CR 509.1i: a blocker was DECLARED -- one entry per creature the defending
     -- player chose in CR 509.1's turn-based action, naming the blocker and one
     -- attacking creature chosen for it (CR 509.1a). AttackerDeclared's mirror,

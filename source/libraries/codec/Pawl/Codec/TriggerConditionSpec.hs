@@ -202,6 +202,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.CreatureAttacksYou
       " {\"type\":\"CreatureAttacksYou\"} "
+  -- CR 508.3d, nullary for the arm above's reason and one of its own: rule
+  -- 508.3d's "[a player]" is CR 109.5's "you" on every printing.
+  Spec.it s "YouAttack" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.YouAttack
+      " {\"type\":\"YouAttack\"} "
   -- CR 508.3b, nullary for the sibling above's reason and one of its own: the
   -- subject is whom the ability's own source is attached to.
   Spec.it s "AttachedPlayerIsAttacked" $

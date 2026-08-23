@@ -2888,6 +2888,119 @@ curseOfVitalitySpec s registry =
               Spec.assertEqWith s "and nothing was declared" (sentAt after) []
             Nothing -> Spec.assertFailure s "fixture should give alice two Pikers, bob a Jace and carol the Curse"
 
+-- CR 508.3d: the third of rule 508.3's three arities, and the first trigger in
+-- the pool whose subject is the ATTACKING PLAYER.
+--
+-- Boggart Prankster {1}{B} Creature -- Goblin Warrior 1/3 is the card: "Whenever
+-- you attack, target attacking Goblin you control gets +1/+0 until end of turn."
+-- Rule 508.3d triggers "if one or more creatures that player controls are
+-- declared as attackers", so ONE declaration is one trigger however many
+-- creatures it named and however many things they were sent at.
+--
+-- Two attacking Goblins is what parts it from CR 508.3a's per-attacker form
+-- (SelfAttacks, CreatureAttacksYou): both are legal targets, so a per-attacker
+-- reading resolves TWO pumps and the Prankster is a 3/3 rather than a 2/3. One
+-- attacker would make the two arities agree, which is the trap.
+--
+-- The same declaration SPLIT across bob and a Jace bob controls is what parts it
+-- from CR 508.3b's per-target form (AttachedPlayerIsAttacked): CR 508.1b lists
+-- player and planeswalker separately, so that reading sees two
+-- GameEvent.BecameAttacked events and pumps twice. Every single-defender board
+-- lets the two agree, which is why this one exists.
+--
+-- The Prankster targets ITSELF on both, being an attacking Goblin alice
+-- controls, so the assertion is one creature's power and cannot be reached by
+-- pumping the other one -- and the Piker's own 2/1 is asserted beside it.
+--
+-- The Prankster HELD BACK is the third board, and it is what parts rule 508.3d
+-- from a self-scoped reading: its controller attacked, so it triggers even
+-- though it is not attacking, and the Piker is then the only legal target.
+boggartPranksterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+boggartPranksterSpec s registry =
+  let -- Declares exactly the creatures `plan` names, announces each at the target
+      -- `plan` pairs with it, and points every target slot at `aim`. Both choices
+      -- are FILTERED out of what the engine offered rather than built: an
+      -- announcement CR 508.1b never offered falls back visibly to the head, and
+      -- a hand-built Recipient of the right object in the wrong shape would be
+      -- dropped at CR 608.2b with no error.
+      answering :: [(ObjectId.ObjectId, AttackTarget.AttackTarget)] -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+      answering plan aim p = case p of
+        Prompt.DeclareAttackers _ _ ids -> filter (\oid -> List.elem oid (fmap fst plan)) ids
+        Prompt.ChooseAttackTarget _ _ oid options ->
+          Maybe.fromMaybe (NonEmpty.head options) (List.find (\t -> List.lookup oid plan == Just t) (NonEmpty.toList options))
+        Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToCreature aim) . snd) sets
+        _ -> S.aggressiveAnswer p
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+      sentAt gs = Combat.Type.attackers (GameState.combat gs)
+      -- alice's Prankster and Piker, bob empty. Both Goblins, both untapped and
+      -- Settled, so both are legal attackers and both are legal targets.
+      plainBoard = do
+        prankster <- S.printingOf s registry "Boggart Prankster"
+        piker <- S.printingOf s registry "Goblin Piker"
+        case S.combatBoardOf [prankster, piker] [] of
+          (gs, [pranksterId, pikerId], []) -> pure (Just (pranksterId, pikerId, gs))
+          _ -> pure Nothing
+      -- The same two attackers with a planeswalker to split them across. The
+      -- loyalty keeps CR 704.5i from burying the Jace before CR 508.1b can offer
+      -- it, exactly as Pawl.EventTriggerSpec's Curse of Vitality board does.
+      splitBoard = do
+        prankster <- S.printingOf s registry "Boggart Prankster"
+        piker <- S.printingOf s registry "Goblin Piker"
+        jace <- S.printingOf s registry "Jace Beleren"
+        case S.combatBoardOf [prankster, piker] [jace] of
+          (gs, [pranksterId, pikerId], [walker]) ->
+            pure (Just (pranksterId, pikerId, walker, S.addCounter CounterKind.Loyalty 3 walker gs))
+          _ -> pure Nothing
+   in Spec.describe s "Boggart Prankster" $ do
+        -- The proving test. TWO Goblins are declared together and the Prankster
+        -- is a 2/3: one declaration, one trigger, one +1/+0. A reading at CR
+        -- 508.3a's arity makes it a 3/3.
+        Spec.it s "CR 508.3d whole card: two creatures declared together trigger it once" $ do
+          built <- plainBoard
+          case built of
+            Just (pranksterId, pikerId, gs) -> do
+              let after = atBlockers (answering [(pranksterId, AttackTarget.OfPlayer S.bob), (pikerId, AttackTarget.OfPlayer S.bob)] pranksterId) gs
+              Spec.assertEqWith s "the Prankster took ONE +1/+0" (S.powerToughnessOf pranksterId after) (Just (2, 3))
+              Spec.assertEqWith s "and the Piker, which the trigger did not target, took none" (S.powerToughnessOf pikerId after) (Just (2, 1))
+              Spec.assertEqWith s "CR 508.1b both Goblins really were declared attacking bob" (sentAt after) (Map.fromList [(pranksterId, AttackTarget.OfPlayer S.bob), (pikerId, AttackTarget.OfPlayer S.bob)])
+            Nothing -> Spec.assertFailure s "fixture should give alice a Prankster and a Piker"
+        -- The same declaration aimed at TWO different things, which records two
+        -- GameEvent.BecameAttacked events and one GameEvent.AttackersDeclared.
+        -- Still a 2/3.
+        Spec.it s "CR 508.3d one declaration split across a player and their planeswalker still triggers it once" $ do
+          built <- splitBoard
+          case built of
+            Just (pranksterId, pikerId, walker, gs) -> do
+              let after = atBlockers (answering [(pranksterId, AttackTarget.OfPlayer S.bob), (pikerId, AttackTarget.OfPlaneswalker walker)] pranksterId) gs
+              Spec.assertEqWith s "the Prankster took ONE +1/+0" (S.powerToughnessOf pranksterId after) (Just (2, 3))
+              Spec.assertEqWith s "and the Piker took none" (S.powerToughnessOf pikerId after) (Just (2, 1))
+              Spec.assertEqWith s "CR 508.1b and the declaration really did name two different targets" (sentAt after) (Map.fromList [(pranksterId, AttackTarget.OfPlayer S.bob), (pikerId, AttackTarget.OfPlaneswalker walker)])
+            Nothing -> Spec.assertFailure s "fixture should give alice a Prankster and a Piker, and bob a Jace"
+        -- The bearer held out of combat. Rule 508.3d asks about its CONTROLLER,
+        -- so it triggers anyway, and "target attacking Goblin you control" then
+        -- has exactly one candidate.
+        Spec.it s "CR 508.3d the Prankster need not attack: its controller's declaration is the event" $ do
+          built <- plainBoard
+          case built of
+            Just (pranksterId, pikerId, gs) -> do
+              let after = atBlockers (answering [(pikerId, AttackTarget.OfPlayer S.bob)] pikerId) gs
+              Spec.assertEqWith s "the Piker, the only attacking Goblin, took the +1/+0" (S.powerToughnessOf pikerId after) (Just (3, 1))
+              Spec.assertEqWith s "and the Prankster, not attacking, is untouched" (S.powerToughnessOf pranksterId after) (Just (1, 3))
+              Spec.assertEqWith s "CR 508.1b and only the Piker was declared" (sentAt after) (Map.fromList [(pikerId, AttackTarget.OfPlayer S.bob)])
+            Nothing -> Spec.assertFailure s "fixture should give alice a Prankster and a Piker"
+        -- No declaration at all, on the same board: rule 508.3d's "one or more",
+        -- and the falsifier for an event recorded per STEP rather than per
+        -- declaration.
+        Spec.it s "CR 508.3d a declare attackers step with no attackers is not attacking" $ do
+          built <- plainBoard
+          case built of
+            Just (pranksterId, pikerId, gs) -> do
+              let after = atBlockers (answering [] pranksterId) gs
+              Spec.assertEqWith s "the Prankster is its printed 1/3" (S.powerToughnessOf pranksterId after) (Just (1, 3))
+              Spec.assertEqWith s "and the Piker its printed 2/1" (S.powerToughnessOf pikerId after) (Just (2, 1))
+              Spec.assertEqWith s "and nothing was declared" (sentAt after) Map.empty
+            Nothing -> Spec.assertFailure s "fixture should give alice a Prankster and a Piker"
+
 anafenzaAttackSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 anafenzaAttackSpec s registry =
   let countersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
@@ -4075,6 +4188,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   masterOfLaketownDeathSpec s registry
   anafenzaAttackSpec s registry
   curseOfVitalitySpec s registry
+  boggartPranksterSpec s registry
   ezuriExperienceSpec s registry
   youngPyromancerSpec s registry
   whisperingWizardSpec s registry

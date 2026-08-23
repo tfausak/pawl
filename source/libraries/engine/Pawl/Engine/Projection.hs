@@ -1990,6 +1990,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.CreatureAttacksAlone f -> TriggerCondition.CreatureAttacksAlone (Filter.rewrite pairs f)
   TriggerCondition.CreatureAttacksYou -> condition
   TriggerCondition.AttachedPlayerIsAttacked -> condition
+  TriggerCondition.YouAttack -> condition
   TriggerCondition.SelfAttacksPlayerWithMostLife -> condition
   TriggerCondition.SelfBlocks -> condition
   TriggerCondition.SelfBlocksCreature f -> TriggerCondition.SelfBlocksCreature (Filter.rewrite pairs f)

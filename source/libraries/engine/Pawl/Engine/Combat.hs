@@ -1244,6 +1244,18 @@ attemptAttackDeclaration pid defender rejected = do
                     let attacked = Set.fromList (Maybe.mapMaybe (\oid -> Map.lookup oid recorded) attacking)
                      in List.foldl' (\h t -> Event.recordEvent (GameEvent.BecameAttacked t) h) g (Set.toList attacked)
                 )
+              -- CR 508.3d's arity, which is neither of the two above: the
+              -- DECLARATION's, so one event however many creatures were named and
+              -- however many things they were sent at. `pid` is rule 508.1's
+              -- declaring player, whom rule 508.3d's "[a player]" names.
+              --
+              -- Only for a non-empty declaration, which is rule 508.3d's "one or
+              -- more creatures": a player who declined has not attacked, and this
+              -- block is reached with `attacking` empty whenever they did.
+              --
+              -- Last of the three, the batch above's reason: CR 508.2b puts every
+              -- trigger from this declaration on the stack together.
+              Monad.unless (null attacking) (State.modify' (Event.recordEvent (GameEvent.AttackersDeclared pid)))
 
 -- CR 508.4: a creature put onto the battlefield attacking has its controller
 -- choose what it is attacking as it enters. Resolve calls this for each permanent
