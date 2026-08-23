@@ -1,13 +1,15 @@
 module Pawl.Types.Search where
 
+import qualified Data.Set as Set
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.Zone as Zone
 
--- | CR 701.23's search: who looks, whose library, how many cards, which cards,
--- and where they go.
+-- | CR 701.23's search: who looks, whose zones are looked through, how many
+-- cards, which cards, and where they go.
 
 -- The two PlayerRefs are the reason the fields are named. CR 701.23a's looking
 -- and CR 400.1's ownership are independent -- Extract's "search target player's
@@ -27,6 +29,26 @@ import qualified Pawl.Types.SearchDestination as SearchDestination
 data Search = MkSearch
   { searcher :: PlayerRef.PlayerRef,
     owner :: PlayerRef.PlayerRef,
+    -- | Which zones this one instruction looks through (CR 701.23a), all of
+    -- them owned by `owner` -- Delivery Moogle's "your library and/or
+    -- graveyard".
+    --
+    -- A Set rather than one Zone, and rather than a list of searches: CR 701.23h
+    -- makes several looks before one shuffle a SINGLE search, so a card naming
+    -- two zones asks its searcher once, over the union. A Set rather than an
+    -- ordered NonEmpty because CR 701.23a orders nothing within a search --
+    -- "library and/or graveyard" and "graveyard, hand, and library" differ only
+    -- in membership.
+    --
+    -- The zone is what decides whether a find can be declined: CR 701.23b/c/d
+    -- are each scoped to a HIDDEN zone, and CR 400.2 makes only the library and
+    -- the hand hidden, so a search of a graveyard must find whatever it can even
+    -- where the same search of a library need not (CR 701.23b's Splinter
+    -- example).
+    --
+    -- Not implemented: the zones being the searcher's CHOICE, printed "and/or"
+    -- (#2148).
+    zones :: Set.Set Zone.Zone,
     -- | How many cards the search may find, or 'Nothing' where the printed
     -- instruction states no count at all -- Mana Severance's "any number of land
     -- cards".

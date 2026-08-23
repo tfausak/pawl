@@ -775,7 +775,7 @@ effectCounts effect = case effect of
   -- The search's count is a Quantity like any other -- Explosive Vegetation's
   -- "up to two" -- so its Counts are reachable from here. A search stating no
   -- count (Mana Severance) has none to reach.
-  Effect.Search (Search.MkSearch _ _ quantity _ _ _) -> foldMap quantityCounts quantity
+  Effect.Search (Search.MkSearch _ _ _ quantity _ _ _) -> foldMap quantityCounts quantity
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   -- Bolster's N is a Quantity like the Search's above, so its Counts are
@@ -3564,7 +3564,7 @@ effectFilters effect = case effect of
   -- THE one search-framed position. CR 701.3a from the candidate's side:
   -- Auratouched Mage's "an Aura card that could enchant it", where the host is
   -- fixed for the whole evaluation and the Aura varies per candidate.
-  Effect.Search (Search.MkSearch _ _ _ f _ _) -> searchFramed [f]
+  Effect.Search (Search.MkSearch _ _ _ _ f _ _) -> searchFramed [f]
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   -- Only the count's Filters: rule 701.39a describes the candidate pool, so no
@@ -6341,7 +6341,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "a Search filter",
-              base {Face.spell = spellOf [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand}] Map.empty}
+              base {Face.spell = spellOf [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand}] Map.empty}
             ),
             ( "an ObjectRef.EachMatching set",
               base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing Nothing Nothing)] Map.empty}
@@ -6453,7 +6453,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "CR 103.5b's pregame action",
-              base {Face.mulliganActions = [HandAction.MkHandAction Nothing [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand}]]}
+              base {Face.mulliganActions = [HandAction.MkHandAction Nothing [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand}]]}
             )
           ]
         report (label, card) = (label, canHostSubjectOffends card, canHostSubjectCounts card)
@@ -6569,7 +6569,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "a Search filter",
-              base {Face.spell = spellOf [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand}] Map.empty}
+              base {Face.spell = spellOf [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand}] Map.empty}
             ),
             ( "an ObjectRef.EachMatching set",
               base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing Nothing Nothing)] Map.empty}

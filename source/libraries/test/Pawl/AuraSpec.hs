@@ -2014,7 +2014,7 @@ battlefieldNamed wanted gs =
 -- seed that went missing shows up as a wrong board rather than as a silence.
 mageAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
 mageAnswer other p = case p of
-  Prompt.SearchLibrary _ _ matches cap -> do
+  Prompt.Search _ _ matches cap -> do
     State.modify' (<> [matches])
     pure (List.genericTake cap matches)
   Prompt.Shuffle library -> pure library

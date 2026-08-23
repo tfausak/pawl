@@ -792,7 +792,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
             Nothing
@@ -809,7 +809,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     mountain <- S.printingOf s registry "Mountain"
     let base = Setup.emptyGame S.bothPlayers
         (_, g1) = S.addLibraryCard mountain S.alice base
-        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing Nothing
+        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing Nothing
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj = Object.MkObject S.alice Nothing (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability}) Zone.Stack TapState.Untapped Facing.FaceUp False 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing ts Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty False 0 (Mana.MkMana []) Nothing Set.empty Set.empty False Set.empty
@@ -834,7 +834,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
             Nothing
@@ -859,7 +859,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
             Nothing
@@ -1381,6 +1381,81 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "and every hand is empty" (fmap (\pid -> namesIn Zone.Hand pid after) [S.alice, S.bob, S.carol]) [[], [], []]
     Spec.assertEqWith s "three asks and no search" asked [(Text.pack "may", S.alice), (Text.pack "may", S.bob), (Text.pack "may", S.carol)]
     Spec.assertEqWith s "the Wayfinder itself still resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Jungle Wayfinder")) S.alice after) 1
+  -- Delivery Moogle -- "{3}{W} Creature -- Moogle 3/2. Flying. When this
+  -- creature enters, search your library and/or graveyard for an artifact card
+  -- with mana value 2 or less, reveal it, and put it into your hand. If you
+  -- search your library this way, shuffle." The whole-card proof that a search
+  -- names ZONES (Search.zones), and that CR 701.23b's fail-to-find is a property
+  -- of the ZONE rather than of the search: CR 400.2 makes the graveyard public
+  -- and the library hidden, and CR 701.23b/c/d each speak only of a hidden zone.
+  -- CR 701.23b's own Splinter example is the authority -- its controller "must
+  -- find the Howling Mine in the graveyard, but may choose to find zero, one, or
+  -- two of the Howling Mines in the library".
+  --
+  -- Not implemented: the printed "and/or", which lets the searcher pick which of
+  -- the two zones to look through (#2148). Pawl searches both, which is the
+  -- STRICTER reading -- a graveyard find it cannot decline.
+  --
+  -- The three cases share one board and differ in the ANSWER alone, except that
+  -- the second empties the graveyard, which is the one thing the rule turns on.
+  -- Bonesplitter sits in the GRAVEYARD and Chromatic Star in the LIBRARY, both
+  -- matching and both mana value 1, so the cap of one cannot separate them and
+  -- the assertion has to name the card. Crucible of Worlds is a mana value 3
+  -- artifact in the same library, so the filter has something to reject and the
+  -- offer is strictly larger than the largest legal answer. Four Plains pay the
+  -- {3}{W}.
+  Spec.it s "CR 701.23b/400.2 whole card: Delivery Moogle's graveyard is public, so declining still finds there" $ do
+    board <- moogleBoard s registry ["Bonesplitter"]
+    let settled = resolveMoogle (findPinned []) board
+    -- The gameplay assertion, and first: an engine gating fail-to-find once over
+    -- the union rather than per zone leaves this hand EMPTY.
+    Spec.assertEqWith
+      s
+      "she declined, but CR 701.23b does not reach a public zone, so the Bonesplitter is in her hand"
+      (namesIn Zone.Hand S.alice settled)
+      [Just (CardName.MkCardName (Text.pack "Bonesplitter"))]
+    Spec.assertEqWith s "and it left the graveyard" (namesIn Zone.Graveyard S.alice settled) []
+    Spec.assertEqWith
+      s
+      "the library is untouched -- the completion is drawn from the public zone alone"
+      (Set.fromList (Game.zoneMembers Zone.Library S.alice settled))
+      (Set.fromList [moogleStar board, moogleCrucible board])
+  -- The other arm of the same rule, on a board differing in exactly one thing:
+  -- nothing in the graveyard. The library match is still there and still
+  -- declined, and CR 701.23b's permission covers it because the library is
+  -- hidden. Without this case an engine that forced the find in EVERY zone would
+  -- pass the case above.
+  Spec.it s "CR 701.23b/400.2 whole card: Delivery Moogle's library is hidden, so declining stands there" $ do
+    board <- moogleBoard s registry []
+    let settled = resolveMoogle (findPinned []) board
+    Spec.assertEqWith s "she found nothing, and her hand is empty" (namesIn Zone.Hand S.alice settled) []
+    Spec.assertEqWith
+      s
+      "both library cards are still in the library"
+      (Set.fromList (Game.zoneMembers Zone.Library S.alice settled))
+      (Set.fromList [moogleStar board, moogleCrucible board])
+  -- The ordinary path, and the control for the first case: the same board, the
+  -- searcher naming the LIBRARY card. CR 701.23h makes the two zones one search
+  -- with one count, so filling the cap from the library leaves the graveyard
+  -- match where it is.
+  Spec.it s "CR 701.23h whole card: Delivery Moogle's two zones are ONE search with one count" $ do
+    board <- moogleBoard s registry ["Bonesplitter"]
+    let settled = resolveMoogle (findPinned [moogleStar board]) board
+    Spec.assertEqWith
+      s
+      "the library card she named is the one in her hand"
+      (namesIn Zone.Hand S.alice settled)
+      [Just (CardName.MkCardName (Text.pack "Chromatic Star"))]
+    Spec.assertEqWith
+      s
+      "the count is filled, so the graveyard match stayed put"
+      (namesIn Zone.Graveyard S.alice settled)
+      [Just (CardName.MkCardName (Text.pack "Bonesplitter"))]
+    Spec.assertEqWith
+      s
+      "and only the card the filter rejected is left in the library"
+      (Game.zoneMembers Zone.Library S.alice settled)
+      [moogleCrucible board]
   Spec.it s "CR 603/608.2n Rest in Peace's ETB exiles graveyards and ceases" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -2016,7 +2091,7 @@ resolveSeverance answer board =
 -- assertion would stay green while the engine's own count was broken.
 findPinned :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
 findPinned wanted p = case p of
-  Prompt.SearchLibrary {} -> wanted
+  Prompt.Search {} -> wanted
   _ -> S.identityAnswer p
 
 untappedOf :: PlayerId.PlayerId -> GameState.GameState -> [ObjectId.ObjectId]
@@ -2028,14 +2103,14 @@ untappedOf pid gs =
 -- list -- one card for the searches that ask for one.
 findFirst :: Prompt.Prompt r -> r
 findFirst p = case p of
-  Prompt.SearchLibrary _ _ matches cap -> List.genericTake cap matches
+  Prompt.Search _ _ matches cap -> List.genericTake cap matches
   _ -> S.identityAnswer p
 
 -- Names a card the search filter did NOT admit -- the lying interpreter #222 is
 -- about. Parameterised so the test can point it at a specific nonland.
 findForbidden :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 findForbidden wanted p = case p of
-  Prompt.SearchLibrary {} -> [wanted]
+  Prompt.Search {} -> [wanted]
   _ -> S.identityAnswer p
 
 -- findFirst, plus CR 603.5's printed "may" taken. The pair below it declines the
@@ -2090,7 +2165,7 @@ wayfinderAnswer p = case p of
     pure (if pid == S.bob then OptionalDecision.Declines else OptionalDecision.Exercises)
   -- CR 701.23b's fail-to-find for carol; the filter states a quality, so an
   -- empty answer stands rather than being completed.
-  Prompt.SearchLibrary _ pid matches cap -> do
+  Prompt.Search _ pid matches cap -> do
     State.modify' (<> [(Text.pack "search", pid)])
     pure (if pid == S.carol then [] else List.genericTake cap matches)
   Prompt.Shuffle offered -> pure (reverse offered)
@@ -2105,6 +2180,37 @@ decliningWayfinderAnswer p = case p of
     pure OptionalDecision.Declines
   _ -> wayfinderAnswer p
 
+-- Delivery Moogle's board. Four Plains pay the {3}{W}; the library holds a
+-- MATCHING artifact (Chromatic Star, mana value 1) and one the filter rejects
+-- (Crucible of Worlds, mana value 3); the graveyard holds whatever the caller
+-- names. Parameterised on the graveyard alone, so the two CR 701.23b cases
+-- differ in exactly the thing CR 400.2 turns on.
+data MoogleBoard = MkMoogleBoard
+  { moogleState :: GameState.GameState,
+    moogleSpell :: ObjectId.ObjectId,
+    moogleStar :: ObjectId.ObjectId,
+    moogleCrucible :: ObjectId.ObjectId
+  }
+
+moogleBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> [String] -> m MoogleBoard
+moogleBoard s registry graveyardNames = do
+  plains <- S.printingOf s registry "Plains"
+  star <- S.printingOf s registry "Chromatic Star"
+  crucible <- S.printingOf s registry "Crucible of Worlds"
+  buried <- mapM (S.printingOf s registry) graveyardNames
+  moogle <- S.printingOf s registry "Delivery Moogle"
+  let (starId, g1) = S.addLibraryCard star S.alice (S.landsInPlay plains 4)
+      (crucibleId, g2) = S.addLibraryCard crucible S.alice g1
+      bury g printing = snd (S.addGraveyardCard printing S.alice g)
+      g3 = List.foldl' bury g2 buried
+      (gs, spellId) = S.handOne moogle g3
+  pure (MkMoogleBoard gs spellId starId crucibleId)
+
+resolveMoogle :: (forall r. Prompt.Prompt r -> r) -> MoogleBoard -> GameState.GameState
+resolveMoogle answer board =
+  let cast = snd (Engine.runGamePure answer (moogleState board) (S.cast S.alice (moogleSpell board)))
+   in snd (Engine.runGamePure answer cast Engine.priorityLoop)
+
 -- findFirstExercising with the FIND pinned to one named card. The two Dragons of
 -- the CR 607.2a pair have to exile DIFFERENT artifacts for the linked set to be
 -- provable at all, and the head of the offered list is where a shuffle left it
@@ -2112,7 +2218,7 @@ decliningWayfinderAnswer p = case p of
 findPinnedExercising :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 findPinnedExercising wanted p = case p of
   Prompt.ChooseOptional {} -> OptionalDecision.Exercises
-  Prompt.SearchLibrary {} -> [wanted]
+  Prompt.Search {} -> [wanted]
   _ -> S.identityAnswer p
 
 -- The board CR 607.2a's two cases share: two Hoarding Dragons of alice's, each
@@ -2193,7 +2299,7 @@ exileNames gs = fmap (`S.soleFaceName` gs) (Game.zoneMembers Zone.Exile S.alice 
 
 findNothing :: Prompt.Prompt r -> r
 findNothing p = case p of
-  Prompt.SearchLibrary {} -> []
+  Prompt.Search {} -> []
   _ -> S.identityAnswer p
 
 -- Fertilid's Favor's answerer, in three parts. CR 601.2c is announced at its
@@ -2212,7 +2318,7 @@ atCarolFinding p = case p of
     fmap
       (\(n, legal) -> Set.fromList (take (Natural.toIntSaturating n) (List.nub (filter (== Recipient.ToPlayer S.carol) (Set.toAscList legal) <> Set.toAscList legal))))
       sets
-  Prompt.SearchLibrary _ pid matches cap ->
+  Prompt.Search _ pid matches cap ->
     if pid == S.carol
       then List.genericTake cap matches
       else []
@@ -2271,12 +2377,12 @@ atCarolTargeted p = case p of
 
 aliceFinding :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aliceFinding wanted p = case p of
-  Prompt.SearchLibrary _ pid _ _ -> if pid == S.alice then [wanted] else []
+  Prompt.Search _ pid _ _ -> if pid == S.alice then [wanted] else []
   _ -> atCarolTargeted p
 
 aliceFindingNothing :: Prompt.Prompt r -> r
 aliceFindingNothing p = case p of
-  Prompt.SearchLibrary {} -> []
+  Prompt.Search {} -> []
   _ -> atCarolTargeted p
 
 -- Denying Wind's board. Extract's, with the mana its {7}{U}{U} needs and a
@@ -2313,7 +2419,7 @@ denyingWindBoard island denyingWind piker altar forest mountain =
 -- cannot repair the answer by finding a different legal one.
 aliceFindingThese :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
 aliceFindingThese wanted p = case p of
-  Prompt.SearchLibrary _ pid _ _ -> if pid == S.alice then wanted else []
+  Prompt.Search _ pid _ _ -> if pid == S.alice then wanted else []
   _ -> atCarolTargeted p
 
 -- aliceFinding, plus a shuffle that REVERSES the library it is offered. Game

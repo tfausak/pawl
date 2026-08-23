@@ -477,7 +477,7 @@ cookbookBoard s registry withCookbooks = do
 cookbookAnswer :: [ObjectId.ObjectId] -> Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
 cookbookAnswer wanted p = case p of
   Prompt.ChooseOptional {} -> pure OptionalDecision.Exercises
-  Prompt.SearchLibrary _ _ matches _ -> do
+  Prompt.Search _ _ matches _ -> do
     State.modify' (\searches -> searches <> [matches])
     pure wanted
   Prompt.Shuffle library -> pure library
