@@ -132,8 +132,9 @@ continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 -- More things it deliberately does NOT touch, each because CR 800.4a
 -- does not reach them:
 --
---   * every stored row of GameState.continuousEffects, GameState.playerEffects,
---     and every row of GameState.replacements that grants nobody control. CR
+--   * the rows already in GameState.continuousEffects and
+--     GameState.playerEffects, and every row of
+--     GameState.replacements that grants nobody control. CR
 --     109.1's list of what an object is does not include a stored continuous
 --     effect, so the first clause does not end one just because its source left
 --     -- a departing player's Giant Growth on someone else's creature keeps its
@@ -250,9 +251,9 @@ objectsLeaveWith pid gs =
       -- change: a permanent leaving the GAME has left the battlefield, so a card
       -- whose text says its effect continues anyway -- Titania's Song -- needs
       -- that effect handed over to GameState.continuousEffects as it goes.
-      -- Event.lingeringHandover is the single writer; this is its second call
-      -- site, and the reason the module's warning about that funnel does not
-      -- apply is that the shared function performs no move.
+      -- Event.lingeringHandover is the single writer of such an effect, shared
+      -- with the zone-change funnel; borrowing it costs this module nothing the
+      -- header warns about, since that function performs no move.
       --
       -- Nothing in CR 800.4a ends the handed-over effect: the second clause ends
       -- only effects giving the departing player CONTROL, which is the same
