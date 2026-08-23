@@ -309,6 +309,8 @@ library codec
     Pawl.Codec.Discarded
     Pawl.Codec.DiscardedSpec
     Pawl.Codec.DiscardSpec
+    Pawl.Codec.Draw
+    Pawl.Codec.DrawSpec
     Pawl.Codec.Drew
     Pawl.Codec.DrewSpec
     Pawl.Codec.DungeonRoom
@@ -1303,6 +1305,7 @@ library types
     Pawl.Types.DiscardCards
     Pawl.Types.DiscardCause
     Pawl.Types.Discarded
+    Pawl.Types.Draw
     Pawl.Types.Drew
     Pawl.Types.DungeonRoom
     Pawl.Types.Duration

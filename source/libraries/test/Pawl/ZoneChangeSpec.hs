@@ -131,6 +131,38 @@ drawersOf gs = Maybe.mapMaybe drawer (S.zoneChangesOf gs)
         then fmap Object.owner (Game.lookupObject (ZoneChange.object zc) gs)
         else Nothing
 
+-- Shahrazad and Sindbad on alice's battlefield, untapped and settled so its {T}
+-- is payable (CR 302.6), over a library whose TOP card is `top` and a hand
+-- holding `handLand` and `handSpell` -- two cards named neither `top` nor each
+-- other, so any of the three is identifiable in the result by name alone.
+--
+-- `filler` sits under the drawn card twice over, which is what keeps CR 104.3c
+-- out of the fixture: alice still has a library after the draw.
+sindbadBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, GameState.GameState)
+sindbadBoard sindbad top filler handLand handSpell =
+  let (sindbadId, onBoard) = S.addCreature sindbad S.alice (Setup.emptyGame S.bothPlayers)
+      -- S.addLibraryCard puts each card ON TOP of the last, so `top` goes in
+      -- after the filler.
+      stocked = snd (S.addLibraryCard top S.alice (stockLibrary filler S.alice 2 onBoard))
+   in (sindbadId, snd (S.addHandCard handSpell S.alice (snd (S.addHandCard handLand S.alice stocked))))
+
+-- Activate the permanent's one activated ability for alice and resolve it. LOUD
+-- rather than quiet when the card offers a different number of them: a helper
+-- that silently did nothing is how this test would stay green while activating
+-- no ability at all.
+activateSole :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+activateSole oid gs = case Activate.abilitiesFor oid gs of
+  [ability] ->
+    let activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice oid ability)
+     in S.runPure S.identityAnswer activated Stack.resolveTop
+  other -> error ("Pawl.ZoneChangeSpec: expected exactly one activated ability, got " <> show (length other))
+
 zoneChangeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
   Spec.it s "CR 701.8 Murder destroys a normal creature into its owner's graveyard" $ do
@@ -350,6 +382,63 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "the two players still in the game drew, in APNAP order" (drawersOf after) [S.alice, S.alice, S.bob, S.bob]
     Spec.assertEqWith s "and nothing was drawn against carol's departed library" (GameState.drewFromEmpty after) Set.empty
+  -- The card that proves Effect.Draw's SLOT (#1899): Shahrazad and Sindbad's
+  -- "{T}: Draw a card and reveal it. If it isn't a land card, discard it."
+  -- (Unknown Event; Oracle text and type line checked against
+  -- api.scryfall.com). Every draw above answers "who" and "how many"; this one
+  -- is the first that has to answer WHICH CARD, because the reveal and the
+  -- discard both say "it" -- CR 121.1 puts the card in the hand, and the two
+  -- later instructions name that card there.
+  --
+  -- The pair below differ in EXACTLY ONE THING, the top card of the library, so
+  -- what the second board shows is the condition reading the bound card rather
+  -- than a board assembled to pass. A binding that named the wrong card would
+  -- reverse both: the nonland board would bury a card the draw never touched,
+  -- and the land board -- whose hand holds a nonland the whole time -- would
+  -- discard THAT instead of leaving the graveyard empty. A binding that named
+  -- nothing empties the first board's graveyard.
+  Spec.it s "CR 121.1 / 701.20a Shahrazad and Sindbad discards the nonland card it just drew, and only that card" $ do
+    sindbad <- S.printingOf s registry "Shahrazad and Sindbad"
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    divination <- S.printingOf s registry "Divination"
+    let (sindbadId, board) = sindbadBoard sindbad piker plains island divination
+        after = activateSole sindbadId board
+    Spec.assertEqWith
+      s
+      "the Goblin Piker it drew is what went to the graveyard"
+      (namesIn Zone.Graveyard S.alice after)
+      [Just (S.printingName piker)]
+    Spec.assertEqWith
+      s
+      "and the two cards the hand already held, one of them a nonland, are untouched"
+      (List.sort (namesIn Zone.Hand S.alice after))
+      (List.sort [Just (S.printingName island), Just (S.printingName divination)])
+    Spec.assertEqWith
+      s
+      "CR 701.20a it was shown to the table as it was drawn"
+      (S.revealsOf after)
+      [(S.alice, Set.singleton (S.printingName piker))]
+  Spec.it s "CR 121.1 the same ability keeps a LAND it drew, so the clause condition reads the bound card" $ do
+    sindbad <- S.printingOf s registry "Shahrazad and Sindbad"
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    divination <- S.printingOf s registry "Divination"
+    let (sindbadId, board) = sindbadBoard sindbad mountain plains island divination
+        after = activateSole sindbadId board
+    Spec.assertEqWith
+      s
+      "the Mountain it drew joined the hand and stayed there"
+      (List.sort (namesIn Zone.Hand S.alice after))
+      (List.sort [Just (S.printingName mountain), Just (S.printingName island), Just (S.printingName divination)])
+    Spec.assertEqWith s "and nothing was discarded" (namesIn Zone.Graveyard S.alice after) []
+    Spec.assertEqWith
+      s
+      "CR 701.20a the reveal happens either way"
+      (S.revealsOf after)
+      [(S.alice, Set.singleton (S.printingName mountain))]
   Spec.it s "CR 701.17 Tome Scour mills five from a target player's library" $ do
     island <- S.printingOf s registry "Island"
     piker <- S.printingOf s registry "Goblin Piker"

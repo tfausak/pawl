@@ -4,12 +4,12 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Quantity as Quantity
 
 -- | "These players, this many" -- the payload of every Pawl.Types.Effect arm
--- whose whole instruction is a PlayerRef and a Quantity: Draw, Scry, Surveil,
--- Fateseal, LoseLife, GainLife, IncreaseSpeed and Blight.
+-- whose whole instruction is a PlayerRef and a Quantity: Scry, Surveil,
+-- Fateseal, LoseLife, GainLife, SetLifeTotal, IncreaseSpeed and Blight.
 --
 -- SHARED FOR EXPEDIENCY, and not because those arms mean the same thing. The
 -- name says the shape rather than a concept precisely because there is no shared
--- concept: drawing and losing life coincide in what they need to be told, and
+-- concept: scrying and losing life coincide in what they need to be told, and
 -- nothing more. A domain noun here would claim an equality that does not hold.
 --
 -- The invariant that keeps the sharing honest, and the reason it is written
@@ -22,7 +22,8 @@ import qualified Pawl.Types.Quantity as Quantity
 -- untagged union #1304 removed: the field's absence would once again be how a
 -- reader tells which arm it is looking at. Pawl.Types.Mill is what spinning out
 -- looks like -- a mill is "these players, this many" plus CR 728.1's tally, so
--- it has its own record rather than a nullable field here.
+-- it has its own record rather than a nullable field here. Pawl.Types.Draw left
+-- the same way, over CR 121.1's "and reveal it" (#1899).
 data PlayerQuantity = MkPlayerQuantity
   { player :: PlayerRef.PlayerRef,
     quantity :: Quantity.Quantity

@@ -43,6 +43,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Effect as Effect
@@ -2288,7 +2289,7 @@ optionalEffectSpec s registry =
               -- A Stack-zone object whose Object.owner is the effect controller
               -- resolveModes reads, without paying to cast anything.
               (stackId, gs) = S.spellOnStack piker S.alice gs1
-              draw = Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1))
+              draw = Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1) Nothing)
               mode =
                 Mode.MkMode
                   ( Seq.fromList
