@@ -258,7 +258,7 @@ data GameEvent
     -- declaration, naming the attacking player, appended by
     -- Pawl.Engine.Combat.declareAttackers alone.
     --
-    -- The third of CR 508.3's three arities, and the two above are the others:
+    -- The third arity a declaration records, and the two above are the others:
     -- AttackerDeclared is per attacking creature (CR 508.3a) and BecameAttacked
     -- per distinct target (CR 508.3b), where rule 508.3d asks only whether "one
     -- or more creatures that player controls are declared as attackers". A

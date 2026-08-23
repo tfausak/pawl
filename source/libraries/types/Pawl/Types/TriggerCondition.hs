@@ -229,21 +229,20 @@ data TriggerCondition
     -- which is why neither of their events could carry it.
     --
     -- The BEARER need not attack, and need not be a creature: rule 508.3d asks
-    -- only that its controller declared one or more attackers. CreatureAttacksAlone's
-    -- bystanding posture, not SelfAttacks' self-scoping.
-    --
-    -- Nullary: rule 508.3d's "[a player]" is CR 109.5's "you" on every printing
-    -- of the shape -- Scryfall o:"whenever you attack," 2026-08-23, and every hit
-    -- reads "you". A PlayerRelation payload would be speculative,
-    -- AttachedPlayerIsAttacked's posture.
+    -- only that its controller declared one or more attackers.
+    -- CreatureAttacksAlone's bystanding posture, not SelfAttacks' self-scoping.
     --
     -- Nothing is bound. Rule 508.3d names a SET of creatures rather than one, so
     -- there is no attacker to point at, and the player it does name is the
-    -- ability's own controller.
+    -- ability's own controller, which the ability already has.
     --
-    -- Not implemented: CR 508.3c's "whenever [a player] attacks with [a
-    -- creature]", this subject at CR 508.3a's arity and binding the creature
-    -- (#2140), and CR 508.3e's "attacks [another player]" (#538).
+    -- Not implemented: rule 508.3d's OTHER subjects. "[A player]" is CR 109.5's
+    -- "you" here and nullary because of it, but "whenever a player attacks" and
+    -- "whenever an opponent attacks" are both printed; a PlayerRelation payload
+    -- plus a bound attacking player is what they need (#2142). Nor CR 508.3c's
+    -- "whenever [a player] attacks with [a creature]", this subject at CR
+    -- 508.3a's arity and binding the creature (#2140), nor CR 508.3e's "attacks
+    -- [another player]" (#538).
     YouAttack
   | -- | CR 702.105a: dethrone -- SelfAttacks narrowed by whom the bearer
     -- attacked. The attacked player comes from Combat.attackers rather than the
