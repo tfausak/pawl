@@ -3027,7 +3027,8 @@ boggartPranksterSpec s registry =
 -- activations -- the answerer takes every activation offered and the MANA bounds
 -- it, so a trigger adding the wrong amount would show as the wrong power.
 --
--- One fixture, two boards differing in exactly one thing: who is active.
+-- One fixture, and the two discriminating boards differ in exactly one thing:
+-- who is active.
 --
 --   * bob active and declaring. Only AnyPlayer fires alice's Roku, so hardcoding
 --     You reads 6/6 here.
@@ -3041,7 +3042,7 @@ boggartPranksterSpec s registry =
 --
 -- The Opponent arm is exercised by no card. Its producer, Ever-Watching
 -- Threshold, carries a CR 603.4 intervening "if" reading what was attacked
--- (#538); the board below proves only that the implementation does not BEHAVE as
+-- (#538); the boards below prove only that the implementation does not BEHAVE as
 -- Opponent.
 avatarRokuSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 avatarRokuSpec s registry =
