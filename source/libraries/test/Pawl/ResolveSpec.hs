@@ -793,7 +793,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
             Nothing
@@ -810,7 +810,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     mountain <- S.printingOf s registry "Mountain"
     let base = Setup.emptyGame S.bothPlayers
         (_, g1) = S.addLibraryCard mountain S.alice base
-        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing Nothing
+        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing Nothing
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj = Object.MkObject S.alice Nothing (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability}) Zone.Stack TapState.Untapped Facing.FaceUp False 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing ts Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty False 0 (Mana.MkMana []) Nothing Set.empty Set.empty False Set.empty
@@ -835,7 +835,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
             Nothing
@@ -860,7 +860,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
             Nothing
@@ -928,6 +928,33 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "the Dragon still resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Hoarding Dragon") S.alice settled) 1
     Spec.assertEqWith s "exile is empty" (Game.zoneMembers Zone.Exile S.alice settled) []
     Spec.assertEqWith s "both library cards are still there" (Set.fromList (Game.zoneMembers Zone.Library S.alice settled)) (Set.fromList [altarId, pikerId])
+  -- CR 608.2c's "If you do", on the pair of boards that tells it from a clause
+  -- that always happens: Tweeze -- "Tweeze deals 3 damage to any target. You may
+  -- discard a card. If you do, draw a card." -- cast at bob off the SAME board
+  -- twice, differing in exactly one answer, CR 603.5's "may".
+  --
+  -- Three clauses rather than two, which is the point: the draw is its own
+  -- clause naming the "may" clause's ordinal (Clause.ifTaken), so the decline
+  -- must skip the draw and leave the damage alone. Baral, Chief of Compliance's
+  -- "you may draw a card. If you do, discard a card" needs none of that, since
+  -- CR 121.3 makes its first action happen whenever it is chosen and one
+  -- optional clause carrying both instructions says the same thing.
+  Spec.it s "CR 608.2c Tweeze's \"If you do\" draws when the discard was taken" $ do
+    board <- tweezeBoard s registry
+    let after = tweezeResolved OptionalDecision.Exercises board
+        nameOf = Just . CardName.MkCardName . Text.pack
+    Spec.assertEqWith s "CR 608.2c the gated clause ran: the drawn Piker is in alice's hand" (List.sort (namesIn Zone.Hand S.alice after)) (List.sort [nameOf "Goblin Piker", nameOf "Chaos Charm"])
+    Spec.assertEqWith s "and her library is one card shorter" (length (Game.zoneMembers Zone.Library S.alice after)) 2
+    Spec.assertEqWith s "the discard she chose, and only it, is in her graveyard beside Tweeze" (List.sort (namesIn Zone.Graveyard S.alice after)) (List.sort [nameOf "Bird Maiden", nameOf "Tweeze"])
+    Spec.assertEqWith s "CR 608.2c the first clause is untouched: bob took the 3 damage" (S.lifeOf S.bob after) (Just 17)
+  Spec.it s "CR 608.2c declining Tweeze's discard skips the draw and nothing else" $ do
+    board <- tweezeBoard s registry
+    let after = tweezeResolved OptionalDecision.Declines board
+        nameOf = Just . CardName.MkCardName . Text.pack
+    Spec.assertEqWith s "CR 608.2c the gated clause was skipped: no Piker was drawn" (List.sort (namesIn Zone.Hand S.alice after)) (List.sort [nameOf "Bird Maiden", nameOf "Chaos Charm"])
+    Spec.assertEqWith s "and her library still holds all three" (length (Game.zoneMembers Zone.Library S.alice after)) 3
+    Spec.assertEqWith s "nothing was discarded -- only Tweeze itself is in the graveyard" (namesIn Zone.Graveyard S.alice after) [nameOf "Tweeze"]
+    Spec.assertEqWith s "CR 608.2c the ungated first clause still happened: bob took the 3 damage" (S.lifeOf S.bob after) (Just 17)
   -- CR 607.2a's linked set, on the board that can tell it from "every card in
   -- exile": TWO Hoarding Dragons, each of which exiled a different artifact, and
   -- one of them dies. The pair below runs the SAME board twice and differs in
@@ -1489,7 +1516,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           TriggeredAbility.MkTriggeredAbility
             TriggerCondition.SelfEnters
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.ExileAllGraveyards]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.ExileAllGraveyards]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             Nothing
             TriggerLimit.Unlimited
         (abilId, g4) = Game.freshObjectId g3
@@ -1571,7 +1598,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
                   },
               ActivatedAbility.modal =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.ControlPlayerNextTurn slot]))) (Map.singleton slot (TargetSlot.required Pool.Players Nothing))))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.ControlPlayerNextTurn slot]))) (Map.singleton slot (TargetSlot.required Pool.Players Nothing))))
                   (ModeSelection.ChooseExactly 1),
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing,
@@ -1669,7 +1696,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
                   },
               ActivatedAbility.modal =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.RestartGame Nothing)))) Map.empty))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.RestartGame Nothing)))) Map.empty))
                   (ModeSelection.ChooseExactly 1),
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing,
@@ -1970,7 +1997,7 @@ installControlBy mindslaver controller target gs0 =
                 },
             ActivatedAbility.modal =
               Modal.MkModal
-                (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.ControlPlayerNextTurn slot]))) (Map.singleton slot (TargetSlot.required Pool.Players Nothing))))
+                (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.ControlPlayerNextTurn slot]))) (Map.singleton slot (TargetSlot.required Pool.Players Nothing))))
                 (ModeSelection.ChooseExactly 1),
             ActivatedAbility.restrictions = [],
             ActivatedAbility.condition = Nothing,
@@ -2147,6 +2174,42 @@ findFirstDeclining :: Prompt.Prompt r -> r
 findFirstDeclining p = case p of
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
   _ -> findFirst p
+
+-- The board both Tweeze cases share: three Mountains for the {2}{R}, Tweeze plus
+-- TWO discardable cards in alice's hand so CR 701.9b's choice is a real one, and
+-- three Goblin Pikers in her library so the draw is observable by name and CR
+-- 104.3c cannot decide the game first. Bob is the damage's target, and the two
+-- cards in hand and the ones in the library are three different names, so no
+-- assertion below can pass by coincidence.
+tweezeBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+tweezeBoard s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  tweeze <- S.printingOf s registry "Tweeze"
+  maiden <- S.printingOf s registry "Bird Maiden"
+  charm <- S.printingOf s registry "Chaos Charm"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let (base, tweezeId) = S.handOne tweeze (S.landsInPlay mountain 3)
+      (maidenId, withMaiden) = S.addHandCard maiden S.alice base
+      (_, withCharm) = S.addHandCard charm S.alice withMaiden
+      stocked = List.foldl' (\gs _ -> snd (S.addLibraryCard piker S.alice gs)) withCharm [1 :: Int .. 3]
+  pure (stocked, tweezeId, maidenId)
+
+-- One resolution of that board. The only thing the two cases vary is CR 603.5's
+-- answer, so the discard is pinned by id and the damage by seat.
+tweezeResolved :: OptionalDecision.OptionalDecision -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId) -> GameState.GameState
+tweezeResolved decision (gs, tweezeId, maidenId) =
+  S.runPure (tweezeAnswer decision maidenId) gs (S.cast S.alice tweezeId >> Stack.resolveTop)
+
+-- Tweeze's three answers in one: the damage aimed at bob by FILTERING the offer
+-- (CR 608.2b re-reads it, so a hand-built recipient would be dropped), CR 603.5's
+-- "may" answered as the case says, and CR 701.9b's discard pinned to one card
+-- rather than to whichever the hand offers first.
+tweezeAnswer :: OptionalDecision.OptionalDecision -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+tweezeAnswer decision toDiscard p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer S.bob) sets
+  Prompt.ChooseOptional {} -> decision
+  Prompt.ChooseDiscard _ _ ids n -> List.genericTake n (filter (== toDiscard) ids)
+  _ -> S.identityAnswer p
 
 -- The board the two Jungle Wayfinder cases share: alice casts it off three
 -- Forests, and every seat's library holds three of ONE basic plus a Goblin Piker
@@ -2518,7 +2581,7 @@ subgameSpellOn borrowed name effects gs0 =
             Face.staticAbilities = [],
             Face.spell =
               Modal.MkModal
-                (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) Map.empty))
+                (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) Map.empty))
                 (ModeSelection.ChooseExactly 1),
             Face.activatedAbilities = [],
             Face.replacementEffects = [],

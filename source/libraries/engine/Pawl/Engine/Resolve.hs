@@ -1281,19 +1281,24 @@ resolveSpellWith runSubgame oid = do
                           (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) legalNow)
                           (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) chosenNow)
                           eff
-                  -- CR 608.2e's clause is the unit all three gates cover, so each
+                  -- CR 608.2e's clause is the unit all four gates cover, so each
                   -- is asked once per clause. The fold carries this mode
-                  -- INSTANCE's CR 118.12 answers, per instance because CR 700.2d
-                  -- makes a mode chosen twice make its offer twice.
+                  -- INSTANCE's CR 118.12 answers and the clauses whose
+                  -- instructions ran, per instance because CR 700.2d makes a mode
+                  -- chosen twice make its offer twice.
                   Monad.foldM_
-                    ( \answers (cIdx, clause) -> do
-                        -- CR 701.46a's printed "if" first, against the LIVE
+                    ( \(answers, ran) (cIdx, clause) -> do
+                        -- CR 608.2c's "If you do" first: a clause hanging off one
+                        -- the fold has not recorded is skipped entirely, so no
+                        -- later gate raises a prompt whose answer cannot matter.
+                        let hangs = ifTakenHolds ran clause
+                        -- CR 701.46a's printed "if" next, against the LIVE
                         -- bindings (CR 608.2c): a slot an earlier clause DEFINED
                         -- is part of the state this one is read against, and the
                         -- re-read adds only defined slots. A REGRESSION FENCE --
                         -- mutating this half back leaves the suite green.
                         gateBindings <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject oid)
-                        gated <- gateHolds effectController oid (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Binding.targetsOf gateBindings)) (Binding.groupsOf gateBindings) clause
+                        gated <- if hangs then gateHolds effectController oid (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Binding.targetsOf gateBindings)) (Binding.groupsOf gateBindings) clause else pure False
                         -- CR 603.5 / 608.2d: then the printed "may", against the
                         -- SAME live bindings CR 608.2b's filter is applied to, so
                         -- a clause whose every read is dead is not asked about.
@@ -1320,9 +1325,9 @@ resolveSpellWith runSubgame oid = do
                                     clause
                             else pure (False, answers)
                         Monad.when admitted (Monad.mapM_ applyOne (Clause.effects clause))
-                        pure answers'
+                        pure (answers', recordTaken admitted cIdx ran)
                     )
-                    Map.empty
+                    (Map.empty, Set.empty)
                     (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode)))
                 finishSpell oid face effectController
 
@@ -1427,14 +1432,19 @@ resolveModesWith runSubgame stackId srcId modes = do
              in -- CR 608.2e's clause is what each gate covers. Run only when
                 -- `fizzles` is False.
                 Monad.foldM_
-                  ( \answers (cIdx, clause) -> do
-                      -- CR 701.46a's printed "if" first, read against `srcId` --
+                  ( \(answers, ran) (cIdx, clause) -> do
+                      -- CR 608.2c's "If you do" first, off the same fold the
+                      -- spell path keeps. A REGRESSION FENCE on this path: no
+                      -- ability in data/cards/ writes `ifTaken`, so mutating this
+                      -- conjunct away leaves the suite green (#1887).
+                      let hangs = ifTakenHolds ran clause
+                      -- CR 701.46a's printed "if" next, read against `srcId` --
                       -- the rule says "this permanent", which is also why
                       -- `payGatePaid` is given `srcId`. Off the LIVE bindings of
                       -- the STACK object (CR 608.2c), where this resolution's
                       -- slots are bound (see bindSlot).
                       gateBindings <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject stackId)
-                      gated <- gateHolds effectController srcId (instanceView (Binding.targetsOf gateBindings)) (Binding.groupsOf gateBindings) clause
+                      gated <- if hangs then gateHolds effectController srcId (instanceView (Binding.targetsOf gateBindings)) (Binding.groupsOf gateBindings) clause else pure False
                       -- CR 603.5 / 608.2d: then the printed "may", against the
                       -- SAME live bindings CR 608.2b's filter is applied to, so a
                       -- clause whose every read is dead is not asked about.
@@ -1445,13 +1455,34 @@ resolveModesWith runSubgame stackId srcId modes = do
                       -- START-of-resolution slots.
                       (admitted, answers') <- if taken then payGateAdmits stackId srcId effectController idx cIdx (instanceView legal) answers clause else pure (False, answers)
                       Monad.when admitted (Monad.mapM_ applyOne (Clause.effects clause))
-                      pure answers'
+                      pure (answers', recordTaken admitted cIdx ran)
                   )
-                  Map.empty
+                  (Map.empty, Set.empty)
                   (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode)))
        in do
             Monad.unless fizzles (Monad.forM_ modes resolveOne)
             State.modify' (Game.cease stackId)
+
+-- CR 608.2c: does this clause's printed "If you do" hold? A clause naming no
+-- earlier one always happens; one that names an earlier clause of this mode
+-- instance happens only if that clause's instructions ran -- Tweeze's "you may
+-- discard a card. If you do, draw a card".
+--
+-- Off the fold's record of what ran, so the answer is the one the named clause's
+-- own riders gave (Clause.ifTaken says why that rather than the board), and a
+-- name the fold has not reached -- a later clause, or one that does not exist --
+-- is False. Asked BEFORE the other three, so a skipped clause raises no prompt.
+--
+-- A pure function rather than a Game action: it reads nothing but the fold.
+ifTakenHolds :: Set ClauseIndex -> Clause.Clause Card.Type.Card -> Bool
+ifTakenHolds ran clause = maybe True (`Set.member` ran) (Clause.ifTaken clause)
+
+-- The other end of the same fold: a clause's ordinal is recorded exactly when
+-- its instructions ran, which is what CR 608.2c's "If you do" asks about. One
+-- writer for both resolution paths, so the spell loop and the ability loop
+-- cannot disagree about what "you did" means.
+recordTaken :: Bool -> ClauseIndex -> Set ClauseIndex -> Set ClauseIndex
+recordTaken admitted cIdx ran = if admitted then Set.insert cIdx ran else ran
 
 -- CR 701.46a: does this clause's printed "if" hold? CR 701.37a prints the same
 -- gate on a proper prefix of a longer ability, which is why the rider is on CR
@@ -1509,6 +1540,10 @@ gateHolds controller source chosen groups clause = case Clause.condition clause 
 -- "may" is about to define is not dead, and without that a clause whose only
 -- read is its own accepters would be judged inert and decline with no prompt
 -- raised.
+--
+-- Not implemented: CR 608.2d's other half, that the player cannot choose an
+-- option that is illegal or impossible -- an inert clause is a slot question,
+-- and "you may discard a card" on an empty hand is not (#2167).
 exercises :: ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Set SlotName -> Map.Map SlotName (Set Recipient) -> Clause.Clause Card.Type.Card -> Game Bool
 exercises resolving controller idx cIdx bound legal clause = case Clause.optionality clause of
   Optionality.Mandatory -> pure True
