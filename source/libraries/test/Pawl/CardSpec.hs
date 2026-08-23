@@ -1596,9 +1596,9 @@ effectReplacements effect = case effect of
 -- for the sibling case (Modification.SetController's baked PlayerId, likewise
 -- accepted by its codec and likewise kept out of card data by a lint here).
 --
--- What makes the split expensive is NOT the codec -- nothing needs a baked
--- pattern to round-trip, since ActiveReplacement and GameState have no codec at
--- all (#126). It is that ReplacementEffect is the carrier for both halves:
+-- What makes the split expensive is NOT the codec -- Pawl.Codec.ActiveReplacement
+-- round-trips a baked pattern through the same ReplacementEffect codec a card
+-- file uses (#126). It is that ReplacementEffect is the carrier for both halves:
 -- Face.replacementEffects, which a card authors, and ActiveReplacement.effect,
 -- which the engine bakes. A card-side / runtime-side split the way Duration and
 -- Expiry are split would therefore have to split or parameterize that whole sum,

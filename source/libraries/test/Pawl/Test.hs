@@ -20,6 +20,7 @@ import qualified Pawl.Codec.ActivationRestrictionSpec
 import qualified Pawl.Codec.ActiveAttackRequirementSpec
 import qualified Pawl.Codec.ActiveBlockRequirementSpec
 import qualified Pawl.Codec.ActivePlayerEffectSpec
+import qualified Pawl.Codec.ActiveReplacementSpec
 import qualified Pawl.Codec.ActiveUnregeneratableSpec
 import qualified Pawl.Codec.AddActivationCostSpec
 import qualified Pawl.Codec.AddSpellCostSpec
@@ -145,6 +146,7 @@ import qualified Pawl.Codec.ExcessDestinationSpec
 import qualified Pawl.Codec.ExchangeSidesSpec
 import qualified Pawl.Codec.ExileCardsFromGraveyardSpec
 import qualified Pawl.Codec.ExileHauntingSpec
+import qualified Pawl.Codec.ExilePlayPermissionSpec
 import qualified Pawl.Codec.ExpirySpec
 import qualified Pawl.Codec.ExtraPhaseSpec
 import qualified Pawl.Codec.ExtraTurnSpec
@@ -187,6 +189,7 @@ import qualified Pawl.Codec.ManaCountSpec
 import qualified Pawl.Codec.ManaFilterSpec
 import qualified Pawl.Codec.ManaProductionSpec
 import qualified Pawl.Codec.ManaRetentionSpec
+import qualified Pawl.Codec.ManaSpec
 import qualified Pawl.Codec.ManaSpendingSpec
 import qualified Pawl.Codec.ManaSymbolSpec
 import qualified Pawl.Codec.ManaTypeSpec
@@ -211,6 +214,7 @@ import qualified Pawl.Codec.MovedBetweenSpec
 import qualified Pawl.Codec.MovedSpec
 import qualified Pawl.Codec.ObjectIdSpec
 import qualified Pawl.Codec.ObjectRefSpec
+import qualified Pawl.Codec.ObjectSpec
 import qualified Pawl.Codec.OfferCastSpec
 import qualified Pawl.Codec.OnsetSpec
 import qualified Pawl.Codec.OptionalitySpec
@@ -237,6 +241,7 @@ import qualified Pawl.Codec.PlayerRefSpec
 import qualified Pawl.Codec.PlayerRelationSpec
 import qualified Pawl.Codec.PlayerSacrificesSpec
 import qualified Pawl.Codec.PlayerScopeSpec
+import qualified Pawl.Codec.PlayerSpec
 import qualified Pawl.Codec.PlayerStaticAbilitySpec
 import qualified Pawl.Codec.PlusSpec
 import qualified Pawl.Codec.PoolSpec
@@ -244,6 +249,7 @@ import qualified Pawl.Codec.PowerSpec
 import qualified Pawl.Codec.PreventAllDamageSpec
 import qualified Pawl.Codec.PreventNextDamageSpec
 import qualified Pawl.Codec.PreventionRiderSpec
+import qualified Pawl.Codec.PreventionSpec
 import qualified Pawl.Codec.PrintedReplacementSpec
 import qualified Pawl.Codec.PrintingIdSpec
 import qualified Pawl.Codec.PrintingSpec
@@ -506,6 +512,7 @@ spec s registry = do
   Pawl.Codec.ActiveAttackRequirementSpec.spec s
   Pawl.Codec.ActiveBlockRequirementSpec.spec s
   Pawl.Codec.ActivePlayerEffectSpec.spec s
+  Pawl.Codec.ActiveReplacementSpec.spec s
   Pawl.Codec.ActiveUnregeneratableSpec.spec s
   Pawl.Codec.AddActivationCostSpec.spec s
   Pawl.Codec.AddSpellCostSpec.spec s
@@ -631,6 +638,7 @@ spec s registry = do
   Pawl.Codec.ExchangeSidesSpec.spec s
   Pawl.Codec.ExileCardsFromGraveyardSpec.spec s
   Pawl.Codec.ExileHauntingSpec.spec s
+  Pawl.Codec.ExilePlayPermissionSpec.spec s
   Pawl.Codec.ExpirySpec.spec s
   Pawl.Codec.ExtraPhaseSpec.spec s
   Pawl.Codec.ExtraTurnSpec.spec s
@@ -673,6 +681,7 @@ spec s registry = do
   Pawl.Codec.ManaFilterSpec.spec s
   Pawl.Codec.ManaProductionSpec.spec s
   Pawl.Codec.ManaRetentionSpec.spec s
+  Pawl.Codec.ManaSpec.spec s
   Pawl.Codec.ManaSpendingSpec.spec s
   Pawl.Codec.ManaSymbolSpec.spec s
   Pawl.Codec.ManaTypeSpec.spec s
@@ -697,6 +706,7 @@ spec s registry = do
   Pawl.Codec.MovedSpec.spec s
   Pawl.Codec.ObjectIdSpec.spec s
   Pawl.Codec.ObjectRefSpec.spec s
+  Pawl.Codec.ObjectSpec.spec s
   Pawl.Codec.OfferCastSpec.spec s
   Pawl.Codec.OnsetSpec.spec s
   Pawl.Codec.OptionalitySpec.spec s
@@ -723,6 +733,7 @@ spec s registry = do
   Pawl.Codec.PlayerRelationSpec.spec s
   Pawl.Codec.PlayerSacrificesSpec.spec s
   Pawl.Codec.PlayerScopeSpec.spec s
+  Pawl.Codec.PlayerSpec.spec s
   Pawl.Codec.PlayerStaticAbilitySpec.spec s
   Pawl.Codec.PlusSpec.spec s
   Pawl.Codec.PoolSpec.spec s
@@ -730,6 +741,7 @@ spec s registry = do
   Pawl.Codec.PreventAllDamageSpec.spec s
   Pawl.Codec.PreventNextDamageSpec.spec s
   Pawl.Codec.PreventionRiderSpec.spec s
+  Pawl.Codec.PreventionSpec.spec s
   Pawl.Codec.PrintedReplacementSpec.spec s
   Pawl.Codec.PrintingIdSpec.spec s
   Pawl.Codec.PrintingSpec.spec s

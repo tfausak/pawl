@@ -13,10 +13,6 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.LastKnown as LastKnown
 
--- | One counter kind and how many of it were on the object (CR 122.1). A pair
--- per kind rather than 'Common.multiset', which spells a count by repeating the
--- element: the counts here are read as numbers, and Pawl.Codec.EntryRiders
--- writes the same shape for the same reason.
 -- | All six axes, none derivable from another: the type's own haddock says why
 -- CR 608.2h needs each of them beside the projection.
 codec :: Codec.Codec LastKnown.LastKnown

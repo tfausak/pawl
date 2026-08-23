@@ -97,6 +97,8 @@ library codec
     Pawl.Codec.ActiveBlockRequirementSpec
     Pawl.Codec.ActivePlayerEffect
     Pawl.Codec.ActivePlayerEffectSpec
+    Pawl.Codec.ActiveReplacement
+    Pawl.Codec.ActiveReplacementSpec
     Pawl.Codec.ActiveUnregeneratable
     Pawl.Codec.ActiveUnregeneratableSpec
     Pawl.Codec.AddActivationCost
@@ -351,6 +353,8 @@ library codec
     Pawl.Codec.ExileCardsFromGraveyardSpec
     Pawl.Codec.ExileHaunting
     Pawl.Codec.ExileHauntingSpec
+    Pawl.Codec.ExilePlayPermission
+    Pawl.Codec.ExilePlayPermissionSpec
     Pawl.Codec.Expiry
     Pawl.Codec.ExpirySpec
     Pawl.Codec.ExtraPhase
@@ -424,6 +428,7 @@ library codec
     Pawl.Codec.LookAtSpec
     Pawl.Codec.Loyalty
     Pawl.Codec.LoyaltySpec
+    Pawl.Codec.Mana
     Pawl.Codec.ManaAddition
     Pawl.Codec.ManaAdditionSpec
     Pawl.Codec.ManaCost
@@ -436,6 +441,7 @@ library codec
     Pawl.Codec.ManaProductionSpec
     Pawl.Codec.ManaRetention
     Pawl.Codec.ManaRetentionSpec
+    Pawl.Codec.ManaSpec
     Pawl.Codec.ManaSpending
     Pawl.Codec.ManaSpendingSpec
     Pawl.Codec.ManaSymbol
@@ -480,10 +486,12 @@ library codec
     Pawl.Codec.MovedSpec
     Pawl.Codec.MoveToZone
     Pawl.Codec.MoveToZoneSpec
+    Pawl.Codec.Object
     Pawl.Codec.ObjectId
     Pawl.Codec.ObjectIdSpec
     Pawl.Codec.ObjectRef
     Pawl.Codec.ObjectRefSpec
+    Pawl.Codec.ObjectSpec
     Pawl.Codec.OfferCast
     Pawl.Codec.OfferCastSpec
     Pawl.Codec.Onset
@@ -513,6 +521,7 @@ library codec
     Pawl.Codec.PhaseSelector
     Pawl.Codec.PhaseSelectorSpec
     Pawl.Codec.PhaseSpec
+    Pawl.Codec.Player
     Pawl.Codec.PlayerCounterKind
     Pawl.Codec.PlayerCounterKindSpec
     Pawl.Codec.PlayerCounters
@@ -535,6 +544,7 @@ library codec
     Pawl.Codec.PlayerSacrificesSpec
     Pawl.Codec.PlayerScope
     Pawl.Codec.PlayerScopeSpec
+    Pawl.Codec.PlayerSpec
     Pawl.Codec.PlayerStaticAbility
     Pawl.Codec.PlayerStaticAbilitySpec
     Pawl.Codec.PlayPermissionOrigin
@@ -547,8 +557,10 @@ library codec
     Pawl.Codec.PowerSpec
     Pawl.Codec.PreventAllDamage
     Pawl.Codec.PreventAllDamageSpec
+    Pawl.Codec.Prevention
     Pawl.Codec.PreventionRider
     Pawl.Codec.PreventionRiderSpec
+    Pawl.Codec.PreventionSpec
     Pawl.Codec.PreventNextDamage
     Pawl.Codec.PreventNextDamageSpec
     Pawl.Codec.PrintedReplacement
