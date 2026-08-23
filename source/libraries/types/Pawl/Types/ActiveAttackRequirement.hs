@@ -38,8 +38,9 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- cannot conflict -- CR 508.1d counts them and never resolves them against each
 -- other.
 --
--- Runtime-only, like Expiry and ActiveBlockRequirement: no codec, which keeps a
--- stored value out of a card file and a printed value out of the store.
+-- Runtime-only: card data writes the printed carrier, never one of these. It
+-- does have a codec (Pawl.Codec.ActiveAttackRequirement), because a game in
+-- progress has to be writable to JSON (#126).
 data ActiveAttackRequirement = MkActiveAttackRequirement
   { source :: ObjectId.ObjectId,
     timestamp :: Timestamp.Timestamp,

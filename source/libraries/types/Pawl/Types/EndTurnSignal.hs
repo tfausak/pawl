@@ -21,4 +21,4 @@ module Pawl.Types.EndTurnSignal where
 data EndTurnSignal
   = Running
   | Ended
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

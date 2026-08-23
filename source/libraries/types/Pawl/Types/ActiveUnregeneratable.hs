@@ -30,8 +30,9 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- No `controller`, where ActivePlayerEffect stores one: a prohibition names no
 -- player, so CR 109.5's "you" is never asked of it.
 --
--- Runtime-only, like Expiry and ActiveBlockRequirement: no codec, which keeps a
--- stored value out of a card file and a printed value out of the store.
+-- Runtime-only: card data writes the printed carrier, never one of these. It
+-- does have a codec (Pawl.Codec.ActiveUnregeneratable), because a game in
+-- progress has to be writable to JSON (#126).
 data ActiveUnregeneratable = MkActiveUnregeneratable
   { source :: ObjectId.ObjectId,
     timestamp :: Timestamp.Timestamp,
