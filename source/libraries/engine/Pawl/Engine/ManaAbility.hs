@@ -241,9 +241,9 @@ movesLibraryCard effect = case effect of
   -- CR 701.44a's explore reveals the top card and may put it into a hand or a
   -- graveyard.
   Effect.Explore {} -> True
-  -- CR 701.23a searches a zone, and this opcode's zone is always a LIBRARY --
-  -- Pawl.Types.Search names whose, and its SearchDestination is where the found
-  -- card goes. A search finding nothing moves nothing, which CR 605.1a's "don't
+  -- CR 701.23a searches a zone -- Pawl.Types.Search names which zones and whose,
+  -- and its SearchDestination is where the found card goes. Every zone it can
+  -- name is one this asks about, so the answer does not depend on Search.zones. A search finding nothing moves nothing, which CR 605.1a's "don't
   -- move any card" tolerates no better than a mode that adds no mana defeats
   -- "could add mana".
   Effect.Search {} -> True

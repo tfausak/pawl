@@ -425,7 +425,7 @@ slotsOf effect = case effect of
   Effect.ChangeText (ChangeText.MkChangeText _ _ slot) -> oneSlot slot
   Effect.AddMana (ManaAddition.MkManaAddition ref _ _ _) -> playerRefSlots ref
   -- BOTH refs: a slot read only by the owner ref would otherwise look dangling.
-  Effect.Search (Search.MkSearch searcher owner quantity _ _ _) ->
+  Effect.Search (Search.MkSearch searcher owner _ quantity _ _ _) ->
     joinSlots (playerRefSlots searcher : playerRefSlots owner : fmap quantitySlots (Maybe.maybeToList quantity))
   Effect.ExileAllGraveyards -> Map.empty
   Effect.Proliferate -> Map.empty
@@ -698,7 +698,7 @@ slotsAreExhaustive effect = case effect of
   Effect.AddMana _ -> True
   -- An unbounded search names no count, so it reads no slot to be exhaustive
   -- about.
-  Effect.Search (Search.MkSearch _ _ quantity _ _ _) -> all Quantity.slotsAreExhaustive quantity
+  Effect.Search (Search.MkSearch _ _ _ quantity _ _ _) -> all Quantity.slotsAreExhaustive quantity
   Effect.ExileAllGraveyards -> True
   Effect.Proliferate -> True
   Effect.Bolster quantity -> Quantity.slotsAreExhaustive quantity
@@ -861,7 +861,7 @@ readsX = any effectReadsX
       Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> any Quantity.readsX (Projection.quantitiesOf modification)
       Effect.ChangeText {} -> False
       Effect.AddMana _ -> False
-      Effect.Search (Search.MkSearch _ _ quantity _ _ _) -> any Quantity.readsX quantity
+      Effect.Search (Search.MkSearch _ _ _ quantity _ _ _) -> any Quantity.readsX quantity
       Effect.ExileAllGraveyards -> False
       Effect.Proliferate -> False
       Effect.Bolster quantity -> Quantity.readsX quantity
@@ -959,113 +959,6 @@ readsX = any effectReadsX
       Effect.GrantPlayFromExile {} -> False
       -- CR 608.2f's body is an effect list like any other, so an X inside it counts.
       Effect.ForEach (ForEach.MkForEach ref _ body) -> any Quantity.readsX (objectRefQuantities ref) || readsX (Foldable.toList body)
-
--- CR 601.3 (Panglacial): does this effect search a library? Stack asks before
--- resolving, to offer the cast-while-searching opportunity.
-searchesLibrary :: Effect Card.Type.Card -> Bool
-searchesLibrary effect = case effect of
-  Effect.Search {} -> True
-  Effect.Proliferate -> False
-  Effect.Bolster _ -> False
-  Effect.Amass _ -> False
-  Effect.Blight _ -> False
-  Effect.TemptWithTheRing -> False
-  Effect.Venture -> False
-  Effect.PlayerSacrifices {} -> False
-  Effect.DealDamage (DealDamage.MkDealDamage {}) -> False
-  Effect.Fight {} -> False
-  Effect.ModifyTarget {} -> False
-  Effect.ChangeText {} -> False
-  Effect.AddMana _ -> False
-  Effect.ExileAllGraveyards -> False
-  Effect.ExileHandThenDraw -> False
-  Effect.RestartGame _ -> False
-  Effect.ControlPlayerNextTurn _ -> False
-  Effect.Destroy {} -> False
-  Effect.Sacrifice _ -> False
-  Effect.TurnFaceDown _ -> False
-  Effect.TurnFaceUp _ -> False
-  Effect.RemoveFromCombat _ -> False
-  Effect.BecomesBlocked _ -> False
-  Effect.MoveToZone {} -> False
-  Effect.Draw {} -> False
-  Effect.Mill {} -> False
-  -- These show NAMED cards; CR 701.23a's search looks through a whole zone.
-  Effect.Reveal {} -> False
-  Effect.LookAt {} -> False
-  Effect.Scry {} -> False
-  Effect.Surveil {} -> False
-  Effect.Fateseal {} -> False
-  -- CR 701.44a reveals the top card; CR 701.23a's search looks through a zone.
-  Effect.Explore {} -> False
-  Effect.Discard {} -> False
-  Effect.LoseLife {} -> False
-  Effect.GainLife {} -> False
-  Effect.ExchangeLifeTotals _ -> False
-  Effect.SetLifeTotal {} -> False
-  Effect.RedistributeLifeTotals -> False
-  Effect.IncreaseSpeed {} -> False
-  Effect.DecreaseSpeed {} -> False
-  Effect.Create {} -> False
-  Effect.CreateCopy {} -> False
-  Effect.BecomeCopy {} -> False
-  Effect.Replace {} -> False
-  Effect.SkipNextPhase {} -> False
-  -- CR 615.5's rider is not descended into: this classification is asked of the
-  -- RESOLUTION about to run, and the rider runs later, outside any resolution.
-  Effect.PreventNextDamage {} -> False
-  Effect.PreventAllDamage {} -> False
-  Effect.RedirectDamage {} -> False
-  Effect.Counter {} -> False
-  Effect.PutCounters {} -> False
-  Effect.RemoveCounters {} -> False
-  Effect.GainPlayerCounters {} -> False
-  Effect.RemovePlayerCounters {} -> False
-  Effect.PayAnyEnergy _ -> False
-  Effect.Tap _ -> False
-  Effect.Untap _ -> False
-  Effect.Detain _ -> False
-  Effect.Goad _ -> False
-  Effect.MakePlotted _ -> False
-  Effect.DoesNotUntapNext _ -> False
-  Effect.Transform _ -> False
-  Effect.PhaseOut _ -> False
-  Effect.AddPhases _ -> False
-  Effect.EndTurn -> False
-  Effect.EndCombatPhase -> False
-  Effect.GainControl (DurationRef.MkDurationRef _ _) -> False
-  Effect.ArmDelayedTrigger {} -> False
-  Effect.AffectPlayers {} -> False
-  Effect.RequireBlock {} -> False
-  Effect.CantBeRegenerated {} -> False
-  Effect.RequireAttack {} -> False
-  Effect.CreateEmblem {} -> False
-  Effect.BecomeMonarch {} -> False
-  Effect.Designate (Designate.MkDesignate _ _) -> False
-  Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> False
-  Effect.Unsuspect _ -> False
-  Effect.Evolve _ -> False
-  Effect.Mentor _ -> False
-  Effect.Train _ -> False
-  Effect.ItBecomes _ -> False
-  Effect.ExileUntilMonarch _ -> False
-  Effect.ExileHaunting {} -> False
-  Effect.Attach _ -> False
-  Effect.AttachTarget {} -> False
-  Effect.AttachTargetToEach {} -> False
-  Effect.PlaySubgame _ -> False
-  Effect.ChooseOpponent _ -> False
-  Effect.ChooseOpponentAtRandom _ -> False
-  Effect.RollDie {} -> False
-  -- CR 701.24 shuffles a library but never LOOKS at one (CR 701.23a).
-  Effect.ShuffleIntoLibrary {} -> False
-  -- CR 608.2g's other producer, and not a search: the cast names one known object.
-  Effect.OfferCast {} -> False
-  Effect.GrantPlayFromExile {} -> False
-  Effect.TakeExtraTurn {} -> False
-  -- Descended into, unlike PreventNextDamage's rider: this body runs INSIDE the
-  -- resolution being asked about (CR 608.2f).
-  Effect.ForEach (ForEach.MkForEach _ _ body) -> any searchesLibrary body
 
 -- CR 603.7: the delayed abilities an effect list ARMS, by name.
 armedAbilities :: [Effect Card.Type.Card] -> Set AbilityName
@@ -3157,11 +3050,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         ManaUnit.restriction = restriction
                       }
               State.modify' (Mana.addMana pid [unit])
-  Effect.Search (Search.MkSearch searcherRef ownerRef quantity filter_ upTo destination) ->
-    -- CR 701.23a: match each library card through its own CR 613 projection --
-    -- rule 613.1 names no zone, so a library card is folded exactly as a
-    -- permanent is, and CR 208.2a's characteristic-defining power rides along at
-    -- layer 7a.
+  Effect.Search (Search.MkSearch searcherRef ownerRef zones quantity filter_ upTo destination) ->
+    -- CR 701.23a: match each candidate through its own CR 613 projection --
+    -- rule 613.1 names no zone, so a card in any of the searched zones is folded
+    -- exactly as a permanent is, and CR 208.2a's characteristic-defining power
+    -- rides along at layer 7a.
     --
     -- The context has no perspective (CR 109.5): a search filter never
     -- references a player, so ControlledBy is vacuously False.
@@ -3182,27 +3075,31 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             { Filter.canAttachToSubject = Maybe.isJust (Attach.attachmentFor oid (Recipient.ToObject source) g)
             }
         matches1 g oid = Filter.matches searchContext (viewOfCandidate g oid) filter_
+        -- CR 400.2: the library and the hand are the hidden zones. CR 701.23b,
+        -- CR 701.23c and CR 701.23d are each scoped to a hidden zone, so this is
+        -- what decides, PER ZONE, whether a find may be declined.
+        isHidden zone = zone == Zone.Library || zone == Zone.Hand
      in do
           gs0 <- State.get
-          -- Search.searcher names who searches; Search.owner names whose library
-          -- is read and shuffled. The searcher is prompted and offered CR 601.3's
-          -- cast. Neither is `controller` except where a ref says so. CR 701.23i
-          -- supplies the order: apnapOrder supplies the ORDER and the ref the
-          -- MEMBERSHIP, for searchers and owners alike.
+          -- Search.searcher names who searches; Search.owner names whose zones
+          -- are read and whose library is shuffled. The searcher is prompted and
+          -- offered CR 601.3's cast. Neither is `controller` except where a ref
+          -- says so. CR 701.23i supplies the order: apnapOrder supplies the ORDER
+          -- and the ref the MEMBERSHIP, for searchers and owners alike.
           --
           -- Not implemented: CR 701.23i's SIMULTANEOUS look, each searcher seeing
-          -- the libraries before any of them decides (#1319).
+          -- the zones before any of them decides (#1319).
           let inApnapOrder r =
                 let named = playerRefPlayers legal controller gs0 r
                  in filter (\pid -> List.elem pid named) (Game.apnapOrder gs0)
               searchers = inApnapOrder searcherRef
               -- "Each player searches THEIR library" (Jungle Wayfinder) is ONE
               -- instruction applied per player, not the cross product of two
-              -- folds: the library read is whichever searcher this pass has
-              -- reached. Rule 701.23a says only how to look, so which library
-              -- that is comes from the card's own sentence rather than from the
-              -- rule. That is Pawl.Types.PlayerRef.Candidate's reading, and
-              -- the substitution is the same move Pawl.Engine.Quantity
+              -- folds: the zones read are whichever searcher this pass has
+              -- reached. Rule 701.23a says only how to look, so which player's
+              -- zones those are comes from the card's own sentence rather than
+              -- from the rule. That is Pawl.Types.PlayerRef.Candidate's reading,
+              -- and the substitution is the same move Pawl.Engine.Quantity
               -- .forCandidate makes for a per-player amount. Every other ref
               -- names a set of its own, so Extract's You/InSlot pair still
               -- crosses -- one searcher over one owner.
@@ -3210,68 +3107,100 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 PlayerRef.Candidate -> [searcher]
                 _ -> inApnapOrder ownerRef
               -- How many cards this search may find (CR 701.23a), evaluated ONCE
-              -- before the loop: one instruction names one count. An unevaluable
-              -- or non-positive quantity comes out as 0. A search that states no
-              -- count at all -- Mana Severance's "any number of land cards" --
-              -- comes out as Nothing, and is bounded per library by what the
-              -- library holds, which is CR 701.23a's "all cards in that zone".
+              -- before the loop: the card prints one instruction with one count
+              -- however many zones it names, so a two-zone search caps the two
+              -- together. An unevaluable or non-positive quantity comes
+              -- out as 0. A search that states no count at all -- Mana Severance's
+              -- "any number of land cards" -- comes out as Nothing, and is bounded
+              -- by what the searched zones hold, which is CR 701.23a's "all cards
+              -- in that zone".
               cap = fmap evaluateCap quantity
               evaluateCap q = case Quantity.evaluateFor (effectViewOf source legal gs0) (effectContext controller source legal (slotGroups resolving gs0)) gs0 resolving source q of
                 Just n | n > 0 -> Integer.toNaturalSaturating n
                 _ -> 0
           Monad.forM_ searchers $ \searcher -> Monad.forM_ (ownersFor searcher) $ \owner -> do
             -- CR 101.2: a player who can't search libraries does not, and finds
-            -- nothing. Asked BEFORE CR 601.3's offer below, which is made WHILE
-            -- SEARCHING. The rest of the instruction still happens -- CR 701.23
-            -- says only how to look, so the shuffle is the card's own.
+            -- nothing there. Asked BEFORE CR 601.3's offer below, which is made
+            -- WHILE SEARCHING. The rest of the instruction still happens -- CR
+            -- 701.23 says only how to look, so the shuffle is the card's own.
+            --
+            -- The prohibition names LIBRARIES (Leonin Arbiter), so it removes
+            -- that one zone rather than the whole instruction: a prohibited
+            -- searcher still looks through the graveyard the same card named. See
+            -- Pawl.Engine.PlayerEffect.prohibitsSearching, which takes no library
+            -- (#1269).
             prohibited <- State.gets (PlayerEffect.prohibitsSearching searcher)
+            let searchedZones = if prohibited then Set.delete Zone.Library zones else zones
             -- A cap of zero asks nothing and finds nothing: one legal answer is
             -- no choice to put to a player. An unbounded search has no such
-            -- shortcut -- its cap is not known until the library is read.
+            -- shortcut -- its cap is not known until the zones are read.
             found <-
-              if prohibited || cap == Just 0
+              if Set.null searchedZones || cap == Just 0
                 then pure []
                 else do
                   -- CR 601.3 (Panglacial Wurm): the chance to cast is offered AT
                   -- THE SEARCH, not when the resolution began, so earlier
                   -- effects of the resolution have already happened. Both spells
                   -- and abilities reach here. The Wurm's "while you're searching
-                  -- your library" makes the offer the SEARCHER's, and only where
-                  -- the library being searched is their own.
-                  Monad.when (searcher == owner) (Cast.castWhileSearching searcher)
+                  -- your library" makes the offer the SEARCHER's, only where the
+                  -- library being searched is their own, and only where a LIBRARY
+                  -- is among the zones at all.
+                  --
+                  -- That last conjunct is a REGRESSION FENCE rather than a proven
+                  -- behaviour: every card in the pool naming a zone also names a
+                  -- library, so removing it reddens nothing. A graveyard-only
+                  -- search would be its observer.
+                  Monad.when (searcher == owner && Set.member Zone.Library searchedZones) (Cast.castWhileSearching searcher)
                   gs <- State.get
-                  let matches = filter (matches1 gs) (Game.zoneMembers Zone.Library owner gs)
-                      -- CR 701.23a bounds an unbounded search by the zone: every
+                  -- ONE prompt over the union, not one per zone: the card prints
+                  -- one instruction with one count, and asking per zone would cap
+                  -- per zone. The zone is kept alongside its candidates because
+                  -- CR 701.23b's permission is a property of the ZONE.
+                  let byZone = fmap (\zone -> (zone, filter (matches1 gs) (Game.zoneMembers zone owner gs))) (Set.toAscList searchedZones)
+                      matches = concatMap snd byZone
+                      -- CR 701.23a bounds an unbounded search by the zones: every
                       -- card the filter admits is findable, and no more.
                       capHere = Maybe.fromMaybe (List.genericLength matches) cap
                       decider = Decide.deciderFor searcher gs
-                  answer <- Game.choose (Prompt.SearchLibrary decider searcher matches capHere)
+                  answer <- Game.choose (Prompt.Search decider searcher matches capHere)
                   -- CR 701.23a: every card found is one the filter admits.
-                  -- Filtered, not trusted, deduplicated, and truncated to
-                  -- the cap. What a SHORT answer leaves is the difference between
-                  -- CR 701.23b and CR 701.23d, and Filter.statesAQuality is which
-                  -- rule this search is under: stating a quality it may find
-                  -- fewer, and a bare quantity must find as many as it can, so
-                  -- the answer is COMPLETED from the remaining matches.
-                  -- Search.upTo is the third case, a card's own "up to" over a
-                  -- filter stating no quality; it lands in CR 701.23b's branch.
-                  -- An unbounded search is a fourth: CR 701.23d reaches a search
-                  -- "simply for a quantity of cards", which one stating no
-                  -- quantity is not, so a short answer stands whatever the filter
-                  -- says. That disjunct is a REGRESSION FENCE rather than a
-                  -- proven behaviour: every printing of "for any number of cards"
-                  -- also states a quality, so the first disjunct answers for all
-                  -- of them and removing this one reddens nothing (Scryfall
-                  -- o:"for any number of cards", 2026-08-23, 25 hits, every one
-                  -- of them qualified -- "named X", "with the chosen name",
-                  -- "that have mana value 9"). A card that said "search your
-                  -- library for any number of cards" would refute that.
-                  let picked = List.genericTake capHere . List.nub $ filter (\oid -> List.elem oid matches) answer
-                      filler = filter (\oid -> List.notElem oid picked) matches
-                  pure $
-                    if Filter.statesAQuality filter_ || upTo || Maybe.isNothing cap
-                      then picked
-                      else List.genericTake capHere (picked <> filler)
+                  -- Filtered, not trusted, deduplicated, and truncated to the cap.
+                  -- What a SHORT answer leaves is the difference between CR
+                  -- 701.23b and CR 701.23d, and it is settled PER ZONE: CR
+                  -- 701.23b, CR 701.23c and CR 701.23d each speak of a HIDDEN
+                  -- zone, and CR 400.2 makes the graveyard public, so a search of
+                  -- a graveyard must find what it can even where the same search
+                  -- of a library need not. CR 701.23b's own Splinter example says
+                  -- exactly that. So a short answer is COMPLETED from the matches
+                  -- the searcher passed over in the zones that may NOT be
+                  -- declined.
+                  --
+                  -- Only the FIRST of the three ways to decline is the rule's
+                  -- and so scoped to a hidden zone: CR 701.23b's "isn't required
+                  -- to find" for a filter stating a quality. Search.upTo -- a
+                  -- card's own "up to" over a quality-free filter -- and a search
+                  -- stating no quantity are the CARD's own permissions, printed
+                  -- over the whole instruction, so they hold in a public zone
+                  -- too; CR 701.23d cannot force the second either, a search
+                  -- stating no quantity not being one "simply for a quantity of
+                  -- cards".
+                  --
+                  -- Those two are REGRESSION FENCES rather than proven behaviour,
+                  -- twice over. No card in the pool prints "up to" or "any number
+                  -- of" over a zone that is not a library, so their zone scoping
+                  -- is unobservable; and every printing of "for any number of
+                  -- cards" also states a quality, so the first disjunct answers
+                  -- for all of them and removing the third reddens nothing
+                  -- (Scryfall o:"for any number of cards", 2026-08-23, 25 hits,
+                  -- every one of them qualified -- "named X", "with the chosen
+                  -- name", "that have mana value 9"). A card that said "search
+                  -- your library and graveyard for any number of cards" would
+                  -- refute both.
+                  let mayDecline zone = upTo || Maybe.isNothing cap || (isHidden zone && Filter.statesAQuality filter_)
+                      picked = List.genericTake capHere . List.nub $ filter (\oid -> List.elem oid matches) answer
+                      forced = concatMap snd (filter (not . mayDecline . fst) byZone)
+                      filler = filter (\oid -> List.notElem oid picked) forced
+                  pure (List.genericTake capHere (picked <> filler))
             -- Where the cards go is the CARD's instruction, not rule 701.23's;
             -- CR 701.23e says the same of the reveal. The searcher is the
             -- revealer (CR 701.20a), and the cards go in the order the searcher
@@ -3279,10 +3208,20 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             Monad.mapM_ (putFound searcher source destination) found
             -- The shuffle is the CARD's instruction too (CR 701.23h, CR 701.24b).
             -- The library shuffled is the one that was READ, so this seat is the
-            -- owner.
-            lib <- State.gets (Game.zoneMembers Zone.Library owner)
-            shuffleAnswer <- Game.ask (Prompt.Shuffle lib)
-            State.modify' (reorderLibrary owner (Game.honourShuffle lib shuffleAnswer))
+            -- owner -- and only where a LIBRARY is among the zones the card named.
+            -- Delivery Moogle's "if you search your library this way, shuffle" is
+            -- that condition printed; a graveyard-only search shuffles nothing.
+            -- Read off the card's own zones rather than searchedZones, since CR
+            -- 101.2's prohibition stops the looking and not the card's other
+            -- instructions.
+            --
+            -- A REGRESSION FENCE for castWhileSearching's reason above: no card
+            -- in the pool searches without naming a library, so removing this
+            -- guard reddens nothing.
+            Monad.when (Set.member Zone.Library zones) $ do
+              lib <- State.gets (Game.zoneMembers Zone.Library owner)
+              shuffleAnswer <- Game.ask (Prompt.Shuffle lib)
+              State.modify' (reorderLibrary owner (Game.honourShuffle lib shuffleAnswer))
   -- Exile every card in every graveyard (CR 400.7: each move funnels through
   -- changeZone). "Every graveyard" is CR 102.1's players still in the game, not
   -- the keys of GameState.players, which keep a departed seat's row.
@@ -5867,7 +5806,7 @@ putFound searcher source destination cardId = case destination of
         Monad.void
           (Event.changeZoneAttaching Nothing Set.empty cardId Zone.Battlefield LibraryPosition.defaultValue (Just seed) TapState.Untapped Map.empty (Just searcher) Nothing Facing.FaceUp False)
 
--- Put a library card onto the battlefield tapped (CR 701.23's Evolving Wilds
+-- Put a found card onto the battlefield tapped (CR 701.23's Evolving Wilds
 -- shape). changeZone mints a new object; tap it by id after the move.
 putTapped :: ObjectId -> Game ()
 putTapped cardId = do

@@ -88,7 +88,7 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- offered list, else fails to find.
 findFirst :: Prompt.Prompt r -> r
 findFirst p = case p of
-  Prompt.SearchLibrary _ _ matches cap -> List.genericTake cap matches
+  Prompt.Search _ _ matches cap -> List.genericTake cap matches
   _ -> S.identityAnswer p
 
 -- Answers ChooseModes with the empty selection, which is an illegal answer to

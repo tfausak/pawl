@@ -1563,7 +1563,7 @@ rewriteEffect pairs effect = case effect of
   Effect.ChangeText (ChangeText.MkChangeText family forbidden slot) ->
     Effect.ChangeText (ChangeText.MkChangeText family (Set.map (swapWordIn family pairs) forbidden) slot)
   Effect.AddMana _ -> effect
-  Effect.Search (Search.MkSearch searcher owner quantity filter_ upTo destination) -> Effect.Search (Search.MkSearch searcher owner quantity (Filter.rewrite pairs filter_) upTo destination)
+  Effect.Search (Search.MkSearch searcher owner zones quantity filter_ upTo destination) -> Effect.Search (Search.MkSearch searcher owner zones quantity (Filter.rewrite pairs filter_) upTo destination)
   Effect.ExileAllGraveyards -> effect
   Effect.Proliferate -> effect
   Effect.Bolster _ -> effect

@@ -83,7 +83,7 @@ encode p answer = case p of
   Prompt.AnnounceTargets {} -> Response.AnnouncedTargets answer
   Prompt.ChooseLandTypeSwap {} -> Response.ChoseLandTypeSwap answer
   Prompt.ChooseCreatureTypeSwap {} -> Response.ChoseCreatureTypeSwap answer
-  Prompt.SearchLibrary {} -> Response.Searched answer
+  Prompt.Search {} -> Response.Searched answer
   Prompt.CastWhileSearching {} -> Response.CastWhileSearched answer
   Prompt.ChooseX {} -> Response.ChoseX answer
   Prompt.ChooseEntwine {} -> Response.AnnouncedEntwine answer
@@ -261,7 +261,7 @@ decode p response = case p of
   Prompt.ChooseCreatureTypeSwap {} -> case response of
     Response.ChoseCreatureTypeSwap pair -> Just pair
     _ -> Nothing
-  Prompt.SearchLibrary {} -> case response of
+  Prompt.Search {} -> case response of
     Response.Searched found -> Just found
     _ -> Nothing
   Prompt.CastWhileSearching {} -> case response of
@@ -571,7 +571,7 @@ defaultAnswer p = case p of
   Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Frog, Subtype.Frog)
   -- CR 701.23b: failing to find is always legal, and the empty answer is that
   -- outcome for a search of any size.
-  Prompt.SearchLibrary {} -> []
+  Prompt.Search {} -> []
   -- Declining the re-entrant cast is always legal.
   Prompt.CastWhileSearching {} -> Nothing
   -- CR 601.2b: X=0 is always payable.
