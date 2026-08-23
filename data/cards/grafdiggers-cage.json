@@ -29,6 +29,33 @@
         }
       ],
       "name": "Grafdigger's Cage",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "CantCastMatching",
+            "value": {
+              "type": "Or",
+              "value": [
+                {
+                  "type": "IsInZone",
+                  "value": {
+                    "type": "Graveyard"
+                  }
+                },
+                {
+                  "type": "IsInZone",
+                  "value": {
+                    "type": "Library"
+                  }
+                }
+              ]
+            }
+          },
+          "scope": {
+            "type": "EachPlayer"
+          }
+        }
+      ],
       "typeLine": {
         "types": [
           {

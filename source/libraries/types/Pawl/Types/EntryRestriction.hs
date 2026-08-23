@@ -65,14 +65,17 @@ data EntryRestriction = MkEntryRestriction
     -- the full set.
     --
     -- A FIELD rather than an atom of the affected filter above, and this is the
-    -- difference between the card and a bug. Pawl.Types.Filter has no zone atom
-    -- (see Pawl.Types.PlayerEffect's CastFromHandWithoutPaying header, which
-    -- states the same absence for the same reason), so
-    -- @Affected.MatchingOffBattlefield@ alone reaches every zone but the
-    -- battlefield -- INCLUDING THE STACK, where an ordinary hardcast creature
-    -- spell sits on its way to becoming a permanent. Grafdigger's Cage does not
-    -- touch that spell, and Pawl.EntryRestrictionSpec's "a hardcast creature
-    -- spell still enters" is the control leg that proves it.
+    -- difference between the card and a bug: @Affected.MatchingOffBattlefield@
+    -- alone reaches every zone but the battlefield -- INCLUDING THE STACK, where
+    -- an ordinary hardcast creature spell sits on its way to becoming a
+    -- permanent. Grafdigger's Cage does not touch that spell, and
+    -- Pawl.EntryRestrictionSpec's "a hardcast creature spell still enters" is the
+    -- control leg that proves it.
+    --
+    -- Not Filter.IsInZone in the filter either, though that atom exists: it asks
+    -- where a candidate IS, and this asks where a MOVE is FROM. The two coincide
+    -- only while the object has not yet been re-homed, and CR 400.4a's "remains in
+    -- its previous zone" is a sentence about the move.
     --
     -- A Set rather than a Maybe: the pool's printings name two zones and none,
     -- and Pawl.Types.Zone is a small closed enum, so the empty-set case never has

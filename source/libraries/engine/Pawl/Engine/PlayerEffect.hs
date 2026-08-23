@@ -560,6 +560,10 @@ prohibitsCasting pid oid name gs =
         -- quality-bearing prohibition can be asked: the spell is in the class
         -- right now, and the player may begin casting it anyway if a choice they
         -- have not yet made could take it out.
+        --
+        -- The quality can be the ZONE the cast is from (Filter.IsInZone): both
+        -- callers ask this before CR 601.2a's move, so the object the view is
+        -- taken of still lies where the cast would take it from.
         PlayerEffect.CantCastMatching criterion ->
           matchesObject criterion oid gs && not (choiceCouldEscape criterion oid gs)
         -- CR 305.1 again, exactly as CantPlayLandChosenName above: a land is
