@@ -495,6 +495,7 @@ substituteXInComponent x component = case component of
   CostComponent.PayEnergy _ -> component
   CostComponent.AddLoyaltyToThis _ -> component
   CostComponent.RemoveLoyaltyFromThis _ -> component
+  CostComponent.RemovePlusOneCountersFromThis _ -> component
   CostComponent.PutPlusOneCountersOnThis _ -> component
   CostComponent.Blight _ -> component
   -- PayLifeX's rewrite one keyword action over: CR 107.3a gives ONE announced
@@ -538,6 +539,7 @@ componentHasVariable component = case component of
   CostComponent.PayEnergy _ -> False
   CostComponent.AddLoyaltyToThis _ -> False
   CostComponent.RemoveLoyaltyFromThis _ -> False
+  CostComponent.RemovePlusOneCountersFromThis _ -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.BlightX -> True
@@ -611,6 +613,7 @@ componentDemandGrowsWithX component = case component of
   CostComponent.PayEnergy _ -> False
   CostComponent.AddLoyaltyToThis _ -> False
   CostComponent.RemoveLoyaltyFromThis _ -> False
+  CostComponent.RemovePlusOneCountersFromThis _ -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.ExileThisFromGraveyard -> False
@@ -847,6 +850,12 @@ loyaltyAmountOf component = case component of
   CostComponent.DiscardCards {} -> Nothing
   CostComponent.DiscardThis _ -> Nothing
   CostComponent.PayEnergy _ -> Nothing
+  -- Nothing, and this is the LOAD-BEARING arm of the component: CR 606.4's
+  -- loyalty symbol is what CR 606.2 reads to call an ability a loyalty ability,
+  -- and a Just here would ration Barkhide Troll's ability to once a turn (CR
+  -- 606.3), gate it on the sorcery window and feed it to `combineLoyalty` (CR
+  -- 606.5). Removing a +1\/+1 counter is none of that.
+  CostComponent.RemovePlusOneCountersFromThis _ -> Nothing
   CostComponent.PutPlusOneCountersOnThis _ -> Nothing
   CostComponent.Blight _ -> Nothing
   CostComponent.BlightX -> Nothing
@@ -921,6 +930,12 @@ zoneOfComponent component = case component of
   CostComponent.PayEnergy _ -> Nothing
   CostComponent.AddLoyaltyToThis _ -> Nothing
   CostComponent.RemoveLoyaltyFromThis _ -> Nothing
+  -- CR 122.1's counter is a marker and not an object, and CR 122.2 has counters
+  -- "simply cease to exist" rather than travel, so removing one moves nothing out
+  -- of any zone and CR 113.6's battlefield default stands. A FENCE and not proven
+  -- behaviour, ReturnThis' above and for its reason: Barkhide Troll's ability
+  -- functions on the battlefield either way.
+  CostComponent.RemovePlusOneCountersFromThis _ -> Nothing
   -- CR 122.6 puts counters on a permanent already where it is, so nothing moves
   -- out of any zone.
   CostComponent.PutPlusOneCountersOnThis _ -> Nothing
@@ -970,6 +985,7 @@ componentStatesHiddenQuality component = case component of
   CostComponent.PayEnergy _ -> False
   CostComponent.AddLoyaltyToThis _ -> False
   CostComponent.RemoveLoyaltyFromThis _ -> False
+  CostComponent.RemovePlusOneCountersFromThis _ -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.BlightX -> False
@@ -978,8 +994,14 @@ componentStatesHiddenQuality component = case component of
 -- Zero for an object with none, which CR 704.5i reads as loyalty 0 -- so this is
 -- only ever asked of something already known to be a planeswalker.
 loyaltyCountersOn :: ObjectId -> GameState -> Natural
-loyaltyCountersOn oid gs =
-  maybe 0 (Map.findWithDefault 0 CounterKind.Loyalty . Object.counters) (Game.lookupObject oid gs)
+loyaltyCountersOn = countersOn CounterKind.Loyalty
+
+-- CR 122.6: how many counters of one kind an object has, zero for an object with
+-- none and zero for one that is not there. The general form of
+-- loyaltyCountersOn above, which the +1\/+1 removal cost reads too.
+countersOn :: CounterKind.CounterKind Keyword.Type.Keyword -> ObjectId -> GameState -> Natural
+countersOn kind oid gs =
+  maybe 0 (Map.findWithDefault 0 kind . Object.counters) (Game.lookupObject oid gs)
 
 addLoyalty :: Natural -> Object.Object -> Object.Object
 addLoyalty n obj = obj {Object.counters = Map.insertWith (+) CounterKind.Loyalty n (Object.counters obj)}
@@ -1161,6 +1183,11 @@ claimOf pid oid component gs = case component of
   CostComponent.PayEnergy _ -> Nothing
   CostComponent.AddLoyaltyToThis _ -> Nothing
   CostComponent.RemoveLoyaltyFromThis _ -> Nothing
+  -- Nothing: CR 122.1's counter is a marker rather than an object, so no object
+  -- leaves any pool -- the two arms either side of this one, for their reason. A
+  -- FENCE, `repeatsOf` settling before any axis matters for a cost with one
+  -- component and a mana part.
+  CostComponent.RemovePlusOneCountersFromThis _ -> Nothing
   CostComponent.PutPlusOneCountersOnThis _ -> Nothing
   -- Nothing, though this one DOES pick an object out of a pool: CR 701.68a takes
   -- nothing out of a zone. Two blights in one cost may choose the same creature,
@@ -1430,6 +1457,10 @@ uncountedCeiling component = case component of
   CostComponent.PayEnergy _ -> Just 1
   CostComponent.AddLoyaltyToThis _ -> Just 1
   CostComponent.RemoveLoyaltyFromThis _ -> Just 1
+  -- An UNDERSTATEMENT, which the header licenses: the counters on the source are
+  -- a resource this module does not count, so a permanent carrying three could
+  -- pay three times.
+  CostComponent.RemovePlusOneCountersFromThis _ -> Just 1
   CostComponent.PutPlusOneCountersOnThis _ -> Just 1
   -- An UNDERSTATEMENT: a player controlling a creature can blight as often as
   -- they can pay the rest of the cost.
@@ -1531,6 +1562,7 @@ lifeOwedByComponent component = case component of
   CostComponent.PayEnergy _ -> 0
   CostComponent.AddLoyaltyToThis _ -> 0
   CostComponent.RemoveLoyaltyFromThis _ -> 0
+  CostComponent.RemovePlusOneCountersFromThis _ -> 0
   CostComponent.PutPlusOneCountersOnThis _ -> 0
   CostComponent.Blight _ -> 0
   CostComponent.BlightX -> 0
@@ -1653,6 +1685,21 @@ canPayComponent pid oid component gs = case component of
     Set.member oid (GameState.battlefield gs)
       && Projection.controllerOf oid gs == Just pid
       && loyaltyCountersOn oid gs >= n
+  -- CR 118.3: payable only while the permanent still carries at least that many
+  -- +1\/+1 counters -- "a player can't pay a cost without having the necessary
+  -- resources to pay it fully". CR 606.6 is the loyalty-only analogue and is NOT
+  -- the rule here. ">=" for that arm's reason: a removal of exactly what is there
+  -- is payable and leaves none.
+  --
+  -- Deliberately NOT gated on control, unlike the loyalty arms above and like
+  -- PutPlusOneCountersOnThis below: CR 122 qualifies a counter by the object it
+  -- sits on and by nothing else, and CR 602.1a already fixes the payer as the
+  -- player activating the ability. Unobservable either way on this pool, CR 602.1
+  -- offering a permanent's activated ability only to its controller -- a declared
+  -- reading rather than a tested one.
+  CostComponent.RemovePlusOneCountersFromThis n ->
+    Set.member oid (GameState.battlefield gs)
+      && countersOn CounterKind.PlusOnePlusOne oid gs >= n
   -- CR 701.63a puts the counters on "that permanent", so the only thing that can
   -- make this unpayable is the permanent no longer being there. Deliberately NOT
   -- gated on control, unlike the loyalty arms above: rule 701.63a fixes the payer
@@ -1870,6 +1917,11 @@ orderSensitive component = case component of
   CostComponent.TapForTotalPower {} -> True
   CostComponent.TapPermanents {} -> True
   CostComponent.AddLoyaltyToThis _ -> True
+  -- A FENCE rather than proven behaviour, ReturnThis' above and for its reason:
+  -- Barkhide Troll is the one card that prints this component and its cost has no
+  -- second order-sensitive part, so `orderObservable` is False whichever way this
+  -- answers.
+  CostComponent.RemovePlusOneCountersFromThis _ -> True
   CostComponent.RemoveLoyaltyFromThis _ -> True
   CostComponent.PutPlusOneCountersOnThis _ -> True
   CostComponent.Blight _ -> True
@@ -2357,6 +2409,18 @@ payComponent pid oid component = case component of
   -- for, so a saturating removal is unreachable through this door anyway.
   CostComponent.RemoveLoyaltyFromThis n -> do
     Event.removeCounters oid CounterKind.Loyalty n
+    pure bindsNothing
+  -- CR 118.1's removal as a cost, through Event.removeCounters -- CR 122's
+  -- removal funnel, RemoveLoyaltyFromThis' road above and for its reason: what
+  -- the funnel adds is the GameEvent.CountersRemoved record a counter-watching
+  -- trigger reads. CR 614.16 does not arise, being about PLACING a counter, so
+  -- this arm owes none of AddLoyaltyToThis' argument above.
+  --
+  -- The funnel saturates, which canPayComponent has already made unreachable
+  -- through this door: CR 118.3 refuses an activation the permanent cannot pay
+  -- for.
+  CostComponent.RemovePlusOneCountersFromThis n -> do
+    Event.removeCounters oid CounterKind.PlusOnePlusOne n
     pure bindsNothing
   -- CR 122.6's placement, through the Event.putCounters funnel as
   -- CounterCause.ByEffect -- the opposite call from AddLoyaltyToThis above, and

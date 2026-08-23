@@ -2762,6 +2762,7 @@ costComponentFilters component = case component of
   CostComponent.PayEnergy _ -> []
   CostComponent.AddLoyaltyToThis _ -> []
   CostComponent.RemoveLoyaltyFromThis _ -> []
+  CostComponent.RemovePlusOneCountersFromThis _ -> []
   CostComponent.PutPlusOneCountersOnThis _ -> []
   CostComponent.Blight _ -> []
   CostComponent.BlightX -> []
