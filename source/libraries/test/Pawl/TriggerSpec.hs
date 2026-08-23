@@ -2559,7 +2559,9 @@ chaptersOnStackFrom oid gs =
 --
 --   alice CAN pay (the Mauler is itself a nontoken creature) and DECLINES,
 --   bob PAYS, sacrificing one of his two Pikers,
---   carol controls only a TOKEN creature, so CR 118.3 never offers her the cost.
+--   carol controls only a TOKEN creature, so CR 118.3 never offers her the cost
+--     -- and the answerer accepts for everyone but alice, so an offer she DID
+--     receive would have spared her and the assertion would read her at 20.
 --
 -- The observable is the LIFE TRIPLE, and it separates three implementations:
 -- EachInSlot gives (16, 20, 16); InSlot's singular read gives (20, 20, 20),
@@ -2575,14 +2577,17 @@ maulerSpec s registry =
       beginEndStep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep, GameState.activePlayer = S.alice})
       settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
       lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
-      -- Payer-keyed: only bob pays. An answerer that ignored the payer would
-      -- collapse the board onto one answer and prove nothing. The Decider is
-      -- checked beside the player because CR 723.1 can part them; nothing here
-      -- controls anybody, so they must agree.
-      onlyBobPays :: Prompt.Prompt r -> r
-      onlyBobPays p = case p of
+      -- Payer-keyed: everyone BUT alice pays whenever asked. An answerer that
+      -- ignored the payer would collapse the board onto one answer and prove
+      -- nothing, and this direction makes carol's limb load-bearing -- she ends
+      -- on the not-paid branch only because CR 118.3 never offered her the cost,
+      -- since an offer she received would have been accepted here. The Decider
+      -- is checked beside the player because CR 723.1 can part them; nothing
+      -- here controls anybody, so they must agree.
+      everyoneButAlicePays :: Prompt.Prompt r -> r
+      everyoneButAlicePays p = case p of
         Prompt.ChooseToPay (Decider.MkDecider d) player _ _ _ _
-          | d == S.bob && player == S.bob ->
+          | d == player && player /= S.alice ->
               PaymentDecision.Pays
         _ -> S.identityAnswer p
       boardOf = do
@@ -2598,7 +2603,7 @@ maulerSpec s registry =
    in Spec.describe s "CR 118.12 a gate offered to the whole table" $ do
         Spec.it s "CR 118.12a only the seats that did not pay lose the life" $ do
           (maulerId, bobFirst, bobSecond, carolToken, onStack) <- boardOf
-          let after = S.runPure onlyBobPays onStack Stack.resolveTop
+          let after = S.runPure everyoneButAlicePays onStack Stack.resolveTop
           -- THE BEHAVIOUR, first: alice declined and carol was never offered, so
           -- both lost 4; bob paid, so he did not.
           Spec.assertEqWith s "CR 119.3: alice and carol lost 4 and bob, who paid, did not" (lives after) (Just 16, Just 20, Just 16)
