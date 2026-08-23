@@ -42,6 +42,12 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       CostComponent.SacrificeThis
       " {\"type\":\"SacrificeThis\"} "
+  Spec.it s "ReturnThis" $
+    Common.assertCodec
+      s
+      codec
+      CostComponent.ReturnThis
+      " {\"type\":\"ReturnThis\"} "
   Spec.it s "PayLife" $
     Common.assertCodec
       s
