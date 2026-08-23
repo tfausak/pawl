@@ -3099,6 +3099,22 @@ raying rays victim gs =
    in S.attach aura victim withAura
 
 -- Who is blocking `attacker`, as CR 509.1g's record states it.
+-- Pawl.Support.runCombat with a STATEFUL answerer, which the Hollow Warrior
+-- rewind case below needs and a pure Prompt r -> r cannot give: CR 509.1's
+-- preamble asks for a FRESH declaration, and an answerer that cannot tell the
+-- second prompt from the first can only repeat itself into the CR 509.1c
+-- degradation. The Int is the number of declare-blockers prompts answered.
+runCombatCounting :: (forall r. Prompt.Prompt r -> State.State Int r) -> GameState.GameState -> GameState.GameState
+runCombatCounting answer gs0 =
+  let inCombat p = case p of
+        Phase.Combat _ -> True
+        _ -> False
+      go n g =
+        if n <= (0 :: Int) || Maybe.isJust (GameState.result g) || not (inCombat (GameState.phase g))
+          then pure g
+          else Engine.runGame answer g Engine.runStep >>= (go (n - 1) . snd)
+   in State.evalState (go 24 gs0) 0
+
 blockersOf :: ObjectId.ObjectId -> GameState.GameState -> Set.Set ObjectId.ObjectId
 blockersOf attacker gs = Map.findWithDefault Set.empty attacker (Combat.Type.blockers (GameState.combat gs))
 
@@ -3305,6 +3321,44 @@ blockCostSpec s registry = Spec.describe s "BlockCosts" $ do
         Spec.assertEqWith s "and the record says so: no blocker was declared" (blockersOf attacker declared) Set.empty
         Spec.assertBool s (allUntapped [blocker] declared) "CR 509.1f is all-or-nothing: the Warrior did not tap itself"
       _ -> Spec.assertFailure s "fixture should have a Piker and a Warrior"
+  Spec.it s "CR 509.1 the rewind unwrites the declaration a failed toll named" $ do
+    -- The case that separates CR 509.1's preamble from a record that merely
+    -- accumulates. bob's ONLY creatures are two Hollow Warriors, so the first
+    -- declaration -- both of them -- owes two taps and has nobody to tap, and
+    -- CR 509.1f leaves it unpaid. The preamble puts the game back to before it,
+    -- which since #2024 includes unwriting Combat.declaredBlockers.
+    --
+    -- The second declaration is where that matters: with only the first Warrior
+    -- blocking, the second is untapped and no longer declared, so it can pay.
+    -- A rewind that left the first declaration's ids standing would exclude it,
+    -- the toll would fail again, and CR 509.1c's degradation would end in no
+    -- blocks at all.
+    --
+    -- A STATEFUL answerer, because a pure one cannot make a second, different
+    -- declaration: it answers both prompts the same way and the case collapses.
+    warrior <- S.printingOf s registry "Hollow Warrior"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = S.combatBoardOf [piker] [warrior, warrior]
+    case (mine, theirs) of
+      ([attacker], [first, second]) -> do
+        let answering :: Prompt.Prompt r -> State.State Int r
+            answering p = case p of
+              Prompt.DeclareBlockers _ _ _ attackers -> do
+                seen <- State.get
+                State.put (seen + 1)
+                pure $ case attackers of
+                  [] -> Map.empty
+                  a : _ ->
+                    if seen == (0 :: Int)
+                      then Map.fromList [(first, Set.singleton a), (second, Set.singleton a)]
+                      else Map.singleton first (Set.singleton a)
+              _ -> pure (S.aggressiveAnswer p)
+            fought = runCombatCounting answering gs
+            declared = State.evalState (fmap snd (Engine.runGame answering (S.runPure S.aggressiveAnswer gs (Combat.declareAttackers S.alice)) Combat.declareBlockers)) 0
+        Spec.assertEqWith s "CR 509.1: the second declaration pays and blocks, so bob takes nothing" (S.lifeOf S.bob fought) (Just 20)
+        Spec.assertEqWith s "and the block that stands is the second declaration's, not the first" (blockersOf attacker declared) (Set.singleton first)
+        Spec.assertBool s (not (allUntapped [second] declared)) "CR 509.1f: the Warrior the rewind released is what paid"
+      _ -> Spec.assertFailure s "fixture should have a Piker and two Warriors"
   Spec.it s "CR 509.1f partial payments are not allowed: two taxed blockers and one land sacrifice nothing" $ do
     -- CR 509.1d totals over the chosen creatures, so two taxed blockers owe two
     -- lands and one land cannot pay. The land sacrificed while the toll was being
