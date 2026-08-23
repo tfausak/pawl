@@ -248,6 +248,26 @@ data Quantity
     --
     -- A LEAF, like LifeTotal, Speed and IsMonarch: it holds no Quantity.
     IsStartingPlayer PlayerRef.PlayerRef
+  | -- | CR 102.1: is that player the ACTIVE player -- the one whose turn it is? 1
+    -- if so and 0 if not. Paladin Class' "spells your opponents cast during your
+    -- turn cost {1} more to cast", where the taxing ability's own controller is
+    -- the seat asked about. IsMonarch's and IsStartingPlayer's shape exactly, and
+    -- for the same reason: this type's vocabulary is numeric, so a yes/no is a
+    -- comparison against a 0/1 on the measured side.
+    --
+    -- "During your turn" and "is the active player" are the same question, which
+    -- is CR 102.1's own wording -- the rule defines the active player AS the
+    -- player whose turn it is, so a clause naming the turn and one naming the
+    -- seat cannot disagree.
+    --
+    -- GameState.activePlayer is the whole answer: there is always exactly one, so
+    -- a disjunction over the named seats and a sum over them agree on every
+    -- board, and no arm here can be unanswerable for want of an active player the
+    -- way IsMonarch can be for want of a monarch.
+    --
+    -- A LEAF, like LifeTotal, Speed, IsMonarch and IsStartingPlayer: it holds no
+    -- Quantity.
+    IsActivePlayer PlayerRef.PlayerRef
   | -- | CR 122.1: how many counters of a kind a PLAYER has -- CR 728.1's "a
     -- number of cards equal to the number of rad counters they have", and the
     -- shape Ezuri, Claw of Progress' "where X is the number of experience

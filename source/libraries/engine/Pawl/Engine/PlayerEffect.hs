@@ -24,6 +24,7 @@ import qualified Data.List as List
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.ManaFilter as ManaFilter
@@ -234,7 +235,36 @@ printedRows gs =
                   -- permanent on the battlefield.
                   let changes = Projection.textChangesAffecting oid gs
                       readAs = if null changes then id else rewritePlayerEffect changes
-                   in fmap (\ability -> (Object.timestamp object, Just oid, controller, AffectedPlayers.Scoped (PlayerStaticAbility.scope ability), readAs (PlayerStaticAbility.effect ability))) abilities
+                      -- CR 604.2's "as long as" clause, the same gate
+                      -- Projection.gatherStatic applies to the object-facing
+                      -- carrier, and asked here for the player-facing one.
+                      --
+                      -- The VIEW is the FINISHED projection, not a bounded one:
+                      -- CR 613.10 and CR 613.11 apply a player effect after the
+                      -- seven layers have run, so there is no layer to bound
+                      -- against -- the answer Projection.abilitiesGiven takes for
+                      -- CR 702.178a's max speed gate, and for that same reason.
+                      --
+                      -- The PERSPECTIVE is the permanent's controller and the
+                      -- source is the permanent, so CR 109.5's "you" inside the
+                      -- clause is the Class controller rather than the taxed
+                      -- player -- which is the whole content of "during YOUR
+                      -- turn". The taxed player rides
+                      -- PlayerStaticAbility.scope instead and never reaches here.
+                      --
+                      -- The clause takes the same CR 612.1 word swap the effect
+                      -- beside it does, since one ability's two halves cannot
+                      -- disagree about what a word means.
+                      lives ability = case PlayerStaticAbility.condition ability of
+                        Nothing -> True
+                        Just c ->
+                          Condition.holds
+                            (Projection.fullView gs)
+                            (Filter.contextFor (Just controller) (Just oid))
+                            gs
+                            oid
+                            (if null changes then c else Projection.rewriteCondition changes c)
+                   in fmap (\ability -> (Object.timestamp object, Just oid, controller, AffectedPlayers.Scoped (PlayerStaticAbility.scope ability), readAs (PlayerStaticAbility.effect ability))) (filter lives abilities)
                 else []
    in concatMap fromPermanent (Set.toList (GameState.battlefield gs))
 

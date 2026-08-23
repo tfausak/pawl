@@ -506,6 +506,7 @@ quantityCounts quantity = case quantity of
   Quantity.Type.IsMonarch _ -> []
   -- CR 103.1's, read the same way and holding the same nothing.
   Quantity.Type.IsStartingPlayer _ -> []
+  Quantity.Type.IsActivePlayer _ -> []
   Quantity.Type.HasDesignation _ -> []
   Quantity.Type.ClassLevel -> []
   Quantity.Type.WasKicked -> []
@@ -1217,6 +1218,11 @@ cardCounts card =
     <> concatMap triggeredAbilityCounts (Map.elems (Face.delayedAbilities card))
     <> concatMap (concatMap effectCounts . Modal.allEffects . DungeonRoom.ability) (Face.rooms card)
     <> concatMap (concatMap conditionCounts . Maybe.maybeToList . AlternativeCost.condition) (Face.alternativeCosts card)
+    -- CR 604.2's "as long as" clause on the PLAYER-facing static carrier, the
+    -- staticAbilityCounts treatment of the same clause on the object-facing one.
+    -- Its PlayerEffect beside it holds no Count -- a player effect states a
+    -- literal amount or a Filter, never a fold over a zone.
+    <> concatMap (concatMap conditionCounts . Maybe.maybeToList . PlayerStaticAbility.condition) (Face.playerAbilities card)
     <> concatMap (quantityCounts . CostReduction.perEach) (Face.costReductions card)
     <> concatMap combatRestrictionCounts (Face.combatRestrictions card)
     <> concatMap blockPermissionCounts (Face.blockPermissions card)
@@ -1291,6 +1297,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.Speed {} -> False
   Quantity.Type.IsMonarch {} -> False
   Quantity.Type.IsStartingPlayer {} -> False
+  Quantity.Type.IsActivePlayer {} -> False
   Quantity.Type.PlayerCounters {} -> False
   Quantity.Type.ObjectCounters {} -> False
   Quantity.Type.HasDesignation {} -> False
@@ -3838,6 +3845,10 @@ cardFilters card =
         <> concatMap (affectedFilters . EntryRestriction.affected) (Face.entryRestrictions card)
     )
     <> concatMap staticAbilityFilters (Face.staticAbilities card)
+    -- SOURCE-HOSTED for staticAbilityFilters' reason: a clause on a static
+    -- ability is framed against the permanent that has it, so an IsSource inside
+    -- it names that permanent rather than being unframed.
+    <> concatMap (sourceHosted . concatMap conditionFilters . Maybe.maybeToList . PlayerStaticAbility.condition) (Face.playerAbilities card)
     <> modalFilters (Face.spell card)
     <> concatMap activatedAbilityFilters (Face.activatedAbilities card)
     <> concatMap activatedAbilityFilters (grantedActivatedAbilities card)
@@ -6350,7 +6361,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             ( "CR 613.11's spell-cost modifier",
               base
                 { Face.playerAbilities =
-                    [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You (PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost buried 1))]
+                    [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You Nothing (PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost buried 1))]
                 }
             ),
             ( "CR 508.1c's combat restriction",

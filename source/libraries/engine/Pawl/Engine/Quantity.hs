@@ -281,6 +281,13 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   Quantity.IsStartingPlayer ref -> case playersOf ref of
     Nothing -> Nothing
     Just pids -> Just (if any (\pid -> Maybe.listToMaybe (GameState.turnOrder gs) == Just pid) pids then 1 else 0)
+  -- CR 102.1: is that player the active player? The two arms above's shape again,
+  -- and the simplest of the three: GameState.activePlayer is a PlayerId rather
+  -- than a Maybe, so there is no "no active player" board for this arm to have a
+  -- posture about.
+  Quantity.IsActivePlayer ref -> case playersOf ref of
+    Nothing -> Nothing
+    Just pids -> Just (if any (\pid -> GameState.activePlayer gs == pid) pids then 1 else 0)
   -- CR 122.1: how many counters of a kind that player has. The third arm on
   -- LifeTotal's and Speed's terms -- live, one player only, through the same
   -- playersOf.
@@ -578,6 +585,7 @@ substituteStar star quantity = case quantity of
   Quantity.Speed _ -> quantity
   Quantity.IsMonarch _ -> quantity
   Quantity.IsStartingPlayer _ -> quantity
+  Quantity.IsActivePlayer _ -> quantity
   Quantity.PlayerCounters {} -> quantity
   Quantity.ObjectCounters _ -> quantity
   Quantity.HasDesignation _ -> quantity
@@ -643,7 +651,9 @@ slots quantity = case quantity of
   Quantity.IsMonarch _ -> Set.empty
   -- And a sixth, CR 103.1's -- the same position again.
   Quantity.IsStartingPlayer _ -> Set.empty
-  -- And a seventh. The PlayerCounterKind beside it names no slot either.
+  -- And a seventh, CR 102.1's -- the same position once more.
+  Quantity.IsActivePlayer _ -> Set.empty
+  -- And an eighth. The PlayerCounterKind beside it names no slot either.
   Quantity.PlayerCounters {} -> Set.empty
   -- A bare CounterKind, which names no slot at all -- this arm carries no
   -- reference of any sort, the object being the one the evaluation is aimed at.
@@ -654,10 +664,10 @@ slots quantity = case quantity of
   Quantity.ClassLevel -> Set.empty
   Quantity.WasKicked -> Set.empty
   Quantity.SnowWasSpent -> Set.empty
-  -- And a seventh PlayerRef in that same position, CR 508.3b's record having
+  -- And a ninth PlayerRef in that same position, CR 508.3b's record having
   -- nothing else on it.
   Quantity.OpponentsAttacked _ -> Set.empty
-  -- And an eighth, CR 701.9a's tally having nothing beside its PlayerRef either.
+  -- And a tenth, CR 701.9a's tally having nothing beside its PlayerRef either.
   Quantity.CardsDiscardedThisTurn _ -> Set.empty
   -- And a ninth, CR 120.1's damage tally likewise.
   Quantity.PlayersDealtDamageThisTurn _ -> Set.empty
@@ -706,6 +716,7 @@ slotsAreExhaustive quantity = case quantity of
   Quantity.Speed ref -> playerRefIsSlotless ref
   Quantity.IsMonarch ref -> playerRefIsSlotless ref
   Quantity.IsStartingPlayer ref -> playerRefIsSlotless ref
+  Quantity.IsActivePlayer ref -> playerRefIsSlotless ref
   Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref _) -> playerRefIsSlotless ref
   Quantity.ObjectCounters _ -> True
   Quantity.HasDesignation _ -> True
@@ -831,6 +842,7 @@ mapPlayerRefs f intoCount quantity = case quantity of
   Quantity.Speed ref -> Quantity.Speed (f ref)
   Quantity.IsMonarch ref -> Quantity.IsMonarch (f ref)
   Quantity.IsStartingPlayer ref -> Quantity.IsStartingPlayer (f ref)
+  Quantity.IsActivePlayer ref -> Quantity.IsActivePlayer (f ref)
   Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref kind) -> Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally (f ref) kind)
   Quantity.OpponentsAttacked ref -> Quantity.OpponentsAttacked (f ref)
   Quantity.CardsDiscardedThisTurn ref -> Quantity.CardsDiscardedThisTurn (f ref)
@@ -948,8 +960,8 @@ readsX quantity = case quantity of
   -- strictly smaller subterm.
   Quantity.Count c -> Count.anyQuantity readsX c
   -- Every remaining arm is a LEAF holding no Quantity, so none can hide an X.
-  -- The six references below (ManaCount's, LifeTotal's, Speed's, IsMonarch's,
-  -- IsStartingPlayer's, PlayerCounters') are PlayerRefs, whose InSlot names a
+  -- The seven references below (ManaCount's, LifeTotal's, Speed's, IsMonarch's,
+  -- IsStartingPlayer's, IsActivePlayer's, PlayerCounters') are PlayerRefs, whose InSlot names a
   -- TARGET slot rather than an amount one, and X is only ever an amount.
   Quantity.Literal _ -> False
   Quantity.ManaValue -> False
@@ -961,6 +973,7 @@ readsX quantity = case quantity of
   Quantity.Speed _ -> False
   Quantity.IsMonarch _ -> False
   Quantity.IsStartingPlayer _ -> False
+  Quantity.IsActivePlayer _ -> False
   Quantity.PlayerCounters {} -> False
   Quantity.ObjectCounters _ -> False
   Quantity.HasDesignation _ -> False

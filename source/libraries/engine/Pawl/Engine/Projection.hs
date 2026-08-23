@@ -2118,6 +2118,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.Speed _ -> quantity
   Quantity.Type.IsMonarch _ -> quantity
   Quantity.Type.IsStartingPlayer _ -> quantity
+  Quantity.Type.IsActivePlayer _ -> quantity
   Quantity.Type.HasDesignation _ -> quantity
   Quantity.Type.ClassLevel -> quantity
   Quantity.Type.WasKicked -> quantity
@@ -3133,6 +3134,7 @@ quantityReads q = case q of
   Quantity.Type.Speed _ -> Set.empty
   Quantity.Type.IsMonarch _ -> Set.empty
   Quantity.Type.IsStartingPlayer _ -> Set.empty
+  Quantity.Type.IsActivePlayer _ -> Set.empty
   Quantity.Type.PlayerCounters {} -> Set.empty
   Quantity.Type.ObjectCounters _ -> Set.empty
   Quantity.Type.HasDesignation _ -> Set.empty

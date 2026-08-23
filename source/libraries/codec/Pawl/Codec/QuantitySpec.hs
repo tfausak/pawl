@@ -175,6 +175,20 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.IsStartingPlayer (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       " {\"type\":\"IsStartingPlayer\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
+  -- CR 102.1, the two arms above's shape and round-tripped the same two ways:
+  -- Paladin Class' "during your turn" is the Relative arm, and the InSlot arm
+  -- beside it is the one a recursive decoder could lose a payload through.
+  Spec.it s "IsActivePlayer, relative and from a slot" $ do
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.IsActivePlayer (PlayerRef.Relative PlayerRelation.You))
+      " {\"type\":\"IsActivePlayer\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.IsActivePlayer (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      " {\"type\":\"IsActivePlayer\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
   -- CR 702.112b, CR 701.37b and CR 701.60b: WHICH designation is on the wire and
   -- nothing else, the object it is asked of riding the evaluation rather than a
   -- reference -- so this is Power's shape rather than IsMonarch's.
