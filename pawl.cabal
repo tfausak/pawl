@@ -381,6 +381,7 @@ library codec
     Pawl.Codec.ForEachSpec
     Pawl.Codec.GameEvent
     Pawl.Codec.GameEventSpec
+    Pawl.Codec.GameState
     Pawl.Codec.GrantedAbility
     Pawl.Codec.GrantedAbilitySpec
     Pawl.Codec.GrantPlayFromExile
