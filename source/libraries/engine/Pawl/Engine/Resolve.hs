@@ -4161,8 +4161,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       pure (victim, List.genericTake count (valid <> filler))
             _ -> pure (victim, [])
     -- CR 101.4: every player chooses in APNAP order, and only THEN do the
-    -- actions happen -- PlayerSacrifices' two phases, so no seat's discard can
-    -- change what a later seat is offered. The candidate hands are read off the
+    -- actions happen -- PlayerSacrifices' two phases, whose edict is 101.4's own
+    -- worked example, so no seat's discard can change what a later seat is
+    -- offered. CR 101.4a is why a hand is no exception. The candidate hands are read off the
     -- one `gs` above for the same reason (CR 608.2f).
     --
     -- The SPLIT is a regression fence rather than a proven behaviour: interleaving
