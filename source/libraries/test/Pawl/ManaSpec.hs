@@ -1160,10 +1160,9 @@ towerBoard tower victim =
 -- 2026-08-21: Grinning Ignus is the one printing whose mana ability names a
 -- STEP-or-phase window this vocabulary can say, and what it says is CR 307.5's
 -- "activate only as a sorcery" rather than a step -- grinningIgnusSpec below is
--- where that card is exercised. Lavinia, Foil to
--- Conspiracy is in the pool and gates these same two windows, but through CR
--- 102.1's turn axis alone (laviniaTurnRiderSpec below), so she leaves the phase
--- axis unexercised. Vivi Ornitier and every other hit ride on "only once each
+-- where that card is exercised. Lavinia, Foil to Conspiracy is in the pool and
+-- gates these same two windows, but through CR 102.1's turn axis alone
+-- (laviniaTurnRiderSpec below), so she leaves the phase axis unexercised. Vivi Ornitier and every other hit ride on "only once each
 -- turn" or "only if <condition>", neither of which
 -- Pawl.Types.ActivationRestriction can say.
 --
