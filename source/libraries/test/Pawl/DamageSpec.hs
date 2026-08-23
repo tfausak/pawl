@@ -97,6 +97,15 @@ aimedAt oid p = case p of
     S.preferring (\r -> Recipient.objectOf r == Just oid) sets
   _ -> S.identityAnswer p
 
+-- aimedAt's player-shaped twin, for CR 120.1's fourth recipient: a slot's offer
+-- is FILTERED rather than answered with a hand-built recipient, so a candidate
+-- the engine never offered cannot be smuggled past CR 608.2b's re-read.
+aimedAtPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+aimedAtPlayer pid p = case p of
+  Prompt.ChooseTargets _ _ _ sets ->
+    S.preferring (== Recipient.ToPlayer pid) sets
+  _ -> S.identityAnswer p
+
 -- The permanent of a given name on the battlefield, found by NAME because CR
 -- 400.7 mints a new object as a spell resolves and the hand's id does not
 -- survive the cast.
@@ -3025,3 +3034,49 @@ dealtDamageThisTurnSpec s registry =
           Spec.assertEqWith s "legal while the damage is this turn's" (Set.toList (Target.legalRecipients Nothing S.noSource theSlot board)) [Recipient.ToCreature hurtId]
           Spec.assertEqWith s "and no candidate at all once the turn has handed over" (Set.toList (Target.legalRecipients Nothing S.noSource theSlot nextTurn)) []
         _ -> Spec.assertFailure s "Prodigal Sorcerer should print an activated ability, and Fatal Blow a 'target' slot"
+
+    -- The PLAYER half of the same atom: CR 120.1 has damage dealt to players as
+    -- well as to the three permanent kinds, so "any target that was dealt damage
+    -- this turn" (Needle Drop) has to answer for a seat and not only for a
+    -- permanent (#2157).
+    --
+    -- THREE seats, because two would collapse the negative control onto the
+    -- caster: alice controls the spell and carol controls nothing, so an
+    -- implementation answering the atom True for every player, or for every
+    -- player but "you", is caught by the offer below rather than passing on the
+    -- one seat it happened to get right. The Prodigal Sorcerer that dealt the
+    -- damage is a fourth undamaged candidate of the OTHER shape, which is what
+    -- keeps the object half honest at the same time.
+    Spec.it s "CR 120.1 Needle Drop can be aimed at the damaged player and not at the untouched seats" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      island <- S.printingOf s registry "Island"
+      sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+      needleDrop <- S.printingOf s registry "Needle Drop"
+      case (Face.activatedAbilities (S.combinedFace sorcerer), S.spellTargetSlot needleDrop) of
+        (ping : _, Just theSlot) -> do
+          let seats = S.landsFor mountain S.alice 1 (Setup.emptyGame S.threePlayers)
+              (sorcererId, gs1) = S.addCreature sorcerer S.alice seats
+              (withDrop, dropId) = S.handOne needleDrop gs1
+              -- CR 121.3: the draw clause needs a card to take, and an empty
+              -- library would lose alice the game to CR 104.3c instead.
+              (_, stocked) = S.addLibraryCard island S.alice withDrop
+              ready = stocked {GameState.priority = Just S.alice}
+              board = S.settleSba (S.runPure (aimedAtPlayer S.bob) ready (do Activate.activateAbility S.alice sorcererId ping; Stack.resolveTop))
+              resolved = S.settleSba (S.runPure (aimedAtPlayer S.bob) board (do S.cast S.alice dropId; Stack.resolveTop))
+          Spec.assertEqWith
+            s
+            "CR 120.1 / 120.3a: bob took the ping and then Needle Drop's own damage"
+            (S.lifeOf S.bob resolved)
+            (Just 18)
+          Spec.assertEqWith
+            s
+            "CR 120.1 / 608.2i: the damaged seat is the only legal target"
+            (Set.toList (Target.legalRecipients Nothing S.noSource theSlot board))
+            [Recipient.ToPlayer S.bob]
+          -- The preconditions the two assertions above rest on, after them so
+          -- neither can absorb a mutation of the atom.
+          Spec.assertEqWith s "the ping alone had put bob at 19" (S.lifeOf S.bob board) (Just 19)
+          Spec.assertEqWith s "and neither untouched seat lost any life" (fmap (`S.lifeOf` resolved) [S.alice, S.carol]) [Just 20, Just 20]
+          Spec.assertEqWith s "CR 121.1: the second clause drew alice a card" (S.handSize S.alice resolved) 1
+          Spec.assertBool s (Set.member sorcererId (GameState.battlefield board)) "and the undamaged Sorcerer is standing to be offered"
+        _ -> Spec.assertFailure s "Prodigal Sorcerer should print an activated ability, and Needle Drop a 'target' slot"

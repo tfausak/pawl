@@ -523,9 +523,11 @@ data Filter keyword
   | -- | CR 120.1 / 608.2i: the candidate was DEALT DAMAGE earlier this turn --
     -- Fatal Blow's "destroy target creature that was dealt damage this turn".
     -- AttackedThisTurn's look-back read of the turn-scoped GameEvent log, one
-    -- event arm over (GameEvent.DamageDealt), and object-scoped where
-    -- Quantity.PlayersDealtDamageThisTurn is the player-scoped half of the same
-    -- question.
+    -- event arm over (GameEvent.DamageDealt). Answered for a PLAYER candidate as
+    -- well as an object, since CR 120.1 has damage dealt to both -- Needle Drop's
+    -- "any target that was dealt damage this turn" is the printing that asks for
+    -- either. Quantity.PlayersDealtDamageThisTurn counts the seats the same
+    -- question answers True for.
     --
     -- The CR defines no term for the phrase: rule 702.54a (bloodthirst) is the
     -- only place it appears, where it is ordinary English over rule 120.1's

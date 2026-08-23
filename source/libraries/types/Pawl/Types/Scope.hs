@@ -20,7 +20,7 @@ data Scope
     InHistory EventShape.EventShape
   | -- | CR 102.1: the PLAYERS the reference names -- Tyranid Invasion's "the
     -- number of opponents you have". The one arm whose candidates are not
-    -- objects (CR 109.1), so each is seen through Pawl.Engine.Filter.playerView
+    -- objects (CR 109.1), so each is seen through Pawl.Engine.Count.playerView
     -- rather than through a projection.
     --
     -- The PlayerRef says WHICH players, exactly as it says whose zone in InZone
@@ -32,7 +32,8 @@ data Scope
     --
     -- The Filter runs over the players, and the atoms that answer for one split
     -- in two. Filter.IsPlayer is answered off the VIEW, relating the candidate to
-    -- the perspective, and it is the only atom playerView holds a field for.
+    -- the perspective, as is Filter.DealtDamageThisTurn, which Count.playerView
+    -- fills from the board (CR 120.1).
     -- Filter.ControlsMoreThanYou (Oreskos Explorer's "players who control more
     -- lands than you"), Filter.IsControllerOfBound (Spikeshell Harrier's "each
     -- other player") and Filter.CardsInGraveyardAtLeast (The Master of

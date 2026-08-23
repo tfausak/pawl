@@ -464,14 +464,15 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
       mOid
   where
     recur = evaluateAgainst viewOf context gs announcedOn mOid mView
-    -- Was this player dealt damage this turn? Game.damagedPlayer is what makes a
-    -- DamageDealt event name a player at all; see it for CR 120.3a's recipient and
-    -- for CR 120.8's zero.
-    wasDealtDamage pid = any ((== Just pid) . Game.damagedPlayer . LoggedEvent.event) (GameState.events gs)
+    -- Was this player dealt damage this turn? Game.wasDealtDamageThisTurn is the
+    -- shared fold, so this count and the Filter.DealtDamageThisTurn atom a player
+    -- candidate answers cannot come apart; see Game.damagedPlayer under it for CR
+    -- 120.3a's recipient and for CR 120.8's zero.
+    wasDealtDamage = Game.wasDealtDamageThisTurn gs
     -- CR 102.1's reference, resolved by Count.playersFor for every arm but the
     -- fold's own candidate. That one is answered HERE because this is where the
     -- candidate is: Count.evaluate's Scope.OverPlayers arm hands each candidate
-    -- to this reader as a Pawl.Engine.Filter.playerView, whose identity IS the
+    -- to this reader as a Pawl.Engine.Count.playerView, whose identity IS the
     -- player, and Count.playersFor holds no view to read it from.
     --
     -- Nothing wherever the evaluation is not aimed at a player -- an object
