@@ -285,11 +285,10 @@ intrinsicManaCost =
       Cost.components = [CostComponent.TapThis]
     }
 
--- The instruction that intrinsic ability gives: "Add [the type]", to the player
--- activating it and with no clause about anything else. CR 305.6 writes the
--- whole sentence, so every other field of the addition takes the value an
--- unwritten clause means -- CR 109.5's "you", CR 106.4's ordinary loss as the
--- step ends, and no CR 106.6 restriction.
+-- The instruction the ability above gives: CR 305.6 writes it out as "{T}: Add
+-- [mana symbol]" and nothing more, so every field beyond the type takes the
+-- value an unwritten clause means -- CR 109.5's "you", CR 106.4's ordinary loss
+-- as the step ends, and no CR 106.6 restriction.
 intrinsicManaAddition :: ManaType -> ManaAddition.ManaAddition
 intrinsicManaAddition manaType =
   ManaAddition.MkManaAddition
@@ -649,7 +648,7 @@ serves supply demand =
     && Set.isSubsetOf (demandTags demand) (supplyTags supply)
 
 -- CR 106.6, split over one player's pool: the units this payment may draw on,
--- and the ones it may not. Built on `spendableOn` below, which is THE one reader
+-- and the ones it may not. Built on `spendableAmong` below, which is THE one reader
 -- of Pawl.Types.ManaUnit.restriction, so payment and payability cannot disagree
 -- about which mana is available -- the reason `serves` just above gives for
 -- being one relation.
@@ -1686,7 +1685,7 @@ payableResolutionsGiven :: Maybe ObjectId -> Capacity -> ManaSpending -> [Object
 payableResolutionsGiven casting capacity spending sources pcs pid committed claimed cost gs =
   let -- CR 106.6, resolved for BOTH halves of the board: mana this payment may
       -- not spend is no supply for it, whether it is already in the pool or
-      -- would be added by tapping a source (`spendableSupplies` below). The two
+      -- would be added by tapping a source (`spendableSupply` below). The two
       -- halves have to be filtered by the same question, or the offer and the
       -- payment disagree -- Mishra's Workshop's three colourless would buy a
       -- creature spell the payment then cannot pay for.
@@ -1703,6 +1702,15 @@ payableResolutionsGiven casting capacity spending sources pcs pid committed clai
       -- keeping its COUNT and its own mana cost: a restricted yield is still an
       -- activation the board may take (its other units may serve), and taking it
       -- still costs what it costs.
+      --
+      -- Not implemented: the narrowing asked a SECOND time, of the demands a
+      -- source's own activation makes. What survives here is admitted for the
+      -- CAST, and the board below may then let it serve a mana ability's cost
+      -- instead -- a payment that is no cast, which CR 106.6 admits none of this
+      -- mana to. The pool half has always read the same way, so the two halves
+      -- still agree; overstating supply this way offers a cast the payment then
+      -- refuses. No board in `data/cards/` reaches it: it wants a restricted
+      -- yield whose type serves a mana-eating route's own demand (#2175).
       spendableSupply (activations, yield, manaCost) =
         (activations, Mana.MkMana (fst (spendableAmong casting pid gs (unitsOf yield))), manaCost)
       activationsOf (activations, _, _) = Activations.claims activations
