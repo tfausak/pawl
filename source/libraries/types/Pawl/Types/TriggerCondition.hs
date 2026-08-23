@@ -278,7 +278,8 @@ data TriggerCondition
     --
     -- A creature put onto the battlefield blocking records that same event, so
     -- the match reads BecameBlocking.putOntoBattlefield to stay off it: rule
-    -- 509.3b's last sentence.
+    -- 509.3b's last sentence, a regression fence rather than proved behaviour
+    -- (#2182).
     --
     -- Not implemented: rule 509.3b's other producer, an effect that causes the
     -- bearer to block, records no event (#1146).

@@ -3898,7 +3898,7 @@ putOntoBattlefieldBlockingSpec s registry = Spec.describe s "PutOntoBattlefieldB
             control = toDamage plain plainBoard
         -- GAMEPLAY FIRST, and the two legs read the same way: what the token is
         -- worth on the board. The flanker's Saproling took CR 702.25a's -1/-1,
-        -- went to 0/0 and CR 704.5a buried it; the control's is untouched.
+        -- went to 0/0 and CR 704.5f buried it; the control's is untouched.
         Spec.assertEqWith s "CR 509.3d: flanking fired off the entry, so the 1/1 Saproling is gone before damage" (fmap (`S.powerToughnessOf` struck) (S.tokensOf struck)) []
         Spec.assertEqWith s "control: the same token, blocking the same 2/2 without flanking, is untouched" (fmap (`S.powerToughnessOf` control) (S.tokensOf control)) [Just (1, 1)]
         -- Anti-vacuity: the token did enter blocking on the leg where it is
@@ -3909,6 +3909,11 @@ putOntoBattlefieldBlockingSpec s registry = Spec.describe s "PutOntoBattlefieldB
         -- CR 509.4's two roads, told apart on the board that took the second: no
         -- creature was DECLARED here, and the event CR 509.3d matched carries the
         -- flag that keeps CR 509.3b off it.
+        -- The same split on the STATE, read on the leg where the token survives
+        -- to be read at all: CR 509.1g's blocking creature, and not CR 509.1a's
+        -- declared one.
+        Spec.assertEqWith s "CR 509.1g: the surviving token is blocking the control's attacker" (Combat.blockersOf plain control) (Set.fromList (S.tokensOf control))
+        Spec.assertEqWith s "CR 509.4b: and it is in no declaration, so it is blocking without ever having blocked" (Combat.Type.declaredBlockers (GameState.combat control)) Set.empty
         Spec.assertBool s (not (any (blockerWasDeclared . LoggedEvent.event) (GameState.events struck))) "CR 509.4: nothing was declared as a blocker on this board"
         Spec.assertBool s (any (blockerEnteredBlocking . LoggedEvent.event) (GameState.events struck)) "and the event that fired the trigger is the entry's own"
       _ -> Spec.assertFailure s "fixture should have one attacker per board"

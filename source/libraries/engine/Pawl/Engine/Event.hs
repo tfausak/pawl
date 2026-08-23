@@ -5226,9 +5226,10 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
   -- CR 509.3a: the bearer was DECLARED as a blocker. SelfAttacks' mirror, and
-  -- matched against the declaration event for that arm's reason -- CR 509.4's
-  -- creature put onto the battlefield blocking is in Combat.blockers and has no
-  -- event here.
+  -- matched against GameEvent.BlocksDeclared for that arm's reason -- CR 509.4's
+  -- creature put onto the battlefield blocking is in Combat.blockers, and the
+  -- only event it records on the blocking side is a GameEvent.BecameBlocking
+  -- this condition does not read, which is rule 509.3a's last sentence.
   --
   -- The attacking creatures the declaration named are neither compared nor bound:
   -- this condition is CR 509.3a's, which names none. SelfBlocksCreature's arm
@@ -5299,6 +5300,10 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
         -- CR 509.3b's last sentence: "It won't trigger if the creature is put
         -- onto the battlefield blocking." CR 509.3d's arm below is where that
         -- same event does fire, which is the whole reason it is recorded.
+        --
+        -- A REGRESSION FENCE rather than proved behaviour: dropping this guard
+        -- leaves the whole suite green, the pool's one CR 509.4 producer making
+        -- a vanilla token that can bear no such trigger (#2182).
         not (BecameBlocking.putOntoBattlefield b) ->
           let attacker = BecameBlocking.attacker b
            in case Projection.viewWithLastKnown attacker gs attacker of
