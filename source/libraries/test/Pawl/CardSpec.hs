@@ -720,6 +720,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 701.3a's carries a Filter, and a Filter holds no Count for
   -- PermanentTurnedFaceUp's reason.
   TriggerCondition.SelfBecomesAttachedBy _ -> []
+  -- CR 603.12's carries nothing at all, so no Count.
+  TriggerCondition.Reflexive -> []
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> []
   TriggerCondition.SelfDies -> []
@@ -3028,6 +3030,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 701.3a's carries one over the ATTACHMENT -- Bramble Elemental's "an
   -- Aura" -- which this sweep must see for PermanentTurnedFaceUp's reason.
   TriggerCondition.SelfBecomesAttachedBy f -> [f]
+  -- CR 603.12's carries nothing, so no Filter either.
+  TriggerCondition.Reflexive -> []
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> []
   TriggerCondition.SelfDies -> []

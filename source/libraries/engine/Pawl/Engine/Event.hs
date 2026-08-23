@@ -4360,6 +4360,12 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- CR 702.179d: the same, one rule over. The speed-increase ability hangs on no
   -- object either, so Pawl.Engine.Speed.inherentPending is where it is matched.
   TriggerCondition.OpponentLostLifeDuringYourTurn -> False
+  -- CR 603.12: a reflexive matches no log entry at all. Its trigger event
+  -- happened during the resolution that CREATED it, which CR 603.12's own
+  -- exception makes a question about the entry's existence rather than about the
+  -- log -- so Event.delayedPending fires it with no event and this answers False
+  -- for every one, StateIs' posture.
+  TriggerCondition.Reflexive -> False
   -- CR 702.29c: the bearer IS the card that was cycled. The event carries the CR
   -- 400.7 incarnation, which is the object the scan offers as the bearer.
   --
@@ -7795,6 +7801,10 @@ reactsToAbilityTriggering cond = case cond of
   -- or by a permanent entering the battlefield -- never an ability triggering, so
   -- CR 603.3b's first pass again.
   TriggerCondition.SelfBecomesAttachedBy _ -> False
+  -- CR 603.12's trigger event is the action the resolving ability instructed --
+  -- a payment, for every printing in the pool -- and never another ability
+  -- triggering, so a reflexive takes CR 603.3b's first pass.
+  TriggerCondition.Reflexive -> False
   -- Everything else names something that happened to the board or to a player,
   -- which is CR 603.3b's first class in as many words.
   TriggerCondition.SelfEnters -> False
@@ -8315,6 +8325,11 @@ eventBindings cond event = case (cond, event) of
   -- And so does SelfDiscarded, for SelfCycled's reason: CR 701.9a's discarded
   -- card is the bearer, whom CR 113.7a's source slot already names, and its owner
   -- is CR 113.8's controller, whom Binding.setYou already names.
+  --
+  -- CR 603.12's Reflexive reaches it NECESSARILY rather than by choice: it
+  -- admits no event at all, so delayedPending never calls this for one and there
+  -- is nothing an arm could read. What such an ability knows comes from CR
+  -- 603.7c's captured environment instead.
   _ -> Map.empty
 
 -- Which slots eventBindings above can stamp for a condition, as a set. A
@@ -8747,6 +8762,11 @@ eventBindingSlots cond = case cond of
   -- anything the event bound. A slot for the player who GAINED control is what a
   -- card printing "that player" would earn; nothing prints one.
   TriggerCondition.LoseControlOfBound _ -> Set.empty
+  -- Empty NECESSARILY rather than by choice: this condition admits no event, so
+  -- there is none to read a slot out of. What a reflexive knows about the
+  -- resolution that made it comes from CR 603.7c's captured environment instead,
+  -- which Pawl.Engine.Resolve stamps into the entry as it is armed.
+  TriggerCondition.Reflexive -> Set.empty
 
 -- Whether a damage recipient is a player (CR 120.1): a total discriminator over
 -- Recipient, so the combat-damage-to-player trigger matcher stays non-partial.
@@ -8914,6 +8934,9 @@ looksBack condition = case condition of
   -- permanent still on the battlefield, Engine.sampleControl sampling nowhere else,
   -- and its bearer is a CR 603.7 delayed entry the store keeps rather than the log.
   TriggerCondition.LoseControlOfBound _ -> False
+  -- CR 603.10a's look-back is a question about which event fired the ability, and
+  -- a reflexive is fired by none. Its bearer is a CR 603.7 delayed entry too.
+  TriggerCondition.Reflexive -> False
 
 -- CR 603.6a: every event is checked against every permanent currently on the
 -- battlefield, not only the object the event names -- a step trigger belongs to a
@@ -10026,6 +10049,13 @@ zonesTriggeredFrom cond = case cond of
   -- GameState.delayedTriggers rather than out of a zone. The default is right
   -- anyway -- the event it matches happens on the battlefield.
   TriggerCondition.LoseControlOfBound _ -> battlefield
+  -- Never consulted either, and for the same reason: CR 603.12 routes a
+  -- reflexive through rule 603.7, so its only carrier is a delayed entry
+  -- Event.delayedPending gathers out of GameState.delayedTriggers. EMPTY rather
+  -- than CR 113.6's default, which is the honest answer here where it is not for
+  -- the arm above: a reflexive is created by a RESOLVING spell or ability and
+  -- watches no zone at all, its source having been able to leave before it fires.
+  TriggerCondition.Reflexive -> Set.empty
   where
     battlefield = Set.singleton Zone.Battlefield
 
@@ -10217,6 +10247,10 @@ controllerTurnScoped cond = case cond of
   -- delayed ability watches on the turn the spell resolved, but that is the
   -- DURATION's doing rather than a restriction the condition states.
   TriggerCondition.LoseControlOfBound _ -> False
+  -- Carries no TurnScope either, and CR 603.12 restricts a reflexive to no turn:
+  -- it fires on whatever turn the ability that created it resolved on, which for
+  -- an instant-speed creator is an opponent's as readily as its controller's.
+  TriggerCondition.Reflexive -> False
 
 -- CR 603.8: state triggers. For every battlefield permanent, each StateIs ability
 -- it bears whose condition is currently TRUE and which has no instance of ITSELF
@@ -10352,6 +10386,10 @@ stateTriggers gs
               -- CHANGING, and a settle re-reading "somebody else controls it" would
               -- fire it again on every pass thereafter.
               TriggerCondition.LoseControlOfBound _ -> False
+              -- CR 603.12 sends a reflexive through rule 603.7, and CR 603.8's
+              -- state triggers are a different family: nothing about "when you
+              -- do" is a state that could be standing true.
+              TriggerCondition.Reflexive -> False
               -- CR 709.5h is an EVENT trigger: it fires on the permanent BEING
               -- GIVEN the designation, which CR 709.5c leaves it holding
               -- thereafter, so a state read would fire it again every time the
@@ -10506,6 +10544,34 @@ delayedPending events gs =
           -- share is read as THIS firing's, which is what the printed word means.
           (Map.union (eventBindings (TriggeredAbility.condition (DelayedTrigger.ability entry)) event) (DelayedTrigger.bindings entry))
       store = GameState.delayedTriggers gs
+      -- CR 603.12's exception to all of the above, and the ONE place the reflexive
+      -- form differs from an ordinary CR 603.7 entry: it is "checked immediately
+      -- after being created" and triggers "based on whether the trigger event or
+      -- events occurred earlier during the resolution of the spell or ability
+      -- that created them" -- which is a question about the resolution that is
+      -- over, not about this batch's log. Pawl.Engine.Resolve appends such an
+      -- entry only from the CR 118.12 pay-gate branch that actually ran, so the
+      -- entry's EXISTENCE is the affirmative answer and no event is needed. It
+      -- therefore fires at the first gather after it was armed, which CR 603.3
+      -- makes the next time a player would receive priority.
+      --
+      -- `armed` still gates it, so the data cannot say two things at once: an
+      -- onset would name a turn CR 603.12's "immediately" has already denied, and
+      -- the entry would sit unfired rather than firing early. No card can reach
+      -- that -- CardSpec's onset lint needs a controller-scoped condition and this
+      -- one is not -- so the guard is a fence, not a live branch.
+      reflexive entry = TriggeredAbility.condition (DelayedTrigger.ability entry) == TriggerCondition.Reflexive
+      -- One firing, whatever the batch holds. CR 603.12a's second sentence wants
+      -- exactly that for a cost payable several times, and `spent` below retires
+      -- the entry immediately after, an expiry-less entry having CR 603.7b's one
+      -- shot. Not implemented: that rule's FIRST sentence, once per occurrence
+      -- (#2121).
+      bare entry =
+        PendingTrigger.MkPendingTrigger
+          (TriggerSource.OfObject (DelayedTrigger.source entry))
+          (DelayedTrigger.controller entry)
+          (DelayedTrigger.ability entry)
+          (DelayedTrigger.bindings entry)
       -- CR 603.2 plus CR 603.4: the event matched AND the intervening "if" held,
       -- which together are what "triggered" means. Per occurrence, since CR 603.4
       -- asks about the moment the event occurs. AFTER firedBy rather than inside
@@ -10513,7 +10579,9 @@ delayedPending events gs =
       -- match and then triggers or does not: this docstring's CR 603.4 paragraph
       -- has the entry survive an occurrence whose "if" was false, not skip past it
       -- to a later one in the same batch.
-      triggered entry = filter (interveningHolds gs) (fmap (pend entry) (firedBy entry))
+      triggered entry
+        | reflexive entry = filter (interveningHolds gs) [bare entry | armed entry]
+        | otherwise = filter (interveningHolds gs) (fmap (pend entry) (firedBy entry))
       -- Triggering spends the one shot only for an entry with no stated duration.
       spent entry = not (null (triggered entry)) && Maybe.isNothing (DelayedTrigger.expiry entry)
    in (concatMap triggered store, Seq.filter (not . spent) store)
