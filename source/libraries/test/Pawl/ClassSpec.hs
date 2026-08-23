@@ -16,7 +16,7 @@
 -- gates the next bar on it, and Pawl.Engine.Projection.gatherStatic gates the
 -- section's continuous effect on it.
 --
--- Paladin Class, AFR 29, is the whole card pool for this file, and it was picked
+-- Paladin Class, AFR 29, is the card under test throughout, and it was picked
 -- for what its level-2 section is: "Creatures you control get +1/+1", a plain
 -- layer 7c modification, so nothing but the level gate is under test. Its TOP
 -- section -- "Spells your opponents cast during your turn cost {1} more to cast",
@@ -261,17 +261,20 @@ ladderSpec s registry = Spec.describe s "Level bar activation" $ do
 -- CR 716.2b: "A level is a designation that any permanent can have. A Class
 -- retains its level even if it stops being a Class."
 --
--- Song of the Dryads, CMD 2014, is the second card this file needs: "Enchanted
+-- Song of the Dryads is the second card this file needs: "Enchanted
 -- permanent is a colorless Forest land" is a Modification.SetCardType, and CR
 -- 205.1a's third clause then takes the Class subtype away with the Enchantment
--- card type it correlates with (CR 205.3h). That is the only way a permanent in
--- data/cards/ stops being a Class.
+-- card type it correlates with (CR 205.3h). It and Gliding Licid are the corpus's
+-- two SetCardType cards (grep it over data/cards/), and the Licid's sets
+-- Enchantment on itself, so this is the one board in the pool on which a Class
+-- stops being one.
 --
 -- The retention is observable across the ROUND TRIP rather than during it, and
 -- that is a rules fact rather than a shortcut: the same Aura's SetLandSubtype
 -- fires CR 305.7, which strips the permanent's abilities, so while the Song is on
--- it the level-2 section is off no matter what the level says. Nothing else in
--- the pool reads another permanent's level. So the case asserts the strip too --
+-- it the level-2 section is off no matter what the level says, and Paladin Class
+-- is the only card in data/cards/ whose text measures a level at all (grep
+-- ClassLevel over the corpus). So the case asserts the strip too --
 -- the Piker is 2/1 while the Class is a Forest land, for rule 305.7's reason and
 -- not for rule 716.2b's, which the level assertion beside it is what shows.
 --
