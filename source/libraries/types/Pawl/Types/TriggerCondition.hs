@@ -216,10 +216,13 @@ data TriggerCondition
     -- already carries the permanent an arm for them would read -- and CR 508.3e's
     -- "[a player] attacks [another player]" (#538).
     AttachedPlayerIsAttacked
-  | -- | CR 508.3d: "whenever you attack" (Boggart Prankster) -- once per
-    -- DECLARATION, by the ability's controller, against
-    -- GameEvent.AttackersDeclared, which Pawl.Engine.Combat.declareAttackers
-    -- records once per CR 508.1 declaration and only for a non-empty one.
+  | -- | CR 508.3d: "whenever [a player] attacks" -- once per DECLARATION,
+    -- against GameEvent.AttackersDeclared, which
+    -- Pawl.Engine.Combat.declareAttackers records once per CR 508.1 declaration
+    -- and only for a non-empty one. The payload is which player rule 508.3d
+    -- names: You for Boggart Prankster's "whenever you attack", AnyPlayer for
+    -- Avatar Roku, Firebender's "whenever a player attacks", Opponent for
+    -- "whenever an opponent attacks".
     --
     -- The third of CR 508.3's arities, and the two arms above are the others:
     -- SelfAttacks and CreatureAttacksYou fire per declared attacker (CR 508.3a),
@@ -229,21 +232,18 @@ data TriggerCondition
     -- which is why neither of their events could carry it.
     --
     -- The BEARER need not attack, and need not be a creature: rule 508.3d asks
-    -- only that its controller declared one or more attackers.
+    -- only that the named player declared one or more attackers.
     -- CreatureAttacksAlone's bystanding posture, not SelfAttacks' self-scoping.
     --
     -- Nothing is bound. Rule 508.3d names a SET of creatures rather than one, so
-    -- there is no attacker to point at, and the player it does name is the
-    -- ability's own controller, which the ability already has.
+    -- there is no attacker to point at.
     --
-    -- Not implemented: rule 508.3d's OTHER subjects. "[A player]" is CR 109.5's
-    -- "you" here and nullary because of it, but "whenever a player attacks" and
-    -- "whenever an opponent attacks" are both printed; a PlayerRelation payload
-    -- plus a bound attacking player is what they need (#2142). Nor CR 508.3c's
-    -- "whenever [a player] attacks with [a creature]", this subject at CR
-    -- 508.3a's arity and binding the creature (#2140), nor CR 508.3e's "attacks
-    -- [another player]" (#538).
-    YouAttack
+    -- Not implemented: rule 508.3d's BOUND attacking player -- "that player" and
+    -- "the attacking player", which Norn's Decree and Mirkwood Trapper print
+    -- (#2154). Nor CR 508.3c's "whenever [a player] attacks with [a creature]",
+    -- this subject at CR 508.3a's arity and binding the creature (#2140), nor CR
+    -- 508.3e's "attacks [another player]" (#538).
+    YouAttack PlayerRelation.PlayerRelation
   | -- | CR 702.105a: dethrone -- SelfAttacks narrowed by whom the bearer
     -- attacked. The attacked player comes from Combat.attackers rather than the
     -- event, and that is the whole narrowing: the event carries CR 508.5's

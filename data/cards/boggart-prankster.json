@@ -28,7 +28,10 @@
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "YouAttack"
+            "type": "YouAttack",
+            "value": {
+              "type": "You"
+            }
           },
           "modal": {
             "modes": [

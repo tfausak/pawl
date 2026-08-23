@@ -18,6 +18,7 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Departure as Departure
@@ -3003,6 +3004,114 @@ boggartPranksterSpec s registry =
               Spec.assertEqWith s "and nothing was declared" (sentAt after) Map.empty
             Nothing -> Spec.assertFailure s "fixture should give alice a Prankster and a Piker"
 
+-- CR 508.3d's OTHER subject. The rule says "[a player]", and the Prankster above
+-- prints the CR 109.5 "you" reading of it; this is the "a player" reading, which
+-- is PlayerRelation.AnyPlayer. The pair is what pins the payload.
+--
+-- Avatar Roku, Firebender {3}{R}{R}{R} Legendary Creature -- Human Avatar 6/6:
+-- "Whenever a player attacks, add six {R}. Until end of combat, you don't lose
+-- this mana as steps end. {R}{R}{R}: Target creature gets +3/+0 until end of
+-- turn."
+--
+-- Not implemented: the retention sentence. ManaRetention has no
+-- until-end-of-combat arm (#2155), so pawl's Roku loses the mana as the declare
+-- attackers step ends (CR 500.5) -- STRICTER than printed, never weaker.
+--
+-- That omission is also why the assertion is Roku's POWER and not its pool: CR
+-- 500.5 empties the pool at the end of the step under every reading of the
+-- trigger, so a pool assertion could not discriminate. The mana is read through
+-- what it BOUGHT instead. alice holds no lands, so the {R}{R}{R} activation is
+-- affordable only through the trigger, and six {R} pays for exactly two
+-- activations -- the answerer takes every activation offered and the MANA bounds
+-- it, so a trigger adding the wrong amount would show as the wrong power.
+--
+-- One fixture, two boards differing in exactly one thing: who is active.
+--
+--   * bob active and declaring. Only AnyPlayer fires alice's Roku, so hardcoding
+--     You reads 6/6 here.
+--   * alice active and declaring. AnyPlayer and You agree, so this is the board
+--     that falsifies hardcoding Opponent.
+--
+-- Roku's trigger TARGETS NOTHING, which is what lets the first board see a
+-- difference at all: CR 603.3d removes a trigger with no legal target, which is
+-- how Boggart Prankster's "target attacking Goblin you control" hides the same
+-- distinction on every board.
+--
+-- The Opponent arm is exercised by no card. Its producer, Ever-Watching
+-- Threshold, carries a CR 603.4 intervening "if" reading what was attacked
+-- (#538); the board below proves only that the implementation does not BEHAVE as
+-- Opponent.
+avatarRokuSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+avatarRokuSpec s registry =
+  let isActivate a = case a of
+        A.Activate _ _ -> True
+        _ -> False
+      -- Attacks with everything, aims every announcement at `defending`, takes
+      -- every activation the engine offers, and points every target slot at
+      -- Roku. Both choices are FILTERED out of what was offered rather than
+      -- built: a hand-built Recipient of the right object in the wrong shape
+      -- would be dropped at CR 608.2b with no error.
+      answering :: PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+      answering defending aim p = case p of
+        Prompt.ChooseAttackTarget _ _ _ options ->
+          Maybe.fromMaybe (NonEmpty.head options) (List.find (== AttackTarget.OfPlayer defending) (NonEmpty.toList options))
+        Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToCreature aim) . snd) sets
+        Prompt.ChooseAction _ _ options -> case filter isActivate options of
+          a : _ -> a
+          [] -> A.Pass
+        _ -> S.aggressiveAnswer p
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+      sentAt gs = Combat.Type.attackers (GameState.combat gs)
+      -- alice's Roku, bob's Piker, and NO lands on either side.
+      fixture = do
+        roku <- S.printingOf s registry "Avatar Roku, Firebender"
+        piker <- S.printingOf s registry "Goblin Piker"
+        case S.combatBoardOf [roku] [piker] of
+          (gs, [rokuId], [pikerId]) -> pure (Just (rokuId, pikerId, gs))
+          _ -> pure Nothing
+      -- combatBoardOf hardcodes alice as the active player and CR 506.2's second
+      -- sentence then makes bob the defender. Both are turned around here, which
+      -- is the whole difference between the two boards.
+      bobsTurn gs =
+        gs
+          { GameState.activePlayer = S.bob,
+            GameState.combat = Combat.emptyCombat {Combat.Type.defender = Just S.alice}
+          }
+   in Spec.describe s "Avatar Roku, Firebender" $ do
+        -- The proving test: a player who is NOT the ability's controller
+        -- declares, and rule 508.3d's "a player" covers them.
+        Spec.it s "CR 508.3d \"whenever a player attacks\" fires on an opponent's declaration" $ do
+          built <- fixture
+          case built of
+            Just (rokuId, pikerId, gs) -> do
+              let after = atBlockers (answering S.alice rokuId) (bobsTurn gs)
+              Spec.assertEqWith s "Roku spent the six {R} bob's declaration added, twice" (S.powerToughnessOf rokuId after) (Just (12, 6))
+              Spec.assertEqWith s "CR 508.1 and it was bob's Piker that was declared, at alice" (sentAt after) (Map.fromList [(pikerId, AttackTarget.OfPlayer S.alice)])
+            Nothing -> Spec.assertFailure s "fixture should give alice a Roku and bob a Piker"
+        -- The same fixture with alice active. AnyPlayer includes CR 109.5's
+        -- "you", so the trigger fires here too -- and a payload misread as
+        -- Opponent would not.
+        Spec.it s "CR 508.3d \"a player\" includes the ability's own controller" $ do
+          built <- fixture
+          case built of
+            Just (rokuId, _, gs) -> do
+              let after = atBlockers (answering S.bob rokuId) gs
+              Spec.assertEqWith s "Roku spent the six {R} its own controller's declaration added, twice" (S.powerToughnessOf rokuId after) (Just (12, 6))
+              Spec.assertEqWith s "CR 508.1 and it was alice's Roku that was declared, at bob" (sentAt after) (Map.fromList [(rokuId, AttackTarget.OfPlayer S.bob)])
+            Nothing -> Spec.assertFailure s "fixture should give alice a Roku and bob a Piker"
+        -- No declaration at all, on the first board: rule 508.3d's "one or more".
+        -- Not a fence here, unlike the Prankster's version -- Roku's trigger
+        -- targets nothing, so a spurious firing would buy two activations and
+        -- show as 12/6.
+        Spec.it s "CR 508.3d a declare attackers step with no attackers adds nothing" $ do
+          built <- fixture
+          case built of
+            Just (rokuId, _, gs) -> do
+              let after = atBlockers (\p -> case p of Prompt.DeclareAttackers {} -> []; _ -> answering S.alice rokuId p) (bobsTurn gs)
+              Spec.assertEqWith s "Roku is its printed 6/6" (S.powerToughnessOf rokuId after) (Just (6, 6))
+              Spec.assertEqWith s "and nothing was declared" (sentAt after) Map.empty
+            Nothing -> Spec.assertFailure s "fixture should give alice a Roku and bob a Piker"
+
 anafenzaAttackSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 anafenzaAttackSpec s registry =
   let countersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
@@ -4191,6 +4300,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   anafenzaAttackSpec s registry
   curseOfVitalitySpec s registry
   boggartPranksterSpec s registry
+  avatarRokuSpec s registry
   ezuriExperienceSpec s registry
   youngPyromancerSpec s registry
   whisperingWizardSpec s registry
