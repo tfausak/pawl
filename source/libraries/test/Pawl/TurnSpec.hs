@@ -9,8 +9,13 @@
 -- Also CR 500.7's extra TURNS, which Engine.handoffTurn deals out -- Time Warp
 -- and Savor the Moment, the pool's creators of any -- and with Savor the Moment
 -- CR 500.11's skip scoped to ONE of them.
+--
+-- And CR 724's two procedures, which rewrite the schedule from inside a
+-- resolution -- Time Stop for the turn and Mandate of Peace for the combat
+-- phase.
 module Pawl.TurnSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -22,6 +27,7 @@ import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -1250,6 +1256,220 @@ endTurnSpec s registry = Spec.describe s "EndTheTurn" $ do
     let after = fst (runTurn castingFirst gs)
     Spec.assertEqWith s "alice's Divination is still in her hand" (fmap Object.zone (Game.lookupObject divine after)) (Just Zone.Hand)
 
+-- alice, active and mid-combat at the DECLARE BLOCKERS step with her Goblin
+-- Piker already attacking, holding Mandate of Peace ({1}{W} Instant, "Cast this
+-- spell only during combat. / Your opponents can't cast spells this turn. / End
+-- the combat phase.") and a Burst Lightning; bob holds a Burst Lightning of his
+-- own and has a third one ALREADY ON THE STACK. Returns the board, alice's Jade
+-- Statue, her attacker, her Mandate and the two spare Burst Lightnings.
+--
+-- Every element earns its place:
+--
+--   * Jade Statue is ANIMATED, by its own {2} ability, after attackers were
+--     declared -- so it is a 3/6 Golem "until end of combat" (CR 500.5a) and is
+--     NOT in combat. It is the pool's only producer of that duration, and the
+--     one quantity that tells CR 724.2d's expiry from its schedule rewrite.
+--   * The attacker is what CR 724.2d's "remove all creatures from combat" acts
+--     on, and bob's Piker blocks it, so the removal has a subject on each side.
+--   * bob's stacked Burst Lightning is a SECOND object on the stack, owned by
+--     the other seat, so CR 724.2b's exile cannot be confused with the resolving
+--     spell's own CR 608.2n move to a graveyard. It is genuinely CAST, aimed at
+--     alice, so "nothing on the stack resolved" is a claim a life total can
+--     falsify rather than one an empty binding map satisfies for free.
+--   * The two hand-held Burst Lightnings are the "your opponents can't cast
+--     spells this turn" clause's pair: after the combat phase ends alice may
+--     still cast hers and bob may not cast his, which is what proves CR 724.2d's
+--     expiry swept by EQUALITY on the combat phase rather than everything.
+--   * The declare blockers step leaves two combat steps between here and the
+--     postcombat main phase, so an implementation that advanced once would not
+--     pass.
+--
+-- Four Plains pay the Jade Statue's {2} and then Mandate of Peace's {1}{W}; a
+-- Mountain each pays for a Burst Lightning. Both libraries are stocked so no
+-- draw decks anyone out (CR 704.5b).
+mandateBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState, ObjectId, ObjectId, ObjectId, ObjectId, ObjectId)
+mandateBoard plains mountain piker statue mandate burst =
+  let (base, ours, _) = S.combatBoardOf [piker] [piker]
+      attacker = case ours of
+        a : _ -> a
+        [] -> error "Pawl.TurnSpec: combatBoardOf should return one creature"
+      (jade, gs1) = S.addCreature statue S.alice base
+      gs2 = S.landsFor mountain S.bob 2 (S.landsFor mountain S.alice 1 (S.landsFor plains S.alice 4 gs1))
+      (spell, gs3) = S.addHandCard mandate S.alice gs2
+      (hers, gs4) = S.addHandCard burst S.alice gs3
+      (his, gs5) = S.addHandCard burst S.bob gs4
+      stock g pid = List.foldl' (\g1 _ -> snd (S.addLibraryCard mountain pid g1)) g [1 .. (10 :: Int)]
+      -- Attackers are declared BEFORE the Jade Statue is animated, so the Statue
+      -- stays out of combat and CR 724.2d's expiry is observable on a permanent
+      -- its removal-from-combat clause never touches.
+      attacking = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer (stock (stock gs5 S.alice) S.bob)
+      animated = case Face.activatedAbilities (S.combinedFace statue) of
+        [] -> error "Pawl.TurnSpec: Jade Statue should have an activated ability"
+        ability : _ ->
+          let activated = snd (Engine.runGamePure S.identityAnswer attacking (Activate.activateAbility S.alice jade ability))
+           in snd (Engine.runGamePure S.identityAnswer activated Stack.resolveTop)
+      (bolt, gs6) = S.addHandCard burst S.bob animated
+      staged = snd (Engine.runGamePure (aimPlayer S.alice) gs6 (S.cast S.bob bolt))
+   in (staged, jade, attacker, spell, hers, his)
+
+-- Casts Mandate of Peace the first time it is offered and passes otherwise,
+-- leaving every combat decision to S.aggressiveAnswer. Pinned to the OBJECT
+-- rather than to "the first cast on offer": alice also holds a Burst Lightning
+-- she could afford, and the survivor case below needs it unspent.
+castingMandate :: ObjectId -> Prompt.Prompt r -> r
+castingMandate spell p = case p of
+  Prompt.ChooseAction _ _ actions -> case filter (S.isCastOf spell) actions of
+    h : _ -> h
+    [] -> Action.Pass
+  _ -> S.aggressiveAnswer p
+
+-- The same board with Time Stop and the six untapped Islands its {4}{U}{U}
+-- wants. CR 724.1d's "the current phase and/or step ends" is CR 724.2d's clause
+-- on a different phase, and this board is where an "until end of combat" effect
+-- exists to observe it; the arms are separate, so both are asserted.
+withTimeStop :: Printing.Printing -> Printing.Printing -> GameState.GameState -> (ObjectId, GameState.GameState)
+withTimeStop island timeStop gs = S.addHandCard timeStop S.alice (S.landsFor island S.alice 6 gs)
+
+-- The board as the postcombat main phase begins, WITHOUT running it -- the
+-- moment CR 724.2d's expiry and the ordinary CR 500.5a sweep disagree. Read at
+-- the end of the turn the two agree, CR 514.2 having dropped everything.
+atPostcombatMain :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+atPostcombatMain = S.runToStep Phase.PostcombatMain
+
+-- CR 724.2, end to end, through the one card rule 724.2 says ends a combat
+-- phase: Mandate of Peace.
+endCombatPhaseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+endCombatPhaseSpec s registry = Spec.describe s "EndTheCombatPhase" $ do
+  let board = do
+        plains <- S.printingOf s registry "Plains"
+        mountain <- S.printingOf s registry "Mountain"
+        piker <- S.printingOf s registry "Goblin Piker"
+        statue <- S.printingOf s registry "Jade Statue"
+        mandate <- S.printingOf s registry "Mandate of Peace"
+        burst <- S.printingOf s registry "Burst Lightning"
+        pure (mandateBoard plains mountain piker statue mandate burst, S.printingName mandate, (S.printingName burst, S.printingName piker))
+  -- THE CONTROL, and the same board differing in exactly one thing: whether alice
+  -- casts Mandate of Peace. Without it every negative below is satisfied by a
+  -- board where the combat phase never got this far.
+  Spec.it s "CR 506.1 the control combat phase runs the rest of its steps" $ do
+    ((gs, jade, _, _, _, his), _, (burstName, pikerName)) <- board
+    let phases = snd (runTurn S.aggressiveAnswer gs)
+        after = atPostcombatMain S.aggressiveAnswer gs
+    Spec.assertEqWith s "the rest of combat ran" phases [Phase.Combat CombatStep.DeclareBlockers, Phase.Combat CombatStep.CombatDamage, Phase.Combat CombatStep.EndOfCombat, Phase.PostcombatMain, Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]
+    -- CR 500.5a's ordinary sweep: the end of combat step ended, so the animation
+    -- is gone by the postcombat main phase here too. The two implementations
+    -- differ in WHEN, not in whether, which is why every expiry assertion below
+    -- is read at this moment and not at end of turn.
+    Spec.assertBool s (not (Projection.isCreatureOf jade after)) "Jade Statue is no longer a creature"
+    Spec.assertEqWith s "and has no power or toughness" (S.powerToughnessOf jade after) Nothing
+    -- The stack was NOT exiled and the combat damage step ran: bob's Burst
+    -- Lightning resolved for 2, and the blocked attacker traded with its blocker.
+    Spec.assertEqWith s "bob's Burst Lightning resolved" (S.lifeOf S.alice after) (Just 18)
+    Spec.assertEqWith s "the blocked attacker and its blocker traded" (namesIn Zone.Graveyard S.alice after, namesIn Zone.Graveyard S.bob after) ([Just pikerName], [Just burstName, Just pikerName])
+    Spec.assertBool s (S.castable S.bob his after) "and bob may cast the one in his hand"
+  -- CR 724.2d/724.2e: the schedule assertion, in its own case so no zone
+  -- assertion can absorb a mutation to the jump. The combat damage and end of
+  -- combat steps never run, which is the whole of CR 724.2e in pawl -- an "at end
+  -- of combat" trigger fires from Engine.runStepThatBegan and nowhere else.
+  Spec.it s "CR 724.2d ending the combat phase skips straight to the next phase" $ do
+    ((gs, _, _, spell, _, _), _, _) <- board
+    let phases = snd (runTurn (castingMandate spell) gs)
+    Spec.assertEqWith s "the combat damage and end of combat steps never ran" phases [Phase.Combat CombatStep.DeclareBlockers, Phase.PostcombatMain, Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]
+  -- CR 724.2d's removal from combat, in its OWN case: the expiry below could
+  -- otherwise absorb a mutation to it, an animation ending being one way a
+  -- creature stops being one.
+  Spec.it s "CR 724.2d it removes every creature from combat" $ do
+    ((gs, _, attacker, spell, _, _), _, _) <- board
+    let after = GameState.combat (atPostcombatMain (castingMandate spell) gs)
+    Spec.assertEqWith s "the fixture really did attack" (Map.keys (Combat.Type.attackers (GameState.combat gs))) [attacker]
+    Spec.assertEqWith s "no creature is attacking in the postcombat main phase" (Map.keys (Combat.Type.attackers after)) []
+    Spec.assertEqWith s "and none is blocking" (Map.keys (Combat.Type.blockers after)) []
+  -- CR 724.2d's expiry clause, which CR 500.5a scopes to the PHASE: the end of
+  -- combat step never ran, so Engine.runStepThatBegan's own sweep never asked.
+  -- The load-bearing case of the group.
+  Spec.it s "CR 724.2d an until-end-of-combat effect expires though the end of combat step never ran" $ do
+    ((gs, jade, _, spell, _, _), _, _) <- board
+    let after = atPostcombatMain (castingMandate spell) gs
+    Spec.assertBool s (not (Projection.isCreatureOf jade after)) "Jade Statue is no longer a creature"
+    Spec.assertEqWith s "and has no power or toughness" (S.powerToughnessOf jade after) Nothing
+  -- CR 724.1d's half of the same clause, on the same board: ending the TURN
+  -- during combat ends that combat phase too, so its expiries expire. Read as the
+  -- cleanup step begins, since CR 514.2's own sweep does not reach an
+  -- Expiry.AtEndOf and the two implementations agree nowhere later.
+  Spec.it s "CR 724.1d ending the turn during combat expires that phase's effects" $ do
+    ((gs, jade, _, _, _, _), _, _) <- board
+    island <- S.printingOf s registry "Island"
+    timeStop <- S.printingOf s registry "Time Stop"
+    let (stop, staged) = withTimeStop island timeStop gs
+        after = S.runToStep (Phase.Ending EndingStep.Cleanup) (castingMandate stop) staged
+    Spec.assertEqWith s "the turn jumped to the cleanup step" (GameState.phase after) (Phase.Ending EndingStep.Cleanup)
+    Spec.assertBool s (not (Projection.isCreatureOf jade after)) "and Jade Statue is no longer a creature"
+    Spec.assertEqWith s "with no power or toughness" (S.powerToughnessOf jade after) Nothing
+  -- CR 724.2b against CR 608.2n: both spells are EXILED, and neither reaches a
+  -- graveyard. Asserting Mandate of Peace's own destination is also what makes a
+  -- card that failed to parse unable to pass this group.
+  Spec.it s "CR 724.2b it exiles the whole stack, the resolving spell included" $ do
+    ((gs, _, _, spell, _, _), mandateName, (burstName, _)) <- board
+    let after = atPostcombatMain (castingMandate spell) gs
+    Spec.assertEqWith s "nothing on the stack resolved" (S.lifeOf S.alice after, S.lifeOf S.bob after) (Just 20, Just 20)
+    Spec.assertEqWith s "alice's exile holds Mandate of Peace" (namesIn Zone.Exile S.alice after) [Just mandateName]
+    Spec.assertEqWith s "bob's exile holds Burst Lightning" (namesIn Zone.Exile S.bob after) [Just burstName]
+    Spec.assertEqWith s "and neither graveyard has either" (namesIn Zone.Graveyard S.alice after, namesIn Zone.Graveyard S.bob after) ([], [])
+    Spec.assertEqWith s "the stack is empty" (GameState.stack after) []
+  -- CR 724.2f: no player gets priority during the process. The seats that were
+  -- offered an action in the declare blockers step, in order -- alice casts,
+  -- alice passes, bob passes, and the process runs with the round closed. An
+  -- implementation that rewrites the schedule and settles anyway hands alice a
+  -- fourth window inside the combat phase it just ended.
+  Spec.it s "CR 724.2f no player gets priority once the combat phase has ended" $ do
+    ((gs, _, _, spell, _, _), _, _) <- board
+    let recording :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+        recording p = case p of
+          Prompt.ChooseAction _ pid _ -> do
+            State.modify' (<> [pid])
+            pure (castingMandate spell p)
+          _ -> pure (castingMandate spell p)
+        seats = State.execState (Engine.runGame recording gs Engine.runStep) []
+    Spec.assertEqWith s "alice cast, alice passed, bob passed, and nobody else was asked" seats [S.alice, S.alice, S.bob]
+  -- The positive assertion about what the procedure did NOT destroy: CR 724.2d
+  -- expires the effects scoped to the COMBAT PHASE, and Expiry.dropAtEndOf
+  -- compares selectors by equality, so the "this turn" prohibition Mandate of
+  -- Peace installed in the same clause outlives it (CR 514.2).
+  Spec.it s "CR 611.1 the until-end-of-turn prohibition outlives the phase it ended" $ do
+    ((gs, _, _, spell, hers, his), _, _) <- board
+    let after = atPostcombatMain (castingMandate spell) gs
+    Spec.assertBool s (not (S.castable S.bob his after)) "bob may not cast his Burst Lightning"
+    Spec.assertBool s (S.castable S.alice hers after) "and alice, who is not her own opponent, may cast hers"
+  -- CR 724.2g: outside a combat phase nothing happens at all -- not the exile,
+  -- not the schedule rewrite. Reached by applying the effect directly, since the
+  -- card's own rider correctly refuses the cast.
+  Spec.it s "CR 724.2g ending the combat phase outside one does nothing" $ do
+    ((gs, _, _, _, _, _), _, _) <- board
+    let staged = gs {GameState.phase = Phase.PrecombatMain, GameState.remaining = afterPrecombatMain}
+        source = ObjectId.MkObjectId 0
+        after = S.runPure S.identityAnswer staged (Resolve.applyEffect source source S.alice Map.empty Map.empty Effect.EndCombatPhase)
+    Spec.assertEqWith s "the stack is untouched" (GameState.stack after) (GameState.stack staged)
+    Spec.assertEqWith s "the schedule is untouched" (GameState.remaining after) afterPrecombatMain
+    Spec.assertEqWith s "and nobody lost life" (S.lifeOf S.alice after, S.lifeOf S.bob after) (Just 20, Just 20)
+  -- CR 601.3 / CR 500.1: the card's own rider, both directions on one board with
+  -- the same mana available in each -- presence alone is satisfied by a
+  -- restriction nothing reads. The third reading pins CR 109.5's scope: "during
+  -- combat" names no turn, so bob's combat phase admits it too.
+  Spec.it s "CR 601.3 Mandate of Peace is castable only during a combat phase" $ do
+    ((gs, _, _, spell, _, _), _, _) <- board
+    let inMain = gs {GameState.phase = Phase.PrecombatMain}
+        onBobsTurn = gs {GameState.activePlayer = S.bob}
+    Spec.assertBool s (S.castable S.alice spell gs) "castable in alice's declare blockers step"
+    Spec.assertBool s (not (S.castable S.alice spell inMain)) "and not in her precombat main phase"
+    Spec.assertBool s (S.castable S.alice spell onBobsTurn) "and castable in bob's combat phase too"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Turn" $ do
   turnSpec s
@@ -1259,3 +1479,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Turn" $ do
   extraTurnSpec s registry
   turnScopedSkipSpec s registry
   endTurnSpec s registry
+  endCombatPhaseSpec s registry

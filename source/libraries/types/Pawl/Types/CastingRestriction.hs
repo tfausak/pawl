@@ -32,18 +32,20 @@ data CastingRestriction
     -- Pawl.Types.TurnScope beside it, since CR 109.5's "your" narrows the window
     -- by turn independently of which window it is.
     --
-    -- The PhaseSelector.CombatPhase window has no producer in the pool. Every
-    -- card printing "Cast this spell only during combat" (checked against
-    -- Scryfall 2026-08-16) drags in machinery pawl lacks: an end-the-combat-phase
-    -- effect (Mandate of Peace), a CONDITIONAL alternative cost that taps another
-    -- creature (Angelic Favor), an effect putting a chosen card from a HAND onto
-    -- the battlefield (Cauldron Dance, Surprise Deployment), or a delayed ability
-    -- naming a spell mode's TARGET slot, which CardSpec's delayed-ability lint
-    -- rejects (Spinal Embrace). So the window is sayable and unexercised here
-    -- (gap #527); Pawl.Engine.Activate's Jade Statue cases are what keep
-    -- Pawl.Engine.Turn.inWindow's containment honest. The narrower cards ("only
-    -- during combat before blockers are declared", Blaze of Glory and eight
-    -- others) do not want this arm at all: their window is not a phase.
+    -- The PhaseSelector.CombatPhase window's producer is Mandate of Peace, whose
+    -- CR 724.2 clause is Pawl.Types.Effect's EndCombatPhase; Pawl.TurnSpec's
+    -- "EndTheCombatPhase" group asserts both directions of the rider on one
+    -- board, and Pawl.Engine.Activate's Jade Statue cases keep the same
+    -- Pawl.Engine.Turn.inWindow containment honest on the activation side. The
+    -- other cards printing "Cast this spell only during combat" (checked against
+    -- Scryfall 2026-08-16) each drag in machinery pawl lacks: a CONDITIONAL
+    -- alternative cost that taps another creature (Angelic Favor), an effect
+    -- putting a chosen card from a HAND onto the battlefield (Cauldron Dance,
+    -- Surprise Deployment), or a delayed ability naming a spell mode's TARGET
+    -- slot, which CardSpec's delayed-ability lint rejects (Spinal Embrace). The
+    -- narrower cards ("only during combat before blockers are declared", Blaze of
+    -- Glory and eight others) do not want this arm at all: their window is not a
+    -- phase.
     DuringPhase DuringPhase.DuringPhase
   | -- | "and only if you've been attacked this step" -- the second clause every
     -- printed instant carrying these words puts on a CAST, Rally the Troops

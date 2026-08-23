@@ -745,10 +745,21 @@ data Effect card
     -- during this process" is what GameState.endTurnSignal carries out to
     -- Engine.priorityLoop; it cannot be expressed in `remaining` alone.
     --
-    -- Not implemented: CR 724.2's sibling, ending the COMBAT PHASE, whose one
-    -- printing (Mandate of Peace) says "cast this spell only during combat" and
-    -- so waits on #527 (#873).
+    -- CR 724.2's sibling is EndCombatPhase below, and the two share the signal
+    -- rather than the arm: the six steps differ in what CR 724.1d and CR 724.2d
+    -- leave at the head of the schedule.
     EndTurn
+  | -- | CR 724.2: end the combat phase (Mandate of Peace, which rule 724.2 says
+    -- is the only card that does). Nullary for EndTurn's reason -- rule 724.2's
+    -- seven steps fix the whole procedure.
+    --
+    -- The same shape as EndTurn and deliberately not a reuse of it: CR 724.2d
+    -- ends the current COMBAT PHASE and jumps to whatever the schedule holds
+    -- next, expiring the "until end of combat" effects CR 500.5a scopes to that
+    -- phase, where CR 724.1d ends the turn outright and jumps to the cleanup
+    -- step. CR 724.2g is the other difference: attempted outside a combat phase,
+    -- nothing happens at all, where ending the turn is always something.
+    EndCombatPhase
   | -- | CR 613.1b / 611.2c: install a layer-2 control effect on the objects the
     -- ObjectRef names, for a duration. The new controller is this effect's
     -- source's controller, baked into a stored SetController effect -- derived,

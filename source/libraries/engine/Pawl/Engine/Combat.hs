@@ -70,9 +70,10 @@ emptyCombat =
 -- next combat phase asks CR 506.7b's question afresh).
 --
 -- Engine.runStep calls this as the step ENDS, not from runTurnBasedActions: CR
--- 511.1 gives this step no turn-based action. CR 724.1d asks for the same removal
--- at a different moment, so Resolve's Effect.EndTurn arm calls it too, guarded on
--- the turn having been ended during a combat phase.
+-- 511.1 gives this step no turn-based action. CR 724.1d and CR 724.2d ask for
+-- the same removal at a different moment, so Resolve's Effect.EndTurn arm calls
+-- it too, guarded on the turn having been ended during a combat phase, and its
+-- Effect.EndCombatPhase arm inside CR 724.2g's guard.
 clearCombat :: GameState -> GameState
 clearCombat gs = gs {GameState.combat = emptyCombat}
 

@@ -119,9 +119,12 @@ thisPhase phase remaining = case lastStepOf phase >>= \step -> Seq.elemIndexL st
   Nothing -> (Seq.empty, remaining)
   Just i -> Seq.splitAt (i + 1) remaining
 
--- CR 500.11: everything left of the turn AFTER this phase. The other half of
--- `thisPhase`'s split. Positional for the same CR 500.8 reason: skipping THIS
--- combat phase says nothing about a second one added later in the turn.
+-- CR 500.11 / CR 724.2d: everything left of the turn AFTER this phase. The other
+-- half of `thisPhase`'s split, and the shape both a SKIPPED phase
+-- (Engine.skipWholePhase) and one an effect ENDED (Resolve's
+-- Effect.EndCombatPhase arm) want. Positional for the same CR 500.8 reason:
+-- dropping THIS combat phase says nothing about a second one added later in the
+-- turn.
 dropRestOfPhase :: Phase -> Seq Phase -> Seq Phase
 dropRestOfPhase phase = snd . thisPhase phase
 
@@ -180,9 +183,12 @@ inWindow selector phase = selector == PhaseSelector.Step phase || wholePhaseOf p
 -- grains: "until end of combat" expires at the end of the combat phase, not at
 -- the start of the end of combat step.
 --
--- Answers from the step alone, so a phase whose last step never runs --
--- skipped, or dropped with the rest of the phase -- never reports its end
--- (#526).
+-- Answers from the step alone, so a phase whose last step never runs never
+-- reports its end here. Two of the three ways that happens are covered
+-- elsewhere: Pawl.Engine.Resolve's CR 724.1 and CR 724.2 arms sweep the phase
+-- they end themselves, and a phase skipped whole never ends at all (CR 500.11,
+-- at Engine.skipWholePhase). Not implemented: the third, a CR 614.1b skip of
+-- the last step ALONE (#2126).
 phaseEndingAt :: Phase -> Maybe PhaseSelector
 phaseEndingAt phase = if lastStepOf phase == Just phase then wholePhaseOf phase else Nothing
 
