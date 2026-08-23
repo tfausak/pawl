@@ -221,6 +221,170 @@
               }
             }
           ]
+        },
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "IsSource"
+            }
+          },
+          "condition": {
+            "type": "Compares",
+            "value": {
+              "comparison": {
+                "type": "AtLeast"
+              },
+              "measured": {
+                "type": "ClassLevel"
+              },
+              "threshold": {
+                "type": "Literal",
+                "value": 3
+              }
+            }
+          },
+          "modifications": [
+            {
+              "type": "GainAbility",
+              "value": {
+                "type": "Triggered",
+                "value": {
+                  "condition": {
+                    "type": "PlayerAttacks",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  "modal": {
+                    "modes": [
+                      {
+                        "clauses": [
+                          {
+                            "effects": [
+                              {
+                                "type": "ModifyTarget",
+                                "value": {
+                                  "duration": {
+                                    "type": "UntilEndOfTurn"
+                                  },
+                                  "modification": {
+                                    "type": "ModifyPowerToughness",
+                                    "value": {
+                                      "power": {
+                                        "type": "Count",
+                                        "value": {
+                                          "aggregation": {
+                                            "type": "Members"
+                                          },
+                                          "filter": {
+                                            "type": "And",
+                                            "value": [
+                                              {
+                                                "type": "IsAttacking"
+                                              },
+                                              {
+                                                "type": "Not",
+                                                "value": {
+                                                  "type": "IsBound",
+                                                  "value": "target"
+                                                }
+                                              }
+                                            ]
+                                          },
+                                          "scope": {
+                                            "type": "InZone",
+                                            "value": {
+                                              "player": {
+                                                "type": "EachPlayer"
+                                              },
+                                              "zone": {
+                                                "type": "Battlefield"
+                                              }
+                                            }
+                                          }
+                                        }
+                                      },
+                                      "toughness": {
+                                        "type": "Count",
+                                        "value": {
+                                          "aggregation": {
+                                            "type": "Members"
+                                          },
+                                          "filter": {
+                                            "type": "And",
+                                            "value": [
+                                              {
+                                                "type": "IsAttacking"
+                                              },
+                                              {
+                                                "type": "Not",
+                                                "value": {
+                                                  "type": "IsBound",
+                                                  "value": "target"
+                                                }
+                                              }
+                                            ]
+                                          },
+                                          "scope": {
+                                            "type": "InZone",
+                                            "value": {
+                                              "player": {
+                                                "type": "EachPlayer"
+                                              },
+                                              "zone": {
+                                                "type": "Battlefield"
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "ref": {
+                                    "type": "InSlot",
+                                    "value": "target"
+                                  }
+                                }
+                              },
+                              {
+                                "type": "ModifyTarget",
+                                "value": {
+                                  "duration": {
+                                    "type": "UntilEndOfTurn"
+                                  },
+                                  "modification": {
+                                    "type": "GainKeyword",
+                                    "value": {
+                                      "type": "DoubleStrike"
+                                    }
+                                  },
+                                  "ref": {
+                                    "type": "InSlot",
+                                    "value": "target"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        ],
+                        "targetSlots": {
+                          "target": {
+                            "filter": {
+                              "type": "IsAttacking"
+                            },
+                            "pool": {
+                              "type": "Creatures"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
         }
       ],
       "typeLine": {

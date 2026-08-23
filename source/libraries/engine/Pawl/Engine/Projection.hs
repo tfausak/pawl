@@ -1190,8 +1190,10 @@ baseView gs oid =
 -- Filter.contextFor built here would carry no slot bindings: Quantity.AgainstSlot
 -- reads Filter.slotObjects, so against an empty map it answers Nothing, the
 -- freeze answers Nothing, and Resolve stores no continuous effect at all. Rush of
--- Blood's "+X/+0 ... where X is its power" is the producer, and
--- Pawl.Engine.Resolve.effectContext is the one engine caller's spelling.
+-- Blood's "+X/+0 ... where X is its power" is one producer; Paladin Class's
+-- level-3 "+1/+1 for each other attacking creature" is another, whose Count
+-- filter reads the same map through Filter.IsBound. Pawl.Engine.Resolve.effectContext
+-- is the one engine caller's spelling.
 freezeQuantities :: GameState -> ObjectId -> ObjectId -> Filter.Context -> Modification.Modification ability -> Maybe (Modification.Modification ability)
 freezeQuantities gs announcedOn source context m =
   let viewOf = fullView gs

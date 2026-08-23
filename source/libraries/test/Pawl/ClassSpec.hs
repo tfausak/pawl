@@ -21,15 +21,11 @@
 -- layer 7c modification, so nothing but the level gate is under test. Its TOP
 -- section -- "Spells your opponents cast during your turn cost {1} more to cast",
 -- which CR 716.3 makes an ability the Class has at all times -- is transcribed
--- too, and topSectionSpec below is what proves it. Its remaining section is
--- transcribed SHORT, and the omission leaves pawl's card strictly WEAKER than
--- printed rather than stronger:
---
---   * The level-3 section's "Whenever you attack, ..." is omitted; the BAR is
---     kept, since CR 716.2a's activated half is what the level-3 gate below is
---     about. The section's own text needs a count that excludes the slot it is
---     aimed at (gap #1946); the shape that would carry it, a level-gated grant of
---     a quoted triggered ability, landed with #1943 and is unused here.
+-- too, and topSectionSpec below is what proves it. Its LEVEL-3 section --
+-- "Whenever you attack, until end of turn, target attacking creature gets +1/+1
+-- for each other attacking creature and gains double strike" -- is transcribed
+-- as well, and levelThreeSpec below is what proves it. Nothing on the card is
+-- omitted.
 --
 -- CR 716.1 is a frame rule with no rules meaning -- the striated text box and the
 -- sideways type line -- so nothing here asserts about the layout, and
@@ -45,7 +41,9 @@
 --     #1944).
 module Pawl.ClassSpec where
 
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cost as Cost
@@ -57,11 +55,15 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Combat as Combat.Type
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -70,6 +72,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Subtype as Subtype
 
@@ -77,6 +80,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Class" $ do
   topSectionSpec s registry
   sectionSpec s registry
+  levelThreeSpec s registry
   ladderSpec s registry
   designationSpec s registry
 
@@ -221,6 +225,102 @@ sectionSpec s registry = Spec.describe s "Level bar section" $ do
         levelled = gainLevel classId gs
     Spec.assertEqWith s "the Piker is 3/2 while the Class is level 2" (S.powerToughnessOf pikerId levelled) (Just (3, 2))
     Spec.assertEqWith s "CR 716.2a: the level BECAME 2" (levelOf classId levelled) (Just (ClassLevel.MkClassLevel 2))
+
+-- CR 716.2a's static half at the LAST section, which is where Paladin Class's
+-- ladder ends: "Whenever you attack, until end of turn, target attacking
+-- creature gets +1/+1 for each other attacking creature and gains double
+-- strike."
+--
+-- Three rules meet here, each with its own falsifier on the boards below:
+--
+--   * CR 716.2a. The section is a static ability gated on level 3 that grants
+--     the Class a quoted TRIGGERED ability (CR 613.1f). The level-2 board is the
+--     negative, and differs from the positive in exactly one field.
+--   * CR 508.3d. "Whenever you attack" asks about the attacking PLAYER and
+--     triggers once per declaration, so four attackers make one trigger and one
+--     pump -- not four.
+--   * "for each OTHER attacking creature", which excludes the creature the pump
+--     is aimed at.
+--
+-- FOUR attackers is what makes that exclusion visible: the right count is 3 and
+-- a count that forgot the exclusion is 4, so the target reads 6/5 rather than
+-- 7/6. One attacker would put the two readings at 0 and 1, which differ too --
+-- but four also keeps the pump clear of the level-2 section's own +1/+1, which
+-- is still on at level 3 (its gate is "2 or greater") and lands on all four.
+--
+-- Goblin Piker on every seat: vanilla, so nothing else can move a number, and
+-- 2/1 rather than square, so a modification landing on one axis only could not
+-- read as both. bob defends with NOTHING, so no blocker and no CR 704.5g
+-- toughness removal can take the creature the assertions read off the board
+-- before they read it.
+
+-- alice's four Settled Pikers and her Class, at the level given; bob empty.
+--
+-- The level is WRITTEN rather than climbed. Pawl.Support.combatBoardOf opens in
+-- the declare attackers step, where CR 307.5 forbids the bar's sorcery-speed
+-- activation, and ladderSpec below is what proves the climb; here the level is a
+-- precondition, and each case asserts it on the board.
+attackBoard :: Printing.Printing -> Printing.Printing -> Natural.Natural -> ([ObjectId.ObjectId], ObjectId.ObjectId, GameState.GameState)
+attackBoard paladinClass piker level =
+  let (gs, pikers, _) = S.combatBoardOf (replicate 4 piker) []
+      (classId, withClass) = S.addCreature paladinClass S.alice gs
+   in (pikers, classId, atLevel classId level withClass)
+
+-- CR 716.2b's designation, written straight onto the permanent.
+atLevel :: ObjectId.ObjectId -> Natural.Natural -> GameState.GameState -> GameState.GameState
+atLevel oid level gs =
+  gs
+    { GameState.objects =
+        Map.adjust (\o -> o {Object.classLevel = Just (ClassLevel.MkClassLevel level)}) oid (GameState.objects gs)
+    }
+
+levelThreeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+levelThreeSpec s registry =
+  let -- Attacks with everything and points the trigger's one target slot at
+      -- `aim`, FILTERED out of what the engine offered rather than hand-built: a
+      -- Recipient of the right object in the wrong shape is dropped at CR 608.2b
+      -- with no error. The four Pikers are indistinguishable to a pure answerer,
+      -- which is exactly why the aim is pinned by id.
+      answering :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+      answering aim p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToCreature aim) . snd) sets
+        _ -> S.aggressiveAnswer p
+      atBlockers aim = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (answering aim)
+   in Spec.describe s "Level 3 section" $ do
+        Spec.it s "CR 716.2a / CR 508.3d the level-3 trigger pumps by each OTHER attacker and grants double strike" $ do
+          paladinClass <- S.printingOf s registry "Paladin Class"
+          piker <- S.printingOf s registry "Goblin Piker"
+          case attackBoard paladinClass piker 3 of
+            (target : others, classId, gs) -> do
+              let after = atBlockers target gs
+              -- The gameplay assertion this unit exists for, and it is first:
+              -- 2/1 printed, +1/+1 from the level-2 section, +3/+3 for the three
+              -- OTHER attackers. A count including the target reads 7/6.
+              Spec.assertEqWith s "the target is 6/5: +3/+3 for the three other attackers, over the level-2 section's +1/+1" (S.powerToughnessOf target after) (Just (6, 5))
+              Spec.assertBool s (Projection.hasKeyword Keyword.DoubleStrike target after) "CR 702.4 the target gained double strike"
+              -- The other three attackers took the level-2 section's +1/+1 and
+              -- nothing else, which is what says the pump reached ONE creature.
+              Spec.assertEqWith s "the untargeted attackers are 3/2 -- the level-2 section alone" (fmap (\oid -> S.powerToughnessOf oid after) others) (fmap (const (Just (3, 2))) others)
+              Spec.assertBool s (not (any (\oid -> Projection.hasKeyword Keyword.DoubleStrike oid after) others)) "and none of them gained double strike"
+              -- The preconditions the readings above rest on.
+              Spec.assertEqWith s "CR 716.2b the Class really is level 3" (levelOf classId after) (Just (ClassLevel.MkClassLevel 3))
+              Spec.assertEqWith s "CR 508.1b all four Pikers really were declared attacking bob" (Combat.Type.attackers (GameState.combat after)) (Map.fromList (fmap (\oid -> (oid, AttackTarget.OfPlayer S.bob)) (target : others)))
+            _ -> Spec.assertFailure s "fixture should give alice four Pikers and a Class"
+        -- The same board with the level as the only difference. CR 716.2a gates
+        -- the section on "level N or greater", so at level 2 there is no trigger
+        -- at all -- and the level-2 section's own +1/+1 is still on, which is
+        -- what says the board is otherwise identical rather than broken.
+        Spec.it s "CR 716.2a the level-3 section is off while the Class is level 2" $ do
+          paladinClass <- S.printingOf s registry "Paladin Class"
+          piker <- S.printingOf s registry "Goblin Piker"
+          case attackBoard paladinClass piker 2 of
+            (target : others, classId, gs) -> do
+              let after = atBlockers target gs
+              Spec.assertEqWith s "the would-be target is 3/2 -- the level-2 section and nothing more" (S.powerToughnessOf target after) (Just (3, 2))
+              Spec.assertBool s (not (Projection.hasKeyword Keyword.DoubleStrike target after)) "and it gained no double strike"
+              Spec.assertEqWith s "CR 716.2b the Class really is level 2" (levelOf classId after) (Just (ClassLevel.MkClassLevel 2))
+              Spec.assertEqWith s "CR 508.1b and all four Pikers really did attack" (Combat.Type.attackers (GameState.combat after)) (Map.fromList (fmap (\oid -> (oid, AttackTarget.OfPlayer S.bob)) (target : others)))
+            _ -> Spec.assertFailure s "fixture should give alice four Pikers and a Class"
 
 -- CR 716.2a's activated half: "[Cost]: This Class's level becomes N. Activate only
 -- if this Class is level N-1 and only as a sorcery."
