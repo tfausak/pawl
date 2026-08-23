@@ -102,6 +102,13 @@ evaluate viewOf quantityOf context gs count = case Count.Type.scope count of
     -- The predicate is baked PER CANDIDATE (see bakePerspective): CR 110.2's
     -- comparison is answered here, where the board is, and the match below is the
     -- same pure one every other scope makes.
+    --
+    -- playerView rather than Filter.playerView is a REGRESSION FENCE on this road
+    -- and a proof on the other: routing the fold through the board-aware builder
+    -- leaves the suite green, no card spelling Filter.DealtDamageThisTurn under a
+    -- count over players -- Quantity.PlayersDealtDamageThisTurn is how a card asks
+    -- that (#1577). The target road, which Pawl.DamageSpec's Needle Drop case
+    -- covers, is what pays for the builder.
     let kept = fmap ((,) Nothing) (Maybe.mapMaybe (\pid -> keep (bakePerspective viewOf context gs pid predicate) context (Just (playerView gs pid))) pids)
     aggregate quantityOf aggregation kept
   where

@@ -3057,8 +3057,8 @@ dealtDamageThisTurnSpec s registry =
           let seats = S.landsFor mountain S.alice 1 (Setup.emptyGame S.threePlayers)
               (sorcererId, gs1) = S.addCreature sorcerer S.alice seats
               (withDrop, dropId) = S.handOne needleDrop gs1
-              -- CR 121.3: the draw clause needs a card to take, and an empty
-              -- library would lose alice the game to CR 104.3c instead.
+              -- CR 121.4: the draw clause needs a card to take, an empty library
+              -- losing alice the game at the next state-based check instead.
               (_, stocked) = S.addLibraryCard island S.alice withDrop
               ready = stocked {GameState.priority = Just S.alice}
               board = S.settleSba (S.runPure (aimedAtPlayer S.bob) ready (do Activate.activateAbility S.alice sorcererId ping; Stack.resolveTop))
