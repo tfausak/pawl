@@ -78,6 +78,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.Modification as Modification
@@ -1281,7 +1282,7 @@ markDamage oid n gs =
 -- Pawl.Engine.Event.eventTriggers asks (CR 603.10a), and it reads the log itself;
 -- an assertion about what happened wants the events alone.
 eventsOf :: GameState.GameState -> [GameEvent.GameEvent]
-eventsOf = fmap snd . Foldable.toList . GameState.events
+eventsOf = fmap LoggedEvent.event . Foldable.toList . GameState.events
 
 -- The damage events recorded so far this turn, in order. Replaces the
 -- GameState.damageEvents list P4 folded into the one turn-scoped log.
@@ -1347,7 +1348,7 @@ emptyCharacteristics = Projection.project (ObjectId.MkObjectId 999) (Setup.empty
 withEvents :: [GameEvent.GameEvent] -> GameState.GameState -> GameState.GameState
 withEvents events gs =
   gs
-    { GameState.events = Seq.fromList (zipWith (\n event -> (EventGroup.MkEventGroup n, event)) [0 ..] events),
+    { GameState.events = Seq.fromList (zipWith (\n event -> LoggedEvent.MkLoggedEvent {LoggedEvent.group = EventGroup.MkEventGroup n, LoggedEvent.event = event}) [0 ..] events),
       GameState.nextEventGroup = EventGroup.MkEventGroup (Natural.length events),
       GameState.eventGroupDepth = 0,
       GameState.scannedThrough = 0,

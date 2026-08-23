@@ -46,6 +46,7 @@ import qualified Pawl.Types.IgnoredAbility as IgnoredAbility
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import Pawl.Types.ManaUnit (ManaUnit)
@@ -423,7 +424,7 @@ rewritePlayerEffect pairs effect = case effect of
 castsThisTurn :: PlayerId -> GameState -> Natural
 castsThisTurn pid gs =
   let mine cast = SpellWasCast.player cast == pid
-   in Natural.length (filter mine (Maybe.mapMaybe (Game.castOf . snd) (Foldable.toList (GameState.events gs))))
+   in Natural.length (filter mine (Maybe.mapMaybe (Game.castOf . LoggedEvent.event) (Foldable.toList (GameState.events gs))))
 
 -- CR 601.3: a player can begin to cast a spell only if no rule or effect
 -- prohibits it. The prohibit half. Cast.permitsCastWhileSearching is not the

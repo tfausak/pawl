@@ -36,6 +36,7 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Modal as Modal.Type
@@ -301,7 +302,7 @@ loyaltyOk pid srcId ability gs =
     || (Turn.sorcerySpeedWindow pid gs && not (loyaltyActivatedThisTurn srcId gs))
 
 loyaltyActivatedThisTurn :: ObjectId -> GameState -> Bool
-loyaltyActivatedThisTurn srcId gs = elem (GameEvent.LoyaltyAbilityActivated srcId) (fmap snd (GameState.events gs))
+loyaltyActivatedThisTurn srcId gs = elem (GameEvent.LoyaltyAbilityActivated srcId) (fmap LoggedEvent.event (GameState.events gs))
 
 -- CR 602.2b's routing of an activation cost through CR 601.2b, at the X=0 FLOOR:
 -- an ability is affordable when its activation cost is payable with X=0, since

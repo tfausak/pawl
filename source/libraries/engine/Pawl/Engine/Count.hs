@@ -29,6 +29,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.MovedBetween as MovedBetween
 import qualified Pawl.Types.Object as Object
@@ -76,7 +77,7 @@ evaluate viewOf quantityOf context gs count = case Count.Type.scope count of
   -- (CR 608.2h last-known information), never from a live object -- a token has
   -- no printed card at all (CR 111.3) and an animated land died as a creature.
   Scope.InHistory shape ->
-    let views = Maybe.mapMaybe (snapshotView gs shape . snd) (Foldable.toList (GameState.events gs))
+    let views = Maybe.mapMaybe (snapshotView gs shape . LoggedEvent.event) (Foldable.toList (GameState.events gs))
         kept = fmap ((,) Nothing) (Maybe.mapMaybe (keep predicate context . Just) views)
      in aggregate quantityOf aggregation kept
   -- CR 102.1: the players themselves. Candidates come from the same

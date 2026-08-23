@@ -9,6 +9,7 @@ import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
+import qualified Pawl.Types.BattlefieldCandidate as BattlefieldCandidate
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
@@ -18,9 +19,9 @@ import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
 import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
-import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.IgnoredAbility as IgnoredAbility
 import qualified Pawl.Types.LastKnown as LastKnown
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Object as Object
@@ -118,7 +119,7 @@ data GameState = MkGameState
     -- consumed, since scannedThrough and damageScannedThrough drain the same log
     -- at different cadences. Groups are non-decreasing along the log, because
     -- recordEvent only ever mints a fresh one or repeats the frozen one.
-    events :: Seq.Seq (EventGroup.EventGroup, GameEvent.GameEvent),
+    events :: Seq.Seq LoggedEvent.LoggedEvent,
     -- | The group Event.recordEvent stamps on the next event it records.
     --
     -- Advanced past on each record, EXCEPT inside an Event.simultaneously
@@ -188,7 +189,7 @@ data GameState = MkGameState
     -- costs nothing, and one it does costs the projection it would have paid at
     -- the scan anyway. Cleared as the scan consumes the log, which is what bounds
     -- both the map and the states its thunks retain.
-    battlefieldWhenTriggered :: Map.Map EventGroup.EventGroup (Map.Map ObjectId.ObjectId (PlayerId.PlayerId, ProjectedCharacteristics.ProjectedCharacteristics)),
+    battlefieldWhenTriggered :: Map.Map EventGroup.EventGroup (Map.Map ObjectId.ObjectId (BattlefieldCandidate.BattlefieldCandidate ProjectedCharacteristics.ProjectedCharacteristics)),
     -- | Who controlled each permanent on the battlefield the last time
     -- Pawl.Engine.Engine.sampleControl looked. The OBSERVATION POINT for a control
     -- change: control is derived (CR 613.1b layer 2), so nothing announces a
