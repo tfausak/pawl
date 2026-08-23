@@ -116,6 +116,13 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       (CostComponent.RemoveLoyaltyFromThis 1)
       " {\"type\":\"RemoveLoyaltyFromThis\",\"value\":1} "
+  -- CR 118.1's counter removal as an activation cost, Barkhide Troll's.
+  Spec.it s "RemovePlusOneCountersFromThis" $
+    Common.assertCodec
+      s
+      codec
+      (CostComponent.RemovePlusOneCountersFromThis 1)
+      " {\"type\":\"RemovePlusOneCountersFromThis\",\"value\":1} "
   -- CR 118.12's counter-placing cost, CR 701.63a's endure.
   Spec.it s "PutPlusOneCountersOnThis" $
     Common.assertCodec
