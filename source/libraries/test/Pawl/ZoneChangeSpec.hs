@@ -541,7 +541,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
         (after, asked) =
           flip State.runState [] $ do
             (_, castGs) <- Engine.runGame answer gs (S.cast S.alice spellId)
-            -- The enchantment resolves, then settling puts its CR 603.3 enters
+            -- The enchantment resolves, then settling puts its CR 603.3d enters
             -- trigger on the stack with its targets announced.
             (_, entered) <- Engine.runGame answer castGs (Stack.resolveTop >> Engine.settleForPriority)
             (_, resolved) <- Engine.runGame answer entered Stack.resolveTop

@@ -4164,6 +4164,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- actions happen -- PlayerSacrifices' two phases, so no seat's discard can
     -- change what a later seat is offered. The candidate hands are read off the
     -- one `gs` above for the same reason (CR 608.2f).
+    --
+    -- The SPLIT is a regression fence rather than a proven behaviour: interleaving
+    -- the burials with the picks left the suite green, because `held` is read off
+    -- the frozen `gs` either way and no printing lets one player's discard reach
+    -- another player's hand. The ORDER is proven -- ZoneChangeSpec's "CR 101.4:
+    -- asked in turn order from the active player" reads the sequence of prompts.
     doomed <- traverse pickFor victims
     -- CR 701.9a's move, through the shared discard funnel, so the discard is
     -- recorded for a trigger to read. The funnel's own answers come back for the
