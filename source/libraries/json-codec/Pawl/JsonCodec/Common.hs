@@ -398,8 +398,9 @@ keyValue ck cv =
 -- ONE ENTRY PER KEY, not a plain array with repeats. The repeat form was shorter
 -- to write and worse in two ways: a count of twenty wrote its key twenty times,
 -- and recounting on decode made a ZERO count unsayable -- which is a state the
--- engine really produces, since Pawl.Engine.Damage spends a shield counter with
--- Map.insert rather than pruning the entry (#126).
+-- engine really produces, since Pawl.Engine.Damage takes loyalty and defense
+-- counters off with Map.insert and a saturating subtraction rather than pruning
+-- the entry (#126).
 --
 -- A REPEATED key is rejected rather than summed, which is 'set''s and
 -- 'keyedList''s reason: the wire form has exactly one way to say each map, so

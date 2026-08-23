@@ -61,9 +61,10 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- Pawl.AdventureSpec's "CR 715.3d from exile the creature is castable and the
 -- Adventure is not" is the pair that proves it.
 --
--- Runtime-only: no codec. A permission is written by a resolution and never
--- printed on a card, and Object -- the only thing that holds one -- has no codec
--- either.
+-- Runtime-only: a permission is written by a resolution and never printed on a
+-- card. It does have a codec (Pawl.Codec.ExilePlayPermission), because a game in
+-- progress has to be writable to JSON (#126), and so does Object, which is the
+-- only thing that holds one.
 data ExilePlayPermission = MkExilePlayPermission
   { player :: PlayerId.PlayerId,
     source :: ObjectId.ObjectId,
