@@ -32,6 +32,7 @@ import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Moved as Moved
@@ -368,6 +369,33 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     Spec.assertEqWith s "still no abilities" (Projection.abilitiesOf axeId gone) []
     Spec.assertEqWith s "bob's Song really left the game" (Game.lookupObject songId gone) Nothing
     Spec.assertEqWith s "and alice's Bonesplitter did not" (fmap Object.owner (Game.lookupObject axeId gone)) (Just S.alice)
+
+  -- The gate's control, one card over and the same board otherwise: Humility
+  -- ({2}{W}{W} Enchantment; name, cost, type line and Oracle text checked against
+  -- api.scryfall.com) is "All creatures lose all abilities and have base power
+  -- and toughness 1/1" -- the same layer-6 strip beside a layer-7b
+  -- P/T set, with NO sentence about leaving the battlefield. So CR 604.2 is read
+  -- straight and bob's departure ends it THIS INSTANT.
+  --
+  -- The pair differs in exactly one thing from the case above: which enchantment
+  -- bob owns. Without it, handing every departing permanent's static abilities
+  -- over would pass the case above and nothing here would notice.
+  --
+  -- Bird Maiden ({2}{R} Creature -- Human Bird, a 1/2 with flying) is alice's,
+  -- so it survives bob's departure to be read: its printed toughness differs from
+  -- Humility's 1, and its flying is what makes the layer-6 strip observable.
+  Spec.it s "CR 604.2 an ordinary static ability does NOT linger past the departure that removed it" $ do
+    humility <- S.printingOf s registry "Humility"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    let (birdId, g1) = S.addCreature birdMaiden S.alice S.threePlayerGame
+        (humilityId, before) = S.addCreature humility S.bob g1
+        gone = S.departs Departure.Type.Conceded S.bob before
+    Spec.assertEqWith s "CR 613 Humility makes the Maiden a 1/1" (S.powerToughnessOf birdId before) (Just (1, 1))
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying birdId before)) "with no flying"
+    Spec.assertEqWith s "CR 604.2 and it is a 1/2 again the moment bob leaves" (S.powerToughnessOf birdId gone) (Just (1, 2))
+    Spec.assertBool s (Projection.hasKeyword Keyword.Flying birdId gone) "with its flying back"
+    Spec.assertEqWith s "nothing was handed over" (GameState.continuousEffects gone) []
+    Spec.assertEqWith s "and bob's Humility really left the game" (Game.lookupObject humilityId gone) Nothing
 
   -- The control for the case above, and what makes its third seat load-bearing:
   -- the same two permanents and the same concede on a board that BEGAN with two

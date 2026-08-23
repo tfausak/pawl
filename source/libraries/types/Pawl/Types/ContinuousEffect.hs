@@ -17,7 +17,8 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- the one clause that turns a static ability's effect into a stored one:
 -- StaticAbility.lingers, Titania's Song's "if this enchantment leaves the
 -- battlefield, this effect continues until end of turn", which
--- Pawl.Engine.Event hands over as the permanent goes. Such an effect keeps the
+-- Pawl.Engine.Event.lingeringHandover hands over as the permanent goes -- by a
+-- zone change, or with its owner under CR 800.4a. Such an effect keeps the
 -- timestamp CR 613.7a gave it rather than taking a fresh one, since the card
 -- says it is the same effect continuing.
 --

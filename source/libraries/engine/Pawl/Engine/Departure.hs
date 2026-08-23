@@ -132,15 +132,20 @@ continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 -- More things it deliberately does NOT touch, each because CR 800.4a
 -- does not reach them:
 --
---   * GameState.continuousEffects, GameState.playerEffects, and every row of
---     GameState.replacements that grants nobody control. CR 109.1's list of what
---     an object is does not include a stored continuous effect, so the first
---     clause does not end one just because its source left -- a departing
---     player's Giant Growth on someone else's creature keeps its +3/+3 until
---     cleanup. The effects this rule DOES end are the control-granting ones, CR
---     800.4a's SECOND clause and so controlEffectsEnd's job -- which is where the
---     control-on-entry rows of GameState.replacements are dropped
---     (givesControlOnEntryTo), and only those.
+--   * every stored row of GameState.continuousEffects, GameState.playerEffects,
+--     and every row of GameState.replacements that grants nobody control. CR
+--     109.1's list of what an object is does not include a stored continuous
+--     effect, so the first clause does not end one just because its source left
+--     -- a departing player's Giant Growth on someone else's creature keeps its
+--     +3/+3 until cleanup. The effects this rule DOES end are the
+--     control-granting ones, CR 800.4a's SECOND clause and so controlEffectsEnd's
+--     job -- which is where the control-on-entry rows of GameState.replacements
+--     are dropped (givesControlOnEntryTo), and only those.
+--
+--     GameState.continuousEffects is the one of the three this function WRITES,
+--     and only ever by adding: `handover` below turns a departing permanent's
+--     lingering static ability into a stored effect, which is CR 604.2's override
+--     rather than anything CR 800.4a ends.
 --
 --   * GameState.delayedTriggers. A delayed triggered ability that has not
 --     triggered is not on the stack, so by CR 109.1 it is not an object either.
