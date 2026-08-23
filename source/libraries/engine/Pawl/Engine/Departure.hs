@@ -241,8 +241,43 @@ objectsLeaveWith pid gs =
       -- look-back condition reads them as simultaneous rather than as a
       -- sequence.
       permanents = filter (\oid -> Set.member oid (GameState.battlefield gs)) owned
+      -- CR 604.2's override, the other half of what this shares with a zone
+      -- change: a permanent leaving the GAME has left the battlefield, so a card
+      -- whose text says its effect continues anyway -- Titania's Song -- needs
+      -- that effect handed over to GameState.continuousEffects as it goes.
+      -- Event.lingeringHandover is the single writer; this is its second call
+      -- site, and the reason the module's warning about that funnel does not
+      -- apply is that the shared function performs no move.
+      --
+      -- Nothing in CR 800.4a ends the handed-over effect: the second clause ends
+      -- only effects giving the departing player CONTROL, which is the same
+      -- reading that leaves their Giant Growth standing above. It expires on its
+      -- own duration, at CR 514.2's cleanup for Titania's Song.
+      --
+      -- Read from `gs`, the board before any of them left, for `filed`'s reason:
+      -- one event, so the effect handed over is the one that was applying while
+      -- every one of these objects still existed.
+      --
+      -- Gated on `permanents` -- GameState.battlefield membership -- rather than
+      -- on Object.zone, which is CR 702.26b: a phased-out permanent is treated as
+      -- though it does not exist, so its static ability was generating no effect
+      -- there is anything to continue. CR 702.26k still takes it out of the game
+      -- with its owner, which is `owned` above.
+      --
+      -- The controller is read the way `filed` reads it, and for CR 109.5's
+      -- reason: the arming's "you" is whoever controlled the permanent as it left,
+      -- who need not be its owner -- the Object.owner fallback is unreachable for
+      -- `filed`'s reason.
+      handover =
+        concatMap
+          (\oid -> Event.lingeringHandover oid (Maybe.fromMaybe pid (Projection.controllerOf oid gs)) gs)
+          permanents
       removed = List.foldl' leave gs owned
-      recorded = removed {GameState.lastKnown = Map.fromList (Maybe.mapMaybe filed owned) <> GameState.lastKnown removed}
+      recorded =
+        removed
+          { GameState.lastKnown = Map.fromList (Maybe.mapMaybe filed owned) <> GameState.lastKnown removed,
+            GameState.continuousEffects = handover <> GameState.continuousEffects removed
+          }
    in Event.simultaneouslyPure
         (\g -> List.foldl' (\g1 oid -> Event.recordEvent (GameEvent.LeftTheGame oid) g1) g permanents)
         recorded
