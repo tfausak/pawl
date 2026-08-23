@@ -512,8 +512,8 @@ emptyManaPools gs =
 -- BLANKET over the arms, not ManaRetention.UntilEndOfTurn-specific, and that is
 -- a decision rather than an oversight: CR 514.2 is the backstop for any
 -- retention still standing at cleanup, and an UntilEndOfCombat unit whose combat
--- phase never reported its end -- Turn.phaseEndingAt names the one such hole
--- see #2126 -- would otherwise sit in the pool for ever. -Werror cannot see the
+-- phase never reported its end would otherwise sit in the pool for ever;
+-- Turn.phaseEndingAt names the one such hole, see #2126. -Werror cannot see the
 -- arm list here, the record update naming no constructor.
 endManaRetention :: GameState -> GameState
 endManaRetention gs =
