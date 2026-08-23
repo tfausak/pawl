@@ -37,26 +37,27 @@
 --
 -- What is NOT proven here, because Paladin Class cannot reach it:
 --
---   * CR 716.2b's "a Class retains its level even if it stops being a Class" and
---     "levels are not a copiable characteristic". The first needs an effect that
---     removes a subtype from an enchantment; the second falls out by construction,
---     a copy effect's payload being a ProjectedCharacteristics and never an Object
---     (see Object.classLevel's own note). Neither has a producer (gap #1947).
+--   * CR 716.2b's "levels are not a copiable characteristic", which falls out by
+--     construction, a copy effect's payload being a ProjectedCharacteristics and
+--     never an Object (see Object.classLevel's own note). No producer (gap #2165).
 --   * CR 716.2c's "to gain a Class level", which only Sorcerer Class prints (gap
 --     #1948), and CR 716's "when this Class becomes level N" triggers (gap
 --     #1944).
 module Pawl.ClassSpec where
 
+import qualified Data.Set as Set
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
@@ -69,12 +70,15 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Subtype as Subtype
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Class" $ do
   topSectionSpec s registry
   sectionSpec s registry
   ladderSpec s registry
+  designationSpec s registry
 
 -- CR 716.3: the text above the first class level bar is an ability the Class has
 -- at ALL times -- no bar precedes it, so no level gates it. Paladin Class prints
@@ -253,3 +257,75 @@ ladderSpec s registry = Spec.describe s "Level bar activation" $ do
         bobsTurn = gs {GameState.activePlayer = S.bob}
     Spec.assertEqWith s "offered on alice's own main phase" (barsOffered classId gs) 1
     Spec.assertEqWith s "not offered on bob's turn" (barsOffered classId bobsTurn) 0
+
+-- CR 716.2b: "A level is a designation that any permanent can have. A Class
+-- retains its level even if it stops being a Class."
+--
+-- Song of the Dryads, CMD 2014, is the second card this file needs: "Enchanted
+-- permanent is a colorless Forest land" is a Modification.SetCardType, and CR
+-- 205.1a's third clause then takes the Class subtype away with the Enchantment
+-- card type it correlates with (CR 205.3h). That is the only way a permanent in
+-- data/cards/ stops being a Class.
+--
+-- The retention is observable across the ROUND TRIP rather than during it, and
+-- that is a rules fact rather than a shortcut: the same Aura's SetLandSubtype
+-- fires CR 305.7, which strips the permanent's abilities, so while the Song is on
+-- it the level-2 section is off no matter what the level says. Nothing else in
+-- the pool reads another permanent's level. So the case asserts the strip too --
+-- the Piker is 2/1 while the Class is a Forest land, for rule 305.7's reason and
+-- not for rule 716.2b's, which the level assertion beside it is what shows.
+--
+-- The Class is levelled to 2 BEFORE the Song arrives, and the Piker's 3/2 once
+-- the Song moves off is the reading: an engine that discarded the level when the
+-- permanent stopped being a Class leaves it at CR 716.2d's default of 1 there and
+-- the Piker its printed 2/1. Levelling first is what makes the two readings
+-- differ -- on an unlevelled Class both report 1.
+--
+-- A state-based pass runs while the permanent is not a Class, so a wipe placed
+-- there would be caught rather than skipped over.
+
+-- The three boards rule 716.2b's sentence needs, in order: the levelled Class
+-- untouched, the same Class with the Song on it and the SBAs settled, and the
+-- Song moved off onto the Mountain. Each differs from the one before it in
+-- exactly one thing, and the level is written once, before any of them.
+--
+-- Tagged ToObject, which is what casting Song of the Dryads stores: its enchant
+-- slot is a Pool.Permanents one, so Target's candidates are ToObject rather than
+-- Pawl.Support.attach's ToCreature -- and the host here is an enchantment.
+retentionBoards ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, GameState.GameState, GameState.GameState)
+retentionBoards paladinClass plains piker mountain song =
+  let (classId, pikerId, gs) = board paladinClass plains piker
+      levelled = gainLevel classId gs
+      (mountainId, withMountain) = S.addCreature mountain S.alice levelled
+      (songId, unattached) = S.addCreature song S.alice withMountain
+      enchanted = S.settleSba (S.attachTo songId (Recipient.ToObject classId) unattached)
+   in (classId, pikerId, unattached, enchanted, S.attachTo songId (Recipient.ToObject mountainId) enchanted)
+
+designationSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+designationSpec s registry = Spec.describe s "Level designation" $ do
+  Spec.it s "CR 716.2b a Class retains its level even if it stops being a Class" $ do
+    paladinClass <- S.printingOf s registry "Paladin Class"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    song <- S.printingOf s registry "Song of the Dryads"
+    let (classId, pikerId, unattached, enchanted, moved) = retentionBoards paladinClass plains piker mountain song
+    -- The gameplay-level assertion the case exists for, first: the level-2
+    -- section is on again once the permanent is a Class again, which it can only
+    -- be if the level outlived the stretch in which it was not one.
+    Spec.assertEqWith s "CR 716.2b the Piker is 3/2 again once the Aura moves off" (S.powerToughnessOf pikerId moved) (Just (3, 2))
+    Spec.assertEqWith s "and the level it resumes at is the one it retained" (levelOf classId moved) (Just (ClassLevel.MkClassLevel 2))
+    -- What the stretch itself looks like, and the preconditions the assertions
+    -- above rest on: were the subtype not stripped, nothing here would be about
+    -- rule 716.2b at all.
+    Spec.assertEqWith s "before: an Enchantment -- Class, level 2, with its section on" (Projection.cardTypesOf classId unattached, Projection.subtypesOf classId unattached, S.powerToughnessOf pikerId unattached) (Set.singleton CardType.Enchantment, Set.singleton Subtype.Class, Just (3, 2))
+    Spec.assertEqWith s "CR 205.1a: Land REPLACES Enchantment, and the Class subtype goes with the type it correlates with" (Projection.cardTypesOf classId enchanted, Projection.subtypesOf classId enchanted) (Set.singleton CardType.Land, Set.singleton Subtype.Forest)
+    Spec.assertEqWith s "CR 305.7: the section is off while it is a Forest land because its abilities are stripped" (S.powerToughnessOf pikerId enchanted) (Just (2, 1))
+    Spec.assertEqWith s "CR 716.2b: and NOT because the level went anywhere" (levelOf classId enchanted) (Just (ClassLevel.MkClassLevel 2))
+    Spec.assertEqWith s "with the Aura gone it is an Enchantment -- Class once more" (Projection.cardTypesOf classId moved, Projection.subtypesOf classId moved) (Set.singleton CardType.Enchantment, Set.singleton Subtype.Class)
