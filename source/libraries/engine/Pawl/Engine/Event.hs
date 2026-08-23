@@ -4981,7 +4981,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   --
   -- No Filter over the attacker and no count: CR 508.1a admits only creatures, and
   -- this fires once per declared attacker (CR 508.3a), not once per declaration --
-  -- which is YouAttack (CR 508.3d) and AttachedPlayerIsAttacked (CR 508.3b)
+  -- which is PlayerAttacks (CR 508.3d) and AttachedPlayerIsAttacked (CR 508.3b)
   -- below, each against its own event.
   TriggerCondition.CreatureAttacksYou -> case event of
     GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared _ defending _) -> defending == you
@@ -5026,32 +5026,39 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
-  -- CR 508.3d: this ability's controller declared one or more attackers. The
+  -- CR 508.3d: the player the payload names declared one or more attackers. The
   -- once-per-DECLARATION arity, matched against the once-per-declaration event --
   -- CreatureAttacksYou above reads the per-attacker one and
   -- AttachedPlayerIsAttacked below the per-target one, and no grouping happens
   -- here for their reason: this function sees one event at a time.
   --
-  -- Rule 508.3d's "[a player]" against CR 109.5's `you`, the ability's
-  -- controller. Read off the event, which Combat.declareAttackers stamps with CR
-  -- 508.1's declaring player, rather than off GameState.activePlayer: the two
-  -- agree today, CR 508.1 letting only the active player declare, but the rule
-  -- asks who declared and the event is the record of that.
+  -- Rule 508.3d's "[a player]" as the card printed it, against CR 109.5's `you`.
+  -- Read off the event, which Combat.declareAttackers stamps with CR 508.1's
+  -- declaring player, rather than off GameState.activePlayer: the two agree
+  -- today, CR 508.1 letting only the active player declare, but the rule asks
+  -- who declared and the event is the record of that.
   --
   -- No bearer test, where SelfAttacks pins one: rule 508.3d's subject is a
   -- player, so the bearer only frames whose declaration this is --
   -- CreatureAttacksAlone's bystanding posture. A Boggart Prankster held out of
   -- combat still triggers on its controller's attack.
   --
-  -- The comparison is a REGRESSION FENCE rather than a proven behaviour: deleting
-  -- it leaves the whole suite green. Boggart Prankster's payload can only pump an
-  -- attacking Goblin ITS OWN controller controls, and CR 508.1 lets only the
-  -- active player declare attackers -- so on any board where a non-controller
-  -- declares, the trigger has no legal target and CR 603.3d removes it either
-  -- way. What would observe the narrowing is a CR 508.3d card whose payload does
-  -- not need its controller to have an attacker.
-  TriggerCondition.YouAttack -> case event of
-    GameEvent.AttackersDeclared attacker -> attacker == you
+  -- Pawl.EventTriggerSpec's Avatar Roku, Firebender group proves the relation is
+  -- READ: its two boards -- an opponent declares, then Roku's own controller
+  -- does -- falsify hardcoding You and hardcoding Opponent respectively. Roku's
+  -- payload adds mana rather than targeting, which is why those boards see a
+  -- difference where Boggart Prankster's "target attacking Goblin you control"
+  -- cannot.
+  --
+  -- The You NARROWING is still a regression fence rather than a proven
+  -- behaviour: answering True unconditionally leaves the whole suite green,
+  -- because the corpus's one You producer is Boggart Prankster, and on any board
+  -- where a non-controller declares, its trigger has no legal target and CR
+  -- 603.3d removes it either way. What would observe it is a card printing
+  -- "whenever you attack" whose payload does not need its controller to have an
+  -- attacker.
+  TriggerCondition.PlayerAttacks relation -> case event of
+    GameEvent.AttackersDeclared attacker -> PlayerRelation.holds relation you attacker
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
@@ -7972,7 +7979,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.CreatureAttacksAlone _ -> False
   TriggerCondition.CreatureAttacksYou -> False
   TriggerCondition.AttachedPlayerIsAttacked -> False
-  TriggerCondition.YouAttack -> False
+  TriggerCondition.PlayerAttacks _ -> False
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature _ -> False
@@ -8686,12 +8693,15 @@ eventBindingSlots cond = case cond of
   -- "that player" and nothing about them.
   TriggerCondition.AttachedPlayerIsAttacked -> Set.singleton Binding.triggerPlayer
   -- NOTHING, and neither the attacker nor the player: rule 508.3d names a SET
-  -- of creatures, so there is no one attacker to point at, and the player it
-  -- does name is CR 109.5's "you" -- a slot would be a second name for a seat
-  -- the ability already has, which is why CreatureAttacksYou leaves the
-  -- defending player unbound too. Boggart Prankster's payload targets rather
-  -- than points. That is also why this condition needs no arm in eventBindings.
-  TriggerCondition.YouAttack -> Set.empty
+  -- of creatures, so there is no one attacker to point at. Boggart Prankster's
+  -- and Avatar Roku, Firebender's payloads target or say "you" rather than
+  -- pointing at the declarer. That is also why this condition needs no arm in
+  -- eventBindings.
+  --
+  -- Not implemented: the declaring player as a bound slot, which "that player"
+  -- and "the attacking player" need (#2154). Both must move together with
+  -- eventBindings, which Pawl.ZoneTriggerSpec pins against this.
+  TriggerCondition.PlayerAttacks _ -> Set.empty
   -- NOTHING, for SelfAttacksWithAnother's reason: rule 702.105a's payload names
   -- only "this creature", so the attacked player is compared and then never
   -- pointed at. That is also why this condition needs no arm in eventBindings.
@@ -9102,7 +9112,7 @@ looksBack condition = case condition of
   TriggerCondition.CreatureAttacksAlone _ -> False
   TriggerCondition.CreatureAttacksYou -> False
   TriggerCondition.AttachedPlayerIsAttacked -> False
-  TriggerCondition.YouAttack -> False
+  TriggerCondition.PlayerAttacks _ -> False
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature _ -> False
@@ -10166,7 +10176,7 @@ zonesTriggeredFrom cond = case cond of
   TriggerCondition.CreatureAttacksAlone _ -> battlefield
   TriggerCondition.CreatureAttacksYou -> battlefield
   TriggerCondition.AttachedPlayerIsAttacked -> battlefield
-  TriggerCondition.YouAttack -> battlefield
+  TriggerCondition.PlayerAttacks _ -> battlefield
   TriggerCondition.SelfAttacksPlayerWithMostLife -> battlefield
   TriggerCondition.SelfBlocks -> battlefield
   TriggerCondition.SelfBlocksCreature _ -> battlefield
@@ -10416,13 +10426,14 @@ controllerTurnScoped cond = case cond of
   -- same way for the same reason.
   TriggerCondition.CreatureAttacksYou -> False
   TriggerCondition.AttachedPlayerIsAttacked -> False
-  -- TRUE, where every arm around it is False: CR 508.1 lets only the active
-  -- player declare attackers and this condition additionally requires that
-  -- player to be CR 109.5's "you", so the event cannot happen on anyone else's
-  -- turn. SelfAttacks answers False because it pins the CREATURE and not the
-  -- declarer -- a stolen creature attacks on its thief's turn -- which is the
-  -- comparison this arm does make.
-  TriggerCondition.YouAttack -> True
+  -- The only arm around here that can answer True, and only on one relation: CR
+  -- 508.1 lets only the active player declare attackers, so the declarer named
+  -- by the event is always the active player. You therefore pins the event to CR
+  -- 109.5's "you"'s own turn; Opponent pins it to somebody else's; AnyPlayer
+  -- pins nothing. SelfAttacks answers False because it pins the CREATURE and not
+  -- the declarer -- a stolen creature attacks on its thief's turn -- which is
+  -- the comparison this arm does make.
+  TriggerCondition.PlayerAttacks relation -> relation == PlayerRelation.You
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature _ -> False
@@ -10594,7 +10605,7 @@ stateTriggers gs
               TriggerCondition.CreatureAttacksAlone _ -> False
               TriggerCondition.CreatureAttacksYou -> False
               TriggerCondition.AttachedPlayerIsAttacked -> False
-              TriggerCondition.YouAttack -> False
+              TriggerCondition.PlayerAttacks _ -> False
               TriggerCondition.SelfAttacksPlayerWithMostLife -> False
               TriggerCondition.SelfBlocks -> False
               TriggerCondition.SelfBlocksCreature _ -> False
