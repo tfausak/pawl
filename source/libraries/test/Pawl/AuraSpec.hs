@@ -51,6 +51,7 @@ import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.AttachTarget as AttachTarget
@@ -65,6 +66,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
@@ -78,6 +80,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
+import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 301.5 / 702.6: Equipment. Shares the attachment substrate with Auras --
@@ -2268,6 +2271,36 @@ licidSpec s registry = Spec.describe s "Licid" $ do
           (Card.foldEnchant (Projection.enchantOf lic after))
           (Just (TargetSlot.required Pool.Creatures Nothing))
         Spec.assertBool s (Set.member lic (GameState.battlefield after)) "and CR 704.5m leaves it alone: its host is one its enchant ability admits"
+  -- The SCOPE of the removal, as a pair of boards differing in exactly one thing:
+  -- the NAME the removal carries. Gliding Licid's own resolution cannot show this
+  -- -- Modification.LoseAllAbilities in place of the named arm is observably
+  -- identical on that board, since the Licid's other printed ability is a static
+  -- one that CR 613.6 spares from a layer-6 strip (Projection.permanentParts'
+  -- `removed`) and the enchant the same sentence grants carries a later timestamp
+  -- than the removal, so CR 613.9's first Example restores it. So the arm's
+  -- narrowness is proved HERE instead, by a name that matches nothing.
+  --
+  -- Gameplay level on both boards: whether alice may activate the ability at all,
+  -- with the mana to pay for it either way, so a negative cannot pass for being
+  -- broke (CR 602.2).
+  Spec.it s "CR 613.1f the removal reads the NAME: one that matches nothing removes nothing" $ do
+    island <- S.printingOf s registry "Island"
+    licid <- S.printingOf s registry "Gliding Licid"
+    let base = S.landsInPlay island 3
+        (lic, placed) = S.addCreature licid S.alice base
+        ready = placed {GameState.priority = Just S.alice}
+        withRemoval name = S.withEffectAt lic (Timestamp.MkTimestamp 500) (Modification.LoseNamedAbility (AbilityName.MkAbilityName (Text.pack name))) ready
+        matching = withRemoval "animate"
+        mismatched = withRemoval "no ability has this name"
+        activatableOn gs = any (\ability -> Activate.activatable S.alice lic ability gs) (Projection.abilitiesOf lic gs)
+    -- The CONTROL first: with no removal at all the ability is there and usable,
+    -- so neither board below can be reading a Licid that never had it.
+    Spec.assertBool s (activatableOn ready) "CR 602.2: with no removal alice may activate it"
+    -- THE discriminating pair.
+    Spec.assertBool s (activatableOn mismatched) "and a removal naming no ability of this card leaves it activatable"
+    Spec.assertBool s (not (activatableOn matching)) "while the removal naming it takes it away"
+    Spec.assertEqWith s "which is one ability gone rather than every ability" (length (Projection.abilitiesOf lic matching)) 0
+    Spec.assertEqWith s "and none gone on the mismatched board" (length (Projection.abilitiesOf lic mismatched)) 1
   -- CR 116.2c, both halves: the offer exists while the effect does, and paying
   -- ends the WHOLE printed sentence rather than one of the four effects it
   -- stored. An implementation that ended only the first would leave an unattached
@@ -2284,6 +2317,11 @@ licidSpec s registry = Spec.describe s "Licid" $ do
         -- The OFFER, which no printed permission grants: it rides the stored
         -- effect, so it exists only because the ability resolved.
         Spec.assertBool s (List.elem (Action.Type.EndEffect lic) (Action.legalActions S.alice ready)) "CR 116.2c: alice is offered the pay-to-end while the effect is live"
+        -- CR 109.5: "you may pay" is the effect's controller, and bob is not it.
+        -- Asked on the SAME board, and bob holds the same three Islands alice
+        -- does (licidBoard stocks both seats), so the only difference between the
+        -- two reads is the seat rather than the mana.
+        Spec.assertBool s (List.notElem (Action.Type.EndEffect lic) (Action.legalActions S.bob (ready {GameState.priority = Just S.bob}))) "and bob, who does not control the effect, is not"
         -- FIRST after the payment, and the gameplay-level read: the creature the
         -- Licid was enchanting has lost the keyword, which is the whole of what
         -- the effect was doing to the board.
@@ -2298,10 +2336,12 @@ licidSpec s registry = Spec.describe s "Licid" $ do
         -- And the offer is gone with the effect: paying twice is not on the menu.
         Spec.assertBool s (List.notElem (Action.Type.EndEffect lic) (Action.legalActions S.alice (paid {GameState.priority = Just S.alice}))) "and the offer is gone with the effect it ended"
 
--- The board licidSpec's two cases share: alice's Gliding Licid animates itself
--- onto her own Goblin Piker off three Islands -- one for the activation, one for
--- the pay-to-end, one spare so a mana shortfall cannot be what a negative
--- assertion is reading.
+-- The board licidSpec's cases share: alice's Gliding Licid animates itself onto
+-- her own Goblin Piker off three Islands -- one for the activation, one for the
+-- pay-to-end, one spare so a mana shortfall cannot be what a negative assertion
+-- is reading. BOB holds three Islands too, and needs them: the negative half of
+-- CR 109.5's "you" is read on this same board, and a seat with no mana would fail
+-- Cost.canPay whatever the controller conjunct answered.
 --
 -- aimAtOffered rather than a hand-built recipient: the slot's pool is
 -- Pool.Creatures, which offers Recipient.ToCreature, and a ToObject of the same
@@ -2312,7 +2352,7 @@ licidBoard ::
   Printing.Printing ->
   Maybe (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 licidBoard island piker licid =
-  let base0 = S.landsInPlay island 3
+  let base0 = S.landsFor island S.bob 3 (S.landsInPlay island 3)
       (host, base1) = S.addCreature piker S.alice base0
       (lic, base2) = S.addCreature licid S.alice base1
       ready = base2 {GameState.priority = Just S.alice}
