@@ -337,7 +337,7 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       (Filter.IsInZone Zone.Graveyard)
       " {\"type\":\"IsInZone\",\"value\":{\"type\":\"Graveyard\"}} "
   -- The spelling Drannith Magistrate's "from anywhere other than their hands"
-  -- takes, nested under Not, since that is the only shape in the pool.
+  -- takes: nested under Not, where Grafdigger's Cage nests two of them under Or.
   Spec.it s "Not (IsInZone Hand)" $
     Common.assertCodec
       s

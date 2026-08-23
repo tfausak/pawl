@@ -840,7 +840,9 @@ data Filter keyword
     -- the zone a spell is cast FROM is the zone its card is in when the cast is
     -- proposed, and Pawl.Engine.Cast.castable gates before CR 601.2a moves the
     -- card to the stack, so the object this atom reads is still in that zone. A
-    -- prohibition asked after the move would read Stack and match nothing.
+    -- prohibition asked after the move would read Stack, which is neither card's
+    -- zone: Grafdigger's Cage would then catch nothing and Drannith Magistrate
+    -- everything.
     --
     -- NAMES A ZONE AND NOT WHOSE, where Pawl.Types.InZone names both: CR 400.1
     -- gives four of its seven zones no per-player copy, so a shared zone has no
