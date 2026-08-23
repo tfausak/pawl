@@ -1490,7 +1490,7 @@ leavesBattlefieldSpec s registry =
         Spec.it s "CR 400.2 eventBindings binds became for every PUBLIC destination and for no hidden one" $ do
           let departed = ObjectId.MkObjectId 1
               arrived = ObjectId.MkObjectId 2
-              leftFor to = Event.eventBindings TriggerCondition.SelfLeavesTheBattlefield (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield to) S.emptyCharacteristics))
+              leftFor to = Event.eventBindings Nothing TriggerCondition.SelfLeavesTheBattlefield (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield to) S.emptyCharacteristics))
               bound = Map.singleton Binding.became (Binding.toObject arrived)
           Spec.assertEqWith s "a graveyard is public" (leftFor Zone.Graveyard) bound
           Spec.assertEqWith s "exile is public" (leftFor Zone.Exile) bound
@@ -2178,14 +2178,31 @@ becameSlotSpec s registry =
           let departed = ObjectId.MkObjectId 1
               arrived = ObjectId.MkObjectId 2
               died = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics)
-          Spec.assertEqWith s "became names the graveyard incarnation" (Event.eventBindings TriggerCondition.SelfDies died) (Map.singleton Binding.became (Binding.toObject arrived))
+          Spec.assertEqWith s "became names the graveyard incarnation" (Event.eventBindings Nothing TriggerCondition.SelfDies died) (Map.singleton Binding.became (Binding.toObject arrived))
         -- A condition that is not a look-back gets no such slot: Narcomoeba's
         -- bearer IS the arriving card, so binding it again would be a second
         -- name for the same object.
         Spec.it s "CR 113.6k a library-to-graveyard trigger binds nothing" $ do
           let oid = ObjectId.MkObjectId 1
               milled = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange oid oid Zone.Library Zone.Graveyard) S.emptyCharacteristics)
-          Spec.assertEqWith s "no became slot" (Event.eventBindings TriggerCondition.SelfPutIntoGraveyardFromLibrary milled) Map.empty
+          Spec.assertEqWith s "no became slot" (Event.eventBindings Nothing TriggerCondition.SelfPutIntoGraveyardFromLibrary milled) Map.empty
+        -- CR 400.7f's arm, the one place the slot comes from something other than
+        -- the event: the BEARER's own arrival, which eventTriggers computes off
+        -- the batch. Pinned in isolation so the rule is stated once here and once
+        -- on the board in screamsFromWithinSpec, and so that the absent case --
+        -- CR 704.5n's Equipment bearer, or an Aura sent anywhere but its owner's
+        -- graveyard -- is visible as the empty map rather than as a wrong id.
+        Spec.it s "CR 400.7f eventBindings binds the BEARER's graveyard incarnation, not the event's" $ do
+          let departed = ObjectId.MkObjectId 1
+              arrived = ObjectId.MkObjectId 2
+              bearerArrived = ObjectId.MkObjectId 3
+              hostDied = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics)
+          Spec.assertEqWith
+            s
+            "became names the Aura's incarnation, not the host's"
+            (Event.eventBindings (Just bearerArrived) TriggerCondition.AttachedCreatureDies hostDied)
+            (Map.singleton Binding.became (Binding.toObject bearerArrived))
+          Spec.assertEqWith s "and nothing at all where the bearer reached no graveyard" (Event.eventBindings Nothing TriggerCondition.AttachedCreatureDies hostDied) Map.empty
         -- The pin on Event.eventBindingSlots, the per-CONDITION slot set the
         -- card lint asks (CardSpec's "every slot a triggered ability reads is
         -- bound for its condition"). That function is a second statement of
@@ -2204,10 +2221,19 @@ becameSlotSpec s registry =
         -- about `became`, and SelfIsDealtDamage, where CR 120.3's two damage
         -- kinds agree on `thatMuch` and so make the floor a real one; for every
         -- other the intersection is exactly that single event's keyset.
+        --
+        -- The BEARER ARRIVAL argument is held constant at a present one, and is
+        -- not a second dimension of the intersection: it is CR 400.7f's datum
+        -- rather than a shape the event can take, and eventBindingSlots'
+        -- AttachedCreatureDies arm carries the argument that CR 704.5m makes it
+        -- present for every bearer a printing can put under that condition.
+        -- Holding it Nothing instead would pin the OTHER reading, under which no
+        -- card could read `became` there at all.
         Spec.it s "CR 603.2 eventBindingSlots names exactly the keys eventBindings stamps for EVERY event a condition admits" $ do
+          let bearerBecame = Just (ObjectId.MkObjectId 3)
           mapM_
             ( \cond ->
-                let stamped = fmap (Map.keysSet . Event.eventBindings cond) (representativeEvents cond)
+                let stamped = fmap (Map.keysSet . Event.eventBindings bearerBecame cond) (representativeEvents cond)
                  in Spec.assertEqWith s ("the slots bound for " <> show cond) (Event.eventBindingSlots cond) (foldr Set.intersection (NonEmpty.head stamped) (NonEmpty.tail stamped))
             )
             everyTriggerCondition
@@ -2291,7 +2317,7 @@ promiseOfTomorrowSpec s registry =
           let departed = ObjectId.MkObjectId 1
               arrived = ObjectId.MkObjectId 2
               died = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics)
-          Spec.assertEqWith s "became names the graveyard incarnation" (Event.eventBindings (TriggerCondition.PermanentDies (Filter.Type.HasCardType CardType.Creature)) died) (Map.singleton Binding.became (Binding.toObject arrived))
+          Spec.assertEqWith s "became names the graveyard incarnation" (Event.eventBindings Nothing (TriggerCondition.PermanentDies (Filter.Type.HasCardType CardType.Creature)) died) (Map.singleton Binding.became (Binding.toObject arrived))
 
 -- CR 607.2a's linked pair read from the SECOND ability, which is the half
 -- promiseOfTomorrowSpec above could not reach: "At the beginning of each end
@@ -4015,7 +4041,7 @@ aetherFlashSpec s registry =
           let castCard = ObjectId.MkObjectId 1
               entered = ObjectId.MkObjectId 2
               entry = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange castCard entered Zone.Stack Zone.Battlefield) S.emptyCharacteristics)
-          Spec.assertEqWith s "became names the permanent that entered" (Event.eventBindings (TriggerCondition.PermanentEnters (Filter.Type.HasCardType CardType.Creature)) entry) (Map.singleton Binding.became (Binding.toObject entered))
+          Spec.assertEqWith s "became names the permanent that entered" (Event.eventBindings Nothing (TriggerCondition.PermanentEnters (Filter.Type.HasCardType CardType.Creature)) entry) (Map.singleton Binding.became (Binding.toObject entered))
         -- CR 603.6a's "EACH TIME an event puts one or more permanents onto
         -- the battlefield" met with a per-entrant payload: Dragon Fodder
         -- ({1}{R} Sorcery, "create two 1/1 red Goblin creature tokens") makes
@@ -4165,18 +4191,27 @@ kindredSpec s registry =
 -- link, CR 704.5m having taken the Aura off the battlefield in the same
 -- CR 117.5 batch.
 --
--- WHERE THIS STOPS. The trigger reaches the stack and then resolves into
--- nothing: its effect moves "this card" out of the graveyard, and the id the
--- ability carries is CR 113.7a's battlefield source, which CR 400.7 has already
--- replaced. CR 400.7f is the rule that would let the payload find the graveyard
--- incarnation, and it is unimplemented (gap #1892) -- so pawl's Screams from
--- Within is STRICTER than printed, never returning. That is why the assertion
--- below is the trigger's presence on the stack rather than the Aura's zone.
+-- AND CR 400.7f is what lets the PAYLOAD act. Its effect moves "this card" out
+-- of the graveyard, and CR 113.7a's source slot carries the battlefield id CR
+-- 400.7 has already replaced -- so the card names Binding.became instead, which
+-- Event.eventBindings stamps with the incarnation the Aura's own burial minted.
+-- Both sentences of the rule are exercised below: the CR 704.5m burial at a
+-- later SBA pass in the first leg, and "at the same time the enchanted permanent
+-- left the battlefield" -- one wrath, one EventGroup -- in the second.
+--
+-- WHEN THE BOARD IS READ. CR 704.5m fires AGAIN on the Aura the moment it
+-- arrives attached to nothing, so a reading taken after the next SBA pass finds
+-- it back in the graveyard whether the rule is implemented or not. The zone
+-- assertions below are therefore taken between Stack.resolveTop and that pass,
+-- and say so.
 --
 -- The board. alice: the enchanted Hill Giant, plus a second Hill Giant. bob: a
 -- Goblin Piker. Hill Giants rather than Pikers on alice's side because the
 -- Aura's own -1/-1 would take a 2/1 to zero toughness (CR 704.5f) and bury the
--- enchanted creature before the test acts.
+-- enchanted creature before the test acts. The census below is per NAME and by
+-- COUNT rather than by presence, which is what tells the Aura's own arrival from
+-- the other one this batch mints: an arm binding the HOST's graveyard
+-- incarnation instead returns a second Hill Giant and no Aura.
 screamsFromWithinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 screamsFromWithinSpec s registry =
   let board = do
@@ -4192,6 +4227,20 @@ screamsFromWithinSpec s registry =
       -- pass buries the host and the now-unattached Aura, and the trigger is put
       -- on the stack after it.
       kill victim gs = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [victim] >> Engine.settleForPriority)
+      -- Resolve the placed trigger and stop, WITHOUT settling again: CR 704.5m
+      -- would bury the returned Aura on the next pass, and a board read after
+      -- that cannot tell the fixed engine from the broken one.
+      resolve gs = S.runPure S.identityAnswer gs Stack.resolveTop
+      screamsName = CardName.MkCardName (Text.pack "Screams from Within")
+      -- The battlefield as three counts, one per printing: the Aura back, the
+      -- surviving Hill Giant, and bob's untouched Piker. Game.zoneMembers indexes
+      -- the battlefield by OWNER (CR 108.3), which is the seat each was made
+      -- under here.
+      census gs =
+        fmap
+          (\(name, pid) -> S.countOnBattlefieldByName (CardName.MkCardName (Text.pack name)) pid gs)
+          [("Screams from Within", S.alice), ("Hill Giant", S.alice), ("Goblin Piker", S.bob)]
+      inGraveyard gs = length (filter (\oid -> fmap Face.name (Game.faceOf oid gs) == Just screamsName) (Game.zoneMembers Zone.Graveyard S.alice gs))
    in Spec.describe s "ScreamsFromWithin" $ do
         -- The proving leg. The discriminating quantity is what the stack holds:
         -- the Aura's trigger with the clause, nothing without it.
@@ -4228,6 +4277,37 @@ screamsFromWithinSpec s registry =
             (fmap (\oid -> fmap Object.source (Game.lookupObject oid after)) (GameState.stack after))
             (fmap (\ab -> Just (Source.OfTrigger TriggeredAbilitySource.MkTriggeredAbilitySource {TriggeredAbilitySource.source = aura, TriggeredAbilitySource.ability = ab})) (Face.triggeredAbilities (S.combinedFace screams)))
           Spec.assertEqWith s "and both really left the battlefield in one batch" (fmap (`Game.lookupObject` after) [enchanted, aura]) [Nothing, Nothing]
+        -- CR 400.7f's second sentence, and the unit's own proving leg: the Aura
+        -- reached the graveyard "as a result of being put there as a state-based
+        -- action for not being attached to a permanent", at a LATER SBA pass than
+        -- its host's death, and the payload finds it there.
+        --
+        -- The census runs FIRST so no precondition can absorb a mutation, and it
+        -- is the quantity no partial fix reaches by another route: the effect
+        -- moves an object out of a graveyard, and only the right id puts an Aura
+        -- on the battlefield rather than a Hill Giant or nothing.
+        Spec.it s "CR 400.7f the payload finds the Aura's graveyard incarnation and returns it" $ do
+          (enchanted, aura, _, gs) <- board
+          let placed = kill enchanted gs
+              after = resolve placed
+          Spec.assertEqWith s "CR 400.7f the Aura is back on the battlefield, and only the Aura came back" (census after) [1, 1, 1]
+          -- CR 400.7: a THIRD incarnation, so the returned permanent is neither
+          -- the id that stood on the battlefield nor the one that was in the
+          -- graveyard. The preconditions follow it.
+          Spec.assertEqWith s "under a new id, the battlefield one being gone" (Game.lookupObject aura after) Nothing
+          Spec.assertEqWith s "and alice's graveyard no longer holds it" (inGraveyard after) 0
+          Spec.assertEqWith s "the trigger really resolved" (length (GameState.stack after)) 0
+          Spec.assertEqWith s "and the board before it resolved held no Aura, one in the graveyard" (census placed, inGraveyard placed) ([0, 1, 1], 1)
+        -- The same rule's FIRST sentence, on the wrath board above: host and Aura
+        -- reach their graveyards in one EventGroup, "at the same time the
+        -- enchanted permanent left the battlefield", and the payload finds it
+        -- there too. Same reading moment and same census as the leg above.
+        Spec.it s "CR 400.7f the payload finds it when the Aura died in the same batch as its host" $ do
+          (enchanted, aura, _, gs) <- board
+          let placed = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [enchanted, aura] >> Engine.settleForPriority)
+              after = resolve placed
+          Spec.assertEqWith s "CR 400.7f the simultaneously buried Aura is back on the battlefield" (census after) [1, 1, 1]
+          Spec.assertEqWith s "under a new id here too" (Game.lookupObject aura after) Nothing
         -- The over-rejection leg, and the reason the clause is a case on the
         -- CONDITION rather than an unconditional Nothing: Squee, Goblin Nabob's
         -- upkeep trigger says nothing about an enchanted object, so CR 113.6m's
