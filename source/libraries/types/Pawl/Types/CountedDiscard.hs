@@ -3,12 +3,15 @@ module Pawl.Types.CountedDiscard where
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
 
--- | CR 701.9b's discard: the ONE player the slot names discards this many cards,
--- choosing which ones. Mind Rot's "target player discards two cards".
+-- | CR 701.9b's discard: EVERY player the slot names discards this many cards,
+-- each choosing their own. Mind Rot's "target player discards two cards" at one
+-- seat, Tinybones Joins Up's "any number of target players each discard a card"
+-- at several.
 --
--- Not implemented: a slot naming several players discards nothing, so "each
--- player discards a card" has no spelling (#1965). Its sibling
--- Pawl.Types.PlayerSacrifices does fold over every seat the slot holds.
+-- A slot, not a Pawl.Types.PlayerRef, exactly as Pawl.Types.PlayerSacrifices'
+-- is: the fold is over whatever the slot holds, so the plural reading is a
+-- question about the READ (Pawl.Engine.Resolve reads it with legalMany, in CR
+-- 101.4 order) rather than about this field.
 data CountedDiscard = MkCountedDiscard
   { slot :: SlotName.SlotName,
     quantity :: Quantity.Quantity,

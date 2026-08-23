@@ -4994,8 +4994,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "nor does a one-target slot read as one object"
     -- CR 601.2c's "any number of target ...", which states no maximum to compare
     -- against: an unbounded slot is plural, so the same one-object reader offends.
-    -- No card in the corpus makes this mistake, so this is the only observer
-    -- TargetCount.plural's unbounded arm has.
+    -- No card in the corpus makes this mistake, so this is the only observer the
+    -- OFFENDING direction of TargetCount.plural's unbounded arm has; the
+    -- permitting direction is Tinybones Joins Up, whose "any number of target
+    -- players" the sweep above walks.
     Spec.assertBool
       s
       (modalCountsOffend (modeWith (TargetSlot.anyNumber Pool.Creatures Nothing) (Effect.Sacrifice slot)))

@@ -12,8 +12,10 @@ module Pawl.Types.SlotArity where
 -- Ordered so that `min` is the conservative join: a slot read BOTH ways by
 -- different effects of one card can hold only one.
 data SlotArity
-  = -- | The reader takes one recipient, or none -- every bare SlotName field, and
-    -- every PlayerRef.InSlot.
+  = -- | The reader takes one recipient, or none -- most bare SlotName fields, and
+    -- every PlayerRef.InSlot. Not ALL bare SlotName fields: Pawl.Types.PlayerSacrifices'
+    -- and Pawl.Types.CountedDiscard's are read with legalMany, so their arity is
+    -- Many below.
     One
   | -- | The reader takes the whole set (CR 608.2f's simultaneous batch): every
     -- ObjectRef.InSlot, which is what "up to two target creatures" is written

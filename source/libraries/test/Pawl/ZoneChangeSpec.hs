@@ -27,6 +27,7 @@ import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -502,6 +503,58 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     Spec.assertEqWith s "and reached no hand" (S.handSize S.alice after) 0
     Spec.assertEqWith s "bob's hand emptied" (S.handSize S.bob after) 0
     Spec.assertEqWith s "bob's graveyard holds the piker" (namesIn Zone.Graveyard S.bob after) [Just (S.printingName piker)]
+  -- CR 701.9's OTHER arity: Tinybones Joins Up's "any number of target players
+  -- each discard a card", where the slot names three seats rather than Mind
+  -- Rot's one. CR 101.4 is the ordering rule -- its own worked example is a
+  -- table-wide edict -- so every seat is asked before any card moves, in turn
+  -- order from the active player.
+  --
+  -- THREE seats and each hand a distinct printing, so both readings of "each"
+  -- are separated: a fold over the controller's hand would empty alice's and
+  -- leave the other two, and legalOne's Nothing would leave all three at two.
+  Spec.it s "CR 701.9 / 101.4 Tinybones Joins Up has every targeted player discard, in APNAP order" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    sentry <- S.printingOf s registry "Ogre Sentry"
+    rats <- S.printingOf s registry "Typhoid Rats"
+    tinybones <- S.printingOf s registry "Tinybones Joins Up"
+    let base = S.landsFor swamp S.alice 1 S.threePlayerGame
+        (withSpell, spellId) = S.handOne tinybones base
+        -- The hands are stocked AFTER S.handOne, which sets alice's hand rather
+        -- than adding to it.
+        gs = handCards rats S.carol 2 (handCards sentry S.bob 2 (handCards piker S.alice 2 withSpell))
+        -- CR 601.2c: "any number" announces zero unless the answer says
+        -- otherwise, and a zero-target announcement is satisfied by BOTH
+        -- readings. So announce every recipient the board offers, and take the
+        -- whole offered set rather than building recipients by hand.
+        --
+        -- The state is the seats ChooseDiscard was raised for, in the order they
+        -- were asked, which is what makes CR 101.4's ordering observable.
+        answer :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+        answer p = case p of
+          Prompt.AnnounceTargets _ _ _ slots -> pure (fmap (\(_, candidates) -> Natural.length candidates) slots)
+          Prompt.ChooseTargets _ _ _ sets -> pure (fmap snd sets)
+          Prompt.ChooseDiscard _ victim held _ -> do
+            State.modify' (<> [victim])
+            pure (take 1 held)
+          _ -> pure (S.identityAnswer p)
+        (after, asked) =
+          flip State.runState [] $ do
+            (_, castGs) <- Engine.runGame answer gs (S.cast S.alice spellId)
+            -- The enchantment resolves, then settling puts its CR 603.3d enters
+            -- trigger on the stack with its targets announced.
+            (_, entered) <- Engine.runGame answer castGs (Stack.resolveTop >> Engine.settleForPriority)
+            (_, resolved) <- Engine.runGame answer entered Stack.resolveTop
+            pure resolved
+    Spec.assertEqWith s "alice discarded one of her two" (S.handSize S.alice after) 1
+    Spec.assertEqWith s "bob discarded one of his two" (S.handSize S.bob after) 1
+    Spec.assertEqWith s "carol discarded one of her two" (S.handSize S.carol after) 1
+    -- WHOSE card left whose hand: a fold reading the controller's hand three
+    -- times would put three pikers in one graveyard.
+    Spec.assertEqWith s "alice's graveyard holds her own piker" (namesIn Zone.Graveyard S.alice after) [Just (S.printingName piker)]
+    Spec.assertEqWith s "bob's graveyard holds his own sentry" (namesIn Zone.Graveyard S.bob after) [Just (S.printingName sentry)]
+    Spec.assertEqWith s "carol's graveyard holds her own rats" (namesIn Zone.Graveyard S.carol after) [Just (S.printingName rats)]
+    Spec.assertEqWith s "CR 101.4: asked in turn order from the active player" asked [S.alice, S.bob, S.carol]
 
 -- Griptide is "Put target creature on top of its owner's library", the pool's
 -- producer for a library arrival that is NOT the bottom (#989). Everything the
