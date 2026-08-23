@@ -201,6 +201,15 @@ mayPlayers = SlotName.MkSlotName (Text.pack "thoseWhoMay")
 -- names, and Pawl.Engine.Resolve never learns which condition placed the ability
 -- it is reading a slot for.
 --
+-- A FOURTH, and the one case where the id does not come off the triggering event
+-- at all: CR 400.7f's "the new object that each Aura enchanting that permanent
+-- became in its owner's graveyard", where the event is the HOST's death and this
+-- slot is the bearer's own arrival, which CR 704.5m minted a pass later. Screams
+-- from Within's "return this card" is the reader, and it is the Endless
+-- Cockroaches shape once more -- two incarnations of one card -- so the same
+-- slot rather than a fresh one. Pawl.Engine.Event.eventTriggers is what supplies
+-- the id, off the batch.
+--
 -- Collapsing them either way is a silent wrong answer, not a type error:
 -- binding only the source makes every such effect a no-op on a dead id, and
 -- rebinding the source to the arrival redirects every viewWithLastKnown
