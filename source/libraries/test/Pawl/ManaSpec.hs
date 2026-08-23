@@ -122,7 +122,7 @@ resolvedCreature land creature nLands =
 -- single-mode ActivatedAbility now takes.
 singleModeAbility :: [Effect.Effect card] -> Map.Map SlotName.SlotName TargetSlot.TargetSlot -> Modal.Modal card
 singleModeAbility effects slots =
-  Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) slots)) (ModeSelection.ChooseExactly 1)
+  Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) slots)) (ModeSelection.ChooseExactly 1)
 
 -- Answers Prompt.ChooseManaSource with `wanted` whenever it is on offer, and
 -- defers everything else to S.identityAnswer. Its sibling avoids that source

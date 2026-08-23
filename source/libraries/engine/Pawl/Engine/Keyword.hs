@@ -386,7 +386,7 @@ cycling cost searchFor =
     { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis DiscardCause.ToPayCyclingCost]},
       ActivatedAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       ActivatedAbility.restrictions = [],
       -- CR 702.29a gives the card this ability outright, with no "as long as".
@@ -439,7 +439,7 @@ reinforce n cost =
     { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis DiscardCause.Ordinary]},
       ActivatedAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton reinforceTarget slot)))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton reinforceTarget slot)))
           (ModeSelection.ChooseExactly 1),
       -- CR 702.77a states no timing restriction, which leaves CR 117.1b's
       -- default, and gives the ability outright with no "as long as".
@@ -602,7 +602,7 @@ crew n =
           },
       ActivatedAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [becomes CardType.Artifact, becomes CardType.Creature]))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [becomes CardType.Artifact, becomes CardType.Creature]))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       ActivatedAbility.restrictions = [],
       -- CR 702.122a gives the permanent this ability outright, with no "as long
@@ -647,7 +647,7 @@ levelUp cost =
     { ActivatedAbility.cost = cost,
       ActivatedAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton gain))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton gain))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
       ActivatedAbility.condition = Nothing,
@@ -673,7 +673,7 @@ outlast cost =
     { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.TapThis]},
       ActivatedAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton grow))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton grow))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
       ActivatedAbility.condition = Nothing,
@@ -1483,7 +1483,7 @@ poisonous n =
     { TriggeredAbility.condition = TriggerCondition.SelfDealsCombatDamageToPlayer,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -1515,7 +1515,7 @@ ingest =
     { TriggeredAbility.condition = TriggerCondition.SelfDealsCombatDamageToPlayer,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -1557,7 +1557,7 @@ annihilator n =
     { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -1584,7 +1584,7 @@ battleCry =
     { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -1627,7 +1627,7 @@ evolve =
           (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You]),
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Just (Condition.Any [entrantExceeds Quantity.Power, entrantExceeds Quantity.Toughness]),
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -1671,7 +1671,7 @@ prowess =
             },
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -1701,7 +1701,7 @@ melee =
     { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -1733,7 +1733,7 @@ rampage n =
     { TriggeredAbility.condition = TriggerCondition.SelfBecomesBlocked,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -1768,7 +1768,7 @@ flanking =
           (Filter.And [Filter.HasCardType CardType.Creature, Filter.Not (Filter.HasKeyword Keyword.Flanking)]),
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton flankingEffect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton flankingEffect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -1804,7 +1804,7 @@ exalted =
           (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You]),
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -1847,7 +1847,7 @@ bushidoHalf condition n =
     { TriggeredAbility.condition = condition,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -1878,7 +1878,7 @@ frenzy n =
     { TriggeredAbility.condition = TriggerCondition.SelfAttacksUnblocked,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -1905,7 +1905,7 @@ afflict n =
     { TriggeredAbility.condition = TriggerCondition.SelfBecomesBlocked,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -1935,7 +1935,7 @@ mentor =
     { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton mentorTarget slot)))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton mentorTarget slot)))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -1970,7 +1970,7 @@ training =
           (Filter.And [Filter.HasCardType CardType.Creature, Filter.PowerGreaterThanSource]),
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -2003,7 +2003,7 @@ ward cost =
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
-    clause = Clause.MkClause Nothing Optionality.Mandatory (Just gate) (Seq.singleton effect)
+    clause = Clause.MkClause Nothing Nothing Optionality.Mandatory (Just gate) (Seq.singleton effect)
     -- PayObligation.Optional and no offeredAt: rule 702.21a's "unless that
     -- player pays" is CR 118.12a's "may", and one clause makes its own offer.
     gate =
@@ -2032,7 +2032,7 @@ decayed =
     { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -2087,7 +2087,7 @@ decayedSacrifice =
     { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Combat CombatStep.EndOfCombat) TurnScope.EachTurn),
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -2112,7 +2112,7 @@ provoke =
     { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.fromList [requirement, untap]))) (Map.singleton provokeTarget slot)))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.fromList [requirement, untap]))) (Map.singleton provokeTarget slot)))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -2150,7 +2150,7 @@ renown n =
     { TriggeredAbility.condition = TriggerCondition.SelfDealsCombatDamageToPlayer,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [grow, designate]))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [grow, designate]))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening =
         Just (Condition.Compares (Compares.MkCompares (Quantity.HasDesignation Designation.Renowned) Comparison.AtMost (Quantity.Literal 0))),
@@ -2173,7 +2173,7 @@ dethrone =
     { TriggeredAbility.condition = TriggerCondition.SelfAttacksPlayerWithMostLife,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton grow))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton grow))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -2215,7 +2215,7 @@ returns kind =
     { TriggeredAbility.condition = TriggerCondition.SelfDies,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton back))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton back))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening =
         Just (Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters kind) Comparison.AtMost (Quantity.Literal 0))),
@@ -2263,7 +2263,7 @@ afterlife n =
     { TriggeredAbility.condition = TriggerCondition.SelfDies,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton spawn))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton spawn))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -2372,7 +2372,7 @@ fabricate n =
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
-    clause = Clause.MkClause Nothing Optionality.Mandatory (Just gate) (Seq.singleton spawn)
+    clause = Clause.MkClause Nothing Nothing Optionality.Mandatory (Just gate) (Seq.singleton spawn)
     gate =
       PayGate.MkPayGate
         { PayGate.payer = PlayerRef.InSlot Binding.you,
@@ -2486,7 +2486,7 @@ soulshift n =
     { TriggeredAbility.condition = TriggerCondition.SelfDies,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.singleton back))) (Map.singleton soulshiftTarget slot)))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.singleton back))) (Map.singleton soulshiftTarget slot)))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -2539,7 +2539,7 @@ haunt =
     { TriggeredAbility.condition = TriggerCondition.SelfDies,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton exile))) (Map.singleton hauntTarget slot)))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton exile))) (Map.singleton hauntTarget slot)))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -2571,7 +2571,7 @@ miracle cost =
     { TriggeredAbility.condition = TriggerCondition.SelfRevealedForMiracle,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton offer))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton offer))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -2643,7 +2643,7 @@ vanishingUpkeep =
     { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn),
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening =
         Just (Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters CounterKind.Time) Comparison.AtLeast (Quantity.Literal 1))),
@@ -2666,7 +2666,7 @@ vanishingLastCounter =
     { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved CounterKind.Time,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -2703,12 +2703,14 @@ fading =
     counted = Quantity.ObjectCounters CounterKind.Fade
     sacrificeClause =
       Clause.MkClause
+        Nothing
         (Just (Condition.Compares (Compares.MkCompares counted Comparison.AtMost (Quantity.Literal 0))))
         Optionality.Mandatory
         Nothing
         (Seq.singleton (Effect.Sacrifice Binding.triggerSource))
     removeClause =
       Clause.MkClause
+        Nothing
         (Just (Condition.Compares (Compares.MkCompares counted Comparison.AtLeast (Quantity.Literal 1))))
         Optionality.Mandatory
         Nothing
@@ -2734,7 +2736,7 @@ modular =
     { TriggeredAbility.condition = TriggerCondition.SelfDies,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.singleton effect))) (Map.singleton modularTarget slot)))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.singleton effect))) (Map.singleton modularTarget slot)))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
