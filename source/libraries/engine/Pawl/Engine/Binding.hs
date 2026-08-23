@@ -134,9 +134,11 @@ triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 -- seat whose answer selected the branch. A reader that takes one recipient
 -- (Pawl.Types.SlotArity.One) therefore reads NOTHING out of it once two seats
 -- are in it; Pawl.Engine.Resolve's Effect.PlayerSacrifices arm and
--- PlayerRef.EachInSlot are the readers that take them all. Not implemented: no
--- card aims a life-total opcode at this slot, so the plural read of it is
--- unexercised (#1966).
+-- PlayerRef.EachInSlot are the readers that take them all. Bellowing Mauler
+-- aims a life-total opcode at this slot -- "each player loses 4 life unless
+-- they sacrifice a nontoken creature of their choice" -- and Pawl.TriggerSpec's
+-- "CR 118.12a only the seats that did not pay lose the life" is where the
+-- plural read is proved, on a board where one of three seats paid.
 --
 -- Not a target (nothing was chosen), so CR 608.2b has nothing to re-validate --
 -- Resolve's legalSlot answers True for any slot that declares no target. `you`'s
