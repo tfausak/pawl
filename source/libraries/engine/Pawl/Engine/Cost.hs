@@ -486,6 +486,7 @@ substituteXInComponent x component = case component of
   CostComponent.TapThis -> component
   CostComponent.UntapThis -> component
   CostComponent.SacrificeThis -> component
+  CostComponent.ReturnThis -> component
   CostComponent.Sacrifice {} -> component
   CostComponent.TapForTotalPower {} -> component
   CostComponent.TapPermanents {} -> component
@@ -528,6 +529,7 @@ componentHasVariable component = case component of
   CostComponent.TapThis -> False
   CostComponent.UntapThis -> False
   CostComponent.SacrificeThis -> False
+  CostComponent.ReturnThis -> False
   CostComponent.Sacrifice {} -> False
   CostComponent.TapForTotalPower {} -> False
   CostComponent.TapPermanents {} -> False
@@ -600,6 +602,7 @@ componentDemandGrowsWithX component = case component of
   CostComponent.TapThis -> False
   CostComponent.UntapThis -> False
   CostComponent.SacrificeThis -> False
+  CostComponent.ReturnThis -> False
   CostComponent.Sacrifice {} -> False
   CostComponent.TapForTotalPower {} -> False
   CostComponent.TapPermanents {} -> False
@@ -835,6 +838,7 @@ loyaltyAmountOf component = case component of
   CostComponent.TapThis -> Nothing
   CostComponent.UntapThis -> Nothing
   CostComponent.SacrificeThis -> Nothing
+  CostComponent.ReturnThis -> Nothing
   CostComponent.PayLife _ -> Nothing
   CostComponent.PayLifeX -> Nothing
   CostComponent.Sacrifice {} -> Nothing
@@ -895,6 +899,12 @@ zoneOfComponent component = case component of
   CostComponent.ExileThisFromGraveyard -> Just Zone.Graveyard
   CostComponent.TapThis -> Nothing
   CostComponent.UntapThis -> Nothing
+  -- CR 113.6m again, and Nothing for SacrificeThis' reason above: it moves the
+  -- object off the BATTLEFIELD, where CR 113.6's default already had it, so
+  -- naming the zone would be redundant rather than wrong. A FENCE and not proven
+  -- behaviour, for exactly that reason -- answering Just Zone.Battlefield leaves
+  -- the suite green, the two readings agreeing wherever CR 113.6's default holds.
+  CostComponent.ReturnThis -> Nothing
   CostComponent.SacrificeThis -> Nothing
   CostComponent.PayLife _ -> Nothing
   CostComponent.PayLifeX -> Nothing
@@ -951,6 +961,10 @@ componentStatesHiddenQuality component = case component of
   CostComponent.TapThis -> False
   CostComponent.UntapThis -> False
   CostComponent.SacrificeThis -> False
+  -- CR 118.8c: the hand is a hidden zone, but this names the object the cost is
+  -- ON rather than describing a card, so nothing is stated for a player to fail
+  -- to find -- DiscardThis' answer above and for its reason.
+  CostComponent.ReturnThis -> False
   CostComponent.PayLife _ -> False
   CostComponent.PayLifeX -> False
   CostComponent.PayEnergy _ -> False
@@ -1072,6 +1086,24 @@ claimOf pid oid component gs = case component of
           ( Set.member oid (GameState.battlefield gs)
               && Projection.controllerOf oid gs == Just pid
               && not (SacrificeRestriction.prohibited oid gs)
+          )
+      )
+      1
+  -- The same battlefield pool SacrificeThis draws on -- a permanent returned to
+  -- hand is as gone from the battlefield as one sacrificed -- and WITHOUT CR
+  -- 101.2's prohibition, `canPayComponent`'s reading below and for its reason.
+  -- The two answers have to agree.
+  --
+  -- A FENCE and not proven behaviour: Grinning Ignus is the one card printing
+  -- this component, its cost states one component and a non-empty mana part, so
+  -- `repeatsOf` settles at 1 before any axis matters. Keying it ClaimAxis.Tapping
+  -- instead leaves the suite green.
+  CostComponent.ReturnThis ->
+    claim
+      (ClaimAxis.Removal Zone.Battlefield)
+      ( itself
+          ( Set.member oid (GameState.battlefield gs)
+              && Projection.controllerOf oid gs == Just pid
           )
       )
       1
@@ -1379,6 +1411,7 @@ uncountedCeiling component = case component of
   -- capped at 1 below, for the header's understatement reason.
   CostComponent.Sacrifice {} -> Nothing
   CostComponent.SacrificeThis -> Nothing
+  CostComponent.ReturnThis -> Nothing
   CostComponent.DiscardCards {} -> Nothing
   CostComponent.DiscardThis _ -> Nothing
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
@@ -1489,6 +1522,7 @@ lifeOwedByComponent component = case component of
   CostComponent.TapThis -> 0
   CostComponent.UntapThis -> 0
   CostComponent.SacrificeThis -> 0
+  CostComponent.ReturnThis -> 0
   CostComponent.Sacrifice {} -> 0
   CostComponent.TapForTotalPower {} -> 0
   CostComponent.TapPermanents {} -> 0
@@ -1523,6 +1557,20 @@ canPayComponent pid oid component gs = case component of
     Set.member oid (GameState.battlefield gs)
       && Projection.controllerOf oid gs == Just pid
       && not (SacrificeRestriction.prohibited oid gs)
+  -- CR 118.1 as a cost: only a permanent, and only one this player controls --
+  -- SacrificeThis' two conjuncts above, read here rather than left to the funnel
+  -- for that arm's reason. `claimOf` must agree.
+  --
+  -- WITHOUT CR 101.2's prohibition, deliberately: an effect saying a permanent
+  -- can't be sacrificed says nothing about returning it to its owner's hand, and
+  -- reading that guard here would refuse a cost the rules allow. UNPROVEN --
+  -- data/cards/garland-royal-kidnapper.json is the pool's one producer of a
+  -- sacrifice restriction and it reaches only creatures its controller does not
+  -- own, so no board here can hold a prohibited Grinning Ignus. A declared
+  -- reading, not a tested one.
+  CostComponent.ReturnThis ->
+    Set.member oid (GameState.battlefield gs)
+      && Projection.controllerOf oid gs == Just pid
   -- CR 119.4: payable only if the life total is at least the amount. This
   -- component ALONE, which is not CR 118.3's question -- canPay hands
   -- `lifeOwedBy`'s sum to the mana side, and this can only be the weaker check.
@@ -1808,6 +1856,10 @@ orderSensitive :: CostComponent.CostComponent Keyword.Type.Keyword -> Bool
 orderSensitive component = case component of
   CostComponent.Sacrifice {} -> True
   CostComponent.SacrificeThis -> True
+  -- A FENCE rather than proven behaviour: Grinning Ignus is the one card that
+  -- prints this component and its cost has no second order-sensitive part, so
+  -- `orderObservable` is False whichever way this answers.
+  CostComponent.ReturnThis -> True
   CostComponent.DiscardCards {} -> True
   CostComponent.DiscardThis _ -> True
   CostComponent.ExileCardsFromGraveyard {} -> True
@@ -2130,6 +2182,13 @@ payComponent pid oid component = case component of
     -- CR 701.21a's "a permanent they don't control" guard lives in the funnel;
     -- `pid` is the player paying, who for "sacrifice this" is its controller.
     Event.sacrifice pid oid
+    pure bindsNothing
+  -- Through Event.changeZone, the CR 400.7 funnel, and never a direct zone poke,
+  -- SacrificeThis' call above and for its reason. CR 400.3 is what makes the bare
+  -- Zone.Hand right: an object that would go to a hand other than its owner's
+  -- goes to its owner's, so the funnel already spells the printed "its owner's".
+  CostComponent.ReturnThis -> do
+    Event.changeZone oid Zone.Hand
     pure bindsNothing
   -- CR 119.4: the payment is subtracted from the life total, shared with CR
   -- 107.4f's Phyrexian symbol as the payability check above is.

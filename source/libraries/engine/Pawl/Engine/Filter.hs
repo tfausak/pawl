@@ -1288,6 +1288,7 @@ rewriteComponent pairs component = case component of
   CostComponent.TapThis -> component
   CostComponent.UntapThis -> component
   CostComponent.SacrificeThis -> component
+  CostComponent.ReturnThis -> component
   CostComponent.PayLife _ -> component
   CostComponent.PayLifeX -> component
   CostComponent.DiscardThis _ -> component

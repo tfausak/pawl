@@ -107,6 +107,7 @@ import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- Cast `creature` off `nLands` copies of `land`, then resolve it.
 resolvedCreature :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
@@ -1154,21 +1155,23 @@ towerBoard tower victim =
 -- SYNTHETIC because no printing reaches CR 500.1's window on the mana path, not
 -- because none prints a rider there. Scryfall `o:"Activate only" o:"Add {"`,
 -- 2026-08-21: Grinning Ignus is the one printing whose mana ability names a
--- STEP-or-phase window this vocabulary can say ("Activate only as a sorcery"),
--- and its activation cost holds MANA, which the supply model counts as no supply
--- at all (#2095), plus a "return this to its owner's hand" component the cost
--- vocabulary lacks (#2004). Lavinia, Foil to Conspiracy is in the pool and gates
--- these same two windows, but through CR 102.1's turn axis alone
--- (laviniaTurnRiderSpec below), so she leaves the phase axis unexercised. Vivi
--- Ornitier and every other hit ride on "only once each turn" or "only if
--- <condition>", neither of which Pawl.Types.ActivationRestriction can say.
--- Grinning Ignus replaces this card when #2095 and #2004 land.
+-- STEP-or-phase window this vocabulary can say, and what it says is CR 307.5's
+-- "activate only as a sorcery" rather than a step -- grinningIgnusSpec below is
+-- where that card is exercised. Its activation cost holds MANA besides, which
+-- the supply model counts as no supply at all (#2095). Lavinia, Foil to
+-- Conspiracy is in the pool and gates these same two windows, but through CR
+-- 102.1's turn axis alone (laviniaTurnRiderSpec below), so she leaves the phase
+-- axis unexercised. Vivi Ornitier and every other hit ride on "only once each
+-- turn" or "only if <condition>", neither of which
+-- Pawl.Types.ActivationRestriction can say.
 --
 -- The two cases below are the SAME board at two moments, and the phase is the
 -- one thing that differs. That is what makes the pair a proof about the rider
 -- rather than about the fixture -- and the phase, unlike CR 307.5's sorcery
 -- window, cannot change under a caster's feet between the offer and the payment
--- (CR 500.12). SorcerySpeed is the arm that can, and is unexercised (#2005).
+-- (CR 500.12). SorcerySpeed is the arm that can; grinningIgnusSpec below reaches
+-- it at the offer, and the divergence #2005 names stays out of reach while #2095
+-- keeps the Ignus off the cast gate's supply entirely.
 riderWindowSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 riderWindowSpec s registry = Spec.describe s "CR 605.3a a printed rider gates both windows" $ do
   Spec.it s "CR 500.1 the priority window offers the source only inside the rider's step" $ do
@@ -2211,6 +2214,74 @@ takesAltarOnce altarId birdsId p = case p of
     State.modify' (+ 1)
     pure (if taken == 0 then takesAltar altarId birdsId p else Action.Type.Pass)
   _ -> pure (takesAltar altarId birdsId p)
+
+-- CR 118.1 as a cost that RETURNS the object it is on: Grinning Ignus, "{R},
+-- Return this creature to its owner's hand: Add {C}{C}{R}. Activate only as a
+-- sorcery." CR 601.2f's list of what a cost may include ends in "and so on" and
+-- never names returning, so this is a cost by CR 118.1's general reading -- "an
+-- action or payment necessary to take another action" -- exactly as
+-- CostComponent.ExileThisFromGraveyard is.
+--
+-- The board is one Ignus and one Mountain and nothing else. The Mountain is the
+-- only source of the ability's own {R}, so the mana window has exactly one
+-- payer; a second red source would make the source prompt ambiguous and prove
+-- nothing more. PrecombatMain with an empty stack and alice active is CR 307.5's
+-- window, which the printed "activate only as a sorcery" rider requires.
+--
+-- The DESTINATION is the whole discriminator. A payment copied from
+-- CostComponent.SacrificeThis reaches the same pool and the same empty
+-- battlefield; only the zone the Ignus lands in tells the two apart, so the hand
+-- count is asserted before either.
+grinningIgnusSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+grinningIgnusSpec s registry = Spec.describe s "Grinning Ignus" $ do
+  Spec.it s "CR 118.1 the cost returns the source to its owner's hand, and the ability still adds its mana" $ do
+    ignus <- S.printingOf s registry "Grinning Ignus"
+    mountain <- S.printingOf s registry "Mountain"
+    let (ignusId, board) = ignusBoard ignus mountain
+        after = snd (State.evalState (Engine.runGame (takesIgnusOnce ignusId) board Engine.priorityLoop) (0 :: Int))
+    Spec.assertEqWith s "CR 118.1 the cost put the Ignus in its owner's hand" (S.handSize S.alice after) 1
+    Spec.assertEqWith s "CR 400.7 through Event.changeZone, so the move is a recorded event bound for the hand" (fmap ZoneChange.to (filter ((== ignusId) . ZoneChange.departed) (S.zoneChangesOf after))) [Zone.Hand]
+    Spec.assertEqWith s "and off the battlefield it left" (S.creaturesInPlay S.alice after) 0
+    Spec.assertEqWith s "CR 602.2b the activation still resolved and added {C}{C}{R}" (poolTypes S.alice after) [ManaType.Colorless, ManaType.Colorless, ManaType.Colored Color.Red]
+
+  -- CR 307.5's rider on the MANA path. riderWindowSpec above reaches
+  -- ActivationRestriction.DuringPhase there with a synthetic, and SorcerySpeed
+  -- reached the mana path with no card at all -- Bonesplitter declares it on an
+  -- equip ability, which CR 605.1a makes no mana ability. Two boards differing in
+  -- the PHASE alone, so the refusal cannot be about the {R}, the return or the
+  -- sickness rules.
+  Spec.it s "CR 307.5 the sorcery-speed rider offers the ability only in her main phase" $ do
+    ignus <- S.printingOf s registry "Grinning Ignus"
+    mountain <- S.printingOf s registry "Mountain"
+    let (ignusId, inMain) = ignusBoard ignus mountain
+        inUpkeep = inMain {GameState.phase = Phase.Beginning BeginningStep.Upkeep}
+        offers gs = filter (== Action.Type.ActivateManaAbility ignusId) (Action.legalActions S.alice gs)
+    Spec.assertEqWith s "in her precombat main phase CR 605.3a offers it" (length (offers inMain)) 1
+    Spec.assertEqWith s "in her upkeep CR 307.5 leaves nothing to offer" (length (offers inUpkeep)) 0
+
+-- alice, active, in her precombat main phase and going nowhere: one Grinning
+-- Ignus and one Mountain, and nothing else on the board or in her hand.
+ignusBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+ignusBoard ignus mountain =
+  let (ignusId, g1) = S.addCreature ignus S.alice (Setup.emptyGame S.bothPlayers)
+      (_, g2) = S.addCreature mountain S.alice g1
+   in (ignusId, g2 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
+
+-- Takes the Ignus's mana ability at the FIRST priority prompt and passes at every
+-- later one, takesAltarOnce's guard and for its reason: an activation that failed
+-- would leave the board untouched and be offered again forever.
+takesIgnusOnce :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State Int r
+takesIgnusOnce ignusId p = case p of
+  Prompt.ChooseAction _ _ actions -> do
+    taken <- State.get
+    State.modify' (+ 1)
+    pure $
+      if taken == 0
+        then case filter (== Action.Type.ActivateManaAbility ignusId) actions of
+          h : _ -> h
+          [] -> Action.Type.Pass
+        else Action.Type.Pass
+  _ -> pure (prefersColor Color.Red p)
 
 -- CR 601.2f, reached by CR 602.2b: an ACTIVATION cost is adjusted like a spell's
 -- mana cost, and CR 605.3b gives a mana ability no stack window for
@@ -3369,6 +3440,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   ashnodsAltarSpec s registry
   phyrexianAltarSpec s registry
   transmograntAltarSpec s registry
+  grinningIgnusSpec s registry
   activationAdjustmentSpec s registry
   treasonousOgreSpec s registry
   sharedVictimSpec s registry

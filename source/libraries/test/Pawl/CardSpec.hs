@@ -2736,6 +2736,7 @@ costComponentFilters component = case component of
   CostComponent.TapThis -> []
   CostComponent.UntapThis -> []
   CostComponent.SacrificeThis -> []
+  CostComponent.ReturnThis -> []
   CostComponent.PayLife _ -> []
   CostComponent.PayLifeX -> []
   CostComponent.DiscardThis _ -> []

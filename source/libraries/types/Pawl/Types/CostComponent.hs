@@ -34,6 +34,35 @@ data CostComponent keyword
     -- self-referential cost names one object and offers no choice, so folding it
     -- into the criterion form would invent a prompt the rules do not have.
     SacrificeThis
+  | -- | CR 118.1 as a cost: return the permanent the cost is on to its owner's
+    -- hand (Grinning Ignus' "{R}, Return this creature to its owner's hand: Add
+    -- {C}{C}{R}"). CR 601.2f's list of what a cost may include ends in "and so
+    -- on" and never names returning, so this is a cost by CR 118.1's general
+    -- reading -- "an action or payment necessary to take another action" --
+    -- exactly as ExileThisFromGraveyard below is.
+    --
+    -- SacrificeThis' shape: it names ONE object, the object the cost is on, and
+    -- offers nothing to choose, so folding it into a count-plus-criterion form
+    -- would invent a CR 601.2h prompt the rules do not have. A cost returning
+    -- some OTHER permanent would be a second constructor, the call
+    -- ExileThisFromGraveyard and ExileCardsFromGraveyard already document.
+    --
+    -- NO ZONE FIELD. The destination is fixed, and CR 400.3 makes it
+    -- owner-relative inside Pawl.Engine.Event's funnel -- "if an object would go
+    -- to any library, graveyard, or hand other than its owner's, it goes to its
+    -- owner's corresponding zone" -- so the printed "its owner's" needs no field
+    -- here. Its CR 113.6m answer is Nothing rather than Just Zone.Battlefield,
+    -- SacrificeThis' answer and for its reason; see
+    -- Pawl.Engine.Cost.zoneOfComponent.
+    --
+    -- NOT read against CR 101.2's "can't be sacrificed", which SacrificeThis is:
+    -- an effect forbidding a sacrifice says nothing about a return to hand, so
+    -- copying that guard here would run STRICTER than printed. Unproven on any
+    -- board this pool can build -- the one producer of a sacrifice restriction
+    -- reaches only creatures its controller does not own -- so
+    -- Pawl.Engine.Cost.canPayComponent's omission is a declared reading rather
+    -- than a tested one.
+    ReturnThis
   | -- | CR 119.4: pay this much life (Greed), payable only out of a life total
     -- at least that large.
     --
