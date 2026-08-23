@@ -791,7 +791,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Quantity.Literal 1, Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
         (abilId, g2) = Game.freshObjectId g1
@@ -807,7 +807,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     mountain <- S.printingOf s registry "Mountain"
     let base = Setup.emptyGame S.bothPlayers
         (_, g1) = S.addLibraryCard mountain S.alice base
-        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Quantity.Literal 1, Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing
+        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj = Object.MkObject S.alice Nothing (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability}) Zone.Stack TapState.Untapped Facing.FaceUp False 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing ts Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty False 0 (Mana.MkMana []) Nothing Set.empty Set.empty False Set.empty
@@ -832,7 +832,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Quantity.Literal 1, Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
         (abilId, g2) = Game.freshObjectId g1
@@ -856,7 +856,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Quantity.Literal 1, Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
         (abilId, g2) = Game.freshObjectId g1
@@ -1054,6 +1054,66 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
       "every library card is still there"
       (Set.fromList (Game.zoneMembers Zone.Library S.alice settled))
       (Set.fromList [vegetationMountain board, vegetationIsland board, vegetationPlains board, vegetationPiker board])
+  -- Mana Severance -- "Search your library for any number of land cards, exile
+  -- them, then shuffle." The whole-card proof that a search can state NO count
+  -- (CR 701.23a: the find is bounded by what the zone holds, not by a number the
+  -- card names), cast and resolved rather than assembled. Its whole printed text
+  -- is expressible.
+  --
+  -- FOUR matching lands, all DIFFERENT basics, against a search that names no
+  -- number: a cap that came from anywhere but the library's own contents would
+  -- have to be a literal, and four distinct names make "all four" assertable
+  -- rather than "one, four times" -- List.nub in the executor cannot repair it.
+  -- None of them is the Island the mana came from. The Piker gives the filter a
+  -- nonland to reject, so the offer is strictly larger than the largest legal
+  -- answer and the prompt cannot short-circuit.
+  --
+  -- The three cases are the same board and the same mana, differing in exactly
+  -- how many of the four the searcher takes.
+  Spec.it s "CR 701.23a whole card: Mana Severance's \"any number of\" exiles every land she names" $ do
+    board <- severanceBoard s registry
+    let settled = resolveSeverance (findPinned (severanceLands board)) board
+    Spec.assertEqWith
+      s
+      "all four lands she named are in exile"
+      (List.sort (fmap (`S.soleFaceName` settled) (Game.zoneMembers Zone.Exile S.alice settled)))
+      (List.sort (fmap (CardName.MkCardName . Text.pack) ["Forest", "Mountain", "Plains", "Swamp"]))
+    Spec.assertEqWith
+      s
+      "and only the nonland the filter rejected is left in the library"
+      (Game.zoneMembers Zone.Library S.alice settled)
+      [severancePiker board]
+  Spec.it s "CR 701.23b whole card: Mana Severance may find FEWER than the library holds" $ do
+    board <- severanceBoard s registry
+    let settled = resolveSeverance (findPinned (take 2 (severanceLands board))) board
+    Spec.assertEqWith
+      s
+      "only the two she named are in exile"
+      (List.sort (fmap (`S.soleFaceName` settled) (Game.zoneMembers Zone.Exile S.alice settled)))
+      (List.sort (fmap (CardName.MkCardName . Text.pack) ["Mountain", "Swamp"]))
+    Spec.assertEqWith
+      s
+      "the two lands she passed over are still in the library"
+      (Set.fromList (Game.zoneMembers Zone.Library S.alice settled))
+      (Set.fromList (severancePiker board : drop 2 (severanceLands board)))
+  -- The case that separates "no count" from "as many as possible". CR 701.23d
+  -- forces a search made "simply for a quantity of cards", which one stating no
+  -- quantity is not, and CR 701.23b's fail-to-find covers the stated quality
+  -- besides -- so an answer of zero stands and nothing is completed from the
+  -- lands she passed over.
+  Spec.it s "CR 701.23b whole card: Mana Severance may decline to find at all" $ do
+    board <- severanceBoard s registry
+    let settled = resolveSeverance (findPinned []) board
+    Spec.assertEqWith
+      s
+      "nothing was exiled"
+      (Game.zoneMembers Zone.Exile S.alice settled)
+      []
+    Spec.assertEqWith
+      s
+      "every library card is still there"
+      (Set.fromList (Game.zoneMembers Zone.Library S.alice settled))
+      (Set.fromList (severancePiker board : severanceLands board))
   -- Extract -- "{U} Sorcery: Search target player's library for a card and exile
   -- it. Then that player shuffles." The whole-card proof that the player LOOKING
   -- and the player whose library is looked at can be different seats (CR 701.23a),
@@ -1852,6 +1912,40 @@ vegetationBoard s registry = do
 resolveVegetation :: (forall r. Prompt.Prompt r -> r) -> VegetationBoard -> GameState.GameState
 resolveVegetation answer board =
   let cast = snd (Engine.runGamePure answer (vegetationState board) (S.cast S.alice (vegetationSpell board)))
+   in snd (Engine.runGamePure answer cast Engine.priorityLoop)
+
+-- Mana Severance's board, built once and shared by its three cases so they
+-- differ in the ANSWER alone. Two Islands pay the {1}{U}, and the library holds
+-- four DIFFERENT basics -- none of them an Island -- against a search that
+-- states no count, plus a nonland for the filter to reject.
+data SeveranceBoard = MkSeveranceBoard
+  { severanceState :: GameState.GameState,
+    severanceSpell :: ObjectId.ObjectId,
+    -- | Mountain, Swamp, Plains and Forest, in the order the cases name them.
+    severanceLands :: [ObjectId.ObjectId],
+    severancePiker :: ObjectId.ObjectId
+  }
+
+severanceBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m SeveranceBoard
+severanceBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  mountain <- S.printingOf s registry "Mountain"
+  swamp <- S.printingOf s registry "Swamp"
+  plains <- S.printingOf s registry "Plains"
+  forest <- S.printingOf s registry "Forest"
+  piker <- S.printingOf s registry "Goblin Piker"
+  severance <- S.printingOf s registry "Mana Severance"
+  let (mountainId, g1) = S.addLibraryCard mountain S.alice (S.landsInPlay island 2)
+      (swampId, g2) = S.addLibraryCard swamp S.alice g1
+      (plainsId, g3) = S.addLibraryCard plains S.alice g2
+      (forestId, g4) = S.addLibraryCard forest S.alice g3
+      (pikerId, g5) = S.addLibraryCard piker S.alice g4
+      (gs, spellId) = S.handOne severance g5
+  pure (MkSeveranceBoard gs spellId [mountainId, swampId, plainsId, forestId] pikerId)
+
+resolveSeverance :: (forall r. Prompt.Prompt r -> r) -> SeveranceBoard -> GameState.GameState
+resolveSeverance answer board =
+  let cast = snd (Engine.runGamePure answer (severanceState board) (S.cast S.alice (severanceSpell board)))
    in snd (Engine.runGamePure answer cast Engine.priorityLoop)
 
 -- Finds exactly the cards named and nothing else, whatever the engine offers.

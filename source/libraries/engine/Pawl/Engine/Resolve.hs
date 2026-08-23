@@ -426,7 +426,7 @@ slotsOf effect = case effect of
   Effect.AddMana (ManaAddition.MkManaAddition ref _ _ _) -> playerRefSlots ref
   -- BOTH refs: a slot read only by the owner ref would otherwise look dangling.
   Effect.Search (Search.MkSearch searcher owner quantity _ _ _) ->
-    joinSlots [playerRefSlots searcher, playerRefSlots owner, quantitySlots quantity]
+    joinSlots (playerRefSlots searcher : playerRefSlots owner : fmap quantitySlots (Maybe.maybeToList quantity))
   Effect.ExileAllGraveyards -> Map.empty
   Effect.Proliferate -> Map.empty
   Effect.Bolster quantity -> quantitySlots quantity
@@ -689,7 +689,9 @@ slotsAreExhaustive effect = case effect of
       && all Quantity.slotsAreExhaustive (Projection.quantitiesOf modification)
   Effect.ChangeText {} -> True
   Effect.AddMana _ -> True
-  Effect.Search (Search.MkSearch _ _ quantity _ _ _) -> Quantity.slotsAreExhaustive quantity
+  -- An unbounded search names no count, so it reads no slot to be exhaustive
+  -- about.
+  Effect.Search (Search.MkSearch _ _ quantity _ _ _) -> all Quantity.slotsAreExhaustive quantity
   Effect.ExileAllGraveyards -> True
   Effect.Proliferate -> True
   Effect.Bolster quantity -> Quantity.slotsAreExhaustive quantity
@@ -850,7 +852,7 @@ readsX = any effectReadsX
       Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> any Quantity.readsX (Projection.quantitiesOf modification)
       Effect.ChangeText {} -> False
       Effect.AddMana _ -> False
-      Effect.Search (Search.MkSearch _ _ quantity _ _ _) -> Quantity.readsX quantity
+      Effect.Search (Search.MkSearch _ _ quantity _ _ _) -> any Quantity.readsX quantity
       Effect.ExileAllGraveyards -> False
       Effect.Proliferate -> False
       Effect.Bolster quantity -> Quantity.readsX quantity
@@ -3194,8 +3196,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 _ -> inApnapOrder ownerRef
               -- How many cards this search may find (CR 701.23a), evaluated ONCE
               -- before the loop: one instruction names one count. An unevaluable
-              -- or non-positive quantity comes out as 0.
-              cap = case Quantity.evaluateFor (effectViewOf source legal gs0) (effectContext controller source legal (slotGroups resolving gs0)) gs0 resolving source quantity of
+              -- or non-positive quantity comes out as 0. A search that states no
+              -- count at all -- Mana Severance's "any number of land cards" --
+              -- comes out as Nothing, and is bounded per library by what the
+              -- library holds, which is CR 701.23a's "all cards in that zone".
+              cap = fmap evaluateCap quantity
+              evaluateCap q = case Quantity.evaluateFor (effectViewOf source legal gs0) (effectContext controller source legal (slotGroups resolving gs0)) gs0 resolving source q of
                 Just n | n > 0 -> Integer.toNaturalSaturating n
                 _ -> 0
           Monad.forM_ searchers $ \searcher -> Monad.forM_ (ownersFor searcher) $ \owner -> do
@@ -3205,9 +3211,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- says only how to look, so the shuffle is the card's own.
             prohibited <- State.gets (PlayerEffect.prohibitsSearching searcher)
             -- A cap of zero asks nothing and finds nothing: one legal answer is
-            -- no choice to put to a player.
+            -- no choice to put to a player. An unbounded search has no such
+            -- shortcut -- its cap is not known until the library is read.
             found <-
-              if prohibited || cap == 0
+              if prohibited || cap == Just 0
                 then pure []
                 else do
                   -- CR 601.3 (Panglacial Wurm): the chance to cast is offered AT
@@ -3219,8 +3226,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   Monad.when (searcher == owner) (Cast.castWhileSearching searcher)
                   gs <- State.get
                   let matches = filter (matches1 gs) (Game.zoneMembers Zone.Library owner gs)
+                      -- CR 701.23a bounds an unbounded search by the zone: every
+                      -- card the filter admits is findable, and no more.
+                      capHere = Maybe.fromMaybe (List.genericLength matches) cap
                       decider = Decide.deciderFor searcher gs
-                  answer <- Game.choose (Prompt.SearchLibrary decider searcher matches cap)
+                  answer <- Game.choose (Prompt.SearchLibrary decider searcher matches capHere)
                   -- CR 701.23a: every card found is one the filter admits.
                   -- Filtered, not trusted, deduplicated, and truncated to
                   -- the cap. What a SHORT answer leaves is the difference between
@@ -3230,12 +3240,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- the answer is COMPLETED from the remaining matches.
                   -- Search.upTo is the third case, a card's own "up to" over a
                   -- filter stating no quality; it lands in CR 701.23b's branch.
-                  let picked = List.genericTake cap . List.nub $ filter (\oid -> List.elem oid matches) answer
+                  -- An unbounded search is a fourth: CR 701.23d reaches a search
+                  -- "simply for a quantity of cards", which one stating no
+                  -- quantity is not, so a short answer stands whatever the filter
+                  -- says.
+                  let picked = List.genericTake capHere . List.nub $ filter (\oid -> List.elem oid matches) answer
                       filler = filter (\oid -> List.notElem oid picked) matches
                   pure $
-                    if Filter.statesAQuality filter_ || upTo
+                    if Filter.statesAQuality filter_ || upTo || Maybe.isNothing cap
                       then picked
-                      else List.genericTake cap (picked <> filler)
+                      else List.genericTake capHere (picked <> filler)
             -- Where the cards go is the CARD's instruction, not rule 701.23's;
             -- CR 701.23e says the same of the reveal. The searcher is the
             -- revealer (CR 701.20a), and the cards go in the order the searcher
