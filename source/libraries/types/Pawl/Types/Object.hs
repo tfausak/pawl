@@ -515,6 +515,9 @@ data Object = MkObject
     -- NOT a copiable value (CR 716.2b's last sentence), and that falls out with
     -- nothing to enforce, exactly as ringBearerFor's note above explains: a copy
     -- effect's payload is a ProjectedCharacteristics, never an Object.
+    -- Pawl.ClassSpec's "levels are not a copiable characteristic" is what proves
+    -- it at gameplay level, a Copy Enchantment entering as a copy of a level-2
+    -- Paladin Class and being offered that Class's level-1 bar.
     --
     -- Per-incarnation state, like damage and counters: cleared by newIncarnation,
     -- because CR 400.7 makes the moved object a new one. CR 716.2b's retention

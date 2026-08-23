@@ -402,7 +402,7 @@ designationSpec s registry = Spec.describe s "Level designation" $ do
         -- the {4}{W} bar instead and land on 3.
         Spec.assertEqWith s "CR 716.2d the copy's own first bar takes it to level 2, not to 3" (levelOf copyId (gainLevel copyId copied)) (Just (ClassLevel.MkClassLevel 2))
         Spec.assertEqWith s "CR 716.2b: and no level designation came across with the copy" (levelOf copyId copied) Nothing
-        Spec.assertEqWith s "CR 707.2b: the original still holds the level it gained" (levelOf classId copied) (Just (ClassLevel.MkClassLevel 2))
+        Spec.assertEqWith s "CR 707.2 writes the COPY: the original still holds the level it gained" (levelOf classId copied) (Just (ClassLevel.MkClassLevel 2))
         -- The preconditions the assertions above rest on: the copy really is a
         -- Paladin Class, with a bar to offer at all. Without them a Copy
         -- Enchantment that copied NOTHING would read the same way.
