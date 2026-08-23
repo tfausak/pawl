@@ -237,7 +237,7 @@ populatedFace =
       Face.characteristicPT = Just Quantity.ManaValue,
       Face.delayedAbilities = Map.singleton (AbilityName.MkAbilityName (Text.pack "trigger")) minimalTriggeredAbility,
       Face.rooms = Seq.empty,
-      Face.playerAbilities = [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You PlayerEffect.CantCastSpells],
+      Face.playerAbilities = [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You Nothing PlayerEffect.CantCastSpells],
       Face.blockRequirements = [BlockRequirement.MkBlockRequirement Nothing (Just Affected.Attached)],
       Face.blockPermissions = [BlockPermission.MkBlockPermission Affected.Attached (Just (Quantity.Literal 1)) Nothing],
       Face.attackRequirements = [AttackRequirement.MkAttackRequirement Affected.Attached Nothing],
@@ -430,7 +430,7 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         s
         encodeFace
         decodeFace
-        baseFace {Face.playerAbilities = [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You PlayerEffect.CantCastSpells]}
+        baseFace {Face.playerAbilities = [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You Nothing PlayerEffect.CantCastSpells]}
         (init baseFaceJson <> ",\"playerAbilities\":[{\"scope\":{\"type\":\"You\"},\"effect\":{\"type\":\"CantCastSpells\"}}]}")
     Spec.it s "blockRequirements" $
       Common.assertJsonCodec

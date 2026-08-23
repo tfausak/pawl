@@ -18,14 +18,13 @@
 --
 -- Paladin Class, AFR 29, is the whole card pool for this file, and it was picked
 -- for what its level-2 section is: "Creatures you control get +1/+1", a plain
--- layer 7c modification, so nothing but the level gate is under test. Its two
--- other text-box sections are transcribed SHORT, and both omissions leave pawl's
--- card strictly WEAKER than printed rather than stronger:
+-- layer 7c modification, so nothing but the level gate is under test. Its TOP
+-- section -- "Spells your opponents cast during your turn cost {1} more to cast",
+-- which CR 716.3 makes an ability the Class has at all times -- is transcribed
+-- too, and topSectionSpec below is what proves it. Its remaining section is
+-- transcribed SHORT, and the omission leaves pawl's card strictly WEAKER than
+-- printed rather than stronger:
 --
---   * "Spells your opponents cast during your turn cost {1} more to cast" (CR
---     716.3's top section) is omitted. Pawl.Types.PlayerStaticAbility carries a
---     scope and an effect and no condition, so "during your turn" is unwritable
---     (gap #1945).
 --   * The level-3 section's "Whenever you attack, ..." is omitted; the BAR is
 --     kept, since CR 716.2a's activated half is what the level-3 gate below is
 --     about. The section's own text needs a count that excludes the slot it is
@@ -50,23 +49,104 @@ module Pawl.ClassSpec where
 
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ClassLevel as ClassLevel
+import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Class" $ do
+  topSectionSpec s registry
   sectionSpec s registry
   ladderSpec s registry
+
+-- CR 716.3: the text above the first class level bar is an ability the Class has
+-- at ALL times -- no bar precedes it, so no level gates it. Paladin Class prints
+-- "Spells your opponents cast during your turn cost {1} more to cast", and the
+-- clause under test is the "during your turn": a CR 604.2 condition on the
+-- PLAYER-facing static carrier, reading CR 102.1's active player.
+--
+-- alice controls the Class and nothing else; bob and alice each hold a Lightning
+-- Bolt ({R}). No lands and no mana: Cost.total answers about a cost rather than
+-- about paying it, so affordability cannot enter any assertion here.
+--
+-- The two boards below differ in EXACTLY one thing, GameState.activePlayer, and
+-- the Class is never levelled -- CR 716.3's section is not a level bar's, so a
+-- level would be a second moving part with nothing to prove.
+taxBoard :: Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> (ObjectId.ObjectId, GameState.GameState)
+taxBoard paladinClass lightningBolt active =
+  let (_, withClass) = S.addCreature paladinClass S.alice (Setup.emptyGame S.bothPlayers)
+      (bolt, withBolt) = S.addHandCard lightningBolt S.bob withClass
+   in ( bolt,
+        withBolt
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = active,
+            GameState.priority = Just active
+          }
+      )
+
+-- What `pid` would pay in total to cast the object in their hand whose printed
+-- mana cost is `printed`. PlayerEffectSpec's totalManaCost, duplicated rather
+-- than hoisted: Pawl.Support rebuilds every spec in the tree.
+totalManaCost :: PlayerId.PlayerId -> ObjectId.ObjectId -> ManaCost.ManaCost -> GameState.GameState -> Maybe ManaCost.ManaCost
+totalManaCost pid oid printed gs = Cost.Type.mana (Cost.total pid oid (Cost.Type.MkCost (Just printed) []) gs)
+
+red :: ManaSymbol.ManaSymbol
+red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+
+topSectionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+topSectionSpec s registry = Spec.describe s "Top text box section" $ do
+  -- The gameplay-level assertion first, and it is the one the whole unit exists
+  -- for: an opponent's spell is taxed on alice's turn and NOT on bob's own turn.
+  -- A Class whose clause was dropped taxes on both, and a clause read from the
+  -- TAXED player's perspective rather than the Class controller's taxes on
+  -- neither -- so the pair discriminates both wrong readings, which no single
+  -- board can.
+  Spec.it s "CR 716.3 / CR 102.1 the tax applies only during the Class controller's turn" $ do
+    paladinClass <- S.printingOf s registry "Paladin Class"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    let (bolt, alicesTurn) = taxBoard paladinClass lightningBolt S.alice
+        (bobsBolt, bobsTurn) = taxBoard paladinClass lightningBolt S.bob
+    Spec.assertEqWith
+      s
+      "bob's {R} Bolt costs {1}{R} during alice's turn"
+      (totalManaCost S.bob bolt (ManaCost.MkManaCost [red]) alicesTurn)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, red]))
+    Spec.assertEqWith
+      s
+      "the same Bolt costs {R} during bob's own turn"
+      (totalManaCost S.bob bobsBolt (ManaCost.MkManaCost [red]) bobsTurn)
+      (Just (ManaCost.MkManaCost [red]))
+  -- The scope half, which the case above cannot see: "your opponents" and "each
+  -- player" agree on every board where only an opponent casts. alice casting on
+  -- her own turn -- the one turn the condition is true -- is where they differ.
+  Spec.it s "CR 716.3 the Class controller's own spell is untaxed on her own turn" $ do
+    paladinClass <- S.printingOf s registry "Paladin Class"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    let (_, withClass) = S.addCreature paladinClass S.alice (Setup.emptyGame S.bothPlayers)
+        (alicesBolt, gs) = S.addHandCard lightningBolt S.alice withClass
+        alicesTurn = gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+    Spec.assertEqWith
+      s
+      "alice's own {R} Bolt stays {R}"
+      (totalManaCost S.alice alicesBolt (ManaCost.MkManaCost [red]) alicesTurn)
+      (Just (ManaCost.MkManaCost [red]))
 
 -- alice's board: the Class and one Goblin Piker on the battlefield, twelve
 -- untapped Plains, in her own precombat main phase with priority. Twelve is more
