@@ -3442,8 +3442,9 @@ retainedRed = plainRed {ManaUnit.retention = ManaRetention.UntilEndOfCombat}
 -- ({R}{R}{R}{R} Sorcery, "Add {R}{R}{R}{R}{R}{R}{R}. Spend this mana only to cast
 -- artifact or creature spells") is the printing, and the whole card is that one
 -- sentence. Its mana comes off the STACK -- a sorcery resolving through
--- Pawl.Engine.Resolve's Effect.AddMana arm -- which is the path that reads the
--- whole ManaAddition; a mana ability paid inline drops the restriction (#1976).
+-- Pawl.Engine.Resolve's Effect.AddMana arm. Mishra's Workshop below is the same
+-- rule on the inline road (CR 605.3b), which is the pair that says the two
+-- producers stamp the same clause.
 --
 -- Nothing is omitted from the card, so pawl's Geosurge is neither stricter nor
 -- weaker than printed.
@@ -3519,6 +3520,68 @@ restrictedRed =
       ManaUnit.retention = ManaRetention.Ordinary,
       ManaUnit.restriction =
         Just (Filter.Or [Filter.HasCardType CardType.Artifact, Filter.HasCardType CardType.Creature])
+    }
+
+-- CR 106.6 on the OTHER road: a mana ability's restricted mana, added inline at
+-- payment (CR 605.3b) rather than by a spell resolving off the stack. Mishra's
+-- Workshop (Land, "{T}: Add {C}{C}{C}. Spend this mana only to cast artifact
+-- spells") is the printing -- Antiquities is the paper set -- and the whole card
+-- is that one ability.
+--
+-- Nothing is omitted from the card, so pawl's Workshop is neither stricter nor
+-- weaker than printed.
+--
+-- Geosurge above is the same rule on the stack road, and the pair is what proves
+-- the two roads agree: the restriction rides Pawl.Types.ManaAddition, and
+-- Mana.manaOptionsOfGiven is what stamps it onto the units this road adds.
+workshopSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+workshopSpec s registry = Spec.describe s "Mishra's Workshop" $ do
+  -- The discriminating pair, twice over. Two SPELLS: Sol Ring ({1} Artifact) is
+  -- what the restriction admits and Goblin Piker ({1}{R} Creature) is what it
+  -- does not, and the Mountain beside the Workshop is what pays the Piker's
+  -- {R} -- so its {1} is the only demand the restricted colourless could serve
+  -- and the refusal is CR 106.6 rather than a colour the board cannot make. Two
+  -- BOARDS: the control swaps the Workshop for three Reliquary Towers, which is
+  -- the same three colourless off untapped lands with nothing said about
+  -- spending them. The boards differ in how many lands carry that mana, since no
+  -- printing in `data/cards/` puts three unrestricted colourless on one
+  -- permanent; what they do not differ in is the mana available, which is what
+  -- both casts are asked about.
+  Spec.it s "CR 106.6 the inline three colourless cast an artifact spell and refuse a creature spell" $ do
+    workshop <- S.printingOf s registry "Mishra's Workshop"
+    tower <- S.printingOf s registry "Reliquary Tower"
+    mountain <- S.printingOf s registry "Mountain"
+    solRing <- S.printingOf s registry "Sol Ring"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let castables board =
+          let (withRing, ringId) = S.handOne solRing board
+              (pikerId, withBoth) = S.addHandCard piker S.alice withRing
+           in (S.castable S.alice ringId withBoth, S.castable S.alice pikerId withBoth)
+    Spec.assertEqWith s "three unrestricted colourless and a Mountain cast either one" (castables (S.landsFor tower S.alice 3 (S.landsInPlay mountain 1))) (True, True)
+    Spec.assertEqWith s "the Workshop's three cast the artifact spell and not the creature spell" (castables (S.landsFor workshop S.alice 1 (S.landsInPlay mountain 1))) (True, False)
+
+  -- The stamp itself, read off the pool the payment left. One Workshop and
+  -- nothing else, so the {1} has one payment and the two unspent mana are
+  -- CR 106.4's floating remainder -- restricted, which is what says the inline
+  -- path carried the instruction's clause and not just its type.
+  Spec.it s "CR 106.4 the artifact cast spends one of the three and leaves two restricted" $ do
+    workshop <- S.printingOf s registry "Mishra's Workshop"
+    solRing <- S.printingOf s registry "Sol Ring"
+    let (before, ringId) = S.handOne solRing (S.landsInPlay workshop 1)
+        paid = S.runPure S.identityAnswer before (S.cast S.alice ringId)
+    Spec.assertEqWith s "two restricted colourless are left floating" (poolOf S.alice paid) (replicate 2 restrictedColorless)
+    Spec.assertEqWith s "Sol Ring is on the stack" (length (GameState.stack paid)) 1
+    Spec.assertEqWith s "and the Workshop is the permanent that paid" (S.tappedCount S.alice paid) 1
+
+-- One of the Workshop's three: colourless, from a source that is not snow, lost
+-- as the phase ends, and spendable only on an artifact spell.
+restrictedColorless :: ManaUnit.ManaUnit
+restrictedColorless =
+  ManaUnit.MkManaUnit
+    { ManaUnit.manaType = ManaType.Colorless,
+      ManaUnit.tags = Set.empty,
+      ManaUnit.retention = ManaRetention.Ordinary,
+      ManaUnit.restriction = Just (Filter.HasCardType CardType.Artifact)
     }
 
 -- CR 105.4's half of the same arm: an ability that adds mana whose TYPE is not
@@ -3802,6 +3865,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   shizukoSpec s registry
   avatarRokuSpec s registry
   geosurgeSpec s registry
+  workshopSpec s registry
   quirionSpec s registry
   celestialDawnSpec s registry
   spendChoiceSpec s registry

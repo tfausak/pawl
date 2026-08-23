@@ -3575,7 +3575,7 @@ effectFilters effect = case effect of
     unframed (durationFilters duration <> modificationFilters (Projection.widenModification modification)) <> sourceHosted (objectRefFilters ref)
   Effect.ChangeText {} -> []
   -- CR 106.6's spending restriction. UNFRAMED: it is evaluated against the spell
-  -- being paid for (Pawl.Engine.Mana.spendableOn), which is neither an attach
+  -- being paid for (Pawl.Engine.Mana.spendableAmong), which is neither an attach
   -- destination nor a target slot.
   Effect.AddMana addition -> unframed (Maybe.maybeToList (ManaAddition.restriction addition))
   -- THE one search-framed position. CR 701.3a from the candidate's side:
