@@ -2292,8 +2292,8 @@ optionalEffectSpec s registry =
               mode =
                 Mode.MkMode
                   ( Seq.fromList
-                      [ Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton draw),
-                        Clause.MkClause Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.singleton draw)
+                      [ Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton draw),
+                        Clause.MkClause Nothing Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.singleton draw)
                       ]
                   )
                   Map.empty

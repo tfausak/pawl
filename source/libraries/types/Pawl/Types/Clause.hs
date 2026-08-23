@@ -1,6 +1,7 @@
 module Pawl.Types.Clause where
 
 import qualified Data.Sequence as Seq
+import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Optionality as Optionality
@@ -25,7 +26,43 @@ import qualified Pawl.Types.PayGate as PayGate
 -- payload, so a concrete `Effect Card` here would make the two modules mutually
 -- importing.
 data Clause card = MkClause
-  { -- | CR 701.46a's "if this permanent has no +1/+1 counters on it" -- a gate on
+  { -- | CR 608.2c's "If you do": which EARLIER clause of this mode this one
+    -- hangs off, so that declining that one skips this one too. Tweeze's "you
+    -- may discard a card. If you do, draw a card" is the witness -- the draw is
+    -- a clause of its own naming the "may" clause's ordinal. Nothing is the
+    -- unmarked case every other card in the corpus takes.
+    --
+    -- CR 608.2c is the whole authority: the controller "follows its instructions
+    -- in the order written", and later text may modify the meaning of earlier
+    -- text, so this is clause sequencing rather than a rule of its own. That is
+    -- why the reference is CR 608.2e's ordinal (Pawl.Types.ClauseIndex), the one
+    -- Pawl.Types.PayGate.offeredAt already names, and why it is read against the
+    -- clauses of THIS mode instance (CR 700.2d).
+    --
+    -- Keyed on the ANSWER the named clause's own riders produced -- did its
+    -- instructions run -- and never on the board afterwards, which is PayGate's
+    -- posture (CR 118.12's "regardless of what events actually occurred")
+    -- carried over to CR 603.5's "may". Baral, Chief of Compliance needs none of
+    -- this: its "you may draw a card. If you do, discard a card" folds into one
+    -- optional clause because CR 121.3 makes the draw happen whenever it is
+    -- chosen, so the answer and the action cannot come apart.
+    --
+    -- Not implemented: an option the named clause could not legally take is
+    -- offered anyway (CR 608.2d), so accepting "you may discard a card" with an
+    -- empty hand admits this clause (#2167).
+    --
+    -- NOT CR 603.12's reflexive triggered ability, the "when you do" spelling
+    -- (Pawl.Types.TriggerCondition's Reflexive): that one creates a NEW ability
+    -- that uses the stack and chooses its targets at CR 603.3d, where this
+    -- clause is part of the same resolution and gets no priority pass. A card
+    -- printing "if you do" must not become one.
+    --
+    -- Not an arm of Pawl.Types.Condition either: that is a predicate over game
+    -- STATE, with customers outliving the resolution -- a "for as long as"
+    -- duration, a static ability's "as long as" -- where a clause ordinal names
+    -- nothing.
+    ifTaken :: Maybe ClauseIndex.ClauseIndex,
+    -- | CR 701.46a's "if this permanent has no +1/+1 counters on it" -- a gate on
     -- THIS clause's effects rather than on the whole ability, which is why the
     -- rider rides the same carrier CR 603.5's "may" does. CR 701.37a's
     -- monstrosity (Nessian Asp) is two instructions rather than adapt's one, but
@@ -70,11 +107,12 @@ data Clause card = MkClause
     -- hang off one {2} -- see Pawl.Types.PayGate.offeredAt. Stymied Hopes is the
     -- other end of the same question, a gate over one clause of two.
     --
-    -- The three riders are independent, and Pawl.Engine.Resolve asks them in
-    -- printed order: `condition` first (CR 701.46a prints its "if" ahead of the
-    -- instructions, and a clause that cannot happen is no question to ask), then
-    -- the "may", then this -- a declined clause has no instruction left for a
-    -- payment to qualify.
+    -- The four riders are independent, and Pawl.Engine.Resolve asks them in
+    -- printed order: `ifTaken` first (CR 608.2c's "If you do" prefixes the
+    -- sentence, and a clause whose predecessor was declined is no question to
+    -- ask), then `condition` (CR 701.46a prints its "if" ahead of the
+    -- instructions), then the "may", then this -- a declined clause has no
+    -- instruction left for a payment to qualify.
     payGate :: Maybe PayGate.PayGate,
     effects :: Seq.Seq (Effect.Effect card)
   }
