@@ -8037,8 +8037,18 @@ reactsToAbilityTriggering cond = case cond of
 -- events at once and carries the environment captured when it was armed (CR
 -- 603.7c). The parallel for a sourceless inherent ability is
 -- Monarch.inherentMatch, which has no bearer to scope a shared matcher to.
-eventBindings :: TriggerCondition -> GameEvent -> Map.Map SlotName.SlotName Binding
-eventBindings cond event = case (cond, event) of
+--
+-- THE FIRST ARGUMENT IS NOT READ OFF THE EVENT, and is the one datum here that
+-- is not: CR 400.7f's "the new object that each Aura enchanting that permanent
+-- became in its owner's graveyard" is a fact about the BEARER's own zone change,
+-- which the event that fired the trigger says nothing about. `eventTriggers`
+-- computes it off the same CR 117.5 batch and hands it in; `delayedPending` has
+-- no bearer departure to scan for and hands in Nothing. Kept here rather than
+-- unioned in at the call site so that eventBindingSlots below stays the single
+-- statement of which slots a condition makes available, which is what the card
+-- lint reads.
+eventBindings :: Maybe ObjectId -> TriggerCondition -> GameEvent -> Map.Map SlotName.SlotName Binding
+eventBindings bearerBecame cond event = case (cond, event) of
   -- CR 603.2b's "that player": the active player, on whose turn the step began.
   -- Shizuko, Caller of Autumn's "at the beginning of each player's upkeep, THAT
   -- PLAYER adds {G}{G}{G}" is the reader, and the seat it names is nobody the
@@ -8403,6 +8413,36 @@ eventBindings cond event = case (cond, event) of
   -- promise needs: every GameEvent.Mentored carries both ids.
   (TriggerCondition.AttachedCreatureMentors, GameEvent.Mentored (Mentored.MkMentored _ mentored)) ->
     Binding.setMentoredCreature mentored Map.empty
+  -- CR 400.7f, the sibling of CR 400.7e's `became` arms above: an ability that
+  -- triggers when an enchanted permanent leaves the battlefield "can find the new
+  -- object that each Aura enchanting that permanent became in its owner's
+  -- graveyard". Screams from Within's "return THIS CARD from your graveyard to
+  -- the battlefield" is the reader, and this is the id that answers it -- CR
+  -- 400.7 having already destroyed the battlefield id CR 113.7a's `triggerSource`
+  -- slot carries. Binding.became's own comment draws the line: `triggerSource` is
+  -- everything the ability says ABOUT itself, this slot everything it DOES to
+  -- itself.
+  --
+  -- Both sentences of the rule, and one lookup serves them: the "at the same time
+  -- the enchanted permanent left the battlefield" case is the wrath, where host
+  -- and Aura share an EventGroup, and the CR 704.5m case is the ordinary one,
+  -- where the Aura is buried by a LATER pass of the same CR 117.5 batch. The
+  -- argument is computed over the whole scanned batch, which is exactly those two
+  -- and no wider: an Aura that reached a graveyard at an EARLIER group than the
+  -- host's death is offered by none of eventTriggers' candidate sources, so its
+  -- trigger is never gathered and this is never asked about it.
+  --
+  -- The EVENT is not read -- see the first argument's note on the signature -- so
+  -- the pattern is a wildcard rather than the Moved shape matchesTrigger accepted.
+  --
+  -- Nothing where the bearer did not reach a graveyard: an Equipment host dying
+  -- under CR 704.5n leaves the bearer standing, and an effect that sent the Aura
+  -- elsewhere in the same batch put it somewhere the rule cannot look. Both are
+  -- CR 400.7f's own answer rather than a hole -- the payload finds nothing and
+  -- moves nothing -- and eventBindingSlots below says why the floor is still the
+  -- slot.
+  (TriggerCondition.AttachedCreatureDies, _) ->
+    maybe Map.empty (`Binding.setBecame` Map.empty) bearerBecame
   -- CR 725.1's newly crowned player: Garland, Royal Kidnapper's "that player",
   -- whose creature the trigger then targets and whose crown its duration watches.
   -- Bound whichever relation matched, for the reason the PlayerLosesLife arm
@@ -8826,12 +8866,30 @@ eventBindingSlots cond = case cond of
   -- Legion's "that creature" has no other name to be read under. Guaranteed given a
   -- match, as this classification has to be: every Mentored event carries both ids.
   TriggerCondition.AttachedCreatureMentors -> Set.singleton Binding.mentoredCreature
-  -- Empty, unlike AttachedCreatureMentors above: CR 303.4b's "enchanted
-  -- creature" is the one permanent the event names beyond the bearer, and
-  -- Screams from Within's payload acts on the bearer alone. A card that did name
-  -- it -- Reins of the Vinesteed's "that creature" -- would need a slot here
+  -- CR 400.7f's `became`, and only it. CR 303.4b's "enchanted creature" is the
+  -- other permanent the event names, and it gets NO slot: Screams from Within's
+  -- payload acts on the bearer alone, and a card that did name the host -- Reins
+  -- of the Vinesteed's "that creature" -- would need a second slot here
   -- (gap #1893).
-  TriggerCondition.AttachedCreatureDies -> Set.empty
+  --
+  -- GUARANTEED given a match, on CR 704.5m rather than on the event: an Aura
+  -- whose host has left the battlefield is attached to nothing, and that rule
+  -- puts it into its owner's graveyard as a state-based action, which CR 117.5
+  -- runs to completion before any trigger is placed. matchesTrigger's arm makes
+  -- the same observation from the other side -- by the time the condition is
+  -- asked, the live attachment is ALWAYS gone.
+  --
+  -- Two shapes escape it, and neither is a hole this classification has to widen
+  -- for. An EQUIPMENT bearer stays on the battlefield under CR 704.5n, and no
+  -- printing carries this condition on one (gap #1894 records the query and the
+  -- card that would refute it). An effect that sends the Aura somewhere other
+  -- than its owner's graveyard in the same batch puts it where CR 400.7f cannot
+  -- look -- and there the rule's own answer is that the ability finds nothing, so
+  -- the payload moving nothing is correct rather than the silent no-op this lint
+  -- exists to catch. That is what separates this arm from
+  -- SelfLeavesTheBattlefield's floor, where a BOUNCE is an ordinary printed
+  -- destination and the slot's absence is an ordinary printed case (#505).
+  TriggerCondition.AttachedCreatureDies -> Set.singleton Binding.became
   -- Empty for SelfEvolves' reason and not for AttachedCreatureMentors' -- rule
   -- 702.149a's counter goes on the bearer, so Savior of Ollenbock's "this creature"
   -- is Binding.triggerSource and the event names nobody else.
@@ -9321,6 +9379,35 @@ eventTriggers events gs =
       -- ability it had, unfiltered, for the reason `battlefieldAbilitiesOf`
       -- above gives.
       leftBattlefield = departedFrom abilitiesOf
+      -- CR 400.7f's own datum, and the one thing `eventBindings` is told that it
+      -- could not read off the event it was handed: for each permanent this batch
+      -- put from the battlefield into a graveyard, the id it BECAME there.
+      -- `departed` is the key because that is the id a borne trigger carries as
+      -- its source (CR 113.7a), so `pend` below can ask it about the bearer.
+      --
+      -- Battlefield to GRAVEYARD alone, that being the only destination the rule
+      -- names ("in its owner's graveyard"); every other departure contributes
+      -- nothing, and a bearer with no entry gets Nothing.
+      --
+      -- The whole scanned batch rather than one group, because the rule's second
+      -- sentence is the CR 704.5m burial, which happens at a strictly later SBA
+      -- pass than the host's death. No wider than the rule even so: a permanent
+      -- whose graveyard arrival was EARLIER than the event was not on the
+      -- battlefield when it happened, so none of the candidate sources below
+      -- offers its abilities and no trigger of its is ever gathered to ask about.
+      becameInGraveyard =
+        Map.fromList
+          ( Maybe.mapMaybe
+              ( ( \event -> case event of
+                    GameEvent.Moved (Moved.MkMoved zc _)
+                      | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard ->
+                          Just (ZoneChange.departed zc, ZoneChange.object zc)
+                    _ -> Nothing
+                )
+                  . LoggedEvent.event
+              )
+              events
+          )
       -- The batch cut into its CR 704.3 / CR 608.2f events. Groups are
       -- non-decreasing along the log (Event.recordEvent only mints a fresh one or
       -- repeats the frozen one), so the members of one event are contiguous and
@@ -9811,7 +9898,7 @@ eventTriggers events gs =
             -- last known information or out of a sample taken while it stood.
             bindings = maybe Map.empty Object.bindings (Game.lookupObject oid gs)
             fires ab = matchesTriggerGiven bindings gs oid ctrl (TriggeredAbility.condition ab) event
-            pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings (TriggeredAbility.condition ab) event)
+            pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings (Map.lookup oid becameInGraveyard) (TriggeredAbility.condition ab) event)
          in fmap pend (filter fires abilities)
       -- Map.unions is left-biased, so the battlefield reading wins over a
       -- last-known one, a cycled card and a graveyard reading. That rules out a
@@ -10702,7 +10789,11 @@ delayedPending events gs =
           -- player" is the seat that just gained, not one the arming spell named.
           -- Map.union is left-biased, so a name the arming environment happens to
           -- share is read as THIS firing's, which is what the printed word means.
-          (Map.union (eventBindings (TriggeredAbility.condition (DelayedTrigger.ability entry)) event) (DelayedTrigger.bindings entry))
+          -- Nothing for CR 400.7f's bearer arrival: this scan looks for events a
+          -- delayed entry watches, not for a bearer's own departure, and the
+          -- entry's captured environment (CR 603.7c) is where what it knows about
+          -- its own object comes from.
+          (Map.union (eventBindings Nothing (TriggeredAbility.condition (DelayedTrigger.ability entry)) event) (DelayedTrigger.bindings entry))
       store = GameState.delayedTriggers gs
       -- CR 603.12's exception to all of the above, and the ONE place the reflexive
       -- form differs from an ordinary CR 603.7 entry: it is "checked immediately

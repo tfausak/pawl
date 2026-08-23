@@ -493,8 +493,9 @@ data TriggerCondition
     -- that buried its host, and CR 117.5 places triggers only after that batch
     -- settles.
     --
-    -- Not implemented: the payload finding the Aura in the graveyard, which is
-    -- CR 400.7f rather than this rule (gap #1892).
+    -- The PAYLOAD finding the Aura in that graveyard is CR 400.7f rather than
+    -- this rule, and lives with the other zone-change slots:
+    -- Pawl.Engine.Event.eventBindings binds the arrival under Binding.became.
     AttachedCreatureDies
   | -- | CR 702.55b/702.55c: "when the creature this card haunts dies", borne by
     -- the haunting CARD IN EXILE. PermanentDies' zone pair; WHICH permanent is
