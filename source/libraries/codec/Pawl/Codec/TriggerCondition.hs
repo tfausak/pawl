@@ -45,6 +45,7 @@ codec =
       Arm.payload "SelfAttacksWithAnother" filterCodec TriggerCondition.SelfAttacksWithAnother (\x -> case x of TriggerCondition.SelfAttacksWithAnother y -> Just y; _ -> Nothing),
       Arm.payload "CreatureAttacksAlone" filterCodec TriggerCondition.CreatureAttacksAlone (\x -> case x of TriggerCondition.CreatureAttacksAlone y -> Just y; _ -> Nothing),
       Arm.nullary "CreatureAttacksYou" TriggerCondition.CreatureAttacksYou,
+      Arm.nullary "YouAttack" TriggerCondition.YouAttack,
       Arm.nullary "AttachedPlayerIsAttacked" TriggerCondition.AttachedPlayerIsAttacked,
       Arm.nullary "SelfAttacksPlayerWithMostLife" TriggerCondition.SelfAttacksPlayerWithMostLife,
       Arm.nullary "SelfBlocks" TriggerCondition.SelfBlocks,
