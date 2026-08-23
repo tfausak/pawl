@@ -29,7 +29,7 @@ import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.Timestamp as Timestamp.Type
 
--- | One counter kind and CR 122.3's timestamp for it. A pair per kind through
+-- | One counter kind and CR 613.7c's timestamp for it. A pair per kind through
 -- 'Common.keyedList' rather than 'Common.multiset', which pairs a key with a
 -- COUNT: the value here is a timestamp, so the shape Pawl.Codec.EntryRiders
 -- writes is the one that fits.
@@ -42,14 +42,16 @@ counterTimestamp = Fields.object $ do
 -- | Every field 'Fields.required', the posture Pawl.Codec.Combat takes for the
 -- rest of the game state: a Maybe is written as an explicit null rather than
 -- elided, and an empty collection as an empty array. Several of the absences are
--- states in their own right rather than a zero -- CR 109.4's "no recorded
--- controller" on `enteredUnder`, CR 702.99a's un-plotted card against a card
+-- states in their own right rather than a zero -- CR 109.4's object with no
+-- controller at all on `enteredUnder`, CR 702.170a's un-plotted card against a card
 -- plotted on turn 0 -- and the type's own haddock argues each; writing them all
 -- alike is what keeps the reader from having to know which.
 --
 -- `counters` is 'Common.multiset', whose entries are key/count objects, so a
--- kind sitting at ZERO survives the round trip: Pawl.Engine.Damage spends a
--- shield counter with Map.insert and does not prune the entry. `bindings` goes
+-- kind sitting at ZERO survives the round trip: Pawl.Engine.Damage takes CR
+-- 120.3c's loyalty and CR 120.3h's defense counters off with Map.insert and a
+-- saturating subtraction, leaving the entry at 0 rather than pruning it --
+-- which is the state CR 704.5i and CR 704.5v then read. `bindings` goes
 -- through Pawl.Codec.Binding's own 'Binding.codecMap', which is the slot-name
 -- keyed object.
 codec :: Codec.Codec Object.Object

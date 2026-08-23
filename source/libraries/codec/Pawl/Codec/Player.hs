@@ -11,9 +11,10 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.Player as Player
 
--- | `counters` is 'Common.multiset', whose entries are key/count objects: CR
--- 122.1 reads an absent kind as zero, and a kind really can sit at zero once an
--- effect has taken the last one off.
+-- | `counters` is 'Common.multiset', whose entries are key/count objects: the
+-- field's absent-means-zero convention (Pawl.Types.Player) makes a zero entry
+-- and an absent one the same to a card, but the map really can hold one once an
+-- effect has taken the last counter off, and the round trip has to keep it.
 --
 -- `commanderDamage` is keyed by a PlayerId, a Natural newtype, so it takes
 -- 'Common.naturalMap' -- a JSON object keyed by the decimal seat, which is what

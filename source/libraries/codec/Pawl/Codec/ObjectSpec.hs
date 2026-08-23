@@ -40,10 +40,10 @@ import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Object" $ do
-  -- CR 108.1: a card in a hand, which is most of what a game state holds. Every
+  -- CR 402.1: a card in a hand, which is most of what a game state holds. Every
   -- optional axis is at its absent value, so this case is where a codec that
   -- elided a null or wrote an empty array as an absent key is caught -- and
-  -- where `plotted` is Nothing against the Just 0 below, which CR 702.99a makes
+  -- where `plotted` is Nothing against the Just 0 below, which CR 702.170a makes
   -- two different cards rather than one.
   Spec.it s "a card in a hand" $
     Common.assertCodec
@@ -109,10 +109,11 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
   -- Set PlayerId axes three different seats.
   --
   -- `counters` carries a kind at ZERO beside one at three. That is a state the
-  -- engine really produces -- Pawl.Engine.Damage spends a CR 615.7 shield
-  -- counter with Map.insert and does not prune the entry -- so an encoder that
-  -- dropped a zero would lose it, which is what CR 122.1's "absent means zero"
-  -- reading would silently license.
+  -- engine really produces: Pawl.Engine.Damage takes CR 120.3c's loyalty
+  -- counters off with Map.insert and a saturating subtraction, so a planeswalker
+  -- dealt lethal damage keeps a Loyalty entry at 0. An encoder that dropped a
+  -- zero would lose it, which the field's own absent-means-zero convention
+  -- (Pawl.Types.Object) would make look harmless.
   Spec.it s "a permanent carrying every axis at once" $
     Common.assertCodec
       s
@@ -145,7 +146,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.counters =
             Map.fromList
               [ (CounterKind.PlusOnePlusOne, 3),
-                (CounterKind.Shield, 0)
+                (CounterKind.Loyalty, 0)
               ],
           Object.counterTimestamps = Map.singleton CounterKind.PlusOnePlusOne (Timestamp.MkTimestamp 7),
           Object.attachedTo = Just (Recipient.ToCreature (ObjectId.MkObjectId 8)),
@@ -198,7 +199,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"sickness\":{\"type\":\"Settled\",\"value\":5}"
           <> ",\"bindings\":{\"target\":{\"targets\":[{\"type\":\"ToCreature\",\"value\":6}]}}"
           <> ",\"counters\":[{\"key\":{\"type\":\"PlusOnePlusOne\"},\"value\":3}"
-          <> ",{\"key\":{\"type\":\"Shield\"},\"value\":0}]"
+          <> ",{\"key\":{\"type\":\"Loyalty\"},\"value\":0}]"
           <> ",\"counterTimestamps\":[{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"timestamp\":7}]"
           <> ",\"attachedTo\":{\"type\":\"ToCreature\",\"value\":8}"
           <> ",\"chosenColor\":{\"type\":\"Red\"},\"chosenSubtype\":{\"type\":\"Goblin\"}"

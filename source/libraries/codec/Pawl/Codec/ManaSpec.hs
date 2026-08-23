@@ -29,10 +29,10 @@ plainJson manaType =
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Mana" $ do
   -- CR 106.4: an empty pool, which is what every player has at the end of every
-  -- step and phase (CR 500.4).
+  -- step and phase -- that rule's own "each player's mana pool empties".
   Spec.it s "an empty pool" $
     Common.assertCodec s Mana.codec (Mana.MkMana []) " [] "
-  -- CR 106.4's multiset, spelled as a list because the units are not fungible:
+  -- CR 106.4's unspent mana, spelled as a list because the units are not fungible:
   -- the two red units here are equal and BOTH must survive, which a set would
   -- collapse and a count-per-type could not tell from one red plus one snow red.
   Spec.it s "two indistinguishable red units beside a snow one" $

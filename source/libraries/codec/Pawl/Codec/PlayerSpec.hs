@@ -13,7 +13,7 @@ import qualified Pawl.Types.Status as Status
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Player" $ do
-  -- CR 103.3's starting life total and nothing else: a player outside a
+  -- CR 103.4's starting life total and nothing else: a player outside a
   -- Commander game (CR 903.3), with no speed at all (CR 702.179b) and no
   -- counters. `speed` is null here and 0 below, which CR 704.5aa makes two
   -- different players.
@@ -36,9 +36,9 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
   -- Every axis away from the case above. `life` is NEGATIVE, which CR 104.3b
   -- reaches through a state-based action rather than clamping at zero, so the
   -- field is an Integer and a Natural encoder would reject this state.
-  -- `counters` carries a kind at ZERO beside one at two: CR 122.1 reads an
-  -- absent kind as zero, so the two are the same to a card, but the map really
-  -- holds the entry and the round trip has to keep it.
+  -- `counters` carries a kind at ZERO beside one at two: an absent kind reads as
+  -- zero (Pawl.Types.Player), so the two are the same to a card, but the map
+  -- really holds the entry and the round trip has to keep it.
   Spec.it s "a departed Commander player with counters, speed and dungeon" $
     Common.assertCodec
       s
