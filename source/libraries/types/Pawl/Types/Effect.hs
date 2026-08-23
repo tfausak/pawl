@@ -15,6 +15,7 @@ import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.Discard as Discard
+import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
@@ -248,7 +249,11 @@ data Effect card
   | -- | CR 121.1: the players the PlayerRef names each draw this many cards, one
     -- at a time (CR 121.2). Empty-library draw is a loss (CR 104.3c), unlike
     -- Mill -- the asymmetry that keeps the two separate.
-    Draw PlayerQuantity.PlayerQuantity
+    --
+    -- The slot is "and remember which cards", for a later clause of the same
+    -- resolution to name them (#1899) -- Shahrazad and Sindbad's "draw a card
+    -- and reveal IT". Nothing for a draw nothing looks back at.
+    Draw Draw.Draw
   | -- | CR 701.17: the players the PlayerRef names each mill this many. A short
     -- or empty library mills fewer, no penalty (CR 701.17b) -- unlike Draw, which
     -- loses.

@@ -28,6 +28,7 @@ import qualified Pawl.Codec.DealDamage as DealDamage
 import qualified Pawl.Codec.Designate as Designate
 import qualified Pawl.Codec.Destroy as Destroy
 import qualified Pawl.Codec.Discard as Discard
+import qualified Pawl.Codec.Draw as Draw
 import qualified Pawl.Codec.DurationRef as DurationRef
 import qualified Pawl.Codec.ExchangeSides as ExchangeSides
 import qualified Pawl.Codec.ExileHaunting as ExileHaunting
@@ -98,7 +99,7 @@ codec cardCodec =
       Arm.payload "BecomesBlocked" SlotName.codec Effect.BecomesBlocked (\x -> case x of Effect.BecomesBlocked y -> Just y; _ -> Nothing),
       Arm.payload "Counter" Counter.codec Effect.Counter (\x -> case x of Effect.Counter y -> Just y; _ -> Nothing),
       Arm.payload "MoveToZone" MoveToZone.codec Effect.MoveToZone (\x -> case x of Effect.MoveToZone y -> Just y; _ -> Nothing),
-      Arm.payload "Draw" PlayerQuantity.codec Effect.Draw (\x -> case x of Effect.Draw y -> Just y; _ -> Nothing),
+      Arm.payload "Draw" Draw.codec Effect.Draw (\x -> case x of Effect.Draw y -> Just y; _ -> Nothing),
       Arm.payload "Reveal" Reveal.codec Effect.Reveal (\x -> case x of Effect.Reveal y -> Just y; _ -> Nothing),
       Arm.payload "LookAt" LookAt.codec Effect.LookAt (\x -> case x of Effect.LookAt y -> Just y; _ -> Nothing),
       Arm.payload "Scry" PlayerQuantity.codec Effect.Scry (\x -> case x of Effect.Scry y -> Just y; _ -> Nothing),

@@ -1067,13 +1067,14 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
   -- charges carol 5 and leaves her on 4, which her printed 9 cannot be confused
   -- with.
   --
-  -- Not transcribed on pawl's card, and both are gaps rather than rules
-  -- equivalences: the intervening "if there haven't been any subgames this
-  -- match", which pawl has no match to count over (gap #1898), and the second
-  -- ability, "{T}: Draw a card and reveal it. If it isn't a land card, discard
-  -- it.", whose "it" is the drawn card and which no binding names (gap #1899).
-  -- The dropped ability leaves pawl's card able to do less than printed. The
-  -- dropped intervening "if" is the other direction -- the trigger fires on every
+  -- The second ability, "{T}: Draw a card and reveal it. If it isn't a land
+  -- card, discard it.", IS transcribed; Pawl.ZoneChangeSpec is where it is
+  -- proven.
+  --
+  -- Not transcribed on pawl's card, and a gap rather than a rules equivalence:
+  -- the intervening "if there haven't been any subgames this match", which pawl
+  -- has no match to count over (gap #1898). That one runs the other direction --
+  -- the trigger fires on every
   -- connection where the printed one fires at most once a match -- and CR 729.1b
   -- charges the controller alongside everyone else who does not win, so what it
   -- repeats favours no seat.

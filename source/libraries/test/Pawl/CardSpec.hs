@@ -126,6 +126,7 @@ import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.DiscardCards as DiscardCards
+import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.DungeonRoom as DungeonRoom
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
@@ -324,7 +325,7 @@ instantLine = spellLine CardType.Instant Set.empty Set.empty
 -- "You draw this many cards" -- the smallest payload an ability can carry, used
 -- below only so that two abilities can be told apart by their effect.
 youDraw :: Integer -> Effect.Effect Card.Type.Card
-youDraw n = Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal n))
+youDraw n = Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal n) Nothing)
 
 -- "This object has [keyword]" as a static ability (CR 604.1), the smallest
 -- carrier Face.staticAbilities takes.
@@ -803,7 +804,7 @@ effectCounts effect = case effect of
   -- gaining a Quantity answers there rather than here -- and that function is
   -- also where the four opcodes that route their ref are named.
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> refCounts ref
-  Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
+  Effect.Draw (Draw.MkDraw _ quantity _) -> quantityCounts quantity
   Effect.Mill (Mill.MkMill _ quantity _ _) -> quantityCounts quantity
   Effect.Reveal (Reveal.MkReveal ref _) -> refCounts ref
   Effect.LookAt (LookAt.MkLookAt ref _) -> refCounts ref
@@ -1536,7 +1537,7 @@ effectReplacements effect = case effect of
   Effect.Destroy {} -> []
   Effect.Sacrifice _ -> []
   Effect.MoveToZone {} -> []
-  Effect.Draw (PlayerQuantity.MkPlayerQuantity _ _) -> []
+  Effect.Draw {} -> []
   Effect.Mill {} -> []
   Effect.Reveal {} -> []
   Effect.LookAt {} -> []
@@ -2186,7 +2187,7 @@ effectMintedFaces effect = case effect of
   Effect.Destroy {} -> []
   Effect.Sacrifice _ -> []
   Effect.MoveToZone {} -> []
-  Effect.Draw (PlayerQuantity.MkPlayerQuantity _ _) -> []
+  Effect.Draw {} -> []
   Effect.Mill {} -> []
   Effect.Reveal {} -> []
   Effect.LookAt {} -> []
@@ -3610,7 +3611,7 @@ effectFilters effect = case effect of
   -- canHostSubjects sweeps the same shape -- the lint is about the positions a
   -- card author can write, not about which of them the pool has used.
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _) -> sourceHosted (objectRefFilters ref) <> unframed (riderFilters riders)
-  Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
+  Effect.Draw (Draw.MkDraw _ quantity _) -> unframed (quantityFilters quantity)
   -- The tally's Filter is a position a card author writes, so the lint reaches
   -- it: rule 728.1's "nonland card" is one of these.
   Effect.Mill (Mill.MkMill _ quantity mTally _) -> unframed (quantityFilters quantity <> fmap MillTally.filter (Maybe.maybeToList mTally))
@@ -4919,7 +4920,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let -- Endless Cockroaches' own payload: "return it to its owner's hand".
         returnIt = Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.InSlot Binding.became) Zone.Hand EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue)
         -- Rule 702.70a's shape, as a targetless read of "that player".
-        thatPlayerDraws = Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Type.Literal 1))
+        thatPlayerDraws = Effect.Draw (Draw.MkDraw (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Type.Literal 1) Nothing)
     Spec.assertBool
       s
       (triggeredAbilityOffends (oneEffectTrigger TriggerCondition.SelfEnters returnIt))
@@ -5053,13 +5054,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- Endless Cockroaches' payload (CR 400.7e) and rule 702.70a's, the two
         -- event slots, neither of which an activation has an event to bind.
         returnIt = Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.InSlot Binding.became) Zone.Hand EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue)
-        thatPlayerDraws = Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Type.Literal 1))
+        thatPlayerDraws = Effect.Draw (Draw.MkDraw (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Type.Literal 1) Nothing)
         -- CR 113.7's source slot, which every activation DOES bind.
         tapSelf = Effect.Tap (ObjectRef.InSlot Binding.triggerSource)
         -- An ordinary slot this ability neither declares nor mints.
         tapGhost = Effect.Tap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "ghost")))
         -- CR 601.2b's announced value, read as a slot rather than as Quantity.X.
-        drawX = Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.InSlot Binding.variableX))
+        drawX = Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.InSlot Binding.variableX) Nothing)
     Spec.assertBool
       s
       (not (activatedAbilityOffends (oneEffectActivated free youDiscards)))
@@ -6396,7 +6397,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 { Face.triggeredAbilities =
                     [ oneEffectTrigger
                         (TriggerCondition.PermanentEnters buried)
-                        (Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.InSlot Binding.you) (Quantity.Type.Literal 1)))
+                        (Effect.Draw (Draw.MkDraw (PlayerRef.InSlot Binding.you) (Quantity.Type.Literal 1) Nothing))
                     ]
                 }
             ),
@@ -6624,7 +6625,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 { Face.triggeredAbilities =
                     [ oneEffectTrigger
                         (TriggerCondition.PermanentEnters buried)
-                        (Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.InSlot Binding.you) (Quantity.Type.Literal 1)))
+                        (Effect.Draw (Draw.MkDraw (PlayerRef.InSlot Binding.you) (Quantity.Type.Literal 1) Nothing))
                     ]
                 }
             ),

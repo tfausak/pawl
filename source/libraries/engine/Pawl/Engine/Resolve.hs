@@ -108,6 +108,7 @@ import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.DiscardCause as DiscardCause
+import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
@@ -450,7 +451,8 @@ slotsOf effect = case effect of
   Effect.RemoveFromCombat slot -> oneSlot slot
   Effect.BecomesBlocked slot -> oneSlot slot
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _) -> joinTwo (objectRefSlots ref) (joinSlots (fmap quantitySlots (riderQuantities riders)))
-  Effect.Draw (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  -- CR 121.1's bound slot is a DEFINITION, not a read: see boundSlots below.
+  Effect.Draw (Draw.MkDraw ref quantity _) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   -- The tally's slot and CR 701.17c's are DEFINITIONS, not reads: see boundSlots
   -- below.
   Effect.Mill (Mill.MkMill ref quantity _ _) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
@@ -719,7 +721,7 @@ slotsAreExhaustive effect = case effect of
   -- Three of the four whose ref may nest a Quantity; ForEach is the fourth. The
   -- entry rider nests one too, CR 122.6's count per kind.
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _) -> all Quantity.slotsAreExhaustive (objectRefQuantities ref <> riderQuantities riders)
-  Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.Draw (Draw.MkDraw _ quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.Mill (Mill.MkMill _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.Reveal (Reveal.MkReveal ref _) -> all Quantity.slotsAreExhaustive (objectRefQuantities ref)
   Effect.LookAt (LookAt.MkLookAt ref _) -> all Quantity.slotsAreExhaustive (objectRefQuantities ref)
@@ -883,7 +885,7 @@ readsX = any effectReadsX
       -- these three -- and ForEach below -- go through objectRefQuantities. The
       -- entry rider is the other nested position, CR 122.6's count per kind.
       Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _) -> any Quantity.readsX (objectRefQuantities ref <> riderQuantities riders)
-      Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+      Effect.Draw (Draw.MkDraw _ quantity _) -> Quantity.readsX quantity
       Effect.Mill (Mill.MkMill _ quantity _ _) -> Quantity.readsX quantity
       Effect.Reveal (Reveal.MkReveal ref _) -> any Quantity.readsX (objectRefQuantities ref)
       Effect.LookAt (LookAt.MkLookAt ref _) -> any Quantity.readsX (objectRefQuantities ref)
@@ -1066,7 +1068,9 @@ boundSlots effect = case effect of
   Effect.TurnFaceUp _ -> Set.empty
   Effect.RemoveFromCombat _ -> Set.empty
   Effect.BecomesBlocked _ -> Set.empty
-  Effect.Draw {} -> Set.empty
+  -- CR 121.1's cards "drawn this way", as CR 400.7's incarnations in the hand
+  -- they arrived in.
+  Effect.Draw (Draw.MkDraw _ _ mSlot) -> foldMap Set.singleton mSlot
   -- CR 701.9a's cards "discarded this way", as CR 400.7's incarnations. The
   -- These arm has none, for the reason its type carries.
   --
@@ -3882,7 +3886,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         defined <- State.gets (\gs -> Map.restrictKeys (Binding.targetsOf (bindingsOf gs)) bodyDefined)
         applyEffectWith runSubgame resolving source controller (withMember member defined legal) (withMember member defined chosen) eff
     State.modify' rescope
-  Effect.Draw (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
+  Effect.Draw (Draw.MkDraw ref quantity mSlot) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal (slotGroups resolving gs)
@@ -3897,14 +3901,29 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         drawers = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
     -- PER DRAWER (evaluateForRecipient), every amount off the same pre-effect `gs`,
     -- so a seat drawing first cannot change what a later seat draws.
-    Monad.forM_ drawers $ \pid ->
+    drawn <- fmap concat . Monad.forM drawers $ \pid ->
       case evaluateForRecipient viewOf context gs resolving source pid quantity of
         Just n
           | n > 0 ->
               -- CR 121.2: draw n one at a time, so each draw re-reads the library
               -- top and the CR 104.3c empty-library loss is preserved.
-              Monad.replicateM_ (Integer.toIntSaturating n) (Event.drawCard pid)
-        _ -> pure ()
+              Maybe.catMaybes <$> Monad.replicateM (Integer.toIntSaturating n) (Event.drawCardReturning pid)
+        _ -> pure []
+    -- CR 121.1's "and reveal IT": the cards the draw put into a hand, for a later
+    -- clause of this resolution to name (#1899). The ids are the ones the CR 400.7
+    -- funnel ANSWERED -- the incarnation in the hand -- so a reader finds the card
+    -- where the rule says it is; a draw a replacement diverted, or one off an
+    -- empty library, contributes nothing and binds nothing.
+    --
+    -- ACROSS drawers and across CR 121.2's individual draws, the tally's posture
+    -- in the Mill arm below: the slot is one name and no reader is per-player.
+    -- The one/many split is every other group binder's -- one card takes the
+    -- SINGLE binding, which slotOne and every singular reader can see, and
+    -- several take the group.
+    Monad.forM_ mSlot $ \slot -> case drawn of
+      [] -> pure ()
+      [only] -> State.modify' (bindSlot resolving slot only)
+      several -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList several))
   Effect.Mill (Mill.MkMill ref quantity mTally mSlot) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs

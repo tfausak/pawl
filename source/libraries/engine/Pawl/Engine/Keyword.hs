@@ -48,6 +48,7 @@ import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.DiscardCause as DiscardCause
+import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryR as EntryR
@@ -404,7 +405,7 @@ cycling cost searchFor =
     -- activated it, and rule 702.29e prints "your library". The reveal is part of
     -- the destination because it is part of that same sentence (CR 701.23e).
     effect = case searchFor of
-      Nothing -> Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1))
+      Nothing -> Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1) Nothing)
       -- CR 702.29e's "search your library for a [quality] card", so one card is
       -- the whole instruction's count.
       Just filter_ ->
