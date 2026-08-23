@@ -221,6 +221,8 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.IsBlocking -> predicate
   Filter.Type.IsBlocked -> predicate
   Filter.Type.AttackedThisTurn -> predicate
+  Filter.Type.DeclaredAttackerThisCombat -> predicate
+  Filter.Type.DeclaredBlockerThisCombat -> predicate
   Filter.Type.MilledThisTurn -> predicate
   -- NOT descended into, unlike And/Or/Not above, and that is the load-bearing
   -- call rather than an omission: `candidate` here is a PLAYER (the sole caller
@@ -570,6 +572,12 @@ viewOfSnapshot mController isToken snapshot =
       Filter.blocking = False,
       Filter.blocked = False,
       Filter.attackedThisTurn = False,
+      -- CR 508.1a / 509.1a: a snapshot is CR 608.2h's record of an object, and
+      -- combat status is no characteristic of one (CR 109.3), so it has nothing
+      -- to answer with -- `attacking` and `blocking` above take the same
+      -- posture.
+      Filter.declaredAttackerThisCombat = False,
+      Filter.declaredBlockerThisCombat = False,
       -- CR 701.17a mills a CARD, and this view describes a snapshot rather than
       -- an object -- there is no id here for the turn's mills to have named.
       Filter.milledThisTurn = False,

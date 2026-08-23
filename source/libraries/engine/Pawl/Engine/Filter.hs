@@ -140,6 +140,16 @@ data View = MkView
     -- actually contains AttackedThisTurn. That is a cost argument rather than
     -- the recursion hazard that field records.
     attackedThisTurn :: Bool,
+    -- CR 508.1a: was this candidate DECLARED as an attacker this COMBAT PHASE?
+    -- Read from GameState.combat like `attacking`, and off a different field of
+    -- it: CR 506.4 removal ends the attacking and CR 506.4a leaves the
+    -- declaration standing, and CR 508.1k writes `attacking` only after CR
+    -- 508.1j's payment while this is written before it.
+    declaredAttackerThisCombat :: Bool,
+    -- CR 509.1a: the same question on CR 509's side, and the same relationship
+    -- to `blocking` that the field above has to `attacking` -- with CR 509.1g in
+    -- place of CR 508.1k.
+    declaredBlockerThisCombat :: Bool,
     -- CR 701.17a: was this candidate MILLED earlier this turn? A look-back read
     -- of the same log `attackedThisTurn` above reads, and LAZY for that field's
     -- reason -- nothing forces it unless a Filter contains MilledThisTurn.
@@ -435,6 +445,10 @@ playerView pid =
       blocked = False,
       -- CR 506.3 again: a player was never declared as an attacker either.
       attackedThisTurn = False,
+      -- CR 506.3 once more, for the two combat-phase-scoped questions: only a
+      -- creature is ever declared as an attacker or a blocker.
+      declaredAttackerThisCombat = False,
+      declaredBlockerThisCombat = False,
       -- CR 701.17a mills CARDS, and a player is not one.
       milledThisTurn = False,
       -- CR 303.4b: a player an Aura is attached to is ENCHANTED by it; the
@@ -853,6 +867,12 @@ matches context view predicate = case predicate of
   -- creature removed from combat (CR 506.4) still attacked, which is what
   -- Relentless Assault's "creatures that attacked this turn" means.
   Filter.AttackedThisTurn -> attackedThisTurn view
+  -- CR 508.1a: a look-back read of the COMBAT PHASE's record rather than the
+  -- turn's log, which is what keeps it apart from the atom above -- CR 511.3
+  -- empties it, so CR 500.8's second combat phase starts over.
+  Filter.DeclaredAttackerThisCombat -> declaredAttackerThisCombat view
+  -- CR 509.1a: the same read off the blocking half of that record.
+  Filter.DeclaredBlockerThisCombat -> declaredBlockerThisCombat view
   -- CR 701.17a: the same look-back, over the mills rather than the attacks. Like
   -- the atom above it cannot stop being true within a turn, and unlike it the
   -- candidate can stop EXISTING -- CR 400.7 mints a new object the moment the
@@ -1023,6 +1043,8 @@ rewrite pairs predicate = case predicate of
   Filter.IsBlocking -> predicate
   Filter.IsBlocked -> predicate
   Filter.AttackedThisTurn -> predicate
+  Filter.DeclaredAttackerThisCombat -> predicate
+  Filter.DeclaredBlockerThisCombat -> predicate
   Filter.MilledThisTurn -> predicate
   -- DESCENT, for ControlsMoreThanYou's reason above: the nested filter describes
   -- the HOST ("attached to a Swamp"), so CR 612.1's word swap reaches it exactly
@@ -1383,6 +1405,8 @@ bakeBound players predicate = case predicate of
   Filter.IsBlocking -> predicate
   Filter.IsBlocked -> predicate
   Filter.AttackedThisTurn -> predicate
+  Filter.DeclaredAttackerThisCombat -> predicate
+  Filter.DeclaredBlockerThisCombat -> predicate
   Filter.MilledThisTurn -> predicate
   -- DESCENT, for ControlsMoreThanYou's reason above: a ControlledByBound written
   -- into the HOST's description is baked exactly as the same atom written at the
@@ -1466,6 +1490,8 @@ manaValueThresholds predicate = case predicate of
   Filter.IsBlocking -> []
   Filter.IsBlocked -> []
   Filter.AttackedThisTurn -> []
+  Filter.DeclaredAttackerThisCombat -> []
+  Filter.DeclaredBlockerThisCombat -> []
   Filter.MilledThisTurn -> []
   -- Descended into, which OVER-reports for ControlsMoreThanYou's reason: the
   -- literals inside bound the HOST's mana value and never the candidate's. Only
@@ -1558,6 +1584,8 @@ statesAQuality predicate = case predicate of
   Filter.IsBlocking -> True
   Filter.IsBlocked -> True
   Filter.AttackedThisTurn -> True
+  Filter.DeclaredAttackerThisCombat -> True
+  Filter.DeclaredBlockerThisCombat -> True
   Filter.MilledThisTurn -> True
   -- True whatever the nest says, for ControlsMoreThanYou's reason: "attached to
   -- something" is itself a stated quality under CR 701.23b, so even the trivial

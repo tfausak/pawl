@@ -456,6 +456,37 @@ data Filter keyword
     -- it has left combat, and an effect can confer the status with no blocker
     -- ever assigned.
     IsBlocked
+  | -- | CR 508.1a: the candidate was DECLARED as an attacker THIS COMBAT PHASE.
+    -- Hollow Warrior's "an untapped creature you control not declared as an
+    -- attacking or blocking creature this combat" is `Not
+    -- DeclaredAttackerThisCombat` and the atom below. Read off
+    -- Combat.declaredAttackers, which CR 511.3 clears with the rest of the
+    -- record. Uncharacteristic for IsAttacking's reason.
+    --
+    -- NOT IsAttacking, and the gap is the whole point of the atom, twice over.
+    -- CR 506.4 removes a creature from combat while CR 506.4a leaves its having
+    -- been declared standing, so a removed attacker is False there and True
+    -- here. And CR 508.1k makes the chosen creatures attacking only AFTER CR
+    -- 508.1j's payment, so during the very payment this atom exists to be read
+    -- in, IsAttacking is False for every creature in the declaration.
+    --
+    -- NOT AttackedThisTurn either: that atom reads the turn-scoped event log,
+    -- and CR 500.8's additional combat phase asks this question again from empty
+    -- (CR 506.7c is the same span read from the casting side).
+    DeclaredAttackerThisCombat
+  | -- | CR 509.1a: the candidate was DECLARED as a blocker THIS COMBAT PHASE --
+    -- the other half of Hollow Warrior's criterion, and a separate atom for the
+    -- reason IsBlocking is separate from IsAttacking: attacking is CR 508 and
+    -- blocking is CR 509, two turn-based actions cards ask about separately.
+    -- Uncharacteristic for IsAttacking's reason.
+    --
+    -- NOT IsBlocking, for the atom above's two reasons with CR 509.1g in place
+    -- of CR 508.1k -- and here the ordering half is what the pool actually
+    -- reaches: CR 509.1f pays while CR 509.1g has not run, so a fellow creature
+    -- chosen in the SAME declaration is not blocking yet. CR 509 has no analogue
+    -- of CR 508.1f's tapping to hide that behind, which is why the blocking side
+    -- is where the difference is observable with no other card on the board.
+    DeclaredBlockerThisCombat
   | -- | CR 608.2i: the candidate was DECLARED as an attacker earlier this turn --
     -- Relentless Assault's "all creatures that attacked this turn". A look-back
     -- read of the turn-scoped GameEvent log, which CR 608.2i sanctions; never a

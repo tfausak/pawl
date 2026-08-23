@@ -221,6 +221,18 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.AttackedThisTurn
       " {\"type\":\"AttackedThisTurn\"} "
+  Spec.it s "DeclaredAttackerThisCombat" $
+    Common.assertCodec
+      s
+      codec
+      Filter.DeclaredAttackerThisCombat
+      " {\"type\":\"DeclaredAttackerThisCombat\"} "
+  Spec.it s "DeclaredBlockerThisCombat" $
+    Common.assertCodec
+      s
+      codec
+      Filter.DeclaredBlockerThisCombat
+      " {\"type\":\"DeclaredBlockerThisCombat\"} "
   Spec.it s "MilledThisTurn" $
     Common.assertCodec
       s
@@ -370,6 +382,15 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
         relentlessAssault = Filter.AttackedThisTurn
         crownOfTheAges = Filter.And [Filter.HasSubtype Subtype.Aura, Filter.AttachedTo (Filter.HasCardType CardType.Creature)]
         labyrinthOfSkophos = Filter.Or [Filter.IsAttacking, Filter.IsBlocking]
+        -- Hollow Warrior's toll criterion, the deepest nest of the two new
+        -- combat-phase atoms a card actually writes.
+        hollowWarrior =
+          Filter.And
+            [ Filter.HasCardType CardType.Creature,
+              Filter.Not Filter.IsTapped,
+              Filter.Not Filter.DeclaredAttackerThisCombat,
+              Filter.Not Filter.DeclaredBlockerThisCombat
+            ]
         auraGraftTarget = Filter.And [Filter.HasSubtype Subtype.Aura, Filter.AttachedTo (Filter.And [])]
         -- Miracle Worker: two levels of nesting under the attachment, which no
         -- other entry here reaches.
@@ -396,6 +417,7 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
             relentlessAssault,
             crownOfTheAges,
             labyrinthOfSkophos,
+            hollowWarrior,
             auraGraftTarget,
             miracleWorker,
             auraGraftDestination,

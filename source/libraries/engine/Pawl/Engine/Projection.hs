@@ -722,6 +722,10 @@ viewOfCard face =
           Filter.blocking = False,
           Filter.blocked = False,
           Filter.attackedThisTurn = False,
+          -- CR 508.1a / 509.1a: a printed face is in no combat, for the reason
+          -- `attacking` above is False.
+          Filter.declaredAttackerThisCombat = False,
+          Filter.declaredBlockerThisCombat = False,
           -- CR 701.17a mills an OBJECT; this builder describes a printed FACE.
           -- viewOfCharacteristics is the view that holds an id and answers.
           Filter.milledThisTurn = False,
@@ -861,6 +865,13 @@ viewOfCharacteristics peers oid pc controller counters gs =
       Filter.blocked = Map.member oid (Combat.blockers (GameState.combat gs)),
       -- CR 608.2i: from the turn's event log, which CR 511.3 does not clear.
       Filter.attackedThisTurn = any (declaredIt oid . LoggedEvent.event) (GameState.events gs),
+      -- CR 508.1a / 509.1a: from the COMBAT record, which CR 511.3 does clear --
+      -- and not from that same log, which cannot answer it. CR 508.1k and CR
+      -- 509.1g put the AttackerDeclared and BlockerDeclared events after the
+      -- payment these two are read during, so a fold over them would be False
+      -- for exactly the creatures being declared.
+      Filter.declaredAttackerThisCombat = Set.member oid (Combat.declaredAttackers (GameState.combat gs)),
+      Filter.declaredBlockerThisCombat = Set.member oid (Combat.declaredBlockers (GameState.combat gs)),
       -- CR 701.17a / 608.2i: the same log, read for the mills.
       Filter.milledThisTurn = any (milledIt oid . LoggedEvent.event) (GameState.events gs),
       -- CR 701.3a: not a characteristic, so the attachment comes off
@@ -2972,6 +2983,10 @@ filterReads f = case f of
   Filter.Type.IsBlocked -> Set.empty
   -- Reads nothing: no Modification writes GameState.events.
   Filter.Type.AttackedThisTurn -> Set.empty
+  -- Reads nothing, for IsAttacking's reason and off the same record: no
+  -- Modification writes GameState.combat.
+  Filter.Type.DeclaredAttackerThisCombat -> Set.empty
+  Filter.Type.DeclaredBlockerThisCombat -> Set.empty
   Filter.Type.MilledThisTurn -> Set.empty
   -- The nest's own reads, declared as if they were the CANDIDATE's even though
   -- they are the HOST's -- exactly right rather than merely safe, for the reason

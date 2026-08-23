@@ -129,6 +129,8 @@ noCombat =
       Combat.attacked = Set.empty,
       Combat.declaredAttacked = Set.empty,
       Combat.declaredAttackedThisStep = Set.empty,
+      Combat.declaredAttackers = Set.empty,
+      Combat.declaredBlockers = Set.empty,
       Combat.blockersDeclared = False,
       Combat.defender = Nothing
     }

@@ -68,8 +68,11 @@ import qualified Pawl.Types.Zone as Zone
 -- The helpers below are duplicated from Pawl.CombatSpec rather than hoisted into
 -- Pawl.Support, which every spec in the tree imports and so rebuilds.
 
-declaredAttackers :: GameState.GameState -> [ObjectId.ObjectId]
-declaredAttackers gs = Map.keys (Combat.Type.attackers (GameState.combat gs))
+-- The ATTACKING creatures (CR 508.1k), which since #2024 is a different question
+-- from Combat.declaredAttackers -- CR 506.4 removal ends one and leaves the
+-- other standing.
+attackersOf :: GameState.GameState -> [ObjectId.ObjectId]
+attackersOf gs = Map.keys (Combat.Type.attackers (GameState.combat gs))
 
 tapStateOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
 tapStateOf oid gs = fmap Object.tapped (Game.lookupObject oid gs)
@@ -538,7 +541,7 @@ vigilanceSpec s registry = Spec.describe s "Vigilance" $ do
         after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
     case mine of
       [centaur, p] -> do
-        Spec.assertEqWith s "both attacking" (length (declaredAttackers after)) 2
+        Spec.assertEqWith s "both attacking" (length (attackersOf after)) 2
         Spec.assertEqWith s "the centaur is untapped" (tapStateOf centaur after) (Just TapState.Untapped)
         Spec.assertEqWith s "the piker is tapped" (tapStateOf p after) (Just TapState.Tapped)
       _ -> Spec.assertFailure s "fixture should have two attackers"
@@ -549,7 +552,7 @@ vigilanceSpec s registry = Spec.describe s "Vigilance" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoardOf [windseekerCentaur] [piker]
         after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
-    Spec.assertEqWith s "attacking" (declaredAttackers after) mine
+    Spec.assertEqWith s "attacking" (attackersOf after) mine
   Spec.it s "CR 702.20b an untapped vigilant attacker can still be blocked" $ do
     -- It is attacking, so it is in the Combat record, tapped or not.
     windseekerCentaur <- S.printingOf s registry "Windseeker Centaur"
@@ -646,12 +649,29 @@ combatLegalitySpec s registry = Spec.describe s "CombatLegality" $ do
                       -- step ended: CR 500.1 scopes this half to the step, and
                       -- Combat.clearAttackedThisStep empties it as one ends.
                       Combat.Type.declaredAttackedThisStep = Set.empty,
+                      -- CR 508.1a / 509.1a: this board is hand-built rather
+                      -- than declared, so nothing was declared on it.
+                      Combat.Type.declaredAttackers = Set.empty,
+                      Combat.Type.declaredBlockers = Set.empty,
                       Combat.Type.blockersDeclared = True,
                       Combat.Type.defender = Just S.bob
                     }
               }
     Spec.assertEqWith s "starts empty" (Combat.Type.attackers (GameState.combat gs)) Map.empty
     Spec.assertEqWith s "clears" (Combat.Type.attackers (GameState.combat (Combat.clearCombat busy))) Map.empty
+    -- CR 511.3 on the two CR 508.1a / 509.1a records too, which is what scopes
+    -- Filter.DeclaredAttackerThisCombat to THIS combat rather than the turn:
+    -- CR 506.7c's second combat phase asks the question from empty.
+    Spec.assertEqWith
+      s
+      "CR 511.3 clears the declared-attacker record"
+      (Combat.Type.declaredAttackers (GameState.combat (Combat.clearCombat busy {GameState.combat = (GameState.combat busy) {Combat.Type.declaredAttackers = Set.fromList mine}})))
+      Set.empty
+    Spec.assertEqWith
+      s
+      "CR 511.3 clears the declared-blocker record"
+      (Combat.Type.declaredBlockers (GameState.combat (Combat.clearCombat busy {GameState.combat = (GameState.combat busy) {Combat.Type.declaredBlockers = Set.fromList mine}})))
+      Set.empty
     -- CR 506.7c: the CR 511.3 reset re-arms CR 506.7b's boundary, so a CR 500.8
     -- second combat phase gets its own window rather than inheriting this one's.
     Spec.assertBool s (Turn.afterBlockersDeclared busy) "CR 506.7b's boundary is up while combat is live"
@@ -2733,6 +2753,39 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
         after = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
     Spec.assertEqWith s "the Piker still attacks" (S.attackerDeclarationsOf after) mine
     Spec.assertBool s (allUntapped forests after) "and no Forest was tapped"
+  Spec.it s "CR 508.1j Hollow Warrior cannot tap a creature declared alongside it" $ do
+    -- The attacking half of Hollow Warrior's criterion. It needs VIGILANCE to be
+    -- observable at all: CR 508.1f taps every chosen creature before CR 508.1h-j
+    -- determine and pay, so on a vanilla board Not IsTapped already excludes the
+    -- co-attackers and the two readings of the criterion agree. Windseeker
+    -- Centaur is a vanilla 2/2 with vigilance, so it is untapped at CR 508.1j and
+    -- CR 508.1k has not yet made it attacking -- which is exactly the creature
+    -- Not IsAttacking would wrongly admit.
+    --
+    -- The pair is the proof, not the first board alone: the SAME two creatures
+    -- with only the Warrior declared must pay and attack, so the negative below
+    -- cannot be an unpayable toll for some unrelated reason.
+    warrior <- S.printingOf s registry "Hollow Warrior"
+    centaur <- S.printingOf s registry "Windseeker Centaur"
+    let (gs, mine, _) = S.combatBoardOf [warrior, centaur] []
+    case mine of
+      [hollow, vigilant] -> do
+        let -- Declares the Warrior alone, leaving the Centaur home to pay.
+            warriorOnly :: Prompt.Prompt r -> r
+            warriorOnly p = case p of
+              Prompt.DeclareAttackers {} -> [hollow]
+              _ -> S.aggressiveAnswer p
+            bothFought = S.runCombat S.aggressiveAnswer gs
+            aloneFought = S.runCombat warriorOnly gs
+            bothDeclared = S.runPure S.aggressiveAnswer gs (Combat.declareAttackers S.alice)
+            aloneDeclared = S.runPure warriorOnly gs (Combat.declareAttackers S.alice)
+        Spec.assertEqWith s "CR 508.1j: with both declared there is nobody left to tap, so neither attacks and bob takes nothing" (S.lifeOf S.bob bothFought) (Just 20)
+        Spec.assertEqWith s "and the record agrees: nothing is attacking" (attackersOf bothDeclared) []
+        Spec.assertBool s (allUntapped [vigilant] bothDeclared) "CR 508.1j is all-or-nothing: the Centaur was not tapped for a declaration that failed"
+        Spec.assertEqWith s "the control: the Centaur stays home, pays, and the Warrior's four go through" (S.lifeOf S.bob aloneFought) (Just 16)
+        Spec.assertEqWith s "and only the Warrior attacked" (attackersOf aloneDeclared) [hollow]
+        Spec.assertBool s (not (allUntapped [vigilant] aloneDeclared)) "CR 701.26a: the Centaur is what paid the toll"
+      _ -> Spec.assertFailure s "fixture should have a Warrior and a Centaur"
   Spec.it s "CR 508.1h the total scales with the declaration: two attackers owe {4}" $ do
     -- CR 508.1h totals the WHOLE declaration, which is what makes Ghostly Prison's
     -- "for each creature they control that's attacking you" a multiplication.
@@ -3204,14 +3257,10 @@ blockCostSpec s registry = Spec.describe s "BlockCosts" $ do
 
   Spec.it s "CR 509.1d a cost to block that is not mana sacrifices a land" $ do
     -- CR 509.1d's list past its first item, attackCostSpec's Exalted Dragon case
-    -- on the blocking side. SYNTHETIC, and legitimately so: Hollow Warrior is the
-    -- printing ("can't attack or block unless you tap an untapped creature you
-    -- control not declared as an attacking or blocking creature this combat"), and
-    -- its criterion asks which creatures were DECLARED this combat, which no
-    -- Pawl.Types.Filter says -- Not IsAttacking admits a creature removed from
-    -- combat, and a fellow chosen blocker is not blocking yet when CR 509.1f pays
-    -- (#2024). Transcribing it that way would make pawl's card WEAKER than
-    -- printed, so the toll is proved on a card that owes nothing to that criterion.
+    -- on the blocking side. SYNTHETIC, and it stays so now that Hollow Warrior is
+    -- in the pool: this case wants a non-mana block toll on an AURA subject, which
+    -- Hollow Warrior (Affected.Matching Filter.IsSource) does not give, and a
+    -- SACRIFICE rather than a tap.
     --
     -- bob pays, and bob's lands are the ones that go: CR 509.1a makes every chosen
     -- blocker one the defending player controls.
@@ -3227,12 +3276,41 @@ blockCostSpec s registry = Spec.describe s "BlockCosts" $ do
         Spec.assertEqWith s "and the block really was declared" (blockersOf attacker after) (Set.singleton blocker)
         Spec.assertBool s (allUntapped (filter (\oid -> Set.member oid (GameState.battlefield after)) forests) after) "the surviving land was not tapped: this toll is not mana"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+  Spec.it s "CR 509.1f Hollow Warrior cannot tap itself to pay for its own block" $ do
+    -- Hollow Warrior: "This creature can't attack or block unless you tap an
+    -- untapped creature you control not declared as an attacking or blocking
+    -- creature this combat." Its 2004-10-04 ruling is this case in words: "You
+    -- have to tap a different creature which is not being declared as an attacker
+    -- or blocker."
+    --
+    -- bob's ONLY creature is the Warrior, and that is the discrimination rather
+    -- than a convenience. CR 509 has no analogue of CR 508.1f's tapping, so the
+    -- Warrior is untapped when CR 509.1f pays whatever the criterion says, and CR
+    -- 509.1g has not yet made it a blocking creature. Written Not IsBlocking the
+    -- criterion would therefore admit the Warrior ITSELF -- one candidate for one
+    -- tap, so Cost.tapCandidates elides the choice -- and the block would stand.
+    -- A second untapped creature under bob lets both readings pay, and collapses
+    -- the case to green.
+    --
+    -- A 2/1 attacker so the life delta is unambiguous, and a 4/4 blocker so a
+    -- block that stands really does stop it.
+    warrior <- S.printingOf s registry "Hollow Warrior"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = S.combatBoardOf [piker] [warrior]
+    case (mine, theirs) of
+      ([attacker], [blocker]) -> do
+        let fought = S.runCombat S.aggressiveAnswer gs
+            declared = S.runPure S.aggressiveAnswer (S.runPure S.aggressiveAnswer gs (Combat.declareAttackers S.alice)) Combat.declareBlockers
+        Spec.assertEqWith s "CR 509.1f: the toll cannot be paid, so nothing blocks and bob takes the Piker's two" (S.lifeOf S.bob fought) (Just 18)
+        Spec.assertEqWith s "and the record says so: no blocker was declared" (blockersOf attacker declared) Set.empty
+        Spec.assertBool s (allUntapped [blocker] declared) "CR 509.1f is all-or-nothing: the Warrior did not tap itself"
+      _ -> Spec.assertFailure s "fixture should have a Piker and a Warrior"
   Spec.it s "CR 509.1f partial payments are not allowed: two taxed blockers and one land sacrifice nothing" $ do
     -- CR 509.1d totals over the chosen creatures, so two taxed blockers owe two
     -- lands and one land cannot pay. The land sacrificed while the toll was being
-    -- paid comes back, which on THIS side is the payment's own doing: CR 509.1's
-    -- preamble leaves declareBlockers nothing of its own to rewind, the record not
-    -- being written until the toll is paid.
+    -- paid comes back: Cost.payToll restores what a half-paid toll spent, and CR
+    -- 509.1's preamble restore beside it puts back the one thing declareBlockers
+    -- writes ahead of the payment (Combat.declaredBlockers).
     tithe <- S.printingOf s registry "Synthetic Blocking Tithe"
     forest <- S.printingOf s registry "Forest"
     piker <- S.printingOf s registry "Goblin Piker"

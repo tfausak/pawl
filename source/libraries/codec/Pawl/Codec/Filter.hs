@@ -73,6 +73,8 @@ codec keywordCodec =
       Arm.nullary "IsBlocking" Filter.IsBlocking,
       Arm.nullary "IsBlocked" Filter.IsBlocked,
       Arm.nullary "AttackedThisTurn" Filter.AttackedThisTurn,
+      Arm.nullary "DeclaredAttackerThisCombat" Filter.DeclaredAttackerThisCombat,
+      Arm.nullary "DeclaredBlockerThisCombat" Filter.DeclaredBlockerThisCombat,
       Arm.nullary "MilledThisTurn" Filter.MilledThisTurn,
       -- Recursive for ControlsMoreThanYou's reason: the payload describes the
       -- HOST, and a card author writes it exactly as they write any other filter.

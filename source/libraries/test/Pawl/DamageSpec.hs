@@ -2153,6 +2153,10 @@ departedAttackerSpec s registry =
                       -- step ended: CR 500.1 scopes this half to the step, and
                       -- Combat.clearAttackedThisStep empties it as one ends.
                       Combat.Type.declaredAttackedThisStep = Set.empty,
+                      -- CR 508.1a / 509.1a: this board is hand-built rather
+                      -- than declared, so nothing was declared on it.
+                      Combat.Type.declaredAttackers = Set.empty,
+                      Combat.Type.declaredBlockers = Set.empty,
                       -- CR 506.7b: the fixture stands after CR 509.1's
                       -- declaration, which is what put the entry in
                       -- Combat.blockers above.
@@ -2224,6 +2228,10 @@ departedDefenderSpec s registry =
                       -- step ended: CR 500.1 scopes this half to the step, and
                       -- Combat.clearAttackedThisStep empties it as one ends.
                       Combat.Type.declaredAttackedThisStep = Set.empty,
+                      -- CR 508.1a / 509.1a: this board is hand-built rather
+                      -- than declared, so nothing was declared on it.
+                      Combat.Type.declaredAttackers = Set.empty,
+                      Combat.Type.declaredBlockers = Set.empty,
                       -- CR 506.7b: attackers are declared and blockers are not,
                       -- which is the moment the comment above describes.
                       Combat.Type.blockersDeclared = False,
@@ -2273,6 +2281,10 @@ departedDefenderSpec s registry =
                       -- step ended: CR 500.1 scopes this half to the step, and
                       -- Combat.clearAttackedThisStep empties it as one ends.
                       Combat.Type.declaredAttackedThisStep = Set.empty,
+                      -- CR 508.1a / 509.1a: this board is hand-built rather
+                      -- than declared, so nothing was declared on it.
+                      Combat.Type.declaredAttackers = Set.empty,
+                      Combat.Type.declaredBlockers = Set.empty,
                       Combat.Type.blockersDeclared = True,
                       Combat.Type.defender = Just S.carol
                     }

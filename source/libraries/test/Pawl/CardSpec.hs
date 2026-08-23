@@ -2488,6 +2488,8 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsBlocking -> 0
   Filter.Type.IsBlocked -> 0
   Filter.Type.AttackedThisTurn -> 0
+  Filter.Type.DeclaredAttackerThisCombat -> 0
+  Filter.Type.DeclaredBlockerThisCombat -> 0
   Filter.Type.MilledThisTurn -> 0
   -- A DESCENT and not a zero, unlike every other atom here: CR 303.4's atom
   -- carries the host's description, which a card author writes exactly as they

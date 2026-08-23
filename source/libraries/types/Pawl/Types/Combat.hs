@@ -117,6 +117,47 @@ data Combat = MkCombat
     -- lets any step be skipped, and a reset sitting on one step's path outlives
     -- the turn in which that step never happens.
     declaredAttackedThisStep :: Set.Set AttackTarget.AttackTarget,
+    -- | CR 508.1a: the creatures DECLARED as attackers this combat phase.
+    -- Hollow Warrior's "not declared as an attacking or blocking creature this
+    -- combat" is what reads it, through Filter.DeclaredAttackerThisCombat.
+    --
+    -- SEPARATE from `attackers` and monotone within the phase, for the reason
+    -- `attacked` above is separate from it: CR 508.1k keeps a creature attacking
+    -- only until CR 506.4 removes it from combat, and CR 506.4a is explicit that
+    -- the removal leaves its having been declared standing. Keyed by the
+    -- CREATURE rather than by the target, which is what separates it from
+    -- `declaredAttacked`: this field answers "which creature", that one answers
+    -- "which player or permanent".
+    --
+    -- Written by Pawl.Engine.Combat.attemptAttackDeclaration BEFORE CR 508.1j's
+    -- payment and after CR 508.1's preamble is captured, which is the ordering
+    -- the card needs and the only reason this is not a fold over
+    -- GameEvent.AttackerDeclared: CR 508.1k records the attack after the toll is
+    -- paid, so an event-log reading is False for exactly the creatures being
+    -- declared alongside the one paying. An unpayable toll rewinds the write
+    -- with everything else.
+    --
+    -- NOT written by putOntoBattlefieldAttacking: CR 508.4 says such a creature
+    -- was never declared as an attacker, the split `declaredAttacked` above
+    -- already makes for the target side.
+    declaredAttackers :: Set.Set ObjectId.ObjectId,
+    -- | CR 509.1a: the creatures DECLARED as blockers this combat phase, the
+    -- other half of the pair above and read by
+    -- Filter.DeclaredBlockerThisCombat.
+    --
+    -- Separate from `blockers` for that field's reason, and keyed by the
+    -- BLOCKER, where `blockers` is keyed by the attacker.
+    --
+    -- Written by Pawl.Engine.Combat.attemptBlockDeclaration before CR 509.1f's
+    -- payment, which on this side is the difference the pool can see: CR 509.1g
+    -- makes the chosen creatures blocking only after that payment, and CR 509
+    -- has no analogue of CR 508.1f's tapping, so a fellow chosen blocker looks
+    -- untapped and unblocking to a toll being paid for another. Rewound if the
+    -- toll cannot be paid.
+    --
+    -- NOT written by putOntoBattlefieldBlocking, for CR 509.4's twin of the
+    -- CR 508.4 reason above.
+    declaredBlockers :: Set.Set ObjectId.ObjectId,
     -- | CR 506.7b: has this combat phase's declare blockers step declared
     -- blockers? The boundary "only during combat after blockers are declared"
     -- names, and the sole reader is
