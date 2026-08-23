@@ -421,6 +421,10 @@ data View = MkView
 -- each ask about the board or a zone, which a function taking nothing but a
 -- PlayerId cannot see, so Pawl.Engine.Count.bakePerspective bakes them against
 -- the game state before the match instead.
+--
+-- CR 120.1's "was dealt damage this turn" is the one field a caller FILLS rather
+-- than bakes, since it is a characteristic of the candidate rather than a
+-- comparison; Pawl.Engine.Count.playerView is that caller, and the field says so.
 playerView :: PlayerId.PlayerId -> View
 playerView pid =
   MkView
@@ -460,13 +464,14 @@ playerView pid =
       -- CR 701.17a mills CARDS, and a player is not one.
       milledThisTurn = False,
       -- CR 120.1 lets a player BE dealt damage, so unlike the two fields above
-      -- this one asks a question a player candidate really can answer -- but not
-      -- here: this view is built from a PlayerId alone and holds no board whose
-      -- event log could be folded.
-      --
-      -- Not implemented: a player dealt damage this turn, which wants baking
-      -- against the game state at Pawl.Engine.Count.bakePerspective the way
-      -- ControlsMoreThanYou is (#2157).
+      -- this one asks a question a player candidate really can answer -- just not
+      -- from here, this view being built from a PlayerId alone and holding no
+      -- board whose event log could be folded. False is therefore the DEFAULT and
+      -- not the answer: Pawl.Engine.Count.playerView overwrites it from
+      -- Game.wasDealtDamageThisTurn, and both roads a player candidate travels --
+      -- that module's Scope.OverPlayers fold and
+      -- Pawl.Engine.Target.admittedGiven's Recipient.ToPlayer arm -- build the
+      -- view through it. Pawl.DamageSpec's Needle Drop case is what proves it.
       dealtDamageThisTurn = False,
       -- CR 303.4b: a player an Aura is attached to is ENCHANTED by it; the
       -- player is not itself attached to anything, because Object.attachedTo is

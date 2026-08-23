@@ -7,6 +7,7 @@ import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Defender as Defender
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -265,7 +266,12 @@ admittedGiven pcs grants pools perspective bindings source slot gs =
         -- IsPlayer atom (#168). Every object-shaped atom is vacuously False
         -- against a player view, so a slot that says "target creature you
         -- control" cannot accidentally admit a player.
-        Recipient.ToPlayer pid -> against (Filter.playerView pid)
+        --
+        -- Through Count.playerView rather than Filter.playerView so that the one
+        -- atom CR 120.1 lets a player answer -- was this seat dealt damage this
+        -- turn (Needle Drop) -- is read off the board here as it is in the
+        -- Scope.OverPlayers fold, rather than going vacuously False.
+        Recipient.ToPlayer pid -> against (Count.playerView gs pid)
         Recipient.ToCreature oid -> against (Projection.viewOfObjectGiven pcs grants oid gs)
         Recipient.ToPlaneswalker oid -> against (Projection.viewOfObjectGiven pcs grants oid gs)
         Recipient.ToBattle oid -> against (Projection.viewOfObjectGiven pcs grants oid gs)

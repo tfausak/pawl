@@ -28,6 +28,7 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import Pawl.Types.Mana (Mana)
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Moved as Moved
@@ -1035,3 +1036,13 @@ damagedPlayer event = damageRecipient event >>= Recipient.playerOf
 -- been narrowed rather than a fourth kind of recipient.
 damagedObject :: GameEvent -> Maybe ObjectId
 damagedObject event = damageRecipient event >>= Recipient.objectOf
+
+-- CR 120.1 / 608.2i: was this PLAYER dealt damage this turn? The log fold
+-- damagedPlayer exists for, written once here because two callers ask it --
+-- Pawl.Engine.Count.playerView, which fills the player candidate's
+-- Filter.dealtDamageThisTurn, and Pawl.Engine.Quantity's
+-- PlayersDealtDamageThisTurn arm, which counts the seats it answers True for.
+-- The turn scope is GameState.events itself: Pawl.Engine.Engine.beginTurnOf
+-- clears the log at the handoff, so "this turn" is what the log holds.
+wasDealtDamageThisTurn :: GameState -> PlayerId -> Bool
+wasDealtDamageThisTurn gs pid = any ((== Just pid) . damagedPlayer . LoggedEvent.event) (GameState.events gs)
