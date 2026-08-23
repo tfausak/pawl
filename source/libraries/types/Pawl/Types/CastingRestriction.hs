@@ -43,9 +43,9 @@ data CastingRestriction
     -- putting a chosen card from a HAND onto the battlefield (Cauldron Dance,
     -- Surprise Deployment), or a delayed ability naming a spell mode's TARGET
     -- slot, which CardSpec's delayed-ability lint rejects (Spinal Embrace). The
-    -- narrower cards ("only
-    -- during combat before blockers are declared", Blaze of Glory and eight
-    -- others) do not want this arm at all: their window is not a phase.
+    -- narrower cards ("only during combat before blockers are declared", Blaze of
+    -- Glory and eight others) do not want this arm at all: their window is not a
+    -- phase.
     DuringPhase DuringPhase.DuringPhase
   | -- | "and only if you've been attacked this step" -- the second clause every
     -- printed instant carrying these words puts on a CAST, Rally the Troops

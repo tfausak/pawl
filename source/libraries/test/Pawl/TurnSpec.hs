@@ -1273,8 +1273,9 @@ endTurnSpec s registry = Spec.describe s "EndTheTurn" $ do
 --     on, and bob's Piker blocks it, so the removal has a subject on each side.
 --   * bob's stacked Burst Lightning is a SECOND object on the stack, owned by
 --     the other seat, so CR 724.2b's exile cannot be confused with the resolving
---     spell's own CR 608.2n move to a graveyard. It has no bindings, so it
---     resolves for nothing in the control rather than moving the assertions.
+--     spell's own CR 608.2n move to a graveyard. It is genuinely CAST, aimed at
+--     alice, so "nothing on the stack resolved" is a claim a life total can
+--     falsify rather than one an empty binding map satisfies for free.
 --   * The two hand-held Burst Lightnings are the "your opponents can't cast
 --     spells this turn" clause's pair: after the combat phase ends alice may
 --     still cast hers and bob may not cast his, which is what proves CR 724.2d's
@@ -1300,7 +1301,7 @@ mandateBoard plains mountain piker statue mandate burst =
         a : _ -> a
         [] -> error "Pawl.TurnSpec: combatBoardOf should return one creature"
       (jade, gs1) = S.addCreature statue S.alice base
-      gs2 = S.landsFor mountain S.bob 1 (S.landsFor mountain S.alice 1 (S.landsFor plains S.alice 4 gs1))
+      gs2 = S.landsFor mountain S.bob 2 (S.landsFor mountain S.alice 1 (S.landsFor plains S.alice 4 gs1))
       (spell, gs3) = S.addHandCard mandate S.alice gs2
       (hers, gs4) = S.addHandCard burst S.alice gs3
       (his, gs5) = S.addHandCard burst S.bob gs4
@@ -1314,7 +1315,8 @@ mandateBoard plains mountain piker statue mandate burst =
         ability : _ ->
           let activated = snd (Engine.runGamePure S.identityAnswer attacking (Activate.activateAbility S.alice jade ability))
            in snd (Engine.runGamePure S.identityAnswer activated Stack.resolveTop)
-      (_, staged) = S.spellOnStack burst S.bob animated
+      (bolt, gs6) = S.addHandCard burst S.bob animated
+      staged = snd (Engine.runGamePure (aimPlayer S.alice) gs6 (S.cast S.bob bolt))
    in (staged, jade, attacker, spell, hers, his)
 
 -- Casts Mandate of Peace the first time it is offered and passes otherwise,
@@ -1367,9 +1369,9 @@ endCombatPhaseSpec s registry = Spec.describe s "EndTheCombatPhase" $ do
     -- is read at this moment and not at end of turn.
     Spec.assertBool s (not (Projection.isCreatureOf jade after)) "Jade Statue is no longer a creature"
     Spec.assertEqWith s "and has no power or toughness" (S.powerToughnessOf jade after) Nothing
-    -- Both halves of the trade, and the Burst Lightning that resolved for nothing
-    -- (it has no bindings, so CR 608.2b empties it): the combat damage step ran,
-    -- and the stack was NOT exiled.
+    -- The stack was NOT exiled and the combat damage step ran: bob's Burst
+    -- Lightning resolved for 2, and the blocked attacker traded with its blocker.
+    Spec.assertEqWith s "bob's Burst Lightning resolved" (S.lifeOf S.alice after) (Just 18)
     Spec.assertEqWith s "the blocked attacker and its blocker traded" (namesIn Zone.Graveyard S.alice after, namesIn Zone.Graveyard S.bob after) ([Just pikerName], [Just burstName, Just pikerName])
     Spec.assertBool s (S.castable S.bob his after) "and bob may cast the one in his hand"
   -- CR 724.2d/724.2e: the schedule assertion, in its own case so no zone

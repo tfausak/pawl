@@ -5455,10 +5455,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     case phase of
       -- CR 724.2g: attempted at a time that is not a combat phase, nothing
       -- happens -- not even the exile of the stack, since rule 724.2's steps are
-      -- the whole of what "ends the combat phase" does. Reachable despite the
-      -- card's own "cast this spell only during combat": CR 608.2 re-reads the
-      -- board at resolution, and an added phase (CR 500.8) or a copy cast under
-      -- another permission can put the resolution outside one.
+      -- the whole of what "ends the combat phase" does. No CAST reaches it today:
+      -- Mandate of Peace's own rider admits only a combat phase, and nothing
+      -- between the cast and the resolution can leave one, this being the only
+      -- card that ends a combat phase. The guard is rule 724.2g's own sentence
+      -- rather than a defence against a board pawl can build, and
+      -- Pawl.TurnSpec's CR 724.2g case reaches it by applying the effect
+      -- directly.
       Phase.Combat _ -> do
         -- CR 724.2a, exactly as CR 724.1a: a watermark bump rather than a queue
         -- flush, which is also what makes 724.2f's exception fall out. UNOBSERVED
@@ -5497,9 +5500,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- combat phase later in the turn is untouched, Turn.dropRestOfPhase being
         -- positional.
         State.modify' $ \gs ->
-          Expiry.dropAtEndOf
-            PhaseSelector.CombatPhase
-            (Combat.clearCombat gs) {GameState.remaining = Turn.dropRestOfPhase phase (GameState.remaining gs)}
+          let cleared = Combat.clearCombat gs
+              skipped = cleared {GameState.remaining = Turn.dropRestOfPhase phase (GameState.remaining gs)}
+           in Expiry.dropAtEndOf PhaseSelector.CombatPhase skipped
         -- CR 724.2f: no player gets priority during this process. The SAME signal
         -- CR 724.1f raises, because the two rules want the same thing of
         -- Engine.priorityLoop -- return without settling and without granting
