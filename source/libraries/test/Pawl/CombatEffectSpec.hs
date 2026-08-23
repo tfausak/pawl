@@ -1575,9 +1575,10 @@ blockAndSong jaceId atBob p = case p of
 --     Enchanted permanent is a colorless Forest land") is the first sentence's
 --     card: CR 205.1a makes the set REPLACE the existing card types, so the
 --     animated Jace stops being a creature and a planeswalker in one resolution.
---     It is the only card in data/cards/ carrying SetCardType (grep the
---     constructor name), and it sets Land, which is why the mirror leg below is
---     still waiting on card data.
+--     It is the only card in data/cards/ whose SetCardType is aimed at ANOTHER
+--     permanent (grep the constructor name: Gliding Licid's sets Enchantment on
+--     itself), and it sets Land, which is why the mirror leg below is still
+--     waiting on card data.
 --   * Vedalken Orrery ({4} Artifact, "You may cast spells as though they had
 --     flash") is alice's, and is what makes that cast reachable: CR 303.1 admits
 --     an enchantment only in a main phase, and the block has to be declared first
@@ -1587,8 +1588,8 @@ blockAndSong jaceId atBob p = case p of
 --
 -- The mirror case, where the permanent stops being a PLANESWALKER and stays a
 -- creature, is unproven here rather than asserted (gap #1846): it needs an effect
--- that sets the card type to Creature, and the Song -- data/cards/'s lone
--- SetCardType -- sets Land. Kenrith's Transformation prints one and is not in the
+-- that sets the card type to Creature, and the Song -- the corpus's only
+-- SetCardType aimed at another permanent -- sets Land. Kenrith's Transformation prints one and is not in the
 -- pool yet.
 --
 -- Every leg hands over at the declare blockers step, typeChangeRemovalSpec's
