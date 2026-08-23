@@ -5575,9 +5575,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- CR 509.4's rider is read by the Create arm of Pawl.Engine.Resolve and by
   -- nothing else, so on a MoveToZone it is inert card data. Not because the rule
   -- forbids it -- CR 509.4 is about a creature "put onto the battlefield", which
-  -- Aetherplasm does from a hand -- but because that road has no producer in the
-  -- pool and so is unwired (#2087 is what Aetherplasm waits on). A card stating
-  -- it there says something nothing reads.
+  -- Aetherplasm does from a hand -- but because that road is unwired: only the
+  -- Create arm reads the rider (gap #2089). Aetherplasm's "If you do" is no
+  -- longer what stops it, Clause.ifTaken having landed. A card stating the rider
+  -- on a MoveToZone says something nothing reads.
   Spec.it s "no MoveToZone carries CR 509.4's blocking entry rider" $ do
     ps <- S.allPrintings s
     let offends effect = case effect of
