@@ -14,9 +14,14 @@ import qualified Pawl.Types.SlotName as SlotName
 -- With no modifier in the pool, CR 706.2's natural result and result coincide,
 -- so the one number this record binds is both.
 --
--- Construct with BRACE syntax everywhere. A count or a table added later is a
--- new field, and positional construction absorbs a new field in argument order
--- with nothing red (#2009, #2021).
+-- CR 706.3's results table is NOT a field here and never will be: a striation
+-- is a Pawl.Types.Clause of the same mode whose `condition` compares this slot
+-- against the striation's range, which is what CR 706.3b's "all part of one
+-- ability" already says (Djinni Windseer, Pawl.DiceSpec).
+--
+-- Construct with BRACE syntax everywhere. A count added later (#2085) is a new
+-- field, and positional construction absorbs a new field in argument order with
+-- nothing red (#2009, #2021).
 data RollDie = MkRollDie
   { sides :: Natural.Natural,
     slot :: SlotName.SlotName
