@@ -2618,8 +2618,9 @@ maulerSpec s registry =
           -- and the three seats really start level.
           Spec.assertEqWith s "CR 603.2b: its end-step trigger is on the stack" (length (GameState.stack onStack)) 1
           Spec.assertEqWith s "all three seats start at 20" (lives onStack) (Just 20, Just 20, Just 20)
-        -- The pair board, differing in exactly ONE thing: bob declines too. It
-        -- tells "bob was asked and his own answer spared him" apart from "bob is
+        -- The pair board: the SAME board and the same trigger, differing in one
+        -- answer, since bob is the only seat the case above pays for. It tells
+        -- "bob was asked and his own answer spared him" apart from "bob is
         -- excluded for some other reason", and shows the whole table CAN be in
         -- the slot at once.
         Spec.it s "CR 118.12a with nobody paying, every seat loses the life" $ do
