@@ -362,17 +362,50 @@ nonEmpty c =
       Codec.schema = Schema.nonEmptyArray <$> Codec.schema c
     }
 
--- | A count-per-key multiset, on the wire as a plain array WITH REPEATS rather
--- than as key/count pairs, ascending by key so it is canonical. Decoding
--- recounts, so a hand-written file may repeat a key in any order and a zero
--- count is unsayable.
-multiset :: (Ord a) => Codec.Codec a -> Codec.Codec (Map.Map a Natural.Natural)
-multiset c =
+-- | A key and a value as an OBJECT rather than a two-element array, which is the
+-- positional shape #1466 removed.
+--
+-- Named GENERICALLY, because the helpers built on this are generic and cannot
+-- know what their halves mean. A codec that does know says so instead, as
+-- Pawl.Codec.EntryRiders' counter pairs do with @kind@ and @count@ -- that one
+-- is authored by hand in card files, where the domain names are worth the
+-- duplication.
+--
+-- Written against the primitives rather than Pawl.JsonCodec.Fields, which
+-- imports this module.
+keyValue :: Codec.Codec k -> Codec.Codec v -> Codec.Codec (k, v)
+keyValue ck cv =
   Codec.MkCodec
-    { Codec.encode = Codec.encode (list c) . concatMap (\(k, n) -> List.genericReplicate n k) . Map.toAscList,
-      Codec.decode = fmap (Map.fromListWith (+) . fmap (\k -> (k, 1))) . Codec.decode (list c),
-      Codec.schema = Schema.array <$> Codec.schema c
+    { Codec.encode = \(k, v) ->
+        Value.object
+          [ Value.pair "key" (Codec.encode ck k),
+            Value.pair "value" (Codec.encode cv v)
+          ],
+      Codec.decode = \value -> do
+        ps <- asObject value
+        k <- Codec.decode ck =<< field "key" ps
+        v <- Codec.decode cv =<< field "value" ps
+        pure (k, v),
+      Codec.schema =
+        (\ks vs -> Schema.object [Value.pair "key" (Schema.unwrap ks), Value.pair "value" (Schema.unwrap vs)] [Text.pack "key", Text.pack "value"])
+          <$> Codec.schema ck
+          <*> Codec.schema cv
     }
+
+-- | A count-per-key multiset, on the wire as an array of key/count objects
+-- ascending by key, so it is canonical.
+--
+-- ONE ENTRY PER KEY, not a plain array with repeats. The repeat form was shorter
+-- to write and worse in two ways: a count of twenty wrote its key twenty times,
+-- and recounting on decode made a ZERO count unsayable -- which is a state the
+-- engine really produces, since Pawl.Engine.Damage spends a shield counter with
+-- Map.insert rather than pruning the entry (#126).
+--
+-- A REPEATED key is rejected rather than summed, which is 'set''s and
+-- 'keyedList''s reason: the wire form has exactly one way to say each map, so
+-- two spellings of one would be a document with no single meaning.
+multiset :: (Ord a) => Codec.Codec a -> Codec.Codec (Map.Map a Natural.Natural)
+multiset c = keyedList (keyValue c natural)
 
 -- | A map whose ENTRY is spelled by the caller's codec, on the wire as an array
 -- of those entries ascending by key, so the encoding is canonical. The entry

@@ -202,19 +202,30 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
         "expected a decode failure"
 
   Spec.describe s "multiset" $ do
+    -- ONE entry per key, ascending, and the counts are given DESCENDING here so
+    -- an encoder that emitted the map in traversal order would fail.
     Spec.it s "round trips to ascending order" $
       Common.assertCodec
         s
         (Common.multiset Common.integer)
         (Map.fromList [(1, 2), (2, 1)] :: Map.Map Integer Natural.Natural)
-        "[1,1,2]"
-    -- Common.multiset recounts, so the wire order need not match the key order
-    -- the encoder would have produced.
-    Spec.it s "recounts repeats regardless of input order" $
-      Spec.assertEq
+        "[{\"key\":1,\"value\":2},{\"key\":2,\"value\":1}]"
+    -- A ZERO count is sayable, which the repeat encoding this replaced could not
+    -- express at all: Pawl.Engine.Damage spends a shield counter with Map.insert
+    -- rather than pruning the entry, so a game state really holds one (#126).
+    Spec.it s "keeps a zero count" $
+      Common.assertCodec
         s
-        (Codec.decode (Common.multiset Common.integer) =<< Common.parse (Text.pack "[2,1,2]"))
-        (Right (Map.fromList [(1, 1), (2, 2)]) :: Either Text.Text (Map.Map Integer Natural.Natural))
+        (Common.multiset Common.integer)
+        (Map.fromList [(1, 0)] :: Map.Map Integer Natural.Natural)
+        "[{\"key\":1,\"value\":0}]"
+    -- Rejected rather than summed, which is 'set''s reason: one map, one
+    -- spelling.
+    Spec.it s "rejects a repeated key" $
+      Spec.assertBool
+        s
+        (Either.isLeft (Codec.decode (Common.multiset Common.integer) =<< Common.parse (Text.pack "[{\"key\":1,\"value\":1},{\"key\":1,\"value\":2}]")))
+        "expected a decode failure"
   Spec.describe s "textMap" $ do
     -- Written in ascending key order rather than the map's traversal order, so
     -- the render is canonical. The entries are given in DESCENDING order here,
