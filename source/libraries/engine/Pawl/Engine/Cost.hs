@@ -1270,8 +1270,9 @@ canPay pid oid cost gs = case Cost.mana cost of
 -- route as a supply that also carries a demand, so one Altar's {B} may be paid
 -- out of another's yield here -- while `payManaExcept`'s in-payment window will
 -- not offer that second Altar (#2094). No board in `data/cards/` tells them
--- apart: the Altar's {C}{C}{C} pays no {B}, and Grinning Ignus's {R} reaches
--- another Ignus's {R} only beside a Mountain that would have paid it anyway.
+-- apart: the Altar's {C}{C}{C} pays no {B}, and the pool's one other mana-eating
+-- route is Grinning Ignus's, which `stackedManaActivations` below keeps off both
+-- of the gates that would weigh it.
 --
 -- The CLAIMS and the LIFE ride along with the count, which alone is a fact about
 -- this source in isolation: two sources whose costs both sacrifice a creature
@@ -1508,20 +1509,56 @@ canPaySomeCompletion casting spending pid oid total_ cost gs =
 --
 -- Action.legalActions' ActivateManaAbility offers are this list and nothing
 -- else. It is NOT the list a payability GATE is judged against; that one is
--- supplyManaSourcesGiven below, and it is the SUPERSET -- see there.
+-- supplyManaSourcesGiven below, and NEITHER contains the other -- see there.
 activationManaSourcesGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> [ObjectId]
 activationManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven (manaActivationsGiven (PlayerEffect.applyingTo pid gs)) grants pcs pid gs
 
 -- The mana sources a payability GATE is judged against -- the same sweep under
 -- Mana.supplyCapacity, which is the invariant Mana.payableResolutionsGiven
--- states and its type cannot. A SUPERSET of the offer list above: the supply
--- capacity is the offer capacity asked with the route's mana part emptied, so
--- every offer source is a supply source and Transmogrant Altar beside no Swamp
--- is a supply source that is no offer. Nothing is overstated by the difference
--- -- such a permanent's option carries the mana part as a DEMAND the board must
--- then serve, and taking it zero times is always among its options.
+-- states and its type cannot. NEITHER list contains the other, and the two
+-- wrappers are why:
+--
+--   * Mana.supplyCapacity is the offer capacity asked with the route's mana part
+--     emptied, which only ADDS sources -- Transmogrant Altar beside no Swamp is a
+--     supply source that is no offer. Nothing is overstated by it: such a
+--     permanent's option carries the mana part as a DEMAND the board must then
+--     serve, and taking it zero times is always among its options.
+--
+--   * `stackedManaActivations` only REMOVES them, and it is the whole of what
+--     both gates below are: every caller is gating an action CR 601.2a or CR
+--     602.2a puts on the stack BEFORE its cost is paid, which closes CR 307.5's
+--     window. Grinning Ignus in that window is an offer that is no supply.
 supplyManaSourcesGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> [ObjectId]
-supplyManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven (Mana.supplyCapacity (manaActivationsGiven (PlayerEffect.applyingTo pid gs))) grants pcs pid gs
+supplyManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven (Mana.supplyCapacity (stackedManaActivations (PlayerEffect.applyingTo pid gs))) grants pcs pid gs
+
+-- `manaActivationsGiven` narrowed to the routes a payment made AFTER its object
+-- reached the stack may take -- which is every cast (CR 601.2a) and every
+-- activation (CR 602.2a), both rules putting the object on the stack a step
+-- before CR 601.2f-h totals and pays the cost.
+--
+-- CR 307.5's empty-stack conjunct is the only window that move closes, and
+-- ActivationRestriction.needsEmptyStack is what reports it. Asked of the RIDER
+-- and not of the board: this runs one step ahead of the move, so the live
+-- GameState.stack is the wrong stack to read -- an empty one here says nothing
+-- about the payment, and reading it counted Grinning Ignus's "{R}, Return this
+-- creature to its owner's hand: Add {C}{C}{R}. Activate only as a sorcery" as a
+-- supply for a cast whose own proposal had already closed its window, so the cast
+-- was offered and then rewound under CR 601.2 (#2005).
+--
+-- NOT A LOSS OF THE PLAY: CR 605.3a's priority window is untouched
+-- (activationManaSourcesGiven above), so the mana is floated first with the stack
+-- still empty and then spent out of the pool, which is what the rules leave the
+-- player and what the Ignus is printed to do.
+--
+-- The IN-PAYMENT window needs no arm of its own: Cost.payMana and payManaExcept
+-- run with the object already on the stack, so ActivationRestriction.restrictionsOk
+-- reads the real stack there and refuses the same routes. The gate and the
+-- payment agree because this function states exactly the move between them.
+stackedManaActivations :: [PlayerEffect.Type.PlayerEffect] -> Mana.Capacity
+stackedManaActivations effects pcs pid oid cost restrictions gs =
+  if any ActivationRestriction.needsEmptyStack restrictions
+    then Mana.noActivations
+    else manaActivationsGiven effects pcs pid oid cost restrictions gs
 
 -- The same question given a board the CALLER has already walked; handing the
 -- board in changes no answer. Build `sources` with supplyManaSourcesGiven
@@ -1535,8 +1572,25 @@ canPaySomeCompletionGiven casting spending sources pcs pid oid total_ cost gs = 
     let outside = lifeOwedBy (Cost.components cost)
         claimed = claimsOf pid oid (Cost.components cost) gs
         -- One player-effect gather for the whole question, shared by every
-        -- source Mana.manaSuppliesGiven measures under it (manaActivationsGiven).
-        hoisted = manaActivationsGiven (PlayerEffect.applyingTo pid gs)
+        -- source Mana.manaSuppliesGiven measures under it.
+        --
+        -- `stackedManaActivations` and NOT `manaActivationsGiven`: both callers
+        -- gate an action CR 601.2a or CR 602.2a puts on the stack before its cost
+        -- is paid. It must also MATCH what `sources` was built under
+        -- (supplyManaSourcesGiven) -- a source listed there whose every route this
+        -- capacity refuses offers nothing, and Mana.payableResolutionsGiven's
+        -- product turns one of those into no board at all.
+        --
+        -- A FENCE on this half and not proven behaviour: the source list is
+        -- narrowed the same way, so the one permanent this refuses is already off
+        -- it, and unstacking THIS capacity alone leaves the suite green. What
+        -- would observe it is a permanent with TWO mana routes, only one carrying
+        -- the rider -- a source on the free route, which this must still refuse
+        -- the ridden one of. In `data/cards/` the two sets do not meet: Grinning
+        -- Ignus, Lavinia and Synthetic Ember Spring carry the pool's three riders
+        -- on a mana ability and each has one route, while Gemstone Caverns,
+        -- Muraganda Raceway and Phyrexian Tower have two routes and no rider.
+        hoisted = stackedManaActivations (PlayerEffect.applyingTo pid gs)
         payable (completed, life) =
           any
             (\totalled -> Mana.canPayCommittingGiven casting hoisted spending sources pcs pid (outside + life) claimed totalled gs)
