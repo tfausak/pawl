@@ -229,7 +229,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           Search.MkSearch
             { Search.searcher = PlayerRef.Relative PlayerRelation.You,
               Search.owner = PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
-              Search.quantity = Quantity.Literal 2,
+              Search.quantity = Just (Quantity.Literal 2),
               Search.filter = Filter.HasCardType CardType.Land,
               Search.upTo = False,
               Search.destination = SearchDestination.BattlefieldTapped

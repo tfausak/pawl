@@ -27,7 +27,23 @@ import qualified Pawl.Types.SearchDestination as SearchDestination
 data Search = MkSearch
   { searcher :: PlayerRef.PlayerRef,
     owner :: PlayerRef.PlayerRef,
-    quantity :: Quantity.Quantity,
+    -- | How many cards the search may find, or 'Nothing' where the printed
+    -- instruction states no count at all -- Mana Severance's "any number of land
+    -- cards".
+    --
+    -- A Maybe rather than a Quantity arm: CR 701.23a's find is bounded by what
+    -- the zone holds, and "any number" is the ABSENCE of a count rather than a
+    -- count that evaluates to something. Pawl.Engine.Quantity.evaluateFor
+    -- already answers Nothing for a quantity it cannot evaluate, which the
+    -- search turns into a cap of zero, so an unbounded arm there would be
+    -- indistinguishable from an unevaluable one at every other call site.
+    --
+    -- Unbounded does not mean mandatory. CR 701.23b still governs a search
+    -- stating a quality, so Mana Severance may find none of the lands it can see;
+    -- CR 701.23d's "simply for a quantity of cards" cannot reach a search that
+    -- states no quantity, so an unbounded search never completes its answer from
+    -- the cards it passed over.
+    quantity :: Maybe Quantity.Quantity,
     filter :: Filter.Filter Keyword.Keyword,
     -- | Whether the printed instruction says "up to", making the quantity a
     -- ceiling the searcher chooses within rather than one they must fill.
@@ -42,9 +58,9 @@ data Search = MkSearch
     --
     -- A Bool beside the Quantity rather than a Quantity arm: "up to" is a
     -- permission attached to a count, not a different count. An unbounded "any
-    -- number of cards" is the other axis -- a count with no number at all --
-    -- and belongs on the Quantity (gap #1685), where it would carry this flag
-    -- too.
+    -- number of cards" is the other axis, and is spelled by the absence of the
+    -- count itself -- over which this flag is unobservable, both readings
+    -- landing in CR 701.23b's branch.
     upTo :: Bool,
     destination :: SearchDestination.SearchDestination
   }
