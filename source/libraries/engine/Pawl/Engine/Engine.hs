@@ -1428,6 +1428,13 @@ runStepThatBegan phase = do
         -- 500.1 nesting the one inside the other; nothing observes the order.
         State.modify' (Expiry.dropAtEndOf (PhaseSelector.Step phase))
         Foldable.traverse_ (State.modify' . Expiry.dropAtEndOf) (Turn.phaseEndingAt phase)
+        -- CR 500.5a's UNIT-axis half, on the phase grain and only there: a mana
+        -- unit's "until end of combat" retention (ManaRetention.UntilEndOfCombat)
+        -- is not a stored effect, so Expiry's sweep above cannot see it. Beside
+        -- that sweep and ahead of the pool below, which is CR 500.5's own order
+        -- -- ending it AFTER emptyManaPools would carry the mana one boundary too
+        -- far.
+        Foldable.traverse_ (State.modify' . Mana.endRetentionAtEndOf) (Turn.phaseEndingAt phase)
         -- CR 703.4q: emptying the pool is a turn-based action that does not use
         -- the stack, and CR 500.5's "Then" puts it AFTER the expiries above. This
         -- line says only WHEN; WHICH mana empties is Mana.emptyManaPools', off

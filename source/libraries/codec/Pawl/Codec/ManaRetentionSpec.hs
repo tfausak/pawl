@@ -19,6 +19,12 @@ spec s = Spec.describe s "Pawl.Codec.ManaRetention" $ do
       ManaRetention.codec
       ManaRetention.UntilEndOfTurn
       " {\"type\":\"UntilEndOfTurn\"} "
+  Spec.it s "UntilEndOfCombat" $
+    Common.assertCodec
+      s
+      ManaRetention.codec
+      ManaRetention.UntilEndOfCombat
+      " {\"type\":\"UntilEndOfCombat\"} "
   -- Exhaustive where the literals above are representative: Arm.enum derives
   -- the arm list from the type, so this is what would catch a constructor the
   -- derivation missed or two that encode alike.

@@ -147,6 +147,9 @@
                                 "type": "Red"
                               }
                             }
+                          },
+                          "retention": {
+                            "type": "UntilEndOfCombat"
                           }
                         }
                       },
@@ -161,6 +164,9 @@
                                 "type": "Red"
                               }
                             }
+                          },
+                          "retention": {
+                            "type": "UntilEndOfCombat"
                           }
                         }
                       },
@@ -175,6 +181,9 @@
                                 "type": "Red"
                               }
                             }
+                          },
+                          "retention": {
+                            "type": "UntilEndOfCombat"
                           }
                         }
                       },
@@ -189,6 +198,9 @@
                                 "type": "Red"
                               }
                             }
+                          },
+                          "retention": {
+                            "type": "UntilEndOfCombat"
                           }
                         }
                       },
@@ -203,6 +215,9 @@
                                 "type": "Red"
                               }
                             }
+                          },
+                          "retention": {
+                            "type": "UntilEndOfCombat"
                           }
                         }
                       },
@@ -217,6 +232,9 @@
                                 "type": "Red"
                               }
                             }
+                          },
+                          "retention": {
+                            "type": "UntilEndOfCombat"
                           }
                         }
                       }

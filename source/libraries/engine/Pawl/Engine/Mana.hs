@@ -55,6 +55,8 @@ import Pawl.Types.ManaUnit (ManaUnit)
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import Pawl.Types.PhaseSelector (PhaseSelector)
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProductionTag as ProductionTag
@@ -506,9 +508,43 @@ emptyManaPools gs =
 -- Rewrites every unit rather than filtering: CR 514.2 ends the retention, it
 -- does not remove the mana, so a retained unit becomes an ordinary one and stays
 -- in the pool for the rest of the step.
+--
+-- BLANKET over the arms, not ManaRetention.UntilEndOfTurn-specific, and that is
+-- a decision rather than an oversight: CR 514.2 is the backstop for any
+-- retention still standing at cleanup, and an UntilEndOfCombat unit whose combat
+-- phase never reported its end would otherwise sit in the pool for ever;
+-- Turn.phaseEndingAt names the one such hole, see #2126. -Werror cannot see the
+-- arm list here, the record update naming no constructor.
 endManaRetention :: GameState -> GameState
 endManaRetention gs =
   let ordinary unit = unit {ManaUnit.retention = ManaRetention.Ordinary}
+      ended pool = Mana.MkMana (fmap ordinary (Mana.unwrap pool))
+   in gs {GameState.manaPool = fmap ended (GameState.manaPool gs)}
+
+-- CR 500.5a, repeated by CR 511.2: an "until end of combat" retention ends as
+-- the combat PHASE ends. endManaRetention's shape one rule over -- it ends the
+-- retention and takes no mana, and the CR 500.5 sweep (emptyManaPools) that
+-- every caller runs after this is what then empties the pool.
+--
+-- Takes the window that is ending rather than being a bare
+-- endCombatManaRetention, so its three callers spell it exactly as they spell
+-- Expiry.dropAtEndOf beside it: Engine.runStepThatBegan for a combat phase whose
+-- last step ended, and Pawl.Engine.Resolve's CR 724.1d and CR 724.2e arms for
+-- one ended part-way through with no last step to ask.
+--
+-- EQUALITY on the selector, not Turn.inWindow's containment, for exactly
+-- dropAtEndOf's reason: containment would end the retention as the first combat
+-- STEP ended, which is the reading CR 500.5a exists to deny.
+--
+-- Only ManaRetention.UntilEndOfCombat, so a CR 514.2 retention outlives a combat
+-- phase in the same turn.
+endRetentionAtEndOf :: PhaseSelector -> GameState -> GameState
+endRetentionAtEndOf ending gs =
+  let ends retention = case retention of
+        ManaRetention.UntilEndOfCombat -> ending == PhaseSelector.CombatPhase
+        ManaRetention.UntilEndOfTurn -> False
+        ManaRetention.Ordinary -> False
+      ordinary unit = if ends (ManaUnit.retention unit) then unit {ManaUnit.retention = ManaRetention.Ordinary} else unit
       ended pool = Mana.MkMana (fmap ordinary (Mana.unwrap pool))
    in gs {GameState.manaPool = fmap ended (GameState.manaPool gs)}
 

@@ -1034,11 +1034,15 @@ untilEndOfCombatSpec s registry = Spec.describe s "UntilEndOfCombat" $ do
   -- nothing, while the same entry swept AFTERWARDS would keep the pool for a
   -- phase it no longer covers. That is the whole of the ordering, made visible.
   --
-  -- The stored effect is installed directly rather than printed by a card: no
-  -- card in the pool joins an end-of-combat duration to mana retention (CR
-  -- 702.189a firebending -- "Until end of combat, you don't lose this mana as
-  -- steps and phases end" -- is the shape that would). The Never-scoped control
-  -- in the same test is what keeps this from passing for the wrong reason.
+  -- The stored effect is installed directly rather than printed by a card. The
+  -- card that joins an end-of-combat duration to mana retention -- Avatar Roku,
+  -- Firebender, CR 702.189a firebending's shape spelled out -- carries it on the
+  -- UNIT (Pawl.Types.ManaRetention), which Pawl.ManaSpec's group of that name
+  -- proves and which is a different carrier from the CR 613.11 player axis this
+  -- case installs. Scryfall o:"unspent mana" o:"end of combat", 2026-08-23: no
+  -- hit; a card printing Upwelling's template scoped to the combat phase would
+  -- refute this. The Never-scoped control in the same test is what keeps this
+  -- from passing for the wrong reason.
   Spec.it s "CR 500.5 an end-of-combat retention effect expires BEFORE the pool empties" $ do
     mountain <- S.printingOf s registry "Mountain"
     let staged expiry =
