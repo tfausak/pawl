@@ -30,6 +30,7 @@ import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapPermanents as TapPermanents
+import qualified Pawl.Types.Zone as Zone
 
 -- The characteristics a Filter atom consults. Supplied by the projection on the
 -- battlefield/stack and by the printed card off the battlefield (both builders
@@ -104,6 +105,16 @@ data View = MkView
     -- 109.1 makes an object of nothing. OwnedBy is vacuously False there, the
     -- posture power and controller take.
     owner :: Maybe PlayerId.PlayerId,
+    -- CR 400.1: which ZONE the candidate object is in -- what IsInZone reads.
+    -- Off Object.zone rather than through any projection: CR 109.3 counts no zone
+    -- among an object's characteristics, so no CR 613 layer writes one, exactly
+    -- as `token` and `tapped` below are read off the object.
+    --
+    -- Nothing where there is no OBJECT to read it off -- a player view, an event
+    -- snapshot, or a printed card being matched by a search, which CR 109.1 makes
+    -- an object of nothing -- so IsInZone is vacuously False there, the posture
+    -- `controller` and `identity` already take.
+    zone :: Maybe Zone.Zone,
     -- Which object this view is OF. Nothing for a printed card off the
     -- battlefield, which is not an object -- so IsSource is vacuously False
     -- there, the same posture power and controller already take.
@@ -446,6 +457,8 @@ playerView pid =
       controller = Nothing,
       -- CR 108.3 gives an owner to a CARD; a player owns cards and is not one.
       owner = Nothing,
+      -- CR 400.1 puts OBJECTS in zones; a player is in none of them (CR 109.1).
+      zone = Nothing,
       identity = Nothing,
       playerIdentity = Just pid,
       -- CR 506.3: only a creature can attack, and a player is not one.
@@ -961,6 +974,11 @@ matches context view predicate = case predicate of
   -- land Humility has stripped stops matching at once, and CR 702.29b's and CR
   -- 702.77b's abilities are in the list the builder measured.
   Filter.HasNonManaActivatedAbility -> nonManaActivatedAbility view
+  -- CR 400.1 off Object.zone, a live read like `token` and `tapped` above: the
+  -- object moves and the atom answers about where it is NOW. That is what makes
+  -- it answer CR 601.2's "from where it is" at a cast gate, which runs before CR
+  -- 601.2a's move to the stack.
+  Filter.IsInZone z -> zone view == Just z
   -- CR 701.54e's designation conjunct, asked of the perspective (CR 109.5's
   -- "you"). A live read of Object.ringBearerFor, never a stamp on the candidate:
   -- CR 701.54a ends the designation when another creature takes it, and the next
@@ -1096,6 +1114,7 @@ rewrite pairs predicate = case predicate of
   -- atom names none -- "an activated ability that isn't a mana ability" has no
   -- word inside it for Artificial Evolution to reach.
   Filter.HasNonManaActivatedAbility -> predicate
+  Filter.IsInZone _ -> predicate
   -- Rewritten THROUGH the kind, for the reason rewriteCounterKind gives.
   Filter.HasCounters kind -> Filter.HasCounters (rewriteCounterKind pairs kind)
 
@@ -1458,6 +1477,7 @@ bakeBound players predicate = case predicate of
   Filter.HasDesignation _ -> predicate
   Filter.HasCounters _ -> predicate
   Filter.HasNonManaActivatedAbility -> predicate
+  Filter.IsInZone _ -> predicate
 
 -- The mana-value LITERALS a Filter compares against: every `n` in a
 -- ManaValueAtMost atom inside it, at any depth.
@@ -1543,6 +1563,7 @@ manaValueThresholds predicate = case predicate of
   Filter.HasDesignation _ -> []
   Filter.HasCounters _ -> []
   Filter.HasNonManaActivatedAbility -> []
+  Filter.IsInZone _ -> []
 
 -- CR 701.23b vs CR 701.23d: does this predicate state a QUALITY? A search whose
 -- filter states one may find fewer cards than it asks for, or none, even when the
@@ -1638,6 +1659,10 @@ statesAQuality predicate = case predicate of
   Filter.HasDesignation _ -> True
   Filter.HasCounters _ -> True
   Filter.HasNonManaActivatedAbility -> True
+  -- CR 400.1 states a quality like any other atom here: a search whose predicate
+  -- names a zone is looking for cards with a stated quality, so CR 701.23b's
+  -- shortfall applies rather than CR 701.23d's "must find".
+  Filter.IsInZone _ -> True
 
 -- The slots a Filter READS -- today exactly the ControlledByBound atoms in it.
 -- Pawl.Engine.Resolve.modeSlots folds this over a mode's target slots, which is

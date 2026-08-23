@@ -713,6 +713,9 @@ viewOfCard face =
           -- where viewUpTo falls back here with an object id in hand and CR 400.3
           -- would answer from Object.owner (#1068).
           Filter.owner = Nothing,
+          -- CR 400.1 / 109.1: a printed card being matched by a search is not an
+          -- object, so there is no zone for IsInZone to read either.
+          Filter.zone = Nothing,
           -- Not an object, so no identity for IsSource to compare.
           Filter.identity = Nothing,
           Filter.playerIdentity = Nothing,
@@ -858,6 +861,10 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- nothing moves ownership. Nothing for an id naming nothing (CR 608.2h,
       -- #1069).
       Filter.owner = fmap Object.owner (Game.lookupObject oid gs),
+      -- CR 400.1 off the OBJECT beside its owner, and for `owner`'s reason: CR
+      -- 109.3 counts no zone among the characteristics, so no projection carries
+      -- one. Nothing for an id naming nothing (CR 608.2h, #1069).
+      Filter.zone = fmap Object.zone (Game.lookupObject oid gs),
       Filter.identity = Just oid,
       Filter.playerIdentity = Nothing,
       -- CR 508.1k: a combat status, not a characteristic (CR 109.3).
@@ -3033,6 +3040,9 @@ filterReads f = case f of
   -- CR 109.3 / 613.1f: the aspect LoseAllAbilities writes, Aspect having no
   -- finer grain than "the abilities".
   Filter.Type.HasNonManaActivatedAbility -> Set.singleton Keywords
+  -- CR 400.1 / 109.3: a zone is not a characteristic, so no Modification writes
+  -- one and no layer's ordering turns on this atom.
+  Filter.Type.IsInZone _ -> Set.empty
   -- Reads nothing: CR 701.54b keeps the ring-bearer designation off the copiable
   -- values, so no Modification writes Object.ringBearerFor.
   Filter.Type.IsRingBearer -> Set.empty
