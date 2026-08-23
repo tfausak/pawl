@@ -5,9 +5,9 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecameAttached as BecameAttached
+import qualified Pawl.Types.BecameBlocking as BecameBlocking
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
-import qualified Pawl.Types.BlockerDeclared as BlockerDeclared
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.ControlChanged as ControlChanged
 import qualified Pawl.Types.CounterChange as CounterChange
@@ -229,7 +229,7 @@ data GameEvent
     -- Pawl.Engine.Combat.declareAttackers alone.
     --
     -- AttackerDeclared's grouping sibling, and the pair stands to each other as
-    -- BlockerDeclared and BlocksDeclared do: rule 508.3b triggers "if one or more
+    -- BecameBlocking and BlocksDeclared do: rule 508.3b triggers "if one or more
     -- creatures are declared as attackers attacking that player or permanent", so
     -- three creatures sent at one player are three of that event and ONE of this.
     -- Pawl.Engine.Event.matchesTrigger sees one event at a time and so cannot do
@@ -284,40 +284,46 @@ data GameEvent
     -- player]" is the shape that wants one beside this player, and no trigger
     -- condition writes it (#538).
     AttackersDeclared PlayerId.PlayerId
-  | -- | CR 509.1i: a blocker was DECLARED -- one entry per creature the defending
-    -- player chose in CR 509.1's turn-based action, naming the blocker and one
-    -- attacking creature chosen for it (CR 509.1a). AttackerDeclared's mirror,
-    -- and appended by Pawl.Engine.Combat.declareBlockers alone.
+  | -- | CR 509.1g: a creature BECAME A BLOCKING CREATURE, naming it and one
+    -- attacking creature it is blocking. AttackerDeclared's mirror, with TWO
+    -- appenders: Pawl.Engine.Combat.declareBlockers, one entry per creature the
+    -- defending player chose in CR 509.1's turn-based action and per attacker
+    -- chosen for it (CR 509.1a), and
+    -- Pawl.Engine.Combat.putOntoBattlefieldBlocking, one entry per creature put
+    -- onto the battlefield blocking (CR 509.4).
     --
-    -- The declaration is the event, for AttackerDeclared's reason: CR 509.4 says
-    -- a creature put onto the battlefield blocking is "blocking" but never
-    -- "blocked", and Combat.blockers cannot tell the two apart.
+    -- Which producer it was rides on the payload's putOntoBattlefield, because
+    -- CR 509.4 makes the two readers disagree: rule 509.3b's "blocks a creature"
+    -- won't trigger for a creature put onto the battlefield blocking, and rule
+    -- 509.3d's "becomes blocked by a creature" will. Combat.blockers cannot tell
+    -- them apart, which is why the flag is on the event rather than read off the
+    -- board.
     --
     -- ONE event per PAIR, which is CR 509.3b's arity ("once for each attacking
     -- creature the creature blocks"). CR 509.3a's once-per-blocker arity is
-    -- BlocksDeclared below; the two differ exactly as BlockerDeclared and
+    -- BlocksDeclared below; the two differ exactly as BecameBlocking and
     -- AttackerBlocked do on the attacking side.
     --
     -- The ATTACKER is the payload CR 509.3b's "blocks a creature" and CR 509.3d's
     -- "becomes blocked by a creature" need -- the first binds it, the second
     -- matches on it -- and it cannot be derived later, since a blocker removed
-    -- from combat (CR 506.4) leaves no record of what it was declared against.
-    BlockerDeclared BlockerDeclared.BlockerDeclared
+    -- from combat (CR 506.4) leaves no record of what it was blocking.
+    BecameBlocking BecameBlocking.BecameBlocking
   | -- | CR 509.1h: an attacking creature BECAME a blocked creature -- one event
     -- per attacker the CR 509.1 declaration gave at least one blocker, plus one
     -- per attacker an effect said becomes blocked (Effect.BecomesBlocked).
     -- Pawl.Engine.Combat.declareBlockers and Pawl.Engine.Combat.becomeBlocked are
     -- the two appenders, which are the two writers of the status itself.
     --
-    -- Derived from the same declaration as BlockerDeclared and not folded into
+    -- Derived from the same declaration as BecameBlocking and not folded into
     -- it, because the two have different arities: an attacker can be blocked by
-    -- several creatures, so BlockerDeclared fires once per PAIR while CR 509.3c's
+    -- several creatures, so BecameBlocking fires once per PAIR while CR 509.3c's
     -- "becomes blocked" fires once per attacker. Grouping is what makes the
     -- difference, and Pawl.Engine.Event.matchesTrigger sees one event at a time
     -- and so cannot do it.
     --
     -- The BLOCKERS are not carried. CR 509.3d's "becomes blocked by a creature"
-    -- is the condition that names one, and it reads BlockerDeclared's pair
+    -- is the condition that names one, and it reads BecameBlocking's pair
     -- instead -- this event exists to be the once-per-combat one (#1146). The
     -- conditions that ask about the blockers as a GROUP -- their quality, or how
     -- many there were -- read Combat.blockers off this event instead, which is
@@ -366,7 +372,7 @@ data GameEvent
     -- creature the CR 509.1 declaration named, appended by
     -- Pawl.Engine.Combat.declareBlockers alone.
     --
-    -- BlockerDeclared's grouped twin, and AttackerBlocked's mirror: that pair
+    -- BecameBlocking's grouped twin, and AttackerBlocked's mirror: that pair
     -- splits an attacker's declaration by CR 509.3c against CR 509.3d, this one
     -- splits a blocker's by CR 509.3a against CR 509.3b. Grouping is the whole
     -- difference, and Pawl.Engine.Event.matchesTrigger sees one event at a time
@@ -377,11 +383,14 @@ data GameEvent
     -- creature that blocks nothing is not in the declaration. Carried rather than
     -- derived for AttackerBlocked's reason -- eventBindings takes no game state --
     -- and the attackers themselves are not, since the condition that names one
-    -- reads BlockerDeclared's pair.
+    -- reads BecameBlocking's pair.
     --
     -- A DECLARATION is the only producer, which is STRICTER than rule 509.3a's
     -- second sentence: an effect that causes a creature to block also triggers
-    -- it. No such effect is in the pool (#1146).
+    -- it. No such effect is in the pool (#1146). A creature put onto the
+    -- battlefield blocking is NOT a shortfall here but rule 509.3a's last
+    -- sentence: Combat.putOntoBattlefieldBlocking records BecameBlocking and
+    -- deliberately not this.
     BlocksDeclared BlocksDeclared.BlocksDeclared
   | -- | CR 701.20a: a player revealed a card.
     --

@@ -259,8 +259,8 @@ data TriggerCondition
     SelfAttacksPlayerWithMostLife
   | -- | CR 509.3a: "whenever [a creature] blocks" (Pride Guardian). SelfAttacks'
     -- mirror, self-scoped, and DECLARED for its reason read on the blocking side
-    -- (CR 509.4), so it matches GameEvent.BlockerDeclared and never
-    -- Combat.blockers.
+    -- (CR 509.4), so it matches GameEvent.BlocksDeclared -- which the declaration
+    -- alone writes -- and never Combat.blockers.
     --
     -- No TriggerFrequency: rule 509.3a's "only once each combat for that
     -- creature" is the GROUPING of GameEvent.BlocksDeclared, recorded once per
@@ -268,13 +268,18 @@ data TriggerCondition
     -- compared nor bound.
     SelfBlocks
   | -- | CR 509.3b: "whenever [a creature] blocks a creature" (Loyal Sentry).
-    -- SelfBlocks reading the per-pair GameEvent.BlockerDeclared instead, which
+    -- SelfBlocks reading the per-pair GameEvent.BecameBlocking instead, which
     -- is the rule's "once for each attacking creature ... blocks", and binding
     -- the attacker under Pawl.Engine.Binding.blockedCreature.
     --
     -- The Filter is a predicate over the ATTACKER blocked (Netcaster Spider's
     -- "with flying"), read at the scan, which is rule 509.3f's "at the point
     -- blockers are declared".
+    --
+    -- A creature put onto the battlefield blocking records that same event, so
+    -- the match reads BecameBlocking.putOntoBattlefield to stay off it: rule
+    -- 509.3b's last sentence, a regression fence rather than proved behaviour
+    -- (#2182).
     --
     -- Not implemented: rule 509.3b's other producer, an effect that causes the
     -- bearer to block, records no event (#1146).
@@ -319,7 +324,7 @@ data TriggerCondition
     SelfBecomesBlocked
   | -- | CR 509.3d: "whenever [a creature] becomes blocked by a creature" -- rule
     -- 702.25a's flanking. Self-scoped on the attacking side, but against
-    -- GameEvent.BlockerDeclared's PAIR rather than the grouped
+    -- GameEvent.BecameBlocking's PAIR rather than the grouped
     -- AttackerBlocked, the rule triggering "once for each creature that blocks".
     -- That arity is the whole difference from SelfBecomesBlocked.
     --
@@ -328,9 +333,16 @@ data TriggerCondition
     -- the triggers on the stack before any player gets priority. The blocker is
     -- bound under Pawl.Engine.Binding.blockingCreature.
     --
-    -- Not implemented: rule 509.3d's other two producers, an effect that adds a
-    -- blocker and a creature put onto the battlefield blocking, record no event
-    -- (#1146).
+    -- Rule 509.3d's third sentence reaches it too, and it is the one form of CR
+    -- 509.3 that CR 509.4 does not silence: a creature put onto the battlefield
+    -- blocking records the same event, through
+    -- Pawl.Engine.Combat.putOntoBattlefieldBlocking, and this condition does not
+    -- read BecameBlocking.putOntoBattlefield where SelfBlocksCreature does.
+    -- Flash Foliage blocking Benalish Cavalry is the pool's producer, and
+    -- Pawl.CombatEffectSpec's PutOntoBattlefieldBlocking group is the proof.
+    --
+    -- Not implemented: rule 509.3d's remaining producer, an effect that causes a
+    -- creature to block, records no event (#1146).
     SelfBecomesBlockedBy (Filter.Filter Keyword.Keyword)
   | -- | CR 509.3e: "whenever [a creature] becomes blocked by one or more [F]
     -- creatures" (Serra Inquisitors' second half) -- SelfBlocksOneOrMore from

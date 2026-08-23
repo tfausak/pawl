@@ -13,9 +13,9 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecameAttached as BecameAttached
+import qualified Pawl.Types.BecameBlocking as BecameBlocking
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
-import qualified Pawl.Types.BlockerDeclared as BlockerDeclared
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ControlChanged as ControlChanged
@@ -161,12 +161,12 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
   -- Two ObjectIds and not an object and a player, unlike the sibling above: CR
   -- 509.1a's declaration pairs a blocker with the creature it blocks. Distinct
   -- numbers, so a codec that swapped the pair would fail.
-  Spec.it s "BlockerDeclared" $
+  Spec.it s "BecameBlocking" $
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.BlockerDeclared (BlockerDeclared.MkBlockerDeclared (ObjectId.MkObjectId 6) (ObjectId.MkObjectId 7)))
-      " {\"type\":\"BlockerDeclared\",\"value\":{\"blocker\":6,\"attacker\":7}} "
+      (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 6, BecameBlocking.attacker = ObjectId.MkObjectId 7, BecameBlocking.putOntoBattlefield = False}))
+      " {\"type\":\"BecameBlocking\",\"value\":{\"blocker\":6,\"attacker\":7}} "
   -- An object and a COUNT: CR 509.3a's event is per blocking creature, and the
   -- number beside it is how many attackers it took (CR 509.3e). Distinct
   -- numbers again, so a codec that swapped them would fail.
