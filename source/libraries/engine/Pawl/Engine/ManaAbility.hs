@@ -32,7 +32,6 @@ import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ManaAddition as ManaAddition
-import Pawl.Types.ManaProduction (ManaProduction)
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
@@ -82,37 +81,28 @@ isManaAbility ab =
   where
     effects = Modal.allEffects (ActivatedAbility.modal ab)
 
--- CR 605: does this effect add mana, and how is its type decided? Read by
+-- CR 605: does this effect add mana, and on what instruction? Read by
 -- Mana.isManaAbility to keep mana abilities off the stack, and by
 -- Mana.manaRoutesOfGiven to enumerate what one activation would add.
 --
--- Returns the ManaProduction rather than a settled ManaType because CR 605.1a
+-- Returns the WHOLE ManaAddition rather than a settled ManaType because CR 605.1a
 -- asks whether the ability COULD add mana, which an unresolved colour choice
 -- answers yes to; which colour is Cost.tapForMana's prompt, not a static fact.
 --
--- The payload's RECIPIENT is dropped, and the classification is right to drop it:
--- CR 605.1a asks whether the ability could add mana to "a player's" pool, not to
--- its controller's, so an ability naming somebody else is a mana ability just the
--- same. Not implemented: the payment path acting on that recipient -- Cost.tapForMana
--- adds an activation's whole yield to the activator, so a mana ability naming
--- another player would pay the wrong pool. Spectral Searchlight and Valleymaker
--- are the printings; neither is in `data/cards/` (#1673).
+-- The whole payload and not its ManaProduction alone, because the two readers
+-- want different halves of it: the classification below asks only whether there
+-- is an addition at all, and CR 605.3b's inline payment
+-- (Mana.manaOptionsOfGiven) has to stamp what the instruction says onto every
+-- unit it adds -- CR 106.6's spending restriction today, the recipient (#1673)
+-- and the retention (#1808) when those land.
 --
--- The payload's RETENTION (Pawl.Types.ManaRetention) is dropped for the same
--- reason and just as rightly: CR 605.1a's four criteria say nothing about how
--- long the mana lasts, so a retained AddMana is a mana ability like any other.
--- Not implemented: the payment path acting on it -- Mana.manaOptionsOfGiven
--- stamps Ordinary, so a mana ability that retained its mana would not (#1808).
---
--- The payload's spending RESTRICTION (CR 106.6) is dropped for the third time
--- and just as rightly, CR 605.1a saying nothing about what the mana may pay for.
--- Not implemented: the payment path acting on it -- Mana.manaOptionsOfGiven
--- stamps Nothing, so a mana ability's restricted mana would be spendable on
--- anything. Mishra's Workshop and Cavern of Souls are the printings; neither is
--- in `data/cards/` (#1976).
-manaProduced :: Effect Card.Type.Card -> Maybe ManaProduction
+-- None of those three narrows the CLASSIFICATION, and CR 605.1a is why: its four
+-- criteria say nothing about whose pool the mana goes to ("a player's", not its
+-- controller's), how long it lasts, or what it may pay for, so an addition
+-- naming any of them is a mana ability just the same.
+manaProduced :: Effect Card.Type.Card -> Maybe ManaAddition.ManaAddition
 manaProduced effect = case effect of
-  Effect.AddMana addition -> Just (ManaAddition.production addition)
+  Effect.AddMana addition -> Just addition
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> Nothing
   Effect.Fight {} -> Nothing
   Effect.ModifyTarget {} -> Nothing

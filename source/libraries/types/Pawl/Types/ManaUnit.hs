@@ -38,19 +38,23 @@ data ManaUnit = MkManaUnit
   { manaType :: ManaType.ManaType,
     tags :: Set.Set ProductionTag.ProductionTag,
     -- | CR 106.4: whether the player loses this mana as a step or phase ends.
-    -- Stamped by the same two producers as `tags`, but read off the ADDITION
-    -- (Pawl.Types.ManaAddition) rather than off the source: a mana ability paid
-    -- inline states no retention, so that path always adds Ordinary.
+    -- Read off the ADDITION (Pawl.Types.ManaAddition) rather than off the
+    -- source. Not implemented: the inline producer reading it --
+    -- Pawl.Engine.Mana.manaOptionsOfGiven stamps Ordinary whatever the
+    -- instruction says, so only Pawl.Engine.Resolve's arm honours a retaining
+    -- clause today (#1808).
     retention :: ManaRetention.ManaRetention,
     -- | CR 106.6: what this mana may be spent on -- Nothing for mana that may
     -- be spent on anything, which is almost every mana. @Just f@ reads "spend
     -- this mana only to cast a spell matching @f@", so a payment that is not a
-    -- CAST cannot use it at all (Pawl.Engine.Mana.spendableOn).
+    -- CAST cannot use it at all (Pawl.Engine.Mana.spendableAmong).
     --
     -- Stamped off the ADDITION (Pawl.Types.ManaAddition) rather than off the
-    -- source, exactly as `retention` is, and for CR 106.6a's reason: the
-    -- restriction belongs to the spell or ability that produced the mana and so
-    -- applies to every mana it produced.
+    -- source, for CR 106.6a's reason: the restriction belongs to the spell or
+    -- ability that produced the mana and so applies to every mana it produced.
+    -- BOTH producers read it -- Pawl.Engine.Mana.manaOptionsOfGiven for a mana
+    -- ability paid inline (Mishra's Workshop) and Pawl.Engine.Resolve's
+    -- Effect.AddMana arm for one that resolves off the stack (Geosurge).
     --
     -- Not implemented: CR 106.6's other two shapes -- an additional effect on
     -- the spell the mana is spent on (Cavern of Souls' "can't be countered"),
