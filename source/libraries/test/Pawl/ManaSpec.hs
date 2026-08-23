@@ -2058,7 +2058,7 @@ workhorseSpec s registry = Spec.describe s "Workhorse" $ do
     Spec.assertEqWith s "with two counters there is no {3} and the cast fails" (countOf "Crucible of Worlds" short) 0
     Spec.assertEqWith s "CR 122.1 three of the four counters paid for it" (S.counterOf CounterKind.PlusOnePlusOne horseId resolved) 1
     Spec.assertEqWith s "CR 122.1a so the 4/4 is a 1/1, and still there to be read" (S.powerToughnessOf horseId resolved) (Just (1, 1))
-    Spec.assertEqWith s "and CR 601.2h spent none of the short board's counters" (S.counterOf CounterKind.PlusOnePlusOne shortId short) 2
+    Spec.assertEqWith s "and the failed cast spent none of the short board's counters" (S.counterOf CounterKind.PlusOnePlusOne shortId short) 2
 
   -- The card's OTHER printed line, which the boards above set by hand: cast the
   -- Workhorse and it arrives already carrying the four counters (CR 614.1c

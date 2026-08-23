@@ -1443,8 +1443,8 @@ repeatsOf pid oid cost gs = case Cost.mana cost of
 -- module cannot count, and for two it need not. EXACT
 -- for CR 107.5's {T}, CR 107.6's {Q} and CR 606.4's loyalty (CR 606.3 allows one
 -- loyalty ability per turn whatever the counters allow); an UNDERSTATEMENT for
--- CR 107.14's energy, for a counter put on the source, and for the two
--- components that tap OTHER permanents (#2171).
+-- CR 107.14's energy, for a counter put on the source, for CR 701.68's blight,
+-- and for the two components that tap OTHER permanents (#2173).
 --
 -- EXHAUSTIVE with no wildcard, this module's posture, and -Werror makes it.
 uncountedCeiling :: CostComponent.CostComponent Keyword.Type.Keyword -> Maybe Natural
@@ -1480,7 +1480,7 @@ uncountedCeiling component = case component of
   -- counters -- and the header's safe direction.
   CostComponent.PutPlusOneCountersOnThis _ -> Just 1
   -- An UNDERSTATEMENT: a player controlling a creature can blight as often as
-  -- they can pay the rest of the cost.
+  -- they can pay the rest of the cost (#2173).
   CostComponent.Blight _ -> Just 1
   -- Zero, PayLifeX's answer above and for its reason: an unannounced X cannot be
   -- paid even once.
