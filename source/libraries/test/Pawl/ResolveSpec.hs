@@ -1068,10 +1068,13 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   -- nonland to reject, so the offer is strictly larger than the largest legal
   -- answer and the prompt cannot short-circuit.
   --
-  -- The three cases are the same board and the same mana, differing in exactly
-  -- how many of the four the searcher takes.
+  -- The first three cases are the same board and the same mana, differing in
+  -- exactly how many of the four the searcher takes. The fourth changes the
+  -- board instead: FIVE matching lands and the same card, which is what rules
+  -- out a literal. A four-land board alone cannot -- a search for "up to four"
+  -- would pass all three of the cases above.
   Spec.it s "CR 701.23a whole card: Mana Severance's \"any number of\" exiles every land she names" $ do
-    board <- severanceBoard s registry
+    board <- severanceBoard s registry severanceFour
     let settled = resolveSeverance (findPinned (severanceLands board)) board
     Spec.assertEqWith
       s
@@ -1084,7 +1087,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
       (Game.zoneMembers Zone.Library S.alice settled)
       [severancePiker board]
   Spec.it s "CR 701.23b whole card: Mana Severance may find FEWER than the library holds" $ do
-    board <- severanceBoard s registry
+    board <- severanceBoard s registry severanceFour
     let settled = resolveSeverance (findPinned (take 2 (severanceLands board))) board
     Spec.assertEqWith
       s
@@ -1102,7 +1105,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   -- besides -- so an answer of zero stands and nothing is completed from the
   -- lands she passed over.
   Spec.it s "CR 701.23b whole card: Mana Severance may decline to find at all" $ do
-    board <- severanceBoard s registry
+    board <- severanceBoard s registry severanceFour
     let settled = resolveSeverance (findPinned []) board
     Spec.assertEqWith
       s
@@ -1114,6 +1117,22 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
       "every library card is still there"
       (Set.fromList (Game.zoneMembers Zone.Library S.alice settled))
       (Set.fromList (severancePiker board : severanceLands board))
+  -- The same card over a bigger library. CR 701.23a bounds the find by the ZONE,
+  -- so the count moves with the library and no number the card could have stated
+  -- explains both this case and the four-land one above.
+  Spec.it s "CR 701.23a whole card: Mana Severance's count is the library's, so five lands exile five" $ do
+    board <- severanceBoard s registry (severanceFour <> ["Evolving Wilds"])
+    let settled = resolveSeverance (findPinned (severanceLands board)) board
+    Spec.assertEqWith
+      s
+      "all five lands she named are in exile"
+      (List.sort (fmap (`S.soleFaceName` settled) (Game.zoneMembers Zone.Exile S.alice settled)))
+      (List.sort (fmap (CardName.MkCardName . Text.pack) ["Evolving Wilds", "Forest", "Mountain", "Plains", "Swamp"]))
+    Spec.assertEqWith
+      s
+      "and only the nonland the filter rejected is left in the library"
+      (Game.zoneMembers Zone.Library S.alice settled)
+      [severancePiker board]
   -- Extract -- "{U} Sorcery: Search target player's library for a card and exile
   -- it. Then that player shuffles." The whole-card proof that the player LOOKING
   -- and the player whose library is looked at can be different seats (CR 701.23a),
@@ -1914,34 +1933,36 @@ resolveVegetation answer board =
   let cast = snd (Engine.runGamePure answer (vegetationState board) (S.cast S.alice (vegetationSpell board)))
    in snd (Engine.runGamePure answer cast Engine.priorityLoop)
 
--- Mana Severance's board, built once and shared by its three cases so they
--- differ in the ANSWER alone. Two Islands pay the {1}{U}, and the library holds
--- four DIFFERENT basics -- none of them an Island -- against a search that
--- states no count, plus a nonland for the filter to reject.
+-- Mana Severance's board. Two Islands pay the {1}{U}, and the library holds the
+-- land cards NAMED -- all different, and none of them an Island -- against a
+-- search that states no count, plus a nonland for the filter to reject.
+--
+-- Parameterised by the lands rather than fixed, because a board of one size
+-- cannot tell an unbounded search from a literal that happens to equal it: the
+-- four-land cases below and the five-land case together admit no literal.
 data SeveranceBoard = MkSeveranceBoard
   { severanceState :: GameState.GameState,
     severanceSpell :: ObjectId.ObjectId,
-    -- | Mountain, Swamp, Plains and Forest, in the order the cases name them.
+    -- | The library's land cards, in the order they were named.
     severanceLands :: [ObjectId.ObjectId],
     severancePiker :: ObjectId.ObjectId
   }
 
-severanceBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m SeveranceBoard
-severanceBoard s registry = do
+severanceBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> [String] -> m SeveranceBoard
+severanceBoard s registry names = do
   island <- S.printingOf s registry "Island"
-  mountain <- S.printingOf s registry "Mountain"
-  swamp <- S.printingOf s registry "Swamp"
-  plains <- S.printingOf s registry "Plains"
-  forest <- S.printingOf s registry "Forest"
+  lands <- mapM (S.printingOf s registry) names
   piker <- S.printingOf s registry "Goblin Piker"
   severance <- S.printingOf s registry "Mana Severance"
-  let (mountainId, g1) = S.addLibraryCard mountain S.alice (S.landsInPlay island 2)
-      (swampId, g2) = S.addLibraryCard swamp S.alice g1
-      (plainsId, g3) = S.addLibraryCard plains S.alice g2
-      (forestId, g4) = S.addLibraryCard forest S.alice g3
-      (pikerId, g5) = S.addLibraryCard piker S.alice g4
-      (gs, spellId) = S.handOne severance g5
-  pure (MkSeveranceBoard gs spellId [mountainId, swampId, plainsId, forestId] pikerId)
+  let place (ids, g) printing = let (oid, g') = S.addLibraryCard printing S.alice g in (ids <> [oid], g')
+      (landIds, g1) = List.foldl' place ([], S.landsInPlay island 2) lands
+      (pikerId, g2) = S.addLibraryCard piker S.alice g1
+      (gs, spellId) = S.handOne severance g2
+  pure (MkSeveranceBoard gs spellId landIds pikerId)
+
+-- The four the three shared cases use.
+severanceFour :: [String]
+severanceFour = ["Mountain", "Swamp", "Plains", "Forest"]
 
 resolveSeverance :: (forall r. Prompt.Prompt r -> r) -> SeveranceBoard -> GameState.GameState
 resolveSeverance answer board =
