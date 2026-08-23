@@ -3778,14 +3778,26 @@ recordTokenEntry newId = do
 -- that draws -- the draw step, an opening hand, a Draw effect -- opens the same
 -- window, and none of them learns that it did.
 drawCard :: PlayerId -> Game ()
-drawCard pid = do
+drawCard pid = Monad.void (drawCardReturning pid)
+
+-- drawCardReturning is to drawCard what changeZoneReturning is to changeZone, and
+-- for CR 121.1's "and reveal IT" (#1899): Just the id the card ARRIVED in the hand
+-- under (CR 400.7), which is where a later clause of the same resolution names it.
+--
+-- Nothing where there is no such card -- an empty library (CR 104.3c is then the
+-- whole of what happened) or a move a replacement effect cancelled -- so a caller
+-- binding the answer binds nothing rather than binding a card that is not there.
+drawCardReturning :: PlayerId -> Game (Maybe ObjectId)
+drawCardReturning pid = do
   gs <- State.get
   case Game.zoneMembers Zone.Library pid gs of
-    [] -> State.put gs {GameState.drewFromEmpty = Set.insert pid (GameState.drewFromEmpty gs)}
+    [] -> do
+      State.put gs {GameState.drewFromEmpty = Set.insert pid (GameState.drewFromEmpty gs)}
+      pure Nothing
     top : _ -> do
       moved <- changeZoneReturning top Zone.Hand
       case moved of
-        Nothing -> pure ()
+        Nothing -> pure Nothing
         Just drawn -> do
           nth <- State.state $ \g ->
             let tally = Map.insertWith (+) pid 1 (GameState.drawsThisTurn g)
@@ -3795,6 +3807,7 @@ drawCard pid = do
           -- off the ordinal this draw was just stamped with rather than off a
           -- second reading of the tally.
           Monad.when (nth == 1) (offerMiracleReveal pid drawn)
+          pure (Just drawn)
 
 -- CR 702.94a's static half, and CR 121.9's window: "you may reveal this card from
 -- your hand as you draw it". Asked of the card that just arrived in the hand, and

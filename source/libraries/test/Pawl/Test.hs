@@ -124,6 +124,7 @@ import qualified Pawl.Codec.DiscardCardsSpec
 import qualified Pawl.Codec.DiscardCauseSpec
 import qualified Pawl.Codec.DiscardSpec
 import qualified Pawl.Codec.DiscardedSpec
+import qualified Pawl.Codec.DrawSpec
 import qualified Pawl.Codec.DrewSpec
 import qualified Pawl.Codec.DungeonRoomSpec
 import qualified Pawl.Codec.DurationRefSpec
@@ -616,6 +617,7 @@ spec s registry = do
   Pawl.Codec.DiscardCauseSpec.spec s
   Pawl.Codec.DiscardSpec.spec s
   Pawl.Codec.DiscardedSpec.spec s
+  Pawl.Codec.DrawSpec.spec s
   Pawl.Codec.DrewSpec.spec s
   Pawl.Codec.DungeonRoomSpec.spec s
   Pawl.Codec.DurationRefSpec.spec s
