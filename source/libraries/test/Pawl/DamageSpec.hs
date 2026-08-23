@@ -3,7 +3,9 @@
 
 -- Covers Pawl.Engine.Damage and Pawl.Engine.Sba: the damage funnel, who the
 -- funnel credits as a damage event's source, its deal-time riders (deathtouch,
--- infect, wither, toxic, lifelink), trample, and state-based actions.
+-- infect, wither, toxic, lifelink), trample, state-based actions, and the
+-- look-back read of the damage the turn's event log records
+-- (Filter.DealtDamageThisTurn).
 module Pawl.DamageSpec where
 
 import qualified Control.Monad as Monad
@@ -2715,6 +2717,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Damage" $ do
   excessDamageSpec s registry
   fightSpec s registry
   m2cPropertySpec s registry
+  dealtDamageThisTurnSpec s registry
 
 -- Fill every target slot with whichever of the two named permanents that slot's
 -- own filter admits. Prey Upon's slots are disjointly filtered by controller, so
@@ -2926,3 +2929,99 @@ selfFight oid gs = case Game.faceOf oid gs of
         let activated = S.runPure (aimedAt oid) gs (Activate.activateAbility S.alice oid ability)
          in S.settleSba (S.runPure (aimedAt oid) activated Stack.resolveTop)
   _ -> gs
+
+-- CR 120.1 / 608.2i: Filter.DealtDamageThisTurn, the look-back read Fatal Blow's
+-- "destroy target creature that was dealt damage this turn" asks for. Here
+-- rather than in Pawl.FilterSpec, whose spec takes no registry and so holds
+-- View-record units only, and rather than in a subsystem spec, Fatal Blow
+-- belonging to none.
+--
+-- The CR defines no term for the phrase -- rule 702.54a is the one place it is
+-- printed in the rules, as ordinary English -- so the citations here are rule
+-- 120.1 for what damage is dealt to and rule 608.2i for reading it back.
+dealtDamageThisTurnSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+dealtDamageThisTurnSpec s registry =
+  Spec.describe s "DealtDamageThisTurn" $ do
+    -- Two IDENTICAL Hill Giants, so no characteristic separates them and only
+    -- the damage can decide the offer -- and 3/3s rather than the Goblin Piker a
+    -- board like this usually uses, because a Piker is 2/1 and CR 704.5g would
+    -- destroy the damaged one before the spell ever looked for a target, leaving
+    -- an empty legal set under every implementation.
+    Spec.it s "CR 120.1 Fatal Blow can be aimed at the pinged creature and not at its twin" $ do
+      island <- S.printingOf s registry "Island"
+      sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+      hillGiant <- S.printingOf s registry "Hill Giant"
+      fatalBlow <- S.printingOf s registry "Fatal Blow"
+      case (Face.activatedAbilities (S.combinedFace sorcerer), S.spellTargetSlot fatalBlow) of
+        (ping : _, Just theSlot) -> do
+          let (sorcererId, gs1) = S.addCreature sorcerer S.alice (S.landsInPlay island 1)
+              (hurtId, gs2) = S.addCreature hillGiant S.bob gs1
+              (wholeId, gs3) = S.addCreature hillGiant S.bob gs2
+              ready = gs3 {GameState.priority = Just S.alice}
+              pinged = S.runPure (aimedAt hurtId) ready (do Activate.activateAbility S.alice sorcererId ping; Stack.resolveTop)
+              board = S.settleSba pinged
+          Spec.assertEqWith
+            s
+            "CR 120.1 / 608.2i: the pinged Giant is the only legal target"
+            (Set.toList (Target.legalRecipients Nothing S.noSource theSlot board))
+            [Recipient.ToCreature hurtId]
+          -- The preconditions the offer rests on, asserted AFTER it so neither
+          -- can absorb a mutation of the atom.
+          Spec.assertEqWith s "CR 120.3e: one damage was marked on it" (S.damageOf hurtId board) (Just 1)
+          Spec.assertBool s (Set.member hurtId (GameState.battlefield board)) "CR 704.5g: 1 is not lethal to a 3/3, so it is still there to target"
+          Spec.assertBool s (Set.member wholeId (GameState.battlefield board)) "and its twin is on the battlefield too, undamaged"
+        _ -> Spec.assertFailure s "Prodigal Sorcerer should print an activated ability, and Fatal Blow a 'target' slot"
+
+    -- The board Object.damage cannot answer, and the rules question the issue
+    -- names. CR 120.6: "All damage marked on a permanent is removed when it
+    -- regenerates" -- so a regenerated Uthden Troll carries no marks and was
+    -- still dealt damage this turn. A marks-reading implementation offers
+    -- nothing here; the log reading offers the Troll.
+    Spec.it s "CR 120.6 a regenerated creature carries no marked damage and is still a legal target" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      uthdenTroll <- S.printingOf s registry "Uthden Troll"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      fatalBlow <- S.printingOf s registry "Fatal Blow"
+      case (Face.activatedAbilities (S.combinedFace uthdenTroll), S.spellTargetSlot fatalBlow) of
+        (regenerate : _, Just theSlot) -> do
+          let (hurtId, gs1) = S.addCreature uthdenTroll S.alice (S.landsInPlay mountain 2)
+              (wholeId, gs2) = S.addCreature uthdenTroll S.alice gs1
+              -- {R}: Regenerate this creature -- really activated, so the shield
+              -- comes from the card rather than from a fixture.
+              armed = S.runPure S.identityAnswer gs2 (do Activate.activateAbility S.alice hurtId regenerate; Stack.resolveTop)
+              (withBolt, boltId) = S.handOne bolt armed
+              cast = S.runPure (aimedAt hurtId) withBolt (S.cast S.alice boltId)
+              -- 3 damage to a 2/2 is lethal (CR 704.5g); CR 701.19a's shield
+              -- replaces the destruction and removes the marks.
+              board = S.settleSba (S.runPure (aimedAt hurtId) cast Stack.resolveTop)
+          Spec.assertEqWith
+            s
+            "CR 120.1 / 120.6: the regenerated Troll is the only legal target"
+            (Set.toList (Target.legalRecipients Nothing S.noSource theSlot board))
+            [Recipient.ToCreature hurtId]
+          Spec.assertEqWith s "CR 120.6: and it carries NO marked damage, so Object.damage cannot be what answered" (S.damageOf hurtId board) (Just 0)
+          Spec.assertBool s (Set.member hurtId (GameState.battlefield board)) "CR 701.19a: the shield saved it"
+          Spec.assertBool s (Set.member wholeId (GameState.battlefield board)) "and its twin, which nothing damaged, is standing too"
+        _ -> Spec.assertFailure s "Uthden Troll should print an activated ability, and Fatal Blow a 'target' slot"
+
+    -- A FENCE rather than a proof of the log reading: what it holds is that the
+    -- atom is turn-scoped at all, Engine.beginTurnOf clearing the event log at
+    -- the handoff. It does not discriminate the readings in the way the case
+    -- above does -- CR 514.2 removes marked damage at cleanup too, so a real turn
+    -- would leave both readings answering False, and this board reaches the
+    -- handoff without passing through a cleanup step.
+    Spec.it s "CR 514.2 the offer does not survive into the next turn" $ do
+      island <- S.printingOf s registry "Island"
+      sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+      hillGiant <- S.printingOf s registry "Hill Giant"
+      fatalBlow <- S.printingOf s registry "Fatal Blow"
+      case (Face.activatedAbilities (S.combinedFace sorcerer), S.spellTargetSlot fatalBlow) of
+        (ping : _, Just theSlot) -> do
+          let (sorcererId, gs1) = S.addCreature sorcerer S.alice (S.landsInPlay island 1)
+              (hurtId, gs2) = S.addCreature hillGiant S.bob gs1
+              ready = gs2 {GameState.priority = Just S.alice}
+              board = S.settleSba (S.runPure (aimedAt hurtId) ready (do Activate.activateAbility S.alice sorcererId ping; Stack.resolveTop))
+              nextTurn = Engine.beginTurnOf S.bob board
+          Spec.assertEqWith s "legal while the damage is this turn's" (Set.toList (Target.legalRecipients Nothing S.noSource theSlot board)) [Recipient.ToCreature hurtId]
+          Spec.assertEqWith s "and no candidate at all once the turn has handed over" (Set.toList (Target.legalRecipients Nothing S.noSource theSlot nextTurn)) []
+        _ -> Spec.assertFailure s "Prodigal Sorcerer should print an activated ability, and Fatal Blow a 'target' slot"

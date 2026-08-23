@@ -520,6 +520,23 @@ data Filter keyword
     -- the card in the graveyard is a different object from the one that came back
     -- to it.
     MilledThisTurn
+  | -- | CR 120.1 / 608.2i: the candidate was DEALT DAMAGE earlier this turn --
+    -- Fatal Blow's "destroy target creature that was dealt damage this turn".
+    -- AttackedThisTurn's look-back read of the turn-scoped GameEvent log, one
+    -- event arm over (GameEvent.DamageDealt), and object-scoped where
+    -- Quantity.PlayersDealtDamageThisTurn is the player-scoped half of the same
+    -- question.
+    --
+    -- The CR defines no term for the phrase: rule 702.54a (bloodthirst) is the
+    -- only place it appears, where it is ordinary English over rule 120.1's
+    -- "objects can deal damage to ... creatures" read back through rule 608.2i.
+    --
+    -- NOT expressible as Object.damage being positive, which is the reading CR
+    -- 120.3e's marks would give: CR 120.6 removes all marked damage when a
+    -- permanent regenerates, and CR 120.3d/120.3e leave a wither or infect
+    -- source marking nothing at all -- and a creature in either state was still
+    -- dealt damage this turn. Marked damage is a strict subset of the question.
+    DealtDamageThisTurn
   | -- | CR 303.4b / 701.3a: the candidate is ATTACHED to something the nested
     -- Filter admits -- Crown of the Ages' "target Aura attached to a creature"
     -- (`AttachedTo (HasCardType Creature)`), Aura Graft's "target Aura that's
