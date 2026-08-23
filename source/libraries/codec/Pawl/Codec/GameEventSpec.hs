@@ -149,6 +149,15 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.BecameAttacked (AttackTarget.OfPlaneswalker (ObjectId.MkObjectId 6)))
       " {\"type\":\"BecameAttacked\",\"value\":{\"type\":\"OfPlaneswalker\",\"value\":6}} "
+  -- CR 508.3d's once-per-declaration sibling: one PLAYER, the one who declared,
+  -- where the arm above carries what was attacked and AttackerDeclared carries
+  -- CR 508.5's defending player.
+  Spec.it s "AttackersDeclared" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.AttackersDeclared (PlayerId.MkPlayerId 7))
+      " {\"type\":\"AttackersDeclared\",\"value\":7} "
   -- Two ObjectIds and not an object and a player, unlike the sibling above: CR
   -- 509.1a's declaration pairs a blocker with the creature it blocks. Distinct
   -- numbers, so a codec that swapped the pair would fail.

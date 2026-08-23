@@ -53,6 +53,7 @@ codec =
       Arm.payload "Drew" Drew.codec GameEvent.Drew (\x -> case x of GameEvent.Drew y -> Just y; _ -> Nothing),
       Arm.payload "AttackerDeclared" AttackerDeclared.codec GameEvent.AttackerDeclared (\x -> case x of GameEvent.AttackerDeclared y -> Just y; _ -> Nothing),
       Arm.payload "BecameAttacked" AttackTarget.codec GameEvent.BecameAttacked (\x -> case x of GameEvent.BecameAttacked y -> Just y; _ -> Nothing),
+      Arm.payload "AttackersDeclared" PlayerId.codec GameEvent.AttackersDeclared (\x -> case x of GameEvent.AttackersDeclared y -> Just y; _ -> Nothing),
       Arm.payload "BlockerDeclared" BlockerDeclared.codec GameEvent.BlockerDeclared (\x -> case x of GameEvent.BlockerDeclared y -> Just y; _ -> Nothing),
       Arm.payload "AttackerBlocked" AttackerBlocked.codec GameEvent.AttackerBlocked (\x -> case x of GameEvent.AttackerBlocked y -> Just y; _ -> Nothing),
       Arm.payload "AttackerUnblocked" ObjectId.codec GameEvent.AttackerUnblocked (\x -> case x of GameEvent.AttackerUnblocked y -> Just y; _ -> Nothing),
