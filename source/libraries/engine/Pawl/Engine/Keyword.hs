@@ -409,7 +409,7 @@ cycling cost searchFor =
           Search.MkSearch
             { Search.searcher = PlayerRef.Relative PlayerRelation.You,
               Search.owner = PlayerRef.Relative PlayerRelation.You,
-              Search.quantity = Quantity.Literal 1,
+              Search.quantity = Just (Quantity.Literal 1),
               Search.filter = filter_,
               -- CR 702.29e prints no "up to", and its quality-stating filter puts
               -- the search under CR 701.23b anyway, so this value is unobservable.

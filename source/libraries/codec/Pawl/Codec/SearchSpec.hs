@@ -26,7 +26,7 @@ spec s = Spec.describe s "Pawl.Codec.Search" $ do
       ( Search.MkSearch
           { Search.searcher = PlayerRef.Relative PlayerRelation.You,
             Search.owner = PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "player")),
-            Search.quantity = Quantity.Literal 1,
+            Search.quantity = Just (Quantity.Literal 1),
             Search.filter = Filter.HasCardType CardType.Land,
             Search.upTo = True,
             Search.destination = SearchDestination.BattlefieldTapped
@@ -43,11 +43,29 @@ spec s = Spec.describe s "Pawl.Codec.Search" $ do
       ( Search.MkSearch
           { Search.searcher = PlayerRef.Relative PlayerRelation.You,
             Search.owner = PlayerRef.Relative PlayerRelation.You,
-            Search.quantity = Quantity.Literal 1,
+            Search.quantity = Just (Quantity.Literal 1),
             Search.filter = Filter.HasCardType CardType.Land,
             Search.upTo = False,
             Search.destination = SearchDestination.BattlefieldTapped
           }
       )
       " {\"searcher\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"owner\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"quantity\":{\"type\":\"Literal\",\"value\":1},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},\"destination\":{\"type\":\"BattlefieldTapped\"}} "
+  -- CR 701.23a's other reading of the count: Mana Severance's "any number of
+  -- land cards" states none at all, which is a null on the wire rather than an
+  -- absent key. Round-tripped explicitly because nothing else forces a case for
+  -- it.
+  Spec.it s "a null quantity is \"any number of\", and round-trips as null" $
+    Common.assertCodec
+      s
+      Search.codec
+      ( Search.MkSearch
+          { Search.searcher = PlayerRef.Relative PlayerRelation.You,
+            Search.owner = PlayerRef.Relative PlayerRelation.You,
+            Search.quantity = Nothing,
+            Search.filter = Filter.HasCardType CardType.Land,
+            Search.upTo = False,
+            Search.destination = SearchDestination.Exile
+          }
+      )
+      " {\"searcher\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"owner\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"quantity\":null,\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},\"destination\":{\"type\":\"Exile\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Search.codec

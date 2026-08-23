@@ -341,10 +341,15 @@ data Prompt r where
   -- | CR 701.23 / 701.23b. The [ObjectId] is the library cards MATCHING the
   -- criterion (engine-pre-filtered), and the PlayerId is the player SEARCHING,
   -- who need not own the library. The Natural is how many the search may find.
+  -- A search that states no count at all (Mana Severance's "any number of land
+  -- cards", a Nothing on Search.quantity) arrives here as the number of MATCHING
+  -- cards, which is the bound CR 701.23a gives it -- the zone, not a number the
+  -- card names.
   --
   -- Answering with fewer is legal for a search stating a quality (CR 701.23b's
-  -- "some or all") and for one printing "up to" (Search.upTo); the empty answer
-  -- is "fail to find". A bare quantity with neither is CR 701.23d, where
+  -- "some or all"), for one printing "up to" (Search.upTo) and for one stating
+  -- no count; the empty answer is "fail to find". A bare quantity with none of
+  -- the three is CR 701.23d, where
   -- Pawl.Engine.Resolve completes a short answer instead. A LIST rather than a
   -- repeated prompt, CR 701.23a's find being one look at the whole zone.
   SearchLibrary :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt [ObjectId.ObjectId]

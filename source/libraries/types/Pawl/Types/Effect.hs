@@ -127,9 +127,10 @@ data Effect card
     AddMana ManaAddition.ManaAddition
   | -- | CR 701.23: the players Search.searcher names each search the library of
     -- each player Search.owner names, for Search.quantity cards matching
-    -- Search.filter, put them where Search.destination says, then that library's
-    -- owner shuffles. The Filter is evaluated over each card's own CR 613
-    -- projection (Projection.viewOfObject).
+    -- Search.filter -- or for any number of them, where Search.quantity is
+    -- Nothing (Mana Severance) -- put them where Search.destination says, then
+    -- that library's owner shuffles. The Filter is evaluated over each card's
+    -- own CR 613 projection (Projection.viewOfObject).
     --
     -- TWO refs, because CR 701.23a's looking and CR 400.1's ownership are
     -- independent (Extract's `You`/`InSlot`). The SEARCHER looks, answers CR
@@ -140,7 +141,8 @@ data Effect card
     -- Whether the Quantity is a CEILING or a QUOTA is read off the Filter rather
     -- than stored, CR 701.23b letting a search STATING A QUALITY find fewer where
     -- CR 701.23d makes a bare quantity find that many. Filter.statesAQuality
-    -- classifies; Search.upTo is the one case it cannot reach.
+    -- classifies; Search.upTo and an absent count are the two cases it cannot
+    -- reach, both of which land in CR 701.23b's branch.
     --
     -- Not implemented: a search of any zone but a library (#1318).
     Search Search.Search
