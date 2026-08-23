@@ -119,9 +119,12 @@ thisPhase phase remaining = case lastStepOf phase >>= \step -> Seq.elemIndexL st
   Nothing -> (Seq.empty, remaining)
   Just i -> Seq.splitAt (i + 1) remaining
 
--- CR 500.11: everything left of the turn AFTER this phase. The other half of
--- `thisPhase`'s split. Positional for the same CR 500.8 reason: skipping THIS
--- combat phase says nothing about a second one added later in the turn.
+-- CR 500.11 / CR 724.2d: everything left of the turn AFTER this phase. The other
+-- half of `thisPhase`'s split, and the shape both a SKIPPED phase
+-- (Engine.skipWholePhase) and one an effect ENDED (Resolve's
+-- Effect.EndCombatPhase arm) want. Positional for the same CR 500.8 reason:
+-- dropping THIS combat phase says nothing about a second one added later in the
+-- turn.
 dropRestOfPhase :: Phase -> Seq Phase -> Seq Phase
 dropRestOfPhase phase = snd . thisPhase phase
 
