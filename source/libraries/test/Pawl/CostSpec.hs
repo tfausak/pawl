@@ -2723,7 +2723,7 @@ barkhideTrollSpec s registry =
           after = S.runPure S.identityAnswer activated Stack.resolveTop
       Spec.assertEqWith s "CR 613.4c the counter makes it a 3/3 before any of this" (S.powerToughnessOf trollId gs) (Just (3, 3))
       Spec.assertEqWith s "CR 613.4c the cost spent the counter, so the printed 2/2 is back" (S.powerToughnessOf trollId after) (Just (2, 2))
-      Spec.assertEqWith s "CR 122.6 and no +1/+1 counter is left on it" (S.counterOf CounterKind.PlusOnePlusOne trollId after) 0
+      Spec.assertEqWith s "CR 122.1 and no +1/+1 counter is left on it" (S.counterOf CounterKind.PlusOnePlusOne trollId after) 0
       Spec.assertEqWith s "CR 118.3 so the ability is not offered again, though a second Forest is still untapped" (length (filter (isActivateOf trollId) (Action.legalActions S.alice after))) 0
       -- SEPARATE from the three above, and that is the point: a payment that
       -- edited Object.counters directly would leave them green and only this red.

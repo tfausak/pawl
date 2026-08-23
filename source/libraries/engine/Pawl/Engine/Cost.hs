@@ -934,8 +934,8 @@ zoneOfComponent component = case component of
   -- CR 122.1's counter is a marker and not an object, and CR 122.2 has counters
   -- "simply cease to exist" rather than travel, so removing one moves nothing out
   -- of any zone and CR 113.6's battlefield default stands. A FENCE and not proven
-  -- behaviour, ReturnThis' above and for its reason: Barkhide Troll's ability
-  -- functions on the battlefield either way.
+  -- behaviour, as ReturnThis' answer above is: Barkhide Troll's ability functions
+  -- on the battlefield under either answer, so nothing separates them.
   CostComponent.RemovePlusOneCountersFromThis _ -> Nothing
   -- CR 122.6 puts counters on a permanent already where it is, so nothing moves
   -- out of any zone.
@@ -997,7 +997,7 @@ componentStatesHiddenQuality component = case component of
 loyaltyCountersOn :: ObjectId -> GameState -> Natural
 loyaltyCountersOn = countersOn CounterKind.Loyalty
 
--- CR 122.6: how many counters of one kind an object has, zero for an object with
+-- CR 122.1: how many counters of one kind an object has, zero for an object with
 -- none and zero for one that is not there. The general form of
 -- loyaltyCountersOn above, which the +1\/+1 removal cost reads too.
 countersOn :: CounterKind.CounterKind Keyword.Type.Keyword -> ObjectId -> GameState -> Natural
@@ -1695,9 +1695,9 @@ canPayComponent pid oid component gs = case component of
   -- Deliberately NOT gated on control, unlike the loyalty arms above and like
   -- PutPlusOneCountersOnThis below: CR 122 qualifies a counter by the object it
   -- sits on and by nothing else, and CR 602.1a already fixes the payer as the
-  -- player activating the ability. Unobservable either way on this pool, CR 602.1
-  -- offering a permanent's activated ability only to its controller -- a declared
-  -- reading rather than a tested one.
+  -- player activating the ability. Unobservable either way on this pool, CR 602.2
+  -- letting only an object's controller activate its activated ability -- a
+  -- declared reading rather than a tested one.
   CostComponent.RemovePlusOneCountersFromThis n ->
     Set.member oid (GameState.battlefield gs)
       && countersOn CounterKind.PlusOnePlusOne oid gs >= n
