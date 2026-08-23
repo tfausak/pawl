@@ -3401,9 +3401,9 @@ blockCostSpec s registry = Spec.describe s "BlockCosts" $ do
 -- its own copy of the `null setEffs || ...` guard: one case for the gate would
 -- leave a change to any single copy regressing silently.
 --
--- Pawl.Engine.BlockCost is the reader with no case, and its own comment says why:
--- discriminating it wants a cost to block printed on a nontoken creature, since
--- Ashaya animates creatures and Oppressive Rays is an Aura (#1999).
+-- Pawl.Engine.BlockCost is the reader with no case: discriminating it wants a
+-- cost to block printed on a nontoken creature, which Hollow Warrior now is, so
+-- the board is buildable and unbuilt rather than unavailable (#1999).
 -- Pawl.Engine.PlayerEffect's share is pinned in Pawl.PlayerEffectSpec and
 -- Pawl.Engine.SacrificeRestriction's in Pawl.SacrificeRestrictionSpec.
 --

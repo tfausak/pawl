@@ -1473,17 +1473,6 @@ declareBlockers = do
           unblocked = filter (\oid -> not (Map.member oid (Combat.blockers c))) (Map.keys (Combat.attackers c))
        in List.foldl' (\h oid -> Event.recordEvent (GameEvent.AttackerUnblocked oid) h) g unblocked
 
--- One attempt at CR 509.1's declaration, plus the preamble's retry --
--- attemptAttackDeclaration's twin, and for the same reason: CR 509.1's preamble
--- is word for word CR 508.1's, and CR 509.1b/509.1c both end "the declaration of
--- blockers is illegal", so an illegal declaration and one CR 509.1f cannot pay for
--- take the same rewind. The game returns to the moment before the declaration and
--- the defending player declares again.
---
--- `rejected` holds the raw answers already rewound -- there is no announcement
--- step here, so the interpreter's own map IS the declaration -- and bounds the
--- recursion exactly as it does for attackers: a repeat degrades to
--- forcedBlockDeclaration rather than being rewound a second time.
 -- CR 509.1a's record of WHICH creatures were declared as blockers this combat
 -- phase, unioned in. Shared by attemptBlockDeclaration's two writers so the
 -- in-flight write and the one that stands cannot disagree about the field.
@@ -1496,6 +1485,17 @@ recordDeclaredBlockers oids g =
           }
     }
 
+-- One attempt at CR 509.1's declaration, plus the preamble's retry --
+-- attemptAttackDeclaration's twin, and for the same reason: CR 509.1's preamble
+-- is word for word CR 508.1's, and CR 509.1b/509.1c both end "the declaration of
+-- blockers is illegal", so an illegal declaration and one CR 509.1f cannot pay for
+-- take the same rewind. The game returns to the moment before the declaration and
+-- the defending player declares again.
+--
+-- `rejected` holds the raw answers already rewound -- there is no announcement
+-- step here, so the interpreter's own map IS the declaration -- and bounds the
+-- recursion exactly as it does for attackers: a repeat degrades to
+-- forcedBlockDeclaration rather than being rewound a second time.
 attemptBlockDeclaration :: PlayerId -> [ObjectId] -> Set (Map ObjectId (Set ObjectId)) -> Game ()
 attemptBlockDeclaration pid attacking rejected = do
   gs <- State.get
@@ -1529,20 +1529,6 @@ attemptBlockDeclaration pid attacking rejected = do
         -- -- this `let`. Asking BlockCost.totalCost a second time is what the rule
         -- forbids, which is why that function leaves locking to its caller.
         let owed = BlockCost.totalCost legal gs1
-        -- CR 509.1e's mana-ability window and CR 509.1f's all-costs-or-nothing
-        -- payment are both Cost.payToll, which restores the entry state rather
-        -- than spending half of it. Skipped outright when nothing is owed, which
-        -- is every board with no cost to block on it.
-        --
-        -- NO "will you pay?" prompt, declareAttackers' reading of the same pair of
-        -- sentences: CR 509.1f is unconditional once the creatures are chosen, and
-        -- CR 509.1c's excuse from paying is exercised one step earlier, at the
-        -- Prompt.DeclareBlockers above, by NOT DECLARING the creature.
-        --
-        -- BEFORE the record is written, which is the rules' own order and the
-        -- reverse of declareAttackers': CR 508.1f taps the chosen creatures before
-        -- their cost is determined, while CR 509.1g makes the chosen creatures
-        -- blocking only after CR 509.1f's payment.
         -- CR 509.1's preamble, captured here for the one thing this function does
         -- write ahead of the payment. Everything else it writes is below.
         before <- State.get
@@ -1556,6 +1542,22 @@ attemptBlockDeclaration pid attacking rejected = do
         --
         -- Unioned, never overwritten, for Combat.attacked's reason.
         State.modify' (recordDeclaredBlockers (Map.keysSet (Map.filter (not . Set.null) legal)))
+        -- CR 509.1e's mana-ability window and CR 509.1f's all-costs-or-nothing
+        -- payment are both Cost.payToll, which restores the entry state rather
+        -- than spending half of it. Skipped outright when nothing is owed, which
+        -- is every board with no cost to block on it.
+        --
+        -- NO "will you pay?" prompt, declareAttackers' reading of the same pair of
+        -- sentences: CR 509.1f is unconditional once the creatures are chosen, and
+        -- CR 509.1c's excuse from paying is exercised one step earlier, at the
+        -- Prompt.DeclareBlockers above, by NOT DECLARING the creature.
+        --
+        -- BEFORE the blocks are recorded, which is the rules' own order and the
+        -- reverse of declareAttackers': CR 508.1f taps the chosen creatures before
+        -- their cost is determined, while CR 509.1g makes the chosen creatures
+        -- blocking only after CR 509.1f's payment. Combat.declaredBlockers above
+        -- is the one thing written earlier, and CR 509.1a rather than CR 509.1g is
+        -- why it may be.
         paid <-
           if null owed
             then pure True

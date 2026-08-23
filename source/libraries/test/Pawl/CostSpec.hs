@@ -2360,9 +2360,9 @@ springleafDrumSpec s registry = Spec.describe s "Springleaf Drum" $ do
 
 -- High Perfect Morcant {2}{B}{G} 4/4 Legendary Creature -- Elf Noble: "Tap three
 -- untapped Elves you control: Proliferate. Activate only as a sorcery." The
--- second producer for CostComponent.TapPermanents, and the one that exercises a
--- COUNT ABOVE ONE -- Springleaf Drum's is one, where 1 and "some" cannot be told
--- apart.
+-- producer for CostComponent.TapPermanents that exercises a COUNT ABOVE ONE --
+-- Springleaf Drum's is one, and so is Hollow Warrior's, where 1 and "some"
+-- cannot be told apart.
 --
 -- Morcant is itself an Elf and the cost does not say "another", so it is one of
 -- its own candidates. Four candidates against a count of three is what makes the
