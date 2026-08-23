@@ -19,7 +19,10 @@ codec :: Codec.Codec Search.Search
 codec = Fields.object $ do
   searcher <- Fields.required "searcher" PlayerRef.codec Search.searcher
   owner <- Fields.required "owner" PlayerRef.codec Search.owner
-  quantity <- Fields.required "quantity" Quantity.codec Search.quantity
+  -- Required but nullable, rather than defaulted-absent: a null is a card
+  -- printing "any number of", and an absent key is a card file that forgot the
+  -- count. Defaulting would read the second as the first.
+  quantity <- Fields.required "quantity" (Common.maybe Quantity.codec) Search.quantity
   filter_ <- Fields.required "filter" (Filter.codec Keyword.codec) Search.filter
   -- Defaulted rather than required: an absent key is a card that does not print
   -- "up to", which is the ordinary case, and the reading every card file already
