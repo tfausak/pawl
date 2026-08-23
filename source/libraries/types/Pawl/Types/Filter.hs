@@ -502,9 +502,9 @@ data Filter keyword
     --
     -- NOT expressible as Object.damage being positive, which is the reading CR
     -- 120.3e's marks would give: CR 120.6 removes all marked damage when a
-    -- permanent regenerates, and CR 120.3d has a wither or infect source mark
-    -- nothing at all -- and a creature in either state was still dealt damage
-    -- this turn. Marked damage is a strict subset of the question.
+    -- permanent regenerates, and CR 120.3d/120.3e leave a wither or infect
+    -- source marking nothing at all -- and a creature in either state was still
+    -- dealt damage this turn. Marked damage is a strict subset of the question.
     DealtDamageThisTurn
   | -- | CR 303.4b / 701.3a: the candidate is ATTACHED to something the nested
     -- Filter admits -- Crown of the Ages' "target Aura attached to a creature"

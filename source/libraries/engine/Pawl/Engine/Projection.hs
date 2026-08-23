@@ -870,8 +870,8 @@ viewOfCharacteristics peers oid pc controller counters gs =
       Filter.milledThisTurn = any (milledIt oid . LoggedEvent.event) (GameState.events gs),
       -- CR 120.1 / 608.2i: the same log again, read for the damage. Never
       -- Object.damage -- CR 120.6 removes the marks on a regeneration and CR
-      -- 120.3d writes none for wither or infect, and either creature was still
-      -- dealt damage this turn.
+      -- 120.3d/120.3e mark none at all for wither or infect, and either creature
+      -- was still dealt damage this turn.
       Filter.dealtDamageThisTurn = any ((== Just oid) . Game.damagedObject . LoggedEvent.event) (GameState.events gs),
       -- CR 701.3a: not a characteristic, so the attachment comes off
       -- Object.attachedTo -- but the HOST's characteristics are projected, so it

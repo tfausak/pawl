@@ -3,7 +3,9 @@
 
 -- Covers Pawl.Engine.Damage and Pawl.Engine.Sba: the damage funnel, who the
 -- funnel credits as a damage event's source, its deal-time riders (deathtouch,
--- infect, wither, toxic, lifelink), trample, and state-based actions.
+-- infect, wither, toxic, lifelink), trample, state-based actions, and the
+-- look-back read of the damage the turn's event log records
+-- (Filter.DealtDamageThisTurn).
 module Pawl.DamageSpec where
 
 import qualified Control.Monad as Monad
@@ -2990,10 +2992,12 @@ dealtDamageThisTurnSpec s registry =
           Spec.assertBool s (Set.member wholeId (GameState.battlefield board)) "and its twin, which nothing damaged, is standing too"
         _ -> Spec.assertFailure s "Uthden Troll should print an activated ability, and Fatal Blow a 'target' slot"
 
-    -- A FENCE rather than a proof, and reported as one: CR 514.2 removes marked
-    -- damage at cleanup and Engine.beginTurnOf clears the event log at the
-    -- handoff, so both readings answer False here and this case cannot tell them
-    -- apart. What it does hold is that the atom is turn-scoped at all.
+    -- A FENCE rather than a proof of the log reading: what it holds is that the
+    -- atom is turn-scoped at all, Engine.beginTurnOf clearing the event log at
+    -- the handoff. It does not discriminate the readings in the way the case
+    -- above does -- CR 514.2 removes marked damage at cleanup too, so a real turn
+    -- would leave both readings answering False, and this board reaches the
+    -- handoff without passing through a cleanup step.
     Spec.it s "CR 514.2 the offer does not survive into the next turn" $ do
       island <- S.printingOf s registry "Island"
       sorcerer <- S.printingOf s registry "Prodigal Sorcerer"

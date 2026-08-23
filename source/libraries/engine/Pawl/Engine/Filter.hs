@@ -149,8 +149,8 @@ data View = MkView
     -- forces it unless a Filter contains DealtDamageThisTurn.
     --
     -- Deliberately not Object.damage: CR 120.6 removes marked damage on a
-    -- regeneration and CR 120.3d writes none for a wither or infect source, so
-    -- the marks are a strict subset of what was dealt.
+    -- regeneration and CR 120.3d/120.3e mark none at all for a wither or infect
+    -- source, so the marks are a strict subset of what was dealt.
     dealtDamageThisTurn :: Bool,
     -- CR 303.4 / 110.1 / 701.3a: the HOST this candidate is attached to, viewed
     -- as a candidate in its own right, so that AttachedTo's nested Filter has
@@ -879,7 +879,7 @@ matches context view predicate = case predicate of
   -- the two atoms above it cannot stop being true within a turn, and unlike
   -- either it is not the reading CR 120.3e's marked damage would give -- CR
   -- 120.6's regeneration and CR 120.3d's wither both leave a creature that was
-  -- dealt damage carrying none marked.
+  -- dealt damage carrying nothing marked.
   Filter.DealtDamageThisTurn -> dealtDamageThisTurn view
   -- CR 701.3a: a live read of Object.attachedTo and of the host's own projection,
   -- never a stamp on the candidate -- an Aura whose host stops being a creature
