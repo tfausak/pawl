@@ -7,8 +7,8 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.Types.AttackTarget as AttackTarget
 
 -- | CR 508.1b's three announcements. Reached from card data only through
--- Pawl.Codec.GameEvent's BecameAttacked arm; the combat record itself is runtime
--- state and is never written to the wire.
+-- Pawl.Codec.GameEvent's BecameAttacked arm; the combat record reaches it the
+-- other way, through Pawl.Codec.Combat (#126).
 codec :: Codec.Codec AttackTarget.AttackTarget
 codec =
   Arm.tagged

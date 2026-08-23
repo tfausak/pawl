@@ -91,6 +91,14 @@ library codec
     Pawl.Codec.ActivatedAbilitySpec
     Pawl.Codec.ActivationRestriction
     Pawl.Codec.ActivationRestrictionSpec
+    Pawl.Codec.ActiveAttackRequirement
+    Pawl.Codec.ActiveAttackRequirementSpec
+    Pawl.Codec.ActiveBlockRequirement
+    Pawl.Codec.ActiveBlockRequirementSpec
+    Pawl.Codec.ActivePlayerEffect
+    Pawl.Codec.ActivePlayerEffectSpec
+    Pawl.Codec.ActiveUnregeneratable
+    Pawl.Codec.ActiveUnregeneratableSpec
     Pawl.Codec.AddActivationCost
     Pawl.Codec.AddActivationCostSpec
     Pawl.Codec.AddSpellCost
@@ -199,8 +207,10 @@ library codec
     Pawl.Codec.ClauseSpec
     Pawl.Codec.Color
     Pawl.Codec.ColorSpec
+    Pawl.Codec.Combat
     Pawl.Codec.CombatRestriction
     Pawl.Codec.CombatRestrictionSpec
+    Pawl.Codec.CombatSpec
     Pawl.Codec.CombatStep
     Pawl.Codec.CombatStepSpec
     Pawl.Codec.Compares
@@ -209,6 +219,8 @@ library codec
     Pawl.Codec.ComparisonSpec
     Pawl.Codec.Condition
     Pawl.Codec.ConditionSpec
+    Pawl.Codec.ContinuousEffect
+    Pawl.Codec.ContinuousEffectSpec
     Pawl.Codec.ControlChanged
     Pawl.Codec.ControlChangedSpec
     Pawl.Codec.ControllerBecomesTarget
@@ -271,6 +283,8 @@ library codec
     Pawl.Codec.DaytimeSpec
     Pawl.Codec.DealDamage
     Pawl.Codec.DealDamageSpec
+    Pawl.Codec.Decider
+    Pawl.Codec.DeciderSpec
     Pawl.Codec.Defense
     Pawl.Codec.DefenseSpec
     Pawl.Codec.DelayedTrigger
@@ -313,6 +327,8 @@ library codec
     Pawl.Codec.EffectSpec
     Pawl.Codec.EndingStep
     Pawl.Codec.EndingStepSpec
+    Pawl.Codec.EndTurnSignal
+    Pawl.Codec.EndTurnSignalSpec
     Pawl.Codec.EntryOption
     Pawl.Codec.EntryOptionSpec
     Pawl.Codec.EntryR
@@ -339,6 +355,8 @@ library codec
     Pawl.Codec.ExpirySpec
     Pawl.Codec.ExtraPhase
     Pawl.Codec.ExtraPhaseSpec
+    Pawl.Codec.ExtraTurn
+    Pawl.Codec.ExtraTurnSpec
     Pawl.Codec.Face
     Pawl.Codec.FaceDownCharacteristics
     Pawl.Codec.FaceDownCharacteristicsSpec
@@ -374,6 +392,8 @@ library codec
     Pawl.Codec.Hybrid
     Pawl.Codec.HybridPhyrexian
     Pawl.Codec.HybridSpec
+    Pawl.Codec.IgnoredAbility
+    Pawl.Codec.IgnoredAbilitySpec
     Pawl.Codec.IncreaseSpellCost
     Pawl.Codec.IncreaseSpellCostSpec
     Pawl.Codec.InherentTriggerSource
@@ -386,6 +406,8 @@ library codec
     Pawl.Codec.KeywordFamily
     Pawl.Codec.KeywordFamilySpec
     Pawl.Codec.KeywordSpec
+    Pawl.Codec.LastKnown
+    Pawl.Codec.LastKnownSpec
     Pawl.Codec.Layout
     Pawl.Codec.LayoutSpec
     Pawl.Codec.LibraryPlacement
@@ -420,6 +442,8 @@ library codec
     Pawl.Codec.ManaSymbolSpec
     Pawl.Codec.ManaType
     Pawl.Codec.ManaTypeSpec
+    Pawl.Codec.ManaUnit
+    Pawl.Codec.ManaUnitSpec
     Pawl.Codec.Mentored
     Pawl.Codec.MentoredSpec
     Pawl.Codec.Mill
@@ -444,6 +468,8 @@ library codec
     Pawl.Codec.ModifyTargetSpec
     Pawl.Codec.MonarchTarget
     Pawl.Codec.MonarchTargetSpec
+    Pawl.Codec.MonarchWatch
+    Pawl.Codec.MonarchWatchSpec
     Pawl.Codec.Morph
     Pawl.Codec.MorphSpec
     Pawl.Codec.MorphVariant
@@ -470,6 +496,8 @@ library codec
     Pawl.Codec.PayGateSpec
     Pawl.Codec.PayObligation
     Pawl.Codec.PayObligationSpec
+    Pawl.Codec.PendingEntryEffect
+    Pawl.Codec.PendingEntryEffectSpec
     Pawl.Codec.PerCreature
     Pawl.Codec.PermanentBecomesDesignated
     Pawl.Codec.PermanentBecomesDesignatedSpec
@@ -478,6 +506,8 @@ library codec
     Pawl.Codec.PermanentSacrificed
     Pawl.Codec.PermanentSacrificedSpec
     Pawl.Codec.Phase
+    Pawl.Codec.PhasedOut
+    Pawl.Codec.PhasedOutSpec
     Pawl.Codec.PhasePattern
     Pawl.Codec.PhasePatternSpec
     Pawl.Codec.PhaseSelector
@@ -507,6 +537,8 @@ library codec
     Pawl.Codec.PlayerScopeSpec
     Pawl.Codec.PlayerStaticAbility
     Pawl.Codec.PlayerStaticAbilitySpec
+    Pawl.Codec.PlayPermissionOrigin
+    Pawl.Codec.PlayPermissionOriginSpec
     Pawl.Codec.Plus
     Pawl.Codec.PlusSpec
     Pawl.Codec.Pool
@@ -515,6 +547,8 @@ library codec
     Pawl.Codec.PowerSpec
     Pawl.Codec.PreventAllDamage
     Pawl.Codec.PreventAllDamageSpec
+    Pawl.Codec.PreventionRider
+    Pawl.Codec.PreventionRiderSpec
     Pawl.Codec.PreventNextDamage
     Pawl.Codec.PreventNextDamageSpec
     Pawl.Codec.PrintedReplacement
@@ -557,6 +591,8 @@ library codec
     Pawl.Codec.RequireBlockSpec
     Pawl.Codec.RestartSignal
     Pawl.Codec.RestartSignalSpec
+    Pawl.Codec.Result
+    Pawl.Codec.ResultSpec
     Pawl.Codec.Reveal
     Pawl.Codec.RevealCause
     Pawl.Codec.RevealCauseSpec
@@ -593,6 +629,8 @@ library codec
     Pawl.Codec.SetPowerToughnessSpec
     Pawl.Codec.ShuffleIntoLibrary
     Pawl.Codec.ShuffleIntoLibrarySpec
+    Pawl.Codec.Sickness
+    Pawl.Codec.SicknessSpec
     Pawl.Codec.SkipNextPhase
     Pawl.Codec.SkipNextPhaseSpec
     Pawl.Codec.SlotName
@@ -613,6 +651,8 @@ library codec
     Pawl.Codec.StackObjectKindSpec
     Pawl.Codec.StaticAbility
     Pawl.Codec.StaticAbilitySpec
+    Pawl.Codec.Status
+    Pawl.Codec.StatusSpec
     Pawl.Codec.StepBegan
     Pawl.Codec.StepBeganSpec
     Pawl.Codec.StepBegins

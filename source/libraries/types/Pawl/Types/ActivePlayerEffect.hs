@@ -45,10 +45,10 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- carriers rather than within each (Pawl.PlayerEffectSpec's Sea Gate Restoration
 -- against The Ten Rings is the proof).
 --
--- Runtime-only, like ActiveReplacement: no codec, which keeps a stored value out
--- of a card file and a printed value out of the store. NOT like Expiry, which
--- does have one (Pawl.Codec.Expiry) because a Duration's condition serialises
--- through it -- the claim this comment used to make; see #1059.
+-- Runtime-only: card data writes Pawl.Types.PlayerStaticAbility, never one of
+-- these. It does have a codec (Pawl.Codec.ActivePlayerEffect), because a game in
+-- progress has to be writable to JSON (#126); see #1059 for the older claim that
+-- a stored carrier had none.
 data ActivePlayerEffect = MkActivePlayerEffect
   { source :: ObjectId.ObjectId,
     controller :: PlayerId.PlayerId,

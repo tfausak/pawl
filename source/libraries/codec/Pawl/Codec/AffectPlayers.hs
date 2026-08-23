@@ -5,6 +5,7 @@ module Pawl.Codec.AffectPlayers where
 import qualified Pawl.Codec.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Codec.Duration as Duration
 import qualified Pawl.Codec.PlayerEffect as PlayerEffect
+import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
@@ -14,7 +15,7 @@ import qualified Pawl.Types.AffectPlayers as AffectPlayers
 codec :: Codec.Codec AffectPlayers.AffectPlayers
 codec = Fields.object $ do
   duration <- Fields.required "duration" Duration.codec AffectPlayers.duration
-  players <- Fields.required "players" AffectedPlayers.codec AffectPlayers.players
+  players <- Fields.required "players" (AffectedPlayers.codec SlotName.codec) AffectPlayers.players
   effect <- Fields.required "effect" PlayerEffect.codec AffectPlayers.effect
   pure
     AffectPlayers.MkAffectPlayers
