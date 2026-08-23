@@ -59,10 +59,10 @@ restrictionMet pid gs restriction = case restriction of
   -- with CR 307.1's casting gate: two rules, the same three facts, one copy.
   --
   -- CR 307.5's empty-stack conjunct is the one window that can change under a
-  -- caster between the offer and the payment, since CR 601.2a puts the spell on
-  -- the stack in between. Not implemented: the cast gate agreeing with the
-  -- payment for this arm on the mana path (#2005). Vacuous for data/cards/,
-  -- where no mana ability prints this rider.
+  -- payer between the offer and the payment, since CR 601.2a and CR 602.2a both
+  -- put an object on the stack in between. `needsEmptyStack` below is how the two
+  -- gates one step ahead of that move ask about it, and Grinning Ignus is the
+  -- printing that lands on it.
   ActivationRestriction.SorcerySpeed -> Turn.sorcerySpeedWindow pid gs
   -- CR 500.1's phases and steps: Turn.inWindow asks whether GameState.phase
   -- falls inside the window the rider names. CONTAINMENT rather than equality,
@@ -98,3 +98,28 @@ restrictionMet pid gs restriction = case restriction of
   -- so this is Turn.afterBlockersDeclared verbatim, the reader Pawl.Engine.Cast's arm
   -- of this name uses. Trap Runner is the card.
   ActivationRestriction.AfterBlockersDeclared -> Turn.afterBlockersDeclared gs
+
+-- CR 307.5's empty-stack conjunct asked ABOUT THE RIDER rather than about the
+-- board: does this clause need an empty stack to be met?
+--
+-- What wants it is a gate asked one step AHEAD of a payment. CR 601.2a puts the
+-- spell on the stack and CR 602.2a the ability, both BEFORE CR 601.2f-h totals
+-- and pays the cost, so no such payment ever has an empty stack -- and a gate
+-- reading GameState.stack would read the stack of the wrong moment and count a
+-- source the payment cannot use (#2005). Pawl.Engine.Cost.stackedManaActivations
+-- is the one caller; `restrictionMet` above is what asks the board at the payment
+-- itself, and the two agree because the move between them is exactly the fact
+-- this reports.
+--
+-- SorcerySpeed alone, and the others are not a default: each of them reads a
+-- phase, a turn or a combat record, and CR 500.12 puts no game event between the
+-- gate and the payment while CR 601.2a's move changes no phase -- so their two
+-- windows agree already (riderWindowSpec's pair in Pawl.ManaSpec is that
+-- argument for the phase axis).
+needsEmptyStack :: ActivationRestriction.ActivationRestriction -> Bool
+needsEmptyStack restriction = case restriction of
+  ActivationRestriction.SorcerySpeed -> True
+  ActivationRestriction.DuringPhase _ -> False
+  ActivationRestriction.DuringTurn _ -> False
+  ActivationRestriction.AttackedThisStep -> False
+  ActivationRestriction.AfterBlockersDeclared -> False

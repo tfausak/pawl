@@ -1581,8 +1581,12 @@ payableResolutions casting capacity spending pid committed claimed cost gs =
 -- uses. A source listed here whose every route the supply capacity refuses
 -- contributes an EMPTY option list, and `sequenceA options` below turns one of
 -- those into no board at all -- the whole player's mana unpayable. The offer
--- list (Cost.activationManaSourcesGiven) is the superset that would do it: it
--- admits a permanent whose only mana route holds mana in its own cost.
+-- list (Cost.activationManaSourcesGiven) is what would do it: it admits a
+-- permanent whose only mana route holds mana in its own cost, and one whose only
+-- mana route CR 601.2a's move puts out of reach (Cost.stackedManaActivations).
+-- Pawl.ManaSpec's "CR 106.4 the Ignus's own yield is no supply for the {R} its
+-- activation eats" is what holds the pairing: unstacking the source list alone
+-- reddens its second assertion, a Mountain no longer paying a {1}.
 --
 -- The SAME board manaSources is judged against serves the per-source yields
 -- too, rather than a fresh projection per source on top of the sweep (#200);
@@ -1647,7 +1651,11 @@ payableResolutionsGiven casting capacity spending sources pcs pid committed clai
       --
       -- Not implemented: a CHAIN, where one mana-eating route's yield pays the
       -- next one's cost in sequence -- two Grinning Ignuses, the second's {R}
-      -- coming from the first. Legal, and understated here (#2152).
+      -- coming from the first. Legal, and understated here (#2152). That pair
+      -- reaches this function only on the roads that are no cast and no
+      -- activation (Pawl.Engine.Cost.canPay), CR 307.5's window being what CR
+      -- 601.2a's and CR 602.2a's move closes on the other two
+      -- (Pawl.Engine.Cost.stackedManaActivations).
       boards =
         [ ( pooled <> concatMap optionSupplies free,
             concatMap optionSupplies eating,
