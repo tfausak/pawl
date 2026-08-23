@@ -1815,15 +1815,16 @@ graveRecitalSpec s registry = Spec.describe s "GraveRecital" $ do
 -- card in your graveyard gains flashback {2}{R}{G} until end of turn" is a CR
 -- 118.12 pay gate whose IfPaid branch ARMS a reflexive ability
 -- (TriggerCondition.Reflexive) rather than granting the flashback itself, so the
--- target belongs to that ability and is chosen as IT goes on the stack. The case
--- below this group's first proves the difference is observable.
+-- target belongs to that ability and is chosen as IT goes on the stack. The
+-- group's first case proves the difference is observable.
 fugitiveDoctorAnswer :: Prompt.Prompt r -> r
 fugitiveDoctorAnswer p = case p of
   -- The Clue is worth spending: without the sacrifice the pay gate's IfPaid
   -- branch never runs and no second flashback is granted.
   Prompt.ChooseToPay {} -> PaymentDecision.Pays
-  -- The graveyard holds ONE instant-or-sorcery card, so taking every legal
-  -- recipient takes exactly the Firebolt, and the slot's count is satisfied.
+  -- Both boards below leave exactly ONE instant-or-sorcery card in alice's
+  -- graveyard, so taking every legal recipient takes exactly that card and the
+  -- slot's count is satisfied.
   Prompt.ChooseTargets _ _ _ sets -> fmap snd sets
   _ -> S.aggressiveAnswer p
 
@@ -1846,8 +1847,82 @@ fugitiveDoctorBoard s registry = do
       withClue = S.runPure S.identityAnswer entered (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
   pure (S.runCombat fugitiveDoctorAnswer withClue, inGraveyard)
 
-fugitiveDoctorSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+-- fugitiveDoctorBoard's discriminating twin. One thing differs: alice's
+-- graveyard is EMPTY, and the card the reflexive ability will target is in her
+-- hand instead -- same lands, same Doctor, same Clue from the same CR 701.16a
+-- investigate, same seats. So nothing below can turn on mana, timing or stock;
+-- only on WHEN the card reaches the graveyard.
+--
+-- Lightning Bolt rather than Firebolt for two reasons: it is an INSTANT, so it
+-- can be cast in response to the attack trigger, and it prints no flashback of
+-- its own, so a flashback cost offered for it in the graveyard came from the
+-- grant and from nothing else.
+emptyGraveyardDoctorBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId)
+emptyGraveyardDoctorBoard s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  forest <- S.printingOf s registry "Forest"
+  bolt <- S.printingOf s registry "Lightning Bolt"
+  doctor <- S.printingOf s registry "The Fugitive Doctor"
+  let (combat, _, _) = S.combatBoardOf [] []
+      lands = S.landsFor forest S.alice 3 (S.landsFor mountain S.alice 7 combat)
+      (inHand, held) = S.addHandCard bolt S.alice lands
+      (_, entered) = S.entersWithTrigger doctor S.alice held
+      withClue = S.runPure S.identityAnswer entered (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
+  pure (withClue, inHand)
+
+-- fugitiveDoctorAnswer plus one action: cast the instant alice holds, the first
+-- time it is offered. The board sits AT declare attackers, so her first priority
+-- of the run is the one CR 508.2b gives her with the attack trigger already on the
+-- stack -- which is the window the reflexive ability's target has to be chosen
+-- after. A pure answerer suffices because the action is offered exactly once:
+-- once cast, the card is in her graveyard and no ChooseAction offers it again.
+respondingDoctorAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+respondingDoctorAnswer inHand p = case p of
+  Prompt.ChooseAction _ _ actions -> Maybe.fromMaybe A.Pass (List.find (S.isCastOf inHand) actions)
+  -- Lightning Bolt's own "any target", pinned to bob. The reflexive ability's
+  -- slot offers graveyard CARDS and never a player, so this cannot answer that
+  -- prompt by accident -- and the reflexive's is left to fugitiveDoctorAnswer.
+  Prompt.ChooseTargets _ _ _ sets
+    | any (Set.member (Recipient.ToPlayer S.bob) . snd) sets ->
+        fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets
+  _ -> fugitiveDoctorAnswer p
+
+fugitiveDoctorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 fugitiveDoctorSpec s registry = Spec.describe s "FugitiveDoctor" $ do
+  -- CR 603.12 routes the reflexive ability through CR 603.7, so it goes on the
+  -- stack in its own right (CR 603.3) and announces its own target there (CR
+  -- 603.3d / 601.2c). Collapsed into the attack trigger, the same target would be
+  -- announced as THAT ability was placed -- and on this board no legal choice
+  -- could be made for it, so CR 603.3d would remove the attack trigger from the
+  -- stack and alice would never be offered the sacrifice at all.
+  Spec.it s "CR 603.12/603.3d a reflexive ability's target is chosen as IT goes on the stack, after the payment" $ do
+    (board, inHand) <- emptyGraveyardDoctorBoard s registry
+    let after = S.runCombat (respondingDoctorAnswer inHand) board
+        buried = Game.zoneMembers Zone.Graveyard S.alice after
+        boltName = CardName.MkCardName (Text.pack "Lightning Bolt")
+        granted = ManaCost.MkManaCost [ManaSymbol.Generic 2, theRed, ManaSymbol.OfType (ManaType.Colored Color.Green)]
+        -- alice owns and controls the Clue and nothing here moves it, so the
+        -- OWNER-indexed count answers the control question too.
+        clues = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Clue Token")) S.alice
+    Spec.assertEqWith s "the fixture's graveyard starts empty, so no target exists when the attack trigger is placed" (Game.zoneMembers Zone.Graveyard S.alice board) []
+    Spec.assertEqWith s "and the Clue the payment will spend is on the battlefield" (clues board) 1
+    Spec.assertEqWith s "she cast it in response, so it lay in the graveyard alone by the time the reflexive was placed" (fmap (fmap S.nameOf . flip Game.cardOf after) buried) [Just boltName]
+    -- The gameplay-level assertion, and first among the three that read `after`:
+    -- the grant reached a card that was not in the graveyard when the creating
+    -- ability went on the stack. Under the collapse this list is empty, Lightning
+    -- Bolt printing no flashback of its own.
+    Spec.assertEqWith
+      s
+      "CR 603.3d: the reflexive ability targeted it, so it has flashback {2}{R}{G}"
+      (fmap (\o -> fmap Cost.Type.mana (Cost.costsFor boltName o after)) buried)
+      [[Just granted]]
+    Spec.assertBool s (all (\o -> S.castable S.alice o after) buried) "and alice may cast it from her graveyard"
+    -- CR 118.12's payment really happened, which the collapse never reaches: the
+    -- attack trigger would have been removed from the stack before the offer.
+    Spec.assertEqWith s "the Clue was sacrificed" (clues after) 0
+    -- CR 603.12a's second sentence, and CR 603.7b: one arming, one firing. A
+    -- second would have wanted a second target and found none.
+    Spec.assertEqWith s "and the reflexive ability fired once, leaving the delayed store empty" (length (GameState.delayedTriggers after)) 0
   Spec.it s "CR 702.34a/601.2b two flashback abilities offer two costs, and either one exiles the card" $ do
     firebolt <- S.printingOf s registry "Firebolt"
     (board, inGraveyard) <- fugitiveDoctorBoard s registry
@@ -1880,83 +1955,6 @@ fugitiveDoctorSpec s registry = Spec.describe s "FugitiveDoctor" $ do
     Spec.assertEqWith s "the granted cost's cast dealt its 2 as well" (S.lifeOf S.alice (resolveWith (paying granted))) (Just 18)
     Spec.assertEqWith s "and exiled the card too" (boltsIn Zone.Exile (resolveWith (paying granted))) 1
     Spec.assertEqWith s "not put it into the graveyard either" (boltsIn Zone.Graveyard (resolveWith (paying granted))) 0
-
--- fugitiveDoctorBoard's discriminating twin. One thing differs: alice's
--- graveyard is EMPTY, and the card the reflexive ability will target is in her
--- hand instead -- same lands, same Doctor, same Clue from the same CR 701.16a
--- investigate, same seats. So nothing below can turn on mana, timing or stock;
--- only on WHEN the card reaches the graveyard.
---
--- Lightning Bolt rather than Firebolt for two reasons: it is an INSTANT, so it
--- can be cast in response to the attack trigger, and it prints no flashback of
--- its own, so a flashback cost offered for it in the graveyard came from the
--- grant and from nothing else.
-emptyGraveyardDoctorBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId)
-emptyGraveyardDoctorBoard s registry = do
-  mountain <- S.printingOf s registry "Mountain"
-  forest <- S.printingOf s registry "Forest"
-  bolt <- S.printingOf s registry "Lightning Bolt"
-  doctor <- S.printingOf s registry "The Fugitive Doctor"
-  let (combat, _, _) = S.combatBoardOf [] []
-      lands = S.landsFor forest S.alice 3 (S.landsFor mountain S.alice 7 combat)
-      (inHand, held) = S.addHandCard bolt S.alice lands
-      (_, entered) = S.entersWithTrigger doctor S.alice held
-      withClue = S.runPure S.identityAnswer entered (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
-  pure (withClue, inHand)
-
--- fugitiveDoctorAnswer plus one action: cast the instant alice holds, the first
--- time it is offered. The board sits AT declare attackers, so her first priority
--- of the run is the one CR 508.2 gives her with the attack trigger already on the
--- stack -- which is the window the reflexive ability's target has to be chosen
--- after. A pure answerer suffices because the action is offered exactly once:
--- once cast, the card is in her graveyard and no ChooseAction offers it again.
-respondingDoctorAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-respondingDoctorAnswer inHand p = case p of
-  Prompt.ChooseAction _ _ actions -> Maybe.fromMaybe A.Pass (List.find (S.isCastOf inHand) actions)
-  -- Lightning Bolt's own "any target", pinned to bob. The reflexive ability's
-  -- slot offers graveyard CARDS and never a player, so this cannot answer that
-  -- prompt by accident -- and the reflexive's is left to fugitiveDoctorAnswer.
-  Prompt.ChooseTargets _ _ _ sets
-    | any (Set.member (Recipient.ToPlayer S.bob) . snd) sets ->
-        fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets
-  _ -> fugitiveDoctorAnswer p
-
-reflexiveTargetSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-reflexiveTargetSpec s registry = Spec.describe s "FugitiveDoctor" $ do
-  -- CR 603.12 routes the reflexive ability through CR 603.7, so it goes on the
-  -- stack in its own right (CR 603.3) and announces its own target there (CR
-  -- 603.3d / 601.2c). Collapsed into the attack trigger, the same target would be
-  -- announced as THAT ability was placed -- and on this board no legal choice
-  -- could be made for it, so CR 603.3d would remove the attack trigger from the
-  -- stack and alice would never be offered the sacrifice at all.
-  Spec.it s "CR 603.12/603.3d a reflexive ability's target is chosen as IT goes on the stack, after the payment" $ do
-    (board, inHand) <- emptyGraveyardDoctorBoard s registry
-    let after = S.runCombat (respondingDoctorAnswer inHand) board
-        buried = Game.zoneMembers Zone.Graveyard S.alice after
-        boltName = CardName.MkCardName (Text.pack "Lightning Bolt")
-        granted = ManaCost.MkManaCost [ManaSymbol.Generic 2, theRed, ManaSymbol.OfType (ManaType.Colored Color.Green)]
-        -- alice owns and controls the Clue and nothing here moves it, so the
-        -- OWNER-indexed count answers the control question too.
-        clues = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Clue Token")) S.alice
-    Spec.assertEqWith s "the fixture's graveyard starts empty, so no target exists when the attack trigger is placed" (Game.zoneMembers Zone.Graveyard S.alice board) []
-    Spec.assertEqWith s "alice held the instant rather than the Clue's target" (clues board) 1
-    Spec.assertEqWith s "she cast it in response, so it lay in the graveyard alone by the time the reflexive was placed" (fmap (fmap S.nameOf . flip Game.cardOf after) buried) [Just boltName]
-    -- The gameplay-level assertion, and first among the three that read `after`:
-    -- the grant reached a card that was not in the graveyard when the creating
-    -- ability went on the stack. Under the collapse this list is empty, Lightning
-    -- Bolt printing no flashback of its own.
-    Spec.assertEqWith
-      s
-      "CR 603.3d: the reflexive ability targeted it, so it has flashback {2}{R}{G}"
-      (fmap (\o -> fmap Cost.Type.mana (Cost.costsFor boltName o after)) buried)
-      [[Just granted]]
-    Spec.assertBool s (all (\o -> S.castable S.alice o after) buried) "and alice may cast it from her graveyard"
-    -- CR 118.12's payment really happened, which the collapse never reaches: the
-    -- attack trigger would have been removed from the stack before the offer.
-    Spec.assertEqWith s "the Clue was sacrificed" (clues after) 0
-    -- CR 603.12a's second sentence, and CR 603.7b: one arming, one firing. A
-    -- second would have wanted a second target and found none.
-    Spec.assertEqWith s "and the reflexive ability fired once, leaving the delayed store empty" (length (GameState.delayedTriggers after)) 0
 
 -- Harness the Storm {2}{R} Enchantment (data/cards/harness-the-storm.json):
 -- "Whenever you cast an instant or sorcery spell from your hand, you may cast
@@ -3633,7 +3631,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   grantedFlashbackSpec s registry
   graveRecitalSpec s registry
   fugitiveDoctorSpec s registry
-  reflexiveTargetSpec s registry
   harnessTheStormSpec s registry
   jumpStartSpec s registry
   legendarySpellSpec s registry

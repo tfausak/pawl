@@ -892,10 +892,10 @@ data TriggerCondition
     -- after being created" and triggers "based on whether the trigger event or
     -- events occurred earlier during the resolution of the spell or ability that
     -- created them". Both halves are discharged STRUCTURALLY rather than by
-    -- re-reading the log: the only thing that appends the entry is the CR 118.12
-    -- pay gate's IfPaid branch, which runs exactly when the cost was paid, so by
-    -- the time an entry with this condition exists its trigger event has already
-    -- occurred. Pawl.Engine.Event.delayedPending therefore fires it once, on no
+    -- re-reading the log: an Effect.ArmDelayedTrigger naming it sits inside the
+    -- branch of a CR 118.12 pay gate, which runs exactly when that branch's
+    -- answer was given, so by the time an entry with this condition exists its
+    -- trigger event has already occurred. Pawl.Engine.Event.delayedPending therefore fires it once, on no
     -- event, at the next gather -- which is CR 603.3's "the next time a player
     -- would receive priority", so its targets are chosen (CR 603.3d) after the
     -- payment rather than as the creating ability went on the stack.
