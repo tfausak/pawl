@@ -38,6 +38,7 @@ import qualified Pawl.Types.HybridPhyrexian as HybridPhyrexian
 import qualified Pawl.Types.Keyword as Keyword
 import Pawl.Types.Mana (Mana)
 import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.ManaAddition as ManaAddition
 import Pawl.Types.ManaCost (ManaCost)
 import qualified Pawl.Types.ManaCost as ManaCost
 import Pawl.Types.ManaOption (ManaOption)
@@ -59,6 +60,8 @@ import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
@@ -257,11 +260,11 @@ producedTypes oid gs production = case production of
 -- printed. Gemstone Caverns says that sentence as two abilities whose
 -- ActivatedAbility.conditions are complements instead -- a gate abilitiesGiven
 -- does apply, with the board in hand (#1924).
-manaRoutesOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [(Cost Keyword.Keyword, [ActivationRestriction.ActivationRestriction], [ManaProduction])]
+manaRoutesOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [(Cost Keyword.Keyword, [ActivationRestriction.ActivationRestriction], [ManaAddition.ManaAddition])]
 manaRoutesOfGiven pcs oid gs =
   let fromSubtypes =
         fmap
-          (\manaType -> (intrinsicManaCost, [], [ManaProduction.OfType manaType]))
+          (\manaType -> (intrinsicManaCost, [], [intrinsicManaAddition manaType]))
           (Maybe.mapMaybe subtypeMana (Set.toList (Projection.subtypesGiven pcs oid gs)))
       selectionRoutes ability =
         fmap
@@ -280,6 +283,20 @@ intrinsicManaCost =
   Cost.MkCost
     { Cost.mana = Just (ManaCost.MkManaCost []),
       Cost.components = [CostComponent.TapThis]
+    }
+
+-- The instruction that intrinsic ability gives: "Add [the type]", to the player
+-- activating it and with no clause about anything else. CR 305.6 writes the
+-- whole sentence, so every other field of the addition takes the value an
+-- unwritten clause means -- CR 109.5's "you", CR 106.4's ordinary loss as the
+-- step ends, and no CR 106.6 restriction.
+intrinsicManaAddition :: ManaType -> ManaAddition.ManaAddition
+intrinsicManaAddition manaType =
+  ManaAddition.MkManaAddition
+    { ManaAddition.player = PlayerRef.Relative PlayerRelation.You,
+      ManaAddition.production = ManaProduction.OfType manaType,
+      ManaAddition.retention = ManaRetention.Ordinary,
+      ManaAddition.restriction = Nothing
     }
 
 -- What tapping this object for mana could actually put in a pool: every route
@@ -380,23 +397,30 @@ manaOptionsOf = manaOptionsOfGiven Map.empty
 manaOptionsOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [ManaOption]
 manaOptionsOfGiven pcs oid gs =
   let tags = productionTagsGiven pcs oid gs
-      asMana manaTypes =
-        -- Not implemented: the retention an AddMana instruction may carry
-        -- (Pawl.Types.ManaRetention). This is CR 605.3b's inline payment, and
-        -- ManaAbility.manaProduced answers a ManaProduction alone, so a mana
-        -- ability that said its mana is kept would be paid Ordinary here while
-        -- the same clause on a stack-using ability works (#1808). Exact for
-        -- data/cards/, where every retaining printing is a static or a trigger.
-        --
-        -- Not implemented: CR 106.6's spending restriction, dropped by the same
-        -- sentence and with the same consequence -- a mana ability's restricted
-        -- mana would be paid unrestricted here (#1976). Exact for data/cards/,
-        -- where Geosurge is the only restricting printing and it is a sorcery.
-        Mana.MkMana (fmap (\manaType -> ManaUnit.MkManaUnit {ManaUnit.manaType = manaType, ManaUnit.tags = tags, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}) manaTypes)
-      expand (cost, restrictions, productions) =
+      -- CR 106.6, stamped from the instruction that adds the unit: the
+      -- restriction is the addition's (CR 106.6a), so every unit one AddMana
+      -- produces carries it and a route mixing a restricted addition with an
+      -- unrestricted one yields units that differ. Pawl.Engine.Cost.payMana is
+      -- what then refuses to spend it on the wrong thing (spendableFor), and
+      -- payableResolutionsGiven is what keeps the offer in step with that.
+      --
+      -- Not implemented: the retention the same instruction may carry
+      -- (Pawl.Types.ManaRetention). This is CR 605.3b's inline payment, and
+      -- Ordinary is stamped here whatever the addition says, so a mana ability
+      -- that said its mana is kept would be paid Ordinary while the same clause
+      -- on a stack-using ability works (#1808). Exact for data/cards/, where
+      -- every retaining printing is a static or a trigger.
+      unitFor addition manaType =
+        ManaUnit.MkManaUnit
+          { ManaUnit.manaType = manaType,
+            ManaUnit.tags = tags,
+            ManaUnit.retention = ManaRetention.Ordinary,
+            ManaUnit.restriction = ManaAddition.restriction addition
+          }
+      expand (cost, restrictions, additions) =
         fmap
-          (\manaTypes -> ManaOption.MkManaOption {ManaOption.cost = cost, ManaOption.restrictions = restrictions, ManaOption.yield = asMana manaTypes})
-          (traverse (producedTypes oid gs) productions)
+          (\units -> ManaOption.MkManaOption {ManaOption.cost = cost, ManaOption.restrictions = restrictions, ManaOption.yield = Mana.MkMana units})
+          (traverse (\addition -> fmap (unitFor addition) (producedTypes oid gs (ManaAddition.production addition))) additions)
    in List.nub (concatMap expand (manaRoutesOfGiven pcs oid gs))
 
 -- The production-time tags (Pawl.Types.ProductionTag) every mana this object
@@ -625,9 +649,10 @@ serves supply demand =
     && Set.isSubsetOf (demandTags demand) (supplyTags supply)
 
 -- CR 106.6, split over one player's pool: the units this payment may draw on,
--- and the ones it may not. THE one reader of Pawl.Types.ManaUnit.restriction, so
--- payment and payability cannot disagree about which mana is available -- the
--- reason `serves` just above gives for being one relation.
+-- and the ones it may not. Built on `spendableOn` below, which is THE one reader
+-- of Pawl.Types.ManaUnit.restriction, so payment and payability cannot disagree
+-- about which mana is available -- the reason `serves` just above gives for
+-- being one relation.
 --
 -- `casting` is the object being CAST, and Nothing says the payment is not a
 -- cast: an activation cost, an attack cost, a special action's cost, CR 118.12's
@@ -639,9 +664,6 @@ serves supply demand =
 -- (CR 106.4): Pawl.Engine.Cost.payMana puts them back beside whatever the
 -- payment left, so mana a cost could not use is mana the next cost still has.
 --
--- The subject's view is built ONCE per call and shared across the units, the
--- restriction being a question about the spell rather than about the mana.
---
 -- The perspective is the PAYER (CR 109.5's "you"), which is who the spell's
 -- controller is at CR 601.2h. Not implemented: a restriction that reads the
 -- SOURCE that produced the mana. Pawl.Types.ManaUnit carries no source id by
@@ -649,14 +671,27 @@ serves supply demand =
 -- vacuously False; Cavern of Souls' "of the chosen type" is the printing that
 -- wants one (#1978).
 spendableFor :: Maybe ObjectId -> PlayerId -> GameState -> ([ManaUnit], [ManaUnit])
-spendableFor casting pid gs =
+spendableFor casting pid gs = spendableAmong casting pid gs (unitsOf (Game.poolOf pid gs))
+
+-- The same split asked of units that are NOT in the pool: what an untapped
+-- source's yield would be worth to this payment. CR 605.3b's mana ability adds
+-- its mana inline, restriction and all (manaOptionsOfGiven's stamp), so
+-- payableResolutionsGiven has to ask this of a yield before counting it as
+-- supply -- otherwise the offer admits a cast the payment then refuses.
+--
+-- THE one reader of Pawl.Types.ManaUnit.restriction, which is what keeps the two
+-- roads' answers the same.
+--
+-- The subject's view is built ONCE per call and shared across the units, the
+-- restriction being a question about the spell rather than about the mana.
+spendableAmong :: Maybe ObjectId -> PlayerId -> GameState -> [ManaUnit] -> ([ManaUnit], [ManaUnit])
+spendableAmong casting pid gs units =
   let subject = fmap (\oid -> (Filter.contextFor (Just pid) Nothing, Projection.viewOfObject oid gs)) casting
       admits unit = case ManaUnit.restriction unit of
         Nothing -> True
         Just wanted -> case subject of
           Nothing -> False
           Just (context, view) -> Filter.matches context view wanted
-      Mana.MkMana units = Game.poolOf pid gs
    in List.partition admits units
 
 -- A pool unit as a supply. Its type is settled, so the option set is a
@@ -1649,10 +1684,12 @@ payableResolutions casting capacity spending pid committed claimed cost gs =
 -- exact: `Cost.canPay` asks this before any part of the cost is paid.
 payableResolutionsGiven :: Maybe ObjectId -> Capacity -> ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
 payableResolutionsGiven casting capacity spending sources pcs pid committed claimed cost gs =
-  let -- CR 106.6, resolved for the POOL half of the board: mana this payment may
-      -- not spend is no supply for it. The SOURCE half needs no such filter --
-      -- Mana.manaOptionsOfGiven stamps no restriction on a mana ability's yield
-      -- (#1976) -- so the two halves agree by construction rather than by care.
+  let -- CR 106.6, resolved for BOTH halves of the board: mana this payment may
+      -- not spend is no supply for it, whether it is already in the pool or
+      -- would be added by tapping a source (`spendableSupplies` below). The two
+      -- halves have to be filtered by the same question, or the offer and the
+      -- payment disagree -- Mishra's Workshop's three colourless would buy a
+      -- creature spell the payment then cannot pay for.
       (units, _) = spendableFor casting pid gs
       -- CR 609.4b, resolved ONCE for this whole question and applied to both
       -- halves of the board: a rewrite reaching the pool but not the untapped
@@ -1661,7 +1698,13 @@ payableResolutionsGiven casting capacity spending sources pcs pid committed clai
       -- then cannot pay.
       clauses = PlayerEffect.spendManaAsThough pid gs
       pooled = fmap (rewriteSupply clauses . supplyOf) units
-      suppliesPer = fmap (\oid -> manaSuppliesGiven capacity pcs pid oid gs) sources
+      suppliesPer = fmap (\oid -> fmap spendableSupply (manaSuppliesGiven capacity pcs pid oid gs)) sources
+      -- One activation's yield narrowed to the units this payment could spend,
+      -- keeping its COUNT and its own mana cost: a restricted yield is still an
+      -- activation the board may take (its other units may serve), and taking it
+      -- still costs what it costs.
+      spendableSupply (activations, yield, manaCost) =
+        (activations, Mana.MkMana (fst (spendableAmong casting pid gs (unitsOf yield))), manaCost)
       activationsOf (activations, _, _) = Activations.claims activations
       -- WHICH sources are worth taking fewer times: the ones whose claims meet
       -- another source's, or the cost's own. Asked GROUPWISE, one group per

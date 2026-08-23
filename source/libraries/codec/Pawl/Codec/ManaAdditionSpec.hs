@@ -64,7 +64,7 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
       " {\"player\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"},\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}},\"retention\":{\"type\":\"UntilEndOfTurn\"}} "
   -- The same pair for CR 106.6's spending restriction, and it needs its own case
   -- for the reason the retention one gives: nothing forces the field (#1715).
-  -- Geosurge is the printing that writes it.
+  -- Geosurge writes it on a spell and Mishra's Workshop on a mana ability.
   Spec.it s "MkManaAddition, a spending restriction written on the wire" $
     Common.assertCodec
       s
