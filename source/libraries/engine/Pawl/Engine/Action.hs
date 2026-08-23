@@ -259,13 +259,15 @@ legalActions pid gs =
       -- handed this one (#1073).
       --
       -- TWO sweeps and not one, because the two questions differ: CR 605.3a's
-      -- offer at the end of this list is every source that could be tapped
-      -- (`manaSources`), while the cost gate is judged against what the supply
-      -- walk can count (`supplySources`, Mana.supplyCapacity). They part on
-      -- exactly a permanent whose every mana route holds mana in its own cost,
-      -- which in `data/cards/` is Transmogrant Altar; the gate must take the
-      -- supply list or Mana.payableResolutionsGiven reads a source with no
-      -- options and finds no payable board at all.
+      -- offer at the end of this list is every source that could be tapped right
+      -- now (`manaSources`), while the cost gate is judged against what the
+      -- supply walk can count (`supplySources`, Mana.supplyCapacity), which asks
+      -- each route with its own mana part emptied and carries that mana as a
+      -- demand instead. They part on exactly a permanent whose every mana route
+      -- holds mana in its own cost that this board cannot pay -- in `data/cards/`
+      -- a Transmogrant Altar beside no black source, which is a supply source and
+      -- no offer. The gate must take the supply list; taking the offer list would
+      -- drop the demand-carrying options Mana.payableResolutionsGiven weighs.
       manaSources = Cost.activationManaSourcesGiven grants pcs pid gs
       supplySources = Cost.supplyManaSourcesGiven grants pcs pid gs
       -- ONE set of base target pools for the whole enumeration, for the same
