@@ -218,6 +218,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireAttack as RequireAttack
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.Reveal as Reveal
+import qualified Pawl.Types.RollDie as RollDie
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
@@ -917,7 +918,8 @@ effectCounts effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.ChooseOpponent _ -> []
   Effect.ChooseOpponentAtRandom _ -> []
-  Effect.RollDie {} -> []
+  -- CR 706.2's modifier is a Quantity, so its Counts are reachable here.
+  Effect.RollDie rollDie -> foldMap quantityCounts (RollDie.modifier rollDie)
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
   Effect.OfferCast {} -> []
@@ -3811,7 +3813,8 @@ effectFilters effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.ChooseOpponent _ -> []
   Effect.ChooseOpponentAtRandom _ -> []
-  Effect.RollDie {} -> []
+  -- CR 706.2's modifier is a Quantity, so its filters are reachable here.
+  Effect.RollDie rollDie -> unframed (foldMap quantityFilters (RollDie.modifier rollDie))
   Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn _ _) -> []
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> sourceHosted (objectRefFilters ref)
   Effect.OfferCast {} -> []
