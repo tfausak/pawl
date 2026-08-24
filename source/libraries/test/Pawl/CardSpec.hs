@@ -3621,6 +3621,10 @@ restrictionFilters restriction =
 -- independently, so a lint that reached one would go quiet on the other.
 -- Prefixed, because `riderFilters` above is CR 614.1's ENTRY riders and the two
 -- have nothing to do with each other.
+--
+-- No lint in this module distinguishes a collected rider condition from an
+-- uncollected one today: neutralising this function leaves the suite green, so
+-- it is here for the next Filter-wide lint rather than for one that exists.
 manaRiderFilters :: ManaRider.ManaRider -> [Filter.Type.Filter Keyword.Keyword]
 manaRiderFilters rider = [ManaRider.condition rider]
 
