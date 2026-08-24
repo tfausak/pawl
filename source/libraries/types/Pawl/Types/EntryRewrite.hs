@@ -19,7 +19,8 @@ import qualified Pawl.Types.WithCounters as WithCounters
 -- loyalty; UnderSourceControl is Gather Specimens (CR 616.1b); Tapped is Zof
 -- Bloodbog and Headless Skaab (CR 614.1d); PayLifeOrTapped is Razorgrass Field
 -- (CR 614.1c); RevealOrTapped is Rustic Clachan (CR 614.1c); RunEffects is
--- Monstrous War-Leech (CR 614.1c).
+-- Monstrous War-Leech (CR 614.1c); ReadAhead is CR 702.155b's pair of
+-- intrinsic abilities on a Saga (CR 714.3b).
 --
 -- AsCopy and ChoiceOf write into the object's COPIABLE snapshot, which is what
 -- makes CR 707.2 fall out with no further machinery -- and CR 707.9b puts
@@ -181,6 +182,35 @@ data EntryRewrite effect
     -- end means -- neither value is copiable (CR 707.2), so neither may be
     -- written into the snapshot AsCopy and ChoiceOf use.
     Riot
+  | -- | CR 702.155b / 714.3b via CR 614.1c: read ahead's pair of intrinsic
+    -- abilities. "As this Saga enters, choose a number between one and this
+    -- Saga's final chapter number" and "This Saga enters with the chosen number
+    -- of lore counters on it."
+    --
+    -- ONE constructor for the two sentences rule 702.155b writes, and
+    -- SacrificeAnyNumber's reason above is this one verbatim: the number is not
+    -- known until the choice is made, where WithCounters carries a Quantity
+    -- settled before the entry. Two rows would be worse than merely awkward --
+    -- they would compete for a CR 616.1e order chosen by the applying player, so
+    -- the counter row could be applied first and read a number nobody had chosen
+    -- yet.
+    --
+    -- NOT WRITTEN BY A CARD, and NULLARY, the position Riot and Unleash take. It
+    -- is minted from the finished projection, but by
+    -- Pawl.Engine.Saga.entryReplacementsOf rather than by
+    -- Pawl.Engine.Keyword.mintedReplacementsFor, because rule 714.3b REPLACES
+    -- rule 714.3a's "enters with a lore counter" ability rather than adding to
+    -- it. It still round-trips through the codec, because every arm of this type
+    -- does.
+    --
+    -- THE BOUND is not carried, for EntersTransformed's reason: rule 714.3b reads
+    -- it off the Saga itself (CR 714.2d's final chapter number), so
+    -- Pawl.Engine.Event's arm takes it from the entering permanent's own
+    -- projection rather than from a number baked when the row was minted.
+    --
+    -- The counters go through Pawl.Engine.Event.putCounters, CR 122.6's funnel,
+    -- as WithCounters' and riot's do, so CR 614.16 applies to them.
+    ReadAhead
   | -- | CR 702.98a via CR 614.1c: unleash's FIRST static ability. "You may have
     -- this permanent enter with an additional +1/+1 counter on it."
     --

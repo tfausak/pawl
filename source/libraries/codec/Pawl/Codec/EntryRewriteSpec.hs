@@ -78,6 +78,14 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       (EntryRewrite.codec (Effect.codec Card.codec))
       EntryRewrite.ChooseBasicLandType
       " {\"type\":\"ChooseBasicLandType\"} "
+  -- CR 702.155b / 714.3b: read ahead's pair of intrinsic abilities as one
+  -- rewrite, payload-free because rule 714.2d reads the bound off the Saga.
+  Spec.it s "ReadAhead (Love Song of Night and Day)" $
+    Common.assertCodec
+      s
+      (EntryRewrite.codec (Effect.codec Card.codec))
+      EntryRewrite.ReadAhead
+      " {\"type\":\"ReadAhead\"} "
   -- CR 614.1c / 102.1: an as-enters player choice, payload-free because every
   -- player in the game is the offer and no card narrows it.
   Spec.it s "ChoosePlayer (Stuffy Doll)" $

@@ -33,6 +33,7 @@ codec effectCodec =
       Arm.nullary "ChoosePlayer" EntryRewrite.ChoosePlayer,
       Arm.payload "ChooseCardNames" (Filter.codec Keyword.codec) EntryRewrite.ChooseCardNames (\x -> case x of EntryRewrite.ChooseCardNames y -> Just y; _ -> Nothing),
       Arm.nullary "UnderSourceControl" EntryRewrite.UnderSourceControl,
+      Arm.nullary "ReadAhead" EntryRewrite.ReadAhead,
       Arm.nullary "Riot" EntryRewrite.Riot,
       Arm.nullary "Unleash" EntryRewrite.Unleash,
       Arm.payload "Bloodthirst" Common.natural EntryRewrite.Bloodthirst (\x -> case x of EntryRewrite.Bloodthirst y -> Just y; _ -> Nothing),

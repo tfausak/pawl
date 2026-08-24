@@ -2053,6 +2053,9 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
   EntryRewrite.ChooseColor -> rewrite
   EntryRewrite.ChooseBasicLandType -> rewrite
   EntryRewrite.ChoosePlayer -> rewrite
+  -- CR 702.155b's offer is a range of NUMBERS, read off the entering Saga's own
+  -- chapter symbols (CR 714.2d), so the rewrite prints no word either.
+  EntryRewrite.ReadAhead -> rewrite
   -- CR 201.4a's restriction on which names may be named.
   EntryRewrite.ChooseCardNames f -> EntryRewrite.ChooseCardNames (Filter.rewrite pairs f)
   EntryRewrite.WithCounters w -> EntryRewrite.WithCounters (rewriteWithCounters pairs w)
@@ -3961,8 +3964,9 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
          Defense.MkDefense n <- Maybe.maybeToList (PC.defense pc)
        ]
     <> Keyword.mintedReplacementsOf (PC.keywords pc)
-    -- CR 714.3a's intrinsic lore counter, minted off the same projection for CR
-    -- 306.5b's reason: a subtype is not an ability.
+    -- CR 714.3a's intrinsic lore counter -- or CR 714.3b's chosen number, which
+    -- rule 714.3b substitutes for it on a Saga with read ahead -- minted off the
+    -- same projection for CR 306.5b's reason: a subtype is not an ability.
     <> Saga.entryReplacementsOf pc
 
 -- CR 614.1: every replacement effect active on the battlefield, PAIRED WITH ITS
