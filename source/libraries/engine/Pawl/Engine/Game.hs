@@ -151,6 +151,7 @@ printingOfObject oid gs = case fmap Object.source (lookupObject oid gs) of
   Just (Source.OfAbility _) -> Nothing
   Just (Source.OfTrigger _) -> Nothing
   Just (Source.OfEmblem pid) -> printingOf pid gs
+  Just (Source.OfSpellCopy pid) -> printingOf pid gs
   Just (Source.OfInherentTrigger _) -> Nothing
 
 -- Reject-not-repair, as payment already does: only a genuine permutation of the
@@ -369,6 +370,13 @@ cardOfSource gs mSource = case mSource of
     Source.OfAbility _ -> Nothing
     Source.OfTrigger _ -> Nothing
     Source.OfEmblem pid -> cardOfPrinting pid gs
+    -- CR 707.10 / 707.2: the copied spell's printing, so every characteristic
+    -- read resolves as the original's does. What the copy is a copy OF is the
+    -- snapshot at Binding.copyOf, layer 1 (CR 613.1a); this is only where the
+    -- text a reader past the projection sees comes from -- CreateCopy's token
+    -- takes the same posture, and its comment says why the pair must move
+    -- together.
+    Source.OfSpellCopy pid -> cardOfPrinting pid gs
     Source.OfInherentTrigger _ -> Nothing
 
 cardOfPrinting :: PrintingId.PrintingId -> GameState -> Maybe Card
@@ -663,6 +671,11 @@ isSpell oid gs = case lookupObject oid gs of
       Source.OfAbility _ -> False
       Source.OfTrigger _ -> False
       Source.OfEmblem _ -> False
+      -- CR 112.1a: "a copy of a spell is also a spell, even if it has no card
+      -- associated with it" -- the sentence rule 112.1's card-on-the-stack
+      -- definition would otherwise exclude. What makes a Counterspell able to
+      -- counter one, and a Twincast able to copy it again.
+      Source.OfSpellCopy _ -> True
       Source.OfInherentTrigger _ -> False
 
 -- CR 113.9: is this object an activated or triggered ability on the stack? The
@@ -676,8 +689,9 @@ isSpell oid gs = case lookupObject oid gs of
 --
 -- CR 725.2's sourceless inherent monarch triggers are triggered abilities all
 -- the same, so a Stifle may counter one. An emblem stays in the command zone
--- (CR 114.1 / 114.4) and a token on the stack would be a spell copy (CR
--- 112.1a), so both answer False whatever zone they are found in.
+-- (CR 114.1 / 114.4) and a token is never on the stack, so both answer False
+-- whatever zone they are found in; CR 112.1a's copy of a spell is a SPELL, and
+-- answers with them above.
 isAbility :: ObjectId -> GameState -> Bool
 isAbility oid gs = case lookupObject oid gs of
   Nothing -> False
@@ -688,6 +702,10 @@ isAbility oid gs = case lookupObject oid gs of
       Source.OfAbility _ -> True
       Source.OfTrigger _ -> True
       Source.OfEmblem _ -> False
+      -- CR 112.1a puts it with the spells above, which is where isSpell answers
+      -- for it: the two are not complements, and a copy of a spell is no more an
+      -- ability than the spell it copies.
+      Source.OfSpellCopy _ -> False
       Source.OfInherentTrigger _ -> True
 
 -- CR 110.5: a permanent's tapped/untapped status. CR 110.5d gives status only
@@ -715,6 +733,9 @@ sourceIsToken source = case source of
   Source.OfAbility _ -> False
   Source.OfTrigger _ -> False
   Source.OfEmblem _ -> False
+  -- CR 707.10f is what would make one: a copy of a permanent spell becomes a
+  -- token as it RESOLVES, and until then it is a spell (#2207).
+  Source.OfSpellCopy _ -> False
   Source.OfInherentTrigger _ -> False
 
 -- CR 104.2a: who is still in the game. Here rather than in

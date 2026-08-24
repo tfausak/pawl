@@ -86,6 +86,7 @@ import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.CopySpell as CopySpell
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
@@ -490,6 +491,7 @@ slotsOf effect = case effect of
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> joinTwo (quantitySlots quantity) (objectRefSlots ref)
   -- Both refs: either may name a slot.
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) -> joinTwo (objectRefSlots original) (objectRefSlots subject)
+  Effect.CopySpell (CopySpell.MkCopySpell ref _) -> objectRefSlots ref
   -- The Duration and Condition each carry Quantities; a Quantity.InSlot is a read.
   -- The pattern's Filter is a READ too: Filter.IsBound in one names an object an
   -- earlier effect of this same resolution defined (Dire Fleet Daredevil's "that
@@ -745,6 +747,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Create (Create.MkCreate quantity _ riders _ _) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.BecomeCopy {} -> True
+  Effect.CopySpell {} -> True
   -- The ReplacementEffect holds no Quantity, and the one reference it can hold --
   -- a Filter.IsBound in its pattern -- slotsOf reports through
   -- replacementPatternSlots. Not implemented: the effects a rewrite or a CR 615.5
@@ -906,6 +909,7 @@ readsX = any effectReadsX
       Effect.Create (Create.MkCreate quantity _ riders _ _) -> any Quantity.readsX (quantity : riderQuantities riders)
       Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> Quantity.readsX quantity
       Effect.BecomeCopy {} -> False
+      Effect.CopySpell {} -> False
       Effect.Replace {} -> False
       Effect.SkipNextPhase {} -> False
       -- CR 601.2b's X reaches the rider too.
@@ -1019,6 +1023,7 @@ boundSlots effect = case effect of
   Effect.CreateCopy {} -> Set.empty
   -- Binds nothing: no new object comes into existence.
   Effect.BecomeCopy {} -> Set.empty
+  Effect.CopySpell {} -> Set.empty
   -- CR 729.1b: the subgame's winner, reported rather than chosen.
   Effect.PlaySubgame slot -> Set.singleton slot
   -- CR 608.2d: the opponent this effect chose.
@@ -1839,6 +1844,7 @@ alreadyTurnedFor resolving victim gs = case Game.lookupObject resolving gs of
       Source.OfCard _ -> False
       Source.OfToken _ -> False
       Source.OfEmblem _ -> False
+      Source.OfSpellCopy _ -> False
       Source.OfInherentTrigger _ -> False
 
 -- CR 608.2b: the ONE recipient still legal in `slot`, for a reader that can take
@@ -2830,18 +2836,91 @@ recordExiledWith source before gs =
    in gs {GameState.exiledWith = Map.restrictKeys (foldr file (GameState.exiledWith gs) arrived) (GameState.exile gs)}
 
 -- CR 724.1b: how one object leaves the stack when an effect ends the turn. A card
--- or a token copy of a spell is EXILED, which is a zone change like any other; an
--- ability is not represented by a card, so it ceases to exist instead (Game.cease,
--- CR 608.2n's own mechanism) rather than being filed into exile as a phantom that
--- rule 724.1b's second sentence expects the next check to remove and that
--- Pawl.Engine.Sba's CR 704.5d pass -- which reaches tokens only -- would not.
+-- or a token is EXILED, which is a zone change like any other; an ability is not
+-- represented by a card, so it ceases to exist instead (Game.cease, CR 608.2n's
+-- own mechanism) rather than being filed into exile as a phantom that rule
+-- 724.1b's second sentence expects the next check to remove and that
+-- Pawl.Engine.Sba's cease pass would not.
+--
+-- A COPY OF A SPELL is exiled with the cards, and rule 724.1b's second sentence
+-- is why it may be: CR 704.5e removes it at the next check, which is the same
+-- pass CR 704.5d makes for a token. Ceasing it here instead would be the same end
+-- state reached without the zone change the rule asks for.
 exileOrCease :: ObjectId -> Game ()
 exileOrCease oid = do
   gs <- State.get
   case fmap Object.source (Game.lookupObject oid gs) of
     Just (Source.OfCard _) -> Event.changeZone oid Zone.Exile
     Just (Source.OfToken _) -> Event.changeZone oid Zone.Exile
+    Just (Source.OfSpellCopy _) -> Event.changeZone oid Zone.Exile
     _ -> State.modify' (Game.cease oid)
+
+-- CR 707.10: what a copy of this object's Source would be, or Nothing when the
+-- object is not a spell. A CLASSIFICATION -- is-it-a-spell, read off the same
+-- Source that Game.isSpell reads -- never which card it is.
+--
+-- A copy of a copy answers with the copy's own printing: CR 707.2's copiable
+-- values are the ones the copied object reports, and its snapshot already carries
+-- them.
+--
+-- Not implemented: CR 707.10b's copy of an activated or triggered ability, which
+-- keeps the original's source rather than naming a printing and so is a different
+-- Source entirely (#2208).
+spellCopyOf :: Source.Source -> Maybe Source.Source
+spellCopyOf source = case source of
+  Source.OfCard pid -> Just (Source.OfSpellCopy pid)
+  Source.OfSpellCopy pid -> Just (Source.OfSpellCopy pid)
+  Source.OfToken _ -> Nothing
+  Source.OfAbility _ -> Nothing
+  Source.OfTrigger _ -> Nothing
+  Source.OfEmblem _ -> Nothing
+  Source.OfInherentTrigger _ -> Nothing
+
+-- CR 707.10c: "the player may leave any number of the targets unchanged, even if
+-- those targets would be illegal. If the player chooses to change some or all of
+-- the targets, the new targets must be legal."
+--
+-- ONE prompt, not a "may" followed by a choice: leaving every target where it is
+-- is an answer to the same question, so a second prompt would ask nothing the
+-- first cannot say. Prompt.ChooseTargets is the shape -- per slot, how many
+-- targets and which recipients -- and this is the second place it is raised;
+-- Pawl.Engine.Target.chooseTargets raises it for CR 601.2c's announcement.
+--
+-- The OFFERED set per slot is the recipients legal on the board NOW, unioned
+-- with what the copy already targets, which is the rule's two halves: a changed
+-- target must be legal, an unchanged one need not be. The count is what the
+-- original announced, CR 707.10 having copied the decision and CR 707.10c
+-- offering no chance to change it.
+--
+-- Not raised when no slot can be answered any other way -- the offered set is
+-- exactly what is already chosen -- because then the options are
+-- indistinguishable.
+--
+-- Reject-not-repair, as every other announcement is: an answer that names a slot
+-- it was not offered, the wrong number of targets, or a recipient outside the
+-- offered set leaves the copied targets standing rather than being patched into
+-- something the player did not choose.
+chooseNewTargetsFor :: PlayerId -> ObjectId -> Game ()
+chooseNewTargetsFor controller copyId = do
+  gs <- State.get
+  Monad.forM_ (Game.lookupObject copyId gs) $ \copy ->
+    Monad.forM_ (Game.faceOf copyId gs) $ \face -> do
+      let slots = targetSlotsOf copy copyId gs face
+          current = Binding.targetsOf (Object.bindings copy)
+          -- CR 608.2b's own derivation, made against the CURRENT board: this is
+          -- a fresh choice of targets rather than a re-check of the old one, so
+          -- it reads what the board can supply now.
+          fresh = Target.legalSets (Just controller) Map.empty copyId slots gs
+          offer slot recipients = (Natural.length recipients, Set.union recipients (Map.findWithDefault Set.empty slot fresh))
+          asked = Map.mapWithKey offer current
+      Monad.unless (all (\(recipients, (_, offered)) -> recipients == offered) (Map.elems (Map.intersectionWith (,) current asked))) $ do
+        answer <- Game.choose (Prompt.ChooseTargets (Decide.deciderFor controller gs) controller copyId asked)
+        let admits (n, offered) picked = Natural.length picked == n && Set.isSubsetOf picked offered
+            wellFormed =
+              Map.keysSet answer == Map.keysSet asked
+                && and (Map.elems (Map.intersectionWith admits asked answer))
+            write o = o {Object.bindings = Map.union (fmap Binding.toRecipients answer) (Object.bindings o)}
+        Monad.when wellFormed (State.modify' (\g -> g {GameState.objects = Map.adjust write copyId (GameState.objects g)}))
 
 -- One effect, applied. `runSubgame` is the injected nested-game runner; only
 -- the PlaySubgame arm consults it.
@@ -4533,6 +4612,57 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               subjects = objectRefObjects legal resolving controller source gs subjectRef
            in gs {GameState.objects = foldr (Map.adjust write) (GameState.objects gs) subjects}
         _ -> gs
+  Effect.CopySpell (CopySpell.MkCopySpell ref newTargets) -> do
+    gs <- State.get
+    -- CR 707.10: one copy per named spell, each put onto the stack. The named
+    -- objects are enumerated ONCE off this `gs` (CR 608.2f); each copy is then
+    -- minted against the live state, since a fresh id and a fresh timestamp are
+    -- both counters the previous mint moved.
+    Monad.forM_ (objectRefObjects legal resolving controller source gs ref) $ \original ->
+      Monad.forM_ (Game.lookupObject original gs) $ \obj ->
+        -- CR 707.10's three nouns, and only the first is implemented: an
+        -- ObjectRef that named an ability on the stack finds no printing here
+        -- and copies nothing (#2208). The classification is the object's KIND,
+        -- never which card it is.
+        Monad.forM_ (spellCopyOf (Object.source obj)) $ \copySource -> do
+          gsNow <- State.get
+          let (copyId, gs1) = Game.freshObjectId gsNow
+              (ts, gs2) = Game.freshTimestamp gs1
+              -- CR 707.10's "all decisions made for it": the modes, the targets,
+              -- the value of X and the announced costs are all fields of the
+              -- object being copied, so the copy IS that object with the few
+              -- things CR 707.10 names overwritten. Enumerating what to carry
+              -- would be a list to keep in step with Pawl.Types.Object; this way
+              -- a new decision field is copied by construction.
+              --
+              -- Owner and controller are the COPYING effect's controller, both
+              -- stated outright by CR 707.10 and neither inherited: the copy is
+              -- "owned by the player under whose control it was put on the
+              -- stack".
+              --
+              -- Zeroed: damage, counters and designations, none of which CR
+              -- 707.2 copies. A spell on the stack carries none of the three
+              -- today, so this is the rule written out rather than a difference
+              -- the board can show.
+              copy =
+                obj
+                  { Object.source = copySource,
+                    Object.owner = controller,
+                    Object.enteredUnder = Just controller,
+                    Object.timestamp = ts,
+                    Object.damage = 0,
+                    Object.counters = Map.empty,
+                    Object.counterTimestamps = Map.empty,
+                    Object.designations = Set.empty,
+                    -- CR 707.2's copiable values, stamped where the other two
+                    -- copy opcodes stamp them so Projection.copiableCharacteristics
+                    -- answers for all three and CR 707.3 holds for free. The LIVE
+                    -- reader, not the last-known one: the object was just looked
+                    -- up, so there is nothing to resurrect.
+                    Object.bindings = Binding.setCopy (Event.copiedSnapshot original gsNow) (Object.bindings obj)
+                  }
+          State.put (Game.insertIntoZone Zone.Stack LibraryPosition.defaultValue controller copyId gs2 {GameState.objects = Map.insert copyId copy (GameState.objects gs2)})
+          Monad.when newTargets (chooseNewTargetsFor controller copyId)
   Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger name onset duration) -> do
     gs <- State.get
     -- CR 608.2h's last-known fallback, and not belt and braces: the source can

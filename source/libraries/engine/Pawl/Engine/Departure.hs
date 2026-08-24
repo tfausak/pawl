@@ -456,6 +456,9 @@ nonCardStackObjectsCease pid gs =
           Source.OfAbility _ -> True
           Source.OfTrigger _ -> True
           Source.OfEmblem _ -> True
+          -- CR 112.1a: a copy of a spell has no card associated with it, so CR
+          -- 800.4a reaches it along with the rest.
+          Source.OfSpellCopy _ -> True
           Source.OfInherentTrigger _ -> True
       theirs oid = Projection.controllerOf oid gs == Just pid && notACard oid
       cease g oid = case Game.lookupObject oid g of

@@ -2,9 +2,9 @@
 
 module Pawl.Codec.CopySpell where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.CopySpell as CopySpell
 

@@ -49,6 +49,7 @@ import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.CopySpell as CopySpell
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -1673,6 +1674,10 @@ rewriteEffect pairs effect = case effect of
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> Effect.CreateCopy (CreateCopy.MkCreateCopy quantity (rewriteObjectRef pairs ref))
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) ->
     Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (rewriteObjectRef pairs original) (rewriteObjectRef pairs subject))
+  -- The ref alone, CreateCopy's reason: CR 707.2 keeps a text change out of the
+  -- copiable values, so what the copy becomes is not rewritten. CR 707.10c's
+  -- offer is no land type either.
+  Effect.CopySpell (CopySpell.MkCopySpell ref newTargets) -> Effect.CopySpell (CopySpell.MkCopySpell (rewriteObjectRef pairs ref) newTargets)
   Effect.Replace {} -> effect
   Effect.SkipNextPhase {} -> effect
   -- CR 612.1: a rider's text is as changeable as any other.

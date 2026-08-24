@@ -789,7 +789,7 @@ performStateBasedActions = Event.simultaneously $ do
       -- move already emitted a zone-change event, so a future dies-trigger still
       -- sees it (CR 111.7's parenthetical). Keyed to "not on the battlefield",
       -- never to a specific zone, so exile is caught too.
-      isVanishingToken oid = case Game.lookupObject oid departed of
+      isVanishing oid = case Game.lookupObject oid departed of
         Nothing -> False
         Just obj -> case Object.source obj of
           -- Object.zone and NOT GameState.battlefield, which is the one place in
@@ -799,8 +799,24 @@ performStateBasedActions = Event.simultaneously $ do
           -- set here would make a phasing token cease to exist the moment it
           -- phased out.
           Source.OfToken _ -> Object.zone obj /= Zone.Battlefield
+          -- CR 704.5e / 707.10a: a copy of a spell in a zone other than the
+          -- stack ceases to exist. The SAME pass and the same shape as the
+          -- token rule above -- one kind of object, one zone it may be in --
+          -- which is why it reads the object's own zone rather than a zone set,
+          -- for the reason that arm gives.
+          --
+          -- What reaches it is the copy's own resolution: CR 608.2n puts the
+          -- resolved copy into its owner's graveyard like any other spell, and
+          -- this removes it there. CR 724.1b's exile and CR 701.6a's countering
+          -- arrive the same way.
+          --
+          -- The rule's SECOND sentence -- a copy of a CARD outside the stack or
+          -- the battlefield -- is not implemented: pawl has no copy of a card
+          -- (CR 707.13), which is #888's subject, so nothing can be in that
+          -- state (gap #888).
+          Source.OfSpellCopy _ -> Object.zone obj /= Zone.Stack
           _ -> False
-      vanishing = filter isVanishingToken (Map.keys (GameState.objects departed))
+      vanishing = filter isVanishing (Map.keys (GameState.objects departed))
       ceaseToExist g oid = case Game.lookupObject oid g of
         Nothing -> g
         Just obj ->

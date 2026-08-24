@@ -1886,9 +1886,10 @@ apply batch candidate event =
 -- number this wrote when it entered, and its own card and face are then no
 -- longer what it reports.
 --
--- CR 202.3b's rule is about "a permanent OR SPELL"; only the permanent half is
--- implemented, this being an entry replacement. Nothing can copy a spell on the
--- stack (#1006).
+-- CR 202.3b's rule is about "a permanent OR SPELL", and BOTH halves come through
+-- here: the entry replacement stamps the permanent's snapshot, and
+-- Pawl.Engine.Resolve's CR 707.10 copy stamps the spell's off this same
+-- function.
 copiedSnapshot :: ObjectId -> GameState -> PC.ProjectedCharacteristics
 copiedSnapshot src gs =
   let snapshot = Projection.copiableCharacteristics src gs

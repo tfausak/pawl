@@ -252,6 +252,7 @@ stackSpec s registry = Spec.describe s "Stack" $ do
             Source.OfAbility _ -> Spec.assertFailure s "expected a card source"
             Source.OfTrigger _ -> Spec.assertFailure s "expected a card source"
             Source.OfEmblem _ -> Spec.assertFailure s "expected a card source"
+            Source.OfSpellCopy _ -> Spec.assertFailure s "expected a card source"
             Source.OfInherentTrigger _ -> Spec.assertFailure s "expected a card source"
   Spec.it s "resolving conserves objects" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -361,6 +362,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
             Source.OfAbility _ -> Spec.assertFailure s "expected a card source"
             Source.OfTrigger _ -> Spec.assertFailure s "expected a card source"
             Source.OfEmblem _ -> Spec.assertFailure s "expected a card source"
+            Source.OfSpellCopy _ -> Spec.assertFailure s "expected a card source"
             Source.OfInherentTrigger _ -> Spec.assertFailure s "expected a card source"
   Spec.it s "CR 117.1a a Bolt is castable outside a main phase" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -3736,6 +3738,9 @@ nameOnStack wanted gs oid = case Game.lookupObject oid gs of
     Source.OfAbility _ -> False
     Source.OfTrigger _ -> False
     Source.OfEmblem _ -> False
+    -- CR 112.1a: a copy of a spell has a name, the copied spell's, and the same
+    -- read finds it. No caller reaches one today.
+    Source.OfSpellCopy _ -> fmap Face.name (Game.faceOf oid gs) == Just wanted
     Source.OfInherentTrigger _ -> False
   Nothing -> False
 
