@@ -93,6 +93,7 @@ import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -1636,6 +1637,10 @@ representativeEvents cond =
         -- the pin the two arms above would break if either grew a binding here.
         -- carol serves every relation, the floor being empty either way.
         TriggerCondition.PlayerAttacks _ -> one (GameEvent.AttackersDeclared S.carol)
+        -- The same declaration event once more, and the same EMPTY floor: rule
+        -- 508.3c's Filter narrows the creatures rather than naming one, so there
+        -- is nothing to bind here either.
+        TriggerCondition.PlayerAttacksWith {} -> one (GameEvent.AttackersDeclared S.carol)
         -- The same declaration event once more. Rule 702.105a binds NOTHING off
         -- it, SelfAttacksWithAnother's case: the player it compares is read from
         -- Combat.attackers and then never named again.
@@ -1882,6 +1887,9 @@ everyTriggerCondition =
     TriggerCondition.PlayerAttacks PlayerRelation.You,
     TriggerCondition.PlayerAttacks PlayerRelation.Opponent,
     TriggerCondition.PlayerAttacks PlayerRelation.AnyPlayer,
+    TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith PlayerRelation.You (Filter.Type.And [])),
+    TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith PlayerRelation.Opponent (Filter.Type.And [])),
+    TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith PlayerRelation.AnyPlayer (Filter.Type.And [])),
     TriggerCondition.SelfAttacksPlayerWithMostLife,
     TriggerCondition.SelfBlocks,
     TriggerCondition.SelfBlocksAtLeast 2,
