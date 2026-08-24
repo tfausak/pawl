@@ -4454,14 +4454,29 @@ betrayalSpec s registry = Spec.describe s "CR 701.26a a becomes-tapped trigger" 
         Spec.assertEqWith s "CR 508.1f both attackers really became tapped" (fmap (`tapStatusOf` after) [enchanted, bare]) [Just TapState.Tapped, Just TapState.Tapped]
         Spec.assertEqWith s "so the ONE draw is the attachment link's doing and not the tap's" (S.tappedCount S.alice after) 2
       _ -> Spec.assertFailure s "fixture should give alice exactly two attackers"
-  -- The pair's other half: the same board and the same combat, the Aura sitting on
-  -- carol's battlefield attached to nothing. One thing differs.
-  Spec.it s "CR 303.4m an unattached Betrayal watches nothing and nobody draws" $ do
+  -- The pair's other half, and the leg that pins WHICH permanent the condition is
+  -- about: the same board, and the tap goes to the creature the Aura does NOT
+  -- enchant. One thing differs, and it is the only thing the matcher reads.
+  Spec.it s "CR 303.4b tapping a creature the Aura does not enchant draws nothing" $ do
+    board <- betrayalBoard s registry True
+    case board of
+      ([enchanted, bare], _, gs) -> do
+        let after = settleAndResolve (S.runPure S.identityAnswer gs (Event.tap bare))
+        Spec.assertEqWith s "CR 303.4b carol's hand is still empty" (handNames S.carol after) []
+        Spec.assertEqWith s "though that creature really did become tapped" (tapStatusOf bare after) (Just TapState.Tapped)
+        Spec.assertEqWith s "and the enchanted one, untouched, did not" (tapStatusOf enchanted after) (Just TapState.Untapped)
+      _ -> Spec.assertFailure s "fixture should give alice exactly two attackers"
+  -- CR 704.5m, and the reason an unattached Aura is NOT the negative to build
+  -- here: it never gets to watch anything, because the state-based action buries
+  -- it before the combat starts. Asserted rather than assumed, so the empty hand
+  -- below is not read as evidence about the matcher.
+  Spec.it s "CR 704.5m an unattached Betrayal is buried before it can watch a tap" $ do
     board <- betrayalBoard s registry False
     case board of
-      ([enchanted, _], _, gs) -> do
+      ([enchanted, _], aura, gs) -> do
         let after = S.runCombat (S.attackTo S.bob) gs
-        Spec.assertEqWith s "carol's hand is still empty" (handNames S.carol after) []
+        Spec.assertBool s (not (S.onBattlefield aura after)) "CR 704.5m the Aura attached to nothing is off the battlefield"
+        Spec.assertEqWith s "so carol drew nothing" (handNames S.carol after) []
         Spec.assertEqWith s "though the same creature still became tapped" (tapStatusOf enchanted after) (Just TapState.Tapped)
       _ -> Spec.assertFailure s "fixture should give alice exactly two attackers"
   -- CR 701.26a's second sentence, "only untapped permanents can be tapped", and
@@ -4494,6 +4509,29 @@ betrayalSpec s registry = Spec.describe s "CR 701.26a a becomes-tapped trigger" 
         Spec.assertEqWith s "though the very same tap through the funnel draws her a card" (handNames S.carol tapped) ["Island"]
         Spec.assertEqWith s "and both left the creature tapped, so the boards differ in nothing else" (fmap (tapStatusOf enchanted) [entered, tapped]) [Just TapState.Tapped, Just TapState.Tapped]
       _ -> Spec.assertFailure s "fixture should give alice exactly two attackers"
+  -- CR 608.2f's route into the funnel, through a real resolving spell: Dream's
+  -- Grip ({U} Instant, "Choose one -- Tap target permanent; or untap target
+  -- permanent." plus Entwine {1}) is the cheapest printing whose first mode is a
+  -- bare Effect.Tap, so what is on trial is that opcode reaching Event.tap.
+  --
+  -- TWO seats here and not three: this leg is about the route, and CR 109.5's
+  -- "you" is already settled by the combat leg above. bob holds the Aura on
+  -- alice's Piker, so it is his library the draw comes out of and alice's spell
+  -- that does the tapping.
+  Spec.it s "CR 608.2f a resolving Tap effect goes through the same funnel and draws" $ do
+    island <- S.printingOf s registry "Island"
+    grip <- S.printingOf s registry "Dream's Grip"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    betrayal <- S.printingOf s registry "Betrayal"
+    let (pikerId, gs1) = S.addCreature piker S.alice (S.landsInPlay island 2)
+        (auraId, gs2) = S.addCreature betrayal S.bob gs1
+        gs3 = snd (S.addLibraryCard mountain S.bob (snd (S.addLibraryCard mountain S.bob (S.attach auraId pikerId gs2))))
+        (board, spellId) = S.handOne grip gs3
+        cast = S.runPure (aimEveryTargetAt pikerId) board (S.cast S.alice spellId)
+        after = settleAndResolve (S.runPure (aimEveryTargetAt pikerId) cast Stack.resolveTop)
+    Spec.assertEqWith s "CR 608.2f the Aura's controller drew off the spell's tap" (handNames S.bob after) ["Mountain"]
+    Spec.assertEqWith s "and the spell really tapped the enchanted creature" (tapStatusOf pikerId after) (Just TapState.Tapped)
   -- CR 701.19a's other route into the funnel: "instead remove all damage marked
   -- on it and its controller taps it". A regeneration is a tap like any other, and
   -- the shield is what makes the destruction not happen.
@@ -4539,6 +4577,15 @@ settleAndResolve gs0 =
           then g
           else go (n - 1) (S.runPure S.identityAnswer g Stack.resolveTop)
    in go 8 (S.runPure S.identityAnswer gs0 Engine.settleForPriority)
+
+-- Every target slot a modal spell offers, aimed at one permanent. Dream's Grip
+-- offers one slot per chosen mode and only one mode is chosen here, so the map is
+-- a single entry; a hand-built Recipient would be a different recipient from the
+-- offered one (CR 608.2b), which is why this rewrites the OFFER.
+aimEveryTargetAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimEveryTargetAt oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
+  _ -> S.identityAnswer p
 
 -- The tap status of one object, Nothing where it is not on the board at all --
 -- which a precondition assertion must be able to say apart from "untapped".
