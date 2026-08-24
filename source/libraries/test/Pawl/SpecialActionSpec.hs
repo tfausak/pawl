@@ -59,6 +59,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
+import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.Facing as Facing
@@ -461,6 +462,11 @@ plotting s registry = Spec.describe s "CR 116.2k Djinn of Fool's Fall" $ do
 -- GameEvent.Plotted would be indistinguishable from one that did. 2/1 to 5/3 is
 -- a value nothing else on this board produces.
 --
+-- The `plot` ARGUMENT is the card the trigger exiles, and the two callers pass
+-- different cards on purpose: Aloe Alchemist for the cases about becoming
+-- plotted, Lightning Bolt for the window case, which needs an INSTANT because CR
+-- 304.1 is what leaves CR 702.170d's main-phase clause the only narrowing left.
+--
 -- The DJINN OF FOOL'S FALL ({4}{U}, mana value 5) is the filter's negative
 -- control. It is the only other card in the hand, so "mana value 3 or less"
 -- leaves exactly one candidate and CR 608.2d's prompt is elided -- which the
@@ -475,11 +481,11 @@ kellanBoard ::
   Printing.Printing ->
   Printing.Printing ->
   (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-kellanBoard forest plains island piker kellan aloe djinn =
+kellanBoard forest plains island piker kellan plot djinn =
   let lands = S.landsFor plains S.alice 1 (S.landsFor island S.alice 1 (S.landsInPlay forest 1))
       (pikerId, g1) = S.addCreature piker S.alice lands
       (kellanId, g2) = S.addHandCard kellan S.alice g1
-      (_, g3) = S.addHandCard aloe S.alice g2
+      (_, g3) = S.addHandCard plot S.alice g2
       (djinnId, g4) = S.addHandCard djinn S.alice g3
    in ( pikerId,
         kellanId,
@@ -591,6 +597,60 @@ makePlotted s registry = Spec.describe s "CR 702.170c Kellan Joins Up" $ do
         1
       Spec.assertEqWith s "exile is empty" (length (GameState.exile resolved)) 0
       Spec.assertEqWith s "and the three lands are still the only tapped permanents: the cast paid nothing" (S.tappedCount S.alice resolved) 3
+
+  -- CR 702.170d's OTHER clause, the one no PRINTED plot card can observe:
+  -- "during their main phase while the stack is empty". Every card that prints
+  -- plot is a creature, so CR 307.5's window already covers the clause there --
+  -- but Kellan Joins Up plots "a nonland card with mana value 3 or less", which
+  -- reaches an INSTANT, and CR 304.1 gives an instant every priority it has. So
+  -- the plotted permission is the only thing left that can narrow the window.
+  --
+  -- FOUR boards, each differing from the castable one in exactly one field, one
+  -- per conjunct of the window: the phase, the active player, and the stack.
+  -- Lightning Bolt rather than the Alchemist because it is the instant; the mana
+  -- value 5 Djinn is still the filter's negative control, so the exiled card is
+  -- the Bolt and CR 608.2d's choice is still elided.
+  Spec.it s "CR 702.170d a plotted instant is castable only in its owner's main phase with the stack empty" $ do
+    forest <- S.printingOf s registry "Forest"
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    kellan <- S.printingOf s registry "Kellan Joins Up"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    djinn <- S.printingOf s registry "Djinn of Fool's Fall"
+    let (pikerId, kellanId, _, gs) = kellanBoard forest plains island piker kellan bolt djinn
+        after = snd (State.evalState (Engine.runGame (kellanAnswers pikerId) gs (S.cast S.alice kellanId >> Engine.priorityLoop)) [])
+        later = after {GameState.turnNumber = GameState.turnNumber after + 1}
+        upkeep = later {GameState.phase = Phase.Beginning BeginningStep.Upkeep}
+        opponentsTurn = later {GameState.activePlayer = S.bob}
+        stackBusy = snd (S.spellOnStack djinn S.bob later)
+    Spec.assertBool s (Maybe.isJust (soleExile after)) "the card was exiled, so the cases below are about a card in exile"
+    Monad.forM_ (soleExile after) $ \exiledId -> do
+      -- ONE assertion over all four boards rather than four: an implementation
+      -- with no window at all answers True everywhere, and a failure that prints
+      -- the whole vector says which conjunct went missing instead of stopping at
+      -- the first.
+      Spec.assertEqWith
+        s
+        "CR 702.170d the plotted instant is castable in her main phase with the stack empty, and in no other window"
+        [ ("her main phase, stack empty", S.castable S.alice exiledId later),
+          ("her upkeep", S.castable S.alice exiledId upkeep),
+          ("bob's turn", S.castable S.alice exiledId opponentsTurn),
+          ("her main phase, a spell on the stack", S.castable S.alice exiledId stackBusy)
+        ]
+        [ ("her main phase, stack empty", True),
+          ("her upkeep", False),
+          ("bob's turn", False),
+          ("her main phase, a spell on the stack", False)
+        ]
+      -- The identity leg, AFTER the four above: the card the window was asked
+      -- about really is the instant, so the refusals are the window narrowing a
+      -- CR 304.1 permission rather than a creature's own CR 307.5 gate.
+      Spec.assertEqWith
+        s
+        "the exiled card is Lightning Bolt, an instant"
+        (fmap S.nameOf (Game.cardOf exiledId after))
+        (Just (S.printingName bolt))
 
 -- Augury Raven (KHM 44) on alice's own precombat main, holding four Islands, the
 -- Raven and a Doomed Traveler.
