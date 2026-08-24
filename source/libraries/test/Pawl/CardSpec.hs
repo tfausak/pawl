@@ -5711,12 +5711,16 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (any (anyFace (any hides . cardResolutionEffects) . Printing.card) ps) "the pool has a card exiling face down"
     Spec.assertEqWith s "only exile keeps a card face down (CR 406.3)" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 509.4's rider is a rule about entering the BATTLEFIELD, so on any other
-  -- destination it is inert card data -- and inert on a Create outright, a token
-  -- being created onto the battlefield and CR 111.7 making one anywhere else
-  -- cease to exist. Both opcodes read it: Pawl.Engine.Resolve's Create arm hands
-  -- its tokens to Combat.putOntoBattlefieldBlocking and its MoveToZone arm hands
-  -- the card it moved to the same function, so this lints an authoring mistake
-  -- rather than guarding the engine.
+  -- destination it is inert card data. Both opcodes read it and both apply it --
+  -- Pawl.Engine.Resolve's Create arm hands its tokens to
+  -- Combat.putOntoBattlefieldBlocking and its MoveToZone arm hands the card it
+  -- moved to the same function -- so this lints an authoring mistake rather than
+  -- guarding the engine.
+  --
+  -- Only the MoveToZone can BE mis-zoned, which is why the Create is not an
+  -- offender here where it is one in the exile lint above: a Create names no
+  -- destination, minting onto the battlefield, and CR 111.7 would make a token
+  -- anywhere else cease to exist anyway.
   Spec.it s "no effect enters blocking anywhere but the battlefield" $ do
     ps <- S.allPrintings s
     let offends effect = case effect of
