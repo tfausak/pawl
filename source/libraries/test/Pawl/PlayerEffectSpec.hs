@@ -3002,9 +3002,8 @@ conditionalSilenceSpec s registry =
 -- Aims a text changer's one target slot at `oid` -- the SpellsAndPermanents
 -- pool's recipient shape -- and answers the basic-land-type swap with
 -- (from, to). The offered set is FILTERED rather than rebuilt, so CR 608.2b's
--- re-read at resolution sees the recipient the engine itself offered; swapAt
--- above rebuilds because its target is a permanent it also has to reach as a
--- creature.
+-- re-read at resolution sees the recipient the engine itself offered rather than
+-- a hand-built one that merely looks the same.
 hackSpellAt :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
 hackSpellAt oid from to p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter (== Recipient.ToObject oid) candidates) sets
@@ -3012,8 +3011,8 @@ hackSpellAt oid from to p = case p of
   _ -> S.identityAnswer p
 
 -- conditionalSilenceBoard's no-Swamp shape, plus the two things a Magical Hack
--- needs: a SECOND Island (the first pays the Silence's {U}, the second the Hack's)
--- and the Hack in hand. alice controls no Swamp on either board here, so the
+-- needs: a SECOND Island (two {U} spells are cast, so two lands pay) and the
+-- Hack in hand. alice controls no Swamp on either board here, so the
 -- Silence's printed "for as long as you control a Swamp" can never start and the
 -- Islands are the only thing the hacked word can count.
 --
@@ -3102,7 +3101,7 @@ hackedSilenceSpec s registry =
           after = hackedSilenceAfter False hushId hackId before
       Spec.assertBool s (elem (Action.Type.Cast bobsPiker (S.printingName piker) Facing.FaceUp) (conditionalSilenceCasts S.bob after)) "bob is still offered his Piker"
       Spec.assertBool s (elem (Action.Type.Cast carolsPiker (S.printingName piker) Facing.FaceUp) (conditionalSilenceCasts S.carol after)) "and carol hers"
-      Spec.assertBool s (notElem hushId (GameState.stack after)) "the Silence really did resolve"
+      Spec.assertEqWith s "the Silence really did resolve" (length (GameState.stack after)) 0
       Spec.assertEqWith s "and nothing is stored" (GameState.playerEffects after) []
 
     -- THE UNIT'S POINT. The same Swamp-less board, with the word the duration
@@ -3122,6 +3121,7 @@ hackedSilenceSpec s registry =
       Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell after) "bob is prohibited"
       Spec.assertBool s (PlayerEffect.prohibitsCasting S.carol anySpellId anySpell after) "carol is prohibited too"
       Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell after)) "alice is not"
+      Spec.assertEqWith s "and both spells resolved" (length (GameState.stack after)) 0
       case fmap ActivePlayerEffect.expiry (GameState.playerEffects after) of
         [Expiry.Type.While (While.MkWhile who _)] -> Spec.assertEqWith s "the duration is keyed to its controller" who S.alice
         other -> Spec.assertFailure s ("expected one conditional player effect, got " <> show other)
