@@ -14,11 +14,10 @@ import qualified Pawl.Types.SlotName as SlotName
 -- filtered back against. CR 706.2 adds the modifier afterwards, and no rule
 -- bounds the sum, so a d20 answered 20 with a modifier of 5 is a result of 25.
 --
--- `modifier` is CR 706.2's first sentence: "the instruction may include
--- modifiers to the roll which add to or subtract from the natural result"
--- (Diviner's Portent, "roll a d20 and add the number of cards in your hand").
--- Nothing where the instruction prints none, which is every other roll in the
--- pool.
+-- `modifier` is CR 706.2's first sentence -- what the roll's OWN instruction
+-- adds to or subtracts from the natural result (Diviner's Portent, "roll a d20
+-- and add the number of cards in your hand"). Nothing where the instruction
+-- prints none, which is every other roll in data/cards/.
 --
 -- `slot` binds the RESULT, not the natural result. Not implemented: a binding
 -- for the natural result (#2083). CR 706.3a's striations and CR 706.4's text

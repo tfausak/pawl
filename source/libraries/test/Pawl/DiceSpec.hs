@@ -267,7 +267,7 @@ resultsTableSpec s registry = Spec.describe s "ResultsTable" $ do
 -- alice holds Diviner's Portent plus `others` cards of one filler printing, has
 -- four untapped Islands, and a library of six cards from six DIFFERENT printings
 -- so no two library positions can be confused. The returned ids are the library
--- reading top-first, then the Portent in hand.
+-- reading top-first; the second component is the Portent in hand.
 --
 -- `others` IS the modifier: the Portent leaves the hand for the stack when it is
 -- cast (CR 601.2a), so the hand at resolution holds exactly those. handOne
@@ -317,8 +317,8 @@ portentOffers spell board =
 
 modifierSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 modifierSpec s registry = Spec.describe s "RollDieModifier" $ do
-  -- CR 706.2's first sentence, on the one card in the pool that prints it.
-  -- 14 is the primary pin because it is the printed boundary of the 1-14 band:
+  -- CR 706.2's first sentence, on the only card in data/cards/ whose roll
+  -- instruction prints a modifier. 14 is the primary pin because it is the printed boundary of the 1-14 band:
   -- the modifier is the only thing that can move a natural 14 out of it. It is
   -- also none of the values a wrong implementation reaches by accident -- not 1
   -- (Replay.defaultAnswer, which S.identityAnswer falls through to), not 20 (the
@@ -340,13 +340,14 @@ modifierSpec s registry = Spec.describe s "RollDieModifier" $ do
       _ -> Spec.assertFailure s "expected six library cards"
   -- The pair that proves the modifier is the HAND COUNT and not a constant:
   -- SAME die, different hand, different band. It is also the guard against a
-  -- Quantity evaluated against an empty context, which answers 0 on both boards
-  -- and makes them agree (#1876's shape).
+  -- Quantity evaluated against a context whose fields were never filled: that
+  -- answers 0 without raising, which is indistinguishable from an empty hand on
+  -- one board and makes both boards agree.
   Spec.it s "CR 706.2 the modifier is the number the instruction names" $ do
     (ids, spell, small) <- portentBoard s registry 1
-    (_, bigSpell, big) <- portentBoard s registry 4
-    case ids of
-      [_, second, third, _, _, _] -> do
+    (bigIds, bigSpell, big) <- portentBoard s registry 4
+    case (ids, bigIds) of
+      ([_, second, _, _, _, _], [_, _, bigThird, _, _, _]) -> do
         Spec.assertEqWith
           s
           "CR 706.2: 11 plus a hand of one is 12, so the 1-14 band drew without scrying"
@@ -356,7 +357,7 @@ modifierSpec s registry = Spec.describe s "RollDieModifier" $ do
           s
           "CR 706.2: the same 11 plus a hand of four is 15, so the 15+ band scried"
           (Maybe.listToMaybe (tableLibrary (runPortent 11 bigSpell big)))
-          (Just third)
+          (Just bigThird)
       _ -> Spec.assertFailure s "expected six library cards"
   -- CR 706.1a bounds the NATURAL result at 1..N; CR 706.2 adds the modifier
   -- afterwards and no rule bounds the sum. A natural 20 with a hand of five is a
@@ -379,8 +380,9 @@ modifierSpec s registry = Spec.describe s "RollDieModifier" $ do
     (ids, spell, board) <- portentBoard s registry 1
     let after = runPortent 14 spell board
     Spec.assertEqWith s "six cards, top-first" (tableLibrary board) ids
-    Spec.assertEqWith s "nothing left on the stack" (length (GameState.stack after)) 0
+    -- Before the stack reading, which a cast that never happened also satisfies.
     Spec.assertEqWith s "one card drawn out of six" (length (tableLibrary after)) 5
+    Spec.assertEqWith s "nothing left on the stack" (length (GameState.stack after)) 0
   -- Supporting, and in its own case: the modifier is the engine's arithmetic, so
   -- it did not become a second roll or a bigger die.
   Spec.it s "CR 706.1 a modified roll is still one roll of the printed die" $ do

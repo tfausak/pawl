@@ -578,7 +578,7 @@ slotsOf effect = case effect of
   Effect.ChooseOpponentAtRandom _ -> Map.empty
   -- A DEFINITION for the result slot (boundSlots below), but CR 706.2's modifier
   -- is a READ: the instruction's own Quantity may name a slot an earlier effect
-  -- of this same resolution bound (CR 400.7).
+  -- of this same resolution bound, CR 608.2c following the list in written order.
   --
   -- A SHAPE CORRECTION, not a tested behaviour: every modifier in data/cards/ is
   -- a Count naming no slot (Diviner's Portent), so leaving this Map.empty leaves
