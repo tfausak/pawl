@@ -107,9 +107,11 @@ data Modification ability
     -- (ActivatedAbility.name) and joined back here, so the removal survives a
     -- card whose list of abilities is reordered.
     --
-    -- Only an ACTIVATED ability carries a name today, so that is all this
-    -- reaches. Not implemented: naming a triggered or static ability for removal
-    -- (#2134).
+    -- An ACTIVATED ability (ActivatedAbility.name) and a PRINTED REPLACEMENT
+    -- (PrintedReplacement.name) are the two carriers of a name, so those are what
+    -- this reaches: Gliding Licid removes the first, Glittering Lion the second.
+    -- Not implemented: naming a triggered ability, or a static ability whose
+    -- continuous effect is not a replacement, for removal (gap #2212).
     --
     -- Distinct from LoseAllAbilities above, and observably so: a Licid keeps its
     -- other printed ability ("Enchanted creature has flying") while losing the
