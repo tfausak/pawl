@@ -987,7 +987,10 @@ scopeIsSlotless scope = case scope of
   Scope.OverPlayers ref -> playerRefIsSlotless ref
   -- False for PlayerRef.InSlot's reason, one position over: this arm reads a
   -- slot and `slots` above does not report it, so the reported set is not the
-  -- whole of what evaluating the count reads (#1079).
+  -- whole of what evaluating the count reads (#1079). Stated from the rule
+  -- rather than from a test: answering True leaves the suite green, CR 603.3b's
+  -- elision being a trigger-ordering question that nothing in data/cards/ writing
+  -- this scope on a TRIGGERED ability could reach.
   Scope.OverBound _ -> False
 
 -- Does this quantity read CR 601.2b's announced X? Since #14 retired X's
