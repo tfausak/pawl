@@ -3296,6 +3296,103 @@ vanishingSpec s registry =
             (Keyword.mintedReplacementsFor (Keyword.Type.Vanishing (Just 2)) 2)
             (replicate 2 (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Time (Quantity.Type.Literal 2))))))
 
+-- CR 702.63b, vanishing printed with NO number: the two triggers and no entry
+-- replacement at all. Tidewalker {2}{U} Creature -- Elemental */* is the card --
+-- "this creature enters with a time counter on it for each Island you control",
+-- numberless vanishing, and a CR 208.2a characteristic-defining power and
+-- toughness equal to the time counters on it.
+--
+-- ALICE HOLDS THREE ISLANDS AND BOB HOLDS TWO, which is what makes the numbers
+-- readable rather than coincidental: three is not one (a mint that defaulted the
+-- absent N), not zero (an entry rider whose "you" was empty, which CR 704.5f
+-- would then bury as a 0/0 before any upkeep), not five (a filter that dropped
+-- "you control") and not the mana value. The one-Island board every number on
+-- would be 1 cannot tell any of those apart.
+--
+-- The CDA is the reason a second reading is taken AFTER an upkeep: a power set
+-- once on entry and a CR 613.4a ability that re-reads the counters agree at 3/3
+-- and disagree at 2/2.
+numberlessVanishingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+numberlessVanishingSpec s registry =
+  let upkeep = Phase.Beginning BeginningStep.Upkeep
+      -- vanishingSpec's helper, and for its reasons: one upkeep for `pid`, run
+      -- out to the end of the priority loop so the trigger is gathered (CR 603.3)
+      -- and resolved.
+      after pid gs =
+        let began = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep pid)) (gs {GameState.phase = upkeep, GameState.activePlayer = pid})
+            settled = snd (Engine.runGamePure S.identityAnswer began Engine.settleForPriority)
+         in snd (Engine.runGamePure S.identityAnswer settled Engine.priorityLoop)
+      times = S.counterOf CounterKind.Time
+      -- CAST rather than placed, for vanishingSpec's reason: the card's own entry
+      -- replacement is what puts the counters on, and S.addCreature reaches no CR
+      -- 616.1 loop. `swamps` pays the generic half of {2}{U} on the control board,
+      -- where two Islands are one mana short.
+      castTidewalker islands swamps = do
+        island <- S.printingOf s registry "Island"
+        swamp <- S.printingOf s registry "Swamp"
+        tidewalker <- S.printingOf s registry "Tidewalker"
+        let base = S.landsFor swamp S.alice swamps (S.landsFor island S.bob 2 (S.landsInPlay island islands))
+            (held, gs0) = S.addHandCard tidewalker S.alice base
+            gs =
+              gs0
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            entered = S.runPure S.identityAnswer gs (S.cast S.alice held >> Stack.resolveTop)
+        pure (walkerOn entered, entered)
+      walkerOn gs =
+        let named oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack "Tidewalker"))
+         in List.find named (Set.toList (GameState.battlefield gs))
+   in Spec.describe s "Vanishing" $ do
+        Spec.it s "CR 702.63b whole card: Tidewalker counts down the counters its own text put on" $ do
+          (found, entered) <- castTidewalker 3 0
+          case found of
+            Nothing -> Spec.assertFailure s "Tidewalker did not reach the battlefield"
+            Just walker -> do
+              Spec.assertEqWith s "a 3/3 on the entry, alice's three Islands and not bob's two" (S.powerToughnessOf walker entered) (Just (3, 3))
+              Spec.assertEqWith s "three time counters behind it" (times walker entered) 3
+              let first = after S.alice entered
+              Spec.assertEqWith s "a 2/2 after the first upkeep, so CR 613.4a re-read the counters" (S.powerToughnessOf walker first) (Just (2, 2))
+              Spec.assertEqWith s "two counters left" (times walker first) 2
+              let second = after S.alice first
+              Spec.assertEqWith s "a 1/1 after the second" (S.powerToughnessOf walker second) (Just (1, 1))
+              Spec.assertBool s (S.onBattlefield walker second) "and still on the battlefield, which a 0/0 would not be"
+              let third = after S.alice second
+              Spec.assertBool s (not (S.onBattlefield walker third)) "the third upkeep takes the last counter"
+              -- Either road ends here: CR 702.63b's second ability sacrifices it,
+              -- and a 0/0 it briefly is goes the same way under CR 704.5f. CR
+              -- 701.21a makes a sacrifice a move to the OWNER's graveyard.
+              Spec.assertEqWith s "and it is in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice third)) 1
+        -- The pair board, differing in ONE thing: alice holds two Islands instead
+        -- of three (the Swamp only pays the generic half of {2}{U}). Both numbers
+        -- move, which is what says they are read rather than constant.
+        Spec.it s "CR 702.63b one Island fewer is a 2/2 that goes an upkeep sooner" $ do
+          (found, entered) <- castTidewalker 2 1
+          case found of
+            Nothing -> Spec.assertFailure s "Tidewalker did not reach the battlefield"
+            Just walker -> do
+              Spec.assertEqWith s "a 2/2 on the entry" (S.powerToughnessOf walker entered) (Just (2, 2))
+              Spec.assertEqWith s "two time counters" (times walker entered) 2
+              let second = after S.alice (after S.alice entered)
+              Spec.assertBool s (not (S.onBattlefield walker second)) "gone after two upkeeps, where three Islands survived two"
+        -- The mint itself, spelled out for vanishingSpec's reason. Rule 702.63b
+        -- states the SAME two triggers as rule 702.63a and no entry ability, so
+        -- the absent number changes exactly one of the two lists.
+        Spec.it s "CR 702.63b keeps both triggers and mints no entry rewrite" $ do
+          let counted = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn)
+              emptied = TriggerCondition.SelfLastCounterRemoved CounterKind.Time
+          Spec.assertEqWith
+            s
+            "both of rule 702.63a's triggers, numberless"
+            (fmap TriggeredAbility.condition (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Vanishing Nothing) 1)))
+            [counted, emptied]
+          Spec.assertEqWith
+            s
+            "and no entry rewrite, however many instances"
+            (Keyword.mintedReplacementsFor (Keyword.Type.Vanishing Nothing) 2)
+            []
+
 -- CR 702.32 fading, vanishing's neighbour and the reason the two are separate
 -- keywords rather than one with a counter kind on it. Rule 702.32a states TWO
 -- abilities where rule 702.63a states three, and it hangs the sacrifice on an
@@ -4490,6 +4587,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   renownSpec s registry
   arborColossusSpec s registry
   vanishingSpec s registry
+  numberlessVanishingSpec s registry
   fadingSpec s registry
   modularSpec s registry
   tovolarSpec s registry
