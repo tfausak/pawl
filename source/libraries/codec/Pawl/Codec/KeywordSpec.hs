@@ -460,12 +460,25 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
     Common.assertCodec
       s
       Keyword.codec
-      (Keyword.Vanishing 2)
+      (Keyword.Vanishing (Just 2))
       " {\"type\":\"Vanishing\",\"value\":2} "
     Spec.assertBool
       s
-      (Codec.encode Keyword.codec (Keyword.Vanishing 3) /= Codec.encode Keyword.codec (Keyword.Bushido 3))
+      (Codec.encode Keyword.codec (Keyword.Vanishing (Just 3)) /= Codec.encode Keyword.codec (Keyword.Bushido 3))
       "vanishing 3 is not bushido 3"
+  -- CR 702.63b: vanishing printed with NO number, which is hexproof's absent
+  -- "value" key rather than a zero -- Tidewalker's counters come from its own
+  -- text, and vanishing 0 would be a permanent that entered already empty.
+  Spec.it s "Vanishing without CR 702.63b's number" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Vanishing Nothing)
+      " {\"type\":\"Vanishing\"} "
+    Spec.assertBool
+      s
+      (Codec.encode Keyword.codec (Keyword.Vanishing Nothing) /= Codec.encode Keyword.codec (Keyword.Vanishing (Just 0)))
+      "numberless vanishing is not vanishing 0"
   -- CR 702.32a's N is the same kind of number as rule 702.63a's, and the two
   -- keywords differ in more than the counter's name -- so the tag is what keeps
   -- fading 2 from vanishing 2 as well.
@@ -477,7 +490,7 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       " {\"type\":\"Fading\",\"value\":2} "
     Spec.assertBool
       s
-      (Codec.encode Keyword.codec (Keyword.Fading 3) /= Codec.encode Keyword.codec (Keyword.Vanishing 3))
+      (Codec.encode Keyword.codec (Keyword.Fading 3) /= Codec.encode Keyword.codec (Keyword.Vanishing (Just 3)))
       "fading 3 is not vanishing 3"
   Spec.it s "SplitSecond" $
     Common.assertCodec
