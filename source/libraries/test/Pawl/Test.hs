@@ -159,6 +159,7 @@ import qualified Pawl.Codec.FaceSpec
 import qualified Pawl.Codec.FacingSpec
 import qualified Pawl.Codec.FightSpec
 import qualified Pawl.Codec.FilterSpec
+import qualified Pawl.Codec.FlipCoinSpec
 import qualified Pawl.Codec.FloatingCandidateSpec
 import qualified Pawl.Codec.ForEachSpec
 import qualified Pawl.Codec.GameEventSpec
@@ -347,6 +348,7 @@ import qualified Pawl.Codec.ZoneChangeRSpec
 import qualified Pawl.Codec.ZoneChangeSpec
 import qualified Pawl.Codec.ZoneSpec
 import qualified Pawl.CodecIntegrationSpec
+import qualified Pawl.CoinSpec
 import qualified Pawl.ColorSpec
 import qualified Pawl.CombatEffectSpec
 import qualified Pawl.CombatSpec
@@ -515,6 +517,7 @@ spec s registry = do
   Pawl.CaseSpec.spec s registry
   Pawl.ClassSpec.spec s registry
   Pawl.CastSpec.spec s registry
+  Pawl.CoinSpec.spec s registry
   Pawl.Codec.AbilityNameSpec.spec s
   Pawl.Codec.AbilityTriggeredSpec.spec s
   Pawl.Codec.ActivatedAbilitySourceSpec.spec s
@@ -662,6 +665,7 @@ spec s registry = do
   Pawl.Codec.FacingSpec.spec s
   Pawl.Codec.FightSpec.spec s
   Pawl.Codec.FilterSpec.spec s
+  Pawl.Codec.FlipCoinSpec.spec s
   Pawl.Codec.FloatingCandidateSpec.spec s
   Pawl.Codec.ForEachSpec.spec s
   Pawl.Codec.GameEventSpec.spec s

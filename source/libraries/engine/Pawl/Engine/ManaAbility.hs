@@ -197,6 +197,7 @@ manaProduced effect = case effect of
   Effect.ChooseOpponent _ -> Nothing
   Effect.ChooseOpponentAtRandom _ -> Nothing
   Effect.RollDie {} -> Nothing
+  Effect.FlipCoin {} -> Nothing
   Effect.TakeExtraTurn {} -> Nothing
   Effect.ShuffleIntoLibrary {} -> Nothing
   Effect.OfferCast {} -> Nothing
@@ -386,6 +387,7 @@ movesLibraryCard effect = case effect of
   Effect.ChooseOpponent _ -> False
   Effect.ChooseOpponentAtRandom _ -> False
   Effect.RollDie {} -> False
+  Effect.FlipCoin {} -> False
   -- The card is wherever the slot bound it, which the opcode itself never
   -- states. Its one producer is CR 310.12b's exiled Siege, so no library is in
   -- reach; a producer that offered the cast of a card in a library would want

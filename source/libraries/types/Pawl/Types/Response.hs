@@ -7,6 +7,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.Concession as Concession
@@ -73,6 +74,17 @@ data Response
     -- point -- a transcript of a player ANNOUNCING a number must not satisfy a
     -- prompt that asked randomness, which is CR 701.9b's distinction.
     RolledDie Natural.Natural
+  | -- | CR 705.1: the face a flipped coin came up, for Pawl.Types.Effect's
+    -- FlipCoin (Winter Sky's "Flip a coin").
+    --
+    -- Its own constructor rather than CalledCoin reused, though both carry one
+    -- CoinFace: this type's rule at the top, and here the difference is the whole
+    -- point -- a transcript of a player ANNOUNCING a call must not satisfy a
+    -- prompt that asked randomness, which is CR 701.9b's distinction.
+    FlippedCoin CoinFace.CoinFace
+  | -- | CR 705.2: the face the flipping player called -- FlippedCoin's opposite
+    -- number, the announcement rather than the randomness.
+    CalledCoin CoinFace.CoinFace
   | ChoseDiscard [ObjectId.ObjectId]
   | -- | CR 701.22a: the ordered partition a scrying player chose -- the cards
     -- going to the bottom, then the ones staying on top, each in the order the

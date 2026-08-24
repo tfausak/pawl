@@ -24,6 +24,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
+import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost.Type
@@ -591,7 +592,7 @@ combatReplaySpec s =
         Spec.it s "an opponent CHOICE does not decode as a random selection" $ do
           let p = Prompt.RandomOpponent (S.bob NonEmpty.:| [S.carol])
           Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseOpponent S.bob)) Nothing
-        -- The fifth Decider-less prompt: CR 706.1a's die. RandomOpponent's
+        -- Another Decider-less prompt: CR 706.1a's die. RandomOpponent's
         -- reasons, over a RANGE rather than a candidate list.
         Spec.it s "RollDie round-trips through the transcript" $ do
           let p = Prompt.RollDie 20
@@ -607,6 +608,26 @@ combatReplaySpec s =
         -- is what Pawl.Types.Response's own rule forbids (CR 701.9b).
         Spec.it s "an announced X does not decode as a die roll" $
           Spec.assertEqWith s "mismatch" (Replay.decode (Prompt.RollDie 20) (Response.ChoseX 13)) Nothing
+        -- CR 705.1's coin: RollDie's posture with no payload at all, the two
+        -- faces being the whole offer.
+        Spec.it s "FlipCoin round-trips through the transcript" $ do
+          let p = Prompt.FlipCoin
+          Spec.assertEqWith s "heads round trips" (Replay.decode p (Replay.encode p CoinFace.Heads)) (Just CoinFace.Heads)
+          -- Discriminating: a decode that ignored the response and handed back
+          -- the default would pass the heads leg by accident.
+          Spec.assertEqWith s "tails round trips" (Replay.decode p (Replay.encode p CoinFace.Tails)) (Just CoinFace.Tails)
+        Spec.it s "a short transcript flips heads" $
+          Spec.assertEqWith s "heads" (Replay.defaultAnswer Prompt.FlipCoin) CoinFace.Heads
+        -- CR 705.2's call, which unlike the flip IS a choice and so carries a
+        -- Decider. Its own Response constructor for the reason the die's has
+        -- one: a transcript of a player ANNOUNCING a call must not satisfy the
+        -- question that asked randomness (CR 701.9b).
+        Spec.it s "CallCoin round-trips through the transcript" $ do
+          let p = Prompt.CallCoin decider S.alice
+          Spec.assertEqWith s "tails round trips" (Replay.decode p (Replay.encode p CoinFace.Tails)) (Just CoinFace.Tails)
+        Spec.it s "a call does not decode as a flip" $ do
+          Spec.assertEqWith s "call for flip" (Replay.decode Prompt.FlipCoin (Response.CalledCoin CoinFace.Tails)) Nothing
+          Spec.assertEqWith s "flip for call" (Replay.decode (Prompt.CallCoin decider S.alice) (Response.FlippedCoin CoinFace.Tails)) Nothing
         -- CR 507.1 / 703.4h: the defending-player choice round-trips like every
         -- other prompt. NonEmpty because the action only runs when there is at
         -- least one candidate.

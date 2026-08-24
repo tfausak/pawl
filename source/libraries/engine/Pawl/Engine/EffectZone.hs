@@ -177,6 +177,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.ChooseOpponent _ -> Nothing
   Effect.ChooseOpponentAtRandom _ -> Nothing
   Effect.RollDie {} -> Nothing
+  Effect.FlipCoin {} -> Nothing
   Effect.TakeExtraTurn {} -> Nothing
   Effect.ShuffleIntoLibrary {} -> Nothing
   Effect.OfferCast {} -> Nothing

@@ -23,6 +23,7 @@ import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.Keyword as Keyword
@@ -1005,6 +1006,24 @@ data Effect card
     -- The slot is a definition, which Pawl.CardSpec's dataflow lint sees through
     -- Pawl.Engine.Resolve.definedSlots.
     RollDie RollDie.RollDie
+  | -- | CR 705.1: flip a coin, and bind CR 705.2's outcome at the payload's slot
+    -- for a later clause of the same resolution to gate on (Winter Sky's "Flip a
+    -- coin. If you win the flip, ... If you lose the flip, ...").
+    --
+    -- RollDie's posture, one rule over, with CR 705.2's extra half: the flipping
+    -- player CALLS heads or tails first, which is a real choice and so a prompt
+    -- carrying a Pawl.Types.Decider, and then the coin comes up, which is nobody's
+    -- choice and so a prompt carrying neither a Decider nor a PlayerId. The engine
+    -- never flips; it asks, and CR 705.2 compares the two answers.
+    --
+    -- Nobody but the flipping player is involved -- CR 705.2's last sentence -- so
+    -- the payload names no seat, and the flipper is the resolving object's
+    -- controller (CR 109.5's "you"). A card telling ANOTHER player to flip would
+    -- put the seat on Pawl.Types.FlipCoin.
+    --
+    -- The slot is a definition, which Pawl.CardSpec's dataflow lint sees through
+    -- Pawl.Engine.Resolve.definedSlots.
+    FlipCoin FlipCoin.FlipCoin
   | -- | CR 103.5b (Serum Powder): exile every card in the resolving controller's
     -- hand, then draw that many. Targetless and controller-scoped.
     --
