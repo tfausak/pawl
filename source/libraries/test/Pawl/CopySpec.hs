@@ -1072,3 +1072,33 @@ copySpellSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "bob gains only his own 6" (S.lifeOf S.bob after) (Just 26)
         Spec.assertEqWith s "carol gains nothing" (S.lifeOf S.carol after) (Just 20)
         Spec.assertEqWith s "and the stack is empty" (length (GameState.stack after)) 0
+  -- CR 109.5's "you", which the case above cannot reach: Renewed Faith says "you"
+  -- with a PlayerRef the resolution answers from its controller, where Char's
+  -- "and 2 damage to you" says it with the reserved `you` SLOT -- and that slot is
+  -- stamped with the CASTER as the original is cast. CR 707.10 copies the
+  -- decisions and not the caster, so the copy's `you` is alice.
+  --
+  -- bob's Char sends 4 at carol and 2 at bob; alice's copy sends 4 at carol
+  -- (unchanged, CR 707.10c) and 2 at ALICE. carol 12 / bob 18 / alice 18, against
+  -- carol 12 / bob 16 / alice 20 for a copy that kept the caster's `you` -- alice
+  -- and bob differ under the two readings and carol does not, which is the point:
+  -- the TARGET is copied and the "you" is not.
+  Spec.it s "CR 707.10 the copy's own \"you\" is its controller, not the copied spell's caster" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    twincast <- S.printingOf s registry "Twincast"
+    char <- S.printingOf s registry "Char"
+    let lands = S.landsFor mountain S.bob 3 (S.landsFor island S.alice 2 S.threePlayerGame)
+        (withTwincast, twincastId) = S.handOne twincast lands
+        (charId, board) = handAppend char S.bob withTwincast
+        castChar = snd (Engine.runGamePure (pinTarget (Recipient.ToPlayer S.carol)) board (S.cast S.bob charId))
+    case topOfStack castChar of
+      Nothing -> Spec.assertFailure s "Char never reached the stack"
+      Just charSpell -> do
+        let cast = snd (Engine.runGamePure (pinTarget (Recipient.ToObject charSpell)) castChar (S.cast S.alice twincastId))
+            -- Twincast, then the copy (CR 707.10c leaves carol targeted), then
+            -- bob's own Char.
+            after = resolveOne S.identityAnswer (resolveOne S.identityAnswer (resolveOne (pinTarget (Recipient.ToPlayer S.carol)) cast))
+        Spec.assertEqWith s "alice takes the COPY's 2, being the copy's you" (S.lifeOf S.alice after) (Just 18)
+        Spec.assertEqWith s "bob takes only his own Char's 2" (S.lifeOf S.bob after) (Just 18)
+        Spec.assertEqWith s "carol takes 4 from each, the target having been copied" (S.lifeOf S.carol after) (Just 12)
