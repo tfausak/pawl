@@ -103,13 +103,15 @@ data Modification ability
     --
     -- A NAME and not an index, Pawl.Types.ActivatedAbility's own posture: that
     -- type's header rules an index out for Action.Activate, and the same argument
-    -- rules it out here. The name is written on the ability by its own card
-    -- (ActivatedAbility.name) and joined back here, so the removal survives a
-    -- card whose list of abilities is reordered.
+    -- rules it out here. The name is written on the ability by its own card and
+    -- joined back here, so the removal survives a card whose list of abilities is
+    -- reordered.
     --
-    -- Only an ACTIVATED ability carries a name today, so that is all this
-    -- reaches. Not implemented: naming a triggered or static ability for removal
-    -- (#2134).
+    -- An ACTIVATED ability (ActivatedAbility.name) and a PRINTED REPLACEMENT
+    -- (PrintedReplacement.name) are the two carriers of a name, so those are what
+    -- this reaches: Gliding Licid removes the first, Glittering Lion the second.
+    -- Not implemented: naming a triggered ability, or a static ability whose
+    -- continuous effect is not a replacement, for removal (gap #2212).
     --
     -- Distinct from LoseAllAbilities above, and observably so: a Licid keeps its
     -- other printed ability ("Enchanted creature has flying") while losing the
@@ -126,8 +128,8 @@ data Modification ability
     --
     -- Distinct from both removals above, and observably so. LoseAllAbilities
     -- would take the enchanted creature's other abilities with the flying, and
-    -- LoseNamedAbility reaches only an ability the card that prints it named
-    -- (ActivatedAbility.name), which no printed keyword carries.
+    -- LoseNamedAbility reaches only an ability the card that prints it named,
+    -- which no printed keyword carries.
     --
     -- Carries a WRITTEN Keyword rather than a KeywordFamily, which is what the
     -- printings ask for: every one that removes a single keyword names the

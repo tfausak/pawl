@@ -1574,6 +1574,75 @@ jaredCarthalionSpec s registry = Spec.describe s "Jared Carthalion, True Heir (C
         Spec.assertEqWith s "and adds no third counter" (countersOn CounterKind.PlusOnePlusOne jared dethroned) 2
       _ -> Spec.assertFailure s "fixture should hold two Firebolts"
 
+-- CR 613.1f's NAMED removal aimed at a printed PREVENTION ability, whose producer
+-- is Glittering Lion ({2}{W} Creature -- Cat 2/2, Prophecy): "Prevent all damage
+-- that would be dealt to this creature. {3}: Until end of turn, this creature
+-- loses 'Prevent all damage that would be dealt to this creature.' Any player may
+-- activate this ability."
+--
+-- The first sentence is the ability being removed, and CR 614.1 / 615.1 make it a
+-- static ability's continuous effect rather than an activated or a triggered one
+-- -- so the name the second sentence quotes hangs on PrintedReplacement.name,
+-- where Gliding Licid's hangs on ActivatedAbility.name. The two are the whole of
+-- what Modification.LoseNamedAbility reaches.
+--
+-- Not implemented: "Any player may activate this ability", so pawl's Lion asks CR
+-- 602.1a's default and only its controller may activate. Stricter than printed,
+-- and out of these cases' way -- alice activates her own Lion (#2213).
+--
+-- Two seats because the damage needs a source that is not the Lion; three lands
+-- because {3} is the whole cost; a 2-power source against a 2/2 so one number
+-- decides both the prevention and the lethality -- a 1-power source would leave
+-- the Lion alive under either implementation.
+glitteringLionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+glitteringLionSpec s registry = Spec.describe s "Glittering Lion (CR 613.1f)" $ do
+  let board = do
+        plains <- S.printingOf s registry "Plains"
+        lionPrinting <- S.printingOf s registry "Glittering Lion"
+        pikerPrinting <- S.printingOf s registry "Goblin Piker"
+        let base = S.landsInPlay plains 3
+            (lion, g1) = S.addCreature lionPrinting S.alice base
+            (attacker, g2) = S.addCreature pikerPrinting S.bob g1
+        pure (lion, attacker, g2 {GameState.priority = Just S.alice})
+      -- The Piker's 2, as noncombat damage: the printed pattern names no kind, so
+      -- either kind would do, and this is the funnel the Capridor cases above use.
+      hits attacker lion = [DamageEvent.MkDamageEvent attacker (Recipient.ToCreature lion) 2 False False False 0 Nothing DamageKind.Noncombat]
+      -- Damage, then CR 704.3's check -- the zone is what these cases assert, so
+      -- the SBAs have to run or a dead Lion still reads as being on the
+      -- battlefield.
+      dealAndCheck lion attacker gs = S.settleSba (settleDamage S.identityAnswer gs (hits attacker lion))
+  -- The CONTROL, and what stops the case below passing vacuously: a Lion that
+  -- never had the prevention would die on both boards.
+  Spec.it s "CR 614.1 the printed ability prevents the 2 that would otherwise be lethal" $ do
+    (lion, attacker, g) <- board
+    let after = dealAndCheck lion attacker g
+    Spec.assertBool s (S.onBattlefield lion after) "the 2/2 survives 2 damage, because all of it is prevented"
+    Spec.assertEqWith s "with nothing marked on it (CR 615.6)" (S.damageOf lion after) (Just 0)
+  -- THE PROVING CASE. The same board and the same 2 damage, with the Lion's own
+  -- {3} resolved in between. A removal reaching only PC.activatedAbilities leaves
+  -- the prevention standing and the Lion alive -- the two implementations
+  -- disagree about WHERE THE LION IS, which is gameplay level.
+  Spec.it s "CR 613.1f after {3} the Lion loses its own prevention, so the same 2 kills it" $ do
+    (lion, attacker, g) <- board
+    lionPrinting <- S.printingOf s registry "Glittering Lion"
+    case Face.activatedAbilities (S.combinedFace lionPrinting) of
+      [] -> Spec.assertFailure s "Glittering Lion should print one activated ability"
+      ability : _ -> do
+        let activated = S.runPure S.identityAnswer g (Activate.activateAbility S.alice lion ability)
+            resolved = S.runPure S.identityAnswer activated Stack.resolveTop
+            after = dealAndCheck lion attacker resolved
+        -- By NAME and over the whole graveyard, not by the battlefield id: CR
+        -- 111.7's new object means the destroyed Lion is not `lion` any more, and
+        -- the list rules out a graveyard that gained something else instead.
+        Spec.assertEqWith s "CR 704.5g destroys the 2/2, its prevention gone, and the Lion alone is in alice's graveyard" (graveyardNames S.alice after) [CardName.MkCardName (Text.pack "Glittering Lion")]
+        Spec.assertBool s (not (S.onBattlefield lion after)) "so it has left the battlefield"
+        -- The SCOPE of the removal, after the behaviour: the {3} names one
+        -- ability, so the Lion's own activated ability is untouched by it.
+        Spec.assertEqWith s "CR 613.1f and the removal took one ability rather than every one" (length (Projection.abilitiesOf lion resolved)) 1
+        -- CR 602.2b: the {3} was really paid, so the removal above is the
+        -- ability's effect rather than something a free activation produced.
+        Spec.assertEqWith s "CR 602.2b: and the three lands paid for it" (S.tappedCount S.alice resolved) 3
+
 -- CR 615.12's damage that "can't be prevented", whose one producer in the pool
 -- is Spider-Punk ({1}{R} Legendary Creature -- Spider Human Hero 2/1, Marvel's
 -- Spider-Man 92), set against a COUNTDOWN shield, Mending Hands ("Prevent the
@@ -3580,6 +3649,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   inkshieldSpec s registry
   stormwildCapridorSpec s registry
   jaredCarthalionSpec s registry
+  glitteringLionSpec s registry
   spiderPunkSpec s registry
   apnapSpec s registry
   excruciatorSpec s registry

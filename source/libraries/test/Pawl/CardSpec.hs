@@ -6487,6 +6487,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                     [ PrintedReplacement.MkPrintedReplacement
                         Nothing
                         (ReplacementEffect.CounterR (CounterR.MkCounterR (CounterPattern.MkCounterPattern Nothing Nothing ControllerRelation.Yours buried Nothing) (Scaling.AddMore 1)))
+                        Nothing
                     ]
                 }
             ),
@@ -6506,6 +6507,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                             )
                         )
                         (ReplacementEffect.DestructionR DestructionRewrite.Regenerate)
+                        Nothing
                     ]
                 }
             ),
@@ -6904,7 +6906,14 @@ namedRemovals face =
             <> concatMap removals (concatMap stored (cardAuthoredEffects face))
         )
 
--- Every AbilityName a face's activated abilities declare -- the other side of the
--- join above.
+-- Every AbilityName a face declares -- the other side of the join above. Both
+-- carriers of one: an activated ability (Gliding Licid) and a printed
+-- replacement (Glittering Lion). A HAND-KEPT union, so a third carrier added to
+-- Pawl.Types.AbilityName's readers must be added here too, or its cards' names
+-- read as dangling.
 declaredAbilityNames :: Face.Face Card.Type.Card -> Set.Set AbilityName.AbilityName
-declaredAbilityNames = Set.fromList . Maybe.mapMaybe ActivatedAbility.name . Face.activatedAbilities
+declaredAbilityNames face =
+  Set.fromList
+    ( Maybe.mapMaybe ActivatedAbility.name (Face.activatedAbilities face)
+        <> Maybe.mapMaybe PrintedReplacement.name (Face.replacementEffects face)
+    )

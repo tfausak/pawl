@@ -14,6 +14,11 @@ import qualified Pawl.Types.Modal as Modal
 --
 -- An activation cost is a Pawl.Types.Cost, the same type a spell's cost takes
 -- (CR 118.1).
+--
+-- Not implemented: WHO may activate. CR 602.1a's default -- the source's
+-- controller -- is what Pawl.Engine.Activate enforces for every ability here, so
+-- Glittering Lion's "Any player may activate this ability" is absent and that
+-- card runs stricter than printed (#2213).
 data ActivatedAbility card = MkActivatedAbility
   { cost :: Cost.Cost Keyword.Keyword,
     modal :: Modal.Modal card,
