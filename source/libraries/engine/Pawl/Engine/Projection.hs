@@ -244,8 +244,12 @@ layer m = case m of
 -- CR 109.5: a static ability's perspective is its SOURCE's controller, so `src`
 -- supplies both that and the InSlot binding source. A CDA instead builds its
 -- context from the object's own controller (applyCharacteristicPT, CR 604.3a(3)).
-applyModification :: Count.ViewOf -> ObjectId -> GameState -> ObjectId -> Modification -> ProjectedCharacteristics -> ProjectedCharacteristics
-applyModification viewOf src gs oid m pc =
+-- `unitTypes` is CR 613.1's whole-effect answer to CR 205.3d: the card types the
+-- effect this modification is a part of leaves the object with, computed by the
+-- caller over the whole unit before any of it is applied (cardTypesAfter). Every
+-- correspondence question below asks it rather than the fold's running value.
+applyModification :: Count.ViewOf -> ObjectId -> GameState -> ObjectId -> Set CardType.CardType -> Modification -> ProjectedCharacteristics -> ProjectedCharacteristics
+applyModification viewOf src gs oid unitTypes m pc =
   let context = Filter.contextFor (controllerOf src gs) (Just src)
    in case m of
         -- CR 613.1f layer 6: a grant adds an ability, so two grants of the same
@@ -321,7 +325,7 @@ applyModification viewOf src gs oid m pc =
             { PC.power = addPT (PC.power pc) (Quantity.evaluate viewOf context gs oid p),
               PC.toughness = addPT (PC.toughness pc) (Quantity.evaluate viewOf context gs oid t)
             }
-        Modification.AddLandSubtype s -> gainSubtype s pc
+        Modification.AddLandSubtype s -> gainSubtype unitTypes s pc
         -- CR 205.1a/205.1b: setting a subtype replaces only the creature types
         -- (CR 205.3m), strips no abilities and touches no card type. The strip
         -- runs whether or not CR 205.3d then lets the new type in, which no board
@@ -329,34 +333,32 @@ applyModification viewOf src gs oid m pc =
         -- of whose card types correlates with it, so an object this arm refuses
         -- has none to strip.
         Modification.SetCreatureSubtype s ->
-          gainSubtype s pc {PC.subtypes = Set.filter (not . Subtype.isCreatureType) (PC.subtypes pc)}
+          gainSubtype unitTypes s pc {PC.subtypes = Set.filter (not . Subtype.isCreatureType) (PC.subtypes pc)}
         -- CR 205.1b's add: every creature type already present is kept.
-        Modification.AddCreatureSubtype s -> gainSubtype s pc
+        Modification.AddCreatureSubtype s -> gainSubtype unitTypes s pc
         -- The same add over CR 205.3m's whole list (CR 702.73a).
         -- applySubtypeDefining writes the same thing at the start of this layer
         -- (CR 613.3); this runs in timestamp order (CR 613.7).
         Modification.AddEveryCreatureSubtype ->
-          pc {PC.subtypes = Set.union (gainableSubtypes pc Subtype.everyCreatureType) (PC.subtypes pc)}
+          pc {PC.subtypes = Set.union (gainableSubtypes unitTypes Subtype.everyCreatureType) (PC.subtypes pc)}
         -- CR 205.1b's add again, over CR 205.3g's and CR 205.3h's families: the
         -- object keeps every subtype it had. Literally the two adds above, and
         -- deliberately so -- what differs is CR 612.2's gate, which lives on the
         -- constructor rather than here.
-        Modification.AddSubtype s -> gainSubtype s pc
-        Modification.AddCardType t ->
-          pc {PC.cardTypes = Set.insert t (PC.cardTypes pc)}
+        Modification.AddSubtype s -> gainSubtype unitTypes s pc
+        Modification.AddCardType _ ->
+          pc {PC.cardTypes = cardTypesAfter m (PC.cardTypes pc)}
         -- CR 205.1a's set, and the whole of it: the new card type replaces the
         -- existing ones; instant and sorcery survive; and a subtype whose family
         -- correlates with no card type the object now has goes with the type that
         -- carried it. A subtype Pawl.Engine.Subtype cannot classify answers with
         -- the empty set and is kept. No ability clause: CR 205.1a says nothing
         -- about abilities.
-        Modification.SetCardType t ->
-          let kept = Set.filter retainedThroughCardTypeSet (PC.cardTypes pc)
-              types = Set.insert t kept
-           in pc
-                { PC.cardTypes = types,
-                  PC.subtypes = Set.filter (correspondsTo types) (PC.subtypes pc)
-                }
+        Modification.SetCardType _ ->
+          pc
+            { PC.cardTypes = cardTypesAfter m (PC.cardTypes pc),
+              PC.subtypes = Set.filter (correspondsTo unitTypes) (PC.subtypes pc)
+            }
         -- CR 205.4b: a gain inserts into the supertype set. CR 205.4 gives an
         -- object a SET of supertypes, so a second grant does not stack.
         Modification.AddSupertype t ->
@@ -366,7 +368,7 @@ applyModification viewOf src gs oid m pc =
         Modification.RemoveSupertype t ->
           pc {PC.supertypes = Set.delete t (PC.supertypes pc)}
         -- CR 305.7's set, with the type written into card data.
-        Modification.SetLandSubtype s -> setLandSubtypeTo s pc
+        Modification.SetLandSubtype s -> setLandSubtypeTo unitTypes s pc
         -- CR 305.7's set again, with the type read off the source's own entry
         -- choice (CR 614.1c). An unchosen source sets and strips nothing rather
         -- than guessing a type, the posture AddChosenColor takes toward an
@@ -378,7 +380,7 @@ applyModification viewOf src gs oid m pc =
         Modification.SetLandSubtypeToChosen ->
           case Game.lookupObject src gs >>= Object.chosenSubtype of
             Nothing -> pc
-            Just s -> setLandSubtypeTo s pc
+            Just s -> setLandSubtypeTo unitTypes s pc
         -- CR 612.1/612.2: a text-changing effect swaps a subtype word in the type
         -- line, the rules text, the keywords (CR 702.14a) and the CDA (CR 208.2a /
         -- 604.3). Layer 3, so it folds before layer 4, and it reaches nothing a
@@ -427,16 +429,16 @@ applyModification viewOf src gs oid m pc =
 -- direction, so the SetCardType arm asks this too -- one predicate, so a subtype
 -- a card-type set would strip is one a later grant cannot put back.
 --
--- The card types are the ones the fold has produced SO FAR, which is what lets
--- an effect grant the card type and the subtype together: Song of the Dryads,
--- Ashaya, Grist and Life and Limb each list their card-type modifications ahead
--- of the subtypes those types carry, and applyModification folds a static
--- ability's modifications in that order.
---
--- Not implemented: CR 613.1 applies one effect's parts together, so the
--- correspondence should be judged over the whole effect rather than over the
--- part of it the fold has reached; a card naming the subtype ahead of the card
--- type would have the subtype refused (#2041).
+-- CR 613.1 applies one effect's parts together, so the card types this is asked
+-- against are the ones the WHOLE unit gives (cardTypesAfter, threaded through
+-- applyModification's unitTypes), not the ones the fold has reached. That is what
+-- lets an effect grant the card type and the subtype together in either written
+-- order: Song of the Dryads reads "a colorless Forest land" and Life and Limb
+-- "Saproling creatures and Forest lands", each naming the subtype first, and both
+-- are transcribed that way. Proved by Pawl.ProjectionSpec's "CR 205.3d/305.6 Song
+-- of the Dryads' Forest lands on the creature the same effect makes a land" and
+-- "CR 613.1/205.3d Life and Limb's Saproling sticks though the card names it
+-- before the Creature type".
 correspondsTo :: Set CardType.CardType -> Subtype.Type.Subtype -> Bool
 correspondsTo types subtype =
   let family = Subtype.correlatedCardTypes subtype
@@ -447,9 +449,9 @@ correspondsTo types subtype =
 -- regression fence at the creature-type one, where every grant in data/cards
 -- names creatures in its affected set (Turn to Frog, Slivdrazi Monstrosity) or
 -- adds the Creature card type first (Life and Limb, Grist).
-gainSubtype :: Subtype.Type.Subtype -> ProjectedCharacteristics -> ProjectedCharacteristics
-gainSubtype s pc
-  | correspondsTo (PC.cardTypes pc) s = pc {PC.subtypes = Set.insert s (PC.subtypes pc)}
+gainSubtype :: Set CardType.CardType -> Subtype.Type.Subtype -> ProjectedCharacteristics -> ProjectedCharacteristics
+gainSubtype types s pc
+  | correspondsTo types s = pc {PC.subtypes = Set.insert s (PC.subtypes pc)}
   | otherwise = pc
 
 -- The same refusal over a whole set, for the two grants that write CR 205.3m's
@@ -459,8 +461,47 @@ gainSubtype s pc
 -- whole suite green, because neither caller can reach an object CR 205.3d
 -- refuses. Maskwood Nexus names creatures in its affected set, and CR 702.73b
 -- puts changeling on creature and Kindred cards, both of which correlate.
-gainableSubtypes :: ProjectedCharacteristics -> Set Subtype.Type.Subtype -> Set Subtype.Type.Subtype
-gainableSubtypes pc = Set.filter (correspondsTo (PC.cardTypes pc))
+gainableSubtypes :: Set CardType.CardType -> Set Subtype.Type.Subtype -> Set Subtype.Type.Subtype
+gainableSubtypes types = Set.filter (correspondsTo types)
+
+-- The card types one modification leaves an object with, factored out of the two
+-- layer-4 arms above that write them so applyModification's own answer and the
+-- whole-unit answer CR 613.1 needs cannot drift apart.
+--
+-- Exhaustive rather than defaulting, for modificationWrites' reason: a new arm
+-- that wrote card types and was not named here would be silently invisible to CR
+-- 205.3d, and -Werror names it only while the case is total.
+cardTypesAfter :: Modification -> Set CardType.CardType -> Set CardType.CardType
+cardTypesAfter m types = case m of
+  -- CR 205.1b's add: the object keeps the card types it had.
+  Modification.AddCardType t -> Set.insert t types
+  -- CR 205.1a's set: the new type replaces the existing ones bar the two named
+  -- exceptions.
+  Modification.SetCardType t -> Set.insert t (Set.filter retainedThroughCardTypeSet types)
+  Modification.GainKeyword _ -> types
+  Modification.GainEnchant _ -> types
+  Modification.GainAbility _ -> types
+  Modification.LoseAllAbilities -> types
+  Modification.LoseNamedAbility _ -> types
+  Modification.LoseKeyword _ -> types
+  Modification.SetBasePowerToughness {} -> types
+  Modification.ModifyPowerToughness {} -> types
+  Modification.SwitchPowerToughness -> types
+  Modification.SetLandSubtype _ -> types
+  Modification.SetLandSubtypeToChosen -> types
+  Modification.AddLandSubtype _ -> types
+  Modification.SetCreatureSubtype _ -> types
+  Modification.AddCreatureSubtype _ -> types
+  Modification.AddEveryCreatureSubtype -> types
+  Modification.AddSubtype _ -> types
+  Modification.ChangeSubtypeWord {} -> types
+  Modification.AddSupertype _ -> types
+  Modification.RemoveSupertype _ -> types
+  Modification.SetColor _ -> types
+  Modification.AddColor _ -> types
+  Modification.AddChosenColor -> types
+  Modification.SetController _ -> types
+  Modification.SetControllerToSource -> types
 
 -- CR 205.1a's named exception to its own set: instant and sorcery are retained.
 retainedThroughCardTypeSet :: CardType.CardType -> Bool
@@ -483,9 +524,9 @@ retainedThroughCardTypeSet t = t == CardType.Instant || t == CardType.Sorcery
 -- about what happens to a LAND, so an object with no Land card type is left
 -- exactly as it was rather than losing its abilities to a subtype it cannot
 -- gain.
-setLandSubtypeTo :: Subtype.Type.Subtype -> ProjectedCharacteristics -> ProjectedCharacteristics
-setLandSubtypeTo s pc
-  | not (correspondsTo (PC.cardTypes pc) s) = pc
+setLandSubtypeTo :: Set CardType.CardType -> Subtype.Type.Subtype -> ProjectedCharacteristics -> ProjectedCharacteristics
+setLandSubtypeTo types s pc
+  | not (correspondsTo types s) = pc
   | otherwise =
       pc
         { PC.subtypes = Set.insert s (Set.filter (not . Subtype.isLandType) (PC.subtypes pc)),
@@ -1149,7 +1190,7 @@ applyColorDefining pc =
 applySubtypeDefining :: ProjectedCharacteristics -> ProjectedCharacteristics
 applySubtypeDefining pc =
   if definesEveryCreatureType (Map.keysSet (PC.keywords pc))
-    then pc {PC.subtypes = Set.union (gainableSubtypes pc Subtype.everyCreatureType) (PC.subtypes pc)}
+    then pc {PC.subtypes = Set.union (gainableSubtypes (PC.cardTypes pc) Subtype.everyCreatureType) (PC.subtypes pc)}
     else pc
 
 -- CR 202.1b: a land has no mana cost at all, so it contributes no colours.
@@ -3447,7 +3488,16 @@ projectDeciding admits cands = forObject
                 -- order the card lists them (CR 613.6). The ViewOf is the SAME
                 -- for every object the effect reaches, so a count inside it
                 -- cannot see the effect's own work on a sibling.
-                applyUnit viewOf o pc cs = List.foldl' (\p c -> applyModification viewOf (gSource c) gs o (gModification c) p) pc (NonEmpty.toList cs)
+                -- CR 613.1: the parts of one effect apply together, so CR
+                -- 205.3d is asked against the card types the WHOLE unit gives,
+                -- computed before any part of it is applied. That is what lets a
+                -- card name the subtype ahead of the card type that licenses it,
+                -- which is how both Song of the Dryads and Life and Limb are
+                -- printed.
+                applyUnit viewOf o pc cs =
+                  let parts = NonEmpty.toList cs
+                      unitTypes = List.foldl' (\ts c -> cardTypesAfter (gModification c) ts) (PC.cardTypes pc) parts
+                   in List.foldl' (\p c -> applyModification viewOf (gSource c) gs o unitTypes (gModification c) p) pc parts
                 -- Apply one effect, recording its decision the first time.
                 -- Re-inserting an existing key rewrites the value just read.
                 applyOne viewOf o (pc, ds) cs =
@@ -3610,14 +3660,22 @@ projectDeciding admits cands = forObject
                     -- other: CR 613.8 says nothing, CR 613.7 timestamp order
                     -- stands, and judging against `seeded` gives the same answers
                     -- as judging one at a time. Also almost every layer of almost
-                    -- every projection, which is why the fold is tighter here.
+                    -- every projection, which is why the fold is tighter here --
+                    -- the effect's affected set is settled once above rather than
+                    -- per candidate.
+                    --
+                    -- Still grouped into CR 613.6's units, because applyUnit's CR
+                    -- 613.1 question is asked of a whole unit and a flat fold
+                    -- cannot answer it. Grouping AFTER the sort is sound because
+                    -- CR 613.7a gives every part of one ability its source's
+                    -- timestamp and List.sortOn is stable, so gatherStatic's
+                    -- contiguity survives and effectUnits still finds each unit.
                     let decided' = List.foldl' remember decided cands
                         applies c = case gEffect c of
                           Nothing -> affectsGiven bounded (gSource c) oid (gAffected c) seeded gs
                           Just k -> Map.findWithDefault False k decided'
-                        ordered = List.sortOn gTimestamp (filter (\c -> gLayer c == lyr && applies c) cands)
-                        step pc c = applyModification bounded (gSource c) gs oid (gModification c) pc
-                     in (List.foldl' step seeded ordered, decided')
+                        ordered = effectUnits (List.sortOn gTimestamp (filter (\c -> gLayer c == lyr && applies c) cands))
+                     in (List.foldl' (applyUnit bounded oid) seeded ordered, decided')
           (folded, decisions) = List.foldl' applyLayer (copiableCharacteristics oid gs, Map.empty) layers
        in (noncreaturePT oid gs folded, decisions)
 
