@@ -1425,6 +1425,7 @@ library types
     Pawl.Types.PayGate
     Pawl.Types.Payment
     Pawl.Types.PaymentDecision
+    Pawl.Types.PaymentMoment
     Pawl.Types.PayObligation
     Pawl.Types.PendingEntryEffect
     Pawl.Types.PendingTrigger

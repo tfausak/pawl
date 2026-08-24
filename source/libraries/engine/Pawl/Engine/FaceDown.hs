@@ -60,6 +60,7 @@ import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
+import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProposedEvent as ProposedEvent
 import Pawl.Types.TurnUpProcedure (TurnUpProcedure)
@@ -240,7 +241,7 @@ turnFaceUp pid procedure oid = do
     else case costOf procedure oid before of
       Nothing -> pure ()
       Just cost -> do
-        payment <- Cost.pay Nothing ManaSpending.AsProduced pid oid cost
+        payment <- Cost.pay PaymentMoment.OutsideResolution Nothing ManaSpending.AsProduced pid oid cost
         case payment of
           Payment.Unpaid -> State.put before
           -- The payment's bound slots are dropped, Pawl.Engine.Ignore's reason:
