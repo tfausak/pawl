@@ -1519,7 +1519,8 @@ apply batch candidate event =
       -- whole point of the arm: the status is stamped straight onto the object
       -- rather than routed through the tap funnel, so the permanent never
       -- transitions from untapped to tapped and nothing watching for that can
-      -- fire. Stamping the ALREADY-MATERIALIZED incarnation is observationally the same
+      -- fire -- which is CR 603.2e's own sentence about a permanent that enters in
+      -- that state. Stamping the ALREADY-MATERIALIZED incarnation is observationally the same
       -- as minting it tapped, on UnderSourceControl's footing above: runEntry
       -- finishes before the Moved event is recorded, so no trigger scan and no
       -- state-based action can see the interim object.

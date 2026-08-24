@@ -2352,10 +2352,12 @@ payComponent moment pid oid component = case component of
   CostComponent.TapThis -> do
     tapObject oid
     pure bindsNothing
-  -- CR 107.6: a direct edit like TapThis above, not a distinction CR 701.26b
-  -- draws. Nothing in `data/cards/` watches for an untap, so the two routes are
-  -- observationally identical; the first card that triggers on untapping would
-  -- force this through the funnel.
+  -- A direct edit, where TapThis above now goes through Pawl.Engine.Event.tap --
+  -- and rule 701.26b draws no such distinction between the two.
+  --
+  -- Not implemented: an untap funnel, so nothing can watch a permanent become
+  -- untapped and rule 701.26b's "only tapped permanents can be untapped" has no
+  -- place to live (#2236).
   CostComponent.UntapThis -> do
     State.modify' (\gs -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Untapped}) oid (GameState.objects gs)})
     pure bindsNothing
@@ -2419,7 +2421,8 @@ payComponent moment pid oid component = case component of
   --
   -- Reject-not-repair, Sacrifice's posture. The total is summed over the answer
   -- as given, INCLUDING any negative power: CR 702.122a measures the creatures
-  -- that were tapped, not a best case. The tap is a direct edit, TapThis' route.
+  -- that were tapped, not a best case. The tap goes through tapObject, TapThis'
+  -- route, so each one is a becomes-tapped event (CR 701.26a).
   --
   -- Not implemented: CR 702.122b/c's "crews a Vehicle" and "crewed by" relation,
   -- and so CR 702.122e's trigger and CR 702.122d's restriction -- the chosen set
@@ -2442,7 +2445,7 @@ payComponent moment pid oid component = case component of
   -- candidates as the count leaves one legal answer and the prompt is elided,
   -- where a THRESHOLD would have left a choice among subsets.
   --
-  -- Reject-not-repair, Sacrifice's posture again; the tap is a direct edit,
+  -- Reject-not-repair, Sacrifice's posture again; the tap goes through tapObject,
   -- TapThis' route.
   --
   -- Binds Binding.tappedPermanent, the second component to bind a slot at all
