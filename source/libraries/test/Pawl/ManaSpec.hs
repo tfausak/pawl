@@ -3850,6 +3850,39 @@ interchangeableSourcesSpec s registry = Spec.describe s "Interchangeable mana so
     Spec.assertBool s paid "the {G} was paid"
     Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
 
+  -- The Bonesplitter case above is caught twice over, and this is the one that is
+  -- caught ONLY by Object.attachedTo: Betrayal ({U} Enchantment -- Aura, "Enchant
+  -- creature an opponent controls / Whenever enchanted creature becomes tapped,
+  -- you draw a card.") has no static ability at all, so the Elf it enchants
+  -- projects exactly like the two beside it -- and tapping THAT one for mana hands
+  -- the Aura's controller a card.
+  --
+  -- Under BOB, which is where the printed enchant clause puts it: alice is his
+  -- opponent, and it is his card the tap would draw.
+  --
+  -- This is what turns Pawl.Engine.Interchangeable.namedByAnother's attachment arm
+  -- from a regression fence into a proved behaviour. Until a trigger condition
+  -- watched a tap, every rider in data/cards changed what it was attached to and
+  -- the projection refused the pair before that line was reached.
+  Spec.it s "CR 601.2g an Elf enchanted by an Aura that changes nothing about it is still a candidate of its own" $ do
+    elf <- S.printingOf s registry "Llanowar Elves"
+    betrayal <- S.printingOf s registry "Betrayal"
+    let (elves, plain) = elfBoard elf 3
+        (aura, enchanted) = S.addCreature betrayal S.bob plain
+        board = S.attach aura (NonEmpty.head elves) enchanted
+        (offers, paid, after) = greenWindow board
+    Spec.assertEqWith s "asked once, with the enchanted Elf beside the two that are alike" (fmap length offers) [2]
+    -- What makes this case the attachment arm's own: the projection cannot tell
+    -- the three apart, so nothing but Object.attachedTo separates them. AFTER the
+    -- assertion above, so it cannot absorb a mutation aimed at that arm.
+    Spec.assertEqWith
+      s
+      "and the three Elves project identically, power, toughness and abilities alike"
+      (fmap (\oid -> (S.powerToughnessOf oid board, length (Projection.triggeredAbilitiesOf oid board))) (NonEmpty.toList elves))
+      (replicate 3 (Just (1, 1), 0))
+    Spec.assertBool s paid "the {G} was paid"
+    Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
+
   -- Object.doesNotUntapNext, which Elvish Hunter writes. Nothing about the Elf's
   -- characteristics changes, so this is the case a projection-only test would
   -- collapse: tapping the frozen Elf costs nothing, tapping either other one

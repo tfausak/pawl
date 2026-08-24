@@ -1075,13 +1075,12 @@ tapCandidates pid oid criterion gs =
 tapPower :: ObjectId -> GameState -> Integer
 tapPower candidate gs = Maybe.fromMaybe 0 (Projection.powerOf candidate gs)
 
--- CR 701.26a: tap one permanent. A direct edit and not a funnel -- see
--- payComponent's TapThis arm -- shared by every component that taps, so an
--- Event.tap would have one call site to move.
+-- CR 701.26a: tap one permanent, through Pawl.Engine.Event's funnel so that
+-- paying a tap cost is a becomes-tapped event like any other route. Shared by
+-- every component that taps -- see payComponent's TapThis arm -- which is what
+-- gave all of them the event for one call.
 tapObject :: ObjectId -> Game ()
-tapObject target =
-  State.modify'
-    (\gs -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) target (GameState.objects gs)})
+tapObject = Event.tap
 
 -- What this component SPENDS out of a pool of objects: which resource it draws
 -- on (Pawl.Types.ClaimAxis), which objects are in that pool, and how many it
@@ -2353,10 +2352,12 @@ payComponent moment pid oid component = case component of
   CostComponent.TapThis -> do
     tapObject oid
     pure bindsNothing
-  -- CR 107.6: a direct edit like TapThis above, not a distinction CR 701.26b
-  -- draws. Nothing in `data/cards/` watches for an untap, so the two routes are
-  -- observationally identical; the first card that triggers on untapping would
-  -- force this through the funnel.
+  -- A direct edit, where TapThis above now goes through Pawl.Engine.Event.tap --
+  -- and rule 701.26b draws no such distinction between the two.
+  --
+  -- Not implemented: an untap funnel, so nothing can watch a permanent become
+  -- untapped and rule 701.26b's "only tapped permanents can be untapped" has no
+  -- place to live (#2236).
   CostComponent.UntapThis -> do
     State.modify' (\gs -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Untapped}) oid (GameState.objects gs)})
     pure bindsNothing
@@ -2420,7 +2421,8 @@ payComponent moment pid oid component = case component of
   --
   -- Reject-not-repair, Sacrifice's posture. The total is summed over the answer
   -- as given, INCLUDING any negative power: CR 702.122a measures the creatures
-  -- that were tapped, not a best case. The tap is a direct edit, TapThis' route.
+  -- that were tapped, not a best case. The tap goes through tapObject, TapThis'
+  -- route, so each one is a becomes-tapped event (CR 701.26a).
   --
   -- Not implemented: CR 702.122b/c's "crews a Vehicle" and "crewed by" relation,
   -- and so CR 702.122e's trigger and CR 702.122d's restriction -- the chosen set
@@ -2443,7 +2445,7 @@ payComponent moment pid oid component = case component of
   -- candidates as the count leaves one legal answer and the prompt is elided,
   -- where a THRESHOLD would have left a choice among subsets.
   --
-  -- Reject-not-repair, Sacrifice's posture again; the tap is a direct edit,
+  -- Reject-not-repair, Sacrifice's posture again; the tap goes through tapObject,
   -- TapThis' route.
   --
   -- Binds Binding.tappedPermanent, the second component to bind a slot at all

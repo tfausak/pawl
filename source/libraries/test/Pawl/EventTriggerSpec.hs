@@ -69,6 +69,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.SlotName as SlotName
@@ -4412,6 +4413,185 @@ handNames pid gs =
     | oid <- Game.zoneMembers Zone.Hand pid gs
     ]
 
+-- CR 701.26a's "becomes tapped", over a whole card. Betrayal ({U} Enchantment --
+-- Aura, "Enchant creature an opponent controls / Whenever enchanted creature
+-- becomes tapped, you draw a card.", checked against Scryfall on 2026-08-24) is
+-- the cheapest printing whose whole text box is that one trigger, so nothing but
+-- the condition and the event under it is on trial.
+--
+-- It is the FUNNEL that this group exists to prove. Before it there was no tap
+-- funnel at all: five sites wrote Object.tapped directly, and a GameEvent arm
+-- with nothing appending it would have been inert. Two of the five must stay
+-- direct, which CR 603.2e states outright -- a permanent that ENTERS tapped never
+-- transitioned -- and the enters-tapped leg below is what pins that.
+--
+-- THREE SEATS, and the two that matter are different players: alice controls the
+-- enchanted attacker, carol controls the Aura, bob is the defending player. CR
+-- 109.5 makes the trigger's "you" the controller of the object when it triggered,
+-- and that object is the AURA -- so carol draws, not alice. Two seats would put
+-- the Aura's controller and the defending player on one seat and could not tell a
+-- defender-anchored reading apart from CR 109.5's.
+--
+-- TWO attackers on alice's side, only one of them enchanted, and this is what
+-- makes the "enchanted" half of the condition falsifiable: both tap in the same
+-- CR 508.1f action, so a matcher that ignored Object.attachedTo would draw carol
+-- two cards rather than one. Carol's library holds three Islands so that one draw,
+-- two draws and a CR 104.3c deck-out are three distinguishable outcomes.
+betrayalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+betrayalSpec s registry = Spec.describe s "CR 701.26a a becomes-tapped trigger" $ do
+  -- The gameplay-level proof, and the leg that pins CR 508.1f's route in
+  -- particular: "attacking simply causes creatures to become tapped", so the
+  -- declaration has to reach the same funnel a cost or an effect does.
+  Spec.it s "CR 508.1f whole card: declaring the enchanted creature as an attacker draws the AURA's controller a card" $ do
+    board <- betrayalBoard s registry True
+    case board of
+      ([enchanted, bare], _, gs) -> do
+        let after = S.runCombat (S.attackTo S.bob) gs
+        Spec.assertEqWith s "CR 109.5 carol, who controls the Aura, drew exactly one card" (handNames S.carol after) ["Island"]
+        Spec.assertEqWith s "and alice, who controls the tapped creature, drew none" (handNames S.alice after) []
+        -- The preconditions the count above rests on, AFTER it so neither can
+        -- absorb a mutation aimed at the funnel or the matcher.
+        Spec.assertEqWith s "CR 508.1f both attackers really became tapped" (fmap (`tapStatusOf` after) [enchanted, bare]) [Just TapState.Tapped, Just TapState.Tapped]
+        Spec.assertEqWith s "so the ONE draw is the attachment link's doing and not the tap's" (S.tappedCount S.alice after) 2
+      _ -> Spec.assertFailure s "fixture should give alice exactly two attackers"
+  -- The pair's other half, and the leg that pins WHICH permanent the condition is
+  -- about: the same board, and the tap goes to the creature the Aura does NOT
+  -- enchant. One thing differs, and it is the only thing the matcher reads.
+  Spec.it s "CR 303.4b tapping a creature the Aura does not enchant draws nothing" $ do
+    board <- betrayalBoard s registry True
+    case board of
+      ([enchanted, bare], _, gs) -> do
+        let after = settleAndResolve (S.runPure S.identityAnswer gs (Event.tap bare))
+        Spec.assertEqWith s "CR 303.4b carol's hand is still empty" (handNames S.carol after) []
+        Spec.assertEqWith s "though that creature really did become tapped" (tapStatusOf bare after) (Just TapState.Tapped)
+        Spec.assertEqWith s "and the enchanted one, untouched, did not" (tapStatusOf enchanted after) (Just TapState.Untapped)
+      _ -> Spec.assertFailure s "fixture should give alice exactly two attackers"
+  -- CR 704.5m, and the reason an unattached Aura is NOT the negative to build
+  -- here: it never gets to watch anything, because the state-based action buries
+  -- it before the combat starts. Asserted rather than assumed, so the empty hand
+  -- below is not read as evidence about the matcher.
+  Spec.it s "CR 704.5m an unattached Betrayal is buried before it can watch a tap" $ do
+    board <- betrayalBoard s registry False
+    case board of
+      ([enchanted, _], aura, gs) -> do
+        let after = S.runCombat (S.attackTo S.bob) gs
+        Spec.assertBool s (not (S.onBattlefield aura after)) "CR 704.5m the Aura attached to nothing is off the battlefield"
+        Spec.assertEqWith s "so carol drew nothing" (handNames S.carol after) []
+        Spec.assertEqWith s "though the same creature still became tapped" (tapStatusOf enchanted after) (Just TapState.Tapped)
+      _ -> Spec.assertFailure s "fixture should give alice exactly two attackers"
+  -- CR 701.26a's second sentence, "only untapped permanents can be tapped", and
+  -- the reason the funnel needs a guard it did not need as a bare assignment: the
+  -- write is idempotent and the EVENT is not. The divergence is a COUNT rather
+  -- than a time, so the exact hand is asserted -- both readings agree on "more
+  -- than nothing".
+  Spec.it s "CR 701.26a tapping the enchanted creature a second time is no event and draws nothing more" $ do
+    board <- betrayalBoard s registry True
+    case board of
+      ([enchanted, _], _, gs) -> do
+        let once = settleAndResolve (S.runPure S.identityAnswer gs (Event.tap enchanted))
+            twice = settleAndResolve (S.runPure S.identityAnswer gs (Event.tap enchanted >> Event.tap enchanted))
+        Spec.assertEqWith s "CR 701.26a the second tap drew nothing: one card, not two" (handNames S.carol twice) ["Island"]
+        Spec.assertEqWith s "which is what one tap already drew" (handNames S.carol once) ["Island"]
+        Spec.assertEqWith s "and the creature is tapped either way" (fmap (tapStatusOf enchanted) [once, twice]) [Just TapState.Tapped, Just TapState.Tapped]
+      _ -> Spec.assertFailure s "fixture should give alice exactly two attackers"
+  -- CR 603.2e: "An ability that triggers when a permanent 'becomes tapped' ...
+  -- doesn't trigger if the permanent enters the battlefield in that state." The
+  -- pair is the same board under the two writes -- Event.enterTapped, which
+  -- Pawl.Engine.Resolve.putTapped mirrors, against Event.tap -- so the only thing
+  -- that differs is which one the engine used.
+  Spec.it s "CR 603.2e a permanent stamped tapped as it enters fires nothing" $ do
+    board <- betrayalBoard s registry True
+    case board of
+      ([enchanted, _], _, gs) -> do
+        let entered = settleAndResolve (S.runPure S.identityAnswer gs (Event.enterTapped enchanted))
+            tapped = settleAndResolve (S.runPure S.identityAnswer gs (Event.tap enchanted))
+        Spec.assertEqWith s "CR 603.2e carol drew nothing off the entering stamp" (handNames S.carol entered) []
+        Spec.assertEqWith s "though the very same tap through the funnel draws her a card" (handNames S.carol tapped) ["Island"]
+        Spec.assertEqWith s "and both left the creature tapped, so the boards differ in nothing else" (fmap (tapStatusOf enchanted) [entered, tapped]) [Just TapState.Tapped, Just TapState.Tapped]
+      _ -> Spec.assertFailure s "fixture should give alice exactly two attackers"
+  -- CR 608.2f's route into the funnel, through a real resolving spell: Dream's
+  -- Grip ({U} Instant, "Choose one -- Tap target permanent; or untap target
+  -- permanent." plus Entwine {1}) is the cheapest printing whose first mode is a
+  -- bare Effect.Tap, so what is on trial is that opcode reaching Event.tap.
+  --
+  -- TWO seats here and not three: this leg is about the route, and CR 109.5's
+  -- "you" is already settled by the combat leg above. bob holds the Aura on
+  -- alice's Piker, so it is his library the draw comes out of and alice's spell
+  -- that does the tapping.
+  Spec.it s "CR 608.2f a resolving Tap effect goes through the same funnel and draws" $ do
+    island <- S.printingOf s registry "Island"
+    grip <- S.printingOf s registry "Dream's Grip"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    betrayal <- S.printingOf s registry "Betrayal"
+    let (pikerId, gs1) = S.addCreature piker S.alice (S.landsInPlay island 2)
+        (auraId, gs2) = S.addCreature betrayal S.bob gs1
+        gs3 = snd (S.addLibraryCard mountain S.bob (snd (S.addLibraryCard mountain S.bob (S.attach auraId pikerId gs2))))
+        (board, spellId) = S.handOne grip gs3
+        cast = S.runPure (aimEveryTargetAt pikerId) board (S.cast S.alice spellId)
+        after = settleAndResolve (S.runPure (aimEveryTargetAt pikerId) cast Stack.resolveTop)
+    Spec.assertEqWith s "CR 608.2f the Aura's controller drew off the spell's tap" (handNames S.bob after) ["Mountain"]
+    Spec.assertEqWith s "and the spell really tapped the enchanted creature" (tapStatusOf pikerId after) (Just TapState.Tapped)
+  -- CR 701.19a's other route into the funnel: "instead remove all damage marked
+  -- on it and its controller taps it". A regeneration is a tap like any other, and
+  -- the shield is what makes the destruction not happen.
+  Spec.it s "CR 701.19a regenerating the enchanted creature taps it, and that draws too" $ do
+    board <- betrayalBoard s registry True
+    case board of
+      ([enchanted, _], _, gs) -> do
+        let shielded = S.addRegenShield enchanted gs
+            after = settleAndResolve (S.runPure S.identityAnswer shielded (Event.destroy Regenerability.Regenerable [enchanted]))
+        Spec.assertEqWith s "CR 701.19a carol drew off the regeneration's tap" (handNames S.carol after) ["Island"]
+        Spec.assertBool s (S.onBattlefield enchanted after) "the shield really stopped the destruction"
+        Spec.assertEqWith s "and the regenerated creature really is tapped" (tapStatusOf enchanted after) (Just TapState.Tapped)
+      _ -> Spec.assertFailure s "fixture should give alice exactly two attackers"
+
+-- alice attacks with two settled Goblin Pikers, carol holds the Aura, bob defends
+-- with nothing. The FIRST Piker is the one the Aura enchants when `attached`.
+--
+-- Carol's library holds three Islands and alice's one Mountain, so every count
+-- below is a real count rather than a CR 104.3c loss, and `handNames` says WHOSE
+-- library a card came out of.
+betrayalBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m ([ObjectId.ObjectId], ObjectId.ObjectId, GameState.GameState)
+betrayalBoard s registry attached = do
+  piker <- S.printingOf s registry "Goblin Piker"
+  betrayal <- S.printingOf s registry "Betrayal"
+  mountain <- S.printingOf s registry "Mountain"
+  island <- S.printingOf s registry "Island"
+  let (base, mine, _, _) = S.threePlayerCombat [piker, piker] [] []
+      stocked = Foldable.foldl' (\g _ -> snd (S.addLibraryCard island S.carol g)) (snd (S.addLibraryCard mountain S.alice base)) [1 :: Int, 2, 3]
+      (auraId, withAura) = S.addCreature betrayal S.carol stocked
+      board = case mine of
+        enchanted : _ | attached -> S.attach auraId enchanted withAura
+        _ -> withAura
+  pure (mine, auraId, board)
+
+-- Put whatever triggered on the stack (CR 603.3) and resolve the stack down, so a
+-- board that fired TWO triggers reads differently from one that fired one. A
+-- reading taken with the triggers still on the stack could not tell them apart at
+-- gameplay level.
+settleAndResolve :: GameState.GameState -> GameState.GameState
+settleAndResolve gs0 =
+  let go n g =
+        if n <= (0 :: Int) || null (GameState.stack g)
+          then g
+          else go (n - 1) (S.runPure S.identityAnswer g Stack.resolveTop)
+   in go 8 (S.runPure S.identityAnswer gs0 Engine.settleForPriority)
+
+-- Every target slot a modal spell offers, aimed at one permanent. Dream's Grip
+-- offers one slot per chosen mode and only one mode is chosen here, so the map is
+-- a single entry; a hand-built Recipient would be a different recipient from the
+-- offered one (CR 608.2b), which is why this rewrites the OFFER.
+aimEveryTargetAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimEveryTargetAt oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
+  _ -> S.identityAnswer p
+
+-- The tap status of one object, Nothing where it is not on the board at all --
+-- which a precondition assertion must be able to say apart from "untapped".
+tapStatusOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
+tapStatusOf oid gs = fmap Object.tapped (Game.lookupObject oid gs)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   discardTriggerSpec s registry
@@ -4452,3 +4632,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   rayOfCommandSpec s registry
   brambleElementalSpec s registry
   sixthSenseSpec s registry
+  betrayalSpec s registry

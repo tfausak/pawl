@@ -381,15 +381,48 @@ payLife pid n gs =
 -- they leave on the board.
 --
 -- ENTERS TAPPED, not "enters, then is tapped". The status goes straight onto the
--- object rather than through the tap funnel, so the permanent never transitions
--- from untapped to tapped and nothing watching for that can fire. See the arms in
--- `apply` for why stamping the already-materialized incarnation is
+-- object rather than through `tap` below, so the permanent never transitions from
+-- untapped to tapped and nothing watching for that can fire. That is CR 603.2e in
+-- as many words: an ability that triggers when a permanent "becomes tapped"
+-- doesn't trigger if the permanent enters the battlefield in that state. See the
+-- arms in `apply` for why stamping the already-materialized incarnation is
 -- observationally the same as minting it tapped.
 enterTapped :: ObjectId -> Game ()
 enterTapped oid =
   State.modify' $ \gs ->
     let stamp obj = obj {Object.tapped = TapState.Tapped}
      in gs {GameState.objects = Map.adjust stamp oid (GameState.objects gs)}
+
+-- CR 701.26a: turn one permanent sideways from an upright position, and record
+-- that it did. The single funnel every route that taps goes through --
+-- Pawl.Engine.Cost.tapObject for a cost component, Pawl.Engine.Resolve's
+-- Effect.Tap opcode, CR 508.1f's attacker declaration in
+-- Pawl.Engine.Combat.declareAttackers, and CR 701.19a's regeneration in `apply`
+-- below -- so that a card watching for a tap sees every one of them.
+--
+-- Rule 701.26a's SECOND sentence is the guard: "only untapped permanents can be
+-- tapped", so an already-tapped permanent is left alone and nothing is recorded.
+-- The write on its own is idempotent and the guard would be redundant for it; the
+-- EVENT is not, and CR 603.2e's "they don't ... retrigger if it persists" is
+-- exactly what a second record would break.
+--
+-- What does NOT come through here is a permanent entering the battlefield tapped
+-- (`enterTapped` above, and Pawl.Engine.Resolve.putTapped) -- CR 603.2e's other
+-- sentence, and the reason those two stay direct writes.
+--
+-- CR 110.5 makes tapped a PERMANENT's status, which every caller above already
+-- has: a cost's tap candidates, an attacker, a regenerating permanent and the
+-- Effect.Tap opcode's victims are all on the battlefield.
+tap :: ObjectId -> Game ()
+tap oid = do
+  gs <- State.get
+  case Game.lookupObject oid gs of
+    Just obj
+      | Object.tapped obj == TapState.Untapped ->
+          State.put
+            . recordEvent (GameEvent.BecameTapped oid)
+            $ gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects gs)}
+    _ -> pure ()
 
 -- The zone change an event describes, if it is one.
 movedOf :: GameEvent -> Maybe ZoneChange
@@ -442,6 +475,7 @@ movedOf event = case event of
   GameEvent.Exerted _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
+  GameEvent.BecameTapped _ -> Nothing
 
 -- The damage an event describes, if it is any.
 damageOf :: GameEvent -> Maybe DamageEvent
@@ -488,6 +522,7 @@ damageOf event = case event of
   GameEvent.Exerted _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
+  GameEvent.BecameTapped _ -> Nothing
 
 -- Who revealed what, if the event is a reveal (CR 701.20a).
 revealOf :: GameEvent -> Maybe (PlayerId, PC.ProjectedCharacteristics)
@@ -534,6 +569,7 @@ revealOf event = case event of
   GameEvent.Exerted _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
+  GameEvent.BecameTapped _ -> Nothing
 
 -- CR 117.5: the events the trigger scan has not yet consumed, WITH the
 -- EventGroup each belongs to. Only eventTriggers wants the groups; every other
@@ -1483,7 +1519,8 @@ apply batch candidate event =
       -- whole point of the arm: the status is stamped straight onto the object
       -- rather than routed through the tap funnel, so the permanent never
       -- transitions from untapped to tapped and nothing watching for that can
-      -- fire. Stamping the ALREADY-MATERIALIZED incarnation is observationally the same
+      -- fire -- which is CR 603.2e's own sentence about a permanent that enters in
+      -- that state. Stamping the ALREADY-MATERIALIZED incarnation is observationally the same
       -- as minting it tapped, on UnderSourceControl's footing above: runEntry
       -- finishes before the Moved event is recorded, so no trigger scan and no
       -- state-based action can see the interim object.
@@ -1754,10 +1791,18 @@ apply batch candidate event =
     (ReplacementEffect.DestructionR rewrite, ProposedEvent.WouldBeDestroyed oid _ _) -> case rewrite of
       DestructionRewrite.Regenerate -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
-        State.modify' $ \gs ->
-          let healTap obj = obj {Object.damage = 0, Object.tapped = TapState.Tapped}
-              healed = gs {GameState.objects = Map.adjust healTap oid (GameState.objects gs)}
-           in Game.removeFromCombat oid healed
+        -- Rule 701.19a's three instructions in the order it prints them: remove
+        -- all marked damage, tap it, then remove it from combat. The ORDER is
+        -- observable now that the middle one records an event -- a trigger
+        -- gathered off the tap reads the board as it stands, and doing the combat
+        -- removal first would show it a creature already out of combat.
+        --
+        -- Three statements rather than one write because `tap` is a Game action;
+        -- the funnel is what makes a regeneration a becomes-tapped event like any
+        -- other route.
+        State.modify' (\gs -> gs {GameState.objects = Map.adjust (\obj -> obj {Object.damage = 0}) oid (GameState.objects gs)})
+        tap oid
+        State.modify' (Game.removeFromCombat oid)
         pure Nothing
       -- CR 122.1c: "instead remove a shield counter from it". The destruction does
       -- not happen, and NONE of regeneration's own work above does either --
@@ -4039,6 +4084,7 @@ countersRemovedFrom bearer wanted event = case event of
   GameEvent.Exerted _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
+  GameEvent.BecameTapped _ -> Nothing
   GameEvent.Moved {} -> Nothing
   GameEvent.DamageDealt _ -> Nothing
   GameEvent.DamagePrevented {} -> Nothing
@@ -4134,6 +4180,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 603.6a's "whenever a [type] enters": a permanent the Filter admits
   -- entered the battlefield. The bearer frames the match rather than being it --
   -- it is the Filter.Context's source (so `Not IsSource` is Soul Warden's
@@ -4204,6 +4251,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 603.2b: this step began, on a turn the scope admits.
   TriggerCondition.StepBegins (StepBegins.MkStepBegins wanted scope) -> case event of
     GameEvent.StepBegan (StepBegan.MkStepBegan began active) ->
@@ -4249,6 +4297,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 603.8: a state trigger is not an event trigger. It never matches an entry
   -- in the log; stateTriggers below is its whole story.
   TriggerCondition.StateIs _ -> False
@@ -4300,6 +4349,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 120.3: the bearer was DEALT damage -- enrage's event. The arm above with the
   -- identity check moved from the event's SOURCE to its RECIPIENT.
   --
@@ -4355,6 +4405,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- The same event read by a BYSTANDER (CR 510.1b / 510.2): a permanent the Filter
   -- admits dealt combat damage to a player. The Filter reads the event's DAMAGER,
   -- the bearer contributing only CR 109.5's "you" and the Filter.Context's source
@@ -4418,6 +4469,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 725.2: never matched via a card's bearer -- the monarch's crown-steal is
   -- an inherent ability of no object, so its real match lives in
   -- Pawl.Engine.Monarch.inherentMatch, not here.
@@ -4482,6 +4534,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 702.94a: the bearer IS the card that was revealed, and the reveal was
   -- miracle's own. SelfCycled's shape one rule over, cause and all -- and for the
   -- same reason: the same card shown by an ordinary reveal reaches the same log
@@ -4548,6 +4601,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 701.9a: the bearer IS the card that was discarded. SelfCycled's shape
   -- above with the CAUSE dropped, which is the whole difference between the two:
   -- CR 702.29a makes cycling a discard, so "when you discard this card" fires on
@@ -4601,6 +4655,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 701.9a: a card was discarded, by a player the relation admits. The
   -- discarding player comes from the event; CR 109.5 fixes "you" as the
   -- ability's controller (CR 603.3a), and PlayerRelation.holds is what each arm
@@ -4662,6 +4717,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- The discard arm above narrowed by the CAUSE, which is the whole of the
   -- difference: CR 702.29a makes cycling a discard, so an ordinary discard
   -- reaches the same log through the same funnel and must fire nothing here.
@@ -4720,6 +4776,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 121.1: a card was DRAWN, by a player the relation admits, and it was that
   -- player's `nth` draw of the turn. The ordinal comes off the event, which
   -- Event.drawCard stamped from GameState.drawsThisTurn as the draw happened;
@@ -4778,6 +4835,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 725.1: a player BECAME the monarch. Matched against the event the
   -- crowning records, so every route through CR 725.1's "an effect instructs a
   -- player to become the monarch" fires it alike: Effect.BecomeMonarch records
@@ -4835,6 +4893,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 508.3a: the bearer was DECLARED as an attacker. Matched against the
   -- declaration event rather than Combat.attackers, which keeps that rule's last
   -- sentence true -- a creature put onto the battlefield attacking is in the
@@ -4893,6 +4952,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 702.149a: the bearer was declared as an attacker, and at least one OTHER
   -- attacking creature satisfies the Filter. SelfAttacks' event and its identity
   -- check, with an existential over the rest of the declaration added.
@@ -4963,6 +5023,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 506.5: a creature the Filter admits was declared as an attacker, and it
   -- was the ONLY one the declaration named. The same event SelfAttacks reads,
   -- with the count taken instead of the bearer's identity.
@@ -5022,6 +5083,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 508.3a's second sentence: some creature was declared as an attacker, and CR
   -- 508.5's defending player for it is the bearer's controller. SelfAttacks' event
   -- with the identity check moved from the ATTACKER to the DEFENDER.
@@ -5080,6 +5142,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 508.3d: the player the payload names declared one or more attackers. The
   -- once-per-DECLARATION arity, matched against the once-per-declaration event --
   -- CreatureAttacksYou above reads the per-attacker one and
@@ -5113,6 +5176,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- attacker.
   TriggerCondition.PlayerAttacks relation -> case event of
     GameEvent.AttackersDeclared attacker -> PlayerRelation.holds relation you attacker
+    GameEvent.BecameTapped _ -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BecameBlocking {} -> False
     GameEvent.BlocksDeclared {} -> False
@@ -5192,6 +5256,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
                   && maybe False (\view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f) (Projection.viewWithLastKnown oid gs oid)
            in any admits (Set.toList (Combat.declaredAttackers combat))
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BecameBlocking {} -> False
     GameEvent.BlocksDeclared {} -> False
@@ -5294,6 +5359,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 702.105a: the bearer was declared attacking A PLAYER, and no player still in
   -- the game has more life than that one. SelfAttacks' event and its identity
   -- check, with the comparison added.
@@ -5358,6 +5424,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 509.3a: the bearer was DECLARED as a blocker. SelfAttacks' mirror, and
   -- matched against GameEvent.BlocksDeclared for that arm's reason -- CR 509.4's
   -- creature put onto the battlefield blocking is in Combat.blockers, and the
@@ -5417,6 +5484,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 509.3b: the PAIRWISE event, which is that rule's "once for each attacking
   -- creature the creature with the ability blocks" -- and the difference from
   -- SelfBlocks above, together with the attacker eventBindings stamps under
@@ -5488,6 +5556,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 509.3e: the bearer blocked at least `n` creatures. SelfBlocks with the
   -- count read, on the very same grouped event -- which is what makes rule
   -- 509.3e's "when blockers are declared" the moment this fires.
@@ -5537,6 +5606,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 509.3e: the bearer blocked at least one creature the Filter admits. The
   -- same grouped event SelfBlocks and SelfBlocksAtLeast read, so the printed "one
   -- or more" fires once for the whole declaration; SelfBlocksCreature's arm above
@@ -5602,6 +5672,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 509.3c: the bearer BECAME a blocked creature, which CR 509.1h makes the
   -- declaration's other product. SelfBlocks' arm above is the mirror.
   --
@@ -5657,6 +5728,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 509.3d: a creature the Filter admits became a blocking creature FOR the
   -- bearer. The pair on GameEvent.BecameBlocking is read from the ATTACKING
   -- side, which is what makes this fire once per blocker where
@@ -5723,6 +5795,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 509.3e read from the attacking side: the bearer became blocked, by at
   -- least one creature the Filter admits. The GROUPED event, which is the printed
   -- "one or more" -- the arm above fires once per blocker, and two admitted
@@ -5779,6 +5852,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 509.3e read by a BYSTANDER on the attacking side: a creature attacking a
   -- player the PlayerRelation admits became blocked by at least `n` creatures.
   -- The arm above with its Filter traded for a count, and the identity check on
@@ -5847,6 +5921,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 509.1h: the bearer became an UNBLOCKED creature, which the glossary's
   -- "attacks and isn't blocked" entry sends here. SelfBecomesBlocked's arm above
   -- is the other branch of the same turn-based action, and no attacker can
@@ -5900,6 +5975,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 603.6: a zone-change trigger matched on BOTH ends of the move, library to
   -- graveyard. The bearer is the incarnation the card became on arrival per CR
   -- 400.7e, a graveyard being public (CR 400.2). The pair is also what makes CR
@@ -5953,6 +6029,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 603.6 with NO origin zone: the destination is the whole condition, so a
   -- discard, a mill, a countered spell and a death all match. `from` is
   -- deliberately unread, which is the one line separating this from the two
@@ -6009,6 +6086,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 603.6c narrowed by CR 700.4's definition of "dies": the bearer was put into
   -- a graveyard from the battlefield. Both ends are load-bearing -- `from` keeps a
   -- permanent DISCARDED out of a hand silent, and `to` keeps one EXILED off the
@@ -6065,6 +6143,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- The same rule and zone pair as SelfDies, watched by a BYSTANDER. The bearer
   -- frames the match rather than being it, as for PermanentEnters: it is the
   -- Filter.Context's source (so `Not IsSource` is "another"), and its controller
@@ -6134,6 +6213,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 700.4's "dies" once more, asked of the permanent the bearer is attached
   -- to: PermanentDies' battlefield-to-graveyard pair, matched on
   -- ZoneChange.departed for that arm's reason (CR 603.10a), against the host id
@@ -6161,6 +6241,71 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
                 Just obj -> Object.attachedTo obj
                 Nothing -> LastKnown.attachedTo =<< Map.lookup bearer (GameState.lastKnown gs)
            in (Recipient.objectOf =<< hostOfBearer) == Just (ZoneChange.departed zc)
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+  -- CR 701.26a's tap, asked of the permanent the bearer is attached to
+  -- (Betrayal's "whenever enchanted creature becomes tapped"). The event names
+  -- whichever permanent turned sideways; Object.attachedTo says whether that is
+  -- this bearer's host.
+  --
+  -- CR 603.2e's exclusions are discharged where the event is MINTED, in `tap`
+  -- above, rather than here: a permanent that entered tapped never transitioned,
+  -- and rule 701.26a's "only untapped permanents can be tapped" makes a repeat tap
+  -- no event at all. So this arm asks only whose tap it was.
+  --
+  -- The host is read through Recipient.objectOf, AttachedCreatureDies' route for
+  -- CR 303.4's other destination: an Aura enchanting a PLAYER has no host id to
+  -- compare and answers False, as does one attached to nothing.
+  --
+  -- LIVE only, where AttachedCreatureDies falls back on CR 608.2h last known
+  -- information. That fallback is load-bearing there because CR 704.5m buries the
+  -- Aura in the same SBA batch as its host; here the host is still standing -- it
+  -- has just become tapped -- so the link is on the board to be read.
+  TriggerCondition.AttachedCreatureBecomesTapped -> case event of
+    GameEvent.BecameTapped tapped ->
+      let hostOfBearer = Object.attachedTo =<< Game.lookupObject bearer gs
+       in (Recipient.objectOf =<< hostOfBearer) == Just tapped
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -6236,6 +6381,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
@@ -6296,6 +6442,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.Exerted _ -> False
           GameEvent.BecameAttacked _ -> False
           GameEvent.AttackersDeclared _ -> False
+          GameEvent.BecameTapped _ -> False
           GameEvent.DamageDealt _ -> False
           GameEvent.StepBegan {} -> False
           GameEvent.SpellCast {} -> False
@@ -6387,6 +6534,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 701.6a: a spell was countered, by a spell or ability whose controller the
   -- relation admits. The countering source's controller comes from the event,
   -- captured as the counter happened, and CR 109.5/603.3a fix "you" as the
@@ -6443,6 +6591,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 615.13: a prevention effect was applied and prevented some damage, and the
   -- damage it prevented was addressed to a player the relation admits. CR 109.5 /
   -- 603.3a fix "you" as the ability's controller, exactly as PlayerDiscards and
@@ -6508,6 +6657,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 119.9: a source caused a player the relation admits to gain life. The
   -- gaining player comes from the event; CR 109.5 / 603.3a fix "you" as the
   -- ability's controller, exactly as PlayerDiscards, SpellOrAbilityCounters and
@@ -6569,6 +6719,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- A player the relation admits LOST life -- Exquisite Blood's "whenever an
   -- opponent loses life". The losing player comes from the event; CR 109.5 /
   -- 603.3a fix "you" as the ability's controller, exactly as PlayerGainsLife
@@ -6635,6 +6786,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 714.2b: counters of this kind were put onto the BEARER, and the count
   -- crossed N going up. Both halves of the rule's sentence are here -- see
   -- Pawl.Types.TriggerCondition.SelfCountersReached for why the intervening "if"
@@ -6667,6 +6819,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.DamagePrevented {} -> False
@@ -6779,6 +6932,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -6851,6 +7005,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 601.2c, self-scoped: the object that became a target IS the bearer, a bare
   -- comparison of ids in SelfCast's shape and for its reason -- nothing about the
   -- targeting spell is read, so no projection can come up empty.
@@ -6877,6 +7032,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
     GameEvent.SpellCast {} -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew {} -> False
@@ -6940,6 +7096,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
     GameEvent.SpellCast {} -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew {} -> False
@@ -7004,6 +7161,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -7060,6 +7218,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -7118,6 +7277,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -7192,6 +7352,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -7244,6 +7405,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -7302,6 +7464,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -7348,6 +7511,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
     -- The event the RULE distinguishes this condition from: +1/+1 counters arriving
     -- say nothing about what put them, which is why rule 702.149c needs a marker at
     -- all.
@@ -7403,6 +7567,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -7467,6 +7632,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -7519,6 +7685,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
     GameEvent.CountersPut {} -> False
     -- CR 700.4 again, from this side: a sacrifice DOES record a Moved event, and
     -- matching it here would answer twice for one sacrifice.
@@ -7606,6 +7773,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -7660,6 +7828,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -7711,6 +7880,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.PermanentSacrificed {} -> False
@@ -7792,6 +7962,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 701.25d, the arm above's twin and Matoya, Archon Elder's other branch.
   -- A surveil that put nothing into a graveyard matches, which is what a
   -- condition built on CR 701.25a's zone changes could not do.
@@ -7838,6 +8009,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 702.170a / 702.170c: the bearer's own card became plotted. Self-scoped, so the
   -- match is the id and nothing else -- and the id the event carries is the
   -- CR 400.7 incarnation in exile, which is the bearer here because
@@ -7886,6 +8058,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 701.44b: a permanent the Filter admits completed an explore.
   -- Wildgrowth Walker's "a creature you control" describes the EXPLORER, so
   -- the bearer only frames the match: it is the Filter.Context's source and
@@ -7943,6 +8116,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 701.43d / 607.2h: the BEARER was exerted. SelfEvolves' arm above, line
   -- for line: CR 701.43a records the event only for the permanent actually
   -- exerted, so WHOSE exert it was is the whole question, and CR 607.2h's
@@ -7991,6 +8165,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted oid -> oid == bearer
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
   -- CR 701.3a read from the HOST: something became attached to the BEARER, and
   -- the Filter narrows WHAT. Two questions, and the split is the condition's
   -- shape -- a bare id comparison for the host (SelfEnters' arm) and a Filter
@@ -8055,6 +8230,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
 
 -- CR 603.3b: is this trigger condition "another ability triggering"? The
 -- classification the rule's two-part placement turns on -- False puts a trigger
@@ -8185,6 +8361,9 @@ reactsToAbilityTriggering cond = case cond of
   -- CR 700.4's zone change is a first-pass event too, and not an ability
   -- triggering.
   TriggerCondition.AttachedCreatureDies -> False
+  -- CR 701.26a's tap is a first-pass event as well, and not an ability
+  -- triggering.
+  TriggerCondition.AttachedCreatureBecomesTapped -> False
   TriggerCondition.PermanentSacrificed -> False
 
 -- CR 603.2: the bindings the EVENT contributes to a trigger it has just fired --
@@ -8603,6 +8782,11 @@ eventBindings bearerBecame cond event = case (cond, event) of
   -- slot.
   (TriggerCondition.AttachedCreatureDies, _) ->
     maybe Map.empty (`Binding.setBecame` Map.empty) bearerBecame
+  -- Nothing at all, stated rather than left to the fallthrough below: the
+  -- attachment link already names the permanent that became tapped, and CR 109.5
+  -- answers the Aura's "you" from Binding.triggerSource. There is no second
+  -- object for the payload to name.
+  (TriggerCondition.AttachedCreatureBecomesTapped, _) -> Map.empty
   -- CR 725.1's newly crowned player: Garland, Royal Kidnapper's "that player",
   -- whose creature the trigger then targets and whose crown its duration watches.
   -- Bound whichever relation matched, for the reason the PlayerLosesLife arm
@@ -9056,6 +9240,10 @@ eventBindingSlots cond = case cond of
   -- SelfLeavesTheBattlefield's floor, where a BOUNCE is an ordinary printed
   -- destination and the slot's absence is an ordinary printed case (#505).
   TriggerCondition.AttachedCreatureDies -> Set.singleton Binding.became
+  -- Empty, and for the opposite reason to the arm above: nothing MOVED, so there
+  -- is no arrival for a payload to find. The tapped permanent is still the one
+  -- Object.attachedTo names.
+  TriggerCondition.AttachedCreatureBecomesTapped -> Set.empty
   -- Empty for SelfEvolves' reason and not for AttachedCreatureMentors' -- rule
   -- 702.149a's counter goes on the bearer, so Savior of Ollenbock's "this creature"
   -- is Binding.triggerSource and the event names nobody else.
@@ -9201,6 +9389,12 @@ looksBack condition = case condition of
   -- triggers when a permanent leaves the battlefield, so the rule reaches the
   -- ability however the bearer is found.
   TriggerCondition.AttachedCreatureDies -> True
+  -- Not on CR 603.10a's list at all: that rule names leaves-the-battlefield
+  -- abilities, sacrifices, cards leaving a graveyard and objects put into a hand
+  -- or library, and a permanent becoming tapped is none of them. It stays on the
+  -- battlefield, so the ordinary CR 603.10 reading -- the board as it is now --
+  -- is the right one.
+  TriggerCondition.AttachedCreatureBecomesTapped -> False
   -- CR 603.10a's first family again, read off the event rather than off the
   -- bearer: this triggers when a permanent leaves the battlefield. Inert today --
   -- the bearer is a card in exile, which no look-back source can offer -- but a
@@ -9512,6 +9706,7 @@ eventTriggers events gs =
         GameEvent.Exerted _ -> Map.empty
         GameEvent.BecameAttacked _ -> Map.empty
         GameEvent.AttackersDeclared _ -> Map.empty
+        GameEvent.BecameTapped _ -> Map.empty
         GameEvent.Moved {} -> Map.empty
         GameEvent.DamageDealt _ -> Map.empty
         GameEvent.DamagePrevented {} -> Map.empty
@@ -9744,6 +9939,7 @@ eventTriggers events gs =
         GameEvent.Exerted _ -> Map.empty
         GameEvent.BecameAttacked _ -> Map.empty
         GameEvent.AttackersDeclared _ -> Map.empty
+        GameEvent.BecameTapped _ -> Map.empty
       -- CR 113.6k and CR 113.6m: every card in every graveyard carrying at least
       -- one ability those rules put there. The one source that widens the SCANNED
       -- ZONE rather than recovering an object an event names, which is why the
@@ -9943,6 +10139,7 @@ eventTriggers events gs =
         GameEvent.Exerted _ -> Map.empty
         GameEvent.BecameAttacked _ -> Map.empty
         GameEvent.AttackersDeclared _ -> Map.empty
+        GameEvent.BecameTapped _ -> Map.empty
       -- CR 114.4 / CR 113.6p: "abilities of emblems function in the command zone".
       -- The third source that widens the SCANNED ZONE rather than recovering an
       -- object an event names, so it is computed once outside the event loop as
@@ -10060,6 +10257,7 @@ eventTriggers events gs =
         GameEvent.Exerted _ -> Map.empty
         GameEvent.BecameAttacked _ -> Map.empty
         GameEvent.AttackersDeclared _ -> Map.empty
+        GameEvent.BecameTapped _ -> Map.empty
       forOne event (oid, (ctrl, abilities)) =
         let -- The bearer's own slot environment, so a condition naming a slot
             -- (TriggerCondition.LoseControlOfBound) is read the same way here as it
@@ -10169,6 +10367,10 @@ zoneFunctionedFrom ability =
 enchantedObjectLeaves :: TriggerCondition -> Bool
 enchantedObjectLeaves condition = case condition of
   TriggerCondition.AttachedCreatureDies -> True
+  -- False, stated rather than left to the wildcard: this watches the SAME
+  -- attachment link, but for an event that leaves the enchanted permanent right
+  -- where it was, so CR 113.6m's Aura clause has nothing to exempt.
+  TriggerCondition.AttachedCreatureBecomesTapped -> False
   TriggerCondition.AnyOf conditions -> any enchantedObjectLeaves conditions
   _ -> False
 
@@ -10306,6 +10508,10 @@ zonesTriggeredFrom cond = case cond of
   -- clause, read by zoneFunctionedFrom above, which is why this arm is reached
   -- for Screams from Within at all.
   TriggerCondition.AttachedCreatureDies -> battlefield
+  -- The same default for the same reason, and more plainly: an Aura enchanting a
+  -- permanent is itself a permanent on the battlefield, and CR 113.6k's exception
+  -- is for a condition that cannot trigger from there at all.
+  TriggerCondition.AttachedCreatureBecomesTapped -> battlefield
   -- The same default from the training creature's own side: rule 702.149a's ability
   -- fires on an attack, so its bearer is on the battlefield and CR 113.6k's
   -- exception -- for a condition that cannot trigger from there at all -- does not
@@ -10557,6 +10763,10 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.AttachedCreatureMentors -> False
   -- CR 303.4 names no turn either: an enchanted creature can die on anyone's.
   TriggerCondition.AttachedCreatureDies -> False
+  -- Nor does CR 701.26a: an enchanted creature can be tapped on anyone's turn,
+  -- and Betrayal's whole point is that the Aura's controller is not the tapping
+  -- creature's.
+  TriggerCondition.AttachedCreatureBecomesTapped -> False
   -- Rule 702.149c names no turn either, and the SelfAttacks arm below settles the
   -- consequence: CR 508.1a makes the training happen on the ACTIVE player's turn,
   -- which is not CR 109.5's "you" -- a stolen creature trains on its thief's turn.
@@ -10852,6 +11062,11 @@ stateTriggers gs
               -- CR 700.4's death is an EVENT, and the board afterwards cannot
               -- say which permanent an Aura in a graveyard used to enchant.
               TriggerCondition.AttachedCreatureDies -> False
+              -- CR 701.26a's tap is an EVENT too. A tapped enchanted permanent is
+              -- a state the board can read, which is exactly why this must be
+              -- False: CR 603.2e says a "becomes" condition does not retrigger
+              -- while the state persists, and a state trigger would do nothing but.
+              TriggerCondition.AttachedCreatureBecomesTapped -> False
               -- CR 702.149c the same: it fires on a resolution, and the counter
               -- that resolution put is a counter like any other, so the board
               -- afterwards says nothing about which creature trained.
