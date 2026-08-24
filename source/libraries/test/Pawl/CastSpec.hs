@@ -4024,6 +4024,11 @@ teferiSorcerySpeedSpec s registry = Spec.describe s "Teferi, Mage of Zhalfir" $ 
     Spec.assertBool s (not (casting S.bob bobBolt board)) "bob may not cast an instant in alice's main phase"
     Spec.assertBool s (not (casting S.carol carolBolt board)) "and neither may carol, the third seat"
     Spec.assertBool s (casting S.alice aliceBolt board) "while alice, who controls Teferi, is no opponent of her own"
+    -- The SAME control at a moment alice is outside CR 307.5's window, which is
+    -- what tells PlayerScope.Opponents from PlayerScope.EachPlayer: on bob's turn
+    -- her own instant is still hers to cast, and an EachPlayer carrier would take
+    -- it away.
+    Spec.assertBool s (casting S.alice aliceBolt (bobsTurn board)) "and still is on bob's turn, where the clause would bite if it reached her"
     Spec.assertBool s (casting S.bob bobBolt (bobsTurn board)) "and bob's own main phase with an empty stack still admits it"
     -- CR 307.5's third conjunct, which the two boards above share and so cannot
     -- separate: his own main phase is not enough while something is on the stack.
@@ -4039,6 +4044,19 @@ teferiSorcerySpeedSpec s registry = Spec.describe s "Teferi, Mage of Zhalfir" $ 
         offered gs = elem (A.Cast bobBolt (S.printingName bolt) Facing.FaceUp) (offeredTo S.bob gs)
     Spec.assertBool s (offered open) "no Teferi, so the instant is legal"
     Spec.assertBool s (not (offered (addTeferi teferi open))) "and the one permanent is the whole difference"
+  -- CR 305.1: the clause narrows CASTING, and playing a land is a special action
+  -- that never uses the stack, so Teferi stops no land. bob's own turn is the
+  -- moment that shows it -- CR 305.3 forbids a land play on anyone else's turn,
+  -- so a board on alice's turn could not tell the two readings apart -- and this
+  -- is what gives prohibitsPlayingLand's arm an observer.
+  Spec.it s "CR 305.1 the clause stops no land play" $ do
+    teferi <- S.printingOf s registry "Teferi, Mage of Zhalfir"
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (_, _, _, open) = teferiSorceryBoard mountain bolt
+        (bobLand, stocked) = S.addHandCard mountain S.bob open
+        board = (addTeferi teferi stocked) {GameState.activePlayer = S.bob}
+    Spec.assertBool s (elem (A.Play bobLand Nothing) (offeredTo S.bob board)) "bob may still play a land with Teferi standing"
   -- THE OTHER PATH, and the reason the clause is read in prohibitsCasting rather
   -- than conjoined onto Cast.timingOk: Cast.castableWhileSearching asks
   -- castableWhenOffered, which omits timingOk on purpose (CR 601.3's timing limb
