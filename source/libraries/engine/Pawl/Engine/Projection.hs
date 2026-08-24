@@ -169,6 +169,7 @@ widenModification m = case m of
   Modification.GainEnchant x -> Modification.GainEnchant x
   Modification.LoseAllAbilities -> Modification.LoseAllAbilities
   Modification.LoseNamedAbility n -> Modification.LoseNamedAbility n
+  Modification.LoseKeyword k -> Modification.LoseKeyword k
   Modification.SetBasePowerToughness x -> Modification.SetBasePowerToughness x
   Modification.ModifyPowerToughness x -> Modification.ModifyPowerToughness x
   Modification.SetLandSubtype x -> Modification.SetLandSubtype x
@@ -205,6 +206,10 @@ layer m = case m of
   -- CR 613.1f again, and the same layer as the wipe above: what differs is the
   -- SCOPE of the removal, never when it applies.
   Modification.LoseNamedAbility _ -> Layer.Ability
+  -- CR 613.1f a third time: the removal that names a rule-702 keyword sits in
+  -- the same layer as the grant it undoes, so CR 613.7's timestamp is the only
+  -- thing that decides which of the two the object ends up with.
+  Modification.LoseKeyword _ -> Layer.Ability
   Modification.SetBasePowerToughness {} -> Layer.SetPT
   Modification.ModifyPowerToughness {} -> Layer.ModifyPT
   Modification.SetLandSubtype _ -> Layer.Type
@@ -286,6 +291,13 @@ applyModification viewOf src gs oid m pc =
         -- keywords, not the CDA -- because the clause names one ability.
         Modification.LoseNamedAbility n ->
           pc {PC.activatedAbilities = filter ((/= Just n) . ActivatedAbility.name) (PC.activatedAbilities pc)}
+        -- CR 613.1f layer 6: the mirror of GainKeyword above. A DELETE and not a
+        -- decrement: the clause takes the ABILITY away, and the CR has no
+        -- removal that spends one instance of one, so every grant standing at
+        -- this point in the timestamp order goes together. A later grant puts it
+        -- back, which is CR 613.7 and not this arm.
+        Modification.LoseKeyword k ->
+          pc {PC.keywords = Map.delete k (PC.keywords pc)}
         Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) ->
           pc
             { PC.power = setPT (PC.power pc) (Quantity.evaluate viewOf context gs oid p),
@@ -1209,6 +1221,7 @@ freezeQuantities gs announcedOn source context m =
         Modification.GainAbility _ -> Just m
         Modification.LoseAllAbilities -> Just m
         Modification.LoseNamedAbility _ -> Just m
+        Modification.LoseKeyword _ -> Just m
         Modification.SetLandSubtype _ -> Just m
         Modification.SetLandSubtypeToChosen -> Just m
         Modification.AddLandSubtype _ -> Just m
@@ -1243,6 +1256,7 @@ quantitiesOf m = case m of
   Modification.GainAbility _ -> []
   Modification.LoseAllAbilities -> []
   Modification.LoseNamedAbility _ -> []
+  Modification.LoseKeyword _ -> []
   Modification.SetLandSubtype _ -> []
   Modification.SetLandSubtypeToChosen -> []
   Modification.AddLandSubtype _ -> []
@@ -1301,6 +1315,7 @@ setsLandSubtype m = case m of
   Modification.ChangeSubtypeWord {} -> False
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _ -> False
+  Modification.LoseKeyword _ -> False
   Modification.SetBasePowerToughness {} -> False
   Modification.ModifyPowerToughness {} -> False
   Modification.SwitchPowerToughness -> False
@@ -1533,6 +1548,14 @@ rewriteModificationWith rewriteAbility pairs m =
         Modification.LoseAllAbilities -> acc
         -- Names an ABILITY of the same card, which is no subtype word.
         Modification.LoseNamedAbility _ -> acc
+        -- CR 612.3 through the removal's own keyword, exactly as GainKeyword
+        -- above: "loses islandwalk" is text printed on the REMOVER, so a text
+        -- change affecting it swaps the land-type word before the removal is
+        -- read. Scarwood Hag's "loses forestwalk" is the printing that carries
+        -- one, and it is not in the pool: Sky Tether's flying is the only
+        -- keyword any card here removes, so this arm is a regression fence where
+        -- the hacked Lord of Atlantis proves the grant above.
+        Modification.LoseKeyword k -> Modification.LoseKeyword (Filter.rewriteKeyword [(from, to)] k)
         Modification.SwitchPowerToughness -> acc
         -- CR 612.1 through both boxes: a Quantity.Count carries a Filter, so a
         -- hacked Aspect of Wolf counts the new type. rewriteQuantity is the same
@@ -2675,6 +2698,15 @@ removesAbilities m = case m of
   -- CR 613.1f: a removal that names one ability is a removal all the same, so CR
   -- 613.9's dependency between a grant and a wipe sees it too.
   Modification.LoseNamedAbility _ -> True
+  -- FALSE, and the one removal arm that answers so. This gate is not CR 613.1f's
+  -- classification: it asks whether the affected object's ABILITIES stop
+  -- existing, so that gatherStatic can drop what they would have generated. A
+  -- keyword removal takes one rule-702 keyword out of the projected map and
+  -- leaves every static, activated and triggered ability the object has, so
+  -- nothing it generates is gated -- Sky Tether's host keeps talking. The
+  -- keyword itself needs no gate here: it lives in the map this fold writes, and
+  -- every reader downstream reads the fold's answer.
+  Modification.LoseKeyword _ -> False
   Modification.GainKeyword _ -> False
   -- A grant, the other direction of CR 613.1f, exactly as GainKeyword above and
   -- GainAbility below.
@@ -3064,9 +3096,10 @@ filterReads f = case f of
 
 -- Which aspects a Modification writes -- the other half of the pair above.
 --
--- The arms that write Keywords: GainKeyword, GainEnchant and LoseAllAbilities per
--- CR 613.1f, both subtype-setting arms per CR 305.7, and ChangeSubtypeWord per CR
--- 612.1, a text change reaching the land type inside a landwalk keyword.
+-- The arms that write Keywords: GainKeyword, LoseKeyword, GainEnchant and
+-- LoseAllAbilities per CR 613.1f, both subtype-setting arms per CR 305.7, and
+-- ChangeSubtypeWord per CR 612.1, a text change reaching the land type inside a
+-- landwalk keyword.
 --
 -- ChangeSubtypeWord also rewrites PC.characteristicPT, deliberately not PowerA:
 -- this asks what a modification writes IN ITS OWN LAYER, and the rewritten CDA
@@ -3092,6 +3125,12 @@ modificationWrites m = case m of
   -- behaviour: no board in the pool makes another effect's affected set depend on
   -- a named removal, so Set.empty here leaves the suite green.
   Modification.LoseNamedAbility _ -> Set.singleton Keywords
+  -- Writes ProjectedCharacteristics.keywords, which Filter.HasKeyword reads --
+  -- the same answer GainKeyword gives above, the removal being the same write. A
+  -- REGRESSION FENCE rather than a proved behaviour: no board in the pool makes
+  -- another effect's affected set depend on a keyword this arm took away, so
+  -- Set.empty here leaves the suite green.
+  Modification.LoseKeyword _ -> Set.singleton Keywords
   Modification.SetBasePowerToughness {} -> Set.singleton PowerA
   Modification.ModifyPowerToughness {} -> Set.singleton PowerA
   Modification.SwitchPowerToughness -> Set.singleton PowerA
@@ -3136,6 +3175,8 @@ modificationReads m = case m of
   Modification.LoseAllAbilities -> Set.empty
   -- Carries a name, which is not a Quantity.
   Modification.LoseNamedAbility _ -> Set.empty
+  -- Carries a Keyword, whose own Filter is read where the keyword is matched.
+  Modification.LoseKeyword _ -> Set.empty
   Modification.SwitchPowerToughness -> Set.empty
   Modification.SetLandSubtype _ -> Set.empty
   Modification.SetLandSubtypeToChosen -> Set.empty
@@ -3860,6 +3901,8 @@ grantsKeywordWhere p m = case m of
   Modification.GainAbility _ -> False
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _ -> False
+  -- Takes a keyword AWAY, which is the opposite of what this asks.
+  Modification.LoseKeyword _ -> False
   Modification.SetBasePowerToughness {} -> False
   Modification.ModifyPowerToughness {} -> False
   Modification.SetLandSubtype _ -> False

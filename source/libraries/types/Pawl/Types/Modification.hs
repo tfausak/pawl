@@ -18,9 +18,9 @@ import qualified Pawl.Types.TargetSlot as TargetSlot
 -- CORE, Pawl.Engine.Projection is the sole module that may case on a
 -- constructor -- the same standing Pawl.Engine.Resolve has over Effect.
 -- Pawl.CardSpec's lints also case on it, legitimately: a test-suite lint that
--- walks the card pool is not rules core. GainKeyword carries a Keyword, a
--- closed-half CITATION, so casing on it is not an invariant violation; and
--- GainAbility carries a whole open-half ability that nothing cases on beyond CR
+-- walks the card pool is not rules core. GainKeyword and LoseKeyword carry a
+-- Keyword, a closed-half CITATION, so casing on it is not an invariant
+-- violation; and GainAbility carries a whole open-half ability that nothing cases on beyond CR
 -- 113.3's ability KIND -- the projection appends it to one of two lists, and
 -- every reader downstream treats it as any other ability. The P/T arms carry
 -- records of signed Quantity. The layer-4 arms below reach card types, subtypes
@@ -115,6 +115,29 @@ data Modification ability
     -- other printed ability ("Enchanted creature has flying") while losing the
     -- one it activated, which a wipe gets wrong in both directions.
     LoseNamedAbility AbilityName.AbilityName
+  | -- | layer 6, CR 613.1f: this object loses this rule-702 keyword -- Sky
+    -- Tether's "enchanted creature has defender and loses flying", the clause an
+    -- Aura or Equipment prints beside a drawback.
+    --
+    -- The MIRROR of GainKeyword above, and a closed-half CITATION for the same
+    -- reason: the payload is a Keyword, which rule 702 defines, so casing on it
+    -- is the act CLAUDE.md licenses rather than the effect-identity case it
+    -- forbids.
+    --
+    -- Distinct from both removals above, and observably so. LoseAllAbilities
+    -- would take the enchanted creature's other abilities with the flying, and
+    -- LoseNamedAbility reaches only an ability the card that prints it named
+    -- (ActivatedAbility.name), which no printed keyword carries.
+    --
+    -- Carries a WRITTEN Keyword rather than a KeywordFamily, which is what the
+    -- printings ask for: every one that removes a single keyword names the
+    -- instance, payload and all -- "loses flying", "loses defender", "loses
+    -- protection from black" (Cephalid Snitch), "loses forestwalk" (Scarwood
+    -- Hag) -- so a family designator would be a second spelling of the same
+    -- removal, the objection KeywordFamily's own header raises against widening
+    -- HasKeyword. Not implemented: removing a whole family, which Hammerheim's
+    -- "loses all landwalk abilities" is the printing for (#2203).
+    LoseKeyword Keyword.Keyword
   | SetBasePowerToughness SetBasePowerToughness.SetBasePowerToughness -- layer 7b (Humility 1/1; Opalescence mana value)
   | ModifyPowerToughness ModifyPowerToughness.ModifyPowerToughness -- layer 7c (Giant Growth +3/+3)
   | SetLandSubtype Subtype.Subtype -- layer 4, CR 305.7 set (Blood Moon -> Mountain)
