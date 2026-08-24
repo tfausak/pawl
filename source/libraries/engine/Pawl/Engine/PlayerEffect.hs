@@ -798,8 +798,9 @@ prohibitsBecomingMonarch pid gs =
    in any (prohibits . snd) (applying pid gs)
 
 -- CR 201.4: the card names chosen for this effect's source, as it entered (CR
--- 614.1c) or while it resolved (CR 608.2c) -- Object.chosenNames. Empty for an effect with no source -- a stored CR 611.2c
--- row -- and for a permanent that chose nothing.
+-- 614.1c) or while it resolved (CR 608.2c) -- Object.chosenNames. Empty for an
+-- effect with no source -- a stored CR 611.2c row -- and for a permanent that
+-- chose nothing.
 --
 -- The empty set is the answer that matches NO object rather than every object,
 -- which is the shape CR 201.2a describes for an object with no name: having no

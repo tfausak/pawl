@@ -685,7 +685,8 @@ data Context = MkContext
     -- Vendetta's search sees the name its own earlier clause chose. That is the
     -- stale-read shape this field exists on the far side of.
     --
-    -- EMPTY in contextFor and contextComparingPower below, so the atom is
+    -- EMPTY in contextFor below and so in contextWithSlots and
+    -- contextComparingPower too, so the atom is
     -- vacuously False in every position but a search's filter -- the posture every
     -- context-relative atom here takes. What keeps a card out of those positions
     -- is Pawl.CardSpec's "CR 201.4 no card asks HasChosenName outside a search's
