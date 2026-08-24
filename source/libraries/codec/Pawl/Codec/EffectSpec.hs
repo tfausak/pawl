@@ -1494,7 +1494,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.ChooseCardName (Filter.Not (Filter.HasCardType CardType.Land)))
-      " {\"type\":\"ChooseCardName\",\"value\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":\"Land\"}}} "
+      " {\"type\":\"ChooseCardName\",\"value\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}} "
   -- CR 701.39a: the count alone, because rule 701.39a fixes the chooser, the kind
   -- of counter and the candidate pool, leaving an author only N to write.
   Spec.it s "Bolster" $

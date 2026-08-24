@@ -4033,6 +4033,40 @@ canAttachToSubjectOffends card =
   let (framed, unframedCount) = canAttachToSubjectCounts card
    in unframedCount /= 0 || framed + unframedCount /= jsonAtoms canAttachToSubjectTag (Codec.encode (Face.Codec.codec Card.codec) card)
 
+-- The CR 201.4 chosen-name tag, spelled once.
+hasChosenNameTag :: Text.Text
+hasChosenNameTag = Text.pack "HasChosenName"
+
+-- How many CR 201.4 chosen-name atoms this card carries inside a SEARCH's filter,
+-- and how many anywhere else. The second number is the offence; the first is what
+-- Ancient Vendetta legitimately has one of.
+hasChosenNameCounts :: Face.Face Card.Type.Card -> (Int, Int)
+hasChosenNameCounts card =
+  let total wanted = sum [filterAtoms hasChosenNameTag f | (framing, f) <- cardFilters card, (framing == SearchFramed) == wanted]
+   in (total True, total False)
+
+-- CR 201.4's chosen name is answerable only where Filter.Context.sourceChosenNames
+-- is filled, and Pawl.Engine.Resolve's Effect.Search arm is the one site that
+-- fills it. Filter.contextFor, Filter.contextWithSlots, Filter.contextComparingPower
+-- and Pawl.Engine.Target.admittedGiven all leave it empty, so Filter.HasChosenName
+-- in a target slot, an affected set, a Count filter or a cost criterion is a silent
+-- False rather than a rejected card. This is where that is made loud.
+--
+-- The SAME framing canAttachToSubjectOffends fences, and for a different rule:
+-- both atoms are answerable exactly where the search arm's own context and view
+-- are built, so one Framing carries two fences.
+--
+-- Two offences under one name, for canHostSubjectOffends' two reasons: the
+-- traversal found the atom outside a search, or the traversal and the codec
+-- disagree about how many the card holds -- the second being a blind spot in
+-- cardFilters, in which an atom would be reported as zero rather than as an
+-- offence. The second disjunct is a REGRESSION FENCE for sameNameAsBoundOffends'
+-- reason.
+hasChosenNameOffends :: Face.Face Card.Type.Card -> Bool
+hasChosenNameOffends card =
+  let (framed, elsewhere) = hasChosenNameCounts card
+   in elsewhere /= 0 || framed + elsewhere /= jsonAtoms hasChosenNameTag (Codec.encode (Face.Codec.codec Card.codec) card)
+
 -- The CR 709.4a tag, spelled once.
 sameNameAsBoundTag :: Text.Text
 sameNameAsBoundTag = Text.pack "SameNameAsBound"
@@ -6159,6 +6193,26 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- nothing.
     let positions = concatMap (cardFilters . S.combinedFace) ps
     Spec.assertBool s (length (filter ((== SearchFramed) . fst) positions) > 5) "the pool gives the accepted side search filters to be about"
+  -- CR 201.4's chosen name is CR 701.3a's atom in the same frame: answerable only
+  -- where Pawl.Engine.Resolve's Effect.Search arm builds the context, and a silent
+  -- False everywhere else. See hasChosenNameOffends for the two offences.
+  Spec.it s "CR 201.4 no card asks HasChosenName outside a search's filter" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace hasChosenNameOffends . Printing.card) ps
+    Spec.assertEqWith s "the atom sits only in a search's filter" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous: the pool authors the atom, and the one card that does is
+    -- ACCEPTED here rather than skipped.
+    vendetta <- S.printingOf s registry "Ancient Vendetta"
+    Spec.assertEqWith
+      s
+      "Ancient Vendetta's one atom is framed by its own search"
+      (hasChosenNameCounts (S.combinedFace vendetta))
+      (1, 0)
+    Spec.assertEqWith
+      s
+      "and it is the pool's only one"
+      (sum (fmap (uncurry (+) . hasChosenNameCounts . S.combinedFace) ps))
+      1
   -- CR 701.23a: a search looks through a zone, so one naming none can find
   -- nothing. Nothing else catches an empty set. Search.zones is defaulted-absent
   -- to the library, so a card file has to write "zones": [] on purpose -- and the
@@ -6763,6 +6817,107 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       "and the ungrafted base card carries no atom at all"
       (sameNameAsBoundOffends base, sameNameAsBoundCounts base)
+      (False, (0, 0))
+  -- The rejecting direction for CR 201.4, for the reason the two tests above give:
+  -- Ancient Vendetta only exercises the ACCEPTING one, and a card that offends a
+  -- lint must not be loadable, so the offenders are hand-built rather than filed.
+  --
+  -- The MODE'S TARGET SLOT is the fixture that separates this lint from the
+  -- SameNameAsBound one above: that atom's accepted position is exactly this
+  -- lint's offence, and vice versa, because CR 601.2c chooses targets before CR
+  -- 608.2c has chosen any name.
+  --
+  -- Every fixture buries the atom under all three combinators, for the sibling's
+  -- reason, and each is asserted through hasChosenNameCounts as well as the
+  -- predicate.
+  Spec.it s "the lint itself catches HasChosenName outside a search's filter" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    vendetta <- S.printingOf s registry "Ancient Vendetta"
+    let base = S.combinedFace piker
+        slot = SlotName.MkSlotName (Text.pack "target")
+        atom = Filter.Type.HasChosenName
+        buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not atom]]
+        spellOf effects slots =
+          Modal.MkModal
+            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) slots))
+            (ModeSelection.ChooseExactly 1)
+        searchFor f = Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = f, Search.upTo = False, Search.destination = SearchDestination.Exile}
+        planted =
+          [ ( "a mode's target slot",
+              base {Face.spell = spellOf [] (Map.singleton slot (TargetSlot.required Pool.Permanents (Just buried)))}
+            ),
+            ( "CR 303.4a's enchant ability",
+              base {Face.enchant = [TargetSlot.required Pool.Permanents (Just buried)]}
+            ),
+            ( "a static ability's affected set",
+              base
+                { Face.staticAbilities =
+                    [ StaticAbility.MkStaticAbility
+                        (Affected.Matching buried)
+                        Nothing
+                        Set.empty
+                        Nothing
+                        (NonEmpty.singleton (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1))))
+                    ]
+                }
+            ),
+            ( "CR 201.4a's own restriction on the choosing effect",
+              base {Face.spell = spellOf [Effect.ChooseCardName buried] Map.empty}
+            ),
+            ( "an ObjectRef.EachMatching set",
+              base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing Nothing Nothing)] Map.empty}
+            ),
+            ( "CR 603.6a's trigger condition",
+              base
+                { Face.triggeredAbilities =
+                    [ oneEffectTrigger
+                        (TriggerCondition.PermanentEnters buried)
+                        (Effect.Draw (Draw.MkDraw (PlayerRef.InSlot Binding.you) (Quantity.Type.Literal 1) Nothing))
+                    ]
+                }
+            ),
+            ( "CR 601.2f's sacrifice cost component",
+              (S.combinedFace sorcerer)
+                { Face.activatedAbilities =
+                    fmap
+                      (\a -> a {ActivatedAbility.cost = (ActivatedAbility.cost a) {Cost.Type.components = [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 buried)]}})
+                      (Face.activatedAbilities (S.combinedFace sorcerer))
+                }
+            ),
+            ( "CR 702.29e's typecycling predicate",
+              base {Face.keywords = Set.singleton (Keyword.Cycling (Cycling.MkCycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Just buried)))}
+            )
+          ]
+        report (label, card) = (label, hasChosenNameOffends card, hasChosenNameCounts card)
+    Spec.assertEqWith
+      s
+      "every position that cannot answer is rejected, and the traversal is what finds it"
+      (fmap report planted)
+      (fmap (\(label, _) -> (label, True, (0, 1))) planted)
+    Spec.assertEqWith
+      s
+      "and the codec counts exactly the atoms the traversal does"
+      (fmap (\(_, card) -> jsonAtoms hasChosenNameTag (Codec.encode (Face.Codec.codec Card.codec) card)) planted)
+      (fmap (const 1) planted)
+    -- The ACCEPTING direction, twice: the real card, and the buried atom in a
+    -- search's filter grafted onto a card that declares none of its own -- so the
+    -- acceptance is about the POSITION and not about Ancient Vendetta.
+    Spec.assertEqWith
+      s
+      "Ancient Vendetta is accepted"
+      (hasChosenNameOffends (S.combinedFace vendetta), hasChosenNameCounts (S.combinedFace vendetta))
+      (False, (1, 0))
+    let searched = base {Face.spell = spellOf [searchFor buried] Map.empty}
+    Spec.assertEqWith
+      s
+      "a buried atom in a search's filter is accepted"
+      (hasChosenNameOffends searched, hasChosenNameCounts searched)
+      (False, (1, 0))
+    Spec.assertEqWith
+      s
+      "and the ungrafted base card carries no atom at all"
+      (hasChosenNameOffends base, hasChosenNameCounts base)
       (False, (0, 0))
 
 m2bCardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

@@ -1515,6 +1515,44 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
       "and the library she could not search is untouched"
       (Set.fromList (Game.zoneMembers Zone.Library S.alice settled))
       (Set.fromList [moogleStar board, moogleCrucible board])
+  -- Ancient Vendetta -- "{3}{B} Sorcery: Choose a card name. Search target
+  -- opponent's graveyard, hand, and library for up to four cards with that name
+  -- and exile them. Then that player shuffles." The whole-card proof of CR 201.4
+  -- chosen ON RESOLUTION (Effect.ChooseCardName) and read back by the search's
+  -- own filter (Filter.HasChosenName), which CR 608.2c sequences: the name the
+  -- first clause chose is on the board when the second clause reads it.
+  --
+  -- The board is built so four wrong implementations produce four different
+  -- exile counts. Three cards named Chromatic Star sit one apiece in bob's
+  -- graveyard, hand and library, and a Crucible of Worlds sits in the library
+  -- beside the third. An atom that cannot see the chosen name offers nothing and
+  -- exiles 0; an atom that admits everything exiles 4 and empties the library; a
+  -- search reading only the first of its three zones exiles 1; the right one
+  -- exiles 3. The cap is four and the matches number three, so CR 701.23b's
+  -- fail-to-find and the count are both slack and neither can masquerade as the
+  -- filter.
+  --
+  -- The searcher is alice and the zones read are bob's, which is Search's two
+  -- independent PlayerRefs at two seats -- the roles that matter here are not
+  -- collapsed by the seat count.
+  Spec.it s "CR 201.4/608.2c whole card: Ancient Vendetta's search reads the name its own first clause chose" $ do
+    board <- vendettaBoard s registry
+    let settled = resolveVendetta board
+        star = Just (CardName.MkCardName (Text.pack "Chromatic Star"))
+    -- The gameplay assertion, and first: an atom the search's context cannot
+    -- answer leaves this EMPTY, and one that admits everything makes it four.
+    Spec.assertEqWith
+      s
+      "the three cards sharing the chosen name are exiled, from all three zones"
+      (namesIn Zone.Exile S.bob settled)
+      [star, star, star]
+    Spec.assertEqWith
+      s
+      "the card the chosen name did not match is still in bob's library"
+      (namesIn Zone.Library S.bob settled)
+      [Just (CardName.MkCardName (Text.pack "Crucible of Worlds"))]
+    Spec.assertEqWith s "bob's hand is empty" (namesIn Zone.Hand S.bob settled) []
+    Spec.assertEqWith s "and so is his graveyard" (namesIn Zone.Graveyard S.bob settled) []
   Spec.it s "CR 603/608.2n Rest in Peace's ETB exiles graveyards and ceases" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -2315,6 +2353,39 @@ resolveMoogle :: (forall r. Prompt.Prompt r -> r) -> MoogleBoard -> GameState.Ga
 resolveMoogle answer board =
   let cast = snd (Engine.runGamePure answer (moogleState board) (S.cast S.alice (moogleSpell board)))
    in snd (Engine.runGamePure answer cast Engine.priorityLoop)
+
+-- Ancient Vendetta's board. Four Swamps pay alice's {3}{B}; bob's graveyard, hand
+-- and library hold one Chromatic Star apiece, and his library holds a Crucible of
+-- Worlds beside the third -- so the filter has something to reject, and the offer
+-- is strictly larger than the largest legal answer.
+--
+-- ONE printing across the three zones on purpose: CR 201.4's name is what the
+-- search matches on, so three copies of one card is the shape that separates
+-- "matched by name" from "matched by zone".
+vendettaBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId)
+vendettaBoard s registry = do
+  swamp <- S.printingOf s registry "Swamp"
+  star <- S.printingOf s registry "Chromatic Star"
+  crucible <- S.printingOf s registry "Crucible of Worlds"
+  vendetta <- S.printingOf s registry "Ancient Vendetta"
+  let g1 = snd (S.addGraveyardCard star S.bob (S.landsInPlay swamp 4))
+      g2 = snd (S.addHandCard star S.bob g1)
+      g3 = snd (S.addLibraryCard star S.bob g2)
+      g4 = snd (S.addLibraryCard crucible S.bob g3)
+   in pure (S.handOne vendetta g4)
+
+-- Names the card and then finds everything the search offers. Two prompts, and
+-- the assertions turn on both: a name the answerer never supplied leaves the
+-- offer empty however the atom behaves.
+vendettaAnswer :: Prompt.Prompt r -> r
+vendettaAnswer p = case p of
+  Prompt.ChooseCardName {} -> CardName.MkCardName (Text.pack "Chromatic Star")
+  _ -> findFirst p
+
+resolveVendetta :: (GameState.GameState, ObjectId.ObjectId) -> GameState.GameState
+resolveVendetta (gs, spellId) =
+  let cast = snd (Engine.runGamePure vendettaAnswer gs (S.cast S.alice spellId))
+   in snd (Engine.runGamePure vendettaAnswer cast Engine.priorityLoop)
 
 -- findFirstExercising with the FIND pinned to one named card. The two Dragons of
 -- the CR 607.2a pair have to exile DIFFERENT artifacts for the linked set to be
