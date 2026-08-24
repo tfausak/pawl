@@ -3842,7 +3842,7 @@ boseijuSpec s registry = Spec.describe s "Boseiju, Who Shelters All" $ do
   --
   -- The asserted quantity is alice's HAND once the stack is empty, which is
   -- Divination's own effect and not the zone it ends in: CR 701.6a puts a
-  -- countered sorcery in the graveyard and CR 608.2m puts a resolved one there
+  -- countered sorcery in the graveyard and CR 608.2n puts a resolved one there
   -- too, so a zone read cannot tell the two apart for an instant or a sorcery --
   -- which is exactly the class Boseiju's rider is about.
   --

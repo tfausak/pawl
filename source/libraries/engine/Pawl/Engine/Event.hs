@@ -3459,12 +3459,12 @@ destroyIn asOf cause regenerability oids = simultaneously $ do
 -- that RESOLVED into the same graveyard (CR 608.2n), and what survives Rest in
 -- Peace redirecting the destination.
 --
--- Nothing is recorded on any of the paths that do NOT counter, which CR
--- 603.2g makes mandatory rather than tidy: an id with no object; any of the
--- three can't-be-countered gates, since through CR 101.2 such a spell was never
+-- Nothing is recorded on any of the paths that do NOT counter, which CR 603.2g
+-- makes mandatory rather than tidy: an id with no object; any of the three
+-- can't-be-countered gates, since through CR 101.2 such a spell was never
 -- countered; and a move the CR 616.1 loop cancelled, which leaves the spell on
--- the stack. The ability branch is
--- not a fifth -- that countering really happened, and its silence is #541.
+-- the stack. The ability branch is not one of them -- that countering really
+-- happened, and its silence is #541.
 --
 -- `source` and `controller` are the countering spell or ability and its controller
 -- (CR 405.4), taken from the caller rather than re-derived: by the time the CR

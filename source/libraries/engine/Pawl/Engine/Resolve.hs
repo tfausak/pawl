@@ -3183,6 +3183,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- The RETENTION (CR 106.4) and CR 106.6's two clauses -- the restriction and
   -- the rider -- are what come off the INSTRUCTION instead, stamped onto every
   -- unit it adds (CR 106.6a).
+  --
   -- The RIDER's stamp here is a regression fence rather than a proven behaviour:
   -- both printings that write one (Boseiju, Who Shelters All and Delighted
   -- Halfling) are mana abilities and take the inline CR 605.3b road instead, so

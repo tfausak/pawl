@@ -3619,8 +3619,8 @@ restrictionFilters restriction =
 -- The predicate a CR 106.6 rider carries. A function beside restrictionFilters
 -- for the same reason: the two clauses ride Pawl.Types.ManaAddition
 -- independently, so a lint that reached one would go quiet on the other.
--- Prefixed, because `riderFilters` above is CR 614.1's ENTRY riders and the two
--- have nothing to do with each other.
+-- Prefixed, because `riderFilters` above is Pawl.Types.EntryRiders -- what a
+-- permanent enters WITH -- and the two have nothing to do with each other.
 --
 -- No lint in this module distinguishes a collected rider condition from an
 -- uncollected one today: neutralising this function leaves the suite green, so
