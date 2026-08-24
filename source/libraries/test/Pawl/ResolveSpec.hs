@@ -571,8 +571,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   -- behaviour the pool exercises.
   Spec.it s "CR 106.4 slotsOf finds the slot an AddMana recipient names" $ do
     let slot = SlotName.MkSlotName (Text.pack "thatPlayer")
-    Spec.assertEqWith s "a named recipient is a read" (Resolve.slotsOf (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.InSlot slot) ManaProduction.AnyColor ManaRetention.Ordinary Nothing))) (Map.singleton slot SlotArity.One)
-    Spec.assertEqWith s "and CR 109.5's unwritten one names no slot" (Resolve.slotsOf (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) ManaProduction.AnyColor ManaRetention.Ordinary Nothing))) Map.empty
+    Spec.assertEqWith s "a named recipient is a read" (Resolve.slotsOf (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.InSlot slot) ManaProduction.AnyColor ManaRetention.Ordinary Nothing Nothing))) (Map.singleton slot SlotArity.One)
+    Spec.assertEqWith s "and CR 109.5's unwritten one names no slot" (Resolve.slotsOf (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) ManaProduction.AnyColor ManaRetention.Ordinary Nothing Nothing))) Map.empty
   -- The same fence for CR 509.4's blocking rider, which the MoveToZone arm reads
   -- since Aetherplasm. Asserted here because the POOL cannot observe it: the
   -- dataflow lint's equality has Mode.targetSlots on its right, which is empty
@@ -592,21 +592,21 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "the rider is a read, beside the ref's own" (Resolve.slotsOf (move EntryRiders.defaultValue {EntryRiders.blocking = Just slot})) (Map.fromList [(moved, SlotArity.Many), (slot, SlotArity.One)])
     Spec.assertEqWith s "and a move stating no attacker names only what it moves" (Resolve.slotsOf (move EntryRiders.defaultValue)) (Map.singleton moved SlotArity.Many)
   Spec.it s "CR 605 manaProduced reads AddMana whole, and nothing else" $ do
-    let plain = ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary Nothing
-        anyColor = ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) ManaProduction.AnyColor ManaRetention.Ordinary Nothing
+    let plain = ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary Nothing Nothing
+        anyColor = ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) ManaProduction.AnyColor ManaRetention.Ordinary Nothing Nothing
     Spec.assertEqWith s "add mana" (ManaAbility.manaProduced (Effect.AddMana plain)) (Just plain)
     Spec.assertEqWith s "add mana of any color" (ManaAbility.manaProduced (Effect.AddMana anyColor)) (Just anyColor)
     -- The WHOLE instruction and not its ManaProduction alone, which is what CR
     -- 605.3b's inline payment needs to stamp CR 106.6's restriction onto the
     -- units it adds (Mana.manaOptionsOfGiven). Mishra's Workshop is the
     -- printing, and Pawl.ManaSpec's group of that name is where it is paid.
-    let restricted = ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) ManaProduction.AnyColor ManaRetention.Ordinary (Just (ManaRestriction.onlyCasts (Filter.Type.HasCardType CardType.Artifact)))
+    let restricted = ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) ManaProduction.AnyColor ManaRetention.Ordinary (Just (ManaRestriction.onlyCasts (Filter.Type.HasCardType CardType.Artifact))) Nothing
     Spec.assertEqWith s "a spending restriction rides along" (ManaAbility.manaProduced (Effect.AddMana restricted)) (Just restricted)
     -- CR 605.1a asks whether the ability could add mana to "a player's" pool, so a
     -- recipient the card names is carried rather than disqualifying: an ability
     -- that adds to somebody else is still a mana ability. What is dropped is
     -- dropped later, on the payment path (#1673).
-    let named = ManaAddition.MkManaAddition (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) ManaProduction.AnyColor ManaRetention.Ordinary Nothing
+    let named = ManaAddition.MkManaAddition (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) ManaProduction.AnyColor ManaRetention.Ordinary Nothing Nothing
     Spec.assertEqWith s "a named recipient does not disqualify" (ManaAbility.manaProduced (Effect.AddMana named)) (Just named)
     Spec.assertEqWith s "damage produces no mana" (ManaAbility.manaProduced (Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x"))) (Quantity.Literal 1) Nothing Nothing))) Nothing
   Spec.it s "CR 612.1 a text change reaches a Filter carried by an effect" $ do

@@ -35,7 +35,12 @@ module Pawl.Types.Counterability where
 -- rules-modifying continuous effect. Neither carrier could hold the other's
 -- card: Pawl.Engine.PlayerEffect.applying walks the battlefield, where a spell
 -- on the stack is not, and this field is read off a card, which an ability on
--- the stack has none of. Pawl.Engine.Event.counter asks both.
+-- the stack has none of.
+--
+-- A THIRD carrier joins them, and is neither: Pawl.Types.ManaRider is CR 106.6's
+-- clause on the MANA that paid for the spell (Boseiju, Who Shelters All), which
+-- belongs to no object on the battlefield and to no card of the protected
+-- spell's own. Pawl.Engine.Event.counterOne asks all three.
 --
 -- Prowling Serpopard prints one sentence of each and so declares both, which is
 -- the clearest demonstration that they are two carriers rather than one written

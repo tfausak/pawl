@@ -42,6 +42,7 @@ import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
+import qualified Pawl.Engine.ManaRider as ManaRider
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
@@ -3458,11 +3459,12 @@ destroyIn asOf cause regenerability oids = simultaneously $ do
 -- that RESOLVED into the same graveyard (CR 608.2n), and what survives Rest in
 -- Peace redirecting the destination.
 --
--- Nothing is recorded on any of the four paths that do NOT counter, which CR
--- 603.2g makes mandatory rather than tidy: an id with no object; either gate,
--- since through CR 101.2 such a spell was never countered; and a move the CR
--- 616.1 loop cancelled, which leaves the spell on the stack. The ability branch is
--- not a fifth -- that countering really happened, and its silence is #541.
+-- Nothing is recorded on any of the paths that do NOT counter, which CR 603.2g
+-- makes mandatory rather than tidy: an id with no object; any of the three
+-- can't-be-countered gates, since through CR 101.2 such a spell was never
+-- countered; and a move the CR 616.1 loop cancelled, which leaves the spell on
+-- the stack. The ability branch is not one of them -- that countering really
+-- happened, and its silence is #541.
 --
 -- `source` and `controller` are the countering spell or ability and its controller
 -- (CR 405.4), taken from the caller rather than re-derived: by the time the CR
@@ -3473,7 +3475,7 @@ counter source controller oid = Monad.void (counterOne source controller oid)
 
 -- counter over a whole batch, answering with the objects it ACTUALLY countered
 -- (CR 701.6a) -- which is emphatically not the batch it was handed: an id naming
--- no object, either can't-be-countered gate, and a move the CR 616.1 loop
+-- no object, any can't-be-countered gate, and a move the CR 616.1 loop
 -- cancelled each leave their victim out of the answer.
 --
 -- The VICTIMS as the caller named them, not the graveyard incarnations CR 400.7
@@ -3498,6 +3500,15 @@ counterOne source controller oid = do
     -- CR 613.11's gate first, ahead of the branch split, because it is the one
     -- that reaches both of CR 701.6a's subjects.
     Just _ | protectedFromCountering oid gs -> pure False
+    -- CR 106.6 through CR 101.2, and ahead of the branch split for CR 613.11's
+    -- reason: rule 106.6 says an additional effect "affects the spell or
+    -- ability that mana is spent on", so both of CR 701.6a's subjects are in
+    -- reach. An ability records no payment today (#2007), which makes this
+    -- vacuous for one rather than wrong.
+    --
+    -- The typed question again, so this module never sees a ManaRiderEffect
+    -- constructor; Pawl.Engine.ManaRider is where the casing lives.
+    Just _ | ManaRider.uncounterable oid gs -> pure False
     -- CR 608.2n, reached before the CR 113.6g gate because that gate asks about a
     -- spell's own card and an ability has none -- Game.faceOf answers Nothing for
     -- one, so asking first would fall through to the graveyard move by accident.

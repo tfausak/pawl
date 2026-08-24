@@ -192,6 +192,8 @@ import qualified Pawl.Codec.ManaFilterSpec
 import qualified Pawl.Codec.ManaProductionSpec
 import qualified Pawl.Codec.ManaRestrictionSpec
 import qualified Pawl.Codec.ManaRetentionSpec
+import qualified Pawl.Codec.ManaRiderEffectSpec
+import qualified Pawl.Codec.ManaRiderSpec
 import qualified Pawl.Codec.ManaSpec
 import qualified Pawl.Codec.ManaSpendingSpec
 import qualified Pawl.Codec.ManaSymbolSpec
@@ -693,6 +695,8 @@ spec s registry = do
   Pawl.Codec.ManaProductionSpec.spec s
   Pawl.Codec.ManaRestrictionSpec.spec s
   Pawl.Codec.ManaRetentionSpec.spec s
+  Pawl.Codec.ManaRiderEffectSpec.spec s
+  Pawl.Codec.ManaRiderSpec.spec s
   Pawl.Codec.ManaSpec.spec s
   Pawl.Codec.ManaSpendingSpec.spec s
   Pawl.Codec.ManaSymbolSpec.spec s
