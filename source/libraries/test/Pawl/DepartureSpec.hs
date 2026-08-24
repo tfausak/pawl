@@ -32,6 +32,7 @@ import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Moved as Moved
@@ -325,6 +326,95 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     -- deleted id regardless of whether it was ever a member.
     Spec.assertEqWith s "nothing of bob's is left in any zone that received an object" (concatMap (\z -> Game.zoneMembers z S.bob gone) [Zone.Library, Zone.Hand, Zone.Graveyard, Zone.Battlefield, Zone.Stack]) []
     Spec.assertEqWith s "and alice's permanent is untouched -- the sweep is keyed to the OWNER" (fmap Object.owner (Game.lookupObject aliceKeeps gone)) (Just S.alice)
+
+  -- CR 800.4a's first clause against a card whose own text overrides CR 604.2.
+  --
+  -- Titania's Song ({3}{G} Enchantment, Antiquities / Masters Edition IV; name,
+  -- cost, type line and Oracle text checked against api.scryfall.com): "Each
+  -- noncreature artifact loses all abilities and becomes an artifact creature
+  -- with power and toughness each equal to its mana value. If this enchantment
+  -- leaves the battlefield, this effect continues until end of turn."
+  --
+  -- Leaving the GAME is leaving the battlefield, so that second sentence applies
+  -- here too -- and CR 800.4a ends only the control-granting effects, so nothing
+  -- in the rule ends this one. The effect has to outlive the ability that made
+  -- it, which means becoming a STORED effect (CR 611.2), exactly as
+  -- Pawl.Engine.Event's zone-change funnel makes it one; Pawl.ExpirySpec's
+  -- whole-card case is that other road, and CR 611.2c's frozen set and CR
+  -- 514.2's cleanup are proved there rather than repeated here.
+  --
+  -- alice OWNS the Bonesplitter ({1} Artifact -- Equipment), so CR 800.4a's
+  -- first clause does not take it with the Song: it is the survivor the effect
+  -- has to go on applying to. Its mana value is 1, so the animation is a 1/1
+  -- rather than a 0/0 CR 704.5f would bury before the assertion reads it, and
+  -- its printed Equip ability is what makes the layer-6 strip observable at all.
+  --
+  -- The three `gone` readings come FIRST, ahead of the two that say the
+  -- departure really happened: those two are true whether or not anything was
+  -- handed over, so leading with them would let them report a red the handover
+  -- never caused.
+  Spec.it s "CR 800.4a/611.2a a lingering static-ability effect is handed over when its owner leaves the game" $ do
+    song <- S.printingOf s registry "Titania's Song"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    let (axeId, g1) = S.addCreature bonesplitter S.alice S.threePlayerGame
+        (songId, before) = S.addCreature song S.bob g1
+        gone = S.departs Departure.Type.Conceded S.bob before
+    -- Without these the rest says nothing: the Song has to have been animating
+    -- the Bonesplitter before bob left.
+    Spec.assertBool s (Projection.isCreatureOf axeId before) "CR 613.1d the Song animates alice's Bonesplitter"
+    Spec.assertEqWith s "CR 613.4b a 1/1, its mana value" (S.powerToughnessOf axeId before) (Just (1, 1))
+    Spec.assertEqWith s "CR 613.1f with its Equip ability stripped" (Projection.abilitiesOf axeId before) []
+    Spec.assertBool s (Projection.isCreatureOf axeId gone) "CR 611.2a the animation continues after bob leaves the game"
+    Spec.assertEqWith s "still a 1/1" (S.powerToughnessOf axeId gone) (Just (1, 1))
+    Spec.assertEqWith s "still no abilities" (Projection.abilitiesOf axeId gone) []
+    Spec.assertEqWith s "bob's Song really left the game" (Game.lookupObject songId gone) Nothing
+    Spec.assertEqWith s "and alice's Bonesplitter did not" (fmap Object.owner (Game.lookupObject axeId gone)) (Just S.alice)
+
+  -- The gate's control, one card over and the same board otherwise: Humility
+  -- ({2}{W}{W} Enchantment; name, cost, type line and Oracle text checked against
+  -- api.scryfall.com) is "All creatures lose all abilities and have base power
+  -- and toughness 1/1" -- the same layer-6 strip beside a layer-7b
+  -- P/T set, with NO sentence about leaving the battlefield. So CR 604.2 is read
+  -- straight and bob's departure ends it THIS INSTANT.
+  --
+  -- The pair differs in exactly one thing from the case above: which enchantment
+  -- bob owns. Without it, handing every departing permanent's static abilities
+  -- over would pass the case above and nothing here would notice.
+  --
+  -- Bird Maiden ({2}{R} Creature -- Human Bird, a 1/2 with flying) is alice's,
+  -- so it survives bob's departure to be read: its printed toughness differs from
+  -- Humility's 1, and its flying is what makes the layer-6 strip observable.
+  Spec.it s "CR 604.2 an ordinary static ability does NOT linger past the departure that removed it" $ do
+    humility <- S.printingOf s registry "Humility"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    let (birdId, g1) = S.addCreature birdMaiden S.alice S.threePlayerGame
+        (humilityId, before) = S.addCreature humility S.bob g1
+        gone = S.departs Departure.Type.Conceded S.bob before
+    Spec.assertEqWith s "CR 613 Humility makes the Maiden a 1/1" (S.powerToughnessOf birdId before) (Just (1, 1))
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying birdId before)) "with no flying"
+    Spec.assertEqWith s "CR 604.2 and it is a 1/2 again the moment bob leaves" (S.powerToughnessOf birdId gone) (Just (1, 2))
+    Spec.assertBool s (Projection.hasKeyword Keyword.Flying birdId gone) "with its flying back"
+    Spec.assertEqWith s "nothing was handed over" (GameState.continuousEffects gone) []
+    Spec.assertEqWith s "and bob's Humility really left the game" (Game.lookupObject humilityId gone) Nothing
+
+  -- The control for the case above, and what makes its third seat load-bearing:
+  -- the same two permanents and the same concede on a board that BEGAN with two
+  -- players. CR 800.1 makes that game not a multiplayer game, so
+  -- continuesAfterDeparture is False and CR 800.4a runs none of its clauses --
+  -- the Song is still on the battlefield, and the Bonesplitter is a 1/1 because
+  -- the LIVE static ability is still animating it rather than because anything
+  -- was handed over. A two-seat version of the case above would pass with the
+  -- handover deleted.
+  Spec.it s "CR 800.1 two seats: the same concede leaves the Song on the battlefield, so nothing is handed over" $ do
+    song <- S.printingOf s registry "Titania's Song"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    let (axeId, g1) = S.addCreature bonesplitter S.alice (Setup.emptyGame S.bothPlayers)
+        (songId, before) = S.addCreature song S.bob g1
+        gone = S.departs Departure.Type.Conceded S.bob before
+    Spec.assertEqWith s "the seam says CR 800.4a does not run" (Departure.continuesAfterDeparture before) False
+    Spec.assertBool s (S.onBattlefield songId gone) "so bob's Song is still on the battlefield"
+    Spec.assertBool s (Projection.isCreatureOf axeId gone) "and the live static ability is what animates the Bonesplitter"
+    Spec.assertEqWith s "nothing became a stored effect" (GameState.continuousEffects gone) []
 
   Spec.it s "CR 510.4 a departing player's id is dropped from the struckFirst snapshot" $ do
     piker <- S.printingOf s registry "Goblin Piker"
