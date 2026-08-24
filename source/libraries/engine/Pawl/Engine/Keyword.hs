@@ -1087,11 +1087,11 @@ mintedReplacementsFor keyword count = case keyword of
   -- permanent's own text is what puts the time counters on (Tidewalker's "for
   -- each Island you control").
   --
-  -- A row of Quantity.Literal 0 would be a regression fence rather than a proof:
-  -- Pawl.Engine.Event's WithCounters arm places nothing for a zero, so no board
-  -- tells the two apart today, and Pawl.KeywordTriggerSpec's numberless case says
-  -- so. The empty list is what rule 702.63b states, and a row minting ANY
-  -- positive number is what that case's 3/3 catches.
+  -- A row of Quantity.Literal 0 is not observable on a BOARD: Pawl.Engine.Event's
+  -- WithCounters arm places nothing for a zero, so Tidewalker enters the same
+  -- either way. What holds the empty list is rule 702.63b itself, fenced by
+  -- Pawl.KeywordTriggerSpec's "and no entry rewrite, however many instances";
+  -- a row minting any POSITIVE number is what that spec's 3/3 catches.
   Keyword.Vanishing n -> foldMap (List.genericReplicate count . ReplacementEffect.EntryR . EntryR.MkEntryR Filter.IsSource . EntryRewrite.WithCounters . WithCounters.MkWithCounters CounterKind.Time . Quantity.Literal . toInteger) n
   -- CR 702.32a's FIRST ability, vanishing's row in the fade counter. One row per
   -- instance for riot's reason, rule 702.32 stating no multiplicity clause.
