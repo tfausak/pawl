@@ -2907,9 +2907,11 @@ fightSpec s registry = Spec.describe s "Fight (CR 701.14)" $ do
 -- one may tap it for the generic, and then the ability has no red mana to pay
 -- with.
 --
--- Moonmist rather than the card's own upkeep trigger: neither face's "if no
--- spells were cast last turn, transform this creature" is transcribed, because no
--- card can read that count (gap #1883).
+-- Moonmist rather than the card's own upkeep trigger, which is transcribed and
+-- fires on its own schedule: this board wants the back face at a moment of its
+-- choosing, and Moonmist is the effect that puts it there without advancing a
+-- turn. Pawl.TransformSpec's SpellsCastLastTurn group is where the trigger itself
+-- is proved.
 predatorBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId)
 predatorBoard s registry = do
   ranger <- S.printingOf s registry "Daybreak Ranger"

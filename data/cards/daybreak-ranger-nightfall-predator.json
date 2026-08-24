@@ -75,6 +75,79 @@
         "type": "Literal",
         "value": 2
       },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "StepBegins",
+            "value": {
+              "phase": {
+                "type": "Beginning",
+                "value": {
+                  "type": "Upkeep"
+                }
+              },
+              "scope": {
+                "type": "EachTurn"
+              }
+            }
+          },
+          "intervening": {
+            "type": "Compares",
+            "value": {
+              "comparison": {
+                "type": "Exactly"
+              },
+              "measured": {
+                "type": "Count",
+                "value": {
+                  "aggregation": {
+                    "type": "Greatest",
+                    "value": {
+                      "type": "SpellsCastLastTurn",
+                      "value": {
+                        "type": "Candidate"
+                      }
+                    }
+                  },
+                  "filter": {
+                    "type": "And",
+                    "value": []
+                  },
+                  "scope": {
+                    "type": "OverPlayers",
+                    "value": {
+                      "type": "EachPlayer"
+                    }
+                  }
+                }
+              },
+              "threshold": {
+                "type": "Literal",
+                "value": 0
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Transform",
+                        "value": {
+                          "type": "InSlot",
+                          "value": "self"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
       "typeLine": {
         "subtypes": [
           {
@@ -155,6 +228,79 @@
         "type": "Literal",
         "value": 4
       },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "StepBegins",
+            "value": {
+              "phase": {
+                "type": "Beginning",
+                "value": {
+                  "type": "Upkeep"
+                }
+              },
+              "scope": {
+                "type": "EachTurn"
+              }
+            }
+          },
+          "intervening": {
+            "type": "Compares",
+            "value": {
+              "comparison": {
+                "type": "AtLeast"
+              },
+              "measured": {
+                "type": "Count",
+                "value": {
+                  "aggregation": {
+                    "type": "Greatest",
+                    "value": {
+                      "type": "SpellsCastLastTurn",
+                      "value": {
+                        "type": "Candidate"
+                      }
+                    }
+                  },
+                  "filter": {
+                    "type": "And",
+                    "value": []
+                  },
+                  "scope": {
+                    "type": "OverPlayers",
+                    "value": {
+                      "type": "EachPlayer"
+                    }
+                  }
+                }
+              },
+              "threshold": {
+                "type": "Literal",
+                "value": 2
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Transform",
+                        "value": {
+                          "type": "InSlot",
+                          "value": "self"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
       "typeLine": {
         "subtypes": [
           {

@@ -115,6 +115,7 @@ codec = Fields.object $ do
   monarch <- Fields.required "monarch" (Common.maybe PlayerId.codec) GameState.monarch
   daytime <- Fields.required "daytime" (Common.maybe Daytime.codec) GameState.daytime
   spellsCastLastTurn <- Fields.required "spellsCastLastTurn" Common.natural GameState.spellsCastLastTurn
+  castsLastTurn <- Fields.required "castsLastTurn" (Common.naturalMap PlayerId.codec Common.natural) GameState.castsLastTurn
   exiledUntilMonarch <- Fields.required "exiledUntilMonarch" (Common.naturalMap ObjectId.codec MonarchWatch.codec) GameState.exiledUntilMonarch
   haunting <- Fields.required "haunting" (Common.naturalMap ObjectId.codec ObjectId.codec) GameState.haunting
   exiledWith <- Fields.required "exiledWith" (Common.naturalMap ObjectId.codec ObjectId.codec) GameState.exiledWith
@@ -178,6 +179,7 @@ codec = Fields.object $ do
         GameState.monarch = monarch,
         GameState.daytime = daytime,
         GameState.spellsCastLastTurn = spellsCastLastTurn,
+        GameState.castsLastTurn = castsLastTurn,
         GameState.exiledUntilMonarch = exiledUntilMonarch,
         GameState.haunting = haunting,
         GameState.exiledWith = exiledWith,

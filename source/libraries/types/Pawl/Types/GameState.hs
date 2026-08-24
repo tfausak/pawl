@@ -511,8 +511,29 @@ data GameState = MkGameState
     --
     -- ONE number and not a map, because rule 731.2 names exactly one player, "the
     -- previous turn's active player". CR 731.2a's shared-team-turns variant asks
-    -- about a whole team and would need more, and pawl has no teams (#175).
+    -- about a whole team and would need more, and pawl has no teams (#175). The
+    -- per-player question a CARD asks is castsLastTurn below, and Engine.beginTurnOf
+    -- reads THIS field out of that map so the two cannot disagree.
     spellsCastLastTurn :: Natural.Natural,
+    -- | CR 601.2i / 608.2i: how many spells EACH player cast during the turn just
+    -- ended -- Daybreak Ranger's "if no spells were cast last turn" and Nightfall
+    -- Predator's "if a player cast two or more spells last turn", neither of which
+    -- is about one named seat.
+    --
+    -- A MAP where spellsCastLastTurn above is a scalar, and not a widening of it:
+    -- rule 731.2 names exactly one player and a card names all of them, so the two
+    -- fields answer different questions off the same fold. Engine.beginTurnOf
+    -- builds this and then reads the scalar out of it, which is what keeps the
+    -- invariant `Map.findWithDefault 0 (previous active player) castsLastTurn ==
+    -- spellsCastLastTurn` true by construction rather than by discipline.
+    --
+    -- SPARSE, as drawsThisTurn is: a player who cast nothing has no entry, and
+    -- every reader takes 0 for an absent one. Nobody having cast is a number.
+    --
+    -- A stored snapshot rather than a fold over the event log, for the reason
+    -- spellsCastLastTurn is one: GameState.events is cleared at the same handoff
+    -- that writes this, and every reader is in a LATER turn.
+    castsLastTurn :: Map.Map PlayerId.PlayerId Natural.Natural,
     -- | CR 725 (Palace Jailer): objects exiled "until an opponent becomes the
     -- monarch", keyed by the exiled incarnation id to the watch that ends the
     -- exile -- the effect's controller, plus whether a crowning has already
