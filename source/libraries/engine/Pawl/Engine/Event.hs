@@ -6134,6 +6134,19 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
+  -- CR 603.2c's batch reading of the arm above (Vengeful Townsfolk's "whenever ONE
+  -- OR MORE other creatures you control die"). Delegated rather than duplicated
+  -- because the per-EVENT question is the same one: which deaths this condition
+  -- admits is PermanentDies' answer, filter, look-back and all.
+  --
+  -- What makes it fire ONCE for a whole sweep is not here. This matcher's contract
+  -- is that it sees one event at a time, so it cannot count occurrences of a CR
+  -- 704.3 / CR 608.2f batch; `batchScoped` below marks the condition and
+  -- eventTriggers keeps the first pending trigger per (bearer, ability) within each
+  -- Pawl.Types.EventGroup. So this arm answering True for every member of the batch
+  -- is deliberate, not a missing dedup: the arm and the dedup are two halves of one
+  -- rule, and matchesTrigger alone is not the whole of it.
+  TriggerCondition.PermanentsDie f -> matchesTriggerGiven bindings gs bearer you (TriggerCondition.PermanentDies f) event
   -- CR 700.4's "dies" once more, asked of the permanent the bearer is attached
   -- to: PermanentDies' battlefield-to-graveyard pair, matched on
   -- ZoneChange.departed for that arm's reason (CR 603.10a), against the host id
@@ -8146,6 +8159,9 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
   TriggerCondition.SelfDies -> False
   TriggerCondition.PermanentDies _ -> False
+  -- CR 603.3b's first class too, for the arm above's reason: a batch of deaths
+  -- is not another ability triggering.
+  TriggerCondition.PermanentsDie _ -> False
   TriggerCondition.SelfLeavesTheBattlefield -> False
   TriggerCondition.PermanentLeavesTheBattlefield _ -> False
   -- CR 702.55b watches a death, not another ability triggering.
@@ -8916,6 +8932,12 @@ eventBindingSlots cond = case cond of
   -- SelfLeavesTheBattlefield below, because matchesTrigger has already pinned the
   -- destination to the graveyard. Promise of Tomorrow's "exile it" is the reader.
   TriggerCondition.PermanentDies _ -> Set.singleton Binding.became
+  -- Empty where PermanentDies binds CR 400.7e's graveyard card, and NECESSARILY
+  -- so: the trigger event is a whole CR 704.3 batch, which may have buried
+  -- several cards, and one slot cannot name them all. No printing of the
+  -- one-or-more wording says "it" -- Vengeful Townsfolk's payload acts on
+  -- itself -- so the lint has nothing to reject (#505).
+  TriggerCondition.PermanentsDie _ -> Set.empty
   -- The same slot and rule as SelfDies, but bound only for a PUBLIC destination
   -- (CR 400.7e's proviso over CR 400.2's hidden zones), so the guaranteed floor is
   -- empty. A card whose leaves-the-battlefield payload names `became` is therefore
@@ -9195,6 +9217,11 @@ looksBack condition = case condition of
   -- graveyard, and narrowing the destination does not leave the family.
   TriggerCondition.SelfDies -> True
   TriggerCondition.PermanentDies _ -> True
+  -- The batch reading of that same form is in the same family: CR 603.10a names
+  -- leaves-the-battlefield abilities without counting them. Load-bearing rather
+  -- than tidy -- it is what offers a bearer swept up in its own batch the
+  -- group-mates that died beside it (CR 603.10a's own Example).
+  TriggerCondition.PermanentsDie _ -> True
   TriggerCondition.SelfLeavesTheBattlefield -> True
   TriggerCondition.PermanentLeavesTheBattlefield _ -> True
   -- CR 603.10a's first family read off the HOST rather than the bearer: this
@@ -9308,6 +9335,106 @@ looksBack condition = case condition of
   -- a reflexive is fired by none. Its bearer is a CR 603.7 delayed entry too.
   TriggerCondition.Reflexive -> False
 
+-- CR 603.2c, the second sentence: does this condition's trigger event CONTAIN the
+-- occurrences, or IS each occurrence its trigger event? "Whenever one or more
+-- other creatures you control die" names the whole CR 704.3 / CR 608.2f batch, so
+-- a sweep that buries three contains one occurrence of it; "whenever another
+-- creature you control dies" names each death, so the same sweep contains three,
+-- which is the rule's own Example.
+--
+-- Read by eventTriggers alone, and only to decide how many pending triggers one
+-- Pawl.Types.EventGroup may yield per (bearer, ability). matchesTriggerGiven sees
+-- one event at a time and so answers the same for both readings -- that is its
+-- contract, and this predicate is what keeps it intact.
+--
+-- A total case over TriggerCondition and never a wildcard, for looksBack's reason:
+-- the fork is one CR 603.2c forces on every zone-change and event-watching
+-- condition, so a new one must be classified rather than defaulted. Everything but
+-- the batch reading is per-occurrence, which is what the rule's first sentence
+-- makes the default -- but a future "whenever one or more" printing on any other
+-- event would answer True here, so the arms are written out rather than folded.
+--
+-- CR 603.1b lets one ability carry several conditions, and `any` makes such an
+-- ability batch-scoped as a whole: a mixed AnyOf would fire at most once per group
+-- rather than once per group plus once per member. No printing mixes the two
+-- readings, and CardSpec's anyOfOffends already narrows what an AnyOf may hold.
+batchScoped :: TriggerCondition -> Bool
+batchScoped condition = case condition of
+  TriggerCondition.RoomEntered _ -> False
+  TriggerCondition.PlayerScries _ -> False
+  TriggerCondition.PlayerSurveils _ -> False
+  TriggerCondition.SelfBecomesPlotted -> False
+  TriggerCondition.PermanentExplores _ -> False
+  TriggerCondition.SelfExerted -> False
+  TriggerCondition.SelfBecomesAttachedBy _ -> False
+  TriggerCondition.SelfDies -> False
+  TriggerCondition.PermanentDies _ -> False
+  TriggerCondition.PermanentsDie _ -> True
+  TriggerCondition.SelfLeavesTheBattlefield -> False
+  TriggerCondition.PermanentLeavesTheBattlefield _ -> False
+  TriggerCondition.AttachedCreatureDies -> False
+  TriggerCondition.HauntedCreatureDies -> False
+  TriggerCondition.PermanentSacrificed -> False
+  TriggerCondition.AnyOf conditions -> any batchScoped conditions
+  TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
+  TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
+  TriggerCondition.SelfTurnedFaceUp -> False
+  TriggerCondition.PermanentTurnedFaceUp _ -> False
+  TriggerCondition.SelfTransformedInto _ -> False
+  TriggerCondition.PermanentBecomesDesignated {} -> False
+  TriggerCondition.SelfEvolves -> False
+  TriggerCondition.AttachedCreatureMentors -> False
+  TriggerCondition.SelfTrains -> False
+  TriggerCondition.SelfEnters -> False
+  TriggerCondition.PermanentEnters _ -> False
+  TriggerCondition.StepBegins {} -> False
+  TriggerCondition.StateIs _ -> False
+  TriggerCondition.SelfDealsCombatDamageToPlayer -> False
+  TriggerCondition.SelfIsDealtDamage -> False
+  TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
+  TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
+  TriggerCondition.OpponentLostLifeDuringYourTurn -> False
+  TriggerCondition.SelfCycled -> False
+  TriggerCondition.SelfRevealedForMiracle -> False
+  TriggerCondition.SelfDiscarded -> False
+  TriggerCondition.PlayerDiscards _ -> False
+  TriggerCondition.PlayerCycles _ -> False
+  TriggerCondition.PlayerDrawsNthCard {} -> False
+  TriggerCondition.SelfAttacks _ -> False
+  TriggerCondition.SelfAttacksWithAnother _ -> False
+  TriggerCondition.CreatureAttacksAlone _ -> False
+  TriggerCondition.CreatureAttacksYou -> False
+  TriggerCondition.AttachedPlayerIsAttacked -> False
+  TriggerCondition.PlayerAttacks _ -> False
+  TriggerCondition.PlayerAttacksWith {} -> False
+  TriggerCondition.SelfAttacksPlayerWithMostLife -> False
+  TriggerCondition.SelfBlocks -> False
+  TriggerCondition.SelfBlocksCreature _ -> False
+  TriggerCondition.SelfBlocksAtLeast _ -> False
+  TriggerCondition.SelfBlocksOneOrMore _ -> False
+  TriggerCondition.SelfBecomesBlocked -> False
+  TriggerCondition.SelfBecomesBlockedBy _ -> False
+  TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> False
+  TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> False
+  TriggerCondition.SelfAttacksUnblocked -> False
+  TriggerCondition.SpellOrAbilityCounters _ -> False
+  TriggerCondition.DamageToPlayerPrevented _ -> False
+  TriggerCondition.PlayerGainsLife _ -> False
+  TriggerCondition.PlayerLosesLife _ -> False
+  TriggerCondition.SelfCountersReached {} -> False
+  TriggerCondition.SelfLastCounterRemoved _ -> False
+  TriggerCondition.SelfCountersRemoved _ -> False
+  TriggerCondition.SpellCast {} -> False
+  TriggerCondition.SelfCast -> False
+  TriggerCondition.SelfBecomesTargeted _ -> False
+  TriggerCondition.ControllerBecomesTarget {} -> False
+  TriggerCondition.SelfHalfUnlocked _ -> False
+  TriggerCondition.RoomFullyUnlocked _ -> False
+  TriggerCondition.SagaFinalChapterTriggers _ -> False
+  TriggerCondition.PlayerBecomesMonarch _ -> False
+  TriggerCondition.LoseControlOfBound _ -> False
+  TriggerCondition.Reflexive -> False
+
 -- CR 603.6a: every event is checked against every permanent currently on the
 -- battlefield, not only the object the event names -- a step trigger belongs to a
 -- permanent with nothing to do with the event.
@@ -9385,6 +9512,12 @@ looksBack condition = case condition of
 -- Events outer, permanents inner (ascending by id): the deterministic canonical
 -- order the CR 603.3b ordering prompt indexes into. Groups do not disturb it --
 -- they decide which permanents an event is offered, never in what order.
+--
+-- CR 603.2c's batch conditions do not disturb it either, which is why they are a
+-- DEDUP (`oncePerBatch` below) rather than a second pass: dropping every match
+-- after a group's first leaves each surviving trigger at the position its earliest
+-- matching event gave it, where appending the batch's triggers to the block would
+-- have moved them.
 eventTriggers :: [LoggedEvent.LoggedEvent] -> GameState -> [PendingTrigger]
 eventTriggers events gs =
   let -- CR 702.70a: a keyword can BE a triggered ability, so a permanent's
@@ -10069,7 +10202,19 @@ eventTriggers events gs =
             bindings = maybe Map.empty Object.bindings (Game.lookupObject oid gs)
             fires ab = matchesTriggerGiven bindings gs oid ctrl (TriggeredAbility.condition ab) event
             pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings (Map.lookup oid becameInGraveyard) (TriggeredAbility.condition ab) event) Nothing
-         in fmap pend (filter fires abilities)
+            -- CR 603.2c's key, for `oncePerBatch` below: which ability of which
+            -- bearer this pending trigger came from, or Nothing when the condition
+            -- is per-occurrence and every member of the batch is its own trigger
+            -- event. Keyed by the ability's POSITION in the bearer's list rather
+            -- than by the ability itself, so a permanent printing the same batch
+            -- condition twice keeps both -- no equality on TriggeredAbility is
+            -- needed and none is assumed.
+            key (index, ab) =
+              if batchScoped (TriggeredAbility.condition ab)
+                then Just (oid, index :: Natural)
+                else Nothing
+            keyed indexed = (key indexed, pend (snd indexed))
+         in fmap keyed (filter (fires . snd) (zip [0 ..] abilities))
       -- Map.unions is left-biased, so the battlefield reading wins over a
       -- last-known one, a cycled card and a graveyard reading. That rules out a
       -- double fire: one entry per id means one pass of `forOne` per id.
@@ -10097,12 +10242,36 @@ eventTriggers events gs =
       -- in the hand, which no other source reads.
       candidates onBattlefield event later same arrivedAfter = Map.toAscList (Map.unions [onBattlefield, leftBattlefield event, later, same, cycledCard event, spellCast event, revealedInHand event, Map.withoutKeys inGraveyards arrivedAfter, arrivedInGraveyard event, inCommand, inExile])
       scanOne onBattlefield later same arrivedAfter event = concatMap (forOne event) (candidates onBattlefield event later same arrivedAfter)
+      -- CR 603.2c's second sentence, applied to ONE event group: a batch-scoped
+      -- condition's trigger event is the whole group, so it triggers once however
+      -- many of the group's members matched, where a per-occurrence condition
+      -- triggers once per member (CR 603.2c's own Example, the sweeper that fires a
+      -- "whenever A land is put into a graveyard" ability once per land).
+      --
+      -- The FIRST match wins rather than the last, which keeps the canonical order
+      -- below intact: this drops later duplicates and reorders nothing, so a batch
+      -- trigger sits exactly where its earliest matching event would have put it.
+      -- Which member won is unobservable anyway -- eventBindingSlots gives a
+      -- batch-scoped condition no slots, so every duplicate carries identical
+      -- bindings.
+      --
+      -- Per GROUP and never per scan: several groups can share one CR 117.5 scan
+      -- (GameState.scannedThrough is not bumped until the scan ends), and CR 704.3
+      -- makes each state-based-action pass its own single event. Board 3 of
+      -- Pawl.ZoneTriggerSpec's "one or more" group is what tells those apart.
+      oncePerBatch seen entries = case entries of
+        [] -> []
+        (k, trigger) : rest -> case k of
+          Nothing -> trigger : oncePerBatch seen rest
+          Just batch
+            | Set.member batch seen -> oncePerBatch seen rest
+            | otherwise -> trigger : oncePerBatch (Set.insert batch seen) rest
       -- The battlefield reading is per GROUP and so is hoisted out of the block:
       -- every event in one group happened at the same time, so they share it. A
       -- group with no events cannot occur -- List.groupBy yields no empty block.
       scanBlock block later same arrivedAfter = case block of
         [] -> []
-        entry : _ -> concatMap (scanOne (onBattlefieldAt (LoggedEvent.group entry)) later same arrivedAfter . LoggedEvent.event) block
+        entry : _ -> oncePerBatch Set.empty (concatMap (scanOne (onBattlefieldAt (LoggedEvent.group entry)) later same arrivedAfter . LoggedEvent.event) block)
    in concat (List.zipWith4 scanBlock groups laterGroups sameGroup arrivedLater)
 
 -- CR 113.6m, read off a TRIGGERED ability: "an ability whose cost or effect
@@ -10401,6 +10570,9 @@ zonesTriggeredFrom cond = case cond of
   -- The same answer one step further: this condition's bearer is not the permanent
   -- that died at all, and watches from the battlefield.
   TriggerCondition.PermanentDies _ -> battlefield
+  -- The batch reading watches from the battlefield too, and for the arm above's
+  -- reason: its bearer is a bystander.
+  TriggerCondition.PermanentsDie _ -> battlefield
   -- The same CR 603.10a answer as both dies conditions, and harder to miss here:
   -- the destination may be a hand or library, and an ability found in a GRAVEYARD
   -- could not be what fired for a permanent that went somewhere else.
@@ -10612,6 +10784,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
   TriggerCondition.SelfDies -> False
   TriggerCondition.PermanentDies _ -> False
+  TriggerCondition.PermanentsDie _ -> False
   TriggerCondition.SelfLeavesTheBattlefield -> False
   TriggerCondition.PermanentLeavesTheBattlefield _ -> False
   -- Rule 702.55b names no turn.
@@ -10796,6 +10969,7 @@ stateTriggers gs
               TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
               TriggerCondition.SelfDies -> False
               TriggerCondition.PermanentDies _ -> False
+              TriggerCondition.PermanentsDie _ -> False
               TriggerCondition.SelfLeavesTheBattlefield -> False
               TriggerCondition.PermanentLeavesTheBattlefield _ -> False
               TriggerCondition.HauntedCreatureDies -> False

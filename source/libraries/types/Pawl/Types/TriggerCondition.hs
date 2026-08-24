@@ -471,6 +471,25 @@ data TriggerCondition
     -- for SelfDies: Pawl.Engine.Binding.became holds the graveyard incarnation,
     -- which Promise of Tomorrow's "exile it" reads.
     PermanentDies (Filter.Filter Keyword.Keyword)
+  | -- | CR 603.2c's other reading of the same written form: "whenever ONE OR MORE
+    -- other creatures you control die" (Vengeful Townsfolk). PermanentDies' Filter
+    -- and PermanentDies' zone pair, scoped to the BATCH instead of to the member --
+    -- CR 704.3 and CR 608.2f make a whole sweep one event, so that event contains
+    -- one occurrence of this trigger however many permanents it buried, where
+    -- PermanentDies' event is each death and CR 603.2c's own Example fires it once
+    -- per land.
+    --
+    -- SelfBlocksOneOrMore is the same fork on the blocking side, and the two are
+    -- built differently for a rules reason rather than a stylistic one: a blocking
+    -- declaration has ONE emitter, so its arity is built into the event
+    -- (GameEvent.BlocksDeclared), while deaths reach a graveyard from four
+    -- unrelated places and what makes them one event is the Pawl.Types.EventGroup
+    -- the log stamps. So the grouping is read in Pawl.Engine.Event.eventTriggers,
+    -- which is the only reader that has it.
+    --
+    -- Binds nothing where PermanentDies binds CR 400.7e's graveyard card: a batch
+    -- may bury several, and no printing of this wording names one of them.
+    PermanentsDie (Filter.Filter Keyword.Keyword)
   | -- | CR 603.6c's first written form taken whole -- "when [this object] leaves
     -- the battlefield", so an exile, a bounce and a shuffle into a library all
     -- fire it (Thragtusk). Self-scoped and a LOOK-BACK for SelfDies' reasons.

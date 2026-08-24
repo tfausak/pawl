@@ -1685,6 +1685,12 @@ representativeEvents cond =
         TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> one (moved Zone.Hand Zone.Graveyard)
         TriggerCondition.SelfDies -> one (moved Zone.Battlefield Zone.Graveyard)
         TriggerCondition.PermanentDies _ -> one (moved Zone.Battlefield Zone.Graveyard)
+        -- The same one event, and NOT because the batch reading matches nothing:
+        -- Event.matchesTrigger answers alike for both (its PermanentsDie arm
+        -- delegates to PermanentDies'), CR 603.2c's once-per-batch scoping living
+        -- in Event.eventTriggers instead. So the floor this pin asserts is the
+        -- same floor, read off the same event.
+        TriggerCondition.PermanentsDie _ -> one (moved Zone.Battlefield Zone.Graveyard)
         -- CR 603.6c admits every destination, and CR 400.2 splits them into
         -- public and hidden, so both sides of CR 400.7e's proviso have to be
         -- here for the floor to be the honest answer. Rule 603.6c's second
@@ -1865,6 +1871,7 @@ everyTriggerCondition =
   [ TriggerCondition.SelfEnters,
     TriggerCondition.PermanentEnters Filter.Type.IsSource,
     TriggerCondition.PermanentDies Filter.Type.IsSource,
+    TriggerCondition.PermanentsDie Filter.Type.IsSource,
     TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.EachTurn),
     TriggerCondition.StateIs (Condition.Type.Compares (Compares.MkCompares (Quantity.Type.Literal 0) Comparison.Exactly (Quantity.Type.Literal 0))),
     TriggerCondition.SelfDealsCombatDamageToPlayer,

@@ -353,6 +353,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PermanentDies (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You, Filter.Not Filter.IsSource]))
       " {\"type\":\"PermanentDies\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},{\"type\":\"Not\",\"value\":{\"type\":\"IsSource\"}}]}} "
+  -- CR 603.2c's batch reading of that same form, carrying the same Filter -- so a
+  -- separate tag is the only thing that keeps the once-per-batch card and the
+  -- once-per-death card apart on the wire.
+  Spec.it s "PermanentsDie round-trips with its Filter" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PermanentsDie (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You, Filter.Not Filter.IsSource]))
+      " {\"type\":\"PermanentsDie\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},{\"type\":\"Not\",\"value\":{\"type\":\"IsSource\"}}]}} "
   -- CR 603.6c's first written form, a separate tag from SelfDies above: the two
   -- must never decode to each other.
   Spec.it s "SelfLeavesTheBattlefield" $
