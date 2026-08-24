@@ -665,6 +665,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.AttachedCreatureMentors -> []
   -- CR 700.4's is nullary as well, for the same reason.
   TriggerCondition.AttachedCreatureDies -> []
+  TriggerCondition.AttachedCreatureBecomesTapped -> []
   -- Nor does CR 702.149c's, for the same reason.
   TriggerCondition.SelfTrains -> []
   -- CR 701.21a's is nullary too, so it holds no Quantity either.
@@ -3030,6 +3031,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 303.4b's "enchanted creature" is one permanent rather than a class of
   -- them too, so this condition carries no Filter either.
   TriggerCondition.AttachedCreatureDies -> []
+  TriggerCondition.AttachedCreatureBecomesTapped -> []
   -- CR 702.149c's carries none either: it names "this creature" and nothing about
   -- it to narrow by.
   TriggerCondition.SelfTrains -> []

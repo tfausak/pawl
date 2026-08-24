@@ -387,6 +387,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.AttachedCreatureDies
       " {\"type\":\"AttachedCreatureDies\"} "
+  -- CR 701.26a's tap read off the enchanted permanent. Nullary for
+  -- AttachedCreatureDies' reason, and the TAG is the whole difference between the
+  -- two -- both are the same attachment link watched for a different event.
+  Spec.it s "AttachedCreatureBecomesTapped" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.AttachedCreatureBecomesTapped
+      " {\"type\":\"AttachedCreatureBecomesTapped\"} "
   -- CR 702.55b/702.55c's exile-zone death watch. Nullary: the link it matches on
   -- is board state, so nothing about it rides the condition.
   Spec.it s "HauntedCreatureDies" $

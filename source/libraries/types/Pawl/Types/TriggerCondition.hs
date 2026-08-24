@@ -551,6 +551,27 @@ data TriggerCondition
     -- this rule, and lives with the other zone-change slots:
     -- Pawl.Engine.Event.eventBindings binds the arrival under Binding.became.
     AttachedCreatureDies
+  | -- | CR 701.26a's "became tapped" read off the permanent the BEARER IS
+    -- ATTACHED TO (Betrayal's "whenever enchanted creature becomes tapped").
+    -- WHICH permanent is Object.attachedTo, AttachedCreatureDies' scoping and
+    -- for its reason: CR 303.4b's "enchanted creature" is a link the Aura
+    -- records, not a class a Filter could name.
+    --
+    -- CR 603.2e is the whole of what "becomes" adds, and both halves of it are
+    -- discharged by the EVENT rather than here: a permanent entering the
+    -- battlefield tapped records none, and rule 701.26a's "only untapped
+    -- permanents can be tapped" means a second tap records none either.
+    --
+    -- Vacuously False while the source is attached to nothing, or to a player
+    -- (CR 303.4), AttachedCreatureDies again -- but read only LIVE, never through
+    -- CR 608.2h last known information: the host is still on the battlefield
+    -- (it just became tapped), so CR 704.5m has taken nothing off, and the Aura
+    -- is standing beside it.
+    --
+    -- Binds nothing. CR 109.5 answers Betrayal's "you" from the Aura's own
+    -- controller through Binding.triggerSource, and the tapped permanent is the
+    -- one the attachment link already names.
+    AttachedCreatureBecomesTapped
   | -- | CR 702.55b/702.55c: "when the creature this card haunts dies", borne by
     -- the haunting CARD IN EXILE. PermanentDies' zone pair; WHICH permanent is
     -- the one GameState.haunting files the bearer against, the link

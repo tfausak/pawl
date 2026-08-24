@@ -927,4 +927,25 @@ data GameEvent
     -- no "which declaration" tag either -- CR 701.43b lets a permanent be exerted
     -- more than once, so a second exert is a second event rather than a repeat.
     Exerted ObjectId.ObjectId
+  | -- | CR 701.26a: this permanent BECAME TAPPED, turning sideways from an
+    -- upright position. Appended by Pawl.Engine.Event.tap alone, the funnel every
+    -- route that taps a permanent goes through -- a cost component
+    -- (Pawl.Engine.Cost.tapObject), the Effect.Tap opcode, CR 508.1f's attacker
+    -- declaration and CR 701.19a's regeneration.
+    --
+    -- Rule 701.26a's second sentence, "only untapped permanents can be tapped",
+    -- is why the funnel is the sole appender: it records this only for a
+    -- permanent that was untapped, so a second tap of an already-tapped
+    -- permanent is no event at all. CR 603.2e states the other exclusion --
+    -- a permanent that ENTERS tapped never transitioned, so
+    -- Pawl.Engine.Event.enterTapped and Pawl.Engine.Resolve.putTapped append
+    -- nothing.
+    --
+    -- The tapped permanent's id ALONE, Exerted's shape. What CAUSED the tap --
+    -- a cost, an attack, an effect, a regeneration -- is not carried: no card in
+    -- `data/cards/` distinguishes them, and CR 603.10's default reading applies
+    -- (a becomes-tapped trigger is not on CR 603.10a's look-back list), so the
+    -- board answers every other question about the permanent live. Adding the
+    -- field is the job of the card that reads it.
+    BecameTapped ObjectId.ObjectId
   deriving (Eq, Ord, Show)
