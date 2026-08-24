@@ -1,8 +1,7 @@
 module Pawl.Types.Expiry where
 
 import qualified Pawl.Types.AfterTurn as AfterTurn
-import qualified Pawl.Types.Cost as Cost
-import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.PaidExpiry as PaidExpiry
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.While as While
@@ -71,5 +70,11 @@ data Expiry
     -- the offer quotes and what the payment charges. Both halves of one printed
     -- sentence therefore end together -- every effect the resolution stored
     -- carries this same arm and the same source.
-    WhenPaid (Cost.Cost Keyword.Keyword)
+    --
+    -- Carries the SEAT beside it, as While above does: CR 109.5's "you" for an
+    -- activated ability is the player who activated it, so the offer is baked at
+    -- arming time rather than re-read off the source's current controller. A
+    -- Licid taken by Confiscate after it animated itself is the board that tells
+    -- the two apart.
+    WhenPaid PaidExpiry.PaidExpiry
   deriving (Eq, Ord, Show)

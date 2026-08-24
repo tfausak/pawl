@@ -15,6 +15,7 @@ import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.PaidExpiry as PaidExpiry
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -88,12 +89,13 @@ spec s = Spec.describe s "Pawl.Codec.Expiry" $ do
       s
       (Codec.encode Expiry.codec (Expiry.AtEndOf PhaseSelector.CombatPhase) /= Codec.encode Expiry.codec (Expiry.AtEndOf (PhaseSelector.Step (Phase.Combat CombatStep.EndOfCombat))))
       "the phase and its own end-of-combat step encode differently"
-  -- CR 116.2c, carrying the price the offer quotes. Distinct from Never, which
-  -- outlasts every window too: Pawl.Engine.EndEffect finds the effects a payment
-  -- ends by this arm, so the two cannot be collapsed.
-  Spec.it s "WhenPaid carries the cost" $
+  -- CR 116.2c, carrying the price the offer quotes and the seat CR 109.5 gives
+  -- it. Distinct from Never, which outlasts every window too:
+  -- Pawl.Engine.EndEffect finds the effects a payment ends by this arm, so the
+  -- two cannot be collapsed.
+  Spec.it s "WhenPaid carries the cost and the seat" $
     Common.assertCodec
       s
       Expiry.codec
-      (Expiry.WhenPaid (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Blue)])) []))
-      " {\"type\":\"WhenPaid\",\"value\":{\"mana\":[{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Blue\"}}}]}} "
+      (Expiry.WhenPaid (PaidExpiry.MkPaidExpiry (PlayerId.MkPlayerId 2) (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Blue)])) [])))
+      " {\"type\":\"WhenPaid\",\"value\":{\"player\":2,\"cost\":{\"mana\":[{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Blue\"}}}]}}} "

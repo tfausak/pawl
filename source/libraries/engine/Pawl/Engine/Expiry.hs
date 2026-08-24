@@ -39,7 +39,6 @@ import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
 import qualified Pawl.Types.AfterTurn as AfterTurn
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
-import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import Pawl.Types.Duration (Duration)
 import qualified Pawl.Types.Duration as Duration
@@ -50,9 +49,9 @@ import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.IgnoredAbility as IgnoredAbility
-import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.PaidExpiry as PaidExpiry
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import Pawl.Types.PlayerId (PlayerId)
@@ -103,10 +102,15 @@ arm players controller source duration gs = case duration of
   -- there is nothing about the game to bake in, because the sweep ends the
   -- effect at the first combat phase whose end it sees (#525).
   Duration.UntilEndOfCombat -> Just (Expiry.AtEndOf PhaseSelector.CombatPhase)
-  -- CR 116.2c: nothing about the game is baked in, because nothing about the game
-  -- ends this -- the PRICE is the whole of it, and it is carried through unchanged
-  -- so the offer below can quote it and the payment charge it.
-  Duration.UntilPaid cost -> Just (Expiry.WhenPaid cost)
+  -- CR 116.2c: nothing about the game's clock is baked in, because no window of
+  -- the turn ends this -- the PRICE is carried through unchanged so the offer
+  -- below can quote it and the payment charge it. The SEAT is baked, as
+  -- UntilYourNextTurn's is: `controller` here is the resolving object's
+  -- controller, stamped at the ability's creation (CR 602.2a, Resolve's
+  -- effectController), which is exactly CR 109.5's "the player who activated the
+  -- ability" -- and unlike that rule's static-ability sentence it must not follow
+  -- the source's control afterwards.
+  Duration.UntilPaid cost -> Just (Expiry.WhenPaid (PaidExpiry.MkPaidExpiry controller cost))
 
 -- CR 514.2: "until end of turn" and "this turn" effects end during the cleanup
 -- step. Delete-and-recompute (design.md 2.5): dropping the stored entry makes
@@ -380,21 +384,21 @@ dropAtEndOf ending gs =
           GameState.objects = clearedPermissions (survives . ExilePlayPermission.expiry) gs
         }
 
--- CR 116.2c: every (source, cost) pair a payment could end right now. The one
--- reader of Expiry.WhenPaid outside the sweeps, and the reason that arm is not
--- Expiry.Never -- a duration nothing ends by time still has to be FINDABLE by
--- the player who may end it.
+-- CR 116.2c: every offer a payment could end right now, paired with the object
+-- that stored it. The one reader of Expiry.WhenPaid outside the sweeps, and the
+-- reason that arm is not Expiry.Never -- a duration nothing ends by time still
+-- has to be FINDABLE by the player who may end it.
 --
 -- Every carrier, not just the continuous effects: Pawl.Types.Duration is one
 -- vocabulary and any opcode taking a duration could print this one, so a carrier
 -- left out here would hold an effect that is offered to nobody and ends never.
--- The pair is the source and the price, which is all CR 116.2c needs -- WHICH of
--- the source's effects is not asked, since one printed sentence stores several
--- and the rule ends the sentence.
-paidExpiries :: GameState -> [(ObjectId, Cost.Cost Keyword)]
+-- The pair is the source and the offer -- the price and CR 109.5's seat, which
+-- is all CR 116.2c needs. WHICH of the source's effects is not asked, since one
+-- printed sentence stores several and the rule ends the sentence.
+paidExpiries :: GameState -> [(ObjectId, PaidExpiry.PaidExpiry)]
 paidExpiries gs =
   let paid (source, expiry) = case expiry of
-        Expiry.WhenPaid cost -> [(source, cost)]
+        Expiry.WhenPaid paidExpiry -> [(source, paidExpiry)]
         Expiry.AtCleanup -> []
         Expiry.Never -> []
         Expiry.While {} -> []
