@@ -1388,9 +1388,12 @@ putOntoBattlefieldAttacking oid = do
 -- putOntoBattlefieldAttacking does not guard it either: no printing is both.
 --
 -- The last two guards are REGRESSION FENCES rather than proved behaviour:
--- dropping both leaves the whole suite green. The pool's one producer is Flash
--- Foliage, whose target slot admits only an attacking creature an opponent
--- controls and is re-read at CR 608.2b, so no board reaches this function with
+-- dropping both leaves the whole suite green. Neither pooled producer can reach
+-- them. Flash Foliage's target slot admits only an attacking creature an
+-- opponent controls and is re-read at CR 608.2b; Aetherplasm's slot is the
+-- attacker its own blocking trigger bound, which CR 509.1a already had attacking
+-- that same defending player, a planeswalker they control or a battle they
+-- protect -- rule 506.3e's three cases exactly. So no board reaches this function with
 -- an attacker that has left combat or one attacking somebody else. The second
 -- becomes reachable under CR 802's attack-multiple-players (#175); the first
 -- needs a card that removes the target from combat between targeting and

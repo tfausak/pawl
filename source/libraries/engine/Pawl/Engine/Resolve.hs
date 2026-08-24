@@ -272,8 +272,11 @@ riderQuantities = Map.elems . EntryRiders.counters
 -- every other rider is a flag or a Quantity (riderQuantities above). Read singly
 -- -- CR 509.4 names one attacking creature.
 --
--- Create alone reaches it, which is where the rider is applied; a MoveToZone
--- carrying one would be inert card data, and Pawl.CardSpec lints that none does.
+-- BOTH opcodes reach it, and both apply it: a Create hands its tokens to
+-- Pawl.Engine.Combat.putOntoBattlefieldBlocking from the minting loop (Flash
+-- Foliage), a MoveToZone hands the card it moved to the same function from
+-- moveOne (Aetherplasm). What stays inert is the rider on a destination other
+-- than the battlefield, which Pawl.CardSpec lints.
 riderSlots :: EntryRiders.EntryRiders count -> Map.Map SlotName SlotArity
 riderSlots = maybe Map.empty oneSlot . EntryRiders.blocking
 
@@ -457,7 +460,7 @@ slotsOf effect = case effect of
   Effect.TurnFaceUp slot -> oneSlot slot
   Effect.RemoveFromCombat ref -> objectRefSlots ref
   Effect.BecomesBlocked slot -> oneSlot slot
-  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _) -> joinTwo (objectRefSlots ref) (joinSlots (fmap quantitySlots (riderQuantities riders)))
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _) -> joinSlots [objectRefSlots ref, joinSlots (fmap quantitySlots (riderQuantities riders)), riderSlots riders]
   -- CR 121.1's bound slot is a DEFINITION, not a read: see boundSlots below.
   Effect.Draw (Draw.MkDraw ref quantity _) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   -- The tally's slot and CR 701.17c's are DEFINITIONS, not reads: see boundSlots
@@ -1471,10 +1474,13 @@ resolveModesWith runSubgame stackId srcId modes = do
                 Monad.foldM_
                   ( \(answers, ran) (cIdx, clause) -> do
                       -- CR 608.2c's "If you do" first, off the same fold the
-                      -- spell path keeps. A REGRESSION FENCE on this path: no
-                      -- ability in data/cards/ writes `ifTaken`, so mutating this
-                      -- conjunct away leaves the suite green -- the same hole
-                      -- every clause gate on this loop has, see #1887.
+                      -- spell path keeps. Proved on this path, not merely
+                      -- fenced: Aetherplasm's second clause hangs on its first,
+                      -- and Pawl.CombatEffectSpec's "declining to return
+                      -- Aetherplasm skips the clause its 'If you do' hangs on"
+                      -- reddens when this conjunct is defeated. What #1887 still
+                      -- covers on this loop is the OTHER gate -- an observable
+                      -- MANDATORY clause standing before a printed "may".
                       let hangs = ifTakenHolds ran clause
                       -- CR 701.46a's printed "if" next, read against `srcId` --
                       -- the rule says "this permanent", which is also why
@@ -3729,16 +3735,23 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- a split card's instant and sorcery halves), and no such spell is a
         -- member of a batch entering the battlefield. A card whose ZoneChangeR
         -- named the battlefield would separate them.
-        moveOne frozen before (sofar, acc) (target, position) = do
+        moveOne mBlocked frozen before (sofar, acc) (target, position) = do
           mNew <- Event.changeZoneEnteringIn (Just before) sofar target zone position frozen (Just controller)
           -- CR 614.6: the move was cancelled, or the id was already gone (CR
           -- 603.7c). Nothing entered, so there is nothing to bind.
-          Monad.forM_ mNew $ \newId ->
+          Monad.forM_ mNew $ \newId -> do
             -- CR 508.4, via Pawl.Engine.Combat -- which is also what keeps this
             -- from looking like a declaration, so CR 508.3a's attack triggers see
             -- nothing. CR 506.3b refuses a controller who is not the active
             -- player, which the funnel above has already settled.
             Monad.when (EntryRiders.attacking entry) (Combat.putOntoBattlefieldAttacking newId)
+            -- CR 509.4, the blocking twin one rule over, through the same
+            -- Pawl.Engine.Combat function the Create arm hands its tokens to, so
+            -- CR 506.3e and CR 509.4a's two no-op conditions are decided in one
+            -- place whichever opcode put the creature there. The attacker was
+            -- read ONCE ahead of this fold (see mBlocked below), so CR 608.2f's
+            -- single event cannot see it move between members.
+            Monad.forM_ mBlocked (Combat.putOntoBattlefieldBlocking newId)
           pure (maybe sofar (`Set.insert` sofar) mNew, mNew : acc)
         -- The context a CHOICE's candidates are filtered in, off the board the
         -- choice is being made on: the resolution's own slots ride along, so a
@@ -3920,7 +3933,25 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- board and before the fold, so no member of the batch can see how many
           -- counters an earlier member arrived with (CR 608.2f).
           let frozen = freezeRiders (effectViewOf source legal before) (chooseContext before) before resolving source entry
-          arrived <- fmap (reverse . snd) (Monad.foldM (moveOne frozen before) (Set.empty, []) arrivals)
+          -- CR 509.4's parenthetical: the attacking creature the effect
+          -- SPECIFIED, named by slot. Read ONCE, ahead of the fold and off the
+          -- same pre-move board the riders' counts were settled on, so CR 608.2f's
+          -- single event cannot see it move; through fromAmongMembers, the reader
+          -- every "the object this slot names" site shares, so a targeted slot
+          -- and one a trigger bound (Aetherplasm's "that creature") read the same
+          -- way.
+          --
+          -- Exactly one object or nothing: CR 509.4 names ONE attacking creature,
+          -- and no printing names several. Nothing here is Combat's own no-op
+          -- case anyway.
+          mBlocked <- case EntryRiders.blocking entry of
+            Nothing -> pure Nothing
+            Just slot -> do
+              named <- fromAmongMembers legal resolving chosen slot
+              pure $ case named of
+                [attacker] -> Just attacker
+                _ -> Nothing
+          arrived <- fmap (reverse . snd) (Monad.foldM (moveOne mBlocked frozen before) (Set.empty, []) arrivals)
           Monad.mapM_ (\slot -> bindArrivals slot (Maybe.catMaybes arrived)) mSlot
   -- CR 701.24: shuffle the objects the ref names into their OWNERS' libraries. Two
   -- steps: CR 400.7's move through the same changeZone funnel every destination
