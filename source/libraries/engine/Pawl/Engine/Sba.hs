@@ -783,7 +783,11 @@ performStateBasedActions = Event.simultaneously $ do
   -- `let`.
   Monad.mapM_ (Departure.depart Departure.Type.Lost) (List.reverse leaving)
   departed <- State.get
-  let -- CR 704.5d: a token in any zone other than the battlefield ceases to exist.
+  let -- CR 704.5d and CR 704.5e: the two objects the rules say cease to exist
+      -- outside one zone -- a token anywhere but the battlefield, a copy of a
+      -- spell anywhere but the stack. ONE pass, because CR 704.3 makes the whole
+      -- check one event and the two arms differ only in the zone.
+      --
       -- Computed from the post-bury state so a token that just died (now in the
       -- graveyard) or was redirected (Rest in Peace -> exile) is removed here; its
       -- move already emitted a zone-change event, so a future dies-trigger still

@@ -2918,7 +2918,10 @@ chooseNewTargetsFor controller copyId = do
           fresh = Target.legalSets (Just controller) Map.empty copyId slots gs
           offer slot recipients = (Natural.length recipients, Set.union recipients (Map.findWithDefault Set.empty slot fresh))
           asked = Map.mapWithKey offer current
-      Monad.unless (all (\(recipients, (_, offered)) -> recipients == offered) (Map.elems (Map.intersectionWith (,) current asked))) $ do
+          -- Every slot answerable only one way means the options are
+          -- indistinguishable, and CR 707.10c's offer is elided.
+          settled slot = Set.isSubsetOf (Map.findWithDefault Set.empty slot fresh)
+      Monad.unless (and (Map.elems (Map.mapWithKey settled current))) $ do
         answer <- Game.choose (Prompt.ChooseTargets (Decide.deciderFor controller gs) controller copyId asked)
         let admits (n, offered) picked = Natural.length picked == n && Set.isSubsetOf picked offered
             wellFormed =
@@ -4624,7 +4627,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- minted against the live state, since a fresh id and a fresh timestamp are
     -- both counters the previous mint moved.
     Monad.forM_ (objectRefObjects legal resolving controller source gs ref) $ \original ->
-      Monad.forM_ (Game.lookupObject original gs) $ \obj ->
+      -- CR 707.10 copies a SPELL, which Game.isSpell classifies off the object's
+      -- zone and its Source -- so an ObjectRef that named a card in a graveyard
+      -- copies nothing, that being CR 707.13's different act (#888).
+      Monad.forM_ (if Game.isSpell original gs then Game.lookupObject original gs else Nothing) $ \obj ->
         -- CR 707.10's three nouns, and only the first is implemented: an
         -- ObjectRef that named an ability on the stack finds no printing here
         -- and copies nothing (#2208). The classification is the object's KIND,
@@ -4652,6 +4658,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               copy =
                 obj
                   { Object.source = copySource,
+                    -- CR 707.10 puts the copy ONTO THE STACK, so the zone is the
+                    -- opcode's own rather than the copied object's -- which the
+                    -- guard above has already established was the stack.
+                    Object.zone = Zone.Stack,
                     Object.owner = controller,
                     Object.enteredUnder = Just controller,
                     Object.timestamp = ts,
@@ -4670,7 +4680,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                     -- controller the copying effect's controller instead. Every
                     -- other binding is a DECISION, which CR 707.10 copies
                     -- verbatim.
-                    Object.bindings = Binding.setYou controller (Binding.setCopy (Event.copiedSnapshot original gsNow) (Object.bindings obj))
+                    Object.bindings = Binding.setYou controller (Binding.setCopy (Event.copiedSnapshot original gs) (Object.bindings obj))
                   }
           State.put (Game.insertIntoZone Zone.Stack LibraryPosition.defaultValue controller copyId gs2 {GameState.objects = Map.insert copyId copy (GameState.objects gs2)})
           Monad.when newTargets (chooseNewTargetsFor controller copyId)
@@ -5578,8 +5588,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- CR 724.1c, and the two are indistinguishable: nothing happens between the
     -- exile and that check, and Game.cease is already what CR 608.2n, CR 603.3c
     -- and CR 701.6a use for an ability, which is not a card and so has no zone to
-    -- arrive in (CR 400.7 mints nothing). A TOKEN copy of a spell does go through
-    -- the exile, because Pawl.Engine.Sba does implement CR 704.5d for it.
+    -- arrive in (CR 400.7 mints nothing). A token, and a copy of a spell, DO go
+    -- through the exile, Pawl.Engine.Sba implementing CR 704.5d and CR 704.5e for
+    -- them.
     --
     -- finishSpell still runs when this fold returns, and is a no-op for it: CR
     -- 400.7 minted a fresh incarnation in exile, so changeZone's lookup of the

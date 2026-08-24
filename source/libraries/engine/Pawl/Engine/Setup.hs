@@ -656,7 +656,9 @@ subgameStateFrom starter parent =
 -- `finalSub`: CR 400.7 mints a fresh id on every zone change, including the
 -- opening-hand draws, so a missing `movedIds` id is the ordinary case for a
 -- card that is alive under a new id. Nothing but objectsLeaveWith deletes a
--- real card's object outright (Sba's `ceaseToExist` guards on Source.OfToken),
+-- real card's object outright (Sba's `ceaseToExist` reaches only a Source the
+-- rules say is not a card -- a token under CR 704.5d, a copy of a spell under CR
+-- 704.5e),
 -- so its firing is the only thing that can need recovering.
 --
 -- Owner-absence rather than `Departure.continuesAfterDeparture finalSub`, which
