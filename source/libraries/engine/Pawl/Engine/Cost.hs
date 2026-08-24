@@ -259,6 +259,9 @@ candidateCostsFor name oid gs = case Game.lookupObject oid gs of
     Source.OfAbility _ -> []
     Source.OfTrigger _ -> []
     Source.OfEmblem _ -> []
+    -- CR 707.10: "a copy of a spell isn't cast", so it is never announced and
+    -- there is no cost to offer for it.
+    Source.OfSpellCopy _ -> []
     Source.OfInherentTrigger _ -> []
 
 -- CR 601.2f: the mana or alternative cost, plus additional costs and increases,

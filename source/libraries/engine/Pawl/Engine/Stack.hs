@@ -183,6 +183,24 @@ resolveTopWith runSubgame = do
         -- CR 114.5: an emblem is never on the stack (created into the command
         -- zone, never cast). Drop it, like a token.
         Source.OfEmblem _ -> State.put gs {GameState.stack = rest}
+        Source.OfSpellCopy _ -> case Game.faceOf oid gs of
+          -- Unreachable, the OfCard arm's reason: the printing this names was
+          -- interned before the original was ever cast.
+          Nothing -> State.put gs {GameState.stack = rest}
+          Just face ->
+            -- The SAME classification the OfCard arm makes, off the same
+            -- Game.faceOf: CR 112.1a's copy is a spell, so CR 608.2 resolves it
+            -- exactly as it resolves the original -- effects, then CR 608.2n's
+            -- graveyard, where CR 704.5e removes it.
+            --
+            -- Not implemented: CR 707.10f's other branch, where a copy of a
+            -- PERMANENT spell becomes a token permanent as it resolves rather
+            -- than entering the battlefield the way the card would. Such a copy
+            -- is dropped here (#2207). No card in the pool reaches it: Twincast,
+            -- the one producer, targets instants and sorceries.
+            if Card.isPermanent face
+              then State.put gs {GameState.stack = rest}
+              else Resolve.resolveSpellWith runSubgame oid
         Source.OfInherentTrigger InherentTriggerSource.MkInherentTriggerSource {InherentTriggerSource.ability = ability} ->
           -- An inherent ability has no source object, so the ability object
           -- itself stands in for one and Object.owner is its controller -- the

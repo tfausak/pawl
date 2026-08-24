@@ -897,8 +897,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- Pool.Abilities on an ACTIVATED ability, which is what makes the path
   -- reachable at all. Not implemented, so the card file omits it: its other
   -- ability, "{2}{U}, {T}: Copy target activated or triggered ability you
-  -- control. You may choose new targets for the copy" -- nothing copies an object
-  -- on the stack (#1006) -- which leaves pawl's Adric stricter than printed.
+  -- control. You may choose new targets for the copy" -- copying a SPELL on the
+  -- stack landed with Twincast, but copying an ABILITY did not (#2208) -- which
+  -- leaves pawl's Adric stricter than printed.
   -- "Ultimate Sacrifice" is an ability word (CR 207.2c) and Doctor's companion is
   -- deck construction (CR 903); neither has a rules meaning in play.
   --

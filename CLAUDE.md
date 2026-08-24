@@ -135,7 +135,10 @@ to agents as written. What it doesn't say:
   313/315, subgames, Commander, the Ring, dungeons).
 
 - Verify Oracle text with `curl -s
-  'https://api.scryfall.com/cards/named?fuzzy=<name>'`; WebFetch gets 403s.
+  'https://api.scryfall.com/cards/named?fuzzy=<name>'`; WebFetch gets 403s. The
+  SEARCH endpoint is stricter than that one: `/cards/search` answers 400 to
+  every regex query unless a `User-Agent` header is sent, where
+  `/cards/named` needs none.
   `_scratch/AllPrintings.json` is a dated MTGJSON dump: sound for FINDING a
   card, unsound for ruling one out. When grepping it there is no space after
   the colon (`"name":"Foo"`), and `rulings` sorts before `text`, so a hit near

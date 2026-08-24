@@ -7,6 +7,7 @@ import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.ChangeText as ChangeText
+import qualified Pawl.Types.CopySpell as CopySpell
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
@@ -467,6 +468,22 @@ data Effect card
     -- ("except it has this ability"), so pawl's Shapeshifter loses its own trigger
     -- as it copies and cannot copy again (#1292); and a stated duration (#1753).
     BecomeCopy BecomeCopy.BecomeCopy
+  | -- | CR 707.10: put a copy of a SPELL ON THE STACK onto the stack (Twincast).
+    -- The third of the copy opcodes and the only one whose product is not a
+    -- permanent: CreateCopy mints a token on the battlefield, BecomeCopy rewrites
+    -- one already there, and this mints a spell with no card behind it (CR
+    -- 112.1a) -- Pawl.Types.Source's OfSpellCopy, which is what CR 704.5e is then
+    -- able to ask about.
+    --
+    -- CR 707.10's "all decisions made for it" is why the mint CLONES the original
+    -- stack object rather than building one: the modes, the targets, the announced
+    -- X and every announced cost live on that object, and enumerating them here
+    -- would be a list to keep in step with Pawl.Types.Object.
+    --
+    -- Not implemented: copying an activated or triggered ability, CR 707.10's
+    -- other two nouns (#2208); and CR 707.10f's token permanent, which a copy of a
+    -- PERMANENT spell becomes as it resolves (#2207).
+    CopySpell CopySpell.CopySpell
   | -- | CR 614.3 / 615.3: install a floating replacement effect for a duration,
     -- with a use count, an origin and an optional condition. Fog and Drudge
     -- Skeletons' regeneration are both this opcode, differing only in the

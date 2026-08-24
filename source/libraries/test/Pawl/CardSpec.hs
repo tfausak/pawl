@@ -102,6 +102,7 @@ import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
+import qualified Pawl.Types.CopySpell as CopySpell
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostReduction as CostReduction
@@ -838,6 +839,9 @@ effectCounts effect = case effect of
   -- Neither a Quantity nor a Duration, so no Count can hide here; the refs'
   -- Filters are effectFilters' business below.
   Effect.BecomeCopy {} -> []
+  -- CR 707.10 copies one spell per named object and prints no count, so the
+  -- BecomeCopy arm above answers for this too.
+  Effect.CopySpell {} -> []
   -- The Condition is Galvanic Blast's and Synthetic Voltaic Surge's "if you
   -- control three or more artifacts", and its Counts are as much card data as a
   -- Duration's.
@@ -1077,6 +1081,7 @@ effectNestedEffects effect = case effect of
   Effect.Create {} -> []
   Effect.CreateCopy {} -> []
   Effect.BecomeCopy {} -> []
+  Effect.CopySpell {} -> []
   Effect.CreateEmblem {} -> []
   Effect.BecomeMonarch {} -> []
   Effect.Designate {} -> []
@@ -1525,6 +1530,7 @@ effectReplacements effect = case effect of
   Effect.Create (Create.MkCreate _ token _ _ _) -> overFaces cardReplacementEffects token
   Effect.CreateCopy {} -> []
   Effect.BecomeCopy {} -> []
+  Effect.CopySpell {} -> []
   Effect.CreateEmblem emblem -> overFaces cardReplacementEffects emblem
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> []
   Effect.ModifyTarget {} -> []
@@ -2172,6 +2178,8 @@ effectMintedFaces effect = case effect of
   Effect.CreateCopy {} -> []
   -- Mints nothing at all: it rewrites an existing permanent's copiable values.
   Effect.BecomeCopy {} -> []
+  -- Mints no face either: the copy's text is the copied spell's.
+  Effect.CopySpell {} -> []
   Effect.CreateEmblem emblem -> fmap ((,) MintedEmblem) (NonEmpty.toList (Card.Type.faces emblem))
   Effect.Replace (Replace.MkReplace _ _ _ _ replacement) -> concatMap effectMintedFaces (replacementEffectRiders replacement)
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> []
@@ -3656,6 +3664,8 @@ effectFilters effect = case effect of
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> unframed (quantityFilters quantity) <> sourceHosted (objectRefFilters ref)
   -- BOTH refs, RequireBlock's arm below: each EachMatching Filter is card text.
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) -> sourceHosted (objectRefFilters original <> objectRefFilters subject)
+  -- The one ref, CreateCopy's arm above: an EachMatching Filter is card text.
+  Effect.CopySpell (CopySpell.MkCopySpell ref _) -> sourceHosted (objectRefFilters ref)
   Effect.Replace (Replace.MkReplace duration _ _ condition replacement) -> unframed (durationFilters duration <> foldMap conditionFilters condition <> replacementEffectFilters replacement) <> concatMap effectFilters (replacementEffectRiders replacement)
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- The rider's Filters too, for CR 615.5. This is the traversal that dropped

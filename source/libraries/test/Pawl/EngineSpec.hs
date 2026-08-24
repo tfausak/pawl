@@ -50,6 +50,9 @@ cardBackedCount gs =
         Source.OfAbility _ -> False
         Source.OfTrigger _ -> False
         Source.OfEmblem _ -> False
+        -- CR 112.1a: no card is associated with a copy of a spell, so it is not
+        -- one of the cards this counts.
+        Source.OfSpellCopy _ -> False
         Source.OfInherentTrigger _ -> False
    in Map.size (Map.filter fromCard (GameState.objects gs))
 
