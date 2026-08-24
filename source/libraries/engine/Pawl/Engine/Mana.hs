@@ -97,7 +97,24 @@ import qualified Pawl.Types.Supertype as Supertype
 -- A CALLBACK rather than a call, for Pawl.Engine.Count.ViewOf's reason: those
 -- are Pawl.Engine.Cost's questions, and that module imports this one.
 -- Pawl.Engine.Cost.manaActivations is the only answer the engine passes.
-type Capacity = Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> Cost Keyword.Keyword -> [ActivationRestriction.ActivationRestriction] -> GameState -> Activations.Activations
+--
+-- The Measure is WHICH of the two questions below is being asked, and it is an
+-- argument rather than two capacities because only Pawl.Engine.Cost can tell
+-- them apart: the difference is whether the route's own mana part is asked about
+-- (`supplyCapacity`), and this module cannot reach the function that asks.
+type Capacity = Measure -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> Cost Keyword.Keyword -> [ActivationRestriction.ActivationRestriction] -> GameState -> Activations.Activations
+
+-- WHICH reader is asking a Capacity: CR 605.3a's windows, which offer a route
+-- only when its whole cost is payable right now, or the supply walk, which
+-- models the route's own mana as a DEMAND instead and so must not ask.
+--
+-- Every site that APPLIES a capacity passes ForOffer; `supplyCapacity` below is
+-- the one thing that substitutes ForSupply, which is what keeps the supply
+-- model a property of the walk rather than of who called it.
+data Measure
+  = ForOffer
+  | ForSupply
+  deriving (Bounded, Enum, Eq, Ord, Show)
 
 -- The same question asked by the SUPPLY WALK rather than at the offer: what one
 -- activation of this route puts on a board, with the mana CR 602.2b makes that
@@ -110,62 +127,37 @@ type Capacity = Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Obje
 -- supply too large offers a cast that then cannot be paid -- and counting such a
 -- route as nothing at all was the understatement this replaced (#1120).
 --
--- WHAT THIS DOES with the mana part is EMPTY it and ask `capacity` about
--- everything else -- the components, CR 302.6's settle, CR 701.35a's detain, CR
--- 602.5's rider. The demand itself is read off the route's printed cost, one
--- level up.
+-- WHAT THIS DOES is ask `capacity` the ForSupply question, which is the whole of
+-- the difference: Pawl.Engine.Cost.manaActivationsGiven then skips its CR 118.3
+-- read of the route's OWN mana part and answers about everything else -- the
+-- components, CR 302.6's settle, CR 701.35a's detain, CR 602.5's rider. The
+-- demand itself is read off the route's printed cost, one level up.
 --
--- Emptying it is also what makes the recursion terminate, and statically.
--- Pawl.Engine.Cost.manaActivationsGiven's CR 118.3 read asks canPayCommitting
--- whether its own route's mana part is payable, and the walk under THAT question
--- runs on this capacity again -- so a single Altar would ask about itself
--- forever. An emptied mana part lands on Pawl.Engine.Cost.manaPartPayable's
--- @Just (MkManaCost []) -> True@ arm, which walks nothing, so the nesting
--- bottoms out one level down whatever is on the board and whatever the pool
+-- Skipping that read is also what makes the recursion terminate, and statically.
+-- The CR 118.3 read asks canPayCommitting whether its own route's mana part is
+-- payable, and the walk under THAT question runs on this capacity again -- so a
+-- single Altar would ask about itself forever. ForSupply cuts the question, so
+-- the nesting bottoms out at once whatever is on the board and whatever the pool
 -- prints.
 --
--- Nothing is CR 118.6's unpayable cost and gets 0, which is manaPartPayable's
--- own first arm and so the answer the offer capacity would have given anyway.
+-- Nothing is CR 118.6's unpayable cost and gets 0, which is the answer the offer
+-- capacity would have given anyway.
 --
--- CAPPED AT ONE activation, because Pawl.Engine.Cost.repeatsOf reads the cost it
--- is handed: an emptied mana part reaches that function's claim, life and
--- counter ceilings, which would make a route repeatable that has to find its
--- mana again every time. A REGRESSION FENCE and not a proven line: exact for `data/cards/`,
--- where the Altar's {T} and Grinning Ignus's return each bound the claim ceiling
--- at 1 anyway, so lifting the cap leaves the suite green. A repeatable
--- mana-eating route is what would observe it.
---
--- Not implemented: a CR 601.2f adjustment scaled per COLORED SYMBOL of the
--- route's own mana part (Pawl.Types.CostScale.PerColoredSymbol). Emptying the
--- mana part empties what Pawl.Engine.Cost.plusComponents counts those symbols
--- in, so such an adjustment adds no component here -- an OVERSTATEMENT, and the
--- only one this function makes. Unobservable: Drought is the pool's one
--- PerColoredSymbol printing and it scales a SPELL's cost (#2151).
+-- ONE activation, and the cost it hands down is the PRINTED one, which is what
+-- keeps that true: Pawl.Engine.Cost.repeatsOf reads a non-empty mana part and
+-- answers 1, repeating a mana part being a way to spend mana that function has
+-- not measured.
 --
 -- APPLIED BY THE WALK, not by its callers: manaSuppliesGiven wraps whatever
 -- capacity it is handed, and canPayCommitting and payableResolutions wrap theirs
 -- before building a source list, so every entry point measures the same thing
 -- whoever called it. `capacity` is Pawl.Engine.Cost.manaActivations at every one.
+-- The incoming Measure is DISCARDED for that reason: a caller cannot ask the
+-- supply walk for the offer's answer.
 supplyCapacity :: Capacity -> Capacity
-supplyCapacity capacity pcs pid oid cost restrictions gs = case Cost.mana cost of
+supplyCapacity capacity _measure pcs pid oid cost restrictions gs = case Cost.mana cost of
   Nothing -> noActivations
-  Just (ManaCost.MkManaCost []) -> capacity pcs pid oid cost restrictions gs
-  Just _ ->
-    let answered = capacity pcs pid oid (cost {Cost.mana = Just (ManaCost.MkManaCost [])}) restrictions gs
-     in answered {Activations.times = min 1 (Activations.times answered)}
-
--- The supply question NARROWED to the routes that need no mana of their own,
--- which is what CR 605.3a's in-payment window offers while a mana ability's own
--- cost is being paid (Pawl.Engine.Cost.payManaExcept). A route whose cost holds
--- mana would open a window inside a window; refusing it outright is what bounds
--- that recursion, and #2094 is what the narrowing elides.
---
--- Separate from supplyCapacity above rather than a case of it: the supply walk
--- COUNTS such a route now, and this one still must not.
-manaFreeCapacity :: Capacity -> Capacity
-manaFreeCapacity capacity pcs pid oid cost restrictions gs = case Cost.mana cost of
-  Just (ManaCost.MkManaCost []) -> capacity pcs pid oid cost restrictions gs
-  _ -> noActivations
+  Just _ -> capacity ForSupply pcs pid oid cost restrictions gs
 
 -- No activation at all: the answer a Capacity gives for a route this player
 -- cannot take.
@@ -357,19 +349,20 @@ manaSuppliesGiven :: Capacity -> Map.Map ObjectId PC.ProjectedCharacteristics ->
 manaSuppliesGiven capacity pcs pid oid gs =
   let -- Applied HERE and not left to the caller: this is the one reader of a
       -- route's yield on the supply side, so wrapping it once is what makes the
-      -- model a property of the walk rather than of who called it. Idempotent on
-      -- an empty mana part, so a caller that has already wrapped its own copy (to
-      -- build the matching source list) loses nothing.
+      -- model a property of the walk rather than of who called it. Idempotent,
+      -- forcing ForSupply twice being forcing it once, so a caller that has
+      -- already wrapped its own copy (to build the matching source list) loses
+      -- nothing.
       supply = supplyCapacity capacity
-      measure option =
-        ( supply pcs pid oid (ManaOption.cost option) (ManaOption.restrictions option) gs,
+      measured option =
+        ( supply ForOffer pcs pid oid (ManaOption.cost option) (ManaOption.restrictions option) gs,
           ManaOption.yield option,
           -- CR 118.6's Nothing never survives the filter below, supplyCapacity
           -- answering 0 for it, so the empty stand-in is unreachable rather than
           -- a claim that such a route costs nothing.
           Maybe.fromMaybe (ManaCost.MkManaCost []) (Cost.mana (ManaOption.cost option))
         )
-      counted = fmap measure (manaOptionsOfGiven pcs oid gs)
+      counted = fmap measured (manaOptionsOfGiven pcs oid gs)
       available = filter (\(activations, _, _) -> Activations.times activations > 0) counted
       yieldOf (_, yield, _) = yield
       -- Ordered so `maximumBy` prefers the larger count, and a mana-free route
@@ -606,7 +599,7 @@ manaSourcesGiven capacity grants pcs pid gs =
       -- the tap and sickness rules reach only such a cost. A Blood Pet is a
       -- black source while tapped and on the turn it arrives, because
       -- "Sacrifice this creature: Add {B}" is neither (#1116).
-      isSource oid = any (\(cost, restrictions, _) -> Activations.times (capacity pcs pid oid cost restrictions gs) > 0) (manaRoutesOfGiven pcs oid gs)
+      isSource oid = any (\(cost, restrictions, _) -> Activations.times (capacity ForOffer pcs pid oid cost restrictions gs) > 0) (manaRoutesOfGiven pcs oid gs)
    in filter isSource (Projection.controlsGiven grants pid gs)
 
 -- What ONE mana must be to satisfy one typed symbol of a cost: one of these mana
@@ -626,12 +619,20 @@ data Demand = MkDemand
   deriving (Eq, Ord, Show)
 
 -- ONE mana the player could put toward a cost, as what it could be: the types it
--- might have, and the tags it would carry. A pool unit is the settled case (its
--- type is already fixed); an untapped source is the open one, where the choice
--- has not been made yet.
+-- might have, the tags it would carry, and whether CR 106.6 restricts what it
+-- may be spent on. A pool unit is the settled case (its type is already fixed);
+-- an untapped source is the open one, where the choice has not been made yet.
+--
+-- The RESTRICTION is a Bool and not the restriction itself, because the units
+-- reaching here have already been asked about the object being cast
+-- (`spendableAmong`): what is left to know is whether this mana is admissible to
+-- a payment that is NO cast -- a mana ability's own activation cost -- and every
+-- restriction in the vocabulary reads "spend this mana only to cast ...", so a
+-- restricted unit is refused by all of them (`spendableAmong`'s Nothing arm).
 data Supply = MkSupply
   { supplyTypes :: Set.Set ManaType,
-    supplyTags :: Set.Set ProductionTag.ProductionTag
+    supplyTags :: Set.Set ProductionTag.ProductionTag,
+    supplyRestricted :: Bool
   }
   deriving (Eq, Ord, Show)
 
@@ -642,6 +643,10 @@ data Supply = MkSupply
 -- types -- while tags are a SUPERSET: CR 107.4h demands mana from a snow source,
 -- and a mana that is not from one cannot become so. A supply carrying a tag
 -- nothing asked for is no worse for it.
+--
+-- The RESTRICTION is not read here: a demand carries no record of which payment
+-- it belongs to, and that is what CR 106.6 asks about.
+-- payableResolutionsGiven's `admits` is where the two meet.
 serves :: Supply -> Demand -> Bool
 serves supply demand =
   not (Set.disjoint (supplyTypes supply) (demandTypes demand))
@@ -700,7 +705,8 @@ supplyOf :: ManaUnit -> Supply
 supplyOf unit =
   MkSupply
     { supplyTypes = Set.singleton (ManaUnit.manaType unit),
-      supplyTags = ManaUnit.tags unit
+      supplyTags = ManaUnit.tags unit,
+      supplyRestricted = Maybe.isJust (ManaUnit.restriction unit)
     }
 
 -- CR 609.4b, applied to ONE mana type: what a mana of this type may be spent as
@@ -766,15 +772,15 @@ ofTypes :: Set.Set ManaType -> Demand
 ofTypes types = MkDemand {demandTypes = types, demandTags = Set.empty}
 
 -- A GENERIC symbol of a SOURCE's own activation cost, said as a demand: CR
--- 106.1b's six types and no tag, so every supply serves it.
+-- 106.1b's six types and no tag, so any supply's TYPE serves it.
 --
 -- A demand rather than a count, unlike the generic part of the cost being paid,
--- because a source's own mana is the half CR 605.3c restricts -- only the pool
--- and the mana-free sources may serve it (payableResolutionsGiven) -- and a
--- plain count cannot say which supplies it may draw on. Unobservable in
--- `data/cards/`, where Transmogrant Altar's {B} and Grinning Ignus's {R} are the
--- two mana-eating routes and neither is generic; kept because Hall's condition
--- would otherwise be asked of a demand it could not see.
+-- because a source's own mana is the half CR 605.3c and CR 106.6 both narrow --
+-- only what an earlier position supplies, and never a restricted unit
+-- (payableResolutionsGiven's `admits`) -- and a plain count cannot say which
+-- supplies it may draw on. Chromatic Star's "{1}, {T}, Sacrifice this artifact"
+-- and Coal Golem's "{3}, Sacrifice this creature" are the printings that reach
+-- it.
 anyTypeDemand :: Demand
 anyTypeDemand = ofTypes everyManaType
 
@@ -1501,13 +1507,17 @@ data SourceOption = MkSourceOption
 
 sourceOptions :: [SpendManaAsThough.SpendManaAsThough] -> Bool -> [(Activations.Activations, Mana, ManaCost)] -> [SourceOption]
 sourceOptions clauses contended supplies =
-  let unitLists = [((activations, manaCost), unitsOf yield) | (activations, yield, manaCost) <- supplies]
+  let -- CR 106.6 joins the key the narrow yields are grouped by, so the collapse
+      -- below never unions a restricted mana with an unrestricted one into a
+      -- supply that is neither. Such a source offers the two as separate
+      -- OPTIONS, which is what they are: one activation makes one or the other.
+      unitLists = [((activations, manaCost, any (Maybe.isJust . ManaUnit.restriction) (unitsOf yield)), unitsOf yield) | (activations, yield, manaCost) <- supplies]
       (narrow, wide) = List.partition (\(_, units) -> length units <= 1) unitLists
-      grouped = [(key, collapsed units) | (key, units) <- Map.toList (Map.fromListWith (<>) narrow)]
+      grouped = [(key, collapsed restricted units) | (key@(_, _, restricted), units) <- Map.toList (Map.fromListWith (<>) narrow)]
       apart = [(key, fmap (rewriteSupply clauses . supplyOf) units) | (key, units) <- wide]
    in List.nub (concatMap optionsFor (grouped <> apart))
   where
-    optionsFor ((activations, manaCost), offered) =
+    optionsFor ((activations, manaCost, _), offered) =
       let claims = Activations.claims activations
           life = Activations.life activations
           eats = not (null (ManaCost.unwrap manaCost))
@@ -1535,7 +1545,7 @@ sourceOptions clauses contended supplies =
           | k <- counts,
             (demands, generic, owed) <- resolved
           ]
-    collapsed units =
+    collapsed restricted units =
       if null units
         then []
         else
@@ -1543,7 +1553,8 @@ sourceOptions clauses contended supplies =
               clauses
               MkSupply
                 { supplyTypes = Set.fromList (fmap ManaUnit.manaType units),
-                  supplyTags = Set.unions (fmap ManaUnit.tags units)
+                  supplyTags = Set.unions (fmap ManaUnit.tags units),
+                  supplyRestricted = restricted
                 }
           ]
 
@@ -1703,14 +1714,11 @@ payableResolutionsGiven casting capacity spending sources pcs pid committed clai
       -- activation the board may take (its other units may serve), and taking it
       -- still costs what it costs.
       --
-      -- Not implemented: the narrowing asked a SECOND time, of the demands a
-      -- source's own activation makes. What survives here is admitted for the
-      -- CAST, and the board below may then let it serve a mana ability's cost
-      -- instead -- a payment that is no cast, which CR 106.6 admits none of this
-      -- mana to. The pool half has always read the same way, so the two halves
-      -- still agree; overstating supply this way offers a cast the payment then
-      -- refuses. No board in `data/cards/` reaches it: it wants a restricted
-      -- yield whose type serves a mana-eating route's own demand (#2175).
+      -- What survives is admitted for the CAST and no further: CR 106.6's
+      -- restriction is asked a SECOND time of the demands a source's own
+      -- activation makes, which are no cast, and `Supply.supplyRestricted`
+      -- carries the answer down to `admits` below. Pawl.ManaSpec's "CR 106.6 the
+      -- restricted red cannot pay the Star's {1}" is what proves it.
       spendableSupply (activations, yield, manaCost) =
         (activations, Mana.MkMana (fst (spendableAmong casting pid gs (unitsOf yield))), manaCost)
       activationsOf (activations, _, _) = Activations.claims activations
@@ -1727,42 +1735,59 @@ payableResolutionsGiven casting capacity spending sources pcs pid committed clai
       -- carries the LIFE its activations pay, which its CR 119.4 clause below is
       -- then asked about, and the MANA they eat, which its Hall clause does.
       --
-      -- Split in two by whether the option eats mana, and CR 605.3c is why: a
-      -- mana ability's yield reaches the pool when it RESOLVES (CR 106.4), and CR
-      -- 601.2g's window is over before CR 601.2h's payment, so the mana one
-      -- activation adds is not there to pay for that same activation -- nor for
-      -- another one taken in the same window, the ability having to have resolved
-      -- first. The pool and the mana-FREE options are what may serve a source's
-      -- own demand; a mana-eating option's supplies may serve only the cost being
-      -- paid.
+      -- ORDERED by CR 605.3c, and that ordering is the whole of the acyclicity:
+      -- once a player begins to activate a mana ability it cannot be activated
+      -- again until it has resolved, so the mana-eating options a board takes
+      -- happen one after another and never at once. The yield of one reaches the
+      -- pool on resolution (CR 106.4), which is before the next one's cost is
+      -- paid (CR 601.2g then CR 601.2h) -- so option i's supplies may serve
+      -- option j's demand for i < j, and no option's supplies may serve its own.
       --
-      -- Not implemented: a CHAIN, where one mana-eating route's yield pays the
-      -- next one's cost in sequence -- two Grinning Ignuses, the second's {R}
-      -- coming from the first. Legal, and understated here (#2152). That pair
-      -- reaches this function only on the roads that are no cast and no
-      -- activation (Pawl.Engine.Cost.canPay), CR 307.5's window being what CR
-      -- 601.2a's and CR 602.2a's move closes on the other two
-      -- (Pawl.Engine.Cost.stackedManaActivations).
+      -- Said as a POSITION on every supply and every demand, so the one Hall
+      -- check below reads it: the pool and the mana-FREE options sit at 0, the
+      -- k-th eating option puts both its supplies and its demands at k, and the
+      -- cost being paid demands at `costPosition`, past every one of them. A
+      -- supply serves a demand only from strictly earlier, which gives all three
+      -- readings at once.
+      --
+      -- The SEARCH grows by the permutations of the eating options a board takes,
+      -- and `orderings` walks exactly one where there are fewer than two -- which
+      -- is every board a single mana-eating source can build.
+      orderings taken = case taken of
+        [] -> [[]]
+        [_] -> [taken]
+        _ -> List.permutations taken
       boards =
-        [ ( pooled <> concatMap optionSupplies free,
-            concatMap optionSupplies eating,
-            concatMap optionDemands taken,
+        [ ( fmap ((,) (0 :: Natural)) (pooled <> concatMap optionSupplies free)
+              <> concat [fmap ((,) k) (optionSupplies option) | (k, option) <- ranked],
+            concat [fmap ((,) k) (optionDemands option) | (k, option) <- ranked],
+            costPosition,
             sum (fmap optionLife taken)
           )
         | taken <- sequenceA options,
           Claim.satisfiable (claimed <> concatMap optionClaims taken),
-          let (eating, free) = List.partition (not . null . optionDemands) taken
+          let (eating, free) = List.partition (not . null . optionDemands) taken,
+          order <- orderings eating,
+          let ranked = zip [1 :: Natural ..] order,
+          let costPosition = 1 + Natural.length eating
         ]
       payable (demands, generic, life) =
-        let fits (freeSupplies, eatingSupplies, eaten, spent) =
-              let -- Both sides tagged with the restriction, so Hall's condition
-                  -- reads ONE bipartite graph: a supply is FREE (the pool, or a
-                  -- source charging no mana) or not, and a demand is the source
-                  -- half (restricted to the free supplies) or the cost's own
-                  -- (served by any of them).
-                  wanted_ = fmap ((,) False) demands <> fmap ((,) True) eaten
-                  supplies = fmap ((,) True) freeSupplies <> fmap ((,) False) eatingSupplies
-                  admits (isFree, supply) (restricted, demand) = serves supply demand && (isFree || not restricted)
+        let fits (supplies, eaten, costPosition, spent) =
+              let -- Both sides tagged with their position, so Hall's condition
+                  -- reads ONE bipartite graph over the whole board: the cost's
+                  -- own demands sit past every option's, and an option's supplies
+                  -- and demands share a position.
+                  wanted_ = fmap ((,) costPosition) demands <> eaten
+                  -- CR 106.6 asked of the demand rather than of the mana: a
+                  -- restricted unit may pay the cast this walk is about and
+                  -- nothing else, so it serves the cost's own demands and never a
+                  -- mana ability's activation cost -- which is exactly what
+                  -- Pawl.Engine.Cost.payActivation does, paying with `casting`
+                  -- Nothing.
+                  admits (from, supply) (wantedAt, demand) =
+                    serves supply demand
+                      && from < wantedAt
+                      && (not (supplyRestricted supply) || wantedAt == costPosition)
                   -- "The supplies that could serve this set of demands" and "the
                   -- demands in it", the two sides of Hall's condition for one
                   -- subset.
@@ -1770,6 +1795,9 @@ payableResolutionsGiven casting capacity spending sources pcs pid committed clai
                   demandedIn subset = length (filter (`elem` subset) wanted_)
                   hallHolds subset = demandedIn subset <= couldServe subset
                in Event.canPayLife pid (committed + life + spent) gs
+                    -- Clause 2 is untouched by the positions: every supply sits
+                    -- strictly before `costPosition`, so every one of them can
+                    -- serve a generic symbol of the cost.
                     && Natural.length supplies >= Natural.length wanted_ + generic
                     && all hallHolds (List.subsequences (List.nub wanted_))
          in any fits boards
