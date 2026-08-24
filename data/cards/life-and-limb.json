@@ -41,15 +41,16 @@
           },
           "modifications": [
             {
-              "type": "AddCardType",
+              "type": "SetBasePowerToughness",
               "value": {
-                "type": "Creature"
-              }
-            },
-            {
-              "type": "AddCardType",
-              "value": {
-                "type": "Land"
+                "power": {
+                  "type": "Literal",
+                  "value": 1
+                },
+                "toughness": {
+                  "type": "Literal",
+                  "value": 1
+                }
               }
             },
             {
@@ -67,22 +68,21 @@
               }
             },
             {
+              "type": "AddCardType",
+              "value": {
+                "type": "Creature"
+              }
+            },
+            {
               "type": "AddLandSubtype",
               "value": {
                 "type": "Forest"
               }
             },
             {
-              "type": "SetBasePowerToughness",
+              "type": "AddCardType",
               "value": {
-                "power": {
-                  "type": "Literal",
-                  "value": 1
-                },
-                "toughness": {
-                  "type": "Literal",
-                  "value": 1
-                }
+                "type": "Land"
               }
             }
           ]

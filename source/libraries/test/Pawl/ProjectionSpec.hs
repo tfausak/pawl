@@ -1627,11 +1627,19 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "the Forest gains the Swamp in addition (CR 205.1b)" (Projection.subtypesOf forestId onForest) (Set.fromList [Subtype.Type.Forest, Subtype.Type.Swamp])
 
   -- The other direction, and the reason CR 205.3d is asked against the card types
-  -- the fold has produced SO FAR rather than the ones the object started with:
-  -- Song of the Dryads' one static ability sets the card type to Land and then
-  -- grants the Forest, so by the time the grant is judged the object it is judged
-  -- against is a land. A check reading the object's base card types would refuse
-  -- the Forest and leave a colourless land that taps for nothing.
+  -- the WHOLE effect gives rather than the ones the object started with: Song of
+  -- the Dryads' one static ability makes the enchanted permanent a Forest land,
+  -- and CR 613.7 orders effects rather than the parts of one. The card is
+  -- transcribed in printed order -- "a colorless Forest land", so the
+  -- SetLandSubtype precedes the SetCardType -- and a check reading either the
+  -- object's base card types or the ones the fold had reached would refuse the
+  -- Forest and leave a colourless land that taps for nothing.
+  --
+  -- Song of the Dryads is Affected.Attached, which nothing can move, so layer 4
+  -- holds no movable effect on this board and projectDeciding takes its flat road
+  -- rather than the dependency one. That is the OTHER fold from the Life and Limb
+  -- case below, and the board is built to stay on it: no second layer-4 static
+  -- ability, and no layer-4 count.
   --
   -- The Mountain is what makes the negative leg mean something: alice has a mana
   -- source on both boards, and green is what only the enchanted Piker adds.
@@ -1821,6 +1829,40 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertBool s (Projection.isCreatureOf forestId gs) "and a creature"
     Spec.assertBool s (Set.member CardType.Land (Projection.cardTypesOf forestId gs)) "and still a land"
 
+  -- CR 613.7 orders effects within a layer and nothing orders one effect's own
+  -- parts against each other, so a card naming the subtype ahead of the card type
+  -- that licenses it (CR 205.3d) gets both. Life and Limb is printed "are 1/1
+  -- green Saproling creatures and Forest lands in addition to their other types"
+  -- (Scryfall) and is transcribed in that order, so both of its subtype parts
+  -- precede the AddCardType CR 205.3d asks them against.
+  --
+  -- The OTHER road from the Song of the Dryads case above. Life and Limb's
+  -- affected set is Affected.Matching, which CR 613.8 could reorder, so layer 4
+  -- takes projectDeciding's dependency road; Song of the Dryads is
+  -- Affected.Attached and takes the flat one. The two roads are separately
+  -- mutable, so a change to one leaves this pair disagreeing.
+  --
+  -- The observable is CR 305.6's {G} on a permanent nothing else makes a land.
+  -- Shroofus Sproutsire ({2}{G} Legendary Creature -- Saproling with trample,
+  -- checked against Scryfall) prints no static ability, and the Mountain is alice's
+  -- mana source on both boards so that red is common to them and green is the one
+  -- thing Life and Limb adds.
+  Spec.it s "CR 613.7/205.3d Life and Limb's Forest lands on the Saproling the same effect makes a land" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    shroofus <- S.printingOf s registry "Shroofus Sproutsire"
+    limb <- S.printingOf s registry "Life and Limb"
+    let base = Setup.emptyGame S.bothPlayers
+        (_, g1) = S.addCreature mountain S.alice base
+        (shroofusId, without) = S.addCreature shroofus S.alice g1
+        (_, with) = S.addCreature limb S.alice without
+        green = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]
+        red = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Red)]
+    Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice green without)) "before: nothing alice controls makes green"
+    Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice green with) "after: the Saproling is a Forest land, so CR 305.6 gives it {T}: Add {G}"
+    Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice red without) "and the Mountain's {R} is common to both boards"
+    Spec.assertEqWith s "CR 205.1b: the granted Forest joins the printed Saproling" (Projection.subtypesOf shroofusId with) (Set.fromList [Subtype.Type.Forest, Subtype.Type.Saproling])
+    Spec.assertBool s (Set.member CardType.Land (Projection.cardTypesOf shroofusId with)) "on the Land card type the same effect gives it"
+
   -- The card-level proof of the layer-4 AddSubtype arm, the add for the families
   -- the two family-tagged arms above cannot reach (CR 205.3g's artifact types
   -- here, CR 205.3h's enchantment types the other half). Ygra, Eater of All
@@ -1844,8 +1886,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     -- arm that SET the subtypes passes the assertion above and fails this one.
     Spec.assertEqWith s "and still its printed Goblin Warrior" (Set.difference (Projection.subtypesOf pikerId gs) (Set.singleton Subtype.Type.Food)) (Set.fromList [Subtype.Type.Goblin, Subtype.Type.Warrior])
     -- The card-type half of the same sentence, and CR 205.3d's precondition for
-    -- the Food: Ygra lists AddCardType Artifact ahead of AddSubtype Food, and
-    -- applyModification folds a static ability's modifications in that order.
+    -- the Food: Ygra prints "Food artifacts", so the AddSubtype comes FIRST and
+    -- the correspondence is settled against what the whole effect gives (CR 613.7,
+    -- correspondsTo).
     Spec.assertBool s (Set.member CardType.Artifact (Projection.cardTypesOf pikerId gs)) "and an artifact in addition to being a creature"
     Spec.assertBool s (Projection.isCreatureOf pikerId gs) "and still a creature"
     -- The printed "Other", and the reason the affected filter is not vacuously
@@ -3685,10 +3728,10 @@ hiddenZoneStaticSpec s registry = Spec.describe s "HiddenZoneStatics" $ do
               (_, b2) = S.addLibraryCard mountain S.alice b1
               (_, b3) = S.addLibraryCard mountain S.alice b2
               (_, b4) = S.addHandCard mountain S.alice b3
-              (_, b5) = S.addHandCard subject S.alice b4
-           in (entomberId, b5 {GameState.priority = Just S.alice})
-        (gristEntomber, gristBoard) = board grist
-        (jaceEntomber, jaceBoard) = board jace
+              (subjectId, b5) = S.addHandCard subject S.alice b4
+           in (entomberId, subjectId, b5 {GameState.priority = Just S.alice})
+        (gristEntomber, gristHandId, gristBoard) = board grist
+        (jaceEntomber, _, jaceBoard) = board jace
         ability = soleActivatedAbility entomber
         resolved = S.runPure S.identityAnswer gristBoard (do Activate.activateAbility S.alice gristEntomber ability; Stack.resolveTop)
     -- Named rather than identified: the discarded card takes a FRESH object id
@@ -3708,6 +3751,15 @@ hiddenZoneStaticSpec s registry = Spec.describe s "HiddenZoneStatics" $ do
       "payable with the Grist in hand, not with an ordinary planeswalker card"
       (Activate.activatable S.alice gristEntomber ability gristBoard, Activate.activatable S.alice jaceEntomber ability jaceBoard)
       (True, False)
+    -- CR 205.1b/205.3d on the same ability, and the reason Grist is transcribed
+    -- in printed order ("a 1/1 Insect creature"): the AddCreatureSubtype comes
+    -- before the AddCardType that licenses it, so the Insect sticks only because
+    -- correspondsTo asks what the whole effect gives.
+    Spec.assertEqWith
+      s
+      "and CR 205.1b keeps its printed Grist type beside the granted Insect"
+      (Projection.subtypesOf gristHandId gristBoard)
+      (Set.fromList [Subtype.Type.Grist, Subtype.Type.Insect])
 
   -- The STACK, where CR 113.6b's stated set overrides CR 113.6's own first
   -- sentence rather than a hidden zone's absence of one: a planeswalker spell's
