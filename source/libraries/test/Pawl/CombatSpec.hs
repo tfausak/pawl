@@ -2896,9 +2896,12 @@ mirageOn landId subtype p = case p of
   Prompt.ChooseBasicLandType {} -> subtype
   _ -> S.identityAnswer p
 
--- CR 701.60c against CR 613.1f, ordered by CR 613.7 -- proved by Reasonable Doubt
--- {1}{U} Instant, "Counter target spell unless its controller pays {2}. Suspect up
--- to one target creature", cast under Humility.
+-- CR 701.60c against the two rules that strip abilities: CR 613.1f's layer-6
+-- removal, ordered by CR 613.7, and CR 305.7's layer-4 subtype set, which spares
+-- an ability the rules granted. Proved by Reasonable Doubt {1}{U} Instant,
+-- "Counter target spell unless its controller pays {2}. Suspect up to one target
+-- creature", cast under Humility for the first pair and beside a Convincing
+-- Mirage for the third case.
 --
 -- Rule 701.60c states its restriction as quoted text, so what the designation gives
 -- a permanent is an ABILITY, and CR 613.1f puts Humility's removal in the same
@@ -2980,7 +2983,7 @@ suspectedAbilityRemovalSpec s registry = Spec.describe s "SuspectedAbilityRemova
     -- type went unset, there are no set-land-subtype effects at all, the gate this
     -- case exists to remove is vacuously satisfied, and the first assertion passes
     -- under the wrong implementation too.
-    Spec.assertEqWith s "CR 305.7: the set really happened -- an Island, and no longer a Forest Dryad" (Projection.subtypesOf arbor gs) (Set.fromList [Subtype.Island, Subtype.Dryad])
+    Spec.assertEqWith s "CR 305.7: the set really happened -- an Island where a Forest was, the Dryad creature type untouched" (Projection.subtypesOf arbor gs) (Set.fromList [Subtype.Island, Subtype.Dryad])
     Spec.assertEqWith s "on the permanent the Doubt suspected, which is still suspected" (suspectedOf arbor gs, suspectedOf other gs) (Just True, Just False)
 
 -- CR 508.1c's and CR 509.1b's SECOND clause -- "or that it can't attack unless

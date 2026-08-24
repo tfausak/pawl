@@ -301,11 +301,12 @@ inForce gs =
       -- menace half is a characteristic, and lives in
       -- Pawl.Engine.Projection.designationGathered.
       --
-      -- Outside `anyMinted`, which asks about keywords, and it takes one half of
-      -- `keepsAbilities` below rather than the pair the printed rows take. Rule
-      -- 701.60c states the restriction as quoted text, so what the designation
-      -- gives the permanent is an ABILITY -- but an ability the RULES grant, which
-      -- the two halves of that gate stand differently towards:
+      -- Outside `anyMinted`, which asks about keywords, and it takes NEITHER half
+      -- of `keepsAbilities` below, where the printed rows take both. Rule 701.60c
+      -- states the restriction as quoted text, so what the designation gives the
+      -- permanent is an ABILITY -- but an ability the RULES grant rather than one
+      -- generated from the permanent's rules text, which the two halves of that
+      -- gate stand differently towards:
       --
       --   * CR 613.1f's layer-6 removal reaches it, in CR 613.7 TIMESTAMP ORDER.
       --     The grant's timestamp is the permanent's own, which is what
@@ -314,7 +315,8 @@ inForce gs =
       --     Humility already on the battlefield when the permanent arrived is
       --     earlier and leaves both in place, and one that arrived later wipes
       --     both. `keepsAbilities`'s blanket removal question cannot tell the two
-      --     apart, which is what CombatSpec's pair of boards proves.
+      --     apart, which is why this row asks `removedAfter` instead -- and what
+      --     CombatSpec's pair of boards proves.
       --   * CR 305.7's layer-4 strip is NOT asked, unlike the printed rows below.
       --     That rule reaches "all abilities generated from its rules text" and
       --     then says outright that it "doesn't remove any abilities that were

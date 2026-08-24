@@ -385,10 +385,9 @@ dropAtEndOf ending gs =
         }
 
 -- CR 116.2c: every offer a payment could end right now, paired with the object
--- that stored it. The one
--- reader of Expiry.WhenPaid outside the sweeps, and the reason that arm is not
--- Expiry.Never -- a duration nothing ends by time still has to be FINDABLE by
--- the player who may end it.
+-- that stored it. The one reader of Expiry.WhenPaid outside the sweeps, and the
+-- reason that arm is not Expiry.Never -- a duration nothing ends by time still
+-- has to be FINDABLE by the player who may end it.
 --
 -- Every carrier, not just the continuous effects: Pawl.Types.Duration is one
 -- vocabulary and any opcode taking a duration could print this one, so a carrier
