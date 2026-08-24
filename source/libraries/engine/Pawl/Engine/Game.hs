@@ -845,6 +845,7 @@ castOf event = case event of
   GameEvent.Exerted _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
+  GameEvent.BecameTapped _ -> Nothing
 
 -- The discarding player an event describes, if it is a discard (CR 701.9a).
 --
@@ -905,6 +906,7 @@ discardOf event = case event of
   GameEvent.Exerted _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
+  GameEvent.BecameTapped _ -> Nothing
 
 -- The permanent an event describes ENTERING THE BATTLEFIELD, if it is one. CR
 -- 400.7's zone change with a destination of Zone.Battlefield, which is what the
@@ -963,6 +965,7 @@ enteredBattlefield event = case event of
   GameEvent.Exerted _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
+  GameEvent.BecameTapped _ -> Nothing
 
 -- The RECIPIENT an event describes damage being dealt to, if it describes one --
 -- CR 120.1's four recipients, undivided. damagedPlayer and damagedObject below
@@ -1036,6 +1039,7 @@ damageRecipient event = case event of
   GameEvent.Exerted _ -> Nothing
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
+  GameEvent.BecameTapped _ -> Nothing
 
 -- The PLAYER an event describes being dealt damage, if it describes one. CR
 -- 120.1's damage with a Recipient.ToPlayer, which is the only recipient CR 120.3a

@@ -1791,6 +1791,11 @@ representativeEvents cond =
         -- matter here: eventBindings claims nothing either way, and the floor is
         -- what this pins.
         TriggerCondition.AttachedCreatureDies -> one (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics))
+        -- CR 701.26a's own event, and the only one this condition admits. Whether
+        -- the tapped permanent is the bearer's host does not matter here for the
+        -- AttachedCreatureDies arm's reason: eventBindings claims nothing either
+        -- way, and the floor is what this pins.
+        TriggerCondition.AttachedCreatureBecomesTapped -> one (GameEvent.BecameTapped departed)
         -- CR 702.149c's own event, and the only one this condition admits, on
         -- `departed` for SelfEvolves' reason: the pair does not match, which pins
         -- the floor for a matching pair too, this arm binding nothing either way.
@@ -1955,6 +1960,7 @@ everyTriggerCondition =
     TriggerCondition.SelfEvolves,
     TriggerCondition.AttachedCreatureMentors,
     TriggerCondition.AttachedCreatureDies,
+    TriggerCondition.AttachedCreatureBecomesTapped,
     TriggerCondition.SelfTrains,
     TriggerCondition.PermanentSacrificed,
     TriggerCondition.SagaFinalChapterTriggers PlayerRelation.You,

@@ -414,6 +414,18 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       s
       (Codec.encode GameEvent.codec (GameEvent.Exerted (ObjectId.MkObjectId 7)) /= Codec.encode GameEvent.codec (GameEvent.Explored (ObjectId.MkObjectId 7)))
       "an exert and an explore of the same object encode differently"
+  -- CR 701.26a. Exerted's payload exactly -- a bare ObjectId -- so the TAG is
+  -- again the whole difference.
+  Spec.it s "BecameTapped" $ do
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.BecameTapped (ObjectId.MkObjectId 8))
+      " {\"type\":\"BecameTapped\",\"value\":8} "
+    Spec.assertBool
+      s
+      (Codec.encode GameEvent.codec (GameEvent.BecameTapped (ObjectId.MkObjectId 8)) /= Codec.encode GameEvent.codec (GameEvent.Exerted (ObjectId.MkObjectId 8)))
+      "a tap and an exert of the same object encode differently"
   -- CR 701.3a's two ends, and the ORDER is what the distinct ids prove: the
   -- attachment first, then what it went onto. A swap would credit the host with
   -- becoming attached to the Aura.

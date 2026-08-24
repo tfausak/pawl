@@ -1075,13 +1075,12 @@ tapCandidates pid oid criterion gs =
 tapPower :: ObjectId -> GameState -> Integer
 tapPower candidate gs = Maybe.fromMaybe 0 (Projection.powerOf candidate gs)
 
--- CR 701.26a: tap one permanent. A direct edit and not a funnel -- see
--- payComponent's TapThis arm -- shared by every component that taps, so an
--- Event.tap would have one call site to move.
+-- CR 701.26a: tap one permanent, through Pawl.Engine.Event's funnel so that
+-- paying a tap cost is a becomes-tapped event like any other route. Shared by
+-- every component that taps -- see payComponent's TapThis arm -- which is what
+-- gave all of them the event for one call.
 tapObject :: ObjectId -> Game ()
-tapObject target =
-  State.modify'
-    (\gs -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) target (GameState.objects gs)})
+tapObject = Event.tap
 
 -- What this component SPENDS out of a pool of objects: which resource it draws
 -- on (Pawl.Types.ClaimAxis), which objects are in that pool, and how many it
