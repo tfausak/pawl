@@ -846,6 +846,7 @@ spec s registry = do
   Pawl.CommanderSpec.spec s registry
   Pawl.ConditionSpec.spec s registry
   Pawl.CopySpec.spec s registry
+  Pawl.CopySpec.copySpellSpec s registry
   Pawl.CoreSpec.spec s registry
   Pawl.CostSpec.spec s registry
   Pawl.CountSpec.spec s registry

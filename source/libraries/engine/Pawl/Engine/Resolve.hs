@@ -2906,7 +2906,12 @@ chooseNewTargetsFor controller copyId = do
   Monad.forM_ (Game.lookupObject copyId gs) $ \copy ->
     Monad.forM_ (Game.faceOf copyId gs) $ \face -> do
       let slots = targetSlotsOf copy copyId gs face
-          current = Binding.targetsOf (Object.bindings copy)
+          -- TARGET slots only. Binding.targetsOf reports every recipient-valued
+          -- binding, and the reserved ones -- CR 109.5's `you` above all -- are
+          -- not targets and are not CR 707.10c's to change. Restricted for CR
+          -- 608.2b's own reason, given at Resolve's legalSlot: a slot declaring
+          -- no target was never targeted.
+          current = Map.restrictKeys (Binding.targetsOf (Object.bindings copy)) (Map.keysSet slots)
           -- CR 608.2b's own derivation, made against the CURRENT board: this is
           -- a fresh choice of targets rather than a re-check of the old one, so
           -- it reads what the board can supply now.
@@ -4659,7 +4664,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                     -- answers for all three and CR 707.3 holds for free. The LIVE
                     -- reader, not the last-known one: the object was just looked
                     -- up, so there is nothing to resurrect.
-                    Object.bindings = Binding.setCopy (Event.copiedSnapshot original gsNow) (Object.bindings obj)
+                    -- CR 109.5's "you" is RE-STAMPED, and it is the one binding
+                    -- that must be: Pawl.Engine.Cast writes the caster into it
+                    -- as the original is cast, and CR 707.10 makes the copy's
+                    -- controller the copying effect's controller instead. Every
+                    -- other binding is a DECISION, which CR 707.10 copies
+                    -- verbatim.
+                    Object.bindings = Binding.setYou controller (Binding.setCopy (Event.copiedSnapshot original gsNow) (Object.bindings obj))
                   }
           State.put (Game.insertIntoZone Zone.Stack LibraryPosition.defaultValue controller copyId gs2 {GameState.objects = Map.insert copyId copy (GameState.objects gs2)})
           Monad.when newTargets (chooseNewTargetsFor controller copyId)
