@@ -42,6 +42,7 @@ codec =
       Arm.nullary "CantSearchLibraries" PlayerEffect.CantSearchLibraries,
       Arm.nullary "CantBecomeMonarch" PlayerEffect.CantBecomeMonarch,
       Arm.payload "CantCastMatching" filterCodec PlayerEffect.CantCastMatching (\x -> case x of PlayerEffect.CantCastMatching y -> Just y; _ -> Nothing),
+      Arm.nullary "CastOnlyAtSorcerySpeed" PlayerEffect.CastOnlyAtSorcerySpeed,
       Arm.nullary "CantPlayLands" PlayerEffect.CantPlayLands,
       Arm.payload "CastFromGraveyard" filterCodec PlayerEffect.CastFromGraveyard (\x -> case x of PlayerEffect.CastFromGraveyard y -> Just y; _ -> Nothing),
       Arm.nullary "PlayLandsFromGraveyard" PlayerEffect.PlayLandsFromGraveyard,

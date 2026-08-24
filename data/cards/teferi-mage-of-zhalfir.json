@@ -40,6 +40,16 @@
         }
       ],
       "name": "Teferi, Mage of Zhalfir",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "CastOnlyAtSorcerySpeed"
+          },
+          "scope": {
+            "type": "Opponents"
+          }
+        }
+      ],
       "power": {
         "type": "Literal",
         "value": 3

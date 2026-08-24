@@ -30,6 +30,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.ManaFilter as ManaFilter
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
@@ -439,6 +440,7 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.DamageCantBePrevented _ -> effect
   PlayerEffect.CantSearchLibraries -> effect
   PlayerEffect.CantBecomeMonarch -> effect
+  PlayerEffect.CastOnlyAtSorcerySpeed -> effect
   PlayerEffect.CantPlayLands -> effect
   PlayerEffect.PlayLandsFromGraveyard -> effect
 
@@ -581,6 +583,26 @@ prohibitsCasting pid oid name gs =
         -- taken of still lies where the cast would take it from.
         PlayerEffect.CantCastMatching criterion ->
           matchesObject criterion oid gs && not (choiceCouldEscape criterion oid gs)
+        -- CR 307.5 / Teferi, Mage of Zhalfir: outside that rule's moment this
+        -- player casts nothing. Turn.sorcerySpeedWindow is CR 307.5's three
+        -- conjuncts and the window CR 307.1 already shares, so there is one copy
+        -- rather than a fourth that could drift.
+        --
+        -- HERE and not in Cast.timingOk, and the choice is load-bearing rather
+        -- than stylistic. That disjunction is asked by `castable` alone;
+        -- `castableWhenOffered` deliberately omits it, because CR 608.2g's cast
+        -- and Panglacial Wurm's mid-search cast are the rules' own window being
+        -- excepted -- and keeps CR 601.3's PROHIBIT limb, which is the limb this
+        -- clause is. A timingOk conjunct would therefore let an opponent's
+        -- mid-search Wurm out from under Teferi, which CR 101.2 forbids.
+        -- Pawl.CastSpec's "CR 307.5 the offered path: an opponent's mid-search
+        -- cast is refused too" is the case that holds it here.
+        --
+        -- Both call sites ask this BEFORE CR 601.2a moves the card to the stack,
+        -- which is what keeps the empty-stack conjunct honest: were it asked
+        -- after the move, the spell itself would make the window False and the
+        -- clause would prohibit every cast.
+        PlayerEffect.CastOnlyAtSorcerySpeed -> not (Turn.sorcerySpeedWindow pid gs)
         -- CR 305.1 again, exactly as CantPlayLandChosenName above: a land is
         -- played and never cast, so the unrestricted play-side prohibition stops
         -- nothing here either.
@@ -617,6 +639,12 @@ prohibitsPlayingLand :: PlayerId -> Set.Set CardName -> GameState -> Bool
 prohibitsPlayingLand pid names gs =
   let prohibits (source, effect) = case effect of
         PlayerEffect.CantPlayLandChosenName -> not (Set.disjoint names (chosenNamesOf source gs))
+        -- CR 305.1 in the direction CantCastChosenName below takes: Teferi's
+        -- clause narrows when this player may CAST, and playing a land is never
+        -- casting. CR 305.1's own window happens to be the same three conjuncts,
+        -- but Action.legalActions is what asks that of a land play, and an
+        -- effect that moved it would have to say so.
+        PlayerEffect.CastOnlyAtSorcerySpeed -> False
         -- Damping Engine's "can't play lands", which narrows nothing: every land
         -- this player could play is stopped, so the name goes unread.
         PlayerEffect.CantPlayLands -> True
@@ -709,6 +737,7 @@ prohibitsSearching pid gs =
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantCastMatching _ -> False
+        PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands -> False
         PlayerEffect.CastFromGraveyard _ -> False
         PlayerEffect.PlayLandsFromGraveyard -> False
@@ -761,6 +790,7 @@ prohibitsBecomingMonarch pid gs =
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.CantSearchLibraries -> False
         PlayerEffect.CantCastMatching _ -> False
+        PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands -> False
         PlayerEffect.CastFromGraveyard _ -> False
         PlayerEffect.PlayLandsFromGraveyard -> False
@@ -905,6 +935,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
+        PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
@@ -936,6 +967,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
+        PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
@@ -970,6 +1002,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
+        PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
@@ -1071,6 +1104,7 @@ activationCostAdjustmentsGiven effects family srcId gs =
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
+        PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
@@ -1103,6 +1137,7 @@ activationCostAdjustmentsGiven effects family srcId gs =
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
+        PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
@@ -1177,6 +1212,7 @@ mayCastAsThoughItHadFlash pid oid gs =
         PlayerEffect.CantSearchLibraries -> False
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantCastMatching _ -> False
+        PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands -> False
         -- The other CR 601.3 permission on this axis, and the two do not
         -- compose: that one names a ZONE and this question is about a TIME, so a
@@ -1240,6 +1276,7 @@ mayCastFromGraveyard pid oid gs =
         -- A PROHIBITION, and CR 601.3 asks the two halves separately:
         -- prohibitsCasting above is where Damping Engine and Silence are read.
         PlayerEffect.CantCastMatching _ -> False
+        PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands -> False
         -- The play-side twin names the same ZONE and still answers nothing here:
         -- CR 305.1 makes playing a land a special action, so a grant to play
@@ -1311,6 +1348,7 @@ mayCastFromHandWithoutPayingManaCost pid oid gs =
         -- 101.2 makes a "can't" beat any cost this offers, and folding them here
         -- would let a permission outvote one.
         PlayerEffect.CantCastMatching _ -> False
+        PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands -> False
    in any (allows . snd) (applying pid gs)
 
@@ -1365,6 +1403,7 @@ mayPlayLandsFromGraveyard pid gs =
         -- 101.2 makes a "can't" beat this permission, and the two are folded at
         -- separate gates so that neither can outvote the other by accident.
         PlayerEffect.CantCastMatching _ -> False
+        PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands -> False
         -- A cost, not a zone: CR 118.9's grant says what a spell PAYS and
         -- widens no pile a land may be played from.
@@ -1430,6 +1469,7 @@ protectedFromTargeting caster pid gs =
         PlayerEffect.CantSearchLibraries -> False
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantCastMatching _ -> False
+        PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands -> False
         PlayerEffect.CastFromGraveyard _ -> False
         PlayerEffect.PlayLandsFromGraveyard -> False
@@ -1489,6 +1529,7 @@ landPlaysAllowed pid gs =
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
+        PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
@@ -1543,6 +1584,7 @@ maximumHandSize pid gs =
         PlayerEffect.CantSearchLibraries -> current
         PlayerEffect.CantBecomeMonarch -> current
         PlayerEffect.CantCastMatching _ -> current
+        PlayerEffect.CastOnlyAtSorcerySpeed -> current
         PlayerEffect.CantPlayLands -> current
         PlayerEffect.CastFromGraveyard _ -> current
         PlayerEffect.PlayLandsFromGraveyard -> current
@@ -1599,6 +1641,7 @@ keepsUnspentMana pid gs =
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
+        PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
@@ -1646,6 +1689,7 @@ spendManaAsThough pid gs =
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
+        PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
@@ -1710,6 +1754,7 @@ cantBeCountered pid oid gs =
         PlayerEffect.CantSearchLibraries -> False
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantCastMatching _ -> False
+        PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands -> False
         PlayerEffect.CastFromGraveyard _ -> False
         PlayerEffect.PlayLandsFromGraveyard -> False
@@ -1764,6 +1809,7 @@ unpreventable gs =
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
+        PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
