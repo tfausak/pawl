@@ -61,6 +61,7 @@ import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.InZone as InZone
@@ -1472,6 +1473,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.RollDie RollDie.MkRollDie {RollDie.sides = 20, RollDie.slot = SlotName.MkSlotName (Text.pack "result")})
       " {\"type\":\"RollDie\",\"value\":{\"sides\":20,\"slot\":\"result\"}} "
+  Spec.it s "FlipCoin" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.FlipCoin FlipCoin.MkFlipCoin {FlipCoin.slot = SlotName.MkSlotName (Text.pack "flip")})
+      " {\"type\":\"FlipCoin\",\"value\":{\"slot\":\"flip\"}} "
   Spec.it s "ExileHandThenDraw" $
     Common.assertJsonCodec
       s

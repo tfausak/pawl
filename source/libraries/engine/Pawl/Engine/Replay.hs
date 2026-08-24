@@ -18,6 +18,7 @@ import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.Concession as Concession
@@ -49,6 +50,8 @@ encode p answer = case p of
   Prompt.RandomObject _ -> Response.SelectedAtRandom answer
   Prompt.RandomOpponent _ -> Response.SelectedOpponentAtRandom answer
   Prompt.RollDie _ -> Response.RolledDie answer
+  Prompt.FlipCoin -> Response.FlippedCoin answer
+  Prompt.CallCoin {} -> Response.CalledCoin answer
   Prompt.ChooseAction {} -> Response.ChoseAction answer
   Prompt.Concede _ -> Response.Conceded answer
   Prompt.ChooseDiscard {} -> Response.ChoseDiscard answer
@@ -158,6 +161,12 @@ decode p response = case p of
     _ -> Nothing
   Prompt.RollDie _ -> case response of
     Response.RolledDie n -> Just n
+    _ -> Nothing
+  Prompt.FlipCoin -> case response of
+    Response.FlippedCoin face -> Just face
+    _ -> Nothing
+  Prompt.CallCoin {} -> case response of
+    Response.CalledCoin face -> Just face
     _ -> Nothing
   Prompt.ChooseAction {} -> case response of
     Response.ChoseAction action -> Just action
@@ -439,6 +448,16 @@ defaultAnswer p = case p of
   -- answer that is in range for any N -- including the degenerate N of a
   -- malformed card. FIXED for the reason RandomObject gives above.
   Prompt.RollDie _ -> 1
+  -- CR 705.1 designates the two sides, so either is a legal answer and neither
+  -- is "least eventful" -- which branch of a card's flip is quieter is the
+  -- CARD's business, not this function's. FIXED for the reason RandomObject
+  -- gives above, so a spec asserting what a flip did must supply its own
+  -- answerer.
+  Prompt.FlipCoin -> CoinFace.Heads
+  -- CR 705.2's call, answered the same way and so always MATCHING the flip
+  -- above: a transcript that lost its coin answers replays a won flip. That is
+  -- exactly the desync 'replay' reports.
+  Prompt.CallCoin {} -> CoinFace.Heads
   Prompt.ChooseAction _ _ actions -> case actions of
     h : _ -> h
     [] -> Action.Pass

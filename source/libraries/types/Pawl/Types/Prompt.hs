@@ -11,6 +11,7 @@ import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
+import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.Concession as Concession
@@ -87,6 +88,33 @@ data Prompt r where
   -- supplies the outcome and the caller filters it back against 1..N, taking CR
   -- 706.1a's floor for an answer outside it.
   RollDie :: Natural.Natural -> Prompt Natural.Natural
+  -- | CR 705.1: which face a flipped coin came up.
+  --
+  -- Carries neither a Decider nor a PlayerId, for RandomOpponent's and RollDie's
+  -- reason: the face is not a choice, so there is no seat weighing options and
+  -- nowhere for a CR 723 controller to sit. The engine never flips -- the
+  -- interpreter supplies the outcome.
+  --
+  -- No payload at all, where RollDie carries N: CR 705.1's coin has exactly two
+  -- equally likely sides, so the offer is the whole of Pawl.Types.CoinFace and
+  -- there is nothing to filter an answer back against.
+  --
+  -- Asked SECOND, after CallCoin: CR 705.2 has the player call and then the coin
+  -- come up, and calling with the face already known is a different game.
+  FlipCoin :: Prompt CoinFace.CoinFace
+  -- | CR 705.2: the face the flipping player calls before the coin comes up. If
+  -- the call matches FlipCoin's answer the player wins the flip, otherwise they
+  -- lose it.
+  --
+  -- Carries a Decider, unlike FlipCoin just above, because this one IS a choice:
+  -- a CR 723 controller genuinely makes the call for a player they control. The
+  -- PlayerId is CR 705.2's last sentence -- only the player who flips the coin
+  -- wins or loses it, and no other player is involved -- so it is the flipper's
+  -- seat and never an opponent's.
+  --
+  -- Not implemented: CR 705.2's face-only effects, which have no winner and so
+  -- ask no call at all (#2251).
+  CallCoin :: Decider.Decider -> PlayerId.PlayerId -> Prompt CoinFace.CoinFace
   -- | CR 514.2. The [ObjectId] is the hand; the Natural is how many to discard.
   ChooseDiscard :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt [ObjectId.ObjectId]
   -- | CR 701.22a. The [ObjectId] is the top of the scrying player's own
