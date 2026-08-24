@@ -5134,7 +5134,10 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- which carries only who declared, and NOT from Combat.attackers as
   -- SelfAttacksWithAnother reads it: CR 508.4 says a creature put onto the
   -- battlefield attacking never "attacked", and putOntoBattlefieldAttacking
-  -- writes the second map and not this one. Exact at this moment for
+  -- writes the second map and not this one. A REGRESSION FENCE rather than a
+  -- proved behaviour: reading Combat.attackers here leaves the suite green,
+  -- since no board reaches a declaration with such a creature already in
+  -- combat. Exact at this moment for
   -- SelfAttacksWithAnother's reason -- CR 508.2b puts every trigger from this
   -- declaration on the stack together, so no player has had priority since.
   --

@@ -3174,14 +3174,22 @@ hermesSpec s registry =
         island <- S.printingOf s registry "Island"
         plains <- S.printingOf s registry "Plains"
         swamp <- S.printingOf s registry "Swamp"
-        case S.combatBoardOf [hermes, maiden, raven] [] of
-          (gs, [hermesId, maidenId, ravenId], []) ->
+        case S.combatBoardOf [hermes, maiden, raven] [maiden] of
+          (gs, [hermesId, maidenId, ravenId], [theirBirdId]) ->
             -- addLibraryCard puts its card ON TOP, so the deepest is stocked
             -- first and `ids` comes out top-first.
             let deal (acc, g) printing = let (oid, g1) = S.addLibraryCard printing S.alice g in (oid : acc, g1)
                 (ids, stocked) = List.foldl' deal ([], gs) [swamp, plains, island, forest, mountain, piker]
-             in pure (Just (hermesId, maidenId, ravenId, ids, stocked))
+             in pure (Just (hermesId, maidenId, ravenId, theirBirdId, ids, stocked))
           _ -> pure Nothing
+      -- combatBoardOf hardcodes alice as the active player and CR 506.2's second
+      -- sentence then makes bob the defender. Both are turned around here, which
+      -- is the whole difference between the last board and the others.
+      bobsTurn gs =
+        gs
+          { GameState.activePlayer = S.bob,
+            GameState.combat = Combat.emptyCombat {Combat.Type.defender = Just S.alice}
+          }
    in Spec.describe s "Hermes, Overseer of Elpis" $ do
         -- The proving case. TWO Birds are declared together and exactly TWO cards
         -- go under: one declaration, one trigger, one scry 2. A reading at CR
@@ -3189,7 +3197,7 @@ hermesSpec s registry =
         Spec.it s "CR 508.3c whole card: two Birds declared together scry ONCE" $ do
           built <- fixture
           case built of
-            Just (_, maidenId, ravenId, ids, gs) -> case ids of
+            Just (_, maidenId, ravenId, _, ids, gs) -> case ids of
               [piker, mountain, forest, island, plains, swamp] -> do
                 let after = atBlockers (answering [(maidenId, AttackTarget.OfPlayer S.bob), (ravenId, AttackTarget.OfPlayer S.bob)]) gs
                 Spec.assertEqWith s "the library started top-first piker, mountain, forest, island, plains, swamp" (libraryOf gs) ids
@@ -3204,7 +3212,7 @@ hermesSpec s registry =
         Spec.it s "CR 508.3c one Bird beside the non-Bird bearer still scries once" $ do
           built <- fixture
           case built of
-            Just (hermesId, maidenId, _, ids, gs) -> case ids of
+            Just (hermesId, maidenId, _, _, ids, gs) -> case ids of
               [piker, mountain, forest, island, plains, swamp] -> do
                 let after = atBlockers (answering [(hermesId, AttackTarget.OfPlayer S.bob), (maidenId, AttackTarget.OfPlayer S.bob)]) gs
                 Spec.assertEqWith s "ONE scry 2 again: piker and mountain went under" (libraryOf after) [forest, island, plains, swamp, piker, mountain]
@@ -3218,12 +3226,24 @@ hermesSpec s registry =
         Spec.it s "CR 508.3c a declaration naming no Bird does not trigger it" $ do
           built <- fixture
           case built of
-            Just (hermesId, _, _, ids, gs) -> case ids of
+            Just (hermesId, _, _, _, ids, gs) -> case ids of
               [_, _, _, _, _, _] -> do
                 let after = atBlockers (answering [(hermesId, AttackTarget.OfPlayer S.bob)]) gs
                 Spec.assertEqWith s "no scry: the library is exactly as it was stocked" (libraryOf after) ids
                 Spec.assertEqWith s "CR 508.1b and Hermes really was declared, alone" (sentAt after) (Map.fromList [(hermesId, AttackTarget.OfPlayer S.bob)])
               _ -> Spec.assertFailure s "expected six library cards"
+            Nothing -> Spec.assertFailure s "fixture should give alice a Hermes and two Birds"
+        -- CR 109.5's "you": BOB declares, with a Bird bob controls, and alice's
+        -- Hermes stays silent. The falsifier for a reading that dropped the
+        -- PlayerRelation -- every board above has alice declaring, so on those
+        -- three the relation is invisible.
+        Spec.it s "CR 508.3c an opponent attacking with a Bird does not trigger it" $ do
+          built <- fixture
+          case built of
+            Just (_, _, _, theirBirdId, ids, gs) -> do
+              let after = atBlockers (answering [(theirBirdId, AttackTarget.OfPlayer S.alice)]) (bobsTurn gs)
+              Spec.assertEqWith s "no scry: alice's library is exactly as it was stocked" (libraryOf after) ids
+              Spec.assertEqWith s "CR 508.1b and bob's Bird really was declared attacking alice" (sentAt after) (Map.fromList [(theirBirdId, AttackTarget.OfPlayer S.alice)])
             Nothing -> Spec.assertFailure s "fixture should give alice a Hermes and two Birds"
 
 anafenzaAttackSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
