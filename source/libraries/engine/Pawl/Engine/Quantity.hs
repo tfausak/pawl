@@ -226,9 +226,9 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   --
   -- Maximising over several is a different shape and has its own spelling:
   -- Aggregation.Greatest over Scope.OverPlayers, with THIS arm reading each
-  -- candidate through PlayerRef.Candidate. Malignus is one such card and Daybreak
-  -- Ranger // Nightfall Predator another, and that shape is why
-  -- nothing here folds.
+  -- candidate through PlayerRef.Candidate -- Malignus is one such card, Daybreak
+  -- Ranger // Nightfall Predator another -- and that shape is why nothing here
+  -- folds.
   Quantity.LifeTotal ref -> case playersOf ref of
     Just [pid] -> fmap Player.life (Map.lookup pid (GameState.players gs))
     _ -> Nothing
@@ -694,7 +694,8 @@ slots quantity = case quantity of
   Quantity.CardsDiscardedThisTurn _ -> Set.empty
   -- And a ninth, CR 120.1's damage tally likewise.
   Quantity.PlayersDealtDamageThisTurn _ -> Set.empty
-  -- And a tenth, CR 601.2i's cast tally having nothing beside its PlayerRef either.
+  -- And another in that same position, CR 601.2i's cast tally having nothing
+  -- beside its PlayerRef either.
   Quantity.SpellsCastLastTurn _ -> Set.empty
   -- And a nullary arm, which names nothing at all: CR 400.7's entry is read
   -- against the object the evaluation is aimed at, as ObjectCounters is.
