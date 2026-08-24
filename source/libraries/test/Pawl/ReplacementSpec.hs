@@ -94,6 +94,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -183,6 +184,9 @@ blightAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 blightAnswer wall p = case p of
   Prompt.ChooseX {} -> 3
   Prompt.ChooseBlight {} -> wall
+  -- CR 118.12's offer, taken: the third case below pays Boggart Mischief's
+  -- blight, where the two cast-time cases never raise this prompt at all.
+  Prompt.ChooseToPay {} -> PaymentDecision.Pays
   _ -> S.identityAnswer p
 
 -- Aim every target slot at one object. Recipient.ToObject, not ToCreature as
@@ -3666,6 +3670,29 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         after = castAndResolve (blightAnswer wall) g3 spellId
     Spec.assertEqWith s "twice that many" (countersOn CounterKind.MinusOneMinusOne wall after) 6
     Spec.assertEqWith s "and the spell dealt its three" (S.lifeOf S.bob after) (Just 17)
+  -- The THIRD board, and what says the split is on the MOMENT rather than on the
+  -- keyword action: Boggart Mischief's "you may blight 1" is CR 118.12's cost,
+  -- paid as the trigger RESOLVES, so CR 609.1 does give it an effect and rule
+  -- 614.16's row applies. Same card data, same Pawl.Types.CostComponent, opposite
+  -- answer from the case above. A fix reading "a blight cost is never doubled"
+  -- fails here.
+  Spec.it s "CR 118.12 Doubling Season DOES double a blight paid as the trigger resolves" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    doublingSeason <- S.printingOf s registry "Doubling Season"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
+    mischief <- S.printingOf s registry "Boggart Mischief"
+    let (_, g1) = S.addCreature doublingSeason S.alice (S.landsInPlay swamp 3)
+        (wall, g2) = S.addCreature wallOfStone S.alice g1
+        (g3, spellId) = S.handOne mischief g2
+        -- CR 603.3: the enters trigger is put on the stack by the next CR 117.5
+        -- scan, not by the resolution that fired it, so the spell's resolution is
+        -- settled for priority before the trigger's own resolveTop.
+        entered = S.runPure (blightAnswer wall) g3 (S.cast S.alice spellId >> Stack.resolveTop >> Engine.settleForPriority)
+        after = S.runPure (blightAnswer wall) entered Stack.resolveTop
+    Spec.assertEqWith s "one counter became two" (countersOn CounterKind.MinusOneMinusOne wall after) 2
+    -- The rider ran, so the payment was made rather than refused, and Doubling
+    -- Season's OTHER clause doubled its two Goblins on the way.
+    Spec.assertEqWith s "and four Goblins, not two" (length (S.tokensOf after)) 4
   -- #79: resolveDestruction answers with the SETTLED object, not a Bool. The
   -- identity of what the CR 616.1 loop hands back is what Event.destroy must
   -- put into the graveyard; collapsing it to a predicate is what made a
