@@ -14,6 +14,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
@@ -58,6 +59,7 @@ import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
@@ -68,6 +70,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layout as Layout
+import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -83,6 +86,7 @@ import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
+import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -569,6 +573,24 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     let slot = SlotName.MkSlotName (Text.pack "thatPlayer")
     Spec.assertEqWith s "a named recipient is a read" (Resolve.slotsOf (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.InSlot slot) ManaProduction.AnyColor ManaRetention.Ordinary Nothing Nothing))) (Map.singleton slot SlotArity.One)
     Spec.assertEqWith s "and CR 109.5's unwritten one names no slot" (Resolve.slotsOf (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) ManaProduction.AnyColor ManaRetention.Ordinary Nothing Nothing))) Map.empty
+  -- The same fence for CR 509.4's blocking rider, which the MoveToZone arm reads
+  -- since Aetherplasm. Asserted here because the POOL cannot observe it: the
+  -- dataflow lint's equality has Mode.targetSlots on its right, which is empty
+  -- for a triggered ability, and Aetherplasm's slot is a trigger binding, so it
+  -- sits on the bound side whether or not slotsOf reports the read. Dropping
+  -- `riderSlots` from that arm changes nothing else in the suite -- the same
+  -- under-reporting the BecomeMonarch arm had (#1040) -- so this is a regression
+  -- fence rather than behaviour the pool proves.
+  --
+  -- The two arities differ on purpose: what a MoveToZone MOVES is read at Many,
+  -- a targeted slot naming every recipient CR 608.2b left legal, while CR 509.4
+  -- names one attacking creature.
+  Spec.it s "CR 509.4 slotsOf finds the slot a MoveToZone's blocking rider names" $ do
+    let slot = SlotName.MkSlotName (Text.pack "thatAttacker")
+        moved = SlotName.MkSlotName (Text.pack "self")
+        move riders = Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.InSlot moved) Zone.Battlefield riders Nothing Nothing LibraryPlacement.defaultValue)
+    Spec.assertEqWith s "the rider is a read, beside the ref's own" (Resolve.slotsOf (move EntryRiders.defaultValue {EntryRiders.blocking = Just slot})) (Map.fromList [(moved, SlotArity.Many), (slot, SlotArity.One)])
+    Spec.assertEqWith s "and a move stating no attacker names only what it moves" (Resolve.slotsOf (move EntryRiders.defaultValue)) (Map.singleton moved SlotArity.Many)
   Spec.it s "CR 605 manaProduced reads AddMana whole, and nothing else" $ do
     let plain = ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary Nothing Nothing
         anyColor = ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) ManaProduction.AnyColor ManaRetention.Ordinary Nothing Nothing

@@ -5728,27 +5728,36 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- prints one.
     Spec.assertBool s (any (anyFace (any hides . cardResolutionEffects) . Printing.card) ps) "the pool has a card exiling face down"
     Spec.assertEqWith s "only exile keeps a card face down (CR 406.3)" (fmap (S.nameOf . Printing.card) offenders) []
-  -- CR 509.4's rider is read by the Create arm of Pawl.Engine.Resolve and by
-  -- nothing else, so on a MoveToZone it is inert card data. Not because the rule
-  -- forbids it -- CR 509.4 is about a creature "put onto the battlefield", which
-  -- Aetherplasm does from a hand -- but because that road is unwired: only the
-  -- Create arm reads the rider (gap #2089). Aetherplasm's "If you do" is no
-  -- longer what stops it, Clause.ifTaken having landed. A card stating the rider
-  -- on a MoveToZone says something nothing reads.
-  Spec.it s "no MoveToZone carries CR 509.4's blocking entry rider" $ do
+  -- CR 509.4's rider is a rule about entering the BATTLEFIELD, so on any other
+  -- destination it is inert card data. Both opcodes read it and both apply it --
+  -- Pawl.Engine.Resolve's Create arm hands its tokens to
+  -- Combat.putOntoBattlefieldBlocking and its MoveToZone arm hands the card it
+  -- moved to the same function -- so this lints an authoring mistake rather than
+  -- guarding the engine.
+  --
+  -- Only the MoveToZone can BE mis-zoned, which is why the Create is not an
+  -- offender here where it is one in the exile lint above: a Create names no
+  -- destination, minting onto the battlefield, and CR 111.7 would make a token
+  -- anywhere else cease to exist anyway.
+  Spec.it s "no effect enters blocking anywhere but the battlefield" $ do
     ps <- S.allPrintings s
     let offends effect = case effect of
-          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _) -> Maybe.isJust (EntryRiders.blocking riders)
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone riders _ _ _) -> Maybe.isJust (EntryRiders.blocking riders) && zone /= Zone.Battlefield
           _ -> False
-        blocks effect = case effect of
+        creates effect = case effect of
           Effect.Create (Create.MkCreate _ _ riders _ _) -> Maybe.isJust (EntryRiders.blocking riders)
           _ -> False
+        moves effect = case effect of
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _) -> Maybe.isJust (EntryRiders.blocking riders)
+          _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
-    -- Guards against a vacuous sweep: with no blocking rider in the pool at all
-    -- this would pass whatever a card said. Flash Foliage is the card that
-    -- prints one.
-    Spec.assertBool s (any (anyFace (any blocks . cardResolutionEffects) . Printing.card) ps) "the pool has a card creating a token that's blocking"
-    Spec.assertEqWith s "only a Create puts a creature onto the battlefield blocking (CR 509.4)" (fmap (S.nameOf . Printing.card) offenders) []
+    -- Guards against a vacuous sweep, one per road, since a lint asserting an
+    -- empty offenders list proves nothing on its own: Flash Foliage creates a
+    -- token that's blocking, and Aetherplasm moves a CARD out of a hand onto the
+    -- battlefield blocking.
+    Spec.assertBool s (any (anyFace (any creates . cardResolutionEffects) . Printing.card) ps) "the pool has a card creating a token that's blocking"
+    Spec.assertBool s (any (anyFace (any moves . cardResolutionEffects) . Printing.card) ps) "the pool has a card moving a card onto the battlefield blocking"
+    Spec.assertEqWith s "only the battlefield can be entered blocking (CR 509.4)" (fmap (S.nameOf . Printing.card) offenders) []
   -- The sibling lint for the OTHER face-down rider, one field over and pointed
   -- at the opposite zone: CR 708.3 is a rule about entering the BATTLEFIELD, so
   -- on any other destination it is inert card data. Inert on a Create outright,

@@ -2276,8 +2276,11 @@ optionalEffectSpec s registry =
         -- tell this rule's reading from a mode-wide one. Not implemented: a
         -- gameplay-level twin for the ability loop, which wants a card whose
         -- mandatory clause is observable (#1887). Until one lands, this is a
-        -- unit-level pin, and it is also the only case for the two-DRAW shape,
-        -- where the library count alone separates "declined" from "drew".
+        -- unit-level pin for THAT shape, and it is also the only case for the
+        -- two-DRAW shape, where the library count alone separates "declined"
+        -- from "drew". Aetherplasm reaches the loop from a real trigger with two
+        -- OPTIONAL clauses, the second hanging on the first, which
+        -- Pawl.CombatEffectSpec proves at gameplay level.
         Spec.it s "CR 608.2d a declined clause skips only its own effects" $ do
           forest <- S.printingOf s registry "Forest"
           piker <- S.printingOf s registry "Goblin Piker"
