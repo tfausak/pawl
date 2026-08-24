@@ -4006,8 +4006,8 @@ drannithMagistrateSpec s registry = Spec.describe s "Drannith Magistrate" $ do
 -- THREE seats, so PlayerScope.Opponents is not a two-seat coincidence and a fix
 -- that hardcoded "the player whose turn it isn't" fails carol. ONE Mountain and
 -- ONE Bolt per seat, alice included: she controls Teferi and is no opponent of
--- her own, so her copy is what fails an over-broad fix, and the shared mana is
--- what keeps affordability from being any seat's reason.
+-- her own, so her copy is what fails an over-broad fix, and the identical mana
+-- is what keeps affordability from being any seat's reason.
 teferiSorcerySpeedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 teferiSorcerySpeedSpec s registry = Spec.describe s "Teferi, Mage of Zhalfir" $ do
   -- THE PROVING CASE. The two refusals come first, because every assertion after
