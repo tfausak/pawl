@@ -4024,6 +4024,122 @@ matoyaTriggerSpec s registry =
           -- on CR 701.25a's zone changes would fail.
           Spec.assertEqWith s "and nothing was binned, so the trigger is not counting cards moved" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
 
+-- Feywild Trickster {2}{U} Creature -- Gnome Warlock 2/2, "Whenever you roll one
+-- or more dice, create a 1/1 blue Faerie Dragon creature token with flying" --
+-- the pool's producer for TriggerCondition.PlayerRollsDice (CR 706.1).
+--
+-- THE ROLLER is Djinni Windseer ("Flying / When this creature enters, roll a
+-- d20. / 1-9 | Scry 1. / 10-19 | Scry 2. / 20 | Scry 3."), already in the pool
+-- and reached by one S.entersWithTrigger. Ancient Copper Dragon, the other
+-- roller, needs a whole combat and mints Treasures of its own.
+--
+-- THE ASSERTED QUANTITY is how many permanents NAMED "Faerie Dragon Token" a
+-- seat has, never a total token count: the Windseer's own striations move
+-- library cards rather than minting anything, but a count by name is what says
+-- WHICH ability resolved rather than that something did.
+--
+-- CR 603.3 IS THE SEQUENCING. The roll happens during the resolution of the
+-- Windseer's enters trigger, so the Trickster's ability triggers there and is
+-- put on the stack only the next time a player would receive priority -- one
+-- place/resolve cycle short of the token. `runRoll` runs the cycle twice.
+--
+-- TWO LEGS AT MINIMUM, in opposite directions. Leg one alone is passed
+-- identically by PlayerRelation.You, by AnyPlayer, and by a condition that
+-- ignores its relation; the bob leg is what tells them apart, and leg three
+-- reads CR 109.5's "you" against the ability's controller rather than against
+-- the active player.
+feywildTricksterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+feywildTricksterSpec s registry =
+  let faerieDragon = CardName.MkCardName (Text.pack "Faerie Dragon Token")
+      -- alice's library stocked from four different printings so the Windseer's
+      -- scry has something to look at and cannot deck her (CR 104.3c), the
+      -- Tricksters placed on the named seats, and the Windseer entering under
+      -- `roller` with its CR 603.6a trigger pending.
+      rollBoard tricksters roller = do
+        djinni <- S.printingOf s registry "Djinni Windseer"
+        trickster <- S.printingOf s registry "Feywild Trickster"
+        deck <- traverse (S.printingOf s registry) ["Goblin Piker", "Bird Maiden", "Mountain", "Forest"]
+        let deal who gs printing = snd (S.addLibraryCard printing who gs)
+            stocked = List.foldl' (deal S.alice) (Setup.emptyGame S.bothPlayers) deck
+            libraries = List.foldl' (deal S.bob) stocked deck
+            watched = List.foldl' (\gs who -> snd (S.addCreature trickster who gs)) libraries tricksters
+            (_, entered) = S.entersWithTrigger djinni roller watched
+        pure entered
+      -- Pins the d20 to 13 -- not 1, which Replay.defaultAnswer would supply
+      -- unasked, not 20, the die's own size, and not 0 -- and bottoms every
+      -- look, DiceSpec.tableAnswer's reasons.
+      rollAnswerer :: Prompt.Prompt r -> r
+      rollAnswerer p = case p of
+        Prompt.RollDie _ -> 13
+        Prompt.ChooseScry _ _ looked -> (looked, [])
+        _ -> S.identityAnswer p
+      -- CR 603.3: place and resolve TWICE. The first cycle resolves the
+      -- Windseer's enters trigger, which is where the roll happens; the
+      -- Trickster's ability triggers during that resolution and reaches the
+      -- stack only in the second.
+      runRoll gs =
+        let cycleOnce g =
+              let placed = S.runPure rollAnswerer g Engine.placePendingTriggers
+               in S.runPure rollAnswerer placed Stack.resolveTop
+         in cycleOnce (cycleOnce gs)
+   in Spec.describe s "PlayerRollsDice" $ do
+        -- CR 706.1: alice's own Windseer rolls, alice's Trickster fires. The
+        -- paired board differs in the Trickster and in nothing else, so the
+        -- token is the trigger rather than anything the Windseer did.
+        Spec.it s "CR 706.1 alice's roll creates alice's Faerie Dragon" $ do
+          board <- rollBoard [S.alice] S.alice
+          bare <- rollBoard [] S.alice
+          let after = runRoll board
+              baseline = runRoll bare
+          Spec.assertEqWith
+            s
+            "CR 706.1: one Faerie Dragon token for alice's roll"
+            (S.countOnBattlefieldByName faerieDragon S.alice after)
+            1
+          Spec.assertEqWith
+            s
+            "and without the Trickster the same roll mints nothing"
+            (S.countOnBattlefieldByName faerieDragon S.alice baseline)
+            0
+          Spec.assertBool s (elem (GameEvent.DiceRolled S.alice) (S.eventsOf after)) "CR 706.1 the roll recorded its event under the roller"
+          Spec.assertEqWith s "the stack is empty, so the trigger really resolved" (GameState.stack after) []
+        -- CR 109.5 / 603.3a: the relation is read against the ABILITY'S
+        -- CONTROLLER. The same board one seat over -- bob's Windseer, alice's
+        -- Trickster -- and this is the leg the unit exists for: a condition
+        -- reading PlayerRelation.AnyPlayer, or ignoring its payload, mints a
+        -- token here.
+        Spec.it s "CR 109.5 bob's roll does not fire alice's Trickster" $ do
+          board <- rollBoard [S.alice] S.bob
+          let after = runRoll board
+          Spec.assertEqWith
+            s
+            "CR 109.5: alice, whose Trickster it is, has no Faerie Dragon"
+            (S.countOnBattlefieldByName faerieDragon S.alice after)
+            0
+          Spec.assertEqWith
+            s
+            "and bob, who rolled, has none either -- he controls no Trickster"
+            (S.countOnBattlefieldByName faerieDragon S.bob after)
+            0
+          Spec.assertBool s (elem (GameEvent.DiceRolled S.bob) (S.eventsOf after)) "bob really rolled, so there was an event to match"
+          Spec.assertBool s (notElem (GameEvent.DiceRolled S.alice) (S.eventsOf after)) "and the event names the roller, not the watcher"
+        -- Both seats hold a Trickster and bob rolls, so the two readings of
+        -- "you" -- the ability's controller and the roller -- fall on different
+        -- seats with the same event on the log. Only bob's fires.
+        Spec.it s "CR 109.5 with a Trickster on each side only the roller's fires" $ do
+          board <- rollBoard [S.alice, S.bob] S.bob
+          let after = runRoll board
+          Spec.assertEqWith
+            s
+            "CR 109.5: bob rolled, so bob's Trickster made the token"
+            (S.countOnBattlefieldByName faerieDragon S.bob after)
+            1
+          Spec.assertEqWith
+            s
+            "and alice's Trickster, watching the same event, made none"
+            (S.countOnBattlefieldByName faerieDragon S.alice after)
+            0
+
 -- Aloe Alchemist {1}{G} Creature -- Plant Warlock 3/2, "Trample; When this card
 -- becomes plotted, target creature gets +3/+2 and gains trample until end of
 -- turn; Plot {1}{G}" -- the pool's producer for TriggerCondition
@@ -4627,6 +4743,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   handOfThePraetorsSpec s registry
   monarchTriggerSpec s registry
   matoyaTriggerSpec s registry
+  feywildTricksterSpec s registry
   aloeAlchemistSpec s registry
   wildgrowthWalkerSpec s registry
   rayOfCommandSpec s registry
