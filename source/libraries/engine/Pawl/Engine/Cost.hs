@@ -1009,9 +1009,6 @@ countersOn :: CounterKind.CounterKind Keyword.Type.Keyword -> ObjectId -> GameSt
 countersOn kind oid gs =
   maybe 0 (Map.findWithDefault 0 kind . Object.counters) (Game.lookupObject oid gs)
 
-addLoyalty :: Natural -> Object.Object -> Object.Object
-addLoyalty n obj = obj {Object.counters = Map.insertWith (+) CounterKind.Loyalty n (Object.counters obj)}
-
 -- The cards this player may discard to pay a cost on `oid`: their hand, in its
 -- own order, narrowed by the criterion and minus `oid` itself -- see
 -- canPayComponent's DiscardCards arm for why that exclusion is CR 601.2a.
@@ -2522,37 +2519,48 @@ payComponent moment pid oid component = case component of
   CostComponent.PayEnergy n -> do
     spendEnergy pid n
     pure bindsNothing
-  -- CR 606.4: put the loyalty counters on. A DIRECT edit and deliberately NOT
-  -- through Event.putCounters, the CR 614 funnel: CR 614.16 admits a
-  -- counter-scaling replacement only where a resolving spell or ability's EFFECT
-  -- puts the counter on, and CR 602.2b pays an activation cost as part of
-  -- ACTIVATING (CR 601.2h), which CR 609.1 gives no resolution to hang it on.
-  -- That is what makes Doubling Season double a planeswalker's starting loyalty
-  -- (CR 306.5b, through the funnel) and leave its +1 alone.
+  -- CR 606.4's placement, through Event.putCounters -- CR 122.6's funnel, the
+  -- road PutPlusOneCountersOnThis below takes and for its reason: WHICH
+  -- replacements see the counters is settled by the CAUSE, which `counterCause`
+  -- reads off the moment, rather than by which door the placement came in at.
   --
-  -- Not implemented: a player-grain counter replacement (Vorinclex, Monstrous
-  -- Raider's "if you would put") reaches a cost-paid placement and so should
-  -- reach this one, where the direct edit gives it no opportunity. CR 614.16's
-  -- effect-grain rows are exact here either way (#2221).
+  -- CR 602.2b pays an activation cost as part of ACTIVATING (CR 601.2h), which
+  -- CR 609.1 gives no resolution to hang an effect on, so a loyalty symbol is
+  -- paid at OutsideResolution and arrives as CounterCause.ByPayment. That is
+  -- the whole of the split Replacement.matchesPutter draws: CR 614.16's
+  -- effect-grain row (Doubling Season, "if an EFFECT would put") refuses a
+  -- ByPayment placement, and CR 614.1's player-grain row (Vorinclex, Monstrous
+  -- Raider, "if YOU would put") takes it, the payer being a player whatever
+  -- moment they pay at. Pawl.PlaneswalkerSpec pins the pair on one board --
+  -- "CR 614.16 Doubling Season does not double a loyalty ability's own cost"
+  -- and "CR 614.1 Vorinclex doubles a loyalty ability's own cost" -- against
+  -- CR 306.5b's entry counters, which both cards do double.
+  --
+  -- What the funnel adds over the direct write this used to be: the
+  -- GameEvent.CountersPut record a counter-watching trigger reads (the trade
+  -- RemoveLoyaltyFromThis below already made for CountersRemoved) and CR
+  -- 613.7c's timestamp on the loyalty counters, which the direct write left
+  -- stale.
   CostComponent.AddLoyaltyToThis n -> do
-    State.modify' (\gs -> gs {GameState.objects = Map.adjust (addLoyalty n) oid (GameState.objects gs)})
+    Monad.void (Event.putCounters (counterCause moment pid) oid CounterKind.Loyalty n)
     pure bindsNothing
-  -- CR 606.4's other half, and NOT the direct edit its sibling above is: it goes
-  -- through Event.removeCounters, CR 122's removal funnel, so the removal is
+  -- CR 606.4's other half, through Event.removeCounters -- CR 122's removal
+  -- funnel, the sibling of the placement funnel above -- so the removal is
   -- recorded as a GameEvent.CountersRemoved a trigger can see (Chandra, Fire
   -- Artisan's "whenever one or more loyalty counters are removed from Chandra",
   -- which her own -7 fires).
   --
-  -- That asymmetry with AddLoyaltyToThis is not a hole in the argument above.
-  -- CR 614.16 is about REPLACING a placement, and Event.removeCounters runs no
+  -- This half owes none of the CR 614.16-versus-CR 614.1 argument above: rule
+  -- 614.16 is about REPLACING a placement, and Event.removeCounters runs no
   -- replacement loop at all -- its own Haddock gives the reason, that no
   -- ReplacementEffect class in Pawl.Types.ReplacementEffect pairs with a removal.
-  -- So routing this half changes nothing about which counters Doubling Season
-  -- doubles; what it adds is the record.
+  -- So the cause the placement above must carry has no analogue here; what this
+  -- funnel adds is the record alone.
   --
-  -- The funnel saturates, which is the floor the direct write here used to apply
-  -- itself: CR 606.6 has already refused an activation the permanent cannot pay
-  -- for, so a saturating removal is unreachable through this door anyway.
+  -- The funnel saturates, which is the floor a direct write would have had to
+  -- apply itself: CR 606.6 has already refused an activation the permanent
+  -- cannot pay for, so a saturating removal is unreachable through this door
+  -- anyway.
   CostComponent.RemoveLoyaltyFromThis n -> do
     Event.removeCounters oid CounterKind.Loyalty n
     pure bindsNothing
@@ -2568,9 +2576,9 @@ payComponent moment pid oid component = case component of
   CostComponent.RemovePlusOneCountersFromThis n -> do
     Event.removeCounters oid CounterKind.PlusOnePlusOne n
     pure bindsNothing
-  -- CR 122.6's placement, through the Event.putCounters funnel -- the opposite
-  -- call from AddLoyaltyToThis above, and the difference is WHEN the cost is
-  -- paid, which `counterCause` below reads off the moment rather than assuming.
+  -- CR 122.6's placement, through the Event.putCounters funnel -- the same call
+  -- AddLoyaltyToThis above makes, and the difference is WHEN the cost is paid,
+  -- which `counterCause` below reads off the moment rather than assuming.
   -- Every printing of this component is CR 118.12's endure, paid as the spell or
   -- ability RESOLVES, which is what CR 609.1 calls an effect and so what CR
   -- 614.16 reaches: Hardened Scales sees endure's counter, and still not a

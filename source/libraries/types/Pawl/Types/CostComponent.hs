@@ -284,8 +284,8 @@ data CostComponent keyword
     -- Filter -- into every traversal of this type, for a kind no card asks for.
     --
     -- RESOLUTION-TIME only, which Blight below is not, and that is what decides
-    -- CR 614.16 -- see Pawl.Engine.Cost.payComponent for why this one goes
-    -- through the counter funnel as an effect while AddLoyaltyToThis does not.
+    -- CR 614.16 -- see Pawl.Engine.Cost.payComponent for why the counter funnel
+    -- carries this one in as an effect and AddLoyaltyToThis above as a payment.
     --
     -- A Natural and not a Quantity, for PayLife's reason.
     PutPlusOneCountersOnThis Natural.Natural
