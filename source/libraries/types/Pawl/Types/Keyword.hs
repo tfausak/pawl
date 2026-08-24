@@ -1140,6 +1140,25 @@ data Keyword
     -- replacement modifying the same entry -- Doubling Season's is the one that
     -- would differ, and no counter-multiplying card is in `data/cards/` (#1996).
     Compleated
+  | -- | 702.155a: read ahead, a keyword found on some Saga cards. "Chapter
+    -- abilities of this Saga can't trigger the turn it entered the battlefield
+    -- unless it has exactly the number of lore counters on it specified in the
+    -- chapter symbol of that ability."
+    --
+    -- Nullary, because rule 702.155a takes no parameter, and its readers take
+    -- MEMBERSHIP rather than the per-keyword count: CR 702.155c says multiple
+    -- instances are redundant in so many words.
+    --
+    -- Rule 702.155b's two intrinsic abilities are minted from this constructor by
+    -- Pawl.Engine.Saga.entryReplacementsOf and NOT by
+    -- Pawl.Engine.Keyword.mintedReplacementsFor, because rule 714.3b REPLACES
+    -- rule 714.3a's ability rather than adding to it -- minting from the keyword
+    -- table would leave both rows on the Saga, which would then enter with one
+    -- lore counter too many.
+    --
+    -- Rule 702.155a's own narrowing is Pawl.Engine.Saga.chapterTriggers, read by
+    -- Pawl.Engine.Event.matchesTrigger and by Saga.awaitingChapter.
+    ReadAhead
   | -- | 702.164a: toxic N. N rides the constructor, so `Toxic 1` and `Toxic 2` are
     -- distinct keywords, and CR 702.164b's total toxic value is the sum over every
     -- toxic ability the creature has (Pawl.Engine.Projection.totalToxic) --

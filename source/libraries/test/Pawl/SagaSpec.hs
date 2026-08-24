@@ -10,12 +10,14 @@
 -- where a card reaches them: CounterKind.Lore, GameEvent.CountersPut (the CR
 -- 122.6 record) and TriggerCondition.SelfCountersReached.
 --
--- History of Benalia is the whole card pool for this file. Chapters I and II
--- create a 2/2 white Knight token with vigilance -- CR 714.2c's "I, II --"
--- shorthand, written as the two abilities that rule says it means -- and
--- chapter III gives Knights its controller controls +2/+1 until end of turn.
+-- Two cards. History of Benalia carries every group but the last: chapters I and
+-- II create a 2/2 white Knight token with vigilance -- CR 714.2c's "I, II --"
+-- shorthand, written as the two abilities that rule says it means -- and chapter
+-- III gives Knights its controller controls +2/+1 until end of turn. Love Song of
+-- Night and Day carries the Read ahead group, and rule 702.155 is the whole
+-- reason it is here.
 --
--- `data/cards` holds a second Saga, Old Fat Spider Can't See Me, whose four
+-- `data/cards` holds a third Saga, Old Fat Spider Can't See Me, whose four
 -- chapters run under Pawl.ExpirySpec's OldFatSpiderCantSeeMe group: rule 714 is
 -- read here, and that group reads what its chapters' CR 611.2b durations do.
 module Pawl.SagaSpec where
@@ -42,6 +44,8 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
@@ -53,9 +57,13 @@ spec s registry = Spec.describe s "Saga" $ do
   chapterSpec s registry
   advanceSpec s registry
   sacrificeSpec s registry
+  readAheadSpec s registry
 
 knightToken :: CardName.CardName
 knightToken = CardName.MkCardName (Text.pack "Knight Token")
+
+birdToken :: CardName.CardName
+birdToken = CardName.MkCardName (Text.pack "Bird Token")
 
 -- One lore counter goes on as the Saga enters (CR 714.3a), which fires chapter I
 -- (CR 714.2b). Both halves are visible from a cast, which is what makes this the
@@ -297,3 +305,76 @@ precombatMainOf pid gs =
       GameState.activePlayer = pid,
       GameState.priority = Just pid
     }
+
+-- CR 702.155 / 714.3b: read ahead. Love Song of Night and Day is the producer --
+-- {2}{W}, read ahead, chapter I "you and target opponent each draw two cards",
+-- chapter II a 1\/1 white Bird with flying, chapter III a +1\/+1 counter on each of
+-- up to two target creatures.
+--
+-- The chapter ANSWERED is II, and the choice of board is the whole test. Answering
+-- I makes every quantity below identical under the read-ahead reading and the
+-- unimplemented one -- one lore counter, chapter I fires, no Bird -- so the prompt
+-- would be raised and its answer unobservable.
+readAheadSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+readAheadSpec s registry = Spec.describe s "Read ahead" $ do
+  Spec.it s "CR 714.3b / 702.155a chapter II is chosen, so the Saga enters on II and chapter I never triggers" $ do
+    plains <- S.printingOf s registry "Plains"
+    loveSong <- S.printingOf s registry "Love Song of Night and Day"
+    let (gs, spellId) = S.handOne loveSong (stocked plains)
+        cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
+        resolved = S.runPure (answeringChapter 2) cast Stack.resolveTop
+        -- CR 704.5 and the trigger scan both run at the settle, and the priority
+        -- round is what drains whatever the scan placed. Without it "chapter I
+        -- did not trigger" could not be told from "has not resolved yet".
+        after = S.runPure (answeringChapter 2) resolved Engine.priorityLoop
+    case sagaOf after of
+      Nothing -> Spec.assertFailure s "Love Song of Night and Day did not reach the battlefield"
+      Just oid -> Spec.assertEqWith s "CR 714.3b two lore counters, the chosen chapter" (S.counterOf CounterKind.Lore oid after) 2
+    -- CR 702.155a: the 0 -> 2 placement crosses chapter I under rule 714.2b's
+    -- "at least N", and read ahead is what stops it triggering. Asserted BEFORE
+    -- the Bird, so a fix that places the counters but never narrows the matcher
+    -- reddens here rather than being absorbed downstream.
+    Spec.assertEqWith s "CR 702.155a chapter I did not trigger, so alice drew nothing" (S.handSize S.alice after) 0
+    Spec.assertEqWith s "CR 702.155a and neither did bob" (S.handSize S.bob after) 0
+    -- CR 702.155a's "unless it has exactly the number of lore counters ...": the
+    -- chapter that DOES match still triggers, so the narrowing is a narrowing and
+    -- not a blanket suppression.
+    Spec.assertEqWith s "CR 714.2b chapter II did trigger" (S.countOnBattlefieldByName birdToken S.alice after) 1
+    case S.tokensOf after of
+      [token] -> Spec.assertEqWith s "a 1/1 Bird" (S.powerToughnessOf token after) (Just (1, 1))
+      other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
+  Spec.it s "CR 704.5s entering on the final chapter still resolves it before the Saga is sacrificed" $ do
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    loveSong <- S.printingOf s registry "Love Song of Night and Day"
+    let (pikerId, board) = S.addCreature piker S.alice (stocked plains)
+        (gs, spellId) = S.handOne loveSong board
+        cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
+        resolved = S.runPure (answeringChapter 3) cast Stack.resolveTop
+        after = S.runPure (answeringChapter 3) resolved Engine.priorityLoop
+    -- CR 702.155a again, with the SBA in the way: chapters I and II are skipped,
+    -- and chapter III must reach the stack and resolve before CR 704.5s takes the
+    -- Saga -- Saga.awaitingChapter's exemption.
+    Spec.assertEqWith s "CR 702.155a chapter I did not trigger" (S.handSize S.bob after) 0
+    Spec.assertEqWith s "CR 702.155a chapter II did not trigger, so no Bird" (S.countOnBattlefieldByName birdToken S.alice after) 0
+    Spec.assertEqWith s "CR 714.2b chapter III did, and it resolved" (S.counterOf CounterKind.PlusOnePlusOne pikerId after) 1
+    case sagaOf resolved of
+      Nothing -> Spec.assertFailure s "Love Song of Night and Day did not reach the battlefield"
+      Just oid -> Spec.assertBool s (not (S.onBattlefield oid after)) "and only then did CR 704.5s take the Saga"
+
+-- Answers CR 702.155b's chapter choice with `n` and nothing else, so the board
+-- below differs from the default-answering one in exactly that.
+answeringChapter :: Natural -> Prompt.Prompt r -> r
+answeringChapter n p = case p of
+  Prompt.ChooseReadAheadChapter {} -> n
+  _ -> S.identityAnswer p
+
+-- alice's three Plains, plus two library cards each: chapter I's draw must have
+-- somewhere to draw FROM, or CR 104.3c ends the game for the drawing player and
+-- the hand-size assertions pass because nobody was left rather than because
+-- nothing was drawn.
+stocked :: Printing.Printing -> GameState.GameState
+stocked plains =
+  let base = S.landsInPlay plains 3
+      add gs pid = snd (S.addLibraryCard plains pid gs)
+   in foldl add base [S.alice, S.alice, S.bob, S.bob]

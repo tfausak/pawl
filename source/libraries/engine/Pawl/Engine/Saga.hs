@@ -20,9 +20,10 @@
 -- a controller (Pawl.Engine.Sba's CR 704.5s pass and Pawl.Engine.Engine's CR 505.4
 -- action) look one up themselves.
 --
--- READ AHEAD (CR 702.155 / 714.3b) is not implemented (#841). Its absence is what
--- makes `entryReplacementsOf` unconditional and what makes `crossed` below read
--- "at least N" rather than "exactly N".
+-- READ AHEAD (CR 702.155 / 714.3b) is here in two halves that must be read
+-- together: `entryReplacementsOf` splits on the keyword to mint rule 714.3b's
+-- rewrite instead of rule 714.3a's, and `chapterTriggers` narrows rule 714.2b's
+-- "at least N" to rule 702.155a's equality for the turn the Saga entered.
 module Pawl.Engine.Saga where
 
 import Data.Map.Strict (Map)
@@ -42,6 +43,8 @@ import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
@@ -69,10 +72,53 @@ import qualified Pawl.Types.WithCounters as WithCounters
 --
 -- "At least N", not "exactly N": one placement can cross several chapters at once,
 -- so a Saga handed two lore counters from nothing fires I and II together. Read
--- ahead (CR 702.155a) is the mechanic that narrows this to an equality, and only
--- on the turn the Saga entered the battlefield; it is not implemented (#841).
+-- ahead (CR 702.155a) narrows this to an equality, and only on the turn the Saga
+-- entered the battlefield -- that narrowing is `chapterTriggers` below, and this
+-- function stays rule 714.2b's own sentence.
 crossed :: Natural -> Natural -> Natural -> Bool
 crossed before after n = before < n && n <= after
+
+-- | CR 702.155a: is this permanent's chapter triggering restricted right now?
+-- "Chapter abilities of this Saga can't trigger the turn it entered the
+-- battlefield unless it has exactly the number of lore counters on it specified
+-- in the chapter symbol of that ability."
+--
+-- Both of the rule's conditions: the permanent has read ahead, and the turn is
+-- the one it entered on. MEMBERSHIP of the keyword and not a count, CR 702.155c
+-- making multiple instances redundant.
+--
+-- "The turn it entered the battlefield" is read off the EVENT LOG rather than off
+-- a field on the object, the route Pawl.Engine.Quantity's EnteredThisTurn arm
+-- takes: Pawl.Engine.Engine.beginTurnOf clears GameState.events at the turn
+-- handoff, so the log's extent IS the current turn (CR 608.2i, and see
+-- Pawl.Types.EventShape). CR 400.7's fresh id per zone change is what makes that
+-- exact rather than approximate -- a Saga that flickered is a new object whose
+-- own entry is the only one that can match.
+--
+-- Takes the projection rather than looking one up, for this module's
+-- no-Pawl.Engine.Projection reason.
+readAheadRestricted :: PC.ProjectedCharacteristics -> GameState -> ObjectId -> Bool
+readAheadRestricted pc gs oid =
+  Map.member Keyword.ReadAhead (PC.keywords pc)
+    && any ((== Just oid) . Game.enteredBattlefield . LoggedEvent.event) (GameState.events gs)
+
+-- | CR 714.2b narrowed by CR 702.155a: does a chapter ability numbered `n` trigger
+-- off a placement taking its Saga's lore counters from `before` to `after`?
+--
+-- `restricted` is `readAheadRestricted`'s answer for that Saga. Under it the "at
+-- least N" of rule 714.2b becomes rule 702.155a's "exactly N", which is what makes
+-- a Saga entering on chapter II skip chapter I rather than firing both.
+--
+-- ONE function for BOTH readers -- Pawl.Engine.Event.matchesTrigger and
+-- `awaitingChapter` below -- for the reason `crossed` gives about the pair: CR
+-- 704.5s exempts a Saga whose chapter ability has triggered, so a matcher that
+-- narrowed while the SBA did not would sacrifice a Saga entering on its final
+-- chapter before that chapter reached the stack.
+--
+-- `after == n` is asked BEFORE `restricted`, so a caller passing an expensive
+-- projection pays for it only where the two readings differ.
+chapterTriggers :: Bool -> Natural -> Natural -> Natural -> Bool
+chapterTriggers restricted before after n = crossed before after n && (after == n || not restricted)
 
 -- | CR 714.2 / 714.2a: is this a chapter ability, and if so which chapter?
 --
@@ -164,15 +210,23 @@ tracksLore pc = isSaga pc && not (null (chaptersOf pc))
 -- or more chapter abilities". A Saga stripped of its abilities still enters with a
 -- lore counter and then never advances.
 --
--- Unconditional because read ahead (CR 702.155b) is not implemented (#841); the
--- card that brings it is the one that must split this into rule 714.3a's arm and
--- rule 714.3b's.
+-- CR 714.3b's arm is the OTHER branch, never a second row: rule 714.3a says
+-- "each Saga WITHOUT read ahead" and rule 714.3b "each Saga WITH read ahead", so
+-- the two are exclusive and a Saga with the keyword gets rule 702.155b's pair of
+-- intrinsic abilities in place of rule 714.3a's one. Minting both would enter the
+-- Saga with `1 + chosen` lore counters.
+--
+-- Rule 702.155b's TWO sentences are ONE EntryRewrite.ReadAhead row and not two,
+-- for the reason EntryRewrite.SacrificeAnyNumber's haddock gives: two rows
+-- modifying one entry compete for a CR 616.1e order chosen by the applying
+-- player, so the counter-placing row could be applied before the number was
+-- chosen.
 entryReplacementsOf :: PC.ProjectedCharacteristics -> [ReplacementEffect (Effect.Effect Card)]
-entryReplacementsOf pc =
-  [ -- CR 614.1c: the entering object is the ability's own source.
-  ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Lore (Quantity.Literal 1))))
-  | isSaga pc
-  ]
+entryReplacementsOf pc
+  | not (isSaga pc) = []
+  -- CR 614.1c on both branches: the entering object is the ability's own source.
+  | Map.member Keyword.ReadAhead (PC.keywords pc) = [ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource EntryRewrite.ReadAhead)]
+  | otherwise = [ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Lore (Quantity.Literal 1))))]
 
 -- | The lore counters on a permanent (CR 714.3). Zero for an object the game does
 -- not hold, which is the same answer Pawl.Engine.Cost.loyaltyCountersOn gives for
@@ -240,10 +294,20 @@ awaitingChapter pcs events gs oid =
         _ -> False
       -- Triggered but not yet placed: an unscanned CR 122.6 placement on this
       -- permanent that crossed one of its chapters. The same comparison
-      -- Pawl.Engine.Event.matchesTrigger makes, through the same `crossed`.
+      -- Pawl.Engine.Event.matchesTrigger makes, through the same
+      -- `chapterTriggers` -- so CR 702.155a narrows this exactly as it narrows
+      -- the matcher: a chapter this Saga's read ahead stopped from triggering is
+      -- owed no resolution, and must not exempt the Saga from CR 704.5s.
+      --
+      -- A REGRESSION FENCE rather than a proven behaviour: no board in
+      -- `data/cards` tells the two readings apart, because a read-ahead Saga
+      -- reaches CR 704.5s's threshold only at the chapter it chose, which is the
+      -- one the equality admits anyway. Kept because `crossed` above requires
+      -- the SBA and the matcher to agree, not because a test reddens without it.
+      restricted = any (\pc -> readAheadRestricted pc gs oid) (Map.lookup oid pcs)
       pending event = case event of
         GameEvent.CountersPut (CounterChange.MkCounterChange target CounterKind.Lore before after) ->
-          target == oid && any (crossed before after) chapters
+          target == oid && any (chapterTriggers restricted before after) chapters
         _ -> False
    in any onStack (GameState.stack gs) || any pending events
 

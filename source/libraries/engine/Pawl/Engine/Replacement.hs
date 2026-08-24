@@ -528,6 +528,11 @@ admitsEntry gs oid rewrite = case rewrite of
   EntryRewrite.WithCounters {} -> True
   EntryRewrite.UnderSourceControl -> True
   EntryRewrite.SacrificeAnyNumber {} -> True
+  -- CR 702.155b states no condition of its own -- a Saga with read ahead always
+  -- has both intrinsic abilities -- so this admits every entry the row is
+  -- collected for. CR 702.155a's turn-scoped narrowing is not a condition on the
+  -- ENTRY at all; it gates the chapter TRIGGERS, in Pawl.Engine.Saga.
+  EntryRewrite.ReadAhead -> True
   EntryRewrite.Riot -> True
   EntryRewrite.Unleash -> True
   -- CR 702.54a's own condition, the ability's rather than the pattern's: "IF AN
@@ -942,6 +947,10 @@ bucketOfEffect re = case re of
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.SacrificeAnyNumber {})) -> ReplacementBucket.Other
   -- CR 702.136a is none of CR 616.1a-d either: riot rewrites what the permanent
   -- enters WITH, never whose it is, what it copies or which face is up.
+  -- CR 616.1e for CR 702.155b's reason: read ahead rewrites how many lore
+  -- counters the Saga enters with, never whose it is, what it copies or which
+  -- face is up.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.ReadAhead) -> ReplacementBucket.Other
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.Riot) -> ReplacementBucket.Other
   -- CR 702.98a is none of CR 616.1a-d for riot's reason, one keyword over.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.Unleash) -> ReplacementBucket.Other
@@ -1044,6 +1053,11 @@ readsApplier re = case re of
   -- 614.12a's moment for AsCopy's reason, and the criterion and counter kind ride
   -- the effect. Two such rows would offer the same player the same permanents.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.SacrificeAnyNumber {})) -> False
+  -- CR 702.155b: the chooser is the ENTERING Saga's controller, read live off
+  -- the board for riot's reason below, and the bound is the entering Saga's own
+  -- final chapter number (CR 714.2d) rather than anything the row carries -- so
+  -- nothing about this rewrite is read off the applier.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.ReadAhead) -> False
   -- CR 702.136a: riot's chooser is the ENTERING object's controller, read live
   -- off the board for AsCopy's reason, and the rewrite carries no payload at all
   -- -- rule 702.136a fixes both halves. Two riot rows are always on the SAME

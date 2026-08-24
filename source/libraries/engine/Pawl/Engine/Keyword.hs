@@ -204,6 +204,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Provoke -> List.genericReplicate count provoke
   Keyword.Rampage n -> List.genericReplicate count (rampage n)
   Keyword.Compleated -> []
+  Keyword.ReadAhead -> []
   Keyword.Training -> List.genericReplicate count training
   Keyword.Renown n -> List.genericReplicate count (renown n)
   Keyword.Persist -> List.genericReplicate count persist
@@ -364,6 +365,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
   Keyword.Compleated -> []
+  Keyword.ReadAhead -> []
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.Disguise _ -> []
@@ -563,6 +565,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
   Keyword.Compleated -> []
+  Keyword.ReadAhead -> []
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.Disguise _ -> []
@@ -813,6 +816,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
   Keyword.Compleated -> []
+  Keyword.ReadAhead -> []
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   -- CR 702.168a grants NO permission, and it is the near miss worth stating: the
@@ -1227,6 +1231,16 @@ mintedReplacementsFor keyword count = case keyword of
   -- its own, so Pawl.Engine.Projection.intrinsicReplacementsOf reads it off
   -- the same projection this list is minted from.
   Keyword.Compleated -> []
+  -- CR 702.155b's two intrinsic abilities are NOT minted here, and CR 714.3b is
+  -- why: rule 714.3b REPLACES rule 714.3a's "enters with a lore counter"
+  -- ability rather than adding to it, and that one is minted from the finished
+  -- projection by Pawl.Engine.Saga.entryReplacementsOf. A row minted here would
+  -- sit beside it and the Saga would enter with one lore counter too many.
+  --
+  -- That is also where CR 702.155c is discharged: `entryReplacementsOf` keys on
+  -- MEMBERSHIP of the keyword set, so the `count` this function takes cannot
+  -- make a second instance mint a second row.
+  Keyword.ReadAhead -> []
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.Disguise _ -> []
@@ -1376,6 +1390,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   -- counter clause removed, rule 702.147a stating the restriction flat.
   Keyword.Decayed -> [CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless (Affected.Matching Filter.IsSource) Nothing)]
   Keyword.Compleated -> []
+  Keyword.ReadAhead -> []
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.Disguise _ -> []
@@ -1534,6 +1549,7 @@ familyOf keyword = case keyword of
   Keyword.Nightbound -> Nothing
   Keyword.Decayed -> Nothing
   Keyword.Compleated -> Nothing
+  Keyword.ReadAhead -> Nothing
   Keyword.Training -> Nothing
   Keyword.StartYourEngines -> Nothing
   Keyword.Exert -> Nothing

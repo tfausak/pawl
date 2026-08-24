@@ -2746,6 +2746,7 @@ keywordFilters keyword = case keyword of
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Compleated -> []
+  Keyword.ReadAhead -> []
   Keyword.Training -> []
   -- CR 702.100a is payload-free: the Filter its minted ability carries -- the
   -- entering creature's -- is the ENGINE's, never a card's.
@@ -3427,6 +3428,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChooseColor -> []
   EntryRewrite.ChooseBasicLandType -> []
   EntryRewrite.ChoosePlayer -> []
+  EntryRewrite.ReadAhead -> []
   -- CR 614.1c's amount is a Quantity (Undergrowth Scavenger's "equal to the number
   -- of creature cards in all graveyards"), so a Count inside it holds card text on
   -- the same axis EntryRiders' counts do -- riderFilters walks those, and this
