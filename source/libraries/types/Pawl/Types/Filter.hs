@@ -51,10 +51,11 @@ data Filter keyword
     -- joined string they render as is not among them (see #650), so an atom that
     -- compared to a single name would miss the halves it is spelling.
     --
-    -- The PRINTED name, and not Pawl.Types.EntryRewrite.ChooseCardNames' chosen
-    -- one: that machinery answers "what did a player name?", read by
-    -- PlayerEffect.CantCastChosenName, where this is a name another card's own
-    -- text prints. The two are different questions and neither can express the
+    -- The PRINTED name, and not a chosen one -- Pawl.Types.EntryRewrite
+    -- .ChooseCardNames' as the permanent enters, or Effect.ChooseCardName's on
+    -- resolution. That machinery answers "what did a player name?", read by
+    -- PlayerEffect.CantCastChosenName and by HasChosenName below, where this is a
+    -- name another card's own text prints. The two are different questions and neither can express the
     -- other -- a card cannot choose on the player's behalf, and a player cannot
     -- be asked to name what a card already says.
     HasName CardName.CardName
@@ -336,6 +337,26 @@ data Filter keyword
     -- has no name at all (CR 708.2a's face-down object) -- the posture IsBound
     -- above takes, and the answer CR 709.4a itself gives for a nameless object.
     SameNameAsBound SlotName.SlotName
+  | -- | CR 201.4: the candidate has a name the SOURCE has chosen -- Ancient
+    -- Vendetta's "cards with that name", where the name was chosen earlier in the
+    -- same resolution (CR 608.2c).
+    --
+    -- HasName's second context-relative sibling, standing to it as
+    -- SameNameAsBound does: that atom carries a literal and this one reads the
+    -- chosen names off Pawl.Engine.Filter.Context, which is where the
+    -- board-holding caller puts them. SameNameAsBound reads a SLOT's names and
+    -- this one the SOURCE's own, which are different questions -- a chosen name
+    -- names no object at all, so no slot can hold it.
+    --
+    -- SHARES A NAME, for CR 201.4g's reason as much as CR 709.4a's: interchangeable
+    -- names mean choosing one chooses each, so the test is membership at both ends.
+    -- Set intersection is that said once.
+    --
+    -- Vacuously False where the source has chosen no name -- the posture every
+    -- context-relative atom here takes. What keeps a card out of the positions that
+    -- cannot answer is Pawl.CardSpec's "CR 201.4 no card asks HasChosenName outside
+    -- a search's filter".
+    HasChosenName
   | -- | CR 115.1: the candidate is a PLAYER who relates thus to the perspective --
     -- "target opponent". Context-relative like ControlledBy, but separate from it
     -- rather than a reuse, because ControlledBy asks who controls an OBJECT
