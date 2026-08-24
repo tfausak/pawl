@@ -381,6 +381,8 @@ library codec
     Pawl.Codec.FightSpec
     Pawl.Codec.Filter
     Pawl.Codec.FilterSpec
+    Pawl.Codec.FlipCoin
+    Pawl.Codec.FlipCoinSpec
     Pawl.Codec.FloatingCandidate
     Pawl.Codec.FloatingCandidateSpec
     Pawl.Codec.ForEach
@@ -1113,6 +1115,7 @@ library test
     Pawl.CastSpec
     Pawl.ClassSpec
     Pawl.CodecIntegrationSpec
+    Pawl.CoinSpec
     Pawl.ColorSpec
     Pawl.CombatEffectSpec
     Pawl.CombatSpec
@@ -1262,6 +1265,7 @@ library types
     Pawl.Types.ClassLevelChange
     Pawl.Types.Clause
     Pawl.Types.ClauseIndex
+    Pawl.Types.CoinFace
     Pawl.Types.Color
     Pawl.Types.Combat
     Pawl.Types.CombatRestriction
@@ -1357,6 +1361,7 @@ library types
     Pawl.Types.Facing
     Pawl.Types.Fight
     Pawl.Types.Filter
+    Pawl.Types.FlipCoin
     Pawl.Types.FloatingCandidate
     Pawl.Types.ForEach
     Pawl.Types.Game

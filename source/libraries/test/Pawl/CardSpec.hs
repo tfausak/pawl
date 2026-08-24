@@ -921,6 +921,7 @@ effectCounts effect = case effect of
   Effect.ChooseOpponentAtRandom _ -> []
   -- CR 706.2's modifier is a Quantity, so its Counts are reachable here.
   Effect.RollDie rollDie -> foldMap quantityCounts (RollDie.modifier rollDie)
+  Effect.FlipCoin {} -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
   Effect.OfferCast {} -> []
@@ -1175,6 +1176,7 @@ effectNestedEffects effect = case effect of
   Effect.ChooseOpponent {} -> []
   Effect.ChooseOpponentAtRandom {} -> []
   Effect.RollDie {} -> []
+  Effect.FlipCoin {} -> []
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers {} -> []
   Effect.RequireBlock {} -> []
@@ -1640,6 +1642,7 @@ effectReplacements effect = case effect of
   Effect.ChooseOpponent _ -> []
   Effect.ChooseOpponentAtRandom _ -> []
   Effect.RollDie {} -> []
+  Effect.FlipCoin {} -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
   Effect.OfferCast {} -> []
@@ -2295,6 +2298,7 @@ effectMintedFaces effect = case effect of
   Effect.ChooseOpponent _ -> []
   Effect.ChooseOpponentAtRandom _ -> []
   Effect.RollDie {} -> []
+  Effect.FlipCoin {} -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
   Effect.OfferCast {} -> []
@@ -3817,6 +3821,7 @@ effectFilters effect = case effect of
   Effect.ChooseOpponentAtRandom _ -> []
   -- CR 706.2's modifier is a Quantity, so its filters are reachable here.
   Effect.RollDie rollDie -> unframed (foldMap quantityFilters (RollDie.modifier rollDie))
+  Effect.FlipCoin {} -> []
   Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn _ _) -> []
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> sourceHosted (objectRefFilters ref)
   Effect.OfferCast {} -> []
