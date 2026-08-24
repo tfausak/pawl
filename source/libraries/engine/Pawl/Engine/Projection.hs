@@ -1552,7 +1552,9 @@ rewriteModificationWith rewriteAbility pairs m =
         -- above: "loses islandwalk" is text printed on the REMOVER, so a text
         -- change affecting it swaps the land-type word before the removal is
         -- read. Scarwood Hag's "loses forestwalk" is the printing that carries
-        -- one.
+        -- one, and it is not in the pool: Sky Tether's flying is the only
+        -- keyword any card here removes, so this arm is a regression fence where
+        -- the hacked Lord of Atlantis proves the grant above.
         Modification.LoseKeyword k -> Modification.LoseKeyword (Filter.rewriteKeyword [(from, to)] k)
         Modification.SwitchPowerToughness -> acc
         -- CR 612.1 through both boxes: a Quantity.Count carries a Filter, so a
@@ -3124,7 +3126,10 @@ modificationWrites m = case m of
   -- a named removal, so Set.empty here leaves the suite green.
   Modification.LoseNamedAbility _ -> Set.singleton Keywords
   -- Writes ProjectedCharacteristics.keywords, which Filter.HasKeyword reads --
-  -- the same answer GainKeyword gives above, the removal being the same write.
+  -- the same answer GainKeyword gives above, the removal being the same write. A
+  -- REGRESSION FENCE rather than a proved behaviour: no board in the pool makes
+  -- another effect's affected set depend on a keyword this arm took away, so
+  -- Set.empty here leaves the suite green.
   Modification.LoseKeyword _ -> Set.singleton Keywords
   Modification.SetBasePowerToughness {} -> Set.singleton PowerA
   Modification.ModifyPowerToughness {} -> Set.singleton PowerA

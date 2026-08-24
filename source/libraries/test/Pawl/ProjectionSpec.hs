@@ -567,9 +567,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "the Ape keeps its own +1/+2" (S.powerToughnessOf apeId board) (Just (2, 3))
     Spec.assertBool s (Projection.hasKeyword Keyword.Defender apeId board) "while the Aura is attached and applying"
 
-  -- CR 613.1f puts the removal in layer 6 and CR 613.7 orders it there against
-  -- the grants, so which of the two wins is a question about TIMESTAMPS and
-  -- nothing else. Both readings on one board, off the Aura's own stamp: a grant
+  -- CR 613.9's first Example, in so many words: a grant of flying and a removal
+  -- of flying do not depend on each other (CR 613.8a), so CR 613.1f puts both in
+  -- layer 6 and CR 613.7's timestamp decides which "wins".
+  --
+  -- Both readings on one board, off the Aura's own stamp: a grant
   -- stamped before it is undone, a grant stamped after it stands. A Piker rather
   -- than a flier, so the removal has nothing printed to bite on and the grant is
   -- the only flying in the fold -- which is what makes the first assertion fail
