@@ -233,7 +233,11 @@ data GameEvent
     -- creatures are declared as attackers attacking that player or permanent", so
     -- three creatures sent at one player are three of that event and ONE of this.
     -- Pawl.Engine.Event.matchesTrigger sees one event at a time and so cannot do
-    -- the grouping itself, which is why the arity is built here.
+    -- the grouping itself, which is why the arity is built here. Built HERE
+    -- rather than deduplicated in the scan (which is what CR 603.2c's batch dies
+    -- conditions do instead) because a declaration has ONE emitter that sees the
+    -- whole of it; deaths reach a graveyard from four unrelated places, so only
+    -- the log's EventGroup knows which of them were one event.
     --
     -- DISTINCT targets: a declaration splitting five attackers across two
     -- planeswalkers records two events, one per permanent attacked, and a target

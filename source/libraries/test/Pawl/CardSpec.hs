@@ -676,6 +676,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- Filter holds no Count (Pawl.Types.Filter's atoms are all characteristics).
   TriggerCondition.PermanentEnters _ -> []
   TriggerCondition.PermanentDies _ -> []
+  TriggerCondition.PermanentsDie _ -> []
   TriggerCondition.PermanentLeavesTheBattlefield _ -> []
   TriggerCondition.StepBegins {} -> []
   TriggerCondition.StateIs condition -> conditionCounts condition
@@ -3046,6 +3047,10 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- final chapter number rather than through a Filter.
   TriggerCondition.SagaFinalChapterTriggers _ -> []
   TriggerCondition.PermanentDies f -> [f]
+  -- CR 603.2c's batch reading of the same written form carries the same Filter,
+  -- so it is swept the same way -- answering [] here would exempt Vengeful
+  -- Townsfolk's "other creatures you control" from every corpus filter lint.
+  TriggerCondition.PermanentsDie f -> [f]
   -- CR 603.6c's bystander form carries the same kind of Filter one rule wider.
   TriggerCondition.PermanentLeavesTheBattlefield f -> [f]
   TriggerCondition.StateIs condition -> conditionFilters condition

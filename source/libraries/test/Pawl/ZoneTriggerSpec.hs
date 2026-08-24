@@ -79,6 +79,7 @@ import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LifeChange as LifeChange
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -1203,6 +1204,209 @@ permanentDiesSpec s registry =
               TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) TurnScope.ControllersTurn)
             ]
 
+-- CR 603.2c's second sentence, and the fork it forces on the written form
+-- permanentDiesSpec above proves the other side of. Vengeful Townsfolk's
+-- "whenever ONE OR MORE other creatures you control die" names the whole CR 704.3
+-- batch as its trigger event, so a state-based-action pass that buries three
+-- creatures contains ONE occurrence of it -- where Meren's "whenever another
+-- creature you control dies" names each death, and the rule's own Example fires
+-- that once per member.
+--
+-- Three boards prove the arity, and all three are load-bearing:
+--
+--   * one batch of three, answering ONE counter. TWO of alice's rather than one,
+--     because a lone death makes the two readings agree and the board could not
+--     discriminate at all; bob's third, because without a creature dying under
+--     another controller in the same batch the Filter's "you control" half cannot
+--     be observed false.
+--   * a SECOND batch later, answering a second counter. Without it an
+--     implementation that fired once per TURN passes the first board.
+--   * two death GROUPS inside ONE CR 117.5 scan, answering two counters.
+--     GameState.scannedThrough is not bumped until the scan, so several groups
+--     share one; without this board an implementation that deduped per scan
+--     rather than per group passes the other two.
+--
+-- Lethal damage settled through Engine.settleForPriority rather than a sweeper on
+-- the first two boards: a sweeper kills the bearer too, and this card's payload
+-- acts on itself, so there would be nothing left to read the counter off. The
+-- deaths are one event either way -- Sba.performStateBasedActions is one
+-- Event.simultaneously bracket.
+--
+-- Three more boards follow, on the Filter and on CR 603.10a: the arity boards
+-- cannot see either half of "other creatures YOU CONTROL", since once the batch is
+-- deduped to one trigger, admitting an extra dying creature changes no counter.
+-- Each is the first board with exactly one thing changed.
+permanentsDieSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+permanentsDieSpec s registry =
+  let -- The distinct EventGroups the log's battlefield-to-graveyard moves carry.
+      -- The precondition every case below rests on: were the deaths not one group,
+      -- "once for the batch" and "once per turn" would be the same claim, and the
+      -- gameplay assertion would prove the weaker one.
+      deathGroups gs =
+        List.nub
+          ( Maybe.mapMaybe
+              ( \logged -> case LoggedEvent.event logged of
+                  GameEvent.Moved (Moved.MkMoved zc _)
+                    | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard -> Just (LoggedEvent.group logged)
+                  _ -> Nothing
+              )
+              (Foldable.toList (GameState.events gs))
+          )
+      -- alice's Vengeful Townsfolk, three Goblin Pikers of hers and one of bob's.
+      -- The Townsfolk takes no damage on any board here, so the bearer is standing
+      -- when the counter is read -- Pawl.Support's builders settle what they place,
+      -- so nothing else about it needs arranging.
+      townsfolkBoard = do
+        townsfolk <- S.printingOf s registry "Vengeful Townsfolk"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (bearer, withBearer) = S.addCreature townsfolk S.alice (Setup.emptyGame S.bothPlayers)
+            (aliceFirst, withFirst) = S.addCreature piker S.alice withBearer
+            (aliceSecond, withSecond) = S.addCreature piker S.alice withFirst
+            (aliceThird, withThird) = S.addCreature piker S.alice withSecond
+            (bobs, gs) = S.addCreature piker S.bob withThird
+        pure (bearer, aliceFirst, aliceSecond, aliceThird, bobs, gs)
+      -- Every trigger the settle put on the stack, resolved. Resolving only the TOP
+      -- would leave the power/toughness assertions below vacuous: a broken engine's
+      -- extra triggers would still be sitting on the stack, unread, and the bearer
+      -- would answer the correct number either way. The stack strictly shrinks --
+      -- nothing here is a settle, and a +1/+1 counter puts nothing back on.
+      resolveWholeStack gs =
+        if null (GameState.stack gs)
+          then gs
+          else resolveWholeStack (S.runPure S.identityAnswer gs Stack.resolveTop)
+      -- A Goblin Piker is a 2/1, so one marked damage is CR 704.5g lethal.
+      lethal = 1 :: Natural
+   in Spec.describe s "PermanentsDie" $ do
+        -- The proving case. Three creatures die in one CR 704.3 pass, two of them
+        -- alice's, and her Townsfolk grows by exactly one.
+        --
+        -- 4/4 is the whole discrimination: 5/5 is the per-object reading (one
+        -- counter per creature of hers that died) and 3/3 is silence.
+        Spec.it s "CR 603.2c three creatures dying in one batch give the Townsfolk one counter" $ do
+          (bearer, aliceFirst, aliceSecond, _, bobs, board) <- townsfolkBoard
+          let damaged = S.markDamage aliceFirst lethal (S.markDamage aliceSecond lethal (S.markDamage bobs lethal board))
+              settled = S.runPure S.identityAnswer damaged Engine.settleForPriority
+              after = resolveWholeStack settled
+          Spec.assertEqWith s "the Townsfolk is a 4/4: one +1/+1 counter for the whole batch" (S.powerToughnessOf bearer after) (Just (4, 4))
+          Spec.assertEqWith s "it was a 3/3 before the batch" (S.powerToughnessOf bearer board) (Just (3, 3))
+          Spec.assertEqWith s "all three creatures died" (fmap (\oid -> Game.lookupObject oid settled) [aliceFirst, aliceSecond, bobs]) [Nothing, Nothing, Nothing]
+          Spec.assertEqWith s "and they died as one event group" (length (deathGroups settled)) 1
+          Spec.assertEqWith s "so exactly one trigger reached the stack" (length (GameState.stack settled)) 1
+        -- The other half, without which "fires once per turn" answers the board
+        -- above correctly. A second batch, in the same turn, is a second trigger
+        -- event: 5/5, where a once-per-turn limiter leaves the 4/4 above standing.
+        --
+        -- One death this time rather than two, which is the point: the first board
+        -- is what proves a batch of several fires once, so this one only has to be
+        -- a second batch.
+        Spec.it s "CR 603.2c a second batch in the same turn is a second trigger event" $ do
+          (bearer, aliceFirst, aliceSecond, aliceThird, bobs, board) <- townsfolkBoard
+          let damaged = S.markDamage aliceFirst lethal (S.markDamage aliceSecond lethal (S.markDamage bobs lethal board))
+              settled = S.runPure S.identityAnswer damaged Engine.settleForPriority
+              after = resolveWholeStack settled
+              again = S.runPure S.identityAnswer (S.markDamage aliceThird lethal after) Engine.settleForPriority
+              afterAgain = resolveWholeStack again
+          Spec.assertEqWith s "the Townsfolk is a 5/5 after the second batch" (S.powerToughnessOf bearer afterAgain) (Just (5, 5))
+          Spec.assertEqWith s "it was a 4/4 after the first" (S.powerToughnessOf bearer after) (Just (4, 4))
+          Spec.assertEqWith s "the third Piker died in a group of its own" (length (deathGroups again)) 2
+          Spec.assertEqWith s "and one more trigger reached the stack" (length (GameState.stack again)) 1
+        -- The control that separates "once per event group" from "once per trigger
+        -- scan", which the two boards above cannot tell apart: alice's Salt Road
+        -- Skirmish destroys her own Goblin Piker (CR 701.8, one group), then creates
+        -- two 1/1 Warrior tokens later in that same resolution, and the CR 117.5
+        -- settle's state-based-action pass buries both as 0/0 under Night of Souls'
+        -- Betrayal (CR 704.5f, a second group). GameState.scannedThrough is not
+        -- bumped until the trigger scan, so both groups are read by one scan.
+        --
+        -- TWO counters is the rules answer, CR 704.3 making each pass its own single
+        -- event. 4/4 is 3/3, Night's -1/-1 and two counters; a per-scan dedup leaves
+        -- 3/3 and the per-object reading gives 5/5, so the three readings are three
+        -- different creatures.
+        --
+        -- The bearer survives Night as a 2/2, which is what leaves a permanent to
+        -- read the counters off. The target is pinned by ObjectId rather than left
+        -- to S.identityAnswer's least Recipient.
+        Spec.it s "CR 704.3 two death groups in one trigger scan are two trigger events" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          townsfolk <- S.printingOf s registry "Vengeful Townsfolk"
+          piker <- S.printingOf s registry "Goblin Piker"
+          night <- S.printingOf s registry "Night of Souls' Betrayal"
+          skirmish <- S.printingOf s registry "Salt Road Skirmish"
+          let (bearer, withBearer) = S.addCreature townsfolk S.alice (Setup.emptyGame S.bothPlayers)
+              (victim, withVictim) = S.addCreature piker S.alice withBearer
+              (_, withNight) = S.addCreature night S.alice withVictim
+              withLands = List.foldl' (\gs _ -> snd (S.addCreature swamp S.alice gs)) withNight [1 :: Int .. 4]
+              (withSpell, spell) = S.handOne skirmish withLands
+              answer :: Prompt.Prompt r -> r
+              answer p = case p of
+                Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature victim))) sets
+                _ -> S.identityAnswer p
+              afterCast = S.runPure answer withSpell (S.cast S.alice spell)
+              resolved = S.runPure answer afterCast Stack.resolveTop
+              settled = S.runPure answer resolved Engine.settleForPriority
+              twice = resolveWholeStack settled
+          Spec.assertEqWith s "the Townsfolk is a 4/4: 2/2 under Night, plus two counters" (S.powerToughnessOf bearer twice) (Just (4, 4))
+          Spec.assertEqWith s "it was a 2/2 before either batch" (S.powerToughnessOf bearer withLands) (Just (2, 2))
+          Spec.assertEqWith s "the Piker and both tokens reached a graveyard" (length (filter (\zc -> ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard) (S.zoneChangesOf settled))) 3
+          Spec.assertEqWith s "in two event groups, both inside one scan" (length (deathGroups settled)) 2
+          Spec.assertEqWith s "so two triggers reached the stack" (length (GameState.stack settled)) 2
+        -- "YOU CONTROL", the ControlledBy arm (CR 109.5 against the ability's
+        -- controller, CR 603.3a). The pair to the first board, differing in exactly
+        -- one thing: the same fixture, the same settle, and only bob's Piker
+        -- damaged. Its own board cannot prove this and the first board cannot
+        -- either -- once the batch is deduped to one trigger, admitting bob's
+        -- creature alongside alice's two changes no counter.
+        Spec.it s "CR 109.5 you control: a batch holding only an opponent's creature fires nothing" $ do
+          (bearer, _, _, _, bobs, board) <- townsfolkBoard
+          let settled = S.runPure S.identityAnswer (S.markDamage bobs lethal board) Engine.settleForPriority
+              after = resolveWholeStack settled
+          Spec.assertEqWith s "the Townsfolk is still a 3/3 once the stack is drained" (S.powerToughnessOf bearer after) (Just (3, 3))
+          Spec.assertEqWith s "though bob's Piker did die" (Game.lookupObject bobs settled) Nothing
+          Spec.assertEqWith s "and nothing reached the stack" (length (GameState.stack settled)) 0
+        -- "OTHER", the Filter's Not IsSource arm, and the pair to the board below:
+        -- the Townsfolk's own death IS a creature alice controls dying, so the
+        -- silence has to come from the exclusion.
+        --
+        -- The stack rather than a counter, here and below, for the same reason: this
+        -- card's payload acts on itself and the bearer is gone, so "the ability
+        -- triggered" is the whole of what a board can show.
+        Spec.it s "CR 603.6c other: the Townsfolk dying alone fires nothing" $ do
+          (bearer, _, _, _, _, board) <- townsfolkBoard
+          let settled = S.runPure S.identityAnswer (S.markDamage bearer 3 board) Engine.settleForPriority
+          Spec.assertEqWith s "the Townsfolk died" (Game.lookupObject bearer settled) Nothing
+          Spec.assertEqWith s "and nothing reached the stack" (length (GameState.stack settled)) 0
+        -- CR 603.10a's own Example, on the batch reading: the bearer swept up in the
+        -- very batch it is watching still sees its group-mates, because the rule
+        -- reads "the appearance of objects immediately prior to the event" and both
+        -- were standing then. One damaged Piker apart from the board above, so the
+        -- two differ in exactly one thing.
+        --
+        -- The stack rather than a counter, and necessarily: this card's payload acts
+        -- on itself, and there is no permanent left to carry one.
+        Spec.it s "CR 603.10a the Townsfolk dying in the batch still sees the Piker beside it" $ do
+          (bearer, aliceFirst, _, _, _, board) <- townsfolkBoard
+          let settled = S.runPure S.identityAnswer (S.markDamage bearer 3 (S.markDamage aliceFirst lethal board)) Engine.settleForPriority
+          Spec.assertEqWith s "one trigger reached the stack" (length (GameState.stack settled)) 1
+          Spec.assertEqWith s "both died" (fmap (\oid -> Game.lookupObject oid settled) [bearer, aliceFirst]) [Nothing, Nothing]
+          Spec.assertEqWith s "in one event group" (length (deathGroups settled)) 1
+        -- The condition is the card's rather than this spec's, as it is for Meren:
+        -- what the three boards above played out is the printed Filter, and a
+        -- transcription that drifted to PermanentDies would answer 5/5 above.
+        Spec.it s "Vengeful Townsfolk's printed condition is PermanentsDie over another creature you control" $ do
+          townsfolk <- S.printingOf s registry "Vengeful Townsfolk"
+          Spec.assertEqWith
+            s
+            "one triggered ability, batch-scoped"
+            (fmap TriggeredAbility.condition (Face.triggeredAbilities (S.combinedFace townsfolk)))
+            [ TriggerCondition.PermanentsDie
+                ( Filter.Type.And
+                    [ Filter.Type.HasCardType CardType.Creature,
+                      Filter.Type.ControlledBy PlayerRelation.You,
+                      Filter.Type.Not Filter.Type.IsSource
+                    ]
+                )
+            ]
+
 -- Meren of Clan Nel Toth's SECOND ability, the half permanentDiesSpec above does
 -- not cover: "At the beginning of your end step, choose target
 -- creature card in your graveyard. If that card's mana value is less than or
@@ -1685,6 +1889,12 @@ representativeEvents cond =
         TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> one (moved Zone.Hand Zone.Graveyard)
         TriggerCondition.SelfDies -> one (moved Zone.Battlefield Zone.Graveyard)
         TriggerCondition.PermanentDies _ -> one (moved Zone.Battlefield Zone.Graveyard)
+        -- The same one event, and NOT because the batch reading matches nothing:
+        -- Event.matchesTrigger answers alike for both (its PermanentsDie arm
+        -- delegates to PermanentDies'), CR 603.2c's once-per-batch scoping living
+        -- in Event.eventTriggers instead. So the floor this pin asserts is the
+        -- same floor, read off the same event.
+        TriggerCondition.PermanentsDie _ -> one (moved Zone.Battlefield Zone.Graveyard)
         -- CR 603.6c admits every destination, and CR 400.2 splits them into
         -- public and hidden, so both sides of CR 400.7e's proviso have to be
         -- here for the floor to be the honest answer. Rule 603.6c's second
@@ -1870,6 +2080,7 @@ everyTriggerCondition =
   [ TriggerCondition.SelfEnters,
     TriggerCondition.PermanentEnters Filter.Type.IsSource,
     TriggerCondition.PermanentDies Filter.Type.IsSource,
+    TriggerCondition.PermanentsDie Filter.Type.IsSource,
     TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.EachTurn),
     TriggerCondition.StateIs (Condition.Type.Compares (Compares.MkCompares (Quantity.Type.Literal 0) Comparison.Exactly (Quantity.Type.Literal 0))),
     TriggerCondition.SelfDealsCombatDamageToPlayer,
@@ -4346,6 +4557,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   serraAvatarSpec s registry
   diesTriggerSpec s registry
   permanentDiesSpec s registry
+  permanentsDieSpec s registry
   merenEndStepSpec s registry
   leavesBattlefieldSpec s registry
   permanentLeavesTheBattlefieldSpec s registry
