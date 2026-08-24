@@ -9,6 +9,7 @@ import qualified Pawl.Types.CreatureBecomesBlockedByAtLeast as CreatureBecomesBl
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
+import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.RoomIndex as RoomIndex
@@ -240,10 +241,31 @@ data TriggerCondition
     --
     -- Not implemented: rule 508.3d's BOUND attacking player -- "that player" and
     -- "the attacking player", which Norn's Decree and Mirkwood Trapper print
-    -- (#2154). Nor CR 508.3c's "whenever [a player] attacks with [a creature]",
-    -- this subject at CR 508.3a's arity and binding the creature (#2140), nor CR
-    -- 508.3e's "attacks [another player]" (#538).
+    -- (#2154). Nor CR 508.3e's "attacks [another player]" (#538). CR 508.3c's
+    -- "attacks with [a creature]" is the arm below.
     PlayerAttacks PlayerRelation.PlayerRelation
+  | -- | CR 508.3c: "whenever [a player] attacks with [a creature]" -- Hermes,
+    -- Overseer of Elpis' "whenever you attack with one or more Birds". The arm
+    -- above narrowed by a quality the declaration has to have named, and that
+    -- Filter is the whole difference.
+    --
+    -- The same once-per-DECLARATION arity, against the same
+    -- GameEvent.AttackersDeclared, because that is the arity the printed
+    -- sentence takes: every printing of "attacks with" quantifies over a set
+    -- ("one or more Birds", "three or more creatures"), so a declaration naming
+    -- two Birds fires it once. CR 508.3a's per-attacker event is SelfAttacks'
+    -- and CreatureAttacksAlone's, and two admitted attackers tell them apart.
+    --
+    -- Nothing is bound, for rule 508.3d's reason above: the form names a SET of
+    -- creatures rather than one.
+    --
+    -- The creatures are read from Pawl.Types.Combat's declaration record rather
+    -- than from the event, which carries only the declaring player --
+    -- SelfBlocksOneOrMore's shape on the blocking side.
+    --
+    -- Not implemented: a FLOOR above one, which Aurelia, the Law Above's "with
+    -- three or more creatures" needs (#2226).
+    PlayerAttacksWith PlayerAttacksWith.PlayerAttacksWith
   | -- | CR 702.105a: dethrone -- SelfAttacks narrowed by whom the bearer
     -- attacked. The attacked player comes from Combat.attackers rather than the
     -- event, and that is the whole narrowing: the event carries CR 508.5's
