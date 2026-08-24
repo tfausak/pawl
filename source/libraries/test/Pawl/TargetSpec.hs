@@ -812,6 +812,85 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
           "and bob's own black Doom Blade can, CR 702.11d stopping only what his opponents control"
       _ -> Spec.assertFailure s "Doom Blade and Angelic Edict should each declare a target slot"
 
+  -- CR 702.16b: "A permanent or player with protection can't be targeted by
+  -- spells with the stated quality and can't be targeted by abilities from a
+  -- source with the stated quality." Apostle of Purifying Light ({1}{W} Creature
+  -- -- Human Cleric 2/1, M20, "Protection from black" plus "{2}: Exile target
+  -- card from a graveyard"), oracle text verified against Scryfall. The quality
+  -- arrives off the card's own `keywords` through the codec, with no test-side
+  -- grant anywhere.
+  --
+  -- THREE ANSWERS OFF ONE BOARD, and the second is the one that tells this rule
+  -- from CR 702.11d's:
+  --
+  --   * alice's black Doom Blade does NOT reach bob's Apostle.
+  --   * BOB's own black Doom Blade does not reach it EITHER. Rule 702.16b names
+  --     no player where rule 702.11d stops only what "your opponents control", so
+  --     this is the leg a hexproof-shaped implementation fails -- and it is the
+  --     exact leg the Knight of Grace case above answers the other way, off the
+  --     same two spells.
+  --   * Her WHITE Angelic Edict does reach it -- without this leg an
+  --     implementation that read protection as CR 702.18a's shroud passes.
+  --
+  -- The Apostle is itself WHITE (CR 202.2, {1}{W}), which is what makes the first
+  -- leg discriminating: an implementation matching the quality against the
+  -- CANDIDATE's colours rather than the source's finds no black on it and admits
+  -- the Doom Blade.
+  --
+  -- Every spell is a REAL object on the stack for the reason the CR 702.11d cases
+  -- above give: S.noSource names no object, its view carries no colour, and the
+  -- whole case would pass vacuously.
+  Spec.it s "CR 702.16b Apostle of Purifying Light stops a black spell whoever casts it, and admits a white one" $ do
+    apostle <- S.printingOf s registry "Apostle of Purifying Light"
+    doomBlade <- S.printingOf s registry "Doom Blade"
+    angelicEdict <- S.printingOf s registry "Angelic Edict"
+    case (S.spellTargetSlot doomBlade, S.spellTargetSlot angelicEdict) of
+      (Just blackSlot, Just whiteSlot) -> do
+        let (apostleId, board) = S.addCreature apostle S.bob (Setup.emptyGame S.bothPlayers)
+            -- Doom Blade's pool is Creatures and Angelic Edict's is Permanents,
+            -- so the same Apostle is tagged differently in the two sets (CR 115).
+            reaches printing theSlot tag caster =
+              let (spellId, onStack) = S.spellOnStack printing caster board
+               in Set.member (tag apostleId) (Target.legalRecipients (Just caster) spellId theSlot onStack)
+        Spec.assertBool
+          s
+          (not (reaches doomBlade blackSlot Recipient.ToCreature S.alice))
+          "alice's black Doom Blade cannot target bob's Apostle (CR 702.16b)"
+        Spec.assertBool
+          s
+          (not (reaches doomBlade blackSlot Recipient.ToCreature S.bob))
+          "and neither can bob's own -- CR 702.16b names no player, unlike CR 702.11d"
+        Spec.assertBool
+          s
+          (reaches angelicEdict whiteSlot Recipient.ToObject S.alice)
+          "her white Angelic Edict can -- the half a shroud-shaped reading loses"
+      _ -> Spec.assertFailure s "Doom Blade and Angelic Edict should each declare a target slot"
+
+  -- The same card through the CAST path and on to a resolution, which is what the
+  -- set-membership case above stands in for: CR 601.2c makes a spell with no legal
+  -- target for a slot uncastable at all, and the source Cast passes is the card IN
+  -- HAND rather than a spell object on the stack.
+  --
+  -- ONE PAIR OF BOARDS DIFFERING IN ONE THING, and Humility is what moves: "All
+  -- creatures lose all abilities and have base power and toughness 1/1" is CR
+  -- 613.1f at layer 6, and CR 702.16 states no clause holding protection clear of
+  -- it. So the humbled row is the same Apostle with the same Doom Blade in the
+  -- same hand over the same two Swamps, minus the keyword -- which also makes this
+  -- the case that proves the read is POST-layer rather than off the printed card.
+  Spec.it s "CR 601.2c whole card: protection leaves alice's Doom Blade no legal target until Humility takes it away" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    apostle <- S.printingOf s registry "Apostle of Purifying Light"
+    doomBlade <- S.printingOf s registry "Doom Blade"
+    humility <- S.printingOf s registry "Humility"
+    let (_, board) = S.addCreature apostle S.bob (S.landsInPlay swamp 2) -- {1}{B}
+        (base, dbId) = S.handOne doomBlade board
+        humbled = S.withHumility humility base
+        resolve gs = snd (Engine.runGamePure S.identityAnswer (snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice dbId))) Stack.resolveTop)
+    Spec.assertBool s (not (S.castable S.alice dbId base)) "CR 702.16b protection from black leaves the black Doom Blade no legal target at all"
+    Spec.assertBool s (S.castable S.alice dbId humbled) "CR 613.1f under Humility it has one again"
+    Spec.assertEqWith s "and the humbled Apostle dies to it" (S.creaturesInPlay S.bob (resolve humbled)) 0
+    Spec.assertEqWith s "while the protected one is still standing, never having been aimed at" (S.creaturesInPlay S.bob base) 1
+
   -- CR 608.2b: "If the spell or ability specifies targets, it checks whether the
   -- targets are still legal. ... If all its targets, for every instance of the
   -- word 'target,' are now illegal, the spell or ability doesn't resolve." The

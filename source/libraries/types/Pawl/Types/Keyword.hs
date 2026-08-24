@@ -138,6 +138,42 @@ data Keyword
     -- CR 702.15d makes it zone-independent, so this is never asked of a live board
     -- when the life is handed over.
     Lifelink
+  | -- | 702.16a: "Protection from [quality]." FOUR SEPARATE PROHIBITIONS, stated
+    -- in five clauses and reaching four different readers: CR 702.16b's targeting
+    -- (Pawl.Engine.Target.targetable), CR 702.16e's damage (a prevent-all row
+    -- minted by Pawl.Engine.Keyword.mintedReplacementsFor), CR 702.16f's blocking
+    -- (a CR 509.1b pairwise restriction minted by
+    -- Pawl.Engine.Keyword.mintedCombatRestrictionsFor), and the attachment of CR
+    -- 702.16c's Auras and CR 702.16d's Equipment and Fortifications.
+    --
+    -- Not implemented: CR 702.16c's Auras and CR 702.16d's Equipment and
+    -- Fortifications, so an Aura or Equipment with the stated quality may still
+    -- become attached and is not removed as a state-based action (#2228).
+    --
+    -- HEXPROOF'S SHAPE (702.11d), minus the controller axis and plus three more
+    -- clauses. The quality rides the constructor for rule 702.11d's reason,
+    -- restated by CR 702.16g: "protection from [quality A] and from [quality B]"
+    -- IS two protection abilities, so a card printing two writes two entries in
+    -- Pawl.Types.Face's Set and CR 702.16m's redundancy is per key. A Filter
+    -- rather than a Color because CR 702.16a says the quality "can be any
+    -- characteristic value or information": Angelic Curator prints protection
+    -- from artifacts and Soldier of the Pantheon protection from multicolored.
+    --
+    -- NOT a hexproof arm, for the reason Shroud is not one either: rule 702.11d
+    -- asks WHO is aiming as well as what, and rule 702.16b asks only what -- a
+    -- creature with protection from black cannot be targeted by its own
+    -- controller's black spell. Three of protection's four clauses have no
+    -- hexproof counterpart at all.
+    --
+    -- ONE constructor rather than one per clause: CR 702.16m makes a second copy
+    -- of the same quality redundant across all four clauses at once, which is
+    -- only expressible if one key carries all four.
+    --
+    -- Not implemented: rule 702.16j's "protection from everything", rule
+    -- 702.16k's "protection from [a player]" -- whose quality is a PLAYER and not
+    -- a characteristic, so no Filter says it -- and the "from each" shorthands of
+    -- rules 702.16h and 702.16i (#2229).
+    Protection (Filter.Filter Keyword)
   | Reach -- 702.17
   | -- | 702.18a: this permanent or player can't be the target of spells or
     -- abilities. The pool's first TARGETING RESTRICTION, read by the CR 115

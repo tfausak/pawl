@@ -281,14 +281,15 @@ admittedGiven pcs grants pools perspective bindings source slot gs =
         Just f -> Filter.matches context view f
    in Set.filter keep (basePoolGiven pools context bindings pool gs)
 
--- CR 702.18a (shroud) and CR 702.11b/702.11d (hexproof): THE
--- targeting-restriction gate, the one every restriction rule 702 states lands
--- in. It is asked of a candidate the slot has already admitted, and it answers
--- with CR 101.2's "can't": what it rejects is gone, so no Filter can put it back.
+-- CR 702.18a (shroud), CR 702.11b/702.11d (hexproof) and CR 702.16b
+-- (protection): THE targeting-restriction gate, the one every restriction rule
+-- 702 states lands in. It is asked of a candidate the slot has already admitted,
+-- and it answers with CR 101.2's "can't": what it rejects is gone, so no Filter
+-- can put it back.
 -- Both of CR 115's moments route through legalRecipients, so neither needs a
 -- clause of its own here.
 --
--- The two restrictions differ in the two things this function reads that
+-- The three restrictions differ in the two things this function reads that
 -- Filter.matches does not, which is the whole reason they are separate keywords
 -- rather than one keyword with a field:
 --
@@ -298,27 +299,30 @@ admittedGiven pcs grants pools perspective bindings source slot gs =
 --     that player -- CR 109.5's "you" -- and CR 702.11b's "your" is the
 --     CANDIDATE's controller, which CR 109.5 fixes for a static ability.
 --     opponentOf below is that comparison, and both of rule 702.11's permanent
---     clauses carry it.
+--     clauses carry it. Protection does NOT: rule 702.16b names no player at
+--     all, so it stops the candidate's own controller as shroud does.
 --   * WHAT IS AIMING. CR 702.11d's variant adds a quality the SOURCE must have
 --     -- "[quality] spells your opponents control or abilities your opponents
 --     control from [quality] sources" -- which `sourceView` answers and plain
---     hexproof never asks. Protection (CR 702.16b) asks the same question of the
---     same view, in the same two halves; it is not a keyword here at all (#877).
+--     hexproof never asks. Rule 702.16b asks that question of the same view, in
+--     the same two halves ("spells with the stated quality" and "abilities from a
+--     source with the stated quality"), and asks nothing else.
 --
 -- The quality is matched against the source with the CANDIDATE's controller as
--- the Context's perspective, not the targeting player's: rule 702.11d's ability
--- is a static ability of the candidate, so CR 109.5 fixes its "you" as the
--- candidate's controller. No quality in the pool reads a perspective at all --
+-- the Context's perspective, not the targeting player's: rule 702.11d's ability,
+-- and rule 702.16b's, is a static ability of the candidate, so CR 109.5 fixes its
+-- "you" as the candidate's controller. No quality in the pool reads a perspective at all --
 -- CR 702.16a's list of what a quality may be is "any characteristic value or
 -- information", and every printed one is a colour or a card type -- but the frame
 -- has to be right before one does.
 --
--- MEMBERSHIP, never the projection's per-keyword count, which both CR 702.18b and
--- CR 702.11h say outright. Membership OF EACH KEY rather than of one key, for
--- hexproof: the quality rides the constructor, so a permanent's hexproof
--- abilities are however many keys of its keyword map happen to be Hexproof, and
--- CR 702.11h's "the same hexproof ability" is per key. Rule 702.11f's card, which
--- prints two, is exactly the one a single-key lookup would get wrong.
+-- MEMBERSHIP, never the projection's per-keyword count, which CR 702.18b, CR
+-- 702.11h and CR 702.16m all say outright. Membership OF EACH KEY rather than of
+-- one key, for hexproof and protection alike: the quality rides the constructor,
+-- so a permanent's hexproof abilities are however many keys of its keyword map
+-- happen to be Hexproof, and CR 702.11h's "the same hexproof ability" is per key.
+-- Rule 702.11f's card, which prints two, is exactly the one a single-key lookup
+-- would get wrong; CR 702.16g says the same of protection.
 --
 -- The POST-layer keywords, like every other keyword reader, so a hexproof granted
 -- at layer 6 restricts and a Humility'd Slippery Bogle does not -- and, by CR
@@ -331,13 +335,11 @@ admittedGiven pcs grants pools perspective bindings source slot gs =
 -- and its projection still carries the card's printed keywords. (It also
 -- short-circuits `pcs` for a slot whose candidates are all off the battlefield.)
 --
--- The restrictions after these two widen this function and nothing else.
--- Protection (CR 702.16b) needs the SOURCE's characteristics, which is
--- `sourceView` -- already here, since CR 702.11d needed it first.
+-- The restrictions after these three widen this function and nothing else.
 --
--- CR 702.18a's "or player" half and CR 702.11c's come in through a DIFFERENT
--- reader. A player has no keywords: rule 702's keywords live on objects and are
--- folded by the CR 613.1-613.7 layers, so the player halves ride the CR
+-- CR 702.18a's "or player" half, CR 702.11c's and CR 702.16b's come in through a
+-- DIFFERENT reader. A player has no keywords: rule 702's keywords live on objects
+-- and are folded by the CR 613.1-613.7 layers, so the player halves ride the CR
 -- 613.10/613.11 player axis as PlayerEffect.CantBeTargetedBy (Ivory Mask, Leyline
 -- of Sanctity). PlayerEffect.protectedFromTargeting is the typed question; this
 -- module never sees the constructor. The two halves are separate readers because
@@ -363,9 +365,9 @@ targetable pcs perspective source sourceView gs recipient =
   let restrictedObject oid =
         let keywords = Projection.keywordsGiven pcs oid gs
             -- The candidate's controller, read at most once and only where a
-            -- hexproof ability is present to ask about it -- both readers of it
-            -- sit behind the `hexproofs` list being non-empty, which is no
-            -- candidate at all on almost every board. See opponentOf.
+            -- hexproof or protection ability is present to ask about it -- every
+            -- reader of it sits behind one of those lists being non-empty, which
+            -- is no candidate at all on almost every board. See opponentOf.
             controller = Projection.controllerOf oid gs
             hexproofs = Maybe.mapMaybe hexproofQuality (Map.keys keywords)
             -- CR 702.11b's Nothing stops every spell an opponent controls; CR
@@ -375,14 +377,30 @@ targetable pcs perspective source sourceView gs recipient =
             stops quality = case quality of
               Nothing -> True
               Just f -> Filter.matches (Filter.contextFor controller (Just source)) sourceView f
-            -- The three conjuncts are in cost order, and the order is the whole
-            -- reason `sourceView` costs nothing on an ordinary board: no hexproof
-            -- ability at all reads no controller, a hexproof ability its own
-            -- controller is aiming past reads no source view, and only the last
-            -- conjunct forces it.
+            -- CR 702.16b's qualities, read off the same keys for hexproof's
+            -- reason: CR 702.16g makes "protection from [A] and from [B]" two
+            -- abilities, so a permanent's protection abilities are however many
+            -- keys of its keyword map happen to be Protection, and CR 702.16m's
+            -- redundancy is per key.
+            --
+            -- Rule 702.16b is the SHORTER sentence: it names no player at all,
+            -- so this disjunct carries no opponentOf -- a black spell its own
+            -- controller casts cannot target their own creature with protection
+            -- from black, where hexproof from black would have let it through.
+            -- What it asks OF THE SOURCE is `stops (Just f)` above, down to the
+            -- Context: rule 702.16b's ability is the CANDIDATE's, so CR 109.5
+            -- fixes its "you" as the candidate's controller too.
+            protects = Filter.matches (Filter.contextFor controller (Just source)) sourceView
+            -- The conjuncts are in cost order, and the order is the whole reason
+            -- `sourceView` costs nothing on an ordinary board: no hexproof or
+            -- protection ability at all reads no controller, a hexproof ability
+            -- its own controller is aiming past reads no source view, and only
+            -- the last conjunct of each forces it. `any` over an empty list is
+            -- False without forcing either.
             restricted =
               Map.member Keyword.Shroud keywords
                 || (not (null hexproofs) && opponentOf perspective controller && any stops hexproofs)
+                || any protects (Maybe.mapMaybe protectionQuality (Map.keys keywords))
          in not (Set.member oid (GameState.battlefield gs) && restricted)
    in case recipient of
         Recipient.ToPlayer pid -> not (PlayerEffect.protectedFromTargeting perspective pid gs)
@@ -428,6 +446,16 @@ opponentOf perspective controller = case (perspective, controller) of
 hexproofQuality :: Keyword.Keyword -> Maybe (Maybe (Filter.Type.Filter Keyword.Keyword))
 hexproofQuality keyword = case keyword of
   Keyword.Hexproof quality -> Just quality
+  _ -> Nothing
+
+-- CR 702.16b: the quality one keyword is a protection ability from, and Nothing
+-- for a keyword that is not one at all. hexproofQuality above without the inner
+-- Maybe: rule 702.16a states a quality on every protection ability, where rule
+-- 702.11b's plain hexproof states none. Rule 702.16j's "protection from
+-- everything" is the variant that would want one, and is not modelled (#2229).
+protectionQuality :: Keyword.Keyword -> Maybe (Filter.Type.Filter Keyword.Keyword)
+protectionQuality keyword = case keyword of
+  Keyword.Protection quality -> Just quality
   _ -> Nothing
 
 -- Every base pool that is a function of the GAME STATE alone, taken once and

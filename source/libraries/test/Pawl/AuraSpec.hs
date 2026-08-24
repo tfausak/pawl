@@ -1886,7 +1886,9 @@ auraSpec s registry = Spec.describe s "Aura" $ do
 -- Goblin Brawler, but the Equipment will fail to move onto it"). CR 702.5a gives
 -- the enchant ability the targeting job and this restriction is not it; only
 -- protection also forbids the targeting, in a clause of its own (CR 702.16b),
--- which pawl has no keyword for (#1731).
+-- which Pawl.Engine.Target.targetable answers. Not implemented: CR 702.16c's and
+-- CR 702.16d's attachment prohibitions, so nothing here yet comes from a keyword
+-- (#2228).
 attachRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 attachRestrictionSpec s registry = Spec.describe s "AttachRestriction" $ do
   -- CR 301.5b's last sentence, at the MOVE: "if an effect attempts to attach an

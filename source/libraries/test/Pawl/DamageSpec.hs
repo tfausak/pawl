@@ -2721,12 +2721,47 @@ spec s registry = Spec.describe s "Pawl.Engine.Damage" $ do
   witherSpec s registry
   toxicSpec s registry
   lifelinkSpec s registry
+  protectionSpec s registry
   lastKnownRiderSpec s registry
   creaturePlaneswalkerSpec s registry
   excessDamageSpec s registry
   fightSpec s registry
   m2cPropertySpec s registry
   dealtDamageThisTurnSpec s registry
+
+-- CR 702.16e: "Any damage that would be dealt by sources that have the stated
+-- quality to a permanent or player with protection is prevented." Rule 702.16
+-- stated as a CR 615.1 prevention shield, minted from Keyword.Protection rather
+-- than printed on a face -- Glittering Lion's row with the quality written into
+-- the SOURCE half.
+--
+-- A PAIR OF COMBATS differing only in the ATTACKER'S COLOUR. Cabal Evangel is a
+-- black 2/2 with no abilities and Goblin Piker a red 2/1 with none, and either
+-- assigns the same 2 to the blocking Apostle of Purifying Light (2/1) -- so the
+-- Apostle's toughness settles nothing and its survival is the prevention or it is
+-- nothing. An implementation that prevented every source fails the red row.
+--
+-- The Apostle BLOCKS rather than attacks, which keeps CR 702.16f out of the way:
+-- that clause restricts an ATTACKING creature with protection, so nothing here
+-- makes either block illegal, and alice's attacker dying to the Apostle's own 2 is
+-- what says combat damage was really exchanged rather than the block refused.
+protectionSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+protectionSpec s registry = Spec.describe s "Protection" $ do
+  Spec.it s "CR 702.16e a black attacker's combat damage to the Apostle is prevented, a red attacker's is not" $ do
+    apostle <- S.printingOf s registry "Apostle of Purifying Light"
+    evangel <- S.printingOf s registry "Cabal Evangel"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let blockedBy attacker =
+          let (gs, _, theirs) = S.combatBoardOf [attacker] [apostle]
+           in (theirs, S.settleSba (S.fightWith S.aggressiveAnswer gs))
+        (blackDefenders, black) = blockedBy evangel
+        (redDefenders, red) = blockedBy piker
+    Spec.assertEqWith s "CR 702.16e bob's Apostle survives blocking the black Cabal Evangel" (S.creaturesInPlay S.bob black) 1
+    Spec.assertEqWith s "and dies blocking the red Goblin Piker, which the same 2 kills it with" (S.creaturesInPlay S.bob red) 0
+    Spec.assertEqWith s "CR 615.6 with nothing marked on the protected one" (fmap (\oid -> S.damageOf oid black) blackDefenders) [Just 0]
+    Spec.assertEqWith s "CR 510.2 while the Apostle's own 2 killed the Evangel, so the block really happened" (S.creaturesInPlay S.alice black) 0
+    Spec.assertEqWith s "and killed the Piker in the row beside it" (S.creaturesInPlay S.alice red) 0
+    Spec.assertEqWith s "the red row's fixture is the same one blocker" (length redDefenders) 1
 
 -- Fill every target slot with whichever of the two named permanents that slot's
 -- own filter admits. Prey Upon's slots are disjointly filtered by controller, so

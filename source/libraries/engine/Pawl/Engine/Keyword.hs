@@ -21,6 +21,7 @@ import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
@@ -45,6 +46,9 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.Cycling as Cycling
+import qualified Pawl.Types.DamagePattern as DamagePattern
+import qualified Pawl.Types.DamageR as DamageR
+import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.DiscardCause as DiscardCause
@@ -218,6 +222,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Indestructible -> []
   Keyword.Landwalk _ -> []
   Keyword.Lifelink -> []
+  Keyword.Protection _ -> []
   Keyword.Reach -> []
   Keyword.Shroud -> []
   Keyword.Trample -> []
@@ -302,6 +307,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Indestructible -> []
   Keyword.Landwalk _ -> []
   Keyword.Lifelink -> []
+  Keyword.Protection _ -> []
   Keyword.Reach -> []
   Keyword.Shroud -> []
   Keyword.Trample -> []
@@ -495,6 +501,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Indestructible -> []
   Keyword.Landwalk _ -> []
   Keyword.Lifelink -> []
+  Keyword.Protection _ -> []
   Keyword.Reach -> []
   Keyword.Shroud -> []
   Keyword.Trample -> []
@@ -735,6 +742,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Indestructible -> []
   Keyword.Landwalk _ -> []
   Keyword.Lifelink -> []
+  Keyword.Protection _ -> []
   Keyword.Reach -> []
   Keyword.Shroud -> []
   Keyword.Trample -> []
@@ -1094,6 +1102,35 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Indestructible -> []
   Keyword.Landwalk _ -> []
   Keyword.Lifelink -> []
+  -- CR 702.16e's clause: "Any damage that would be dealt by sources that have
+  -- the stated quality to a permanent or player with protection is prevented."
+  -- Glittering Lion's printed shield with the quality written into the SOURCE
+  -- half -- Filter.IsSource in the recipient position is the permanent this
+  -- keyword is on (Stormwild Capridor's spelling), and the quality is matched
+  -- against the damage's source at the event, which is CR 609.7b's recheck.
+  --
+  -- ONE ROW whatever the count, unlike riot's replicate: CR 702.16m makes a
+  -- second instance of protection from the same quality redundant, and a second
+  -- prevent-all row would have nothing left to prevent anyway.
+  --
+  -- The PERMANENT half only. Rule 702.16e's "or player" is unreachable from a
+  -- keyword -- a player has no keywords, the same split
+  -- Pawl.Engine.Target.targetable states for CR 702.16b.
+  Keyword.Protection quality ->
+    [ ReplacementEffect.DamageR
+        DamageR.MkDamageR
+          { DamageR.matching =
+              DamagePattern.MkDamagePattern
+                { DamagePattern.whichKind = Nothing,
+                  DamagePattern.whatSource = quality,
+                  DamagePattern.whatRecipient = Just Filter.IsSource,
+                  DamagePattern.whichRecipient = Nothing,
+                  DamagePattern.whichSource = Nothing
+                },
+            DamageR.rewrite = DamageRewrite.PreventAll,
+            DamageR.riders = Seq.empty
+          }
+    ]
   Keyword.Reach -> []
   Keyword.Shroud -> []
   Keyword.Trample -> []
@@ -1256,6 +1293,25 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Indestructible -> []
   Keyword.Landwalk _ -> []
   Keyword.Lifelink -> []
+  -- CR 702.16f: "Attacking creatures with protection can't be blocked by
+  -- creatures that have the stated quality." The one clause of rule 702.16 that
+  -- is already a printed shape -- Questing Beast's row with the quality in the
+  -- blocker position and Filter.IsSource naming the attacker.
+  --
+  -- The rule restricts an ATTACKING creature only, which needs no conjunct here:
+  -- Pawl.Engine.CombatRestriction.cantBeBlockedBy is asked about attacker/blocker
+  -- pairs, so a creature that is not attacking is in no pair.
+  --
+  -- Ungated (Nothing), rule 702.16f stating no condition, and membership rather
+  -- than a count for the type's own reason.
+  Keyword.Protection quality ->
+    [ CombatRestriction.CantBeBlockedBy
+        CantBeBlockedBy.MkCantBeBlockedBy
+          { CantBeBlockedBy.affected = Affected.Matching Filter.IsSource,
+            CantBeBlockedBy.blockers = quality,
+            CantBeBlockedBy.unless = Nothing
+          }
+    ]
   Keyword.Reach -> []
   Keyword.Shroud -> []
   Keyword.Trample -> []
@@ -1413,6 +1469,9 @@ familyOf keyword = case keyword of
   Keyword.Foretell _ -> Just KeywordFamily.Foretell
   -- CR 702.94a's parameterized keyword: "a card with miracle" drops the cost.
   Keyword.Miracle _ -> Just KeywordFamily.Miracle
+  -- CR 702.16a's parameterized keyword: "a creature with protection" drops the
+  -- stated quality.
+  Keyword.Protection _ -> Just KeywordFamily.Protection
   Keyword.Deathtouch -> Nothing
   Keyword.Defender -> Nothing
   Keyword.DoubleStrike -> Nothing
