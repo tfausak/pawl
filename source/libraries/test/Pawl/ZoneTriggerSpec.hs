@@ -1212,7 +1212,7 @@ permanentDiesSpec s registry =
 -- creature you control dies" names each death, and the rule's own Example fires
 -- that once per member.
 --
--- Three boards, and all three are load-bearing:
+-- Three boards prove the arity, and all three are load-bearing:
 --
 --   * one batch of three, answering ONE counter. TWO of alice's rather than one,
 --     because a lone death makes the two readings agree and the board could not
@@ -1231,6 +1231,11 @@ permanentDiesSpec s registry =
 -- acts on itself, so there would be nothing left to read the counter off. The
 -- deaths are one event either way -- Sba.performStateBasedActions is one
 -- Event.simultaneously bracket.
+--
+-- Three more boards follow, on the Filter and on CR 603.10a: the arity boards
+-- cannot see either half of "other creatures YOU CONTROL", since once the batch is
+-- deduped to one trigger, admitting an extra dying creature changes no counter.
+-- Each is the first board with exactly one thing changed.
 permanentsDieSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 permanentsDieSpec s registry =
   let -- The distinct EventGroups the log's battlefield-to-graveyard moves carry.
