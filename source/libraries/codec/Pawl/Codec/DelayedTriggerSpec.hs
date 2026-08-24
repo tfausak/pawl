@@ -13,6 +13,7 @@ import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TurnWindow as TurnWindow
 
 -- | MkDelayedTrigger at CR 603.7a/603.7b's default (an unrestricted window and
@@ -26,14 +27,15 @@ entry =
       DelayedTrigger.controller = PlayerId.MkPlayerId 0,
       DelayedTrigger.bindings = Map.singleton (SlotName.MkSlotName (Text.pack "token")) (Binding.empty {Binding.amount = Just 9}),
       DelayedTrigger.window = TurnWindow.AnyTurn,
-      DelayedTrigger.expiry = Nothing
+      DelayedTrigger.expiry = Nothing,
+      DelayedTrigger.createdAt = Timestamp.MkTimestamp 7
     }
 
 entryJson :: String
 entryJson =
   "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"source\":4,\"controller\":0,"
     <> "\"bindings\":{\"token\":{\"amount\":9}},"
-    <> "\"window\":{\"type\":\"AnyTurn\"}}"
+    <> "\"window\":{\"type\":\"AnyTurn\"},\"createdAt\":7}"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.DelayedTrigger" $ do
@@ -48,7 +50,7 @@ spec s = Spec.describe s "Pawl.Codec.DelayedTrigger" $ do
       entry {DelayedTrigger.expiry = Just Expiry.AtCleanup}
       ( "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"source\":4,\"controller\":0,"
           <> "\"bindings\":{\"token\":{\"amount\":9}},"
-          <> "\"window\":{\"type\":\"AnyTurn\"},\"expiry\":{\"type\":\"AtCleanup\"}}"
+          <> "\"window\":{\"type\":\"AnyTurn\"},\"expiry\":{\"type\":\"AtCleanup\"},\"createdAt\":7}"
       )
   -- CR 603.7a: an onset gate. Pawl.Codec.TurnWindowSpec covers the other arms.
   Spec.it s "MkDelayedTrigger, an onset gate (CR 603.7a)" $
@@ -58,7 +60,7 @@ spec s = Spec.describe s "Pawl.Codec.DelayedTrigger" $ do
       entry {DelayedTrigger.window = TurnWindow.ControllersNextTurn}
       ( "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"source\":4,\"controller\":0,"
           <> "\"bindings\":{\"token\":{\"amount\":9}},"
-          <> "\"window\":{\"type\":\"ControllersNextTurn\"}}"
+          <> "\"window\":{\"type\":\"ControllersNextTurn\"},\"createdAt\":7}"
       )
   -- 'bindings' at its default and no stated 'expiry'. 'window' stays a required
   -- key regardless: CR 603.7a's "no restriction" is one of TurnWindow's arms,
@@ -73,6 +75,7 @@ spec s = Spec.describe s "Pawl.Codec.DelayedTrigger" $ do
           DelayedTrigger.controller = PlayerId.MkPlayerId 0,
           DelayedTrigger.bindings = Map.empty,
           DelayedTrigger.window = TurnWindow.AnyTurn,
-          DelayedTrigger.expiry = Nothing
+          DelayedTrigger.expiry = Nothing,
+          DelayedTrigger.createdAt = Timestamp.MkTimestamp 7
         }
-      "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"source\":4,\"controller\":0,\"window\":{\"type\":\"AnyTurn\"}}"
+      "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"source\":4,\"controller\":0,\"window\":{\"type\":\"AnyTurn\"},\"createdAt\":7}"

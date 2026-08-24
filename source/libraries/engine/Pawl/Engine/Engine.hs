@@ -722,7 +722,11 @@ placeBorne srcId pending = do
               Source.OfTrigger
                 TriggeredAbilitySource.MkTriggeredAbilitySource
                   { TriggeredAbilitySource.source = srcId,
-                    TriggeredAbilitySource.ability = ability
+                    TriggeredAbilitySource.ability = ability,
+                    -- CR 603.7a's creation moment, for a delayed entry's firing
+                    -- and Nothing for every other trigger. The one thing on the
+                    -- stack that tells the two apart (CR 701.27f).
+                    TriggeredAbilitySource.createdAt = PendingTrigger.createdAt pending
                   },
             Object.zone = Zone.Stack,
             Object.tapped = TapState.Untapped,

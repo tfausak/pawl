@@ -1539,7 +1539,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
                 Source.OfTrigger
                   TriggeredAbilitySource.MkTriggeredAbilitySource
                     { TriggeredAbilitySource.source = ripId,
-                      TriggeredAbilitySource.ability = ability
+                      TriggeredAbilitySource.ability = ability,
+                      TriggeredAbilitySource.createdAt = Nothing
                     },
               Object.zone = Zone.Stack,
               Object.tapped = TapState.Untapped,

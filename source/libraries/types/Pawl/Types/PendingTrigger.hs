@@ -5,6 +5,7 @@ import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 
@@ -31,6 +32,11 @@ data PendingTrigger = MkPendingTrigger
   { source :: TriggerSource.TriggerSource,
     controller :: PlayerId.PlayerId,
     ability :: TriggeredAbility.TriggeredAbility Card.Card,
-    bindings :: Map.Map SlotName.SlotName Binding.Binding
+    bindings :: Map.Map SlotName.SlotName Binding.Binding,
+    -- | CR 603.7a's creation moment, for a trigger that fired from a delayed
+    -- entry, and Nothing for one an object simply has. Engine.placeBorne hands
+    -- it to the stack object; TriggeredAbilitySource.createdAt says what reads
+    -- it there.
+    createdAt :: Maybe Timestamp.Timestamp
   }
   deriving (Eq, Ord, Show)

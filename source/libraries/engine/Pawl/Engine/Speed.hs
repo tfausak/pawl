@@ -203,7 +203,7 @@ inherentPending events gs =
       -- below 4 having spent no trigger.
       below = Maybe.maybe False (< maxSpeed) (speedOf you gs)
       alreadyTriggered = Set.member you (GameState.speedIncreasedThisTurn gs)
-   in [ PendingTrigger.MkPendingTrigger TriggerSource.Sourceless you increaseAbility Map.empty
+   in [ PendingTrigger.MkPendingTrigger TriggerSource.Sourceless you increaseAbility Map.empty Nothing
       | hasSpeed,
         below,
         not alreadyTriggered,
