@@ -149,6 +149,31 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.Lifelink
       " {\"type\":\"Lifelink\"} "
+  -- CR 702.16a states a quality on EVERY protection ability, so the payload is
+  -- required where hexproof's is optional: there is no bare protection tag to
+  -- write, and rule 702.16j's "protection from everything" -- the variant that
+  -- would want one -- is not modelled (#2229).
+  Spec.it s "Protection carries CR 702.16a's quality" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Protection (Filter.HasColor Color.Black))
+      " {\"type\":\"Protection\",\"value\":{\"type\":\"HasColor\",\"value\":{\"type\":\"Black\"}}} "
+    -- CR 702.16a's "any characteristic value or information": protection from
+    -- artifacts is as printed as protection from black.
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Protection (Filter.HasCardType CardType.Artifact))
+      " {\"type\":\"Protection\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}}} "
+    Spec.assertBool
+      s
+      (Codec.encode Keyword.codec (Keyword.Protection (Filter.HasColor Color.Black)) /= Codec.encode Keyword.codec (Keyword.Hexproof (Just (Filter.HasColor Color.Black))))
+      "protection from black and hexproof from black encode differently"
+    Spec.assertBool
+      s
+      (Codec.encode Keyword.codec (Keyword.Protection (Filter.HasColor Color.Black)) /= Codec.encode Keyword.codec (Keyword.Protection (Filter.HasColor Color.White)))
+      "and so do protection from black and protection from white"
   Spec.it s "Reach" $
     Common.assertCodec
       s

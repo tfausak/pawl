@@ -24,9 +24,13 @@
 -- neither, so an Aura spell may still target a permanent that refuses it (CR
 -- 608.2b keeps it legal, CR 608.3c attaches it, CR 704.5m buries it on the next
 -- state-based check). Protection is the one quality that also forbids the
--- targeting, in a clause of its own (CR 702.16b), and pawl has no protection
--- keyword at all. Not implemented: an Aura spell with protection's quality is
--- still a legal target for the permanent that has protection from it (#1731).
+-- targeting, in a clause of its own (CR 702.16b), which
+-- Pawl.Engine.Target.targetable answers off Keyword.Protection.
+--
+-- Not implemented: CR 702.16c's and CR 702.16d's prohibitions themselves, which
+-- are this type's shape but are minted from a keyword rather than printed on a
+-- face -- so an Aura or Equipment with the stated quality may still become
+-- attached to a permanent with protection from it (#2228).
 module Pawl.Engine.AttachRestriction where
 
 import qualified Data.Set as Set

@@ -2636,6 +2636,8 @@ keywordFilters keyword = case keyword of
   -- CR 702.15a: lifelink is a static ability with no payload -- its rider rides
   -- the damage event, not the keyword.
   Keyword.Lifelink -> []
+  -- CR 702.16a's "[quality]", which every protection ability states.
+  Keyword.Protection quality -> [quality]
   Keyword.Reach -> []
   Keyword.Shroud -> []
   Keyword.Trample -> []

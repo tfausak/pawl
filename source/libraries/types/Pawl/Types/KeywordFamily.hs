@@ -41,6 +41,11 @@ data KeywordFamily
     Hexproof
   | -- | CR 702.14a: "[type]walk".
     Landwalk
+  | -- | CR 702.16a: protection from [quality]. The family a card writing "a
+    -- creature with protection" names, as against protection from black; no card
+    -- in the pool asks yet, and it is owed at the keyword rather than at the
+    -- first asker.
+    Protection
   | -- | CR 702.21a: ward [cost]. The family a card writing "a creature with
     -- ward" names, as against ward {2}; no card in the pool asks yet, and it is
     -- owed at the keyword rather than at the first asker.

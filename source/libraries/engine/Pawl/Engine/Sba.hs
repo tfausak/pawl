@@ -323,7 +323,8 @@ fallsOff pcs gs oid = case Map.lookup oid pcs of
 -- Admission, NOT target legality: CR 303.4c asks about an illegal object or
 -- player as defined by the enchant ability, which rule 702's TARGETING
 -- restrictions do not speak to. Protection would bury this Aura, but by its own
--- separate clause (CR 702.16c), while shroud (CR 702.18) and hexproof (CR 702.11)
+-- separate clause (CR 702.16c), which is not implemented (#2228), while shroud
+-- (CR 702.18) and hexproof (CR 702.11)
 -- restrict targeting and nothing else -- so an Aura stays attached to a host that
 -- gains either. See Target.admittedRecipients.
 --
