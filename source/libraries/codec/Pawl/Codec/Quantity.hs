@@ -82,6 +82,12 @@ codec =
       -- CardsDiscardedThisTurn's reason above. The threshold that turns the count
       -- into "an opponent was dealt damage" is the Comparison's, not this arm's.
       Arm.payload "PlayersDealtDamageThisTurn" PlayerRef.codec Quantity.PlayersDealtDamageThisTurn (\x -> case x of Quantity.PlayersDealtDamageThisTurn y -> Just y; _ -> Nothing),
+      -- CR 601.2i's tally, with only a PlayerRef on the wire for
+      -- CardsDiscardedThisTurn's reason above -- but read off the handoff snapshot
+      -- rather than the log, since "last turn" outlives the log it was folded
+      -- from. The thresholds that turn the count into "no spells were cast" and
+      -- "a player cast two or more" are the Comparison's, not this arm's.
+      Arm.payload "SpellsCastLastTurn" PlayerRef.codec Quantity.SpellsCastLastTurn (\x -> case x of Quantity.SpellsCastLastTurn y -> Just y; _ -> Nothing),
       -- CR 400.7's entry read against the object the quantity is aimed at, so
       -- there is nothing on the wire: the turn is the log's extent rather than a
       -- window a card could state, as for CardsDiscardedThisTurn above.

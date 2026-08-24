@@ -226,7 +226,8 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   --
   -- Maximising over several is a different shape and has its own spelling:
   -- Aggregation.Greatest over Scope.OverPlayers, with THIS arm reading each
-  -- candidate through PlayerRef.Candidate. Malignus is that card, and it is why
+  -- candidate through PlayerRef.Candidate. Malignus is one such card and Daybreak
+  -- Ranger // Nightfall Predator another, and that shape is why
   -- nothing here folds.
   Quantity.LifeTotal ref -> case playersOf ref of
     Just [pid] -> fmap Player.life (Map.lookup pid (GameState.players gs))
@@ -419,6 +420,26 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   Quantity.PlayersDealtDamageThisTurn ref -> case playersOf ref of
     Nothing -> Nothing
     Just pids -> Just (toInteger (length (filter wasDealtDamage pids)))
+  -- CR 601.2i / 608.2i: how many spells that player cast during the turn just
+  -- ended. LifeTotal's arm in ARITY -- one player's tally, so a reference naming
+  -- several answers "whose?" rather than a sum -- and read STRAIGHT OFF the
+  -- handoff snapshot for the reason the life total is read straight off
+  -- GameState.players: the log it was folded from is cleared by that same handoff
+  -- (Engine.beginTurnOf), so there is nothing live left to fold.
+  --
+  -- Both printed readings are about every player at once and both reach this arm
+  -- through Aggregation.Greatest over Scope.OverPlayers, whose candidate arrives
+  -- as PlayerRef.Candidate -- "no spells were cast last turn" is that maximum
+  -- compared to 0 and "a player cast two or more spells last turn" is the same
+  -- maximum compared to 2. Summing the seats would answer the second wrongly when
+  -- two players cast one spell each.
+  --
+  -- An ABSENT entry answers 0 rather than Nothing, as CardsDiscardedThisTurn's
+  -- empty log does: nobody having cast is an answered question. What is
+  -- unanswered is only the reference.
+  Quantity.SpellsCastLastTurn ref -> case playersOf ref of
+    Just [pid] -> Just (toInteger (Map.findWithDefault 0 pid (GameState.castsLastTurn gs)))
+    _ -> Nothing
   -- CR 400.7 / 608.2i read as a 0/1: did the object this evaluation is aimed at
   -- enter the battlefield this turn?
   --
@@ -596,6 +617,7 @@ substituteStar star quantity = case quantity of
   Quantity.OpponentsAttacked _ -> quantity
   Quantity.CardsDiscardedThisTurn _ -> quantity
   Quantity.PlayersDealtDamageThisTurn _ -> quantity
+  Quantity.SpellsCastLastTurn _ -> quantity
   Quantity.EnteredThisTurn -> quantity
   Quantity.BlockersBeyondFirst -> quantity
   -- No descent, for the Count arm's reason: CR 604.3 makes a CDA a static
@@ -672,6 +694,8 @@ slots quantity = case quantity of
   Quantity.CardsDiscardedThisTurn _ -> Set.empty
   -- And a ninth, CR 120.1's damage tally likewise.
   Quantity.PlayersDealtDamageThisTurn _ -> Set.empty
+  -- And a tenth, CR 601.2i's cast tally having nothing beside its PlayerRef either.
+  Quantity.SpellsCastLastTurn _ -> Set.empty
   -- And a nullary arm, which names nothing at all: CR 400.7's entry is read
   -- against the object the evaluation is aimed at, as ObjectCounters is.
   Quantity.EnteredThisTurn -> Set.empty
@@ -727,6 +751,7 @@ slotsAreExhaustive quantity = case quantity of
   Quantity.OpponentsAttacked ref -> playerRefIsSlotless ref
   Quantity.CardsDiscardedThisTurn ref -> playerRefIsSlotless ref
   Quantity.PlayersDealtDamageThisTurn ref -> playerRefIsSlotless ref
+  Quantity.SpellsCastLastTurn ref -> playerRefIsSlotless ref
   Quantity.EnteredThisTurn -> True
   Quantity.BlockersBeyondFirst -> True
   -- True because `slots` above DOES report this arm's slot, unlike the nested
@@ -848,6 +873,7 @@ mapPlayerRefs f intoCount quantity = case quantity of
   Quantity.OpponentsAttacked ref -> Quantity.OpponentsAttacked (f ref)
   Quantity.CardsDiscardedThisTurn ref -> Quantity.CardsDiscardedThisTurn (f ref)
   Quantity.PlayersDealtDamageThisTurn ref -> Quantity.PlayersDealtDamageThisTurn (f ref)
+  Quantity.SpellsCastLastTurn ref -> Quantity.SpellsCastLastTurn (f ref)
   Quantity.ManaCount c -> Quantity.ManaCount c {ManaCount.Type.player = f (ManaCount.Type.player c)}
   Quantity.Count c -> Quantity.Count (intoCount c)
   Quantity.Plus (Plus.MkPlus a b) -> Quantity.Plus (Plus.MkPlus (recur a) (recur b))
@@ -984,6 +1010,7 @@ readsX quantity = case quantity of
   Quantity.OpponentsAttacked _ -> False
   Quantity.CardsDiscardedThisTurn _ -> False
   Quantity.PlayersDealtDamageThisTurn _ -> False
+  Quantity.SpellsCastLastTurn _ -> False
   Quantity.EnteredThisTurn -> False
   Quantity.BlockersBeyondFirst -> False
   -- Not a leaf: its payload is a whole Quantity and may read X, the same recursion

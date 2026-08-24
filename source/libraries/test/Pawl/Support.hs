@@ -1631,6 +1631,7 @@ oneMountainState mountain ph =
           GameState.monarch = Nothing,
           GameState.daytime = Nothing,
           GameState.spellsCastLastTurn = 0,
+          GameState.castsLastTurn = mempty,
           GameState.exiledUntilMonarch = Map.empty,
           GameState.haunting = Map.empty,
           GameState.exiledWith = Map.empty,

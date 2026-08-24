@@ -144,6 +144,7 @@ spec s registry = Spec.describe s "Transform" $ do
   enterTransformedSpec s registry
   transformedPermanentSpec s registry
   transformTriggerSpec s registry
+  spellsCastLastTurnSpec s registry
   -- CR 712.8d: "While a double-faced permanent has its front face up, it has
   -- only the characteristics of its front face." Nothing has turned this one
   -- over, so CR 712.8a's front face is what Pawl.Engine.Card.combined answers
@@ -735,3 +736,121 @@ destroyEveryFungus =
         Destroy.buried = Nothing,
         Destroy.permanents = Nothing
       }
+
+-- The two faces Daybreak Ranger prints, for the CR 603.4 group below.
+rangerFront, rangerBack :: CardName.CardName
+rangerFront = CardName.MkCardName (Text.pack "Daybreak Ranger")
+rangerBack = CardName.MkCardName (Text.pack "Nightfall Predator")
+
+-- The face this permanent shows and its power/toughness, as one tuple, so a case
+-- names a FACE rather than two independent facts. 2/2 and 4/4 do not coincide, so
+-- a partial fix cannot reach the name by one road and the size by another.
+faceAndSize ::
+  ObjectId.ObjectId ->
+  GameState.GameState ->
+  (Maybe CardName.CardName, Maybe (Integer, Integer))
+faceAndSize oid gs = (faceNameOf oid gs, S.powerToughnessOf oid gs)
+
+-- `pid` casts that spell and it resolves. CR 601.2i files the SpellWasCast the
+-- last-turn tally is folded from; resolving keeps the stack empty so the upkeep
+-- step below has only the trigger on it.
+castAndResolve :: PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+castAndResolve pid oid gs =
+  let cast = S.runPure S.castAnswer gs (S.cast pid oid)
+   in S.runPure S.castAnswer cast Stack.resolveTop
+
+-- The turn handoff, then the new active player's upkeep step run to completion.
+-- Pawl.DaytimeSpec's `upkeep` with the seat read off the board rather than fixed:
+-- Engine.beginTurnOf has already set it, and the schedule loses its head so
+-- runStep advances OUT of the upkeep rather than back into it.
+--
+-- The untap step is skipped rather than run, which changes nothing here: CR 502.2
+-- is inert on a board with no daybound or nightbound permanent (asserted below),
+-- and skipping it leaves every land as the cast that tapped it left it.
+handOffThenUpkeep :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+handOffThenUpkeep pid gs =
+  let handed = Engine.beginTurnOf pid gs
+      atUpkeep =
+        handed
+          { GameState.phase = Phase.Beginning BeginningStep.Upkeep,
+            GameState.priority = Just pid,
+            GameState.remaining = Seq.drop 1 (GameState.remaining handed)
+          }
+   in S.runPure S.identityAnswer atUpkeep Engine.runStep
+
+-- CR 603.2b / 603.4: Daybreak Ranger // Nightfall Predator's two upkeep triggers,
+-- whose intervening "if" reads how many spells each player cast LAST turn.
+--
+-- The card is an Innistrad werewolf and carries NO daybound or nightbound
+-- keyword, so it is not on CR 731's day/night road at all: GameState.daytime
+-- stays Nothing, CR 502.2's untap check returns immediately, and every flip below
+-- is the printed trigger's doing. That is a fixture constraint -- a daybound
+-- permanent on this board would hand the flips to Pawl.Engine.Daytime -- so the
+-- first case asserts the designation is absent.
+--
+-- Fog is the spell cast throughout: {G}, an instant, targetless, and its only
+-- effect is a combat-damage replacement on a board that never reaches combat. So
+-- "bob cast a spell" is the only thing a cast contributes.
+spellsCastLastTurnSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+spellsCastLastTurnSpec s registry = Spec.describe s "SpellsCastLastTurn" $ do
+  -- The whole unit in one board, read four times. Each read is the falsifier for
+  -- a different wrong implementation, and none of the four can be dropped:
+  --
+  --   A. bob casts during ALICE's turn. "No spells were cast last turn" is false,
+  --      so the front face does NOT flip. An implementation reading the previous
+  --      turn's ACTIVE PLAYER alone (GameState.spellsCastLastTurn, CR 502.2's
+  --      scalar) sees 0 and flips.
+  --   B. a turn passes with nobody casting, and it flips. Without this, A is
+  --      satisfied by a trigger that never fires at all.
+  --   C. alice and bob cast ONE EACH. "A player cast two or more spells" is an
+  --      existential, so the back face does NOT flip back. An implementation
+  --      SUMMING the seats sees 2 and flips.
+  --   D. bob casts TWO in one turn, and it flips back. Without this, C is
+  --      satisfied by a back-face trigger that never fires.
+  Spec.it s "CR 603.4 the upkeep triggers read what each player cast last turn" $ do
+    ranger <- S.printingOf s registry "Daybreak Ranger"
+    forest <- S.printingOf s registry "Forest"
+    fog <- S.printingOf s registry "Fog"
+    let (rangerId, withRanger) = S.addCreature ranger S.alice emptyBoard
+        withLands = S.landsFor forest S.bob 4 (S.landsFor forest S.alice 1 withRanger)
+        (aliceFog, withAliceFog) = S.addHandCard fog S.alice withLands
+        (bobFogA, withA) = S.addHandCard fog S.bob withAliceFog
+        (bobFogB, withB) = S.addHandCard fog S.bob withA
+        (bobFogC, withC) = S.addHandCard fog S.bob withB
+        (bobFogD, board) = S.addHandCard fog S.bob withC
+        -- Turn 1 is alice's; bob casts one Fog during it.
+        turn1 = castAndResolve S.bob bobFogA board
+        -- Turn 2 is bob's. Read A.
+        turn2 = handOffThenUpkeep S.bob turn1
+        -- Nobody casts during turn 2. Turn 3 is alice's. Read B.
+        turn3 = handOffThenUpkeep S.alice turn2
+        -- alice and bob cast one each during turn 3. Turn 4 is bob's. Read C.
+        turn3Cast = castAndResolve S.bob bobFogB (castAndResolve S.alice aliceFog turn3)
+        turn4 = handOffThenUpkeep S.bob turn3Cast
+        -- bob casts two during turn 4. Turn 5 is alice's. Read D.
+        turn4Cast = castAndResolve S.bob bobFogD (castAndResolve S.bob bobFogC turn4)
+        turn5 = handOffThenUpkeep S.alice turn4Cast
+    Spec.assertEqWith s "the board is neither day nor night, so CR 502.2 reaches nothing" (GameState.daytime turn2) Nothing
+    Spec.assertEqWith s "A: bob cast during alice's turn, so the front face stays up" (faceAndSize rangerId turn2) (Just rangerFront, Just (2, 2))
+    Spec.assertEqWith s "B: a turn with no spell at all transforms it" (faceAndSize rangerId turn3) (Just rangerBack, Just (4, 4))
+    Spec.assertEqWith s "C: one spell each is not a player casting two, so it stays transformed" (faceAndSize rangerId turn4) (Just rangerBack, Just (4, 4))
+    Spec.assertEqWith s "D: one player casting two transforms it back" (faceAndSize rangerId turn5) (Just rangerFront, Just (2, 2))
+    -- The preconditions the four reads rest on, asserted AFTER them so a failure
+    -- names the behaviour first: bob really cast (his hand shrank by four), and
+    -- alice really cast (hers emptied).
+    Spec.assertEqWith s "bob cast all four Fogs" (S.handSize S.bob turn5) 0
+    Spec.assertEqWith s "and alice cast hers" (S.handSize S.alice turn5) 0
+  -- The snapshot the four reads above rest on, asserted at the state level: the
+  -- handoff records a count PER SEAT, and CR 502.2's one-player scalar keeps
+  -- answering about the outgoing active player alone. A unit-level fence, not the
+  -- proof -- the case above is that.
+  Spec.it s "CR 608.2i the handoff records what each player cast, per seat" $ do
+    forest <- S.printingOf s registry "Forest"
+    fog <- S.printingOf s registry "Fog"
+    let withLands = S.landsFor forest S.bob 1 emptyBoard
+        (bobFog, board) = S.addHandCard fog S.bob withLands
+        handed = Engine.beginTurnOf S.bob (castAndResolve S.bob bobFog board)
+    -- SPARSE: alice cast nothing and so has no entry at all, which every reader
+    -- takes for 0.
+    Spec.assertEqWith s "bob cast one during alice's turn and alice cast none" (GameState.castsLastTurn handed) (Map.fromList [(S.bob, 1)])
+    Spec.assertEqWith s "and CR 502.2's scalar still answers about alice alone" (GameState.spellsCastLastTurn handed) 0

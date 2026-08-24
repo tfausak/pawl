@@ -264,7 +264,10 @@ settle record = do
 --
 -- The count is GameState.spellsCastLastTurn, snapshotted at the handoff, because
 -- the event log this would otherwise be folded from is cleared there and this
--- runs afterwards.
+-- runs afterwards. That scalar and not GameState.castsLastTurn beside it: rule
+-- 731.2 names exactly one player where a CARD asks about every player, and
+-- Engine.beginTurnOf reads the scalar out of that map, so the two agree about the
+-- one seat this rule is about.
 --
 -- A TURN-BASED ACTION that does not use the stack, so it is performed inline by
 -- Pawl.Engine.Engine's untap arm and nothing is put anywhere.
