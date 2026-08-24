@@ -444,6 +444,8 @@ library codec
     Pawl.Codec.ManaFilterSpec
     Pawl.Codec.ManaProduction
     Pawl.Codec.ManaProductionSpec
+    Pawl.Codec.ManaRestriction
+    Pawl.Codec.ManaRestrictionSpec
     Pawl.Codec.ManaRetention
     Pawl.Codec.ManaRetentionSpec
     Pawl.Codec.ManaSpec
@@ -1389,6 +1391,7 @@ library types
     Pawl.Types.ManaFilter
     Pawl.Types.ManaOption
     Pawl.Types.ManaProduction
+    Pawl.Types.ManaRestriction
     Pawl.Types.ManaRetention
     Pawl.Types.ManaSpending
     Pawl.Types.ManaSymbol
@@ -1428,6 +1431,7 @@ library types
     Pawl.Types.Payment
     Pawl.Types.PaymentDecision
     Pawl.Types.PaymentMoment
+    Pawl.Types.PaymentSubject
     Pawl.Types.PayObligation
     Pawl.Types.PendingEntryEffect
     Pawl.Types.PendingTrigger

@@ -2,9 +2,8 @@
 
 module Pawl.Codec.ManaAddition where
 
-import qualified Pawl.Codec.Filter as Filter
-import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ManaProduction as ManaProduction
+import qualified Pawl.Codec.ManaRestriction as ManaRestriction
 import qualified Pawl.Codec.ManaRetention as ManaRetention
 import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -37,7 +36,7 @@ codec = Fields.object $ do
   player <- Fields.defaulted "player" defaultPlayer PlayerRef.codec ManaAddition.player
   production <- Fields.required "production" ManaProduction.codec ManaAddition.production
   retention <- Fields.defaulted "retention" ManaRetention.Ordinary ManaRetention.codec ManaAddition.retention
-  restriction <- Fields.defaulted "restriction" Nothing (Common.maybe (Filter.codec Keyword.codec)) ManaAddition.restriction
+  restriction <- Fields.defaulted "restriction" Nothing (Common.maybe ManaRestriction.codec) ManaAddition.restriction
   pure
     ManaAddition.MkManaAddition
       { ManaAddition.player = player,

@@ -59,21 +59,23 @@
                         }
                       },
                       "restriction": {
-                        "type": "Or",
-                        "value": [
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Artifact"
+                        "casts": {
+                          "type": "Or",
+                          "value": [
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Artifact"
+                              }
+                            },
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Creature"
+                              }
                             }
-                          },
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Creature"
-                            }
-                          }
-                        ]
+                          ]
+                        }
                       }
                     }
                   },
@@ -90,21 +92,23 @@
                         }
                       },
                       "restriction": {
-                        "type": "Or",
-                        "value": [
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Artifact"
+                        "casts": {
+                          "type": "Or",
+                          "value": [
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Artifact"
+                              }
+                            },
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Creature"
+                              }
                             }
-                          },
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Creature"
-                            }
-                          }
-                        ]
+                          ]
+                        }
                       }
                     }
                   },
@@ -121,21 +125,23 @@
                         }
                       },
                       "restriction": {
-                        "type": "Or",
-                        "value": [
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Artifact"
+                        "casts": {
+                          "type": "Or",
+                          "value": [
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Artifact"
+                              }
+                            },
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Creature"
+                              }
                             }
-                          },
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Creature"
-                            }
-                          }
-                        ]
+                          ]
+                        }
                       }
                     }
                   },
@@ -152,21 +158,23 @@
                         }
                       },
                       "restriction": {
-                        "type": "Or",
-                        "value": [
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Artifact"
+                        "casts": {
+                          "type": "Or",
+                          "value": [
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Artifact"
+                              }
+                            },
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Creature"
+                              }
                             }
-                          },
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Creature"
-                            }
-                          }
-                        ]
+                          ]
+                        }
                       }
                     }
                   },
@@ -183,21 +191,23 @@
                         }
                       },
                       "restriction": {
-                        "type": "Or",
-                        "value": [
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Artifact"
+                        "casts": {
+                          "type": "Or",
+                          "value": [
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Artifact"
+                              }
+                            },
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Creature"
+                              }
                             }
-                          },
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Creature"
-                            }
-                          }
-                        ]
+                          ]
+                        }
                       }
                     }
                   },
@@ -214,21 +224,23 @@
                         }
                       },
                       "restriction": {
-                        "type": "Or",
-                        "value": [
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Artifact"
+                        "casts": {
+                          "type": "Or",
+                          "value": [
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Artifact"
+                              }
+                            },
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Creature"
+                              }
                             }
-                          },
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Creature"
-                            }
-                          }
-                        ]
+                          ]
+                        }
                       }
                     }
                   },
@@ -245,21 +257,23 @@
                         }
                       },
                       "restriction": {
-                        "type": "Or",
-                        "value": [
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Artifact"
+                        "casts": {
+                          "type": "Or",
+                          "value": [
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Artifact"
+                              }
+                            },
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Creature"
+                              }
                             }
-                          },
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Creature"
-                            }
-                          }
-                        ]
+                          ]
+                        }
                       }
                     }
                   }
