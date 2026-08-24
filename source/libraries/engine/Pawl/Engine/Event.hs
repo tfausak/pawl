@@ -9610,6 +9610,15 @@ batchScoped condition = case condition of
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature _ -> False
+  -- FALSE despite naming batches in the RULES, which is the one group of answers
+  -- here that is not what it looks like. Rule 509.3e's "one or more" and rule
+  -- 508.3b's are already once-per-declaration, structurally: their events
+  -- (GameEvent.BlocksDeclared, GameEvent.AttackerBlocked, GameEvent.BecameAttacked)
+  -- are minted at that arity by Pawl.Engine.Combat, the one emitter that sees a
+  -- whole declaration, so there is nothing left for this predicate to dedup and
+  -- True would be a second dedup over an already-unique trigger. Deaths get the
+  -- other treatment because they reach a graveyard from four places and no event
+  -- carries the arity; GameEvent.BecameAttacked's own haddock draws that line.
   TriggerCondition.SelfBlocksAtLeast _ -> False
   TriggerCondition.SelfBlocksOneOrMore _ -> False
   TriggerCondition.SelfBecomesBlocked -> False
@@ -10461,8 +10470,9 @@ eventTriggers events gs =
       --
       -- Per GROUP and never per scan: several groups can share one CR 117.5 scan
       -- (GameState.scannedThrough is not bumped until the scan ends), and CR 704.3
-      -- makes each state-based-action pass its own single event. Board 3 of
-      -- Pawl.ZoneTriggerSpec's "one or more" group is what tells those apart.
+      -- makes each state-based-action pass its own single event.
+      -- Pawl.ZoneTriggerSpec's "CR 704.3 two death groups in one trigger scan are
+      -- two trigger events" is what tells the two readings apart.
       oncePerBatch seen entries = case entries of
         [] -> []
         (k, trigger) : rest -> case k of
