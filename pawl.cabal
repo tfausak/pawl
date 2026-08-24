@@ -448,6 +448,10 @@ library codec
     Pawl.Codec.ManaRestrictionSpec
     Pawl.Codec.ManaRetention
     Pawl.Codec.ManaRetentionSpec
+    Pawl.Codec.ManaRider
+    Pawl.Codec.ManaRiderEffect
+    Pawl.Codec.ManaRiderEffectSpec
+    Pawl.Codec.ManaRiderSpec
     Pawl.Codec.ManaSpec
     Pawl.Codec.ManaSpending
     Pawl.Codec.ManaSpendingSpec
@@ -827,6 +831,7 @@ library engine
     Pawl.Engine.ManaAbility
     Pawl.Engine.ManaCount
     Pawl.Engine.ManaFilter
+    Pawl.Engine.ManaRider
     Pawl.Engine.Modal
     Pawl.Engine.Monarch
     Pawl.Engine.Mulligan
@@ -1393,6 +1398,8 @@ library types
     Pawl.Types.ManaProduction
     Pawl.Types.ManaRestriction
     Pawl.Types.ManaRetention
+    Pawl.Types.ManaRider
+    Pawl.Types.ManaRiderEffect
     Pawl.Types.ManaSpending
     Pawl.Types.ManaSymbol
     Pawl.Types.ManaType

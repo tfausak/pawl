@@ -3,6 +3,7 @@ module Pawl.Types.ManaAddition where
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.ManaRestriction as ManaRestriction
 import qualified Pawl.Types.ManaRetention as ManaRetention
+import qualified Pawl.Types.ManaRider as ManaRider
 import qualified Pawl.Types.PlayerRef as PlayerRef
 
 -- | CR 106.3 / 106.4: "this player adds one mana, decided this way" -- the whole
@@ -30,7 +31,9 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 -- or ability" and "will apply to all mana produced" by it, so it belongs to the
 -- instruction and is copied onto every unit that instruction adds rather than
 -- being authored one unit at a time. Geosurge writes its seven AddMana effects
--- with the same restriction on each.
+-- with the same restriction on each. The RIDER (Pawl.Types.ManaRider) rides here
+-- for the same reason and by the same sentence, which names "any restrictions or
+-- additional effects" together.
 --
 -- The RETENTION rides this instruction rather than a second opcode, because
 -- Shizuko's "they don't lose THIS mana" names the units the preceding
@@ -47,6 +50,13 @@ data ManaAddition = MkManaAddition
     -- | CR 106.6: what the mana this instruction adds may be spent on, stamped
     -- onto every unit it produces (Pawl.Types.ManaUnit.restriction). Nothing is
     -- the unrestricted default every printing but a CR 106.6 one means.
-    restriction :: Maybe ManaRestriction.ManaRestriction
+    restriction :: Maybe ManaRestriction.ManaRestriction,
+    -- | CR 106.6's other shape, riding this instruction for the same reason and
+    -- stamped onto every unit alongside the restriction
+    -- (Pawl.Types.ManaUnit.rider): what the mana DOES to the spell it is spent
+    -- on, as opposed to what it may be spent on at all. Boseiju, Who Shelters
+    -- All prints this and no restriction, Mishra's Workshop a restriction and no
+    -- rider, and Delighted Halfling both.
+    rider :: Maybe ManaRider.ManaRider
   }
   deriving (Eq, Ord, Show)

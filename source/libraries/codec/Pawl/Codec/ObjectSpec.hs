@@ -183,7 +183,8 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
                   { ManaUnit.manaType = ManaType.Colored Color.Green,
                     ManaUnit.tags = Set.empty,
                     ManaUnit.retention = ManaRetention.Ordinary,
-                    ManaUnit.restriction = Nothing
+                    ManaUnit.restriction = Nothing,
+                    ManaUnit.rider = Nothing
                   }
               ],
           Object.announcedX = Just 20,
@@ -213,7 +214,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"designations\":[{\"type\":\"Renowned\"}],\"kicked\":true"
           <> ",\"phyrexianLifePaid\":19"
           <> ",\"manaSpent\":[{\"manaType\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}"
-          <> ",\"tags\":[],\"retention\":{\"type\":\"Ordinary\"},\"restriction\":null}]"
+          <> ",\"tags\":[],\"retention\":{\"type\":\"Ordinary\"},\"restriction\":null,\"rider\":null}]"
           <> ",\"announcedX\":20,\"detainedUntil\":[21],\"goadedBy\":[22]"
           <> ",\"doesNotUntapNext\":true,\"exertedBy\":[23]} "
       )
