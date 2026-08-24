@@ -1337,6 +1337,40 @@ permanentsDieSpec s registry =
           Spec.assertEqWith s "the Piker and both tokens reached a graveyard" (length (filter (\zc -> ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard) (S.zoneChangesOf settled))) 3
           Spec.assertEqWith s "in two event groups, both inside one scan" (length (deathGroups settled)) 2
           Spec.assertEqWith s "so two triggers reached the stack" (length (GameState.stack settled)) 2
+        -- "YOU CONTROL", the ControlledBy arm (CR 109.5 against the ability's
+        -- controller, CR 603.3a). The pair to the first board, differing in exactly
+        -- one thing: the same fixture, the same settle, and only bob's Piker
+        -- damaged. Its own board cannot prove this and the first board cannot
+        -- either -- once the batch is deduped to one trigger, admitting bob's
+        -- creature alongside alice's two changes no counter.
+        Spec.it s "CR 109.5 you control: a batch holding only an opponent's creature fires nothing" $ do
+          (bearer, _, _, _, bobs, board) <- townsfolkBoard
+          let settled = S.runPure S.identityAnswer (S.markDamage bobs lethal board) Engine.settleForPriority
+          Spec.assertEqWith s "the Townsfolk is still a 3/3" (S.powerToughnessOf bearer settled) (Just (3, 3))
+          Spec.assertEqWith s "though bob's Piker did die" (Game.lookupObject bobs settled) Nothing
+          Spec.assertEqWith s "and nothing reached the stack" (length (GameState.stack settled)) 0
+        -- "OTHER", the Filter's Not IsSource arm, and the pair to the board below:
+        -- the Townsfolk's own death IS a creature alice controls dying, so the
+        -- silence has to come from the exclusion.
+        Spec.it s "CR 603.6c other: the Townsfolk dying alone fires nothing" $ do
+          (bearer, _, _, _, _, board) <- townsfolkBoard
+          let settled = S.runPure S.identityAnswer (S.markDamage bearer 3 board) Engine.settleForPriority
+          Spec.assertEqWith s "the Townsfolk died" (Game.lookupObject bearer settled) Nothing
+          Spec.assertEqWith s "and nothing reached the stack" (length (GameState.stack settled)) 0
+        -- CR 603.10a's own Example, on the batch reading: the bearer swept up in the
+        -- very batch it is watching still sees its group-mates, because the rule
+        -- reads "the appearance of objects immediately prior to the event" and both
+        -- were standing then. One damaged Piker apart from the board above, so the
+        -- two differ in exactly one thing.
+        --
+        -- The stack rather than a counter, and necessarily: this card's payload acts
+        -- on itself, and there is no permanent left to carry one.
+        Spec.it s "CR 603.10a the Townsfolk dying in the batch still sees the Piker beside it" $ do
+          (bearer, aliceFirst, _, _, _, board) <- townsfolkBoard
+          let settled = S.runPure S.identityAnswer (S.markDamage bearer 3 (S.markDamage aliceFirst lethal board)) Engine.settleForPriority
+          Spec.assertEqWith s "one trigger reached the stack" (length (GameState.stack settled)) 1
+          Spec.assertEqWith s "both died" (fmap (\oid -> Game.lookupObject oid settled) [bearer, aliceFirst]) [Nothing, Nothing]
+          Spec.assertEqWith s "in one event group" (length (deathGroups settled)) 1
         -- The condition is the card's rather than this spec's, as it is for Meren:
         -- what the three boards above played out is the printed Filter, and a
         -- transcription that drifted to PermanentDies would answer 5/5 above.
