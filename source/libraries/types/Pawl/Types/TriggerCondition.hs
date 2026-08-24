@@ -360,8 +360,10 @@ data TriggerCondition
     -- blocking records the same event, through
     -- Pawl.Engine.Combat.putOntoBattlefieldBlocking, and this condition does not
     -- read BecameBlocking.putOntoBattlefield where SelfBlocksCreature does.
-    -- Flash Foliage blocking Benalish Cavalry is the pool's producer, and
-    -- Pawl.CombatEffectSpec's PutOntoBattlefieldBlocking group is the proof.
+    -- Flash Foliage blocking Benalish Cavalry is the pooled pair that fires it,
+    -- and Pawl.CombatEffectSpec's PutOntoBattlefieldBlocking group is the proof.
+    -- Aetherplasm reaches the same function from a MoveToZone, but nothing it
+    -- can put out carries flanking, so it observes nothing here.
     --
     -- Not implemented: rule 509.3d's remaining producer, an effect that causes a
     -- creature to block, records no event (#1146).

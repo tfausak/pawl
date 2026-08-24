@@ -1464,10 +1464,13 @@ resolveModesWith runSubgame stackId srcId modes = do
                 Monad.foldM_
                   ( \(answers, ran) (cIdx, clause) -> do
                       -- CR 608.2c's "If you do" first, off the same fold the
-                      -- spell path keeps. A REGRESSION FENCE on this path: no
-                      -- ability in data/cards/ writes `ifTaken`, so mutating this
-                      -- conjunct away leaves the suite green -- the same hole
-                      -- every clause gate on this loop has, see #1887.
+                      -- spell path keeps. Proved on this path, not merely
+                      -- fenced: Aetherplasm's second clause hangs on its first,
+                      -- and Pawl.CombatEffectSpec's "declining to return
+                      -- Aetherplasm skips the clause its 'If you do' hangs on"
+                      -- reddens when this conjunct is defeated. What #1887 still
+                      -- covers on this loop is the OTHER gate -- an observable
+                      -- MANDATORY clause standing before a printed "may".
                       let hangs = ifTakenHolds ran clause
                       -- CR 701.46a's printed "if" next, read against `srcId` --
                       -- the rule says "this permanent", which is also why

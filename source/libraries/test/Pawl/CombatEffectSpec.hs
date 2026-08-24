@@ -3935,7 +3935,7 @@ battlefieldNamed wanted pid gs =
 -- blocking). A creature put onto the battlefield this way is 'blocking' but, for
 -- the purposes of trigger events and effects, it never 'blocked'."
 --
--- Flash Foliage is the pool's producer -- {2}{G} INSTANT, "Cast this spell only
+-- Flash Foliage is the pool's Create-side producer -- {2}{G} INSTANT, "Cast this spell only
 -- during combat after blockers are declared. / Create a 1/1 green Saproling
 -- creature token that's blocking target creature attacking you. / Draw a card."
 -- It is CR 509.4's parenthetical case: the effect specifies what the token
