@@ -244,10 +244,11 @@ layer m = case m of
 -- CR 109.5: a static ability's perspective is its SOURCE's controller, so `src`
 -- supplies both that and the InSlot binding source. A CDA instead builds its
 -- context from the object's own controller (applyCharacteristicPT, CR 604.3a(3)).
--- `unitTypes` is CR 613.1's whole-effect answer to CR 205.3d: the card types the
--- effect this modification is a part of leaves the object with, computed by the
--- caller over the whole unit before any of it is applied (cardTypesAfter). Every
--- correspondence question below asks it rather than the fold's running value.
+-- `unitTypes` is CR 205.3d's whole-effect answer (see correspondsTo): the card
+-- types the effect this modification is a part of leaves the object with,
+-- computed by the caller over the whole unit before any of it is applied
+-- (cardTypesAfter). Every correspondence question below asks it rather than the
+-- fold's running value.
 applyModification :: Count.ViewOf -> ObjectId -> GameState -> ObjectId -> Set CardType.CardType -> Modification -> ProjectedCharacteristics -> ProjectedCharacteristics
 applyModification viewOf src gs oid unitTypes m pc =
   let context = Filter.contextFor (controllerOf src gs) (Just src)
@@ -429,15 +430,18 @@ applyModification viewOf src gs oid unitTypes m pc =
 -- direction, so the SetCardType arm asks this too -- one predicate, so a subtype
 -- a card-type set would strip is one a later grant cannot put back.
 --
--- CR 613.1 applies one effect's parts together, so the card types this is asked
--- against are the ones the WHOLE unit gives (cardTypesAfter, threaded through
--- applyModification's unitTypes), not the ones the fold has reached. That is what
--- lets an effect grant the card type and the subtype together in either written
+-- The card types are the ones the WHOLE effect gives (cardTypesAfter, threaded
+-- through applyModification's unitTypes), not the ones the fold has reached: CR
+-- 613.7 orders EFFECTS within a layer and nothing orders one effect's own parts
+-- against each other, CR 613.6 those parts being the parts of one effect wherever
+-- they land. CR 613.6's Svogthos example is this rule in the CR's own words -- one
+-- effect gives the Plant Zombie types and the Creature card type they correspond
+-- to. So an effect may grant the card type and the subtype in either written
 -- order: Song of the Dryads reads "a colorless Forest land" and Life and Limb
 -- "Saproling creatures and Forest lands", each naming the subtype first, and both
 -- are transcribed that way. Proved by Pawl.ProjectionSpec's "CR 205.3d/305.6 Song
 -- of the Dryads' Forest lands on the creature the same effect makes a land" and
--- "CR 613.1/205.3d Life and Limb's Forest lands on the Saproling the same effect
+-- "CR 613.7/205.3d Life and Limb's Forest lands on the Saproling the same effect
 -- makes a land", one on each of projectDeciding's two roads.
 correspondsTo :: Set CardType.CardType -> Subtype.Type.Subtype -> Bool
 correspondsTo types subtype =
@@ -466,7 +470,7 @@ gainableSubtypes types = Set.filter (correspondsTo types)
 
 -- The card types one modification leaves an object with, factored out of the two
 -- layer-4 arms above that write them so applyModification's own answer and the
--- whole-unit answer CR 613.1 needs cannot drift apart.
+-- whole-unit answer CR 205.3d needs cannot drift apart.
 --
 -- Exhaustive rather than defaulting, for modificationWrites' reason: a new arm
 -- that wrote card types and was not named here would be silently invisible to CR
@@ -3488,12 +3492,12 @@ projectDeciding admits cands = forObject
                 -- order the card lists them (CR 613.6). The ViewOf is the SAME
                 -- for every object the effect reaches, so a count inside it
                 -- cannot see the effect's own work on a sibling.
-                -- CR 613.1: the parts of one effect apply together, so CR
-                -- 205.3d is asked against the card types the WHOLE unit gives,
-                -- computed before any part of it is applied. That is what lets a
-                -- card name the subtype ahead of the card type that licenses it,
-                -- which is how both Song of the Dryads and Life and Limb are
-                -- printed.
+                -- CR 613.7 orders effects, not one effect's parts, so CR 205.3d
+                -- is asked against the card types the WHOLE unit gives, computed
+                -- before any part of it is applied (correspondsTo). That is what
+                -- lets a card name the subtype ahead of the card type that
+                -- licenses it, which is how both Song of the Dryads and Life and
+                -- Limb are printed.
                 applyUnit viewOf o pc cs =
                   let parts = NonEmpty.toList cs
                       unitTypes = List.foldl' (\ts c -> cardTypesAfter (gModification c) ts) (PC.cardTypes pc) parts

@@ -1629,7 +1629,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- The other direction, and the reason CR 205.3d is asked against the card types
   -- the WHOLE effect gives rather than the ones the object started with: Song of
   -- the Dryads' one static ability makes the enchanted permanent a Forest land,
-  -- and CR 613.1 applies both parts of it together. The card is transcribed in
+  -- and CR 613.7 orders effects rather than the parts of one. The card is transcribed in
   -- printed order -- "a colorless Forest land", so the SetLandSubtype precedes the
   -- SetCardType -- and a check reading either the object's base card types or the
   -- ones the fold had reached would refuse the Forest and leave a colourless land
@@ -1829,8 +1829,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertBool s (Projection.isCreatureOf forestId gs) "and a creature"
     Spec.assertBool s (Set.member CardType.Land (Projection.cardTypesOf forestId gs)) "and still a land"
 
-  -- CR 613.1: the parts of one effect apply together, so a card naming the
-  -- subtype ahead of the card type that licenses it gets both. Life and Limb is
+  -- CR 613.7 orders effects within a layer and nothing orders one effect's own
+  -- parts against each other, so a card naming the subtype ahead of the card type
+  -- that licenses it (CR 205.3d) gets both. Life and Limb is
   -- printed "are 1/1 green Saproling creatures and Forest lands in addition to
   -- their other types" (Scryfall) and is transcribed in that order, so both of its
   -- subtype parts precede the AddCardType CR 205.3d asks them against.
@@ -1846,7 +1847,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- checked against Scryfall) prints no static ability, and the Mountain is alice's
   -- mana source on both boards so that red is common to them and green is the one
   -- thing Life and Limb adds.
-  Spec.it s "CR 613.1/205.3d Life and Limb's Forest lands on the Saproling the same effect makes a land" $ do
+  Spec.it s "CR 613.7/205.3d Life and Limb's Forest lands on the Saproling the same effect makes a land" $ do
     mountain <- S.printingOf s registry "Mountain"
     shroofus <- S.printingOf s registry "Shroofus Sproutsire"
     limb <- S.printingOf s registry "Life and Limb"
@@ -1885,8 +1886,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     -- arm that SET the subtypes passes the assertion above and fails this one.
     Spec.assertEqWith s "and still its printed Goblin Warrior" (Set.difference (Projection.subtypesOf pikerId gs) (Set.singleton Subtype.Type.Food)) (Set.fromList [Subtype.Type.Goblin, Subtype.Type.Warrior])
     -- The card-type half of the same sentence, and CR 205.3d's precondition for
-    -- the Food: Ygra lists AddCardType Artifact ahead of AddSubtype Food, and
-    -- applyModification folds a static ability's modifications in that order.
+    -- the Food: Ygra prints "Food artifacts", so the AddSubtype comes FIRST and
+    -- the correspondence is settled against what the whole effect gives (CR 613.7,
+    -- correspondsTo).
     Spec.assertBool s (Set.member CardType.Artifact (Projection.cardTypesOf pikerId gs)) "and an artifact in addition to being a creature"
     Spec.assertBool s (Projection.isCreatureOf pikerId gs) "and still a creature"
     -- The printed "Other", and the reason the affected filter is not vacuously
