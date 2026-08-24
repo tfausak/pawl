@@ -1,5 +1,6 @@
 module Pawl.Types.PrintedReplacement where
 
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 
@@ -38,6 +39,19 @@ data PrintedReplacement effect = MkPrintedReplacement
     -- differs is CR 109.5's "you" -- that row bakes its controller, this one
     -- reads it live off the battlefield.
     condition :: Maybe Condition.Condition,
-    effect :: ReplacementEffect.ReplacementEffect effect
+    effect :: ReplacementEffect.ReplacementEffect effect,
+    -- | The name another clause of the SAME card uses to refer to the static
+    -- ability this replacement effect comes from, or Nothing for one nothing
+    -- refers to, which is nearly all of them.
+    --
+    -- The same REFERENCE Pawl.Types.ActivatedAbility.name is, read by the same
+    -- CR 613.1f removal (Modification.LoseNamedAbility) and carrying that field's
+    -- reasoning whole: not an identity, so two abilities may share a name and a
+    -- removal naming it takes both. Glittering Lion is the producer -- its "{3}:
+    -- Until end of turn, this creature loses 'Prevent all damage that would be
+    -- dealt to this creature.'" names a PREVENTION ability, which CR 614.1 /
+    -- 615.1 make a static ability's continuous effect rather than an activated or
+    -- triggered one.
+    name :: Maybe AbilityName.AbilityName
   }
   deriving (Eq, Ord, Show)

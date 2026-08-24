@@ -287,11 +287,21 @@ applyModification viewOf src gs oid m pc =
         -- keeps "Enchanted creature has flying" while losing the ability that
         -- animated it, which is the whole difference between the two arms.
         --
-        -- Reaches PC.activatedAbilities alone, that being the only list whose
-        -- members carry a name (#2134). Nothing else is emptied -- not the
-        -- keywords, not the CDA -- because the clause names one ability.
+        -- Reaches the two lists whose members carry a name: the activated
+        -- abilities (Gliding Licid) and the printed replacements (Glittering
+        -- Lion, whose "{3}:" removes a PREVENTION ability -- CR 614.1 / 615.1
+        -- make that a static ability's continuous effect). Nothing else is
+        -- emptied -- not the keywords, not the CDA -- because the clause names one
+        -- ability.
+        --
+        -- Not implemented: Pawl.Types.TriggeredAbility and
+        -- Pawl.Types.StaticAbility carry no name, so a removal cannot single one
+        -- of those out (gap #2212).
         Modification.LoseNamedAbility n ->
-          pc {PC.activatedAbilities = filter ((/= Just n) . ActivatedAbility.name) (PC.activatedAbilities pc)}
+          pc
+            { PC.activatedAbilities = filter ((/= Just n) . ActivatedAbility.name) (PC.activatedAbilities pc),
+              PC.replacementEffects = filter ((/= Just n) . PrintedReplacement.name) (PC.replacementEffects pc)
+            }
         -- CR 613.1f layer 6: the mirror of GainKeyword above. A DELETE and not a
         -- decrement: the clause takes the ABILITY away, and the CR has no
         -- removal that spends one instance of one, so every grant standing at

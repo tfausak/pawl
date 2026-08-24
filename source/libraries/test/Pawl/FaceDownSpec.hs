@@ -1283,7 +1283,7 @@ declining fodder p = case p of
 giftDestinationFilter :: Printing.Printing -> Maybe (Filter.Type.Filter Keyword.Keyword)
 giftDestinationFilter printing =
   case Face.replacementEffects (S.combinedFace printing) of
-    [PrintedReplacement.MkPrintedReplacement _ (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ (TurnUpRewrite.MayAttachTo f)))] -> Just f
+    [PrintedReplacement.MkPrintedReplacement _ (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ (TurnUpRewrite.MayAttachTo f))) _] -> Just f
     _ -> Nothing
 
 -- CR 701.40a / 708.3: a permanent PUT onto the battlefield face down, which is

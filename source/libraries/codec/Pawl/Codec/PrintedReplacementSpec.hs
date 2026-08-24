@@ -1,10 +1,12 @@
 module Pawl.Codec.PrintedReplacementSpec where
 
+import qualified Data.Text as Text
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Effect as Effect
 import qualified Pawl.Codec.PrintedReplacement as PrintedReplacement
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
@@ -24,7 +26,8 @@ spec s = Spec.describe s "Pawl.Codec.PrintedReplacement" $ do
       codec
       ( PrintedReplacement.MkPrintedReplacement
           { PrintedReplacement.condition = Nothing,
-            PrintedReplacement.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate
+            PrintedReplacement.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate,
+            PrintedReplacement.name = Nothing
           }
       )
       " {\"effect\":{\"type\":\"DestructionR\",\"value\":{\"type\":\"Regenerate\"}}} "
@@ -44,10 +47,26 @@ spec s = Spec.describe s "Pawl.Codec.PrintedReplacement" $ do
                         (Quantity.Literal 1)
                     )
                 ),
-            PrintedReplacement.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate
+            PrintedReplacement.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate,
+            PrintedReplacement.name = Nothing
           }
       )
       " {\"condition\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"IsMonarch\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}},\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":1}}},\"effect\":{\"type\":\"DestructionR\",\"value\":{\"type\":\"Regenerate\"}}} "
+  -- Glittering Lion's "shield", the case that writes the OTHER optional key. Its
+  -- own case rather than a rider on one above, because 'Fields.defaulted' decodes
+  -- a mistyped key as Nothing with no error, and a nameless printed replacement
+  -- is one a CR 613.1f removal silently cannot reach.
+  Spec.it s "MkPrintedReplacement, name written" $
+    Common.assertCodec
+      s
+      codec
+      ( PrintedReplacement.MkPrintedReplacement
+          { PrintedReplacement.condition = Nothing,
+            PrintedReplacement.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate,
+            PrintedReplacement.name = Just (AbilityName.MkAbilityName (Text.pack "shield"))
+          }
+      )
+      " {\"effect\":{\"type\":\"DestructionR\",\"value\":{\"type\":\"Regenerate\"}},\"name\":\"shield\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec
   where
     -- The effect codec the card boundary would pass in (CR 615.5's riders ride

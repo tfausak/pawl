@@ -9,8 +9,11 @@ import qualified Data.Text as Text
 -- Two joins use it. A delayed triggered ability declared on a card (CR 603.7)
 -- joins Effect.ArmDelayedTrigger to Face.delayedAbilities; and
 -- Modification.LoseNamedAbility joins a CR 613.1f removal to the
--- ActivatedAbility.name it removes -- "this creature loses this ability", the
--- Licid clause, where "this ability" is the very one being resolved.
+-- ActivatedAbility.name or PrintedReplacement.name it removes -- "this creature
+-- loses this ability", the Licid clause, where "this ability" is the very one
+-- being resolved, and Glittering Lion's "this creature loses 'Prevent all damage
+-- that would be dealt to this creature.'", which quotes a prevention ability
+-- instead.
 --
 -- The delayed join is policed the way SlotName's is: the dataflow lint checks
 -- that every armed name is declared and every declared name is armed, so a

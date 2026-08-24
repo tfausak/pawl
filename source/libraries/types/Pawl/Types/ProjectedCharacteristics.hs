@@ -123,12 +123,13 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- | CR 602 / 613 layer 6: the object's activated abilities after the layer
     -- system. Seeded from the card and added to by CR 613.1f's grant (Presence of
     -- Gond); emptied by LoseAllAbilities (Humility) and by CR 305.7's strip at
-    -- layer 4 (Blood Moon), as are the two fields below. The ONE field a NAMED
-    -- removal reaches too (Modification.LoseNamedAbility, Gliding Licid), since
-    -- an ActivatedAbility is the only ability kind carrying a name (#2134).
+    -- layer 4 (Blood Moon), as are the two fields below. A NAMED removal reaches
+    -- it too (Modification.LoseNamedAbility, Gliding Licid), as it does the
+    -- replacementEffects below; those two are the ability kinds carrying a name.
     activatedAbilities :: [ActivatedAbility.ActivatedAbility Card.Card],
     -- | CR 614 layer 6: the object's replacement effects after the layer system,
-    -- the same projection posture as activatedAbilities, emptied by the same two.
+    -- the same projection posture as activatedAbilities, emptied by the same two
+    -- and singled out by the same named removal (Glittering Lion).
     replacementEffects :: [PrintedReplacement.PrintedReplacement (Effect.Effect Card.Card)],
     -- | CR 603 layer 6: the object's triggered abilities after the layer system,
     -- the same projection posture as activatedAbilities: seeded from the card,
