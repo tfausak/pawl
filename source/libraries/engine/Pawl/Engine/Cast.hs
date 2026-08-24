@@ -583,14 +583,15 @@ spendingFor pid oid gs = case Game.lookupObject oid gs >>= Object.playableFromEx
 --     which counts every turn the game takes -- extra turns (CR 500.7) included
 --     -- so the clause needs no other bookkeeping.
 --   * the window, "during their main phase while the stack is empty", which is
---     `sorcerySpeed` above word for word -- the same three conjuncts CR 307.5
---     states, asked of the same player the ownership conjunct names.
+--     `sorcerySpeed` above word for word -- the phase, the active player and the
+--     empty stack, asked of the same player the ownership conjunct names.
+--     Priority is implicit here as everywhere in this module.
 --
 -- That window is a conjunct HERE and not in Cast.timingOk, which is where a
 -- window normally lives: timingOk is a disjunction, so it can only widen one and
 -- never narrow one. It has to narrow, because CR 702.170c's route plots whatever
 -- the exiling clause admits and Kellan Joins Up's is "a nonland card with mana
--- value 3 or less", which reaches an INSTANT -- and CR 304.1 hands an instant
+-- value 3 or less", which reaches an INSTANT -- and CR 117.1a hands an instant
 -- every priority its controller has. Every card the pool PRINTS plot on is a
 -- creature (Djinn of Fool's Fall, Aloe Alchemist), for which CR 307.5 would have
 -- covered the clause anyway. Pawl.SpecialActionSpec's "CR 702.170d a plotted
@@ -606,7 +607,8 @@ permitsCastPlotted pid oid gs = Maybe.fromMaybe False $ do
   pure (Object.owner obj == pid && GameState.turnNumber gs > turn && sorcerySpeed pid gs)
 
 -- CR 702.143a: may this player cast this FORETOLD card? permitsCastPlotted's
--- three conjuncts one rule over, and the rule states each of them:
+-- stamp, owner and later-turn conjuncts one rule over, and the rule states each
+-- of them:
 --
 --   * the card is foretold, which is the Object.foretold stamp
 --     Pawl.Engine.Foretell wrote;

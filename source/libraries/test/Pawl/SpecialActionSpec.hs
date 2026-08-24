@@ -465,7 +465,7 @@ plotting s registry = Spec.describe s "CR 116.2k Djinn of Fool's Fall" $ do
 -- The `plot` ARGUMENT is the card the trigger exiles, and the two callers pass
 -- different cards on purpose: Aloe Alchemist for the cases about becoming
 -- plotted, Lightning Bolt for the window case, which needs an INSTANT because CR
--- 304.1 is what leaves CR 702.170d's main-phase clause the only narrowing left.
+-- 117.1a is what leaves CR 702.170d's main-phase clause the only narrowing left.
 --
 -- The DJINN OF FOOL'S FALL ({4}{U}, mana value 5) is the filter's negative
 -- control. It is the only other card in the hand, so "mana value 3 or less"
@@ -602,7 +602,7 @@ makePlotted s registry = Spec.describe s "CR 702.170c Kellan Joins Up" $ do
   -- "during their main phase while the stack is empty". Every card that prints
   -- plot is a creature, so CR 307.5's window already covers the clause there --
   -- but Kellan Joins Up plots "a nonland card with mana value 3 or less", which
-  -- reaches an INSTANT, and CR 304.1 gives an instant every priority it has. So
+  -- reaches an INSTANT, and CR 117.1a gives an instant every priority it has. So
   -- the plotted permission is the only thing left that can narrow the window.
   --
   -- FOUR boards, each differing from the castable one in exactly one field, one
@@ -645,7 +645,7 @@ makePlotted s registry = Spec.describe s "CR 702.170c Kellan Joins Up" $ do
         ]
       -- The identity leg, AFTER the four above: the card the window was asked
       -- about really is the instant, so the refusals are the window narrowing a
-      -- CR 304.1 permission rather than a creature's own CR 307.5 gate.
+      -- CR 117.1a permission rather than a creature's own CR 307.5 gate.
       Spec.assertEqWith
         s
         "the exiled card is Lightning Bolt, an instant"
