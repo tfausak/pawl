@@ -592,6 +592,7 @@ snapshotView gs shape event = case event of
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Scried _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
+  GameEvent.DiceRolled _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
   GameEvent.Exerted _ -> Nothing

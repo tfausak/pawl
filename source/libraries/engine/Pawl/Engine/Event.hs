@@ -470,6 +470,7 @@ movedOf event = case event of
   GameEvent.Milled {} -> Nothing
   GameEvent.Scried _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
+  GameEvent.DiceRolled _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
   GameEvent.Exerted _ -> Nothing
@@ -517,6 +518,7 @@ damageOf event = case event of
   GameEvent.Milled {} -> Nothing
   GameEvent.Scried _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
+  GameEvent.DiceRolled _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
   GameEvent.Exerted _ -> Nothing
@@ -564,6 +566,7 @@ revealOf event = case event of
   GameEvent.Milled {} -> Nothing
   GameEvent.Scried _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
+  GameEvent.DiceRolled _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
   GameEvent.Exerted _ -> Nothing
@@ -4079,6 +4082,7 @@ countersRemovedFrom bearer wanted event = case event of
   GameEvent.Milled {} -> Nothing
   GameEvent.Scried _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
+  GameEvent.DiceRolled _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
   GameEvent.Exerted _ -> Nothing
@@ -4175,6 +4179,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4246,6 +4251,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4292,6 +4298,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4344,6 +4351,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4400,6 +4408,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4464,6 +4473,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4529,6 +4539,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4596,6 +4607,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4650,6 +4662,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4712,6 +4725,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4771,6 +4785,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4830,6 +4845,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4888,6 +4904,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4947,6 +4964,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5018,6 +5036,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5078,6 +5097,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5137,6 +5157,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5214,6 +5235,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5294,6 +5316,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5355,6 +5378,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5419,6 +5443,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5479,6 +5504,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5551,6 +5577,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5601,6 +5628,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5667,6 +5695,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5723,6 +5752,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5790,6 +5820,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5847,6 +5878,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5916,6 +5948,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5970,6 +6003,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6024,6 +6058,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6081,6 +6116,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6138,6 +6174,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6208,6 +6245,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6291,6 +6329,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6356,6 +6395,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6389,6 +6429,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6450,6 +6491,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.Milled {} -> False
           GameEvent.Scried _ -> False
           GameEvent.Surveiled _ -> False
+          GameEvent.DiceRolled _ -> False
           GameEvent.Plotted _ -> False
           GameEvent.Explored _ -> False
           GameEvent.Exerted _ -> False
@@ -6542,6 +6584,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6599,6 +6642,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6665,6 +6709,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6727,6 +6772,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6794,6 +6840,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6827,6 +6874,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6940,6 +6988,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7013,6 +7062,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7040,6 +7090,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7104,6 +7155,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7169,6 +7221,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7226,6 +7279,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7285,6 +7339,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7360,6 +7415,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7413,6 +7469,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7472,6 +7529,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7519,6 +7577,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7575,6 +7634,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7640,6 +7700,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7693,6 +7754,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7781,6 +7843,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7836,6 +7899,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7888,6 +7952,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7970,6 +8035,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried scryer -> PlayerRelation.holds relation you scryer
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -8017,6 +8083,64 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled surveiller -> PlayerRelation.holds relation you surveiller
+    GameEvent.DiceRolled _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+  -- CR 706.1: this player rolled a die, the relation reading the roller against
+  -- CR 109.5's "you" as PlayerScries above does. Feywild Trickster is the You
+  -- form.
+  --
+  -- The EVENT alone. What the die SHOWED is deliberately not a bar here: CR
+  -- 706.7 has the planar die firing this very condition while every effect
+  -- reading a numerical result ignores it, so a condition gated on the result
+  -- would be the wrong shape rather than a stricter one (#934).
+  --
+  -- Not implemented: CR 706.6's ignored roll, which "is considered to have never
+  -- happened" and triggers nothing -- nothing in data/cards ignores or rerolls a
+  -- roll (#2083), so no recorded event is one this must skip.
+  TriggerCondition.PlayerRollsDice relation -> case event of
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled roller -> PlayerRelation.holds relation you roller
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -8066,6 +8190,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted plotted -> plotted == bearer
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -8122,6 +8247,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored explorer -> case Projection.viewWithLastKnown explorer gs explorer of
       Nothing -> False
@@ -8173,6 +8299,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted oid -> oid == bearer
@@ -8238,6 +8365,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -8277,6 +8405,9 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.PlayerSurveils _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
   TriggerCondition.PermanentExplores _ -> False
+  -- CR 706.1's roll is something a resolving effect INSTRUCTS a player to do,
+  -- never an ability triggering, so it takes CR 603.3b's first pass as well.
+  TriggerCondition.PlayerRollsDice _ -> False
   -- The same answer for the same reason: CR 701.43a's exert is a keyword action a
   -- PLAYER takes, and CR 508.1g puts it in a turn-based action rather than in a
   -- resolving ability.
@@ -8919,6 +9050,13 @@ eventBindingSlots cond = case cond of
   TriggerCondition.PlayerSurveils _ -> Set.empty
   TriggerCondition.SelfBecomesPlotted -> Set.empty
   TriggerCondition.PermanentExplores _ -> Set.empty
+  -- Nothing here either. CR 706.1's event names the roller, but Feywild
+  -- Trickster's payload points at no one -- it creates a token for its own
+  -- controller -- and a card printing "that player" is what would earn a slot.
+  -- The roll's numerical RESULT is not a binding of this condition at all:
+  -- Pawl.Engine.Resolve binds it at Pawl.Types.RollDie's own slot, during the
+  -- roller's own resolution, for a later effect of THAT ability to read.
+  TriggerCondition.PlayerRollsDice _ -> Set.empty
   -- Empty for the same reason, and CR 701.43d is what settles it: the linked
   -- trigger's "it" is the exerted permanent, which is already CR 113.7a's source
   -- slot, so a binding here would be a second name for one object. Glory-Bound
@@ -9394,6 +9532,9 @@ looksBack condition = case condition of
   TriggerCondition.PlayerSurveils _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
   TriggerCondition.PermanentExplores _ -> False
+  -- Not on CR 603.10a's list, and CR 706.1's roll is no zone change: it moves
+  -- no object at all, so CR 603.10's first sentence governs.
+  TriggerCondition.PlayerRollsDice _ -> False
   -- The same answer once more, and the most plainly: CR 701.43c can only exert a
   -- permanent that is ON the battlefield, so nothing has changed zones.
   TriggerCondition.SelfExerted -> False
@@ -9562,6 +9703,12 @@ batchScoped condition = case condition of
   TriggerCondition.PlayerSurveils _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
   TriggerCondition.PermanentExplores _ -> False
+  -- Per-occurrence, and today indistinguishable from the batch reading of
+  -- Feywild Trickster's "one or more dice": CR 706.1's other half, how MANY
+  -- dice, is unimplemented (#2085), so one Effect.RollDie records exactly one
+  -- event and the ability can fire at most once either way. A card rolling
+  -- several dice at once would have to answer True here.
+  TriggerCondition.PlayerRollsDice _ -> False
   TriggerCondition.SelfExerted -> False
   TriggerCondition.SelfBecomesAttachedBy _ -> False
   TriggerCondition.SelfDies -> False
@@ -9849,6 +9996,7 @@ eventTriggers events gs =
         GameEvent.Milled {} -> Map.empty
         GameEvent.Scried _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
+        GameEvent.DiceRolled _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
         GameEvent.Explored _ -> Map.empty
         GameEvent.Exerted _ -> Map.empty
@@ -10082,6 +10230,7 @@ eventTriggers events gs =
         GameEvent.Milled {} -> Map.empty
         GameEvent.Scried _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
+        GameEvent.DiceRolled _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
         GameEvent.Explored _ -> Map.empty
         GameEvent.Exerted _ -> Map.empty
@@ -10282,6 +10431,7 @@ eventTriggers events gs =
         GameEvent.Milled {} -> Map.empty
         GameEvent.Scried _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
+        GameEvent.DiceRolled _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
         GameEvent.Explored _ -> Map.empty
         GameEvent.Exerted _ -> Map.empty
@@ -10400,6 +10550,7 @@ eventTriggers events gs =
         GameEvent.Milled {} -> Map.empty
         GameEvent.Scried _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
+        GameEvent.DiceRolled _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
         GameEvent.Explored _ -> Map.empty
         GameEvent.Exerted _ -> Map.empty
@@ -10621,6 +10772,10 @@ zonesTriggeredFrom cond = case cond of
   TriggerCondition.PlayerScries _ -> battlefield
   TriggerCondition.PlayerSurveils _ -> battlefield
   TriggerCondition.PermanentExplores _ -> battlefield
+  -- CR 113.6's default again: Feywild Trickster is a creature, and nothing
+  -- about rolling a die is a condition that cannot trigger from the
+  -- battlefield.
+  TriggerCondition.PlayerRollsDice _ -> battlefield
   -- CR 113.6's default, and CR 701.43c makes it the only possible answer rather
   -- than a default: an object that isn't on the battlefield can't be exerted, so
   -- the bearer is standing there when its own exert is recorded.
@@ -10888,6 +11043,8 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PlayerSurveils _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
   TriggerCondition.PermanentExplores _ -> False
+  -- CR 706.1 names no turn either.
+  TriggerCondition.PlayerRollsDice _ -> False
   -- False for the SelfAttacks arm's reason below, which is exactly this case one
   -- rule earlier: CR 508.1g exerts on the ACTIVE player's turn, and CR 109.5's
   -- "you" is the ability's controller, so a stolen Glory-Bound Initiate is
@@ -11151,6 +11308,9 @@ stateTriggers gs
               TriggerCondition.PlayerSurveils _ -> False
               TriggerCondition.SelfBecomesPlotted -> False
               TriggerCondition.PermanentExplores _ -> False
+              -- CR 603.2 once more: a die roll is something that HAPPENS, with its own log
+              -- entry, never a CR 603.8 state that could be true standing still.
+              TriggerCondition.PlayerRollsDice _ -> False
               -- CR 603.2 again: being exerted is something that happens, with its
               -- own log entry, and CR 701.43b makes "already exerted" no bar to
               -- exerting again -- so there is no standing state to be true.

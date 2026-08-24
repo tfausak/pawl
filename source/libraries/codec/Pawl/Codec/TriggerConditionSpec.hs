@@ -721,6 +721,19 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PlayerSurveils PlayerRelation.Opponent)
       " {\"type\":\"PlayerSurveils\",\"value\":{\"type\":\"Opponent\"}} "
+  -- CR 706.1. Both relations, for the reason above: Feywild Trickster is the
+  -- You form, and CR 109.5 is what an Opponent printing would be read against.
+  Spec.it s "PlayerRollsDice round-trips both relations" $ do
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerRollsDice PlayerRelation.You)
+      " {\"type\":\"PlayerRollsDice\",\"value\":{\"type\":\"You\"}} "
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerRollsDice PlayerRelation.Opponent)
+      " {\"type\":\"PlayerRollsDice\",\"value\":{\"type\":\"Opponent\"}} "
   -- CR 702.170a. Nullary, SelfCycled's shape: the ability is printed on the card
   -- that becomes plotted, so there is nothing to select among.
   Spec.it s "SelfBecomesPlotted round-trips" $

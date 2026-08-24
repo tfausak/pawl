@@ -741,6 +741,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- a Filter holds no Count for PermanentEnters' reason above.
   TriggerCondition.PlayerScries _ -> []
   TriggerCondition.PlayerSurveils _ -> []
+  TriggerCondition.PlayerRollsDice _ -> []
   TriggerCondition.SelfBecomesPlotted -> []
   TriggerCondition.PermanentExplores _ -> []
   -- CR 701.43d carries nothing at all, so no Count either.
@@ -3119,6 +3120,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- so none of them holds a Filter.
   TriggerCondition.PlayerScries _ -> []
   TriggerCondition.PlayerSurveils _ -> []
+  TriggerCondition.PlayerRollsDice _ -> []
   TriggerCondition.SelfBecomesPlotted -> []
   -- CR 701.44b DOES carry one, a predicate over the explorer -- Wildgrowth
   -- Walker's "a creature you control" -- which the card lint must sweep.

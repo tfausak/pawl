@@ -2048,6 +2048,7 @@ representativeEvents cond =
         -- is what keeps this pin honest: an arm matching a scry here would claim
         -- the floor for the wrong keyword action.
         TriggerCondition.PlayerSurveils _ -> one (GameEvent.Surveiled S.bob)
+        TriggerCondition.PlayerRollsDice _ -> one (GameEvent.DiceRolled S.bob)
         -- CR 702.170a's own event, and the only one this condition admits. On
         -- `departed`, which is not the bearer on the board below -- so the pair
         -- does not match, which pins the floor for a matching pair too, this
@@ -2191,6 +2192,8 @@ everyTriggerCondition =
     TriggerCondition.PlayerScries PlayerRelation.Opponent,
     TriggerCondition.PlayerSurveils PlayerRelation.You,
     TriggerCondition.PlayerSurveils PlayerRelation.Opponent,
+    TriggerCondition.PlayerRollsDice PlayerRelation.You,
+    TriggerCondition.PlayerRollsDice PlayerRelation.Opponent,
     TriggerCondition.SelfBecomesPlotted,
     TriggerCondition.PermanentExplores (Filter.Type.And []),
     TriggerCondition.SelfExerted,

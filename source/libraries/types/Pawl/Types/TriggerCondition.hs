@@ -948,6 +948,20 @@ data TriggerCondition
     -- keeps it apart from a condition built on CR 701.25a's zone changes. CR
     -- 701.25c's surveil 0 fires nothing.
     PlayerSurveils PlayerRelation.PlayerRelation
+  | -- | CR 706.1: "whenever you roll one or more dice" (Feywild Trickster),
+    -- against GameEvent.DiceRolled, with the relation read against CR 109.5's
+    -- "you" -- the ability's controller at the moment it triggered (CR 603.3a),
+    -- PlayerScries' shape.
+    --
+    -- The EVENT and nothing else: the result is not here, and CR 706.7 is why
+    -- that is the right split rather than an omission -- in Planechase the
+    -- planar die fires this very condition while every effect reading a
+    -- numerical result ignores it. #934 is the planar die.
+    --
+    -- Not implemented: the printed "one or more", which needs CR 706.1's die
+    -- count (#2085); one roll is one event, so the batch and per-occurrence
+    -- readings coincide today.
+    PlayerRollsDice PlayerRelation.PlayerRelation
   | -- | CR 702.170a / 702.170c: "when this card becomes plotted" (Aloe
     -- Alchemist), against GameEvent.Plotted naming the bearer. Self-scoped and
     -- nullary. Watched for from EXILE, which is where both routes leave the
