@@ -437,8 +437,8 @@ applyModification viewOf src gs oid unitTypes m pc =
 -- "Saproling creatures and Forest lands", each naming the subtype first, and both
 -- are transcribed that way. Proved by Pawl.ProjectionSpec's "CR 205.3d/305.6 Song
 -- of the Dryads' Forest lands on the creature the same effect makes a land" and
--- "CR 613.1/205.3d Life and Limb's Saproling sticks though the card names it
--- before the Creature type".
+-- "CR 613.1/205.3d Life and Limb's Forest lands on the Saproling the same effect
+-- makes a land", one on each of projectDeciding's two roads.
 correspondsTo :: Set CardType.CardType -> Subtype.Type.Subtype -> Bool
 correspondsTo types subtype =
   let family = Subtype.correlatedCardTypes subtype

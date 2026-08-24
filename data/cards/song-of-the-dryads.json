@@ -39,15 +39,15 @@
               "value": []
             },
             {
-              "type": "SetCardType",
-              "value": {
-                "type": "Land"
-              }
-            },
-            {
               "type": "SetLandSubtype",
               "value": {
                 "type": "Forest"
+              }
+            },
+            {
+              "type": "SetCardType",
+              "value": {
+                "type": "Land"
               }
             }
           ]
