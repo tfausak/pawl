@@ -1058,7 +1058,9 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
     -- printed power and toughness box is a number or a star" lint holds every
     -- card's own faces to it. A MINTED face may print a computed box (CR 111.3),
     -- which Resolve.bakeTokenCharacteristics stamps into a Literal as the token is
-    -- created -- except when it could not determine one (gap #1908).
+    -- created -- undeterminable ones included, so the only quantity that reaches
+    -- this seed from a token is CR 208.2's star. Pawl.CountSpec's Miming Slime
+    -- group is what proves that.
     let seedViewOf = const Nothing
         seedContext = Filter.contextFor (controllerOf oid gs) (Just oid)
      in PC.MkProjectedCharacteristics
@@ -1646,7 +1648,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Sacrifice _ -> effect
   Effect.TurnFaceDown _ -> effect
   Effect.TurnFaceUp _ -> effect
-  Effect.RemoveFromCombat _ -> effect
+  Effect.RemoveFromCombat ref -> Effect.RemoveFromCombat (rewriteObjectRef pairs ref)
   Effect.BecomesBlocked _ -> effect
   -- Not implemented: a CR 122.1b keyword counter named in the riders keeps its
   -- printed keyword through the swap (#1190).

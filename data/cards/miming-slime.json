@@ -1,0 +1,152 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Miming Slime",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "Create",
+                    "value": {
+                      "card": {
+                        "faces": [
+                          {
+                            "colorIndicator": [
+                              {
+                                "type": "Green"
+                              }
+                            ],
+                            "name": "Ooze Token",
+                            "power": {
+                              "type": "Count",
+                              "value": {
+                                "aggregation": {
+                                  "type": "Greatest",
+                                  "value": {
+                                    "type": "Power"
+                                  }
+                                },
+                                "filter": {
+                                  "type": "And",
+                                  "value": [
+                                    {
+                                      "type": "HasCardType",
+                                      "value": {
+                                        "type": "Creature"
+                                      }
+                                    },
+                                    {
+                                      "type": "ControlledBy",
+                                      "value": {
+                                        "type": "You"
+                                      }
+                                    }
+                                  ]
+                                },
+                                "scope": {
+                                  "type": "InZone",
+                                  "value": {
+                                    "player": {
+                                      "type": "EachPlayer"
+                                    },
+                                    "zone": {
+                                      "type": "Battlefield"
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            "toughness": {
+                              "type": "Count",
+                              "value": {
+                                "aggregation": {
+                                  "type": "Greatest",
+                                  "value": {
+                                    "type": "Power"
+                                  }
+                                },
+                                "filter": {
+                                  "type": "And",
+                                  "value": [
+                                    {
+                                      "type": "HasCardType",
+                                      "value": {
+                                        "type": "Creature"
+                                      }
+                                    },
+                                    {
+                                      "type": "ControlledBy",
+                                      "value": {
+                                        "type": "You"
+                                      }
+                                    }
+                                  ]
+                                },
+                                "scope": {
+                                  "type": "InZone",
+                                  "value": {
+                                    "player": {
+                                      "type": "EachPlayer"
+                                    },
+                                    "zone": {
+                                      "type": "Battlefield"
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            "typeLine": {
+                              "subtypes": [
+                                {
+                                  "type": "Ooze"
+                                }
+                              ],
+                              "types": [
+                                {
+                                  "type": "Creature"
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      "quantity": {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

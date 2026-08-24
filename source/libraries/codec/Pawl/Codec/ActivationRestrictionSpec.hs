@@ -83,4 +83,12 @@ spec s = Spec.describe s "Pawl.Codec.ActivationRestriction" $ do
       ActivationRestriction.codec
       ActivationRestriction.AfterBlockersDeclared
       " {\"type\":\"AfterBlockersDeclared\"} "
+  -- Save Point's "activate only during combat before combat damage has been
+  -- dealt" (CR 506.7 through CR 506.7g).
+  Spec.it s "BeforeCombatDamage" $
+    Common.assertCodec
+      s
+      ActivationRestriction.codec
+      ActivationRestriction.BeforeCombatDamage
+      " {\"type\":\"BeforeCombatDamage\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ActivationRestriction.codec

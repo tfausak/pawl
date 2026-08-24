@@ -1116,9 +1116,10 @@ stayHomeAnswer homebody p = case p of
 -- CR 506.4: "A permanent is removed from combat if ... an effect specifically
 -- removes it from combat." The rule's one clause a card ASKS for, rather than a
 -- condition the engine has to notice -- and Labyrinth of Skophos is the pool's
--- producer: "{T}: Add {C}. / {4}, {T}: Remove target attacking or blocking
--- creature from combat." (Land, Murders at Karlov Manor Commander; oracle text
--- checked against Scryfall.)
+-- TARGETED producer: "{T}: Add {C}. / {4}, {T}: Remove target attacking or
+-- blocking creature from combat." (Land, Murders at Karlov Manor Commander;
+-- oracle text checked against Scryfall.) The Save Point group below is the
+-- swept-set half of the same opcode.
 --
 -- Every leg runs whole steps through Engine.runStep, so the combat record under
 -- test is the engine's own: the fixture declares nothing by hand. The two damage
@@ -1197,6 +1198,105 @@ effectRemovalSpec s registry = Spec.describe s "EffectRemoval" $ do
         Spec.assertEqWith s "IsBlocking admits the blocker" (admits blocker) (Just True)
         Spec.assertEqWith s "and the creature in neither role is rejected" (admits homebody) (Just False)
       _ -> Spec.assertFailure s "fixture should give alice two Pikers and a Labyrinth, and bob a blocker"
+
+-- Save Point's only activated ability, read off the JSON-loaded printing for
+-- removalAbility's reason.
+savePointAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+savePointAbility printing = case Face.activatedAbilities (S.combinedFace printing) of
+  [ability] -> Just ability
+  _ -> Nothing
+
+-- mazeAnswer's shape, and stateful for mazeAnswer's reason -- but with no target
+-- and no mana to choose: Save Point's whole cost is sacrificing itself, so the
+-- activation either happens or the rider refused it, and nothing else can
+-- explain a leg where it did not.
+savePointAnswer ::
+  ObjectId.ObjectId ->
+  ActivatedAbility.ActivatedAbility Card.Type.Card ->
+  Prompt.Prompt r ->
+  State.State Bool r
+savePointAnswer pointId ability p = case p of
+  Prompt.ChooseAction _ _ actions -> do
+    tried <- State.get
+    if tried || notElem (A.Activate pointId ability) actions
+      then pure A.Pass
+      else do
+        State.put True
+        pure (A.Activate pointId ability)
+  _ -> pure (S.aggressiveAnswer p)
+
+-- CR 506.4 read over a SET rather than one named permanent, which is what
+-- Effect.RemoveFromCombat's ObjectRef payload buys and what Labyrinth of Skophos
+-- above cannot show: its ability names one target, so a fold over a one-element
+-- group and a reader that takes the head agree on every board it builds.
+--
+-- Save Point, {1}{W} Enchantment (Unknown Event, a Mystery-Booster-style
+-- playtest card; oracle text checked against Scryfall): "When this enchantment
+-- enters, draw a card. / Sacrifice this enchantment: Remove each creature from
+-- combat and untap each creature that attacked this turn. There is an additional
+-- combat phase after this one. Activate only during combat before combat damage
+-- has been dealt."
+--
+-- "Each creature" is CR 109.2's unqualified description -- every creature on the
+-- battlefield, both players' -- so ObjectRef.EachMatching carries it with no
+-- context-relative atom in the filter at all.
+--
+-- THE BOARD: alice attacks with two Goblin Pikers and bob blocks the first with
+-- one of his own. TWO attackers, because one cannot tell a sweep from a reader
+-- that removed the head and stopped; a blocker, so CR 509.1h's asymmetry is on
+-- the board; and bob's life is the falsifier -- the UNBLOCKED Piker is the one a
+-- head-only reader would leave in combat, so 20 against 18 separates the sweep
+-- from both a partial removal and a no-op.
+--
+-- The activation happens in the declare blockers step, which is inside the
+-- rider's window (Pawl.ActivateSpec's Save Point case is what pins the window
+-- itself).
+savePointSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+savePointSpec s registry = Spec.describe s "Save Point" $ do
+  Spec.it s "CR 506.4/109.2 whole card: Save Point removes EVERY creature from combat, so no combat damage is dealt" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    savePoint <- S.printingOf s registry "Save Point"
+    let (gs0, ours, theirs) = S.combatBoardOf [piker, piker] [piker]
+    case (savePointAbility savePoint, ours, theirs) of
+      (Just ability, [blocked, unblocked], [blocker]) -> do
+        let (pointId, staged) = S.addCreature savePoint S.alice gs0
+            atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer staged
+            atEnd = runToEndOfCombatWith (savePointAnswer pointId ability) atBlockers
+            idle = runToEndOfCombat S.aggressiveAnswer atBlockers
+            -- atBlockers is the declare blockers step BEFORE its turn-based
+            -- action, so the blocks the legs below run under are read one step
+            -- on, where nothing has died yet.
+            atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) S.aggressiveAnswer atBlockers
+        Spec.assertBool s (Set.member blocker (Combat.blockersOf blocked atDamage)) "the fixture really blocked the first Piker"
+        Spec.assertBool s (not (Combat.isBlocked unblocked atDamage)) "and left the second one unblocked"
+        Spec.assertBool s (not (S.onBattlefield pointId atEnd)) "the ability really was activated: Save Point sacrificed itself"
+        -- The sweep, at gameplay level. A reader that removed only the head of
+        -- the group would leave the UNBLOCKED Piker attacking and bob would take
+        -- its 2, which is the same 18 a no-op leaves.
+        Spec.assertEqWith s "CR 510.1a: bob takes nothing, so the unblocked Piker left combat too" (S.lifeOf S.bob atEnd) (Just 20)
+        Spec.assertEqWith s "CR 506.4: nothing is an attacking creature any more" (Combat.Type.attackers (GameState.combat atEnd)) Map.empty
+        Spec.assertEqWith s "CR 506.4: and the blocker is blocking nothing" (Combat.blockersOf blocked atEnd) Set.empty
+        Spec.assertBool s (all (`S.onBattlefield` atEnd) [blocked, unblocked, blocker]) "so the blocked pair never traded"
+        Spec.assertEqWith s "control leg: unactivated, bob takes the unblocked Piker's 2" (S.lifeOf S.bob idle) (Just 18)
+        Spec.assertBool s (not (S.onBattlefield blocked idle) && not (S.onBattlefield blocker idle)) "control leg: and the blocked pair trades"
+      _ -> Spec.assertFailure s "fixture should give alice two Pikers and a Save Point, and bob a blocker"
+  Spec.it s "CR 701.26b/500.8 the same activation untaps both attackers and adds a combat phase after this one" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    savePoint <- S.printingOf s registry "Save Point"
+    let (gs0, ours, theirs) = S.combatBoardOf [piker, piker] [piker]
+    case (savePointAbility savePoint, ours, theirs) of
+      (Just ability, [blocked, unblocked], [_]) -> do
+        let (pointId, staged) = S.addCreature savePoint S.alice gs0
+            atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer staged
+            atEnd = runToEndOfCombatWith (savePointAnswer pointId ability) atBlockers
+            idle = runToEndOfCombat S.aggressiveAnswer atBlockers
+            nextPhase g = GameState.phase (S.runPure S.identityAnswer g Engine.runStep)
+        Spec.assertEqWith s "CR 508.1f: attacking tapped them both" (fmap (`tapStateOf` atBlockers) [blocked, unblocked]) [Just TapState.Tapped, Just TapState.Tapped]
+        Spec.assertEqWith s "CR 701.26b: both are untapped, so the sweep reached the blocked one and the unblocked one" (fmap (`tapStateOf` atEnd) [blocked, unblocked]) [Just TapState.Untapped, Just TapState.Untapped]
+        Spec.assertEqWith s "CR 500.8: a second combat phase follows this one" (nextPhase atEnd) (Phase.Combat CombatStep.BeginningOfCombat)
+        Spec.assertEqWith s "control leg: unactivated, the surviving attacker stays tapped" (tapStateOf unblocked idle) (Just TapState.Tapped)
+        Spec.assertEqWith s "control leg: and the postcombat main phase follows" (nextPhase idle) Phase.PostcombatMain
+      _ -> Spec.assertFailure s "fixture should give alice two Pikers and a Save Point, and bob a blocker"
 
 -- alice is mid-combat with Opalescence, Living Plane and a Goblin Piker, plus one
 -- Forest that Living Plane has made a 1/1 creature; bob defends with nothing but
@@ -4421,6 +4521,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   typeChangeRemovalSpec s registry
   creaturePlaneswalkerCombatSpec s registry
   effectRemovalSpec s registry
+  savePointSpec s registry
   putOntoBattlefieldAttackingSpec s registry
   putOntoBattlefieldBlockingSpec s registry
   towershellSpec s registry

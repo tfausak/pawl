@@ -358,6 +358,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   aetherfluxReservoirSpec s registry
   tobiasSpec s registry
   roothaSpec s registry
+  mimingSlimeSpec s registry
   tyranidInvasionSpec s registry
   oreskosExplorerSpec s registry
   relicRunnerSpec s registry
@@ -672,6 +673,84 @@ roothaSpec s registry =
           Spec.assertEqWith s "the Wurm was cast" (length (filter isSpellCast (S.eventsOf cast))) 1
           Spec.assertEqWith s "the ability never triggered" (filter isAbilityTriggered (S.eventsOf after)) []
           Spec.assertEqWith s "and no token was created" (S.tokensOf after) []
+
+-- The other half of Rootha's fold: a GREATEST that cannot be determined, which
+-- CR 111.3 still has to settle into the token's text. GAMEPLAY LEVEL for
+-- Rootha's reason.
+--
+-- Miming Slime, {2}{G} Sorcery: "Create an X/X green Ooze creature token, where
+-- X is the greatest power among creatures you control." Nothing else on the
+-- card, so the token's box is the only thing a case can be reading.
+--
+-- With no creatures the maximum is over an empty set, which Count.evaluate
+-- answers Nothing to and no rule gives a value (CR 714.2d is the CR legislating
+-- one such case, and this is not it). CR 208.2a's "use 0 instead" is what
+-- Resolve.bakeTokenCharacteristics applies, so the Ooze is a 0/0 -- and CR
+-- 704.5f puts a 0-toughness creature away.
+--
+-- THREE SEATS and a creature on BOB's side, so "creatures you control" and
+-- "creatures" are different sentences: bob's Panglacial Wurm is a 9/9 and alice's
+-- Goblin Piker a 2/1, so the greatest power alice controls (2) differs from the
+-- greatest power on the board (9), from the Piker's toughness (1), and from
+-- every other number in the group.
+mimingSlimeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+mimingSlimeSpec s registry =
+  let addLands printing pid n g = List.foldl' (\g' _ -> snd (S.addCreature printing pid g')) g [1 .. (n :: Int)]
+      board forest =
+        (addLands forest S.alice 6 S.threePlayerGame)
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      castOne printing caster gs =
+        let (oid, gs1) = S.addHandCard printing caster gs
+            cast = S.runPure S.identityAnswer gs1 (S.cast caster oid)
+         in S.settleSba (S.runPure S.identityAnswer cast Engine.priorityLoop)
+      oozes gs = fmap (\oid -> S.powerToughnessOf oid gs) (S.tokensOf gs)
+   in Spec.describe s "Miming Slime" $ do
+        Spec.it s "CR 111.3 X is the greatest power among the creatures ALICE controls, stamped into the Ooze" $ do
+          forest <- S.printingOf s registry "Forest"
+          slime <- S.printingOf s registry "Miming Slime"
+          piker <- S.printingOf s registry "Goblin Piker"
+          wurm <- S.printingOf s registry "Panglacial Wurm"
+          let staged = snd (S.addCreature wurm S.bob (snd (S.addCreature piker S.alice (board forest))))
+              after = castOne slime S.alice staged
+          Spec.assertEqWith s "a 2/2 Ooze: alice's Piker is a 2/1 and bob's Wurm a 9/9" (oozes after) [Just (2, 2)]
+          Spec.assertEqWith s "beside the Piker, so the Ooze did not replace it" (S.creaturesInPlay S.alice after) 2
+        -- The Scryfall ruling's own sentence, and the whole of this group's
+        -- reason to exist: "If you control no creatures at that time, X will be
+        -- 0, creating a 0/0 Ooze token that will be put into your graveyard as a
+        -- state-based action (unless something else is raising its toughness)."
+        --
+        -- The Anthem is that something else, and it is what makes the two
+        -- readings tell apart. A box left standing describes NOTHING through the
+        -- seed view Projection.baseCharacteristics evaluates it against, so the
+        -- Ooze arrives with no power and no toughness at all; Projection.addPT
+        -- leaves a Nothing alone, so the Anthem cannot save it and CR 208.5's
+        -- substitution makes it a 0/0 that dies. Stamped, the Ooze is a 0/0 whose
+        -- toughness the Anthem raises to 1 -- and it lives.
+        Spec.it s "CR 208.2a with no creatures X is 0, and the Anthem's +1/+1 is what the 0/0 Ooze survives on" $ do
+          forest <- S.printingOf s registry "Forest"
+          slime <- S.printingOf s registry "Miming Slime"
+          anthem <- S.printingOf s registry "Glorious Anthem"
+          wurm <- S.printingOf s registry "Panglacial Wurm"
+          let staged = snd (S.addCreature wurm S.bob (snd (S.addCreature anthem S.alice (board forest))))
+              after = castOne slime S.alice staged
+          Spec.assertEqWith s "a 1/1 Ooze: a stamped 0/0 plus the Anthem, not bob's 9 and not a box that reads nothing" (oozes after) [Just (1, 1)]
+          Spec.assertEqWith s "the Ooze is the only creature alice controls" (S.creaturesInPlay S.alice after) 1
+          Spec.assertEqWith s "and bob's Wurm never moved" (S.creaturesInPlay S.bob after) 1
+        -- The ruling's main clause, on the same board minus the Anthem. A
+        -- REGRESSION FENCE rather than a proof: an undeterminable box left
+        -- standing also reads as no value and dies here, so this case cannot tell
+        -- the two implementations apart. The case above is the one that can.
+        Spec.it s "CR 704.5f with no creatures and nothing raising its toughness, the 0/0 Ooze dies" $ do
+          forest <- S.printingOf s registry "Forest"
+          slime <- S.printingOf s registry "Miming Slime"
+          wurm <- S.printingOf s registry "Panglacial Wurm"
+          let staged = snd (S.addCreature wurm S.bob (board forest))
+              after = castOne slime S.alice staged
+          Spec.assertEqWith s "no Ooze is left on the battlefield" (oozes after) []
+          Spec.assertEqWith s "alice controls no creatures at all" (S.creaturesInPlay S.alice after) 0
 
 isAbilityTriggered :: GameEvent.GameEvent -> Bool
 isAbilityTriggered event = case event of
