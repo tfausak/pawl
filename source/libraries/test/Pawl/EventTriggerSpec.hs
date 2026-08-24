@@ -4077,10 +4077,17 @@ feywildTricksterSpec s registry =
       -- Windseer's enters trigger, which is where the roll happens; the
       -- Trickster's ability triggers during that resolution and reaches the
       -- stack only in the second.
+      --
+      -- The stack is DRAINED rather than popped once, which the third case
+      -- below needs: two Tricksters put two abilities on one stack, and
+      -- resolving only the top cannot tell "alice's did not trigger" from
+      -- "alice's is still sitting there".
       runRoll gs =
-        let cycleOnce g =
-              let placed = S.runPure rollAnswerer g Engine.placePendingTriggers
-               in S.runPure rollAnswerer placed Stack.resolveTop
+        let drain n g =
+              if n <= (0 :: Int) || null (GameState.stack g)
+                then g
+                else drain (n - 1) (S.runPure rollAnswerer g Stack.resolveTop)
+            cycleOnce g = drain 8 (S.runPure rollAnswerer g Engine.placePendingTriggers)
          in cycleOnce (cycleOnce gs)
    in Spec.describe s "PlayerRollsDice" $ do
         -- CR 706.1: alice's own Windseer rolls, alice's Trickster fires. The
