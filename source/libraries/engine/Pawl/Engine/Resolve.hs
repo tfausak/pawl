@@ -5244,6 +5244,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- became. The level BEFORE is read through CR 716.2d's default, so a Class that
   -- has never been levelled crosses from 1.
   --
+  -- That guard is a REGRESSION FENCE rather than a proven behaviour: no card in
+  -- `data/cards/` carries Effect.SetClassLevel outside a level bar, and a bar
+  -- cannot set the level it already has, so removing it leaves the suite green.
+  -- It is kept because rule 603.2 states it, not because a test pays for it.
+  --
   -- One writer, every road: this arm is the only place in the engine that writes
   -- Object.classLevel, so there is no second road to record on.
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel level slot) ->

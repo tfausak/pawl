@@ -379,9 +379,10 @@ ladderSpec s registry = Spec.describe s "Level bar activation" $ do
 -- The retention is observable across the ROUND TRIP rather than during it, and
 -- that is a rules fact rather than a shortcut: the same Aura's SetLandSubtype
 -- fires CR 305.7, which strips the permanent's abilities, so while the Song is on
--- it the level-2 section is off no matter what the level says, and Paladin Class
--- is the only card in data/cards/ whose text measures a level at all (grep
--- ClassLevel over the corpus). So the case asserts the strip too --
+-- it the level-2 section is off no matter what the level says, and no Class in
+-- data/cards/ measures a level except through its own sections (grep ClassLevel
+-- over the corpus: Paladin Class and Stormchaser's Talent, each reading only
+-- itself). So the case asserts the strip too --
 -- the Piker is 2/1 while the Class is a Forest land, for rule 305.7's reason and
 -- not for rule 716.2b's, which the level assertion beside it is what shows.
 --
@@ -557,18 +558,29 @@ designationSpec s registry = Spec.describe s "Level designation" $ do
 --
 -- Twelve Islands: more than both bars together cost ({3}{U} then {5}{U}), so no
 -- assertion here can turn on affordability.
+--
+-- A SECOND Stormchaser's Talent under bob, already at level 2, is what makes the
+-- condition's "oid == bearer" observable. Its level-2 section is on, so it really
+-- holds the granted trigger throughout; a condition that matched any Class's level
+-- change would fire bob's copy off alice's activation and pull bob's Raise Dead
+-- out of bob's graveyard. Without it the bearer is the only object on the board
+-- with a class level and the identity check has no observer at all.
 talentBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 talentBoard talent island bolt raiseDead =
   let (classId, withClass) = S.addCreature talent S.alice (S.landsInPlay island 12)
       (mineId, withMine) = S.addGraveyardCard bolt S.alice withClass
       (_, withTheirs) = S.addGraveyardCard raiseDead S.bob withMine
+      (theirClassId, withTheirClass) = S.addCreature talent S.bob withTheirs
    in ( classId,
         mineId,
-        withTheirs
-          { GameState.phase = Phase.PrecombatMain,
-            GameState.activePlayer = S.alice,
-            GameState.priority = Just S.alice
-          }
+        atLevel
+          theirClassId
+          2
+          withTheirClass
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
       )
 
 -- The names of the cards in a zone of pid's, in zone order. Identity AND zone in
@@ -586,12 +598,27 @@ namesIn zone pid gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)
 -- The target is FILTERED out of what the engine offered rather than hand-built --
 -- a Recipient of the right card in the wrong shape is dropped at CR 608.2b with
 -- no error -- and pinned by id, so an answerer cannot repair a mutation by
--- finding the other graveyard's card instead.
+-- reaching for the other graveyard's card instead.
+--
+-- Where the pin is NOT on offer, ONE candidate is answered -- the least, so the
+-- choice is deterministic, and one because every slot here wants one target. That
+-- is what keeps a trigger raised by bob's Class observable: an answerer that
+-- filtered every prompt down to alice's card would hand bob's trigger an empty
+-- set, CR 603.3d would drop it for want of a legal target, and a condition
+-- matching the wrong bearer would look exactly like one that never matched.
 climbAiming :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 climbAiming classId aim gs =
-  let answering :: Prompt.Prompt r -> r
+  let pinned = Recipient.ToObject aim
+      answering :: Prompt.Prompt r -> r
       answering p = case p of
-        Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToObject aim) . snd) sets
+        Prompt.ChooseTargets _ _ _ sets ->
+          fmap
+            ( \(_, candidates) ->
+                if Set.member pinned candidates
+                  then Set.singleton pinned
+                  else maybe Set.empty (Set.singleton . fst) (Set.minView candidates)
+            )
+            sets
         _ -> S.aggressiveAnswer p
    in case Activate.abilitiesFor classId gs of
         [] -> gs
