@@ -3587,9 +3587,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     State.modify' (bindAmountSlot source (RollDie.slot rollDie) result)
     State.modify' (Event.recordEvent (GameEvent.DiceRolled controller))
   -- CR 705.1's flip, in RollDie's holder and for its reason: bindAmountSlot's
-  -- `source` is the resolving object, and on a spell -- Winter Sky, the only
-  -- producer -- `source` and `resolving` are the same object, so the ambiguity
-  -- the arm above documents does not arise.
+  -- `source` is the resolving object, and on a SPELL -- which Winter Sky is --
+  -- `source` and `resolving` are the same object, so the ambiguity the arm above
+  -- documents does not arise there. A triggered ability that flipped would land
+  -- on that arm's reasoning instead, which says either holder answers.
   --
   -- TWO questions, in CR 705.2's own order. The CALL comes first and through
   -- Game.choose, because it is a choice: the flipping player weighs heads
@@ -3597,9 +3598,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- second and through Game.ask, because it is not: nobody decides how a coin
   -- lands, so there is nothing to usurp and the question goes to the
   -- INTERPRETER. Asking in the other order would let the call be made with the
-  -- face already known, which is a different game; nothing in data/cards can
-  -- observe the order today, so this is consistency rather than a proven
-  -- behaviour.
+  -- face already known, which is a different game. No board reaches the
+  -- difference: both orders leave the same slot bound, so Pawl.CoinSpec's "only
+  -- the flipping player calls" case proves the order by what the engine ASKED
+  -- rather than by anything the board shows.
   --
   -- No filtering back, unlike RollDie: CR 705.1's coin has exactly two sides and
   -- Pawl.Types.CoinFace has exactly two constructors, so every answer is in

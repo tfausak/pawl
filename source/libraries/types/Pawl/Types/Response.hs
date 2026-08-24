@@ -82,8 +82,8 @@ data Response
     -- point -- a transcript of a player ANNOUNCING a call must not satisfy a
     -- prompt that asked randomness, which is CR 701.9b's distinction.
     FlippedCoin CoinFace.CoinFace
-  | -- | CR 705.2: the face the flipping player called, RolledDie's opposite --
-    -- the announcement, not the randomness.
+  | -- | CR 705.2: the face the flipping player called -- FlippedCoin's opposite
+    -- number, the announcement rather than the randomness.
     CalledCoin CoinFace.CoinFace
   | ChoseDiscard [ObjectId.ObjectId]
   | -- | CR 701.22a: the ordered partition a scrying player chose -- the cards
