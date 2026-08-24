@@ -1735,9 +1735,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Expiry" $ do
 -- of Pawl.AuraSpec's Gliding Licid pair. The offer that DOES end it is
 -- Pawl.Engine.EndEffect's, and it is proved there at gameplay level.
 --
--- The cost {U} is arbitrary here and is asserted to travel unchanged, which is
--- the whole of what arming does to this arm -- there is nothing about the game to
--- bake in, and the price is what the offer later quotes.
+-- The cost {U} is arbitrary here and is asserted to travel unchanged, since the
+-- price is what the offer later quotes. What arming DOES decide is the seat: CR
+-- 109.5's "you" for an activated ability is the player who activated it, so it is
+-- baked once here rather than re-read off the source's controller.
 whenPaidSpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 whenPaidSpec s = Spec.describe s "WhenPaid" $ do
   Spec.it s "CR 611.2a / 116.2c a pay-to-end duration arms to WhenPaid, carrying the price and CR 109.5's seat" $ do
