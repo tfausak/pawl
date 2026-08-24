@@ -283,6 +283,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.IsSource -> predicate
   Filter.Type.IsBound _ -> predicate
   Filter.Type.SameNameAsBound _ -> predicate
+  Filter.Type.HasChosenName -> predicate
   Filter.Type.IsPlayer _ -> predicate
   Filter.Type.IsAttacking -> predicate
   Filter.Type.IsBlocking -> predicate
@@ -592,6 +593,7 @@ snapshotView gs shape event = case event of
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Scried _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
+  GameEvent.DiceRolled _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
   GameEvent.Exerted _ -> Nothing

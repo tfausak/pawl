@@ -198,6 +198,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.SameNameAsBound (SlotName.MkSlotName (Text.pack "castSpell")))
       " {\"type\":\"SameNameAsBound\",\"value\":\"castSpell\"} "
+  Spec.it s "HasChosenName" $
+    Common.assertCodec
+      s
+      codec
+      Filter.HasChosenName
+      " {\"type\":\"HasChosenName\"} "
   Spec.it s "IsAttacking" $
     Common.assertCodec
       s

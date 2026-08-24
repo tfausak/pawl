@@ -22,8 +22,10 @@ import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.Fight as Fight
+import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.Mill as Mill
@@ -1019,6 +1021,27 @@ data Effect card
     -- player counters Event.putPlayerCounters, so CR 614's counter replacements
     -- get their opportunity against either recipient.
     Proliferate
+  | -- | CR 201.4 via CR 608.2c: the resolving controller chooses a card name, and
+    -- the name is written to Pawl.Types.Object.chosenNames on the resolving
+    -- object -- Ancient Vendetta's "Choose a card name."
+    --
+    -- The RESOLUTION-time twin of Pawl.Types.EntryRewrite.ChooseCardNames, which
+    -- is CR 614.1c's as-enters choice. Same prompt (Prompt.ChooseCardName), same
+    -- store, different moment: a spell that is never a permanent cannot use the
+    -- entry replacement at all.
+    --
+    -- CHOOSE, not target, and no SlotName: a name is not an object, so nothing
+    -- binds. What READS the name is Pawl.Types.Filter's HasChosenName, off the
+    -- source, which is why the two clauses of Ancient Vendetta's sentence are one
+    -- resolution rather than a binding handed along.
+    --
+    -- The Filter is CR 201.4a's restriction on which names may be chosen, read off
+    -- the card for ChooseCardNames' reason -- Necromentia's "nonland card name" --
+    -- and passed to the prompt unchecked (#663).
+    --
+    -- Not implemented: a chooser other than CR 109.5's "you" -- Petra Sphinx's
+    -- "target player chooses a card name" (#2233).
+    ChooseCardName (Filter.Filter Keyword.Keyword)
   | -- | CR 701.39a: "bolster N" -- choose a creature the resolving controller
     -- controls with the least toughness, or tied for least, then put that many
     -- +1\/+1 counters on it. CHOOSE, not target, so no SlotName;

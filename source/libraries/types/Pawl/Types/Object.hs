@@ -208,10 +208,14 @@ data Object = MkObject
     -- Per-incarnation state: reset by newIncarnation, because CR 400.7 makes the
     -- moved object a new one.
     chosenSubtype :: Maybe Subtype.Subtype,
-    -- | CR 614.1c / CR 201.4: the card names chosen as this object entered
-    -- ("As this enchantment enters, you and an opponent each choose a card name"
-    -- -- Null Chamber). Read by Pawl.Engine.PlayerEffect off the effect's SOURCE,
-    -- the same direction Modification.AddChosenColor reads chosenColor.
+    -- | CR 201.4: the card names this object's controller has chosen. TWO
+    -- moments write it -- CR 614.1c's as-enters choice ("As this enchantment
+    -- enters, you and an opponent each choose a card name" -- Null Chamber) and
+    -- CR 608.2c's on-resolution one (Effect.ChooseCardName, Ancient Vendetta) --
+    -- and both readers ask the effect's SOURCE, the same direction
+    -- Modification.AddChosenColor reads chosenColor: Pawl.Engine.PlayerEffect for
+    -- the prohibitions, and Pawl.Engine.Filter's HasChosenName for the search that
+    -- matches on the name.
     --
     -- The third `chosen` field, and still a sibling of the two above rather than
     -- the generalized choice map a third arrival was expected to force. A

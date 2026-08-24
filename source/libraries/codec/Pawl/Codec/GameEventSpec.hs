@@ -386,6 +386,15 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Surveiled (PlayerId.MkPlayerId 2))
       " {\"type\":\"Surveiled\",\"value\":2} "
+  -- CR 706.1. One player id and no result: CR 706.7's planar die fires the
+  -- trigger while every reader of a numerical result ignores it, so the number
+  -- is not part of this entry.
+  Spec.it s "DiceRolled" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.DiceRolled (PlayerId.MkPlayerId 3))
+      " {\"type\":\"DiceRolled\",\"value\":3} "
   -- CR 702.170a. The id is the CR 400.7 incarnation in exile, not the one that
   -- was in the hand.
   Spec.it s "Plotted" $

@@ -13,8 +13,9 @@
 -- enters, roll a d20. / 1-9 | Scry 1. / 10-19 | Scry 2. / 20 | Scry 3.") is CR
 -- 706.3's results table, where the result selects an effect instead. Between
 -- them that is the whole of CR 706 this file can reach: one die (#2085), no
--- modifier and no reroll (#2083), nothing triggering off the roll (#2084), and
--- no "Roll again" (#2124).
+-- modifier and no reroll (#2083), and no "Roll again" (#2124). CR 706.1's roll
+-- does record its event now, but the trigger reading it lives in
+-- Pawl.EventTriggerSpec beside the other condition cases.
 --
 -- THE ASSERTED QUANTITY on the DRAGON's boards is how many Treasure tokens alice
 -- controls once combat damage has been dealt. It is the roll's result made

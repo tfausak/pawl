@@ -1634,6 +1634,9 @@ rewriteEffect pairs effect = case effect of
   Effect.Search (Search.MkSearch searcher owner zones quantity filter_ upTo destination) -> Effect.Search (Search.MkSearch searcher owner zones quantity (Filter.rewrite pairs filter_) upTo destination)
   Effect.ExileAllGraveyards -> effect
   Effect.Proliferate -> effect
+  -- CR 612.1: rule 201.4a's restriction is printed card text, so a text-changer
+  -- rewrites it exactly as it rewrites a search's filter above.
+  Effect.ChooseCardName restriction -> Effect.ChooseCardName (Filter.rewrite pairs restriction)
   Effect.Bolster _ -> effect
   -- CR 612.1 / 612.2a: amass's subtype is a printed word of CR 205.3m's family,
   -- and the token's own name follows it.
@@ -2153,6 +2156,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.RoomEntered _ -> condition
   TriggerCondition.PlayerScries _ -> condition
   TriggerCondition.PlayerSurveils _ -> condition
+  TriggerCondition.PlayerRollsDice _ -> condition
   TriggerCondition.SelfBecomesPlotted -> condition
   TriggerCondition.PermanentExplores f -> TriggerCondition.PermanentExplores (Filter.rewrite pairs f)
   TriggerCondition.SelfExerted -> condition
@@ -3060,6 +3064,9 @@ filterReads f = case f of
   Filter.Type.IsBound _ -> Set.empty
   -- Reads NAMES at both ends, which no Modification writes.
   Filter.Type.SameNameAsBound _ -> Set.empty
+  -- Reads NAMES at both ends too, HasName's answer one indirection along: the
+  -- chosen half is not a projection at all, and no Modification writes the other.
+  Filter.Type.HasChosenName -> Set.empty
   Filter.Type.IsPlayer _ -> Set.empty
   -- Reads a CONTROLLER rather than a characteristic (CR 109.3 lists none).
   Filter.Type.IsControllerOfBound _ -> Set.empty
