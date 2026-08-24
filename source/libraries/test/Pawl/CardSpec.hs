@@ -793,6 +793,7 @@ effectCounts effect = case effect of
   Effect.Search (Search.MkSearch _ _ _ quantity _ _ _) -> foldMap quantityCounts quantity
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.ChooseCardName _ -> []
   -- Bolster's N is a Quantity like the Search's above, so its Counts are
   -- reachable from here.
   Effect.Bolster quantity -> quantityCounts quantity
@@ -1098,6 +1099,7 @@ effectNestedEffects effect = case effect of
   Effect.Search {} -> []
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.ChooseCardName _ -> []
   Effect.Bolster {} -> []
   Effect.Amass {} -> []
   Effect.Blight {} -> []
@@ -1544,6 +1546,7 @@ effectReplacements effect = case effect of
   Effect.Search {} -> []
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.ChooseCardName _ -> []
   Effect.Bolster _ -> []
   Effect.Amass _ -> []
   Effect.Blight _ -> []
@@ -2194,6 +2197,7 @@ effectMintedFaces effect = case effect of
   Effect.Search {} -> []
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.ChooseCardName _ -> []
   Effect.Bolster _ -> []
   -- The Army token is Pawl.Engine.Amass.armyToken's, minted from the rulebook
   -- rather than embedded in card data, so this arm mints no face of the card's own.
@@ -2502,6 +2506,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsPlayer _ -> 0
   Filter.Type.IsBound _ -> 0
   Filter.Type.SameNameAsBound _ -> 0
+  Filter.Type.HasChosenName -> 0
   Filter.Type.IsControllerOfBound _ -> 0
   -- Zero for the nullary atoms' reason, a payload over: CR 400.1's card count is
   -- a Natural, which holds no Filter for a card author to reach.
@@ -3627,6 +3632,10 @@ effectFilters effect = case effect of
   Effect.Search (Search.MkSearch _ _ _ _ f _ _) -> searchFramed [f]
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  -- CR 201.4a's restriction, UNFRAMED: it is handed to Prompt.ChooseCardName for
+  -- an answerer to obey rather than matched against a candidate at all, so none of
+  -- the framings' evaluators is the one that reads it.
+  Effect.ChooseCardName restriction -> unframed [restriction]
   -- Only the count's Filters: rule 701.39a describes the candidate pool, so no
   -- Filter on the card names it.
   Effect.Bolster quantity -> unframed (quantityFilters quantity)

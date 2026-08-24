@@ -87,6 +87,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.Search {} -> Nothing
   Effect.ExileAllGraveyards -> Nothing
   Effect.Proliferate -> Nothing
+  Effect.ChooseCardName _ -> Nothing
   Effect.Bolster _ -> Nothing
   Effect.Amass _ -> Nothing
   Effect.Blight _ -> Nothing

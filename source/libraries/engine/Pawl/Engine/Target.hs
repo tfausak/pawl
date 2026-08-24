@@ -246,7 +246,14 @@ admittedGiven pcs grants pools perspective bindings source slot gs =
             -- reference the card already made rather than a choice CR 601.2c
             -- leaves open. Pawl.CardSpec's position lint is what keeps that true,
             -- and widening it here would be a capability no card asks for.
-            Filter.sourceAttachedTo = Nothing
+            Filter.sourceAttachedTo = Nothing,
+            -- Empty, sourceAttachedTo's reason one atom over: CR 201.4's name is
+            -- chosen while the spell RESOLVES (CR 608.2c), and a target slot is
+            -- matched at CR 601.2c, before any of that has happened. So there is
+            -- no chosen name here even for a source that will have one, and
+            -- HasChosenName is vacuously False. Pawl.CardSpec's position lint is
+            -- what keeps a card out of the slot.
+            Filter.sourceChosenNames = Set.empty
           }
       -- ONE whole-board projection and ONE control-grant walk for the whole
       -- slot: both the base pool's creature test and the Filter's per-candidate

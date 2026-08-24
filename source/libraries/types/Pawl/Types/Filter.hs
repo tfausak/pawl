@@ -336,6 +336,26 @@ data Filter keyword
     -- has no name at all (CR 708.2a's face-down object) -- the posture IsBound
     -- above takes, and the answer CR 709.4a itself gives for a nameless object.
     SameNameAsBound SlotName.SlotName
+  | -- | CR 201.4: the candidate has a name the SOURCE has chosen -- Ancient
+    -- Vendetta's "cards with that name", where the name was chosen earlier in the
+    -- same resolution (CR 608.2c).
+    --
+    -- HasName's second context-relative sibling, standing to it as
+    -- SameNameAsBound does: that atom carries a literal and this one reads the
+    -- chosen names off Pawl.Engine.Filter.Context, which is where the
+    -- board-holding caller puts them. SameNameAsBound reads a SLOT's names and
+    -- this one the SOURCE's own, which are different questions -- a chosen name
+    -- names no object at all, so no slot can hold it.
+    --
+    -- SHARES A NAME, for CR 201.4g's reason as much as CR 709.4a's: interchangeable
+    -- names mean choosing one chooses each, so the test is membership at both ends.
+    -- Set intersection is that said once.
+    --
+    -- Vacuously False where the source has chosen no name -- the posture every
+    -- context-relative atom here takes. What keeps a card out of the positions that
+    -- cannot answer is Pawl.CardSpec's "CR 201.4 no card asks HasChosenName outside
+    -- a search's filter".
+    HasChosenName
   | -- | CR 115.1: the candidate is a PLAYER who relates thus to the perspective --
     -- "target opponent". Context-relative like ControlledBy, but separate from it
     -- rather than a reuse, because ControlledBy asks who controls an OBJECT

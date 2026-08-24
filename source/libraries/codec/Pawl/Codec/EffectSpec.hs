@@ -1486,6 +1486,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       Effect.Proliferate
       " {\"type\":\"Proliferate\"} "
+  -- CR 201.4a's restriction on which names may be chosen, and nothing else: rule
+  -- 109.5 fixes the chooser and rule 201.4 the count.
+  Spec.it s "ChooseCardName" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ChooseCardName (Filter.Not (Filter.HasCardType CardType.Land)))
+      " {\"type\":\"ChooseCardName\",\"value\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":\"Land\"}}} "
   -- CR 701.39a: the count alone, because rule 701.39a fixes the chooser, the kind
   -- of counter and the candidate pool, leaving an author only N to write.
   Spec.it s "Bolster" $
