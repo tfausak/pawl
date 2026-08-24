@@ -5,6 +5,7 @@ module Pawl.Codec.ManaAddition where
 import qualified Pawl.Codec.ManaProduction as ManaProduction
 import qualified Pawl.Codec.ManaRestriction as ManaRestriction
 import qualified Pawl.Codec.ManaRetention as ManaRetention
+import qualified Pawl.Codec.ManaRider as ManaRider
 import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -31,16 +32,23 @@ defaultPlayer = PlayerRef.Relative PlayerRelation.You
 -- default is that the player loses the mana as the step ends, so a card that
 -- says nothing means Ordinary. Shizuko, Caller of Autumn's "until end of turn,
 -- they don't lose this mana" is the one printing in the pool that writes it.
+--
+-- @restriction@ and @rider@ are CR 106.6's two shapes, each DEFAULTED to
+-- Nothing: almost every printing says neither, and the two are independent --
+-- Mishra's Workshop writes only the first key, Boseiju, Who Shelters All only
+-- the second, Delighted Halfling both.
 codec :: Codec.Codec ManaAddition.ManaAddition
 codec = Fields.object $ do
   player <- Fields.defaulted "player" defaultPlayer PlayerRef.codec ManaAddition.player
   production <- Fields.required "production" ManaProduction.codec ManaAddition.production
   retention <- Fields.defaulted "retention" ManaRetention.Ordinary ManaRetention.codec ManaAddition.retention
   restriction <- Fields.defaulted "restriction" Nothing (Common.maybe ManaRestriction.codec) ManaAddition.restriction
+  rider <- Fields.defaulted "rider" Nothing (Common.maybe ManaRider.codec) ManaAddition.rider
   pure
     ManaAddition.MkManaAddition
       { ManaAddition.player = player,
         ManaAddition.production = production,
         ManaAddition.retention = retention,
-        ManaAddition.restriction = restriction
+        ManaAddition.restriction = restriction,
+        ManaAddition.rider = rider
       }

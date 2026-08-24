@@ -6,15 +6,18 @@
 -- roll is externalised through. The transcript legs live in Pawl.ReplaySpec
 -- with the other randomness prompts.
 --
--- TWO FIXTURES, one per half of CR 706. Ancient Copper Dragon ("Flying /
+-- THREE FIXTURES. Ancient Copper Dragon ("Flying /
 -- Whenever this creature deals combat damage to a player, roll a d20. You create
 -- a number of Treasure tokens equal to the result") is CR 706.4's, the result
 -- read straight into a count; Djinni Windseer ("Flying / When this creature
 -- enters, roll a d20. / 1-9 | Scry 1. / 10-19 | Scry 2. / 20 | Scry 3.") is CR
--- 706.3's results table, where the result selects an effect instead. Between
--- them that is the whole of CR 706 this file can reach: one die (#2085), no
--- modifier and no reroll (#2083), and no "Roll again" (#2124). CR 706.1's roll
--- does record its event now, but the trigger reading it lives in
+-- 706.3's results table, where the result selects an effect instead; Diviner's
+-- Portent ("Roll a d20 and add the number of cards in your hand. / 1-14 | Draw X
+-- cards. / 15+ | Scry X, then draw X cards.") is CR 706.2's modifier, printed in
+-- the instruction that ordered the roll. Between them that is the whole of CR
+-- 706 this file can reach: one die (#2085), no reroll and no modifier from
+-- another source (#2083), and no "Roll again" (#2124). CR 706.1's roll does
+-- record its event now, but the trigger reading it lives in
 -- Pawl.EventTriggerSpec beside the other condition cases.
 --
 -- THE ASSERTED QUANTITY on the DRAGON's boards is how many Treasure tokens alice
@@ -51,6 +54,13 @@
 -- distinguishable rather than clamped by a short library: dropping the 10-19
 -- band's upper endpoint makes a roll of 20 scry 2 AND scry 3, which is five cards
 -- bottomed and card 6 on top.
+--
+-- THE ASSERTED QUANTITY on the PORTENT's boards is the same top card, for the
+-- same reason, over the same six-card library -- but reached by a CAST rather
+-- than an enters trigger, since the Portent is an instant. Hand size is NOT the
+-- reading: X is announced as 1 and both striations draw X, so the hand is one
+-- larger under either implementation of the modifier. Only the scry the 15+ band
+-- performs moves the library, so the top card is what separates the bands.
 module Pawl.DiceSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -75,6 +85,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   rollDieSpec s registry
   resultsTableSpec s registry
+  modifierSpec s registry
 
 treasure :: CardName.CardName
 treasure = CardName.MkCardName (Text.pack "Treasure Token")
@@ -216,10 +227,12 @@ resultsTableSpec s registry = Spec.describe s "ResultsTable" $ do
         -- FENCE on this striation's own shape rather than a proof of it: 20 is a
         -- d20's top face, so a `20+` reading agrees with the printed `20` on
         -- every outcome, and swapping the card's Exactly for an AtLeast leaves
-        -- this assertion green. It becomes discriminable only alongside a
-        -- modifier that can push a result past the face count (#2083). What the
-        -- assertion DOES prove is that 20 selects this striation and not the
-        -- 10-19 band above it.
+        -- this assertion green. Windseer's own instruction prints no modifier, so
+        -- it becomes discriminable here only alongside one reaching the roll from
+        -- ANOTHER source (#2083); the single-endpoint form itself is proved on
+        -- Diviner's Portent below, whose printed modifier pushes a natural 20
+        -- past the face count. What the assertion DOES prove is that 20 selects
+        -- this striation and not the 10-19 band above it.
         Spec.assertEqWith s "CR 706.3a: a roll of 20 is the 20 striation, so scry 3" (Maybe.listToMaybe (tableLibrary (runTable 20 board))) (Just fourth)
       _ -> Spec.assertFailure s "expected six library cards"
   -- Both endpoints of a printed N1-N2 belong to it (CR 706.3a). 9 and 10 above
@@ -250,3 +263,128 @@ resultsTableSpec s registry = Spec.describe s "ResultsTable" $ do
     (ids, board) <- tableBoard s registry
     Spec.assertEqWith s "six cards, top-first" (tableLibrary board) ids
     Spec.assertEqWith s "CR 701.22a: the library still holds all six" (length (tableLibrary (runTable 9 board))) 6
+
+-- alice holds Diviner's Portent plus `others` cards of one filler printing, has
+-- four untapped Islands, and a library of six cards from six DIFFERENT printings
+-- so no two library positions can be confused. The returned ids are the library
+-- reading top-first; the second component is the Portent in hand.
+--
+-- `others` IS the modifier: the Portent leaves the hand for the stack when it is
+-- cast (CR 601.2a), so the hand at resolution holds exactly those. handOne
+-- REPLACES the hand, so it runs before the filler is appended.
+--
+-- Four Islands, because X is announced as 1 on every leg and {X}{U}{U}{U} at
+-- X=1 is four mana.
+portentBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m ([ObjectId.ObjectId], ObjectId.ObjectId, GameState.GameState)
+portentBoard s registry others = do
+  portent <- S.printingOf s registry "Diviner's Portent"
+  island <- S.printingOf s registry "Island"
+  filler <- S.printingOf s registry "Lightning Bolt"
+  deck <- traverse (S.printingOf s registry) ["Goblin Piker", "Bird Maiden", "Mountain", "Forest", "Swamp", "Plains"]
+  let (held, spell) = S.handOne portent (S.landsInPlay island 4)
+      deal (acc, gs) printing = let (oid, gs') = S.addLibraryCard printing S.alice gs in (oid : acc, gs')
+      (ids, stocked) = List.foldl' deal ([], held) (reverse deck)
+      pad gs _ = snd (S.addHandCard filler S.alice gs)
+  pure (ids, spell, List.foldl' pad stocked [1 .. others])
+
+-- Pins every question this cast asks: X is 1, the d20 comes up `n`, and every
+-- scry bottoms its WHOLE look, so the number of cards leaving the top is the
+-- scry's count and nothing else. ChooseX gets its own arm rather than falling
+-- through to S.identityAnswer, which reaches Replay.defaultAnswer and would
+-- announce a value the test never chose.
+portentAnswer :: Natural.Natural -> Prompt.Prompt r -> r
+portentAnswer n p = case p of
+  Prompt.RollDie _ -> n
+  Prompt.ChooseX {} -> 1
+  Prompt.ChooseScry _ _ looked -> (looked, [])
+  _ -> S.identityAnswer p
+
+-- Cast the Portent and resolve it, one run under one answerer.
+runPortent :: Natural.Natural -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+runPortent n spell board = S.runPure (portentAnswer n) board (S.cast S.alice spell >> Stack.resolveTop)
+
+-- The same cast under an answerer that RECORDS what each roll prompt offered,
+-- since the offer is not readable off the resulting board.
+portentOffers :: ObjectId.ObjectId -> GameState.GameState -> [Natural.Natural]
+portentOffers spell board =
+  let logging :: Prompt.Prompt r -> State.State [Natural.Natural] r
+      logging p = case p of
+        Prompt.RollDie sides -> do
+          State.modify' (sides :)
+          pure (portentAnswer 14 p)
+        _ -> pure (portentAnswer 14 p)
+   in reverse (State.execState (Engine.runGame logging board (S.cast S.alice spell >> Stack.resolveTop)) [])
+
+modifierSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+modifierSpec s registry = Spec.describe s "RollDieModifier" $ do
+  -- CR 706.2's first sentence, on the only card in data/cards/ whose roll
+  -- instruction prints a modifier. 14 is the primary pin because it is the printed boundary of the 1-14 band:
+  -- the modifier is the only thing that can move a natural 14 out of it. It is
+  -- also none of the values a wrong implementation reaches by accident -- not 1
+  -- (Replay.defaultAnswer, which S.identityAnswer falls through to), not 20 (the
+  -- die's size), not 15 (the other band's endpoint) and not 0.
+  Spec.it s "CR 706.2 the instruction's modifier is added to the natural result" $ do
+    (ids, spell, board) <- portentBoard s registry 1
+    case ids of
+      [_, _, third, _, _, _] ->
+        -- THE GAMEPLAY ASSERTION, and the only one in this case so nothing can
+        -- absorb a mutation. A natural 14 plus a hand of one is 15, which is the
+        -- 15+ band: scry 1 bottoms card 1 and draw 1 takes card 2, leaving card
+        -- 3 on top. An engine that dropped the modifier reads 14, fires the 1-14
+        -- band instead, draws card 1 and leaves card 2 on top.
+        Spec.assertEqWith
+          s
+          "CR 706.2: 14 plus a hand of one is 15, so the 15+ band scried"
+          (Maybe.listToMaybe (tableLibrary (runPortent 14 spell board)))
+          (Just third)
+      _ -> Spec.assertFailure s "expected six library cards"
+  -- The pair that proves the modifier is the HAND COUNT and not a constant:
+  -- SAME die, different hand, different band. It is also the guard against a
+  -- Quantity evaluated against a context whose fields were never filled: that
+  -- answers 0 without raising, which is indistinguishable from an empty hand on
+  -- one board and makes both boards agree.
+  Spec.it s "CR 706.2 the modifier is the number the instruction names" $ do
+    (ids, spell, small) <- portentBoard s registry 1
+    (bigIds, bigSpell, big) <- portentBoard s registry 4
+    case (ids, bigIds) of
+      ([_, second, _, _, _, _], [_, _, bigThird, _, _, _]) -> do
+        Spec.assertEqWith
+          s
+          "CR 706.2: 11 plus a hand of one is 12, so the 1-14 band drew without scrying"
+          (Maybe.listToMaybe (tableLibrary (runPortent 11 spell small)))
+          (Just second)
+        Spec.assertEqWith
+          s
+          "CR 706.2: the same 11 plus a hand of four is 15, so the 15+ band scried"
+          (Maybe.listToMaybe (tableLibrary (runPortent 11 bigSpell big)))
+          (Just bigThird)
+      _ -> Spec.assertFailure s "expected six library cards"
+  -- CR 706.1a bounds the NATURAL result at 1..N; CR 706.2 adds the modifier
+  -- afterwards and no rule bounds the sum. A natural 20 with a hand of five is a
+  -- result of 25, past the die's own top face. An engine that reused the 1..N
+  -- filter on the SUM falls to CR 706.1a's floor of 1 and fires the 1-14 band.
+  Spec.it s "CR 706.1a the face is bounded by the die and the result is not" $ do
+    (ids, spell, board) <- portentBoard s registry 5
+    case ids of
+      [_, _, third, _, _, _] ->
+        Spec.assertEqWith
+          s
+          "CR 706.2: a natural 20 plus a hand of five is a result of 25"
+          (Maybe.listToMaybe (tableLibrary (runPortent 20 spell board)))
+          (Just third)
+      _ -> Spec.assertFailure s "expected six library cards"
+  -- The fixture pins, in their own case so they cannot stand in for a band
+  -- above: the spell really resolved, and the library really lost exactly the
+  -- one card X drew rather than being clamped short.
+  Spec.it s "CR 608.2 the spell resolved and the library is not short" $ do
+    (ids, spell, board) <- portentBoard s registry 1
+    let after = runPortent 14 spell board
+    Spec.assertEqWith s "six cards, top-first" (tableLibrary board) ids
+    -- Before the stack reading, which a cast that never happened also satisfies.
+    Spec.assertEqWith s "one card drawn out of six" (length (tableLibrary after)) 5
+    Spec.assertEqWith s "nothing left on the stack" (length (GameState.stack after)) 0
+  -- Supporting, and in its own case: the modifier is the engine's arithmetic, so
+  -- it did not become a second roll or a bigger die.
+  Spec.it s "CR 706.1 a modified roll is still one roll of the printed die" $ do
+    (_, spell, board) <- portentBoard s registry 1
+    Spec.assertEqWith s "asked once, offering twenty sides" (portentOffers spell board) [20]

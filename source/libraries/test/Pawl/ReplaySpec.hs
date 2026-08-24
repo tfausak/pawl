@@ -79,7 +79,7 @@ oneMana color =
   ManaOption.MkManaOption
     { ManaOption.cost = Mana.intrinsicManaCost,
       ManaOption.restrictions = [],
-      ManaOption.yield = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}]
+      ManaOption.yield = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}]
     }
 
 combatReplaySpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -677,7 +677,7 @@ combatReplaySpec s =
         -- transcript like any other. The pair differs in one field, so a decode
         -- returning the head would pass one leg by accident.
         Spec.it s "ChooseManaToSpend round-trips through the transcript" $ do
-          let plain = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
+          let plain = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
               snow = plain {ManaUnit.tags = Set.singleton ProductionTag.Snow}
               p = Prompt.ChooseManaToSpend decider S.alice (plain NonEmpty.:| [snow])
           Spec.assertEqWith s "the plain one round trips" (Replay.decode p (Replay.encode p plain)) (Just plain)

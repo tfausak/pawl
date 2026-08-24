@@ -1,5 +1,5 @@
--- Integration coverage for the codec sublibrary: the 104 per-type
--- Pawl.Codec.XSpec modules are the codec's own spec, each proving its shape
+-- Integration coverage for the codec sublibrary: the per-type Pawl.Codec.XSpec
+-- modules beside each codec are the codec's own spec, each proving its shape
 -- against literals with no registry. What remains here needs one -- these
 -- cases load real cards through S.printingOf (Cancel, Rending Volley,
 -- Typhoid Rats, Branchblight Stalker) to prove codec shapes against actual

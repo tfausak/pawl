@@ -85,7 +85,9 @@ data Prompt r where
   -- die result is not a choice, so there is no seat weighing options and nowhere
   -- for a CR 723 controller to sit. The engine never rolls -- the interpreter
   -- supplies the outcome and the caller filters it back against 1..N, taking CR
-  -- 706.1a's floor for an answer outside it.
+  -- 706.1a's floor for an answer outside it. What comes back is CR 706.2's
+  -- NATURAL result: the instruction's own modifier is added afterwards, by the
+  -- engine, so a modified roll asks nothing more of the interpreter.
   RollDie :: Natural.Natural -> Prompt Natural.Natural
   -- | CR 514.2. The [ObjectId] is the hand; the Natural is how many to discard.
   ChooseDiscard :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt [ObjectId.ObjectId]

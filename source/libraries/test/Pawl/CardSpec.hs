@@ -162,6 +162,7 @@ import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaRestriction as ManaRestriction
+import qualified Pawl.Types.ManaRider as ManaRider
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Mill as Mill
@@ -217,6 +218,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireAttack as RequireAttack
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.Reveal as Reveal
+import qualified Pawl.Types.RollDie as RollDie
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
@@ -916,7 +918,8 @@ effectCounts effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.ChooseOpponent _ -> []
   Effect.ChooseOpponentAtRandom _ -> []
-  Effect.RollDie {} -> []
+  -- CR 706.2's modifier is a Quantity, so its Counts are reachable here.
+  Effect.RollDie rollDie -> foldMap quantityCounts (RollDie.modifier rollDie)
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
   Effect.OfferCast {} -> []
@@ -3615,6 +3618,18 @@ restrictionFilters restriction =
   Maybe.maybeToList (ManaRestriction.casts restriction)
     <> Maybe.maybeToList (ManaRestriction.activations restriction)
 
+-- The predicate a CR 106.6 rider carries. A function beside restrictionFilters
+-- for the same reason: the two clauses ride Pawl.Types.ManaAddition
+-- independently, so a lint that reached one would go quiet on the other.
+-- Prefixed, because `riderFilters` above is Pawl.Types.EntryRiders -- what a
+-- permanent enters WITH -- and the two have nothing to do with each other.
+--
+-- No lint in this module distinguishes a collected rider condition from an
+-- uncollected one today: neutralising this function leaves the suite green, so
+-- it is here for the next Filter-wide lint rather than for one that exists.
+manaRiderFilters :: ManaRider.ManaRider -> [Filter.Type.Filter Keyword.Keyword]
+manaRiderFilters rider = [ManaRider.condition rider]
+
 -- Every Filter one effect carries, paired with its Framing. Two arms answer
 -- AttachDestination -- Effect.AttachTarget's destination and
 -- Effect.AttachTargetToEach's, which are the only CARD-AUTHORED Filter positions
@@ -3644,13 +3659,18 @@ effectFilters effect = case effect of
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     unframed (durationFilters duration <> modificationFilters (Projection.widenModification modification)) <> sourceHosted (objectRefFilters ref)
   Effect.ChangeText {} -> []
-  -- CR 106.6's spending restriction, BOTH halves of it: the cast's predicate and
-  -- the activation's are each an ordinary Filter, and collecting one of them
-  -- would take every lint in this module off the other. UNFRAMED: each is
-  -- evaluated against the object being paid for
-  -- (Pawl.Engine.Mana.spendableAmong), which is neither an attach destination
-  -- nor a target slot.
-  Effect.AddMana addition -> unframed (concatMap restrictionFilters (Maybe.maybeToList (ManaAddition.restriction addition)))
+  -- CR 106.6's two clauses, and every predicate in them: the restriction's cast
+  -- half, its activation half, and the rider's condition are each an ordinary
+  -- Filter, and collecting one of them would take every lint in this module off
+  -- the others. UNFRAMED: each is evaluated against the object being paid for
+  -- (Pawl.Engine.Mana.spendableAmong for the restriction,
+  -- Pawl.Engine.ManaRider.uncounterable for the rider), which is neither an
+  -- attach destination nor a target slot.
+  Effect.AddMana addition ->
+    unframed
+      ( concatMap restrictionFilters (Maybe.maybeToList (ManaAddition.restriction addition))
+          <> concatMap manaRiderFilters (Maybe.maybeToList (ManaAddition.rider addition))
+      )
   -- THE one search-framed position. CR 701.3a from the candidate's side:
   -- Auratouched Mage's "an Aura card that could enchant it", where the host is
   -- fixed for the whole evaluation and the Aura varies per candidate.
@@ -3793,7 +3813,8 @@ effectFilters effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.ChooseOpponent _ -> []
   Effect.ChooseOpponentAtRandom _ -> []
-  Effect.RollDie {} -> []
+  -- CR 706.2's modifier is a Quantity, so its filters are reachable here.
+  Effect.RollDie rollDie -> unframed (foldMap quantityFilters (RollDie.modifier rollDie))
   Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn _ _) -> []
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> sourceHosted (objectRefFilters ref)
   Effect.OfferCast {} -> []

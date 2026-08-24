@@ -205,13 +205,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary Nothing))
+      (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary Nothing Nothing))
       " {\"type\":\"AddMana\",\"value\":{\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}}}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) ManaProduction.AnyColor ManaRetention.Ordinary Nothing))
+      (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) ManaProduction.AnyColor ManaRetention.Ordinary Nothing Nothing))
       " {\"type\":\"AddMana\",\"value\":{\"production\":{\"type\":\"AnyColor\"}}} "
   -- CR 106.4's other half: Shizuko, Caller of Autumn's "that player adds", where
   -- the recipient is written because CR 109.5's "you" is somebody else.
@@ -220,7 +220,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary Nothing))
+      (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary Nothing Nothing))
       " {\"type\":\"AddMana\",\"value\":{\"player\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"},\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}}}} "
   Spec.it s "Search" $
     Common.assertJsonCodec
@@ -1470,8 +1470,17 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.RollDie RollDie.MkRollDie {RollDie.sides = 20, RollDie.slot = SlotName.MkSlotName (Text.pack "result")})
+      (Effect.RollDie RollDie.MkRollDie {RollDie.sides = 20, RollDie.modifier = Nothing, RollDie.slot = SlotName.MkSlotName (Text.pack "result")})
       " {\"type\":\"RollDie\",\"value\":{\"sides\":20,\"slot\":\"result\"}} "
+  -- CR 706.2's modifier, so the elided field above is not the only shape this
+  -- arm round-trips.
+  Spec.it s "RollDie with a modifier" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.RollDie RollDie.MkRollDie {RollDie.sides = 20, RollDie.modifier = Just (Quantity.Literal 3), RollDie.slot = SlotName.MkSlotName (Text.pack "result")})
+      " {\"type\":\"RollDie\",\"value\":{\"modifier\":{\"type\":\"Literal\",\"value\":3},\"sides\":20,\"slot\":\"result\"}} "
   Spec.it s "ExileHandThenDraw" $
     Common.assertJsonCodec
       s

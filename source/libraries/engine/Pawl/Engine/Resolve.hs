@@ -430,7 +430,7 @@ slotsOf effect = case effect of
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     joinSlots [objectRefSlots ref, joinSlots (fmap quantitySlots (Projection.quantitiesOf modification)), durationSlots duration]
   Effect.ChangeText (ChangeText.MkChangeText _ _ slot) -> oneSlot slot
-  Effect.AddMana (ManaAddition.MkManaAddition ref _ _ _) -> playerRefSlots ref
+  Effect.AddMana (ManaAddition.MkManaAddition ref _ _ _ _) -> playerRefSlots ref
   -- BOTH refs: a slot read only by the owner ref would otherwise look dangling.
   Effect.Search (Search.MkSearch searcher owner _ quantity _ _ _) ->
     joinSlots (playerRefSlots searcher : playerRefSlots owner : fmap quantitySlots (Maybe.maybeToList quantity))
@@ -576,8 +576,15 @@ slotsOf effect = case effect of
   -- A DEFINITION too: chosen as this effect is applied (CR 608.2d), never read.
   Effect.ChooseOpponent _ -> Map.empty
   Effect.ChooseOpponentAtRandom _ -> Map.empty
-  -- A DEFINITION too: CR 706.1's die size is a literal, so nothing is read.
-  Effect.RollDie {} -> Map.empty
+  -- A DEFINITION for the result slot (boundSlots below), but CR 706.2's modifier
+  -- is a READ: the instruction's own Quantity may name a slot an earlier effect
+  -- of this same resolution bound, CR 608.2c following the list in written order.
+  --
+  -- A SHAPE CORRECTION, not a tested behaviour: every modifier in data/cards/ is
+  -- a Count naming no slot (Diviner's Portent), so leaving this Map.empty leaves
+  -- the suite green. A card whose roll added "the number of cards you drew this
+  -- way" would refute that. The same holds of the two arms below.
+  Effect.RollDie rollDie -> maybe Map.empty quantitySlots (RollDie.modifier rollDie)
   Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn ref _) -> playerRefSlots ref
   -- Both halves may name a slot: what is shuffled, and whose library.
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named ref) -> joinTwo (maybe Map.empty playerRefSlots named) (objectRefSlots ref)
@@ -829,7 +836,7 @@ slotsAreExhaustive effect = case effect of
   -- PlaySubgame's answer: a definition reads no slot.
   Effect.ChooseOpponent _ -> True
   Effect.ChooseOpponentAtRandom _ -> True
-  Effect.RollDie {} -> True
+  Effect.RollDie rollDie -> all Quantity.slotsAreExhaustive (RollDie.modifier rollDie)
   Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn _ _) -> True
   Effect.ShuffleIntoLibrary {} -> True
   Effect.OfferCast {} -> True
@@ -970,7 +977,9 @@ readsX = any effectReadsX
       Effect.PlaySubgame _ -> False
       Effect.ChooseOpponent _ -> False
       Effect.ChooseOpponentAtRandom _ -> False
-      Effect.RollDie {} -> False
+      -- CR 706.2's modifier is an ordinary Quantity, so it may be the X the
+      -- caster announced (CR 601.2b).
+      Effect.RollDie rollDie -> any Quantity.readsX (RollDie.modifier rollDie)
       Effect.TakeExtraTurn {} -> False
       Effect.ShuffleIntoLibrary {} -> False
       Effect.OfferCast {} -> False
@@ -3180,8 +3189,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- CR 106.4: into the pool of the player the effect names, read through
   -- playerRefPlayers like every other slot read (CR 608.2b). The type and the CR
   -- 106.3 tags come from the ability's SOURCE, the payment path's own readers.
-  -- The RETENTION is the one thing read off the instruction (CR 106.4).
-  Effect.AddMana (ManaAddition.MkManaAddition ref production retention restriction) -> do
+  -- The RETENTION (CR 106.4) and CR 106.6's two clauses -- the restriction and
+  -- the rider -- are what come off the INSTRUCTION instead, stamped onto every
+  -- unit it adds (CR 106.6a).
+  --
+  -- The RIDER's stamp here is a regression fence rather than a proven behaviour:
+  -- both printings that write one (Boseiju, Who Shelters All and Delighted
+  -- Halfling) are mana abilities and take the inline CR 605.3b road instead, so
+  -- neutralising this line leaves the whole suite green. CR 106.6a states it
+  -- anyway, which is why the line is here.
+  Effect.AddMana (ManaAddition.MkManaAddition ref production retention restriction rider) -> do
     gs0 <- State.get
     case Mana.producedTypes source gs0 production of
       -- One settled type is one mana; a clause adding two writes two effects,
@@ -3192,7 +3209,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 { ManaUnit.manaType = manaType,
                   ManaUnit.tags = Mana.productionTagsGiven Map.empty source gs0,
                   ManaUnit.retention = retention,
-                  ManaUnit.restriction = restriction
+                  ManaUnit.restriction = restriction,
+                  ManaUnit.rider = rider
                 }
          in State.modify' (\gs -> foldr (\pid -> Mana.addMana pid [unit]) gs (playerRefPlayers legal controller gs0 ref))
       -- No type at all is CR 607.2d's "the chosen color" with nothing chosen:
@@ -3221,7 +3239,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       { ManaUnit.manaType = manaType,
                         ManaUnit.tags = Mana.productionTagsGiven Map.empty source gs0,
                         ManaUnit.retention = retention,
-                        ManaUnit.restriction = restriction
+                        ManaUnit.restriction = restriction,
+                        ManaUnit.rider = rider
                       }
               State.modify' (Mana.addMana pid [unit])
   Effect.Search (Search.MkSearch searcherRef ownerRef zones quantity filter_ upTo destination) ->
@@ -3518,8 +3537,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- an answer outside the range leaves the floor standing rather than a value no
   -- die could show; the instruction is mandatory, so there is no third option.
   --
-  -- With nothing in the pool that modifies a roll (#2083), CR 706.2's natural
-  -- result and result coincide, and this one binding is both.
+  -- CR 706.2: the natural result is the face, and the instruction's own modifier
+  -- is added to it to give the RESULT, which is what this binds (Diviner's
+  -- Portent). ORDER IS LOAD-BEARING: CR 706.1a bounds the face at 1..N and no
+  -- rule bounds the sum, so the filter runs on the face and the modifier is added
+  -- after -- a d20 answered 20 with a modifier of 5 is a result of 25, past the
+  -- die's own top face. CR 107.1b for a sum a negative modifier drove below zero.
+  --
+  -- Not implemented: a binding for the natural result, CR 706.2a's costed
+  -- modifier and CR 706.2b's ordering among competing modifiers (#2083); with one
+  -- mandatory, free modifier there is nothing to order and no second reader.
   --
   -- CR 706.1's roll is also the event TriggerCondition.PlayerRollsDice watches
   -- (Feywild Trickster). Recorded under `controller`, not `source`: rule 706.1's
@@ -3539,7 +3566,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.RollDie rollDie -> do
     let sides = RollDie.sides rollDie
     rolled <- Game.ask (Prompt.RollDie sides)
-    let result = if rolled >= 1 && rolled <= sides then rolled else 1
+    gs <- State.get
+    let viewOf = effectViewOf source legal gs
+        context = effectContext controller source legal (slotGroups resolving gs)
+        -- CR 706.2, read AFTER the roll as the rule words it. CR 107.2's posture
+        -- for a modifier that cannot be evaluated: no modifier at all.
+        modifier = case RollDie.modifier rollDie of
+          Nothing -> 0
+          Just quantity -> Maybe.fromMaybe 0 (Quantity.evaluateFor viewOf context gs resolving source quantity)
+        natural = if rolled >= 1 && rolled <= sides then rolled else 1
+        result = Integer.toNaturalSaturating (toInteger natural + modifier)
     State.modify' (bindAmountSlot source (RollDie.slot rollDie) result)
     State.modify' (Event.recordEvent (GameEvent.DiceRolled controller))
   Effect.ControlPlayerNextTurn slot ->
