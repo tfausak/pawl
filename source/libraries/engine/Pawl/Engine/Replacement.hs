@@ -591,7 +591,9 @@ admitsEntry gs oid rewrite = case rewrite of
 -- Nothing is rule 614.16's own subject, "if an EFFECT would put one or more
 -- counters" -- so it admits exactly that rule's two causes and no others. CR 609.1
 -- makes CR 714.3c's turn-based action neither, which is what keeps Doubling Season
--- off a Saga's advancing lore counter.
+-- off a Saga's advancing lore counter, and it makes a cost paid under CR 601.2h
+-- neither for the same reason, which keeps Doubling Season off Soul Immolation's
+-- "blight X".
 --
 -- Just a relation is a clause naming a PLAYER instead (Vorinclex, Monstrous
 -- Raider's "if you would put", "if an opponent would put"). Rule 714.3c has "that
@@ -601,10 +603,14 @@ admitsEntry gs oid rewrite = case rewrite of
 matchesPutter :: GameState -> ObjectId -> Maybe ControllerRelation -> CounterCause.CounterCause -> Bool
 matchesPutter gs src subject cause = case (subject, cause) of
   (Nothing, CounterCause.ByEffect _) -> True
+  (Nothing, CounterCause.ByPayment _) -> False
   (Nothing, CounterCause.ByRule _) -> False
-  -- The two causes coincide here on purpose, and the pair is written out rather
-  -- than collapsed: a player clause asks WHO, and both causes name a player.
+  -- The three causes coincide here on purpose, and the rows are written out
+  -- rather than collapsed through CounterCause.putter: a player clause asks WHO,
+  -- and every cause names a player, but a fourth cause must be read against rule
+  -- 614.16 above before it is answered here.
   (Just rel, CounterCause.ByEffect pid) -> matchesPlayer gs src rel pid
+  (Just rel, CounterCause.ByPayment pid) -> matchesPlayer gs src rel pid
   (Just rel, CounterCause.ByRule pid) -> matchesPlayer gs src rel pid
 
 -- CR 109.5 / 614.1: does this PLAYER satisfy a pattern's relation, read against

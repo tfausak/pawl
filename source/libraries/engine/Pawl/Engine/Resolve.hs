@@ -174,6 +174,7 @@ import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PayObligation as PayObligation
 import qualified Pawl.Types.Payment as Payment
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
+import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PendingEntryEffect as PendingEntryEffect
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
@@ -1750,7 +1751,10 @@ payGatePaidBy resolving source idx cIdx payer gate = do
           -- Discarded, Activate's reason: rule 702.150a asks about a spell's own
           -- cost, not about a cost paid during a resolution (CR 118.13b).
           (announced, _) <- Cost.announce Nothing ManaSpending.AsProduced payer source pure cost
-          outcome <- Cost.pay Nothing ManaSpending.AsProduced payer source announced
+          -- DuringResolution: rule 118.12's cost is paid as the spell or ability
+          -- resolves, which is CR 609.1's effect, so a blight paid here is CR
+          -- 614.16's subject where Soul Immolation's additional cost is not.
+          outcome <- Cost.pay PaymentMoment.DuringResolution Nothing ManaSpending.AsProduced payer source announced
           -- Not implemented: the slots this payment bound are dropped, so a
           -- CR 118.12 cost that sacrifices a permanent cannot be read by a
           -- later clause of the same resolution (#1872).
@@ -5427,7 +5431,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     Monad.forM_ blighters $ \pid ->
       case evaluateForRecipient viewOf context gs resolving source pid quantity of
         Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
-        Just n -> Monad.void (Blight.blight pid resolving (Integer.toNaturalSaturating n))
+        Just n -> Monad.void (Blight.blight (CounterCause.ByEffect pid) resolving (Integer.toNaturalSaturating n))
   -- CR 701.54a: the Ring tempts the resolving controller; the keyword action is
   -- Pawl.Engine.Ring.tempt's.
   Effect.TemptWithTheRing -> Ring.tempt controller

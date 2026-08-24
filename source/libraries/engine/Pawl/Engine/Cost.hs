@@ -81,6 +81,7 @@ import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
+import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerEffect as PlayerEffect.Type
@@ -1850,14 +1851,20 @@ canPayComponent pid oid component gs = case component of
 -- rejection, so an Unpaid result is a complete no-op even though paying is
 -- monadic -- which CR 118.12's resolution-time caller rests on too.
 --
+-- `moment` is which of CR 601.2h and CR 118.12 this payment is (see
+-- Pawl.Types.PaymentMoment). Taken from the CALLER and never derived, since the
+-- cost itself does not say -- `counterCause` below is what reads it, and the
+-- parameter is what makes a new caller state its moment rather than inherit a
+-- default.
+--
 -- `casting` is the SPELL this payment is for, and it is Just at exactly one
 -- caller: Pawl.Engine.Cast. It is not `oid` under another name -- `oid` is
 -- whatever object the cost belongs to, which for a special action or CR 118.12's
 -- resolution-time payment is not a spell being cast -- and CR 106.6's
 -- restrictions all read "spend this mana only to CAST", so the two questions are
 -- different ones. Mana.spendableFor is what reads it.
-pay :: Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
-pay casting spending pid oid cost = do
+pay :: PaymentMoment.PaymentMoment -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
+pay moment casting spending pid oid cost = do
   before <- State.get
   case Cost.mana cost of
     -- CR 118.6: attempting to pay an unpayable cost is an illegal action.
@@ -1869,7 +1876,7 @@ pay casting spending pid oid cost = do
       if not paidMana
         then pure Payment.Unpaid
         else do
-          outcome <- payComponents pid oid (Cost.components cost)
+          outcome <- payComponents moment pid oid (Cost.components cost)
           case outcome of
             -- The components' bound slots ride out unchanged: the mana window
             -- above binds none, and a caller that has a binding environment to
@@ -1941,7 +1948,9 @@ payTagged :: PlayerId -> [(ObjectId, [CostComponent.CostComponent Keyword.Type.K
 payTagged pid charges = case charges of
   [] -> pure bindsNothing
   (oid, components) : rest -> do
-    outcome <- payComponents pid oid components
+    -- CR 508.1i / 509.1e: a toll is paid during the declaration, which is a
+    -- turn-based action and not a resolution (PaymentMoment's own reason).
+    outcome <- payComponents PaymentMoment.OutsideResolution pid oid components
     case outcome of
       Payment.Unpaid -> pure Payment.Unpaid
       Payment.Paid bound -> fmap (mergeBound bound) (payTagged pid rest)
@@ -1958,23 +1967,23 @@ payTagged pid charges = case charges of
 --
 -- FILTERED, NOT TRUSTED: Game.permute keeps the printed order for an answer that
 -- is not a permutation of the offered indices.
-payComponents :: PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
-payComponents pid oid components =
+payComponents :: PaymentMoment.PaymentMoment -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
+payComponents moment pid oid components =
   if orderObservable components
     then do
       gs <- State.get
       answer <- Game.choose (Prompt.OrderCostComponents (Decide.deciderFor pid gs) pid oid components)
-      payInOrder pid oid (Game.permute components answer)
-    else payInOrder pid oid components
+      payInOrder moment pid oid (Game.permute components answer)
+    else payInOrder moment pid oid components
 
-payInOrder :: PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
-payInOrder pid oid components = case components of
+payInOrder :: PaymentMoment.PaymentMoment -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
+payInOrder moment pid oid components = case components of
   [] -> pure bindsNothing
   component : rest -> do
-    outcome <- payComponent pid oid component
+    outcome <- payComponent moment pid oid component
     case outcome of
       Payment.Unpaid -> pure Payment.Unpaid
-      Payment.Paid bound -> fmap (mergeBound bound) (payInOrder pid oid rest)
+      Payment.Paid bound -> fmap (mergeBound bound) (payInOrder moment pid oid rest)
 
 -- The slots two components of one cost bound, in one map. Set-UNIONED per slot
 -- rather than left-biased: Jarad, Golgari Lich Lord's "Sacrifice a Swamp and a
@@ -2304,7 +2313,9 @@ payActivation inFlight pid oid cost = do
     Just manaCost -> payManaExcept (Set.insert oid inFlight) Nothing ManaSpending.AsProduced pid manaCost
     -- CR 118.6: attempting to pay an unpayable cost is an illegal action.
     Nothing -> pure False
-  outcome <- if paid then payComponents pid oid (Cost.components cost) else pure Payment.Unpaid
+  -- CR 602.2b sends this through CR 601.2h, so the payment is made while the
+  -- ability is being ACTIVATED and no resolution is behind it.
+  outcome <- if paid then payComponents PaymentMoment.OutsideResolution pid oid (Cost.components cost) else pure Payment.Unpaid
   let settled = case outcome of
         Payment.Paid _ -> paid
         Payment.Unpaid -> False
@@ -2337,8 +2348,8 @@ chooseManaYield pid oid candidates gs = case candidates of
         then answer
         else NonEmpty.head candidates
 
-payComponent :: PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> Game Payment.Payment
-payComponent pid oid component = case component of
+payComponent :: PaymentMoment.PaymentMoment -> PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> Game Payment.Payment
+payComponent moment pid oid component = case component of
   CostComponent.TapThis -> do
     tapObject oid
     pure bindsNothing
@@ -2510,6 +2521,10 @@ payComponent pid oid component = case component of
   -- ACTIVATING (CR 601.2h), which CR 609.1 gives no resolution to hang it on.
   -- That is what makes Doubling Season double a planeswalker's starting loyalty
   -- (CR 306.5b, through the funnel) and leave its +1 alone.
+  -- Not implemented: a player-grain counter replacement (Vorinclex, Monstrous
+  -- Raider's "if you would put") reaches a cost-paid placement and so should
+  -- reach this one, where the direct edit gives it no opportunity. CR 614.16's
+  -- effect-grain rows are exact here either way (#2223).
   CostComponent.AddLoyaltyToThis n -> do
     State.modify' (\gs -> gs {GameState.objects = Map.adjust (addLoyalty n) oid (GameState.objects gs)})
     pure bindsNothing
@@ -2544,27 +2559,26 @@ payComponent pid oid component = case component of
   CostComponent.RemovePlusOneCountersFromThis n -> do
     Event.removeCounters oid CounterKind.PlusOnePlusOne n
     pure bindsNothing
-  -- CR 122.6's placement, through the Event.putCounters funnel as
-  -- CounterCause.ByEffect -- the opposite call from AddLoyaltyToThis above, and
-  -- the difference is WHEN the cost is paid. CR 118.12 pays this one as the spell
-  -- or ability RESOLVES, which is what CR 609.1 calls an effect and so what CR
+  -- CR 122.6's placement, through the Event.putCounters funnel -- the opposite
+  -- call from AddLoyaltyToThis above, and the difference is WHEN the cost is
+  -- paid, which `counterCause` below reads off the moment rather than assuming.
+  -- Every printing of this component is CR 118.12's endure, paid as the spell or
+  -- ability RESOLVES, which is what CR 609.1 calls an effect and so what CR
   -- 614.16 reaches: Hardened Scales sees endure's counter, and still not a
   -- planeswalker's +1. Paid whatever the funnel then places.
   CostComponent.PutPlusOneCountersOnThis n -> do
-    -- CR 609.1: the player putting them is the one whose resolution this is,
-    -- which for a cost paid during a resolution is the player paying it.
-    Monad.void (Event.putCounters (CounterCause.ByEffect pid) oid CounterKind.PlusOnePlusOne n)
+    Monad.void (Event.putCounters (counterCause moment pid) oid CounterKind.PlusOnePlusOne n)
     pure bindsNothing
   -- CR 701.68a's whole procedure, which Pawl.Engine.Blight owns. Unpaid on rule
   -- 701.68b's board, which canPayComponent has already refused, so reaching it
   -- means the creature left between the check and the payment.
   --
-  -- ByEffect, and the one place this module's CR 614.16 story is not exact: a
-  -- blight paid under CR 601.2h has no resolution for the placement to be the
-  -- effect of. Unobservable, rule 614.16's effect-grain patterns in `data/cards/`
-  -- all naming +1/+1 counters (gap #1647).
+  -- The one component paid at BOTH moments -- Soul Immolation's additional cost
+  -- under CR 601.2h, Boggart Mischief's "unless you blight 1" under CR 118.12 --
+  -- so the cause is `counterCause`'s and not a constant. Doubling Season doubles
+  -- the second and not the first; Vorinclex, Monstrous Raider doubles both.
   CostComponent.Blight n -> do
-    blighted <- Blight.blight pid oid n
+    blighted <- Blight.blight (counterCause moment pid) oid n
     pure (if blighted then bindsNothing else Payment.Unpaid)
   -- Unpayable, `canPayComponent`'s answer and for its reason -- PayLifeX's arm
   -- above, verbatim.
@@ -2607,6 +2621,26 @@ payComponent pid oid component = case component of
       Just candidate -> do
         Event.changeZone candidate Zone.Exile
         pure bindsNothing
+
+-- CR 614.16's question, asked of a payment: does the placement this cost makes
+-- have a resolving spell or ability's effect behind it?
+--
+-- CR 609.1 says it does exactly when the cost is paid under CR 118.12, as the
+-- object resolves; CR 601.2h's payment and CR 508.1i's toll are made while a
+-- spell is cast, an ability activated or a declaration is being made, and none of
+-- those is a resolution. The PLAYER is the payer either way -- CR 122.6a's "the
+-- effect doesn't specify a player" case for the first, and the payer being the
+-- only player in sight for the second.
+--
+-- What this buys is Soul Immolation beside Doubling Season: the blight is the
+-- payer's, and no effect's, so rule 614.16's row does not apply and X counters
+-- go on rather than 2X (#1647). Vorinclex, Monstrous Raider's row names a player
+-- instead and still applies, which is the pair that says the answer is about the
+-- CAUSE and not about counters-during-costs.
+counterCause :: PaymentMoment.PaymentMoment -> PlayerId -> CounterCause.CounterCause
+counterCause moment pid = case moment of
+  PaymentMoment.OutsideResolution -> CounterCause.ByPayment pid
+  PaymentMoment.DuringResolution -> CounterCause.ByEffect pid
 
 -- The arithmetic half, pure and board-free.
 --
