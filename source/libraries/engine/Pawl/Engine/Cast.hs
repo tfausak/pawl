@@ -570,7 +570,7 @@ spendingFor pid oid gs = case Game.lookupObject oid gs >>= Object.playableFromEx
   Just permission | ExilePlayPermission.player permission == pid -> ExilePlayPermission.spending permission
   _ -> ManaSpending.AsProduced
 
--- CR 702.170d: may this player cast this PLOTTED card? Three conjuncts, and the
+-- CR 702.170d: may this player cast this PLOTTED card? Four conjuncts, and the
 -- rule states each of them:
 --
 --   * the card is plotted, which is the Object.plotted stamp Pawl.Engine.Plot
@@ -582,20 +582,28 @@ spendingFor pid oid gs = case Game.lookupObject oid gs >>= Object.playableFromEx
 --     which it became plotted". A strict comparison on GameState.turnNumber,
 --     which counts every turn the game takes -- extra turns (CR 500.7) included
 --     -- so the clause needs no other bookkeeping.
+--   * the window, "during their main phase while the stack is empty", which is
+--     `sorcerySpeed` above word for word -- the same three conjuncts CR 307.5
+--     states, asked of the same player the ownership conjunct names.
 --
--- Not implemented: the rule's own "during their main phase while the stack is
--- empty" is no conjunct here. Every card the pool PRINTS plot on is a creature
--- (Djinn of Fool's Fall, Aloe Alchemist), and CR 307.5's window is what a
--- creature card is cast in anyway -- but CR 702.170c's route plots whatever the
--- exiling clause admits, and Kellan Joins Up's is "a nonland card with mana
--- value 3 or less", which reaches an instant. The seam is this function rather
--- than Cast.timingOk -- that one is a disjunction, so it can only widen a window
--- and never narrow one (#1392).
+-- That window is a conjunct HERE and not in Cast.timingOk, which is where a
+-- window normally lives: timingOk is a disjunction, so it can only widen one and
+-- never narrow one. It has to narrow, because CR 702.170c's route plots whatever
+-- the exiling clause admits and Kellan Joins Up's is "a nonland card with mana
+-- value 3 or less", which reaches an INSTANT -- and CR 304.1 hands an instant
+-- every priority its controller has. Every card the pool PRINTS plot on is a
+-- creature (Djinn of Fool's Fall, Aloe Alchemist), for which CR 307.5 would have
+-- covered the clause anyway. Pawl.SpecialActionSpec's "CR 702.170d a plotted
+-- instant is castable only in its owner's main phase with the stack empty" is
+-- what proves the narrowing, one board per conjunct.
+--
+-- permitsCastForetold below is the control: CR 702.143a fixes no window, so it
+-- takes none.
 permitsCastPlotted :: PlayerId -> ObjectId -> GameState -> Bool
 permitsCastPlotted pid oid gs = Maybe.fromMaybe False $ do
   obj <- Game.lookupObject oid gs
   turn <- Object.plotted obj
-  pure (Object.owner obj == pid && GameState.turnNumber gs > turn)
+  pure (Object.owner obj == pid && GameState.turnNumber gs > turn && sorcerySpeed pid gs)
 
 -- CR 702.143a: may this player cast this FORETOLD card? permitsCastPlotted's
 -- three conjuncts one rule over, and the rule states each of them:
