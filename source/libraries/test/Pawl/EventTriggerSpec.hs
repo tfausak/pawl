@@ -3116,6 +3116,116 @@ avatarRokuSpec s registry =
               Spec.assertEqWith s "and nothing was declared" (sentAt after) Map.empty
             Nothing -> Spec.assertFailure s "fixture should give alice a Roku and bob a Piker"
 
+-- CR 508.3c: rule 508.3d's arity narrowed by a quality of what was declared, and
+-- the first trigger in the pool whose subject is the attacking PLAYER and whose
+-- payload also names a kind of creature.
+--
+-- Hermes, Overseer of Elpis {3}{U} Legendary Creature -- Elder Wizard 2/4 is the
+-- card: "Whenever you attack with one or more Birds, scry 2." The printed
+-- quantifier is "one or more", so ONE declaration is ONE trigger however many
+-- Birds it named.
+--
+-- Hermes is an Elder Wizard and NOT a Bird, so on every board here the bearer is
+-- a bystander and the Filter is doing the work. Its other ability watches casts
+-- and nothing in this group casts anything.
+--
+-- Two attacking Birds is what parts this from CR 508.3a's per-attacker form: a
+-- reading against GameEvent.AttackerDeclared scries TWICE. ONE Bird would make
+-- the two arities agree, which is the trap, so the two-Bird case is the
+-- load-bearing one.
+--
+-- Hermes attacking ALONE is what parts it from the unfiltered CR 508.3d form
+-- (TriggerCondition.PlayerAttacks): a reading that dropped the Filter scries
+-- once where this one scries not at all.
+--
+-- The scry is read as LIBRARY ORDER and not as a prompt count. CR 701.22a moves
+-- no card out of the library, so the library's SIZE cannot tell two scries from
+-- one; its order can, the answerer bottoming everything it is shown, which sends
+-- two more cards under per resolution.
+hermesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hermesSpec s registry =
+  let -- Declares exactly the creatures `plan` names and announces each at the
+      -- target `plan` pairs with it, FILTERED out of what the engine offered
+      -- rather than built, for boggartPranksterSpec's reason above.
+      answering :: [(ObjectId.ObjectId, AttackTarget.AttackTarget)] -> Prompt.Prompt r -> r
+      answering plan p = case p of
+        Prompt.DeclareAttackers _ _ ids -> filter (\oid -> List.elem oid (fmap fst plan)) ids
+        Prompt.ChooseAttackTarget _ _ oid options ->
+          Maybe.fromMaybe (NonEmpty.head options) (List.find (\t -> List.lookup oid plan == Just t) (NonEmpty.toList options))
+        -- Everything looked at goes UNDER, in the order it was looked at. Pinned
+        -- structurally rather than searched for: this answer cannot find its way
+        -- back to the right library after a mutation changed how many times the
+        -- ability resolved.
+        Prompt.ChooseScry _ _ looked -> (looked, [])
+        _ -> S.aggressiveAnswer p
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+      sentAt gs = Combat.Type.attackers (GameState.combat gs)
+      libraryOf = Game.zoneMembers Zone.Library S.alice
+      -- alice holds Hermes and two Birds, all Settled and untapped; bob holds
+      -- nothing, so no block intervenes. Six DISTINCT cards under alice's
+      -- library, deep enough that two scry 2s never wrap.
+      fixture = do
+        hermes <- S.printingOf s registry "Hermes, Overseer of Elpis"
+        maiden <- S.printingOf s registry "Bird Maiden"
+        raven <- S.printingOf s registry "Augury Raven"
+        piker <- S.printingOf s registry "Goblin Piker"
+        mountain <- S.printingOf s registry "Mountain"
+        forest <- S.printingOf s registry "Forest"
+        island <- S.printingOf s registry "Island"
+        plains <- S.printingOf s registry "Plains"
+        swamp <- S.printingOf s registry "Swamp"
+        case S.combatBoardOf [hermes, maiden, raven] [] of
+          (gs, [hermesId, maidenId, ravenId], []) ->
+            -- addLibraryCard puts its card ON TOP, so the deepest is stocked
+            -- first and `ids` comes out top-first.
+            let deal (acc, g) printing = let (oid, g1) = S.addLibraryCard printing S.alice g in (oid : acc, g1)
+                (ids, stocked) = List.foldl' deal ([], gs) [swamp, plains, island, forest, mountain, piker]
+             in pure (Just (hermesId, maidenId, ravenId, ids, stocked))
+          _ -> pure Nothing
+   in Spec.describe s "Hermes, Overseer of Elpis" $ do
+        -- The proving case. TWO Birds are declared together and exactly TWO cards
+        -- go under: one declaration, one trigger, one scry 2. A reading at CR
+        -- 508.3a's arity bottoms four.
+        Spec.it s "CR 508.3c whole card: two Birds declared together scry ONCE" $ do
+          built <- fixture
+          case built of
+            Just (_, maidenId, ravenId, ids, gs) -> case ids of
+              [piker, mountain, forest, island, plains, swamp] -> do
+                let after = atBlockers (answering [(maidenId, AttackTarget.OfPlayer S.bob), (ravenId, AttackTarget.OfPlayer S.bob)]) gs
+                Spec.assertEqWith s "the library started top-first piker, mountain, forest, island, plains, swamp" (libraryOf gs) ids
+                Spec.assertEqWith s "ONE scry 2: piker and mountain went under, and nothing else moved" (libraryOf after) [forest, island, plains, swamp, piker, mountain]
+                Spec.assertEqWith s "CR 508.1b both Birds really were declared attacking bob" (sentAt after) (Map.fromList [(maidenId, AttackTarget.OfPlayer S.bob), (ravenId, AttackTarget.OfPlayer S.bob)])
+              _ -> Spec.assertFailure s "expected six library cards"
+            Nothing -> Spec.assertFailure s "fixture should give alice a Hermes and two Birds"
+        -- ONE Bird, declared alongside the non-Bird bearer. Still one scry 2 --
+        -- the control that rules out a reading counting the declaration's
+        -- creatures rather than the Birds among them, which would bottom four
+        -- here.
+        Spec.it s "CR 508.3c one Bird beside the non-Bird bearer still scries once" $ do
+          built <- fixture
+          case built of
+            Just (hermesId, maidenId, _, ids, gs) -> case ids of
+              [piker, mountain, forest, island, plains, swamp] -> do
+                let after = atBlockers (answering [(hermesId, AttackTarget.OfPlayer S.bob), (maidenId, AttackTarget.OfPlayer S.bob)]) gs
+                Spec.assertEqWith s "ONE scry 2 again: piker and mountain went under" (libraryOf after) [forest, island, plains, swamp, piker, mountain]
+                Spec.assertEqWith s "CR 508.1b Hermes and the Bird really were declared" (sentAt after) (Map.fromList [(hermesId, AttackTarget.OfPlayer S.bob), (maidenId, AttackTarget.OfPlayer S.bob)])
+              _ -> Spec.assertFailure s "expected six library cards"
+            Nothing -> Spec.assertFailure s "fixture should give alice a Hermes and two Birds"
+        -- Hermes attacking ALONE. Rule 508.3c asks for a creature the Filter
+        -- admits, and an Elder Wizard is not one, so the ability does not
+        -- trigger and the library is untouched. The falsifier for a reading that
+        -- ignored the Filter.
+        Spec.it s "CR 508.3c a declaration naming no Bird does not trigger it" $ do
+          built <- fixture
+          case built of
+            Just (hermesId, _, _, ids, gs) -> case ids of
+              [_, _, _, _, _, _] -> do
+                let after = atBlockers (answering [(hermesId, AttackTarget.OfPlayer S.bob)]) gs
+                Spec.assertEqWith s "no scry: the library is exactly as it was stocked" (libraryOf after) ids
+                Spec.assertEqWith s "CR 508.1b and Hermes really was declared, alone" (sentAt after) (Map.fromList [(hermesId, AttackTarget.OfPlayer S.bob)])
+              _ -> Spec.assertFailure s "expected six library cards"
+            Nothing -> Spec.assertFailure s "fixture should give alice a Hermes and two Birds"
+
 anafenzaAttackSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 anafenzaAttackSpec s registry =
   let countersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
@@ -4305,6 +4415,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   curseOfVitalitySpec s registry
   boggartPranksterSpec s registry
   avatarRokuSpec s registry
+  hermesSpec s registry
   ezuriExperienceSpec s registry
   youngPyromancerSpec s registry
   whisperingWizardSpec s registry
