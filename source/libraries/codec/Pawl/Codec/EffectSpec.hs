@@ -1471,8 +1471,17 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.RollDie RollDie.MkRollDie {RollDie.sides = 20, RollDie.slot = SlotName.MkSlotName (Text.pack "result")})
+      (Effect.RollDie RollDie.MkRollDie {RollDie.sides = 20, RollDie.modifier = Nothing, RollDie.slot = SlotName.MkSlotName (Text.pack "result")})
       " {\"type\":\"RollDie\",\"value\":{\"sides\":20,\"slot\":\"result\"}} "
+  -- CR 706.2's modifier, so the elided field above is not the only shape this
+  -- arm round-trips.
+  Spec.it s "RollDie with a modifier" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.RollDie RollDie.MkRollDie {RollDie.sides = 20, RollDie.modifier = Just (Quantity.Literal 3), RollDie.slot = SlotName.MkSlotName (Text.pack "result")})
+      " {\"type\":\"RollDie\",\"value\":{\"modifier\":{\"type\":\"Literal\",\"value\":3},\"sides\":20,\"slot\":\"result\"}} "
   Spec.it s "FlipCoin" $
     Common.assertJsonCodec
       s
