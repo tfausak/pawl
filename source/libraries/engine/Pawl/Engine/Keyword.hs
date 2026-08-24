@@ -1073,14 +1073,14 @@ mintedReplacementsFor keyword count = case keyword of
   -- position. Riot's rewrite asks a question and this one does not, so the count
   -- rides the rewrite rather than a prompt. ONE ROW PER INSTANCE, and CR 702.63c
   -- makes the counters add up, each rewrite placing its own N.
-  Keyword.Vanishing n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Time n))))
+  Keyword.Vanishing n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Time (Quantity.Literal (toInteger n))))))
   -- CR 702.32a's FIRST ability, vanishing's row in the fade counter. One row per
   -- instance for riot's reason, rule 702.32 stating no multiplicity clause.
-  Keyword.Fading n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Fade n))))
+  Keyword.Fading n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Fade (Quantity.Literal (toInteger n))))))
   Keyword.Frenzy _ -> []
   -- CR 702.43a's FIRST ability, vanishing's row with a different counter kind. One
   -- row per instance, and CR 702.43b makes them add up.
-  Keyword.Modular n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne n))))
+  Keyword.Modular n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne (Quantity.Literal (toInteger n))))))
   Keyword.Crew _ -> []
   Keyword.Fabricate _ -> []
   Keyword.Deathtouch -> []
@@ -1124,7 +1124,7 @@ mintedReplacementsFor keyword count = case keyword of
   -- (Pawl.FaceDownSpec's Misthoof Kirin pair). morphCost answers one cost per
   -- permanent, so the rest of the condition needs no test.
   Keyword.Morph (Morph.MkMorph _ MorphVariant.Mega) ->
-    List.genericReplicate count (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR Filter.IsSource (TurnUpRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne 1))))
+    List.genericReplicate count (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR Filter.IsSource (TurnUpRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1)))))
   Keyword.Menace -> []
   Keyword.Renown _ -> []
   Keyword.Cycling {} -> []

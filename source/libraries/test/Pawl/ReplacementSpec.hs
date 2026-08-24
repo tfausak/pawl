@@ -3737,6 +3737,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   gatherSpecimensSpec s registry
   kismetSpec s registry
   shimatsuSpec s registry
+  undergrowthScavengerSpec s registry
   entryBudgetSpec s registry
   riotSpec s registry
   unleashSpec s registry
@@ -4683,6 +4684,78 @@ shimatsuSpec s registry =
         Just shimatsuId -> do
           Spec.assertEqWith s "six counters, one per OTHER permanent" (countersOn CounterKind.PlusOnePlusOne shimatsuId after) 6
           Spec.assertEqWith s "nothing else of alice's is left" (Set.toList (GameState.battlefield after)) [shimatsuId]
+
+-- alice controls four untapped Forests and holds an Undergrowth Scavenger. Her
+-- graveyard holds `aliceCreatures` Goblin Pikers and `aliceLands` Mountains;
+-- bob's holds `bobCreatures` Goblin Pikers. Returns the state and the
+-- Scavenger's hand id.
+--
+-- Every element earns its place against a different wrong reading of "the number
+-- of creature cards in all graveyards":
+--
+--   * bob's graveyard is stocked, so Scope.EachPlayer and Scope.Relative You
+--     disagree. Without it the two readings produce the same number.
+--   * alice's graveyard holds a LAND card too, so HasCardType Creature is not
+--     vacuous. Without it, dropping the filter changes nothing.
+--   * the two seats hold DIFFERENT counts, so an implementation reading one
+--     graveyard twice is caught as well.
+--
+-- Goblin Piker for the creature cards, Mountain for the noncreature: neither
+-- carries anything that reaches the entry loop, so the only thing the board
+-- varies is what a graveyard holds.
+scavengerBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Int -> Int -> (GameState.GameState, ObjectId.ObjectId)
+scavengerBoard forest piker mountain scavenger aliceCreatures aliceLands bobCreatures =
+  let bury printing pid g _ = snd (S.addGraveyardCard printing pid g)
+      base = S.landsInPlay forest 4
+      buried =
+        List.foldl' (bury piker S.bob) (List.foldl' (bury mountain S.alice) (List.foldl' (bury piker S.alice) base (replicate aliceCreatures ())) (replicate aliceLands ())) (replicate bobCreatures ())
+      (gs, held) = S.handOne scavenger buried
+   in ( gs
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          },
+        held
+      )
+
+-- CR 614.1c's variable amount: "This creature enters with a number of +1/+1
+-- counters on it equal to the number of creature cards in all graveyards."
+undergrowthScavengerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+undergrowthScavengerSpec s registry =
+  Spec.describe s "Undergrowth Scavenger (CR 614.1c)" $ do
+    Spec.it s "CR 614.1c one +1/+1 counter per creature card in EVERY graveyard" $ do
+      forest <- S.printingOf s registry "Forest"
+      piker <- S.printingOf s registry "Goblin Piker"
+      mountain <- S.printingOf s registry "Mountain"
+      scavenger <- S.printingOf s registry "Undergrowth Scavenger"
+      -- Two creature cards and a land in alice's graveyard, one creature card in
+      -- bob's: three, and no other reading of the sentence gives three.
+      let (gs, held) = scavengerBoard forest piker mountain scavenger 2 1 1
+          after = S.runPure S.identityAnswer gs (S.cast S.alice held >> Stack.resolveTop >> Engine.settleForPriority)
+      case newestNamed (CardName.MkCardName $ Text.pack "Undergrowth Scavenger") after of
+        Nothing -> Spec.assertFailure s "the Scavenger did not survive the battlefield"
+        Just scavengerId -> do
+          -- The printed body is 0/0, so power and toughness ARE the count.
+          Spec.assertEqWith s "power" (Projection.powerOf scavengerId after) (Just 3)
+          Spec.assertEqWith s "toughness" (Projection.toughnessOf scavengerId after) (Just 3)
+          Spec.assertEqWith s "three +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne scavengerId after) 3
+          -- CR 614.1c fixes the number AS the permanent enters, so a fourth
+          -- creature card reaching a graveyard afterwards does not grow it. The
+          -- half that separates a stamped count from one re-read live.
+          let (_, later) = S.addGraveyardCard piker S.bob after
+          Spec.assertEqWith s "still 3/3 after a fourth creature card is buried" (Projection.powerOf scavengerId later) (Just 3)
+    Spec.it s "CR 704.5f with every graveyard empty it enters 0/0 and dies" $ do
+      forest <- S.printingOf s registry "Forest"
+      piker <- S.printingOf s registry "Goblin Piker"
+      mountain <- S.printingOf s registry "Mountain"
+      scavenger <- S.printingOf s registry "Undergrowth Scavenger"
+      -- The same board with nothing buried, which is CR 107.1b's floor rather
+      -- than the count: a correct engine and one that clamped a zero amount to
+      -- zero agree here. What it rules out is an engine that refuses the entry,
+      -- raises, or places a counter it was never told to.
+      let (gs, held) = scavengerBoard forest piker mountain scavenger 0 0 0
+          after = S.runPure S.identityAnswer gs (S.cast S.alice held >> Stack.resolveTop >> Engine.settleForPriority)
+      Spec.assertEqWith s "the 0/0 Scavenger is gone" (newestNamed (CardName.MkCardName $ Text.pack "Undergrowth Scavenger") after) Nothing
 
 -- CR 614.12b's board: alice controls nine untapped Islands, two untapped
 -- Forests and an untapped Bayou, a TAPPED Forest, a Mountain and a Wood

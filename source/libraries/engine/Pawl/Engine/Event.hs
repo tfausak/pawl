@@ -45,9 +45,11 @@ import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Engine.Saga as Saga
+import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
@@ -1201,9 +1203,31 @@ apply batch candidate event =
       -- counters are placed here rather than folded into the entry event's own
       -- payload. Consumed like every other arm, so CR 614.5 keeps the loop's next
       -- iteration from placing them twice.
-      EntryRewrite.WithCounters (WithCounters.MkWithCounters kind n) -> do
+      --
+      -- CR 614.1c also admits "a number of ... counters ... equal to [something]"
+      -- (Undergrowth Scavenger), so the amount is a Quantity and is evaluated ONCE
+      -- here (CR 608.2f) rather than inside the CR 122.6 funnel, which would
+      -- re-read it per replacement iteration. CR 107.1b clamps a negative result
+      -- to zero, which is Integer.toNaturalSaturating.
+      --
+      -- The permanent is already materialized on the battlefield when this loop
+      -- runs (see runEntry), so the CR 613 projection answers for it. The Context
+      -- is the ROW's, through Replacement.candidateContext: CR 109.5's "you" is
+      -- the row's controller rather than the entrant's, and a floating row's
+      -- captured slot bindings ride along, which is what a bare Filter.contextFor
+      -- would have dropped; see #2141 for the four callers that still do.
+      --
+      -- Consumed unconditionally: CR 614.5 is about the row having applied, and a
+      -- row whose amount would not evaluate has still applied. Consuming only on
+      -- the evaluable branch loops.
+      EntryRewrite.WithCounters (WithCounters.MkWithCounters kind quantity) -> do
+        gs <- State.get
+        let viewOf = Projection.viewWithLastKnown oid gs
+            context = Replacement.candidateContext candidate
         Replacement.consume (ReplacementCandidate.identity candidate)
-        Monad.void (putOwnCountersIn batch oid kind n)
+        case Quantity.evaluate viewOf context gs oid quantity of
+          Nothing -> pure () -- unevaluable quantity: no counters (Resolve's PutCounters posture)
+          Just n -> Monad.when (n > 0) (Monad.void (putOwnCountersIn batch oid kind (Integer.toNaturalSaturating n)))
         pure (Just event)
       -- CR 616.1b / 110.2: Gather Specimens. The entering object's CR 110.2
       -- DEFAULT controller becomes CR 109.5's "you" -- the candidate's
@@ -1809,15 +1833,23 @@ apply batch candidate event =
     --
     -- The counters go through putCounters, the CR 122.6 funnel, exactly as the
     -- EntryR WithCounters arm's do -- so CR 614.16 applies and Hardened Scales
-    -- sees a megamorph counter the way it sees a riot one.
+    -- sees a megamorph counter the way it sees a riot one. The amount is
+    -- evaluated the same way too, though rule 702.37b states its own number and
+    -- Pawl.CardSpec holds that no printing authors a turn-up counter rewrite, so
+    -- the only quantity that reaches here today is that arm's Literal 1.
     --
     -- The event survives: turning face up is not replaced by the counter, only
     -- accompanied by it, so Just is returned and FaceDown.performTurnFaceUp goes on to
     -- record CR 708.7's event.
     (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ rewrite), ProposedEvent.WouldTurnFaceUp oid _) -> case rewrite of
-      TurnUpRewrite.WithCounters (WithCounters.MkWithCounters kind n) -> do
+      TurnUpRewrite.WithCounters (WithCounters.MkWithCounters kind quantity) -> do
+        gs <- State.get
+        let viewOf = Projection.viewWithLastKnown oid gs
+            context = Replacement.candidateContext candidate
         Replacement.consume (ReplacementCandidate.identity candidate)
-        Monad.void (putOwnCounters oid kind n)
+        case Quantity.evaluate viewOf context gs oid quantity of
+          Nothing -> pure ()
+          Just n -> Monad.when (n > 0) (Monad.void (putOwnCounters oid kind (Integer.toNaturalSaturating n)))
         pure (Just event)
       -- CR 303.4k with CR 614.1e: Gift of Doom's "as this Aura is turned face
       -- up, you may attach it to a creature", applied WHILE the permanent turns

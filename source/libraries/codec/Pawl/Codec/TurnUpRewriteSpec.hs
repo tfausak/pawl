@@ -6,6 +6,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.WithCounters as WithCounters
 
@@ -15,8 +16,8 @@ spec s = Spec.describe s "Pawl.Codec.TurnUpRewrite" $ do
     Common.assertCodec
       s
       TurnUpRewrite.codec
-      (TurnUpRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne 1))
-      " {\"type\":\"WithCounters\",\"value\":{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"amount\":1}} "
+      (TurnUpRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1)))
+      " {\"type\":\"WithCounters\",\"value\":{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"amount\":{\"type\":\"Literal\",\"value\":1}}} "
   Spec.it s "MayAttachTo (Gift of Doom, CR 303.4k)" $
     Common.assertCodec
       s

@@ -3294,7 +3294,7 @@ vanishingSpec s registry =
             s
             "and two entry rewrites of two time counters each, which is what makes them add up"
             (Keyword.mintedReplacementsFor (Keyword.Type.Vanishing 2) 2)
-            (replicate 2 (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Time 2)))))
+            (replicate 2 (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Time (Quantity.Type.Literal 2))))))
 
 -- CR 702.32 fading, vanishing's neighbour and the reason the two are separate
 -- keywords rather than one with a counter kind on it. Rule 702.32a states TWO
@@ -3405,7 +3405,7 @@ fadingSpec s registry =
             s
             "and two entry rewrites of two FADE counters each, never rule 702.63a's time counters"
             (Keyword.mintedReplacementsFor (Keyword.Type.Fading 2) 2)
-            (replicate 2 (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Fade 2)))))
+            (replicate 2 (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Fade (Quantity.Type.Literal 2))))))
 
 -- CR 702.43 modular, whose rule text also spans BOTH of
 -- Pawl.Engine.Keyword's mints -- one CR 614.1c entry replacement and one death
@@ -3561,7 +3561,7 @@ modularSpec s registry =
             s
             "and two entry rewrites of two counters each, which is what makes them add up"
             (Keyword.mintedReplacementsFor (Keyword.Type.Modular 2) 2)
-            (replicate 2 (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne 2)))))
+            (replicate 2 (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne (Quantity.Type.Literal 2))))))
 
 -- CR 510.1b / 510.2's combat damage watched by a BYSTANDER rather than by the
 -- creature that dealt it -- TriggerCondition.PermanentDealsCombatDamageToPlayer,
