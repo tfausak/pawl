@@ -449,7 +449,7 @@ slotsOf effect = case effect of
   Effect.Sacrifice slot -> oneSlot slot
   Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown slot _) -> oneSlot slot
   Effect.TurnFaceUp slot -> oneSlot slot
-  Effect.RemoveFromCombat slot -> oneSlot slot
+  Effect.RemoveFromCombat ref -> objectRefSlots ref
   Effect.BecomesBlocked slot -> oneSlot slot
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _) -> joinTwo (objectRefSlots ref) (joinSlots (fmap quantitySlots (riderQuantities riders)))
   -- CR 121.1's bound slot is a DEFINITION, not a read: see boundSlots below.
@@ -1161,13 +1161,29 @@ namesEveryToken quantity = quantity /= Quantity.Type.Literal 1
 -- computed power or toughness is settled here and stamped as a literal. Left as a
 -- quantity it would be re-read on every projection, and GameState.events is
 -- cleared at the turn handoff -- the token would have no P/T next turn and die to
--- a state-based action. An UNDETERMINABLE quantity is left standing, which keeps
--- CR 208.2's star working for Projection.seedCharacteristicPT. P/T is the whole
--- of it: the only printed characteristics a Face holds as a Quantity.
+-- a state-based action. P/T is the whole of it: the only printed characteristics
+-- a Face holds as a Quantity.
+--
+-- A box holding CR 208.2's STAR is left standing, so Projection.seedCharacteristicPT
+-- still has a star to substitute the token's characteristic-defining ability into
+-- at layer 7a. Everything else is settled even when it cannot be evaluated, on CR
+-- 208.2a's terms (Quantity.determineWith: an undeterminable number is 0, including
+-- inside a calculation) -- Miming Slime with no creatures makes a 0/0 Ooze, which
+-- CR 704.5f puts away unless something is raising its toughness. Left standing it
+-- would instead be a board-reading box on a permanent, which is not a thing CR
+-- 208 allows a token to have.
+--
+-- The star half is a REGRESSION FENCE, not a proven behaviour: no card in
+-- data/cards mints a token whose printed box holds a Star (grepped 2026-08-24),
+-- so making containsStar answer False everywhere leaves the suite green. It is
+-- kept because CR 208.2 states it.
 bakeTokenCharacteristics :: (Quantity.Type.Quantity -> Maybe Integer) -> Card.Type.Card -> Card.Type.Card
 bakeTokenCharacteristics eval card = card {Card.Type.faces = fmap bakeFace (Card.Type.faces card)}
   where
-    bake quantity = Maybe.maybe quantity Quantity.Type.Literal (eval quantity)
+    bake quantity =
+      if Quantity.containsStar quantity
+        then quantity
+        else Quantity.Type.Literal (Quantity.determineWith eval quantity)
     bakeFace face =
       face
         { Face.power = fmap (Power.MkPower . bake . Power.unwrap) (Face.power face),
@@ -3617,18 +3633,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       Just target -> FaceDown.turnFaceUpByEffect target
     -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
     _ -> pure ()
-  Effect.RemoveFromCombat slot ->
+  Effect.RemoveFromCombat ref ->
     State.modify' $ \gs ->
-      case legalOne slot legal of
-        Just recipient -> case Recipient.objectOf recipient of
-          Nothing -> gs -- a player recipient is not in combat
-          -- CR 506.4: through Game.removeFromCombat, the one performer of every
-          -- clause of that rule, so CR 509.1h's asymmetry comes along for free.
-          -- Unprompted and undirected: the rule leaves nothing to ask.
-          Just target -> Game.removeFromCombat target gs
-        -- Illegal slot (CR 608.2b) or a non-object recipient: no-op. A target
-        -- already out of combat needs no guard either.
-        _ -> gs
+      -- CR 506.4: through Game.removeFromCombat, the one performer of every
+      -- clause of that rule, so CR 509.1h's asymmetry comes along for free.
+      -- Unprompted and undirected: the rule leaves nothing to ask.
+      --
+      -- The victims are enumerated ONCE (CR 608.2f), as Untap's fold above does;
+      -- an illegal slot (CR 608.2b), a player recipient and an empty match all
+      -- remove nothing, and a permanent already out of combat needs no guard.
+      foldr Game.removeFromCombat gs (objectRefObjects legal resolving controller source gs ref)
   Effect.BecomesBlocked slot ->
     State.modify' $ \gs ->
       case legalOne slot legal of

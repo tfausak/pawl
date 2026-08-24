@@ -316,3 +316,31 @@ attackedThisStep pid gs =
 -- (#2010).
 afterBlockersDeclared :: GameState -> Bool
 afterBlockersDeclared = Combat.blockersDeclared . GameState.combat
+
+-- CR 506.7: is the game inside a combat phase and short of the point "only
+-- during combat before combat damage has been dealt" names? Save Point is the
+-- card, and CR 506.7g is what lets an activated ability print the clause.
+--
+-- The PHASE and not the combat record, unlike afterBlockersDeclared above. CR
+-- 510.1 and CR 510.2 assign and deal combat damage as turn-based actions at the
+-- START of the combat damage step and CR 510.3 gives priority only afterwards,
+-- so the three steps below are exactly the priority windows of a combat phase in
+-- which no combat damage has been dealt. CR 510.5's first-strike damage step
+-- needs no fourth conjunct for the same reason: whichever damage step a player
+-- holds priority in, damage was dealt as it began.
+--
+-- CR 506.7c: "during combat" names every combat phase of the turn, which asking
+-- the phase alone gives -- an extra combat phase (CR 500.8) reopens the window,
+-- and no CR 506.7d first-phase-only reading applies, since the card prints the
+-- "during combat" words.
+beforeCombatDamage :: Phase -> Bool
+beforeCombatDamage phase = case phase of
+  Phase.Combat CombatStep.BeginningOfCombat -> True
+  Phase.Combat CombatStep.DeclareAttackers -> True
+  Phase.Combat CombatStep.DeclareBlockers -> True
+  Phase.Combat CombatStep.CombatDamage -> False
+  Phase.Combat CombatStep.EndOfCombat -> False
+  Phase.Beginning _ -> False
+  Phase.PrecombatMain -> False
+  Phase.PostcombatMain -> False
+  Phase.Ending _ -> False

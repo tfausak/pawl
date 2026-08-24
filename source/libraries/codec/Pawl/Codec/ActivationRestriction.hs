@@ -7,8 +7,8 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 
 -- | Tagged rather than bare-nullary since CR 500.1's DuringPhase carries a
--- window and CR 102.1's DuringTurn a scope; SorcerySpeed, AttackedThisStep and
--- AfterBlockersDeclared still render as bare tags.
+-- window and CR 102.1's DuringTurn a scope; SorcerySpeed, AttackedThisStep,
+-- AfterBlockersDeclared and BeforeCombatDamage still render as bare tags.
 --
 -- There is no tag for "no rider": CR 602.2's default is the EMPTY LIST on the
 -- ability, which Pawl.Codec.ActivatedAbility writes by omitting the key.
@@ -19,5 +19,6 @@ codec =
       Arm.payload "DuringPhase" DuringPhase.codec ActivationRestriction.DuringPhase (\x -> case x of ActivationRestriction.DuringPhase y -> Just y; _ -> Nothing),
       Arm.payload "DuringTurn" TurnScope.codec ActivationRestriction.DuringTurn (\x -> case x of ActivationRestriction.DuringTurn y -> Just y; _ -> Nothing),
       Arm.nullary "AttackedThisStep" ActivationRestriction.AttackedThisStep,
-      Arm.nullary "AfterBlockersDeclared" ActivationRestriction.AfterBlockersDeclared
+      Arm.nullary "AfterBlockersDeclared" ActivationRestriction.AfterBlockersDeclared,
+      Arm.nullary "BeforeCombatDamage" ActivationRestriction.BeforeCombatDamage
     ]

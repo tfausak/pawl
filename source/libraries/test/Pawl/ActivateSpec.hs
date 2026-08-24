@@ -3367,6 +3367,45 @@ printedActivationCombatPointSpec s registry = Spec.describe s "PrintedActivation
         Spec.assertEqWith s "control: and the Runner is untapped" (fmap Object.tapped (Game.lookupObject runnerId idle)) (Just TapState.Untapped)
       _ -> Spec.assertFailure s "fixture should have given alice an attacker and bob a Trap Runner"
 
+  -- CR 506.7's other point, printed on the same kind of rider: Save Point (an
+  -- Unknown Event playtest card, {1}{W} Enchantment) says "Activate only during
+  -- combat before combat damage has been dealt". CR 510.1 and CR 510.2 deal
+  -- combat damage as turn-based actions at the START of the combat damage step
+  -- and CR 510.3 gives priority only afterwards, so the window closes as that
+  -- step begins -- three steps open, two shut.
+  --
+  -- The FIVE readings are what make this more than a spot check, and they are
+  -- what tell BeforeCombatDamage apart from the two arms that already exist:
+  -- ActivationRestriction.DuringPhase over PhaseSelector.CombatPhase would
+  -- answer offered in all five (Turn.inWindow is containment), and
+  -- AfterBlockersDeclared inverted would shut the declare blockers step.
+  --
+  -- bob's Prodigal Sorcerer is the anti-vacuity control this module's other
+  -- rider groups use: an unrestricted {T} offered on every leg, so a leg with no
+  -- Save Point activation is withholding that one ability rather than offering
+  -- nothing at all. Save Point's own cost is a sacrifice with no mana and no
+  -- target, so no leg can refuse it for a reason the rider has nothing to do
+  -- with.
+  Spec.it s "CR 506.7/510.2 the rider runs to the combat damage step and shuts as it begins" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    savePoint <- S.printingOf s registry "Save Point"
+    prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let (gs0, _, theirs) = S.combatBoardOf [piker] [savePoint, prodigalSorcerer]
+        atAttackers = gs0 {GameState.priority = Just S.bob}
+        inStep step = atAttackers {GameState.phase = Phase.Combat step}
+        outside = atAttackers {GameState.phase = Phase.PrecombatMain}
+        offeredOn = Action.legalActions S.bob
+    case theirs of
+      [pointId, sorcererId] -> do
+        Spec.assertBool s (not (any (null . activationsOf sorcererId . offeredOn) [inStep CombatStep.BeginningOfCombat, inStep CombatStep.DeclareAttackers, inStep CombatStep.DeclareBlockers, inStep CombatStep.CombatDamage, inStep CombatStep.EndOfCombat, outside])) "bob's unrestricted {T} is offered on every leg"
+        Spec.assertEqWith s "offered in the beginning of combat step" (length (activationsOf pointId (offeredOn (inStep CombatStep.BeginningOfCombat)))) 1
+        Spec.assertEqWith s "offered in the declare attackers step" (length (activationsOf pointId (offeredOn (inStep CombatStep.DeclareAttackers)))) 1
+        Spec.assertEqWith s "offered in the declare blockers step" (length (activationsOf pointId (offeredOn (inStep CombatStep.DeclareBlockers)))) 1
+        Spec.assertEqWith s "CR 510.2: not offered in the combat damage step, where damage has already been dealt" (activationsOf pointId (offeredOn (inStep CombatStep.CombatDamage))) []
+        Spec.assertEqWith s "nor in the end of combat step" (activationsOf pointId (offeredOn (inStep CombatStep.EndOfCombat))) []
+        Spec.assertEqWith s "and not outside combat at all" (activationsOf pointId (offeredOn outside)) []
+      _ -> Spec.assertFailure s "fixture should have given bob a Save Point and a Prodigal Sorcerer"
+
 -- `n` copies of a printing on the battlefield under alice, in her precombat
 -- main phase.
 --
