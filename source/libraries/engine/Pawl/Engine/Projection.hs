@@ -25,6 +25,7 @@ import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
@@ -1721,9 +1722,17 @@ rewriteEffect pairs effect = case effect of
   Effect.EndCombatPhase -> effect
   Effect.GainControl (DurationRef.MkDurationRef duration ref) -> Effect.GainControl (DurationRef.MkDurationRef (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
   Effect.ArmDelayedTrigger {} -> effect
+  -- CR 612.1 through the DURATION, the same descent every neighbouring arm here
+  -- makes: a stored player effect's "for as long as" clause is printed text, so a
+  -- Magical Hack on the spell while it is on the stack changes which word the
+  -- clause counts. The players axis names no word -- an AffectedPlayers is a
+  -- PlayerScope or a SlotName, and neither is a subtype.
+  --
   -- Not implemented: the Filter inside the PlayerEffect keeps its printed word
-  -- while the spell is on the stack (#1370).
-  Effect.AffectPlayers {} -> effect
+  -- while the spell is on the stack, where the printed carrier's own copy of that
+  -- Filter is already rewritten by Pawl.Engine.PlayerEffect.rewritePlayerEffect
+  -- (#2223).
+  Effect.AffectPlayers x -> Effect.AffectPlayers x {AffectPlayers.duration = rewriteDuration pairs (AffectPlayers.duration x)}
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration blocker attacker) ->
     Effect.RequireBlock (RequireBlock.MkRequireBlock (rewriteDuration pairs duration) (rewriteObjectRef pairs blocker) (rewriteObjectRef pairs attacker))
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration ref) ->
