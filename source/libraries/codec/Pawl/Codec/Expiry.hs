@@ -1,8 +1,7 @@
 module Pawl.Codec.Expiry where
 
 import qualified Pawl.Codec.AfterTurn as AfterTurn
-import qualified Pawl.Codec.Cost as Cost
-import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Codec.PaidExpiry as PaidExpiry
 import qualified Pawl.Codec.PhaseSelector as PhaseSelector
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.While as While
@@ -23,5 +22,5 @@ codec =
       Arm.payload "AtTurnOf" PlayerId.codec Expiry.AtTurnOf (\x -> case x of Expiry.AtTurnOf y -> Just y; _ -> Nothing),
       Arm.payload "AtEndOfTurnOf" AfterTurn.codec Expiry.AtEndOfTurnOf (\x -> case x of Expiry.AtEndOfTurnOf y -> Just y; _ -> Nothing),
       Arm.payload "AtEndOf" PhaseSelector.codec Expiry.AtEndOf (\x -> case x of Expiry.AtEndOf y -> Just y; _ -> Nothing),
-      Arm.payload "WhenPaid" (Cost.codec Keyword.codec) Expiry.WhenPaid (\x -> case x of Expiry.WhenPaid y -> Just y; _ -> Nothing)
+      Arm.payload "WhenPaid" PaidExpiry.codec Expiry.WhenPaid (\x -> case x of Expiry.WhenPaid y -> Just y; _ -> Nothing)
     ]

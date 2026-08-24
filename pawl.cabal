@@ -501,6 +501,8 @@ library codec
     Pawl.Codec.OnsetSpec
     Pawl.Codec.Optionality
     Pawl.Codec.OptionalitySpec
+    Pawl.Codec.PaidExpiry
+    Pawl.Codec.PaidExpirySpec
     Pawl.Codec.PayBranch
     Pawl.Codec.PayBranchSpec
     Pawl.Codec.PayGate
@@ -1415,6 +1417,7 @@ library types
     Pawl.Types.Onset
     Pawl.Types.OptionalDecision
     Pawl.Types.Optionality
+    Pawl.Types.PaidExpiry
     Pawl.Types.PayBranch
     Pawl.Types.PayGate
     Pawl.Types.Payment

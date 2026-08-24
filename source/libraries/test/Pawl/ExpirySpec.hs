@@ -72,6 +72,7 @@ import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PaidExpiry as PaidExpiry
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
@@ -1739,17 +1740,25 @@ spec s registry = Spec.describe s "Pawl.Engine.Expiry" $ do
 -- bake in, and the price is what the offer later quotes.
 whenPaidSpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 whenPaidSpec s = Spec.describe s "WhenPaid" $ do
-  Spec.it s "CR 611.2a / 116.2c a pay-to-end duration arms to WhenPaid, carrying the price" $
+  Spec.it s "CR 611.2a / 116.2c a pay-to-end duration arms to WhenPaid, carrying the price and CR 109.5's seat" $ do
     Spec.assertEqWith
       s
       "armed"
       (Expiry.arm Map.empty S.alice S.noSource (Duration.UntilPaid blueCost) armGs)
-      (Just (Expiry.Type.WhenPaid blueCost))
+      (Just (Expiry.Type.WhenPaid (blueOfferTo S.alice)))
+    -- The seat comes from the CONTROLLER argument and nothing else: the same
+    -- duration off the same source arms to a different offer for a different
+    -- activator (CR 109.5).
+    Spec.assertEqWith
+      s
+      "armed for the other seat"
+      (Expiry.arm Map.empty S.bob S.noSource (Duration.UntilPaid blueCost) armGs)
+      (Just (Expiry.Type.WhenPaid (blueOfferTo S.bob)))
   -- All four time sweeps, on one board. Never answers True in all four too, so
   -- this case does not distinguish the two arms -- what does is that a WhenPaid
   -- entry can be FOUND, which the case below asserts and Never could not satisfy.
   Spec.it s "CR 116.2c no sweep of the turn's structure ends it" $ do
-    let armed = effectWith (Expiry.Type.WhenPaid blueCost) (Setup.emptyGame S.bothPlayers)
+    let armed = effectWith (Expiry.Type.WhenPaid (blueOfferTo S.alice)) (Setup.emptyGame S.bothPlayers)
         conditional = S.runPure S.identityAnswer armed Expiry.sweepConditional
     Spec.assertEqWith s "cleanup leaves it" (length (GameState.continuousEffects (Expiry.dropAtCleanup armed))) 1
     Spec.assertEqWith s "a turn handoff leaves it" (length (GameState.continuousEffects (Expiry.dropAtTurnOf S.alice armed))) 1
@@ -1758,9 +1767,9 @@ whenPaidSpec s = Spec.describe s "WhenPaid" $ do
   -- The IDENTITY the arm exists for, and the reason Expiry.Never is not it: the
   -- effect is findable by its source, so a payment knows what to end.
   Spec.it s "CR 116.2c the stored effect is findable by its source, with its price" $ do
-    let armed = effectWith (Expiry.Type.WhenPaid blueCost) (Setup.emptyGame S.bothPlayers)
+    let armed = effectWith (Expiry.Type.WhenPaid (blueOfferTo S.alice)) (Setup.emptyGame S.bothPlayers)
         never = effectWith Expiry.Type.Never (Setup.emptyGame S.bothPlayers)
-    Spec.assertEqWith s "the offer names the source and the price" (Expiry.paidExpiries armed) [(effectSource, blueCost)]
+    Spec.assertEqWith s "the offer names the source, the price and the seat" (Expiry.paidExpiries armed) [(effectSource, blueOfferTo S.alice)]
     Spec.assertEqWith s "an indefinite effect from the same source offers nothing" (Expiry.paidExpiries never) []
     Spec.assertEqWith s "and paying ends it" (GameState.continuousEffects (Expiry.dropWhenPaidBy effectSource armed)) []
     Spec.assertEqWith s "while another object's payment does not" (length (GameState.continuousEffects (Expiry.dropWhenPaidBy S.noSource armed))) 1
@@ -1768,3 +1777,7 @@ whenPaidSpec s = Spec.describe s "WhenPaid" $ do
 -- {U}, the price every Licid prints.
 blueCost :: Cost.Type.Cost Keyword.Keyword
 blueCost = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Blue)])) []
+
+-- That price, offered to one seat -- CR 109.5's "you" as Expiry.arm bakes it.
+blueOfferTo :: PlayerId.PlayerId -> PaidExpiry.PaidExpiry
+blueOfferTo pid = PaidExpiry.MkPaidExpiry pid blueCost
