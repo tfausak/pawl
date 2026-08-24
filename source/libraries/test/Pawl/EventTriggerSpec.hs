@@ -4045,9 +4045,10 @@ matoyaTriggerSpec s registry =
 --
 -- TWO LEGS AT MINIMUM, in opposite directions. Leg one alone is passed
 -- identically by PlayerRelation.You, by AnyPlayer, and by a condition that
--- ignores its relation; the bob leg is what tells them apart, and leg three
--- reads CR 109.5's "you" against the ability's controller rather than against
--- the active player.
+-- ignores its relation; the bob leg is what tells them apart, PlayerRelation
+-- Opponent included -- under that reading alice's Trickster fires on bob's roll.
+-- Leg three puts a Trickster on BOTH seats, so one event is watched from two
+-- seats at once and only the roller's fires.
 feywildTricksterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 feywildTricksterSpec s registry =
   let faerieDragon = CardName.MkCardName (Text.pack "Faerie Dragon Token")

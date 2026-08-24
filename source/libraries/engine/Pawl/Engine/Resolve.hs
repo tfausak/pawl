@@ -3498,12 +3498,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   --
   -- CR 706.1's roll is also the event TriggerCondition.PlayerRollsDice watches
   -- (Feywild Trickster). Recorded under `controller`, not `source`: rule 706.1's
-  -- instruction is aimed at a player, RollDie carries none of its own, and CR
-  -- 608.2's resolution is being performed by its controller. A card telling
-  -- ANOTHER player to roll would put the seat on Pawl.Types.RollDie.
+  -- instruction is aimed at a PLAYER, RollDie names none of its own, and an
+  -- unnamed player on a resolving object is CR 109.5's "you" -- its controller. A
+  -- card telling ANOTHER player to roll would put the seat on Pawl.Types.RollDie.
   --
-  -- One writer, one road: this arm is the whole of pawl's dice, Prompt.RollDie
-  -- being asked nowhere else.
+  -- One writer, one road: Prompt.RollDie is asked from this arm and from no
+  -- other place in the engine, so there is no second road to record on.
   --
   -- Recorded AFTER the binding, so a trigger placed by CR 603.3 sees the same
   -- state a later effect of this resolution would. Nothing observes the order --
