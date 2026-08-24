@@ -494,6 +494,37 @@ data Quantity
     --
     -- A LEAF, like LifeTotal, Speed and CardsDiscardedThisTurn: it holds no Quantity.
     PlayersDealtDamageThisTurn PlayerRef.PlayerRef
+  | -- | CR 601.2i / 608.2i: how many spells that player cast during the turn just
+    -- ended -- Daybreak Ranger's "if no spells were cast last turn" and Nightfall
+    -- Predator's "if a player cast two or more spells last turn".
+    --
+    -- LifeTotal's shape and not PlayersDealtDamageThisTurn's: this is ONE player's
+    -- tally, so a reference naming several answers "whose?" rather than a sum. Both
+    -- of the printed readings above are about every player at once, and both are
+    -- spelled the way Malignus spells "the highest life total among your opponents"
+    -- -- Aggregation.Greatest over Scope.OverPlayers, with this arm reading each
+    -- candidate through PlayerRef.Candidate. That is what makes "no spells were
+    -- cast" (greatest == 0) and "a player cast two or more" (greatest >= 2)
+    -- different thresholds on one measurement, and it is why neither is a sum: two
+    -- players casting one spell each is not a player casting two.
+    --
+    -- LAST turn and not this one, which is why it reads GameState.castsLastTurn
+    -- rather than folding GameState.events as CardsDiscardedThisTurn does: the log
+    -- is cleared at the handoff (Engine.beginTurnOf) and every reader of this is in
+    -- a later turn, so the snapshot is the only surviving record. "This turn" is a
+    -- different measurement over the live log, wanted by Brightspear Zealot and
+    -- Ertai's Scorn. Not implemented: no arm measures it (#2185).
+    --
+    -- NOT GameState.spellsCastLastTurn, which is CR 502.2's scalar about the
+    -- previous turn's ACTIVE PLAYER alone. Reading that here would answer 0 on a
+    -- turn where only a nonactive player cast.
+    --
+    -- An ABSENT entry answers 0 rather than Nothing, as CardsDiscardedThisTurn's
+    -- empty log does: nobody having cast is an answered question. Nothing is
+    -- reserved for a reference that could not be resolved at all.
+    --
+    -- A LEAF, like LifeTotal and CardsDiscardedThisTurn: it holds no Quantity.
+    SpellsCastLastTurn PlayerRef.PlayerRef
   | -- | CR 400.7 / 608.2i: did the object this quantity is evaluated against ENTER
     -- THE BATTLEFIELD this turn? 1 if so and 0 if not -- Thrasta, Tempest's Roar's
     -- "Thrasta has hexproof as long as it entered this turn", a CR 604.1 static

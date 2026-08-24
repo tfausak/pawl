@@ -1253,7 +1253,11 @@ walkToNextTurn seatsLeft seat gs =
 -- exactly one place to land.
 beginTurnOf :: PlayerId -> GameState -> GameState
 beginTurnOf pid gs =
-  let -- CR 800.4b: a player who would be controlled by a departed player isn't, so
+  let -- CR 601.2i / 608.2i: how many spells each player cast during the turn that
+      -- is ending, taken here because the log it is folded from is cleared by the
+      -- record update below. `gs` still holds the OUTGOING active player.
+      casts = PlayerEffect.castsPerPlayer gs
+      -- CR 800.4b: a player who would be controlled by a departed player isn't, so
       -- a pending Decider naming one is not promoted. CR 800.4a's second clause
       -- clears the entry at the departure itself; this guard answers otherwise.
       promoted = case Map.lookup pid (GameState.pendingControl gs) of
@@ -1284,10 +1288,14 @@ beginTurnOf pid gs =
             -- draws on turns that are not theirs, so "each turn" is the whole map.
             GameState.drawsThisTurn = Map.empty,
             -- CR 502.2 / 731.2: the count the NEXT turn's untap step asks about
-            -- "the previous turn's active player", taken here because the log it
-            -- is folded from is cleared by this same record update. `gs` still
-            -- holds the OUTGOING active player.
-            GameState.spellsCastLastTurn = PlayerEffect.castsThisTurn (GameState.activePlayer gs) gs,
+            -- "the previous turn's active player".
+            GameState.spellsCastLastTurn = Map.findWithDefault 0 (GameState.activePlayer gs) casts,
+            -- CR 601.2i / 608.2i: the same fold, kept per seat, because a CARD
+            -- asks about every player ("if no spells were cast last turn") and
+            -- about any one of them ("if a player cast two or more spells last
+            -- turn") where rule 731.2 asks only about the outgoing active player.
+            -- The scalar above is read out of THIS map, so the two cannot drift.
+            GameState.castsLastTurn = casts,
             GameState.scannedThrough = 0,
             -- Cleared with the log it describes: the settle Engine.advance runs
             -- immediately before this leaves nothing unscanned.

@@ -307,6 +307,21 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.PlayersDealtDamageThisTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       " {\"type\":\"PlayersDealtDamageThisTurn\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
+  -- CR 601.2i, on CardsDiscardedThisTurn's terms again: a PlayerRef and nothing
+  -- else. Daybreak Ranger // Nightfall Predator writes the Candidate arm, which is
+  -- how a per-player quantity is read under a count over players; the InSlot arm
+  -- beside it is the recursive-decoder pair the two cases above make.
+  Spec.it s "SpellsCastLastTurn, from the fold's candidate and from a slot" $ do
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.SpellsCastLastTurn PlayerRef.Candidate)
+      " {\"type\":\"SpellsCastLastTurn\",\"value\":{\"type\":\"Candidate\"}} "
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.SpellsCastLastTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      " {\"type\":\"SpellsCastLastTurn\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
   -- CR 400.7 with NOTHING on the wire either: the object is the one the quantity
   -- is evaluated against, and "this turn" is the event log's own extent.
   Spec.it s "EnteredThisTurn is nullary" $

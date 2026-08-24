@@ -2165,6 +2165,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.OpponentsAttacked _ -> quantity
   Quantity.Type.CardsDiscardedThisTurn _ -> quantity
   Quantity.Type.PlayersDealtDamageThisTurn _ -> quantity
+  Quantity.Type.SpellsCastLastTurn _ -> quantity
   Quantity.Type.EnteredThisTurn -> quantity
   Quantity.Type.BlockersBeyondFirst -> quantity
   -- Not a leaf: the payload is a whole Quantity and may hide a Count.
@@ -3189,6 +3190,7 @@ quantityReads q = case q of
   Quantity.Type.OpponentsAttacked _ -> Set.empty
   Quantity.Type.CardsDiscardedThisTurn _ -> Set.empty
   Quantity.Type.PlayersDealtDamageThisTurn _ -> Set.empty
+  Quantity.Type.SpellsCastLastTurn _ -> Set.empty
   Quantity.Type.EnteredThisTurn -> Set.empty
   Quantity.Type.BlockersBeyondFirst -> Set.empty
 

@@ -526,6 +526,9 @@ quantityCounts quantity = case quantity of
   -- CR 120.1's tally of logged damage: a PlayerRef and nothing else, so no Count
   -- and no Filter here either.
   Quantity.Type.PlayersDealtDamageThisTurn _ -> []
+  -- CR 601.2i's tally of casts, read off the handoff snapshot: a PlayerRef and
+  -- nothing else, so no Count and no Filter here either.
+  Quantity.Type.SpellsCastLastTurn _ -> []
   -- CR 400.7's logged entry, read against the object the quantity is aimed at: no
   -- reference at all, so no Count and no Filter here either.
   Quantity.Type.EnteredThisTurn -> []
@@ -1322,6 +1325,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.OpponentsAttacked {} -> False
   Quantity.Type.CardsDiscardedThisTurn {} -> False
   Quantity.Type.PlayersDealtDamageThisTurn {} -> False
+  Quantity.Type.SpellsCastLastTurn {} -> False
   Quantity.Type.EnteredThisTurn -> False
   Quantity.Type.BlockersBeyondFirst -> False
   Quantity.Type.AgainstSlot {} -> False

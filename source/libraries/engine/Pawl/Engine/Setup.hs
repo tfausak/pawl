@@ -157,6 +157,7 @@ emptyGame order =
           -- CR 731.1: "the game starts with neither designation".
           GameState.daytime = Nothing,
           GameState.spellsCastLastTurn = 0,
+          GameState.castsLastTurn = mempty,
           GameState.exiledUntilMonarch = Map.empty,
           GameState.haunting = Map.empty,
           GameState.exiledWith = Map.empty,
@@ -483,6 +484,7 @@ restartGame perform exempt starter = do
             -- with neither designation however the ended one finished.
             GameState.daytime = Nothing,
             GameState.spellsCastLastTurn = 0,
+            GameState.castsLastTurn = mempty,
             GameState.exiledUntilMonarch = Map.empty,
             GameState.haunting = Map.empty,
             -- Kept for the CR 727.5 exemptions alone, and cleared for every
@@ -612,6 +614,7 @@ subgameStateFrom starter parent =
           -- neither designation and the main game's is untouched by it.
           GameState.daytime = Nothing,
           GameState.spellsCastLastTurn = 0,
+          GameState.castsLastTurn = mempty,
           GameState.exiledUntilMonarch = Map.empty,
           GameState.haunting = Map.empty,
           GameState.exiledWith = Map.empty,
