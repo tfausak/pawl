@@ -2539,7 +2539,7 @@ takesIgnusOnce ignusId p = case p of
 -- CR 601.2f, reached by CR 602.2b: an ACTIVATION cost is adjusted like a spell's
 -- mana cost, and CR 605.3b gives a mana ability no stack window for
 -- Pawl.Engine.Activate to do it in -- so Cost.manaActivations and
--- Cost.tapForManaVia gather the adjustments themselves.
+-- Cost.tapForManaWith gather the adjustments themselves.
 --
 -- BOTH halves of CR 601.2f, one producer each, both pairings already printed:
 --
@@ -2580,7 +2580,7 @@ activationAdjustmentSpec s registry = Spec.describe s "CR 601.2f a mana ability'
 
   -- The OFFER, asked of the same two boards: CR 605.3a offers an activation the
   -- payment can pay for and no other, so the gate and the payment have to read
-  -- the same total (Cost.manaActivations and Cost.tapForManaVia, one gather).
+  -- the same total (Cost.manaActivations and Cost.tapForManaWith, one gather).
   Spec.it s "CR 605.3a the offer is made against the reduced cost too" $ do
     golem <- S.printingOf s registry "Coal Golem"
     heartstone <- S.printingOf s registry "Heartstone"

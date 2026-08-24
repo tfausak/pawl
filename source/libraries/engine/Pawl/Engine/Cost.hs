@@ -1279,7 +1279,7 @@ canPay pid oid cost gs = case Cost.mana cost of
 -- of creatures cost {1} less" reaches Coal Golem's "{3}, Sacrifice this
 -- creature: Add {R}{R}{R}", and a gate reading {3} refuses an activation the
 -- rules charge {2} for. `manaActivationAdjustments` is the gather, and
--- Cost.tapForManaVia charges the same total off the same one.
+-- Cost.tapForManaWith charges the same total off the same one.
 manaActivations :: Mana.Capacity
 manaActivations measure pcs pid oid cost restrictions gs = manaActivationsGiven (PlayerEffect.applyingTo pid gs) measure pcs pid oid cost restrictions gs
 
@@ -2078,7 +2078,7 @@ orderSensitive component = case component of
 -- The window in full. `inFlight` is the set of permanents whose mana ability is
 -- mid-activation, which is the one thing that has to bound the recursion CR
 -- 602.2b creates; `casting` is payMana's own first argument, the spell being
--- cast. `inFlight` is empty exactly when `casting` may be Just: an activation is
+-- cast. `inFlight` is non-empty only where `casting` is Nothing: an activation is
 -- not a cast.
 --
 -- CR 605.3c is what the set says -- an ability being activated cannot be
@@ -2240,7 +2240,11 @@ tapForManaWith inFlight oid = do
       -- This path adds the whole yield to `controller`; a resolving ability
       -- reads the reference instead (#1673).
       let controller = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
-      case filter (\option -> Activations.times (manaActivations Mana.ForOffer Map.empty controller oid (ManaOption.cost option) (ManaOption.restrictions option) gs) > 0) (Mana.manaOptionsOf oid gs) of
+          -- ONE gather of the player's effects for every option this permanent
+          -- offers, rather than one per option: `manaActivations` would take its
+          -- own, and that walk is the shape #1073 was about.
+          capacity = manaActivationsGiven (PlayerEffect.applyingTo controller gs)
+      case filter (\option -> Activations.times (capacity Mana.ForOffer Map.empty controller oid (ManaOption.cost option) (ManaOption.restrictions option) gs) > 0) (Mana.manaOptionsOf oid gs) of
         [] -> pure False
         first : rest -> do
           chosen <- chooseManaYield controller oid (first NonEmpty.:| rest) gs
@@ -2283,8 +2287,8 @@ tapForManaWith inFlight oid = do
 -- so a cost with none opens none. That is every mana ability in `data/cards/`
 -- but this one, and this is on the path of every tap for mana.
 --
--- The recursion CR 602.2b makes of that window is bounded by payManaExcept, not
--- by the order.
+-- The recursion CR 602.2b makes of that window is bounded by the in-flight set
+-- this function adds to (CR 605.3c), not by the order.
 payActivation :: Set.Set ObjectId -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
 payActivation inFlight pid oid cost = do
   before <- State.get
