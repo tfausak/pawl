@@ -324,9 +324,9 @@ fallsOff pcs gs oid = case Map.lookup oid pcs of
 -- player as defined by the enchant ability, which rule 702's TARGETING
 -- restrictions do not speak to. Protection would bury this Aura, but by its own
 -- separate clause (CR 702.16c), which is not implemented (#2228), while shroud
--- (CR 702.18) and hexproof (CR 702.11)
--- restrict targeting and nothing else -- so an Aura stays attached to a host that
--- gains either. See Target.admittedRecipients.
+-- (CR 702.18) and hexproof (CR 702.11) restrict targeting and nothing else -- so
+-- an Aura stays attached to a host that gains either. See
+-- Target.admittedRecipients.
 --
 -- Pool.Creatures with no Filter is the shape MOST folded enchant slots in this
 -- pool carry (Unholy Strength), and the shape a granted "enchant creature" takes

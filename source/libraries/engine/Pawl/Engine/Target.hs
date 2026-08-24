@@ -283,8 +283,9 @@ admittedGiven pcs grants pools perspective bindings source slot gs =
 
 -- CR 702.18a (shroud), CR 702.11b/702.11d (hexproof) and CR 702.16b
 -- (protection): THE targeting-restriction gate, the one every restriction rule
--- 702 states lands in. It is asked of a candidate the slot has already admitted, and it answers
--- with CR 101.2's "can't": what it rejects is gone, so no Filter can put it back.
+-- 702 states lands in. It is asked of a candidate the slot has already admitted,
+-- and it answers with CR 101.2's "can't": what it rejects is gone, so no Filter
+-- can put it back.
 -- Both of CR 115's moments route through legalRecipients, so neither needs a
 -- clause of its own here.
 --
@@ -298,8 +299,8 @@ admittedGiven pcs grants pools perspective bindings source slot gs =
 --     that player -- CR 109.5's "you" -- and CR 702.11b's "your" is the
 --     CANDIDATE's controller, which CR 109.5 fixes for a static ability.
 --     opponentOf below is that comparison, and both of rule 702.11's permanent
---     clauses carry it. Protection carries neither: rule 702.16b names no player,
---     so it stops the candidate's own controller as shroud does.
+--     clauses carry it. Protection does NOT: rule 702.16b names no player at
+--     all, so it stops the candidate's own controller as shroud does.
 --   * WHAT IS AIMING. CR 702.11d's variant adds a quality the SOURCE must have
 --     -- "[quality] spells your opponents control or abilities your opponents
 --     control from [quality] sources" -- which `sourceView` answers and plain
@@ -309,8 +310,8 @@ admittedGiven pcs grants pools perspective bindings source slot gs =
 --
 -- The quality is matched against the source with the CANDIDATE's controller as
 -- the Context's perspective, not the targeting player's: rule 702.11d's ability,
--- and rule 702.16b's, is a static ability of the candidate, so CR 109.5 fixes its "you" as the
--- candidate's controller. No quality in the pool reads a perspective at all --
+-- and rule 702.16b's, is a static ability of the candidate, so CR 109.5 fixes its
+-- "you" as the candidate's controller. No quality in the pool reads a perspective at all --
 -- CR 702.16a's list of what a quality may be is "any characteristic value or
 -- information", and every printed one is a colour or a card type -- but the frame
 -- has to be right before one does.
@@ -337,8 +338,8 @@ admittedGiven pcs grants pools perspective bindings source slot gs =
 -- The restrictions after these three widen this function and nothing else.
 --
 -- CR 702.18a's "or player" half, CR 702.11c's and CR 702.16b's come in through a
--- DIFFERENT reader. A player has no keywords: rule 702's keywords live on objects and are
--- folded by the CR 613.1-613.7 layers, so the player halves ride the CR
+-- DIFFERENT reader. A player has no keywords: rule 702's keywords live on objects
+-- and are folded by the CR 613.1-613.7 layers, so the player halves ride the CR
 -- 613.10/613.11 player axis as PlayerEffect.CantBeTargetedBy (Ivory Mask, Leyline
 -- of Sanctity). PlayerEffect.protectedFromTargeting is the typed question; this
 -- module never sees the constructor. The two halves are separate readers because
@@ -386,9 +387,9 @@ targetable pcs perspective source sourceView gs recipient =
             -- so this disjunct carries no opponentOf -- a black spell its own
             -- controller casts cannot target their own creature with protection
             -- from black, where hexproof from black would have let it through.
-            -- Its `stops` is `stops (Just f)` above, which is why the quality
-            -- reads the same Context: rule 702.16b's ability is the CANDIDATE's,
-            -- so CR 109.5 fixes its "you" as the candidate's controller too.
+            -- What it asks OF THE SOURCE is `stops (Just f)` above, down to the
+            -- Context: rule 702.16b's ability is the CANDIDATE's, so CR 109.5
+            -- fixes its "you" as the candidate's controller too.
             protects = Filter.matches (Filter.contextFor controller (Just source)) sourceView
             -- The conjuncts are in cost order, and the order is the whole reason
             -- `sourceView` costs nothing on an ordinary board: no hexproof or

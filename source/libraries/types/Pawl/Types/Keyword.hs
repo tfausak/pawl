@@ -138,13 +138,13 @@ data Keyword
     -- CR 702.15d makes it zone-independent, so this is never asked of a live board
     -- when the life is handed over.
     Lifelink
-  | -- | 702.16a: "Protection from [quality]." Four separate prohibitions, which
-    -- rule 702.16 states in four clauses and which reach four different readers:
-    -- CR 702.16b's targeting (Pawl.Engine.Target.targetable), CR 702.16e's damage
-    -- (a prevent-all row minted by Pawl.Engine.Keyword.mintedReplacementsFor), CR
-    -- 702.16f's blocking (a CR 509.1b pairwise restriction minted by
-    -- Pawl.Engine.Keyword.mintedCombatRestrictionsFor), and CR 702.16c/702.16d's
-    -- attachment.
+  | -- | 702.16a: "Protection from [quality]." FOUR SEPARATE PROHIBITIONS, stated
+    -- in five clauses and reaching four different readers: CR 702.16b's targeting
+    -- (Pawl.Engine.Target.targetable), CR 702.16e's damage (a prevent-all row
+    -- minted by Pawl.Engine.Keyword.mintedReplacementsFor), CR 702.16f's blocking
+    -- (a CR 509.1b pairwise restriction minted by
+    -- Pawl.Engine.Keyword.mintedCombatRestrictionsFor), and the attachment of CR
+    -- 702.16c's Auras and CR 702.16d's Equipment and Fortifications.
     --
     -- Not implemented: CR 702.16c's Auras and CR 702.16d's Equipment and
     -- Fortifications, so an Aura or Equipment with the stated quality may still
@@ -156,8 +156,8 @@ data Keyword
     -- IS two protection abilities, so a card printing two writes two entries in
     -- Pawl.Types.Face's Set and CR 702.16m's redundancy is per key. A Filter
     -- rather than a Color because CR 702.16a says the quality "can be any
-    -- characteristic value or information"; protection from artifacts and
-    -- protection from multicolored are printed.
+    -- characteristic value or information": Angelic Curator prints protection
+    -- from artifacts and Soldier of the Pantheon protection from multicolored.
     --
     -- NOT a hexproof arm, for the reason Shroud is not one either: rule 702.11d
     -- asks WHO is aiming as well as what, and rule 702.16b asks only what -- a
