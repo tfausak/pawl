@@ -1,1 +1,11 @@
 packages: .
+-- Nothing in the tree uses Template Haskell, so the dynamic objects GHC builds
+-- alongside the static ones are never loaded. Skipping them cuts a clean build
+-- of pawl:types from 27.0s to 17.1s. flake.nix does the same for Nix builds,
+-- which run Setup directly and never read this file.
+executable-dynamic: False
+shared: False
+-- The pedantic flag's -Werror turns -Wunused-packages into a load failure in
+-- GHCi, which links every sublibrary but compiles a module that uses one of
+-- them. Downgrading it there is what makes `cabal repl` usable at all.
+repl-options: -Wwarn=unused-packages

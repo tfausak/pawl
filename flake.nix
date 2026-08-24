@@ -44,6 +44,12 @@
           pkgs = nixpkgs.legacyPackages.${system};
           pawl = pkgs.lib.pipe (pkgs.haskellPackages.callCabal2nix "pawl" source { }) [
             pkgs.haskell.lib.compose.doBenchmark
+            # Nothing in the tree uses Template Haskell, so the dynamic objects
+            # GHC builds alongside the static ones are never loaded. cabal.project
+            # says the same thing for local builds; this builder runs Setup
+            # directly and never reads that file.
+            pkgs.haskell.lib.compose.disableSharedExecutables
+            pkgs.haskell.lib.compose.disableSharedLibraries
             (pkgs.haskell.lib.compose.enableCabalFlag "pedantic")
             (pkgs.haskell.lib.compose.overrideCabal (old: {
               postInstall = (old.postInstall or "") + ''
@@ -122,6 +128,7 @@
               pkgs.fzf
               pkgs.gh
               pkgs.ghc
+              pkgs.ghcid
               pkgs.git
               pkgs.hlint
               pkgs.jq
