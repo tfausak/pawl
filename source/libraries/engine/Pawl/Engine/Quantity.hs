@@ -973,6 +973,9 @@ mapScope f scope = case scope of
   Scope.InZone (InZone.MkInZone zone ref) -> Scope.InZone (InZone.MkInZone zone (f ref))
   Scope.OverPlayers ref -> Scope.OverPlayers (f ref)
   Scope.InHistory _ -> scope
+  -- CR 400.7j's fold names a SLOT rather than a player reference, so there is
+  -- nothing here for either baking to rewrite.
+  Scope.OverBound _ -> scope
 
 -- CR 608.2i's look-back names no player and no slot; a zone scope names whose
 -- zone it is, and a player scope names the players themselves -- the same
@@ -982,6 +985,13 @@ scopeIsSlotless scope = case scope of
   Scope.InZone (InZone.MkInZone _ ref) -> playerRefIsSlotless ref
   Scope.InHistory _ -> True
   Scope.OverPlayers ref -> playerRefIsSlotless ref
+  -- False for PlayerRef.InSlot's reason, one position over: this arm reads a
+  -- slot and `slots` above does not report it, so the reported set is not the
+  -- whole of what evaluating the count reads (#1079). Stated from the rule
+  -- rather than from a test: answering True leaves the suite green, CR 603.3b's
+  -- elision being a trigger-ordering question that nothing in data/cards/ writing
+  -- this scope on a TRIGGERED ability could reach.
+  Scope.OverBound _ -> False
 
 -- Does this quantity read CR 601.2b's announced X? Since #14 retired X's
 -- dedicated constructor, that read is a Quantity.InSlot naming

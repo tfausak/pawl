@@ -111,9 +111,44 @@ evaluate viewOf quantityOf context gs count = case Count.Type.scope count of
     -- covers, is what pays for the builder.
     let kept = fmap ((,) Nothing) (Maybe.mapMaybe (\pid -> keep (bakePerspective viewOf context gs pid predicate) context (Just (playerView gs pid))) pids)
     aggregate quantityOf aggregation kept
+  -- CR 400.7j: the objects one of the surrounding announcement's slots names,
+  -- wherever they wound up. The one scope whose candidates come from the
+  -- resolution's bindings rather than from the board, which is what lets it
+  -- follow a CR 614 redirect that moved them out of the zone the effect aimed
+  -- them at: Psychic Miasma's "if a land card is discarded this way" asked
+  -- under Rest in Peace.
+  --
+  -- Candidates are LIVE objects, so the injected ViewOf answers them exactly as
+  -- it answers the zone arm's -- and the two agree on any candidate they share,
+  -- since Filter.IsBound over a zone fold reaches the same ids.
+  Scope.OverBound slot ->
+    let ids = Set.toList (Map.findWithDefault Set.empty slot (Filter.slotObjects context))
+        kept = Maybe.mapMaybe (\oid -> if findableAfterMove gs oid then fmap ((,) (Just oid)) (keep predicate context (viewOf oid)) else Nothing) ids
+     in aggregate quantityOf aggregation kept
   where
     predicate = Count.Type.filter count
     aggregation = Count.Type.aggregation count
+
+-- CR 400.7j / CR 400.2: may a later part of the effect that moved this object
+-- FIND it? Only where it landed in a public zone, which is what
+-- Game.isHiddenZone classifies. CR 701.9c is why the hidden side cannot simply
+-- be counted anyway: a card discarded into a hidden zone has every
+-- characteristic undefined, so no Filter has an honest answer about it.
+--
+-- The EXCLUSION is not observable by any card in data/cards/: nothing in the
+-- pool replaces a move into a graveyard with one into a hidden zone, so every
+-- candidate this sees today is public and dropping the test altogether leaves
+-- the suite green. Kept because CR 400.7j states it, as a regression fence
+-- rather than as a proven behaviour (#2230). Admitting a PUBLIC candidate is
+-- proven -- Pawl.ZoneChangeSpec's Psychic Miasma leg under Rest in Peace reads
+-- a discarded card out of exile.
+--
+-- False for an id with no object, which is one that has ceased to exist since
+-- the binding was written -- CR 111.7's token, whose exile leaves nothing.
+findableAfterMove :: GameState -> ObjectId -> Bool
+findableAfterMove gs oid = case Game.lookupObject oid gs of
+  Nothing -> False
+  Just object -> not (Game.isHiddenZone (Object.zone object))
 
 -- The binding slots the per-member quantity of a count reads, with the reader
 -- INJECTED for the module-cycle reason QuantityOf is. Only Aggregation.Greatest
