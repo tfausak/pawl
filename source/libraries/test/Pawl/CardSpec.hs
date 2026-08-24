@@ -5244,10 +5244,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let offenders = filter (anyFace printedBoxOffends . Printing.card) ps
     Spec.assertEqWith s "no printed box holds a computed quantity" (fmap (S.nameOf . Printing.card) offenders) []
     -- The sweep is vacuous on a predicate that accepts everything, so both
-    -- directions are asserted on real card data. Rootha, Mastering the Moment is
-    -- the pool's one computed box, and it sits on a MINTED face (CR 111.3), which
-    -- is exactly the shape the sweep above must not reach and the predicate must
-    -- still reject.
+    -- directions are asserted on real card data. Rootha, Mastering the Moment
+    -- prints a computed box (Miming Slime's Ooze is the other), and it sits on a
+    -- MINTED face (CR 111.3), which is exactly the shape the sweep above must not
+    -- reach and the predicate must still reject.
     rootha <- S.printingOf s registry "Rootha, Mastering the Moment"
     let elemental = mintedFaces (S.combinedFace rootha)
     Spec.assertBool

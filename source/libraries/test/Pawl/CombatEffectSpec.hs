@@ -1116,9 +1116,10 @@ stayHomeAnswer homebody p = case p of
 -- CR 506.4: "A permanent is removed from combat if ... an effect specifically
 -- removes it from combat." The rule's one clause a card ASKS for, rather than a
 -- condition the engine has to notice -- and Labyrinth of Skophos is the pool's
--- producer: "{T}: Add {C}. / {4}, {T}: Remove target attacking or blocking
--- creature from combat." (Land, Murders at Karlov Manor Commander; oracle text
--- checked against Scryfall.)
+-- TARGETED producer: "{T}: Add {C}. / {4}, {T}: Remove target attacking or
+-- blocking creature from combat." (Land, Murders at Karlov Manor Commander;
+-- oracle text checked against Scryfall.) The Save Point group below is the
+-- swept-set half of the same opcode.
 --
 -- Every leg runs whole steps through Engine.runStep, so the combat record under
 -- test is the engine's own: the fixture declares nothing by hand. The two damage
