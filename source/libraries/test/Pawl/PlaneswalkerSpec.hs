@@ -414,6 +414,29 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
         after = useAbility plusTwo jace jaceId board
     Spec.assertEqWith s "six plus two, not six plus four" (S.counterOf CounterKind.Loyalty jaceId after) 8
 
+  -- The control above with ONE thing changed: Vorinclex, Monstrous Raider's
+  -- clause names a PLAYER ("if you would put") rather than an effect, and the
+  -- payer is a player whatever moment they pay at -- so CR 614.1 reaches the
+  -- cost CR 606.4 charges where CR 614.16 does not. Mirrors
+  -- Pawl.ReplacementSpec's "CR 614.1 Vorinclex DOES double the same blight".
+  --
+  -- Vorinclex is on the battlefield BEFORE Jace resolves on purpose. CR 306.5b's
+  -- entry counters go through the same funnel, so the six witnesses that the row
+  -- is live, is gathered, resolves its "yours" against alice and reaches this
+  -- very object -- without which the ten could not tell a fix from a Vorinclex
+  -- that never applied at all. It is asserted SECOND so that it cannot absorb a
+  -- mutation of the cost placement the ten exists to prove.
+  Spec.it s "CR 614.1 Vorinclex doubles a loyalty ability's own cost" $ do
+    island <- S.printingOf s registry "Island"
+    jace <- S.printingOf s registry "Jace Beleren"
+    vorinclex <- S.printingOf s registry "Vorinclex, Monstrous Raider"
+    let (gs, handId) = S.handOne jace (snd (S.addCreature vorinclex S.alice (stockLibraries island (S.landsInPlay island 3))))
+        board = S.runPure S.identityAnswer gs (do S.cast S.alice handId; Stack.resolveTop)
+        jaceId = theJace board
+        after = useAbility plusTwo jace jaceId board
+    Spec.assertEqWith s "six plus four, not six plus two" (S.counterOf CounterKind.Loyalty jaceId after) 10
+    Spec.assertEqWith s "and the row was live on the way in: three doubled to six" (S.counterOf CounterKind.Loyalty jaceId board) 6
+
   -- CR 115.4: "These targets may be creatures, players, planeswalkers, or
   -- battles." Read off Lightning Bolt's OWN committed target slot rather than a
   -- hand-built one, so what is under test is the pool the card data selects.
