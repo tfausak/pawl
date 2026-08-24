@@ -1210,12 +1210,11 @@ apply batch candidate event =
       -- to zero, which is Integer.toNaturalSaturating.
       --
       -- The permanent is already materialized on the battlefield when this loop
-      -- runs (see runEntry), so the ordinary battlefield builders answer: the CR
-      -- 613 projection through viewWithLastKnown, and a Filter context framed by
-      -- the entrant's own controller. Filter.contextFor leaves every slot empty,
-      -- which is honest here because an as-enters replacement resolves no spell
-      -- and binds no slot; a quantity reading one would answer Nothing rather than
-      -- wrongly (#1876).
+      -- runs (see runEntry), so the CR 613 projection answers for it. The Context
+      -- is the ROW's, through Replacement.candidateContext: CR 109.5's "you" is
+      -- the row's controller rather than the entrant's, and a floating row's
+      -- captured slot bindings ride along, which is what a bare Filter.contextFor
+      -- would have dropped; see #2141 for the four callers that still do.
       --
       -- Consumed unconditionally: CR 614.5 is about the row having applied, and a
       -- row whose amount would not evaluate has still applied. Consuming only on
@@ -1223,7 +1222,7 @@ apply batch candidate event =
       EntryRewrite.WithCounters (WithCounters.MkWithCounters kind quantity) -> do
         gs <- State.get
         let viewOf = Projection.viewWithLastKnown oid gs
-            context = Filter.contextFor (Projection.controllerOf oid gs) (Just oid)
+            context = Replacement.candidateContext candidate
         Replacement.consume (ReplacementCandidate.identity candidate)
         case Quantity.evaluate viewOf context gs oid quantity of
           Nothing -> pure () -- unevaluable quantity: no counters (Resolve's PutCounters posture)
@@ -1845,7 +1844,7 @@ apply batch candidate event =
       TurnUpRewrite.WithCounters (WithCounters.MkWithCounters kind quantity) -> do
         gs <- State.get
         let viewOf = Projection.viewWithLastKnown oid gs
-            context = Filter.contextFor (Projection.controllerOf oid gs) (Just oid)
+            context = Replacement.candidateContext candidate
         Replacement.consume (ReplacementCandidate.identity candidate)
         case Quantity.evaluate viewOf context gs oid quantity of
           Nothing -> pure ()

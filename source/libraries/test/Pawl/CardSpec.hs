@@ -3389,7 +3389,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChooseColor -> []
   EntryRewrite.ChooseBasicLandType -> []
   EntryRewrite.ChoosePlayer -> []
-  -- CR 122.6's amount is a Quantity (Undergrowth Scavenger's "equal to the number
+  -- CR 614.1c's amount is a Quantity (Undergrowth Scavenger's "equal to the number
   -- of creature cards in all graveyards"), so a Count inside it holds card text on
   -- the same axis EntryRiders' counts do -- riderFilters walks those, and this
   -- walks this.
