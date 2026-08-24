@@ -3636,7 +3636,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- this spell, blight X" is paid while the spell is being CAST, so CR 609.1
   -- gives the placement no resolving spell or ability to be the effect of and
   -- rule 614.16's row does not apply -- Pawl.Types.CounterCause.ByPayment, which
-  -- Pawl.Engine.Cost.counterCause chooses off the payment's moment (#1647).
+  -- Pawl.Engine.Cost.counterCause chooses off the payment's moment; see #1647.
   --
   -- Wall of Stone is 0/8 so BOTH readings leave it alive: three counters and six
   -- are each an assertable count, where a creature that died under the doubled

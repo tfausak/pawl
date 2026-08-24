@@ -2524,7 +2524,7 @@ payComponent moment pid oid component = case component of
   -- Not implemented: a player-grain counter replacement (Vorinclex, Monstrous
   -- Raider's "if you would put") reaches a cost-paid placement and so should
   -- reach this one, where the direct edit gives it no opportunity. CR 614.16's
-  -- effect-grain rows are exact here either way (#2223).
+  -- effect-grain rows are exact here either way (#2221).
   CostComponent.AddLoyaltyToThis n -> do
     State.modify' (\gs -> gs {GameState.objects = Map.adjust (addLoyalty n) oid (GameState.objects gs)})
     pure bindsNothing
@@ -2634,7 +2634,7 @@ payComponent moment pid oid component = case component of
 --
 -- What this buys is Soul Immolation beside Doubling Season: the blight is the
 -- payer's, and no effect's, so rule 614.16's row does not apply and X counters
--- go on rather than 2X (#1647). Vorinclex, Monstrous Raider's row names a player
+-- go on rather than 2X; see #1647. Vorinclex, Monstrous Raider's row names a player
 -- instead and still applies, which is the pair that says the answer is about the
 -- CAUSE and not about counters-during-costs.
 counterCause :: PaymentMoment.PaymentMoment -> PlayerId -> CounterCause.CounterCause
