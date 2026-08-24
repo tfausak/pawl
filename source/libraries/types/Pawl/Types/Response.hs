@@ -158,6 +158,14 @@ data Response
     -- Hatred-style announcement would be a silent wrong answer rather than a
     -- desync.
     ChosePaidEnergy Natural.Natural
+  | -- | CR 702.155b / 714.3b: the chapter a player chose for an entering Saga
+    -- with read ahead.
+    --
+    -- Its own constructor and not ChosePaidEnergy or ChoseX, though all three
+    -- carry one Natural, for ChosePaidEnergy's reason: this one is made as a
+    -- permanent ENTERS (CR 614.12a), and a transcript of one replaying as
+    -- another would be a silently wrong answer rather than a desync.
+    ChoseReadAheadChapter Natural.Natural
   | -- | CR 609.7a: the damage source a player chose for a prevention effect that
     -- names one.
     --

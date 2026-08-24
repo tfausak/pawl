@@ -2005,6 +2005,9 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
   EntryRewrite.ChooseColor -> rewrite
   EntryRewrite.ChooseBasicLandType -> rewrite
   EntryRewrite.ChoosePlayer -> rewrite
+  -- CR 702.155b's offer is a range of NUMBERS, read off the entering Saga's own
+  -- chapter symbols (CR 714.2d), so the rewrite prints no word either.
+  EntryRewrite.ReadAhead -> rewrite
   -- CR 201.4a's restriction on which names may be named.
   EntryRewrite.ChooseCardNames f -> EntryRewrite.ChooseCardNames (Filter.rewrite pairs f)
   EntryRewrite.WithCounters w -> EntryRewrite.WithCounters (rewriteWithCounters pairs w)

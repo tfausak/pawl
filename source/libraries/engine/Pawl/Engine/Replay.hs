@@ -71,6 +71,7 @@ encode p answer = case p of
   Prompt.ChooseAmass {} -> Response.ChoseAmass answer
   Prompt.ChooseBlight {} -> Response.ChoseBlight answer
   Prompt.ChoosePaidEnergy {} -> Response.ChosePaidEnergy answer
+  Prompt.ChooseReadAheadChapter {} -> Response.ChoseReadAheadChapter answer
   Prompt.ChooseDamageSource {} -> Response.ChoseDamageSource answer
   Prompt.ChooseCardInGraveyard {} -> Response.ChoseCardInGraveyard answer
   Prompt.ChooseCardInHand {} -> Response.ChoseCardInHand answer
@@ -224,6 +225,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChoosePaidEnergy {} -> case response of
     Response.ChosePaidEnergy n -> Just n
+    _ -> Nothing
+  Prompt.ChooseReadAheadChapter {} -> case response of
+    Response.ChoseReadAheadChapter n -> Just n
     _ -> Nothing
   Prompt.ChooseDamageSource {} -> case response of
     Response.ChoseDamageSource oid -> Just oid
@@ -598,6 +602,10 @@ defaultAnswer p = case p of
   -- CR 107.14's payment is "any amount", zero included, and paying nothing is
   -- how a transcript that ran out declines it.
   Prompt.ChoosePaidEnergy {} -> 0
+  -- CR 702.155b's range opens at one, and Pawl.Engine.Event never raises this
+  -- prompt for a Saga whose final chapter number is 0, so the floor is always
+  -- legal. The smallest answer, for ChooseX's reason.
+  Prompt.ChooseReadAheadChapter {} -> 1
   -- The first `count` legal modes, deterministically -- and under CR 700.2d's
   -- "You may choose the same mode more than once" the LEAST legal mode that many
   -- times, since there may be fewer legal modes than the count and the answer

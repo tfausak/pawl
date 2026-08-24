@@ -235,6 +235,24 @@ data Prompt r where
   -- implemented: skipping it when the bound is 0, where the one payable amount is
   -- determined (#1920).
   ChoosePaidEnergy :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt Natural.Natural
+  -- | CR 702.155b / 714.3b: which chapter a Saga with read ahead enters on --
+  -- "choose a number between one and this Saga's final chapter number", asked as
+  -- the Saga enters (Love Song of Night and Day). The ObjectId is the entering
+  -- Saga; the Natural is CR 714.2d's final chapter number, the top of the
+  -- inclusive range.
+  --
+  -- The bound is ENFORCED rather than advisory, ChoosePaidEnergy's position and
+  -- not ChooseX's: rule 702.155b names a closed range, so
+  -- Pawl.Engine.Event clamps the answer into it rather than letting an answerer
+  -- name a chapter the Saga does not print. Rule 601.2's reversal, which is what
+  -- makes ChooseX's bound advisory, has no counterpart in an entry replacement --
+  -- CR 614.12a settles the choice before the permanent enters.
+  --
+  -- NOT RAISED where the range holds one number: a one-chapter Saga leaves
+  -- nothing to decide, EntryRewrite.ChoiceOf's elision. Not raised for a bound of
+  -- 0 either, which is CR 714.2d's abilityless Saga -- an empty range, so no
+  -- counters and no question.
+  ChooseReadAheadChapter :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt Natural.Natural
   -- | CR 609.7a: which SOURCE OF DAMAGE a player chooses for a prevention
   -- effect that names one (Healing Grace's "by a source of your choice"). The
   -- ObjectId is the spell or ability resolving; the NonEmpty is the sources it

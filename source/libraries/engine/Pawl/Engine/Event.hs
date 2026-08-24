@@ -1429,6 +1429,51 @@ apply batch candidate event =
       -- on, which for this one is the permanent that entered a moment ago and has
       -- the newest object timestamp on the board -- so the two coincide at every
       -- ordering question a card in this pool can ask.
+      -- CR 702.155b / 714.3b: read ahead's two intrinsic abilities, applied as
+      -- one rewrite -- choose a number between one and this Saga's final chapter
+      -- number, then enter with that many lore counters.
+      --
+      -- THE BOUND is CR 714.2d's final chapter number, read off the entering
+      -- permanent's own projection rather than off the row: the row is minted
+      -- from the projection by Pawl.Engine.Saga.entryReplacementsOf, but a layer
+      -- effect could have changed which chapter abilities the Saga has since, and
+      -- rule 714.2d asks about the abilities it HAS.
+      --
+      -- The counters go through putOwnCountersIn, CR 122.6's funnel, so CR 614.16
+      -- applies to them exactly as it does to riot's counter below.
+      EntryRewrite.ReadAhead -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        let bound = Saga.finalChapterOf (Projection.project oid gs)
+        picked <- case (Projection.controllerOf oid gs, bound) of
+          -- CR 714.2d's abilityless Saga: "between one and 0" names an EMPTY
+          -- range, so there is nothing to ask and no counter to place. No
+          -- printing reaches it -- it needs a read-ahead Saga an effect has
+          -- stripped of its chapter abilities -- and this is rule 714.2d read
+          -- honestly rather than a question withheld.
+          (_, 0) -> pure 0
+          -- Unreachable, and defensive for the arms above's reason: the object is
+          -- materialized on the battlefield before this loop runs, so
+          -- controllerOf falls back to its owner. Chooses the FLOOR of rule
+          -- 702.155b's range rather than conjuring a chapter, which is also
+          -- Replay.defaultAnswer's answer.
+          (Nothing, _) -> pure 1
+          (Just controller, _)
+            -- CR 702.155b's range holds one number, so nothing is left to decide
+            -- -- EntryRewrite.ChoiceOf's elision, and no player's choice is being
+            -- made. At two or more the chapters are distinguishable (entering on
+            -- II skips I), so the prompt is owed.
+            | bound == 1 -> pure 1
+            | otherwise -> do
+                let decider = Decide.deciderFor controller gs
+                answer <- Game.choose (Prompt.ChooseReadAheadChapter decider controller oid bound)
+                -- CLAMPED rather than trusted, Prompt.ChoosePaidEnergy's posture:
+                -- rule 702.155b names a closed range and an answerer naming a
+                -- chapter outside it would put the Saga past its final chapter
+                -- (CR 704.5s) or leave it on none.
+                pure (max 1 (min bound answer))
+        Monad.when (picked > 0) (Monad.void (putOwnCountersIn batch oid CounterKind.Lore picked))
+        pure (Just event)
       EntryRewrite.Riot -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         gs <- State.get
@@ -6873,9 +6918,20 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- thresholds at once (CR 714.2b says "at least N", not "exactly N"): a Saga
   -- given two lore counters while it has none fires chapters I and II together.
   -- Read ahead (CR 702.155a) is the mechanic that wants the equality instead, and
-  -- then only on the turn the Saga entered; it is not implemented (#841).
+  -- then only on the turn the Saga entered -- Saga.chapterTriggers, which asks
+  -- Saga.readAheadRestricted of the bearer.
+  --
+  -- The narrowing does NOT leak past Sagas even though this arm is generic over
+  -- counter kind: readAheadRestricted gates on Keyword.ReadAhead, which rule
+  -- 702.155a puts only on Saga cards, so the extra conjunct is inert for every
+  -- other counter this condition watches. A CounterKind.Lore test here would
+  -- restate that gate rather than add to it.
+  --
+  -- Projected LAZILY, and Saga.chapterTriggers asks `after == n` first, so the
+  -- whole-board projection is forced only where the two readings could differ.
   TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached wanted n) -> case event of
-    GameEvent.CountersPut (CounterChange.MkCounterChange oid kind before after) -> oid == bearer && kind == wanted && Saga.crossed before after n
+    GameEvent.CountersPut (CounterChange.MkCounterChange oid kind before after) ->
+      oid == bearer && kind == wanted && Saga.chapterTriggers (Saga.readAheadRestricted (Projection.project bearer gs) gs bearer) before after n
     -- Rule 714.2b says "are PUT onto", so a removal crosses nothing: a Saga whose
     -- lore counters were taken off and put back fires its chapters again.
     GameEvent.CountersRemoved {} -> False

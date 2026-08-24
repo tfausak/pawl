@@ -778,6 +778,14 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.Compleated
       " {\"type\":\"Compleated\"} "
     Spec.assertBool s (Codec.encode Keyword.codec Keyword.Compleated /= Codec.encode Keyword.codec Keyword.Riot) "compleated and riot encode differently"
+  -- CR 702.155a/c: nullary, and redundant in multiples, so nothing rides it.
+  Spec.it s "ReadAhead" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.ReadAhead
+      " {\"type\":\"ReadAhead\"} "
+    Spec.assertBool s (Codec.encode Keyword.codec Keyword.ReadAhead /= Codec.encode Keyword.codec Keyword.Riot) "read ahead and riot encode differently"
   Spec.it s "Daybound" $
     Common.assertCodec
       s
