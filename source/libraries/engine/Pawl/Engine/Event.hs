@@ -10885,6 +10885,10 @@ delayedPending events gs =
           (DelayedTrigger.controller entry)
           (DelayedTrigger.ability entry)
           (DelayedTrigger.bindings entry)
+          -- CR 603.12: a reflexive ability follows CR 603.7, so it carries the
+          -- creation moment too. No card exercises the pairing -- nothing
+          -- reflexive transforms -- so this is CR 701.27f as the rule states it
+          -- rather than a behaviour a test pins.
           (Just (DelayedTrigger.createdAt entry))
       -- CR 603.2 plus CR 603.4: the event matched AND the intervening "if" held,
       -- which together are what "triggered" means. Per occurrence, since CR 603.4

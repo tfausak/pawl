@@ -127,10 +127,23 @@ backFace = (Set.singleton antagonizerName, Just (4, 2), Set.fromList [Subtype.Ga
 
 -- CR 701.27f's SECOND sentence needs a permanent whose own DELAYED ability turns
 -- it over, and something else able to turn it over in between. Aang, at the
--- Crossroads // Aang, Destined Savior is the only printing of that shape whose
--- front face is a Human, which is what puts it in reach of Moonmist's "transform
--- all Humans" -- the pool's one way to turn a permanent over without using its
--- own ability.
+-- Crossroads // Aang, Destined Savior is that permanent, and Moonmist is that
+-- something else: of the Transform opcodes in `data/cards/`, Moonmist's is the
+-- only one whose ObjectRef is not `InSlot "self"`, so it is what can turn a
+-- permanent over without being an ability of it -- and it names Humans, which
+-- Aang's front face is. A second such card in the corpus would give this
+-- fixture a choice; today there is none.
+--
+-- WHY Aang and not Archangel Avacyn, which prints the same shape: Avacyn is an
+-- Angel, and nothing in `data/cards/` can turn an Angel over, so a board built
+-- on it agrees under both clocks. Scryfall
+-- `o:transform o:"beginning of the next" include:extras`, 2026-08-24, returns
+-- eight cards; of the four whose front face is a Human, Liliana, Heretical
+-- Healer and Loyal Cathar return transformed from another zone rather than
+-- transforming a permanent, and Sun-Blessed Guardian transforms through an
+-- activated ability with no delayed one. A printing whose delayed ability
+-- transforms it and whose front face shares a subtype with a corpus
+-- transformer would refute the choice, not the rule.
 --
 -- Not implemented: Aang's back face prints "at the beginning of combat on your
 -- turn, earthbend 2", and CR 701.66a's keyword action does not exist, so the
