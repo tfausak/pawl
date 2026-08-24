@@ -43,8 +43,9 @@ import qualified Pawl.Types.TapState as TapState
 -- up is the design call rather than an oversight. CR 509.4's parenthetical --
 -- "unless the effect that put it onto the battlefield specifies what it's
 -- blocking" -- is the case every printing of this shape is in: Flash Foliage
--- names a target, Brimaz, King of Oreskos and Aetherplasm name a trigger's
--- binding, Mirror Match names the attacker it copied. So the field names the
+-- names a target and Aetherplasm names a trigger's binding, both in the pool;
+-- Brimaz, King of Oreskos names a trigger's binding too and Mirror Match names
+-- the attacker it copied, neither pooled. So the field names the
 -- SLOT the effect specified, and the engine never asks. A Bool plus a prompt
 -- would put a question to the player that the effect has already answered.
 --
@@ -56,8 +57,14 @@ import qualified Pawl.Types.TapState as TapState
 -- Applied by Pawl.Engine.Combat.putOntoBattlefieldBlocking, which is where CR
 -- 506.3e and CR 509.4a's two no-op conditions live and where CR 509.4b's
 -- exemption from the declaration's requirements and restrictions is what NOT
--- asking canBlock amounts to. Read by Create alone: the pool's producer is a
--- token, and Pawl.CardSpec's corpus lint holds that no MoveToZone sets it.
+-- asking canBlock amounts to. READ BY BOTH opcodes, like `counters` below: a
+-- Create hands its tokens to that function from the minting loop (Flash
+-- Foliage), a MoveToZone hands the card it moved to it from moveOne
+-- (Aetherplasm's "put a creature card from your hand onto the battlefield
+-- blocking that creature"). Nothing in CR 509.4 privileges either door -- the
+-- rule is worded "put onto the battlefield", which a card does as much as a
+-- token. Pawl.CardSpec's corpus lint fences the DESTINATION instead: on any zone
+-- but the battlefield the rider says something nothing reads.
 --
 -- `transformed` is a Bool rather than a face name for the reason CR 712.14a
 -- states: "If a spell or ability puts a double-faced card onto the battlefield

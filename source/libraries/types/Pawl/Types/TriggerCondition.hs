@@ -300,8 +300,8 @@ data TriggerCondition
     --
     -- A creature put onto the battlefield blocking records that same event, so
     -- the match reads BecameBlocking.putOntoBattlefield to stay off it: rule
-    -- 509.3b's last sentence, a regression fence rather than proved behaviour
-    -- (#2182).
+    -- 509.3b's last sentence, which Aetherplasm putting Loyal Sentry onto the
+    -- battlefield blocking proves at gameplay level.
     --
     -- Not implemented: rule 509.3b's other producer, an effect that causes the
     -- bearer to block, records no event (#1146).
@@ -360,8 +360,10 @@ data TriggerCondition
     -- blocking records the same event, through
     -- Pawl.Engine.Combat.putOntoBattlefieldBlocking, and this condition does not
     -- read BecameBlocking.putOntoBattlefield where SelfBlocksCreature does.
-    -- Flash Foliage blocking Benalish Cavalry is the pool's producer, and
-    -- Pawl.CombatEffectSpec's PutOntoBattlefieldBlocking group is the proof.
+    -- Flash Foliage blocking Benalish Cavalry is the pooled pair that fires it,
+    -- and Pawl.CombatEffectSpec's PutOntoBattlefieldBlocking group is the proof.
+    -- Aetherplasm reaches the same function from a MoveToZone, but nothing it
+    -- can put out carries flanking, so it observes nothing here.
     --
     -- Not implemented: rule 509.3d's remaining producer, an effect that causes a
     -- creature to block, records no event (#1146).

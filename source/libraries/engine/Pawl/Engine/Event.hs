@@ -5528,9 +5528,11 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
         -- onto the battlefield blocking." CR 509.3d's arm below is where that
         -- same event does fire, which is the whole reason it is recorded.
         --
-        -- A REGRESSION FENCE rather than proved behaviour: dropping this guard
-        -- leaves the whole suite green, the pool's one CR 509.4 producer making
-        -- a vanilla token that can bear no such trigger (#2182).
+        -- Proved rather than fenced, since Aetherplasm: it puts a creature
+        -- CARD onto the battlefield blocking, so the arrival brings its own
+        -- text. Pawl.CombatEffectSpec puts Loyal Sentry out that way against a
+        -- 2/2 and reddens here when this guard is dropped, with the same Sentry
+        -- DECLARED as the control leg where it does fire.
         not (BecameBlocking.putOntoBattlefield b) ->
           let attacker = BecameBlocking.attacker b
            in case Projection.viewWithLastKnown attacker gs attacker of

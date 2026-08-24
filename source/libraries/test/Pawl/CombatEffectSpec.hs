@@ -42,6 +42,7 @@ import qualified Pawl.Types.BecameBlocking as BecameBlocking
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -3856,13 +3857,93 @@ castFoliage victim p = case p of
   Prompt.DeclareBlockers {} -> Map.empty
   _ -> S.aggressiveAnswer p
 
+-- alice attacks with one Icehide Golem; bob defends with Aetherplasm on the
+-- battlefield and one Cabal Evangel in hand. Returns the attacker, Aetherplasm
+-- and the Evangel's HAND id.
+--
+-- Every element is load-bearing. Both 2/2s so the trade is lethal in BOTH
+-- directions -- a Golem that survived its blocker would leave the count only
+-- half moved. Aetherplasm's printed 1/1 is what makes the declined leg differ:
+-- left blocking, it dies to the Golem and the Golem lives. The Evangel is
+-- vanilla so no trigger of any kind rides on its arrival (CR 509.3d would let
+-- flanking kill the Golem by a second route), and it is bob's only card so the
+-- library is never drawn from. No lands: the trigger costs nothing. Two seats:
+-- nothing here reads APNAP or a second opponent. ONE attacker, so CR 510.1c's
+-- divided assignment is never entered and no Prompt.AssignCombatDamage is
+-- raised.
+aetherBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId], ObjectId.ObjectId)
+aetherBoard golem plasm evangel =
+  let (gs0, ours, theirs) = S.combatBoardOf [golem] [plasm]
+      (evangelId, withCard) = S.addHandCard evangel S.bob gs0
+   in (withCard, ours, theirs, evangelId)
+
+-- Declare Aetherplasm blocking the Golem, answer each printed "may" by its
+-- CLAUSE ORDINAL, and take the Evangel out of hand. The declaration is spelled
+-- out rather than left to aggressiveAnswer so the pairing the trigger binds is
+-- the test's and not the default's.
+--
+-- ChooseCardInHand is a real choice on the leg that takes clause 0: Aetherplasm
+-- is back in hand beside the Evangel and both are creature cards, so the offer
+-- carries two candidates. Pinned by FILTERING the offered set, so a leg where
+-- the Evangel is not offered takes the fallback rather than succeeding on a
+-- hand-built id.
+aetherAnswer ::
+  ObjectId.ObjectId ->
+  ObjectId.ObjectId ->
+  ObjectId.ObjectId ->
+  (ClauseIndex.ClauseIndex -> OptionalDecision.OptionalDecision) ->
+  Prompt.Prompt r ->
+  r
+aetherAnswer plasm golem evangel decide p = case p of
+  Prompt.DeclareBlockers {} -> Map.singleton plasm (Set.singleton golem)
+  Prompt.ChooseOptional _ _ _ _ cIdx -> decide cIdx
+  Prompt.ChooseCardInHand _ _ _ offered ->
+    Maybe.fromMaybe (NonEmpty.head offered) (List.find (== evangel) (NonEmpty.toList offered))
+  _ -> S.aggressiveAnswer p
+
+-- Declare one blocker against one attacker and answer everything else the
+-- default way. The declaration twin of aetherAnswer's own, for the leg that has
+-- no trigger to answer.
+declareBlock :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+declareBlock blocker attacker p = case p of
+  Prompt.DeclareBlockers {} -> Map.singleton blocker (Set.singleton attacker)
+  _ -> S.aggressiveAnswer p
+
+-- The ids Combat.blockers holds for an attacker, narrowed to the ones still on
+-- the battlefield.
+--
+-- The narrowing is not decoration. CR 506.4 removes a permanent from combat as
+-- it leaves the battlefield, but this engine spells that lazily: nothing prunes
+-- the blocker's id on the way out, and Pawl.Engine.Damage's liveness filter is
+-- what makes the assignment right (Pawl.Engine.Departure's comment states the
+-- reason -- a blocker DESTROYED mid-combat leaves an identical stale id no
+-- pruner could see). Aetherplasm is the first board here whose blocker leaves
+-- the battlefield ALIVE, so it is the first to read one.
+liveBlockersOf :: ObjectId.ObjectId -> GameState.GameState -> [ObjectId.ObjectId]
+liveBlockersOf attacker gs = filter (`S.onBattlefield` gs) (Set.toList (Combat.blockersOf attacker gs))
+
+-- The battlefield objects a player OWNS that are copies of a card with this
+-- name. Owner and not controller (CR 108.3), which is the question
+-- Game.zoneMembers answers -- and the two coincide on every board below, bob
+-- owning and controlling everything he puts out.
+--
+-- By name because CR 400.7 mints a NEW object for a card that changes zones, so
+-- the hand id a fixture hands back cannot name the permanent it becomes.
+battlefieldNamed :: CardName.CardName -> PlayerId.PlayerId -> GameState.GameState -> [ObjectId.ObjectId]
+battlefieldNamed wanted pid gs =
+  filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just wanted) (Game.zoneMembers Zone.Battlefield pid gs)
+
 -- CR 509.4: "If a creature is put onto the battlefield blocking, its controller
 -- chooses which attacking creature it's blocking as it enters the battlefield
 -- (unless the effect that put it onto the battlefield specifies what it's
 -- blocking). A creature put onto the battlefield this way is 'blocking' but, for
 -- the purposes of trigger events and effects, it never 'blocked'."
 --
--- Flash Foliage is the pool's producer -- {2}{G} INSTANT, "Cast this spell only
+-- Flash Foliage is the pool's Create-side producer -- {2}{G} INSTANT, "Cast this spell only
 -- during combat after blockers are declared. / Create a 1/1 green Saproling
 -- creature token that's blocking target creature attacking you. / Draw a card."
 -- It is CR 509.4's parenthetical case: the effect specifies what the token
@@ -4017,6 +4098,183 @@ putOntoBattlefieldBlockingSpec s registry = Spec.describe s "PutOntoBattlefieldB
         Spec.assertBool s (not (any (blockerWasDeclared . LoggedEvent.event) (GameState.events struck))) "CR 509.4: nothing was declared as a blocker on this board"
         Spec.assertBool s (any (blockerEnteredBlocking . LoggedEvent.event) (GameState.events struck)) "and the event that fired the trigger is the entry's own"
       _ -> Spec.assertFailure s "fixture should have one attacker per board"
+  -- CR 509.4's OTHER door, and the one nothing could reach until Aetherplasm:
+  -- the creature put onto the battlefield blocking is a CARD moved out of a
+  -- hand, not a token minted. Nothing in rule 509.4 privileges either -- it is
+  -- worded "put onto the battlefield" -- and Pawl.Engine.Resolve's MoveToZone
+  -- arm now hands its arrival to the same Combat.putOntoBattlefieldBlocking the
+  -- Create arm above hands its tokens to.
+  --
+  -- Aetherplasm {2}{U}{U} 1/1 Illusion -- "Whenever this creature blocks a
+  -- creature, you may return this creature to its owner's hand. If you do, you
+  -- may put a creature card from your hand onto the battlefield blocking that
+  -- creature." CR 509.4's parenthetical case again, and the slot it names is a
+  -- TRIGGER'S BINDING ("that creature") where Flash Foliage's is a target.
+  --
+  -- WHAT DOES NOT DISCRIMINATE HERE, and it is the reverse of the Flash Foliage
+  -- cases above: LIFE TOTALS. Aetherplasm's own declaration already made the
+  -- Golem a blocked creature (CR 509.1h), and that rule's last sentence keeps it
+  -- blocked once Aetherplasm leaves, so CR 510.1c's second sentence gives it no
+  -- combat damage to assign whether or not the Evangel arrives blocking. Bob is
+  -- at 20 on every leg. The quantity that moves is SURVIVAL, which is why the
+  -- first assertion of each leg counts creatures rather than life -- and bob's
+  -- 20 is asserted as a labelled control, pinning that the divergence is the
+  -- rider rather than a leaked Game.removeFromCombat regression.
+  --
+  -- Three legs off one board and one answerer, differing only in how the two
+  -- printed "may"s are answered.
+  Spec.it s "CR 509.4 whole card: Aetherplasm swaps itself out for a creature card from hand, blocking" $ do
+    golemP <- S.printingOf s registry "Icehide Golem"
+    plasmP <- S.printingOf s registry "Aetherplasm"
+    evangelP <- S.printingOf s registry "Cabal Evangel"
+    case aetherBoard golemP plasmP evangelP of
+      (gs, [golem], [plasm], evangel) -> do
+        let golemName = S.nameOf (Printing.card golemP)
+            evangelName = S.nameOf (Printing.card evangelP)
+            atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+            takeBoth = const OptionalDecision.Exercises
+            -- The same answerer twice: once stopped before combat damage, where
+            -- the arrival is still alive and the combat record can be read
+            -- against it, and once run to the end, where the survivors are.
+            -- Spelled out at each use rather than bound once: runToStep takes a
+            -- rank-2 answerer, and a let-bound one would be monomorphic.
+            blocking = S.runToStep (Phase.Combat CombatStep.CombatDamage) (aetherAnswer plasm golem evangel takeBoth) atBlockers
+            atEnd = runToEndOfCombat (aetherAnswer plasm golem evangel takeBoth) atBlockers
+        -- GAMEPLAY FIRST: both 2/2s traded, so neither is left. Under a
+        -- MoveToZone that ignores the rider the Evangel enters as an ordinary
+        -- permanent, the blocked Golem assigns nothing (CR 510.1c) and takes
+        -- nothing, and this pair reads (1, 1).
+        Spec.assertEqWith s "CR 510.1c: the Golem and the creature put onto the battlefield blocking it traded, so neither survives" (length (battlefieldNamed golemName S.alice atEnd), length (battlefieldNamed evangelName S.bob atEnd)) (0, 0)
+        -- Control, on the leg the rider fires: the blocked Golem assigns no
+        -- combat damage either way (CR 509.1h, CR 510.1c), so life cannot be the
+        -- discriminating quantity and must not be read as one.
+        Spec.assertEqWith s "control: CR 509.1h keeps the Golem blocked, so bob takes nothing whatever the rider did" (S.lifeOf S.bob atEnd) (Just 20)
+        Spec.assertEqWith s "control: and nothing reached alice" (S.lifeOf S.alice atEnd) (Just 20)
+        -- The rider landed on the attacker the TRIGGER bound, read before damage
+        -- removes the participants.
+        case battlefieldNamed evangelName S.bob blocking of
+          [arrival] -> do
+            Spec.assertEqWith s "CR 509.4: the creature card from hand is blocking the Golem" (liveBlockersOf golem blocking) [arrival]
+            Spec.assertEqWith s "CR 506.4: and it joined combat under bob" (Map.lookup arrival (Combat.Type.joinedUnder (GameState.combat blocking))) (Just S.bob)
+            -- CR 509.4's "never blocked": the DECLARED blocker was Aetherplasm,
+            -- so read the arrival specifically rather than the whole set.
+            Spec.assertBool s (not (Set.member arrival (Combat.Type.declaredBlockers (GameState.combat blocking)))) "CR 509.4: the arrival was never declared as a blocker"
+          other -> Spec.assertFailure s ("expected exactly one arrival on bob's battlefield, got " <> show (length other))
+        -- Clause 0 ran, which is what clause 1's "If you do" hangs on.
+        Spec.assertBool s (not (S.onBattlefield plasm atEnd)) "CR 506.4: Aetherplasm left the battlefield, so it was removed from combat"
+        Spec.assertEqWith s "CR 400.3: and bob's hand holds Aetherplasm alone, the Evangel having left it" (fmap (fmap S.nameOf . (`Game.cardOf` atEnd)) (Game.zoneMembers Zone.Hand S.bob atEnd)) [Just (S.nameOf (Printing.card plasmP))]
+      _ -> Spec.assertFailure s "fixture should have one attacker and one blocker"
+  -- The CR 608.2c fence, differing from the leg above in ONE answer: bob
+  -- declines the first "may", so Aetherplasm stays where it is and clause 1's
+  -- "If you do" never holds. Nothing is asked about clause 1 at all.
+  --
+  -- What the leg pins is that the gate is real: an engine that ran clause 1
+  -- regardless would put the Evangel onto the battlefield blocking the Golem
+  -- too, and the Golem would take 1 from Aetherplasm plus 2 from the Evangel and
+  -- die. So the Golem's survival is the discriminating quantity, and the
+  -- answerer exercises every clause but the first for exactly that reason.
+  --
+  -- A trigger that never fired at all would leave the same board, which is what
+  -- the leg above rules out: it is the SAME fixture and the same answerer, and
+  -- there the trigger moves Aetherplasm and the Evangel both.
+  Spec.it s "CR 608.2c declining to return Aetherplasm skips the clause its 'If you do' hangs on" $ do
+    golemP <- S.printingOf s registry "Icehide Golem"
+    plasmP <- S.printingOf s registry "Aetherplasm"
+    evangelP <- S.printingOf s registry "Cabal Evangel"
+    case aetherBoard golemP plasmP evangelP of
+      (gs, [golem], [plasm], evangel) -> do
+        let golemName = S.nameOf (Printing.card golemP)
+            evangelName = S.nameOf (Printing.card evangelP)
+            atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+            declineFirst cIdx = if cIdx == ClauseIndex.MkClauseIndex 0 then OptionalDecision.Declines else OptionalDecision.Exercises
+            atEnd = runToEndOfCombat (aetherAnswer plasm golem evangel declineFirst) atBlockers
+        -- GAMEPLAY FIRST: the Golem took Aetherplasm's 1 and lived, and nothing
+        -- came out of bob's hand. Ungated, the Evangel would have arrived
+        -- blocking and the pair would read (0, 1).
+        Spec.assertEqWith s "CR 608.2c: the second clause never ran, so the Golem took only Aetherplasm's 1 and nothing left bob's hand" (length (battlefieldNamed golemName S.alice atEnd), length (battlefieldNamed evangelName S.bob atEnd)) (1, 0)
+        Spec.assertBool s (List.elem evangel (Game.zoneMembers Zone.Hand S.bob atEnd)) "the Evangel is still the card bob is holding"
+        Spec.assertBool s (not (S.onBattlefield plasm atEnd)) "CR 510.1c: Aetherplasm stayed blocking and took the Golem's 2, so it died"
+        Spec.assertEqWith s "control: bob takes nothing, the Golem being blocked throughout" (S.lifeOf S.bob atEnd) (Just 20)
+      _ -> Spec.assertFailure s "fixture should have one attacker and one blocker"
+  -- The rider's own control, differing from the whole-card leg in ONE answer:
+  -- bob returns Aetherplasm and then declines to put anything out. Everything
+  -- else on the card has run, so what is left out is the arrival and nothing
+  -- else -- and the Golem, blocked with no blockers, assigns no combat damage
+  -- (CR 509.1h, CR 510.1c) and takes none.
+  Spec.it s "CR 509.1h an attacker whose only blocker returned to hand stays blocked and assigns nothing" $ do
+    golemP <- S.printingOf s registry "Icehide Golem"
+    plasmP <- S.printingOf s registry "Aetherplasm"
+    evangelP <- S.printingOf s registry "Cabal Evangel"
+    case aetherBoard golemP plasmP evangelP of
+      (gs, [golem], [plasm], evangel) -> do
+        let golemName = S.nameOf (Printing.card golemP)
+            evangelName = S.nameOf (Printing.card evangelP)
+            atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+            declineSecond cIdx = if cIdx == ClauseIndex.MkClauseIndex 0 then OptionalDecision.Exercises else OptionalDecision.Declines
+            blocking = S.runToStep (Phase.Combat CombatStep.CombatDamage) (aetherAnswer plasm golem evangel declineSecond) atBlockers
+            atEnd = runToEndOfCombat (aetherAnswer plasm golem evangel declineSecond) atBlockers
+        Spec.assertEqWith s "CR 510.1c: with nothing put onto the battlefield blocking it the Golem is untouched, and bob's hand is untouched too" (length (battlefieldNamed golemName S.alice atEnd), length (battlefieldNamed evangelName S.bob atEnd)) (1, 0)
+        Spec.assertEqWith s "CR 509.1h: the Golem is still a blocked creature with its blocker gone" (liveBlockersOf golem blocking) []
+        Spec.assertBool s (Combat.isBlocked golem blocking) "so CR 510.1c gives it no combat damage to assign rather than letting it through"
+        Spec.assertEqWith s "control: which is why bob is at 20 on this leg as well as the one the Evangel arrives on" (S.lifeOf S.bob atEnd) (Just 20)
+        Spec.assertBool s (List.elem evangel (Game.zoneMembers Zone.Hand S.bob atEnd)) "the declined clause left the Evangel in hand"
+        Spec.assertBool s (not (S.onBattlefield plasm atEnd)) "and Aetherplasm did return to hand, so the leg differs from the whole-card one in the second may alone"
+      _ -> Spec.assertFailure s "fixture should have one attacker and one blocker"
+  -- CR 509.4's second sentence -- a creature put onto the battlefield blocking
+  -- is "blocking" but "never blocked" -- and CR 509.3b's last sentence, which
+  -- says the same thing from the trigger's side: "It won't trigger if the
+  -- creature is put onto the battlefield blocking."
+  --
+  -- Until Aetherplasm this was a REGRESSION FENCE. The only card that could put
+  -- a creature onto the battlefield blocking minted a vanilla token, which can
+  -- bear no trigger, so deleting matchesTrigger's read of
+  -- BecameBlocking.putOntoBattlefield left the whole suite green. A creature
+  -- CARD arrives with its own text.
+  --
+  -- Loyal Sentry {W} 1/1 -- "Whenever this creature blocks a creature, destroy
+  -- that creature and this creature." It is already in the pool, it already
+  -- reads `thatAttacker` off this very trigger condition, and its effect is
+  -- loud: if the exclusion leaked, the Golem would be DESTROYED outright rather
+  -- than merely taking a 1/1's damage.
+  --
+  -- A PAIR differing in exactly one thing -- how the Sentry came to block the
+  -- Golem. Same card, same attacker, same seats, same 2/2: put onto the
+  -- battlefield blocking on one leg, DECLARED on the other. CR 509.3b's second
+  -- sentence ("It triggers if the creature is declared as a blocker") is what
+  -- makes the control leg the exclusion's opposite rather than an unrelated
+  -- board.
+  Spec.it s "CR 509.3b a creature put onto the battlefield blocking never blocked, so its own blocks trigger stays silent" $ do
+    golemP <- S.printingOf s registry "Icehide Golem"
+    plasmP <- S.printingOf s registry "Aetherplasm"
+    sentryP <- S.printingOf s registry "Loyal Sentry"
+    case (aetherBoard golemP plasmP sentryP, S.combatBoardOf [golemP] [sentryP]) of
+      ((gs, [golem], [plasm], sentry), (declaredGs, [otherGolem], [otherSentry])) -> do
+        let golemName = S.nameOf (Printing.card golemP)
+            sentryName = S.nameOf (Printing.card sentryP)
+            entered =
+              runToEndOfCombat
+                (aetherAnswer plasm golem sentry (const OptionalDecision.Exercises))
+                (S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs)
+            declared =
+              runToEndOfCombat
+                (declareBlock otherSentry otherGolem)
+                (S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer declaredGs)
+        -- GAMEPLAY FIRST, and the pair reads the same quantity on both legs: is
+        -- the attacker still there. Silent, the Sentry only trades its 1 power
+        -- into a 2/2 and dies to the Golem's 2; leaked, the ability destroys the
+        -- Golem outright.
+        Spec.assertEqWith s "CR 509.3b: the Sentry entered blocking, so it never blocked and the Golem survives its 1 damage" (length (battlefieldNamed golemName S.alice entered)) 1
+        Spec.assertEqWith s "control: the SAME Sentry DECLARED as a blocker does trigger, and the Golem is destroyed" (length (battlefieldNamed golemName S.alice declared)) 0
+        -- Anti-vacuity: the Sentry really did arrive and really did block, so its
+        -- silence is CR 509.3b and not a clause that never ran.
+        Spec.assertBool s (Combat.isBlocked golem entered) "CR 509.1h: the Golem was a blocked creature on the entry leg"
+        Spec.assertEqWith s "and the Sentry is gone, having taken the Golem's 2 as a blocking creature (CR 510.1c)" (length (battlefieldNamed sentryName S.bob entered)) 0
+        Spec.assertBool s (not (S.onBattlefield plasm entered)) "Aetherplasm returned to hand, which is what put the Sentry out"
+        -- CR 509.3b again on the control leg, in the direction it DOES fire: the
+        -- Sentry destroys itself too, which a mere trade would also do, so the
+        -- Golem above is the assertion that separates them.
+        Spec.assertEqWith s "control: and the Sentry destroyed itself, as its own text says" (length (battlefieldNamed sentryName S.bob declared)) 0
+      _ -> Spec.assertFailure s "fixture should have one attacker and one blocker on each board"
 
 -- CR 506.7b's window, "only during combat after blockers are declared", proved
 -- step by step on ONE board.
