@@ -29,6 +29,7 @@ import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.TokenPattern as TokenPattern
@@ -212,8 +213,8 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
     Common.assertCodec
       s
       codec
-      (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR Filter.IsSource (TurnUpRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne 1))))
-      " {\"type\":\"TurnUpR\",\"value\":{\"matching\":{\"type\":\"IsSource\"},\"rewrite\":{\"type\":\"WithCounters\",\"value\":{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"amount\":1}}}} "
+      (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR Filter.IsSource (TurnUpRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1)))))
+      " {\"type\":\"TurnUpR\",\"value\":{\"matching\":{\"type\":\"IsSource\"},\"rewrite\":{\"type\":\"WithCounters\",\"value\":{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"amount\":{\"type\":\"Literal\",\"value\":1}}}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec
   where
     -- CR 615.5: the DamageR arm carries riders, so the codec takes the effect

@@ -253,6 +253,7 @@ import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.UntapRestriction as UntapRestriction
+import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
@@ -3388,7 +3389,11 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChooseColor -> []
   EntryRewrite.ChooseBasicLandType -> []
   EntryRewrite.ChoosePlayer -> []
-  EntryRewrite.WithCounters {} -> []
+  -- CR 122.6's amount is a Quantity (Undergrowth Scavenger's "equal to the number
+  -- of creature cards in all graveyards"), so a Count inside it holds card text on
+  -- the same axis EntryRiders' counts do -- riderFilters walks those, and this
+  -- walks this.
+  EntryRewrite.WithCounters w -> quantityFilters (WithCounters.amount w)
   EntryRewrite.UnderSourceControl -> []
   EntryRewrite.Riot -> []
   EntryRewrite.Unleash -> []
@@ -3409,7 +3414,10 @@ entryRewriteFilters entryRewrite = case entryRewrite of
 -- text. That is why this list feeds `unframed` with every other position.
 turnUpRewriteFilters :: TurnUpRewrite.TurnUpRewrite -> [Filter.Type.Filter Keyword.Keyword]
 turnUpRewriteFilters turnUpRewrite = case turnUpRewrite of
-  TurnUpRewrite.WithCounters {} -> []
+  -- entryRewriteFilters' WithCounters arm, on the rewrite that shares the payload.
+  -- Vacuous over `data/cards/` while the CR 702.37b lint below holds, and walked
+  -- anyway so the two halves of one payload cannot be swept differently.
+  TurnUpRewrite.WithCounters w -> quantityFilters (WithCounters.amount w)
   TurnUpRewrite.MayAttachTo f -> [f]
 
 -- CR 614.1c-e: four replacement patterns narrow by a Filter. CounterPattern.onWhat

@@ -5,6 +5,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.WithCounters as WithCounters
@@ -22,9 +23,9 @@ spec s = Spec.describe s "Pawl.Codec.TurnUpR" $ do
               TurnUpRewrite.WithCounters
                 WithCounters.MkWithCounters
                   { WithCounters.kind = CounterKind.PlusOnePlusOne,
-                    WithCounters.amount = 1
+                    WithCounters.amount = Quantity.Literal 1
                   }
           }
       )
-      " {\"matching\":{\"type\":\"IsSource\"},\"rewrite\":{\"type\":\"WithCounters\",\"value\":{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"amount\":1}}} "
+      " {\"matching\":{\"type\":\"IsSource\"},\"rewrite\":{\"type\":\"WithCounters\",\"value\":{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"amount\":{\"type\":\"Literal\",\"value\":1}}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s TurnUpR.codec

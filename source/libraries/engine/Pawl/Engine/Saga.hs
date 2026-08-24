@@ -46,6 +46,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Quantity as Quantity
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.SelfCountersReached as SelfCountersReached
@@ -169,7 +170,7 @@ tracksLore pc = isSaga pc && not (null (chaptersOf pc))
 entryReplacementsOf :: PC.ProjectedCharacteristics -> [ReplacementEffect (Effect.Effect Card)]
 entryReplacementsOf pc =
   [ -- CR 614.1c: the entering object is the ability's own source.
-  ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Lore 1)))
+  ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Lore (Quantity.Literal 1))))
   | isSaga pc
   ]
 
