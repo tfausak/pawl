@@ -22,6 +22,7 @@ import qualified Pawl.Types.Keyword as Keyword
 -- 'Keyword.Hexproof' is 'Arm.optionalPayload'\'s first caller: CR 702.11b's
 -- bare hexproof has no "value" key at all (@{"type":"Hexproof"}@) where CR
 -- 702.11d's "hexproof from [quality]" does, both under the one constructor.
+-- 'Keyword.Vanishing' is the same shape for CR 702.63b's sake.
 codec :: Codec.Codec Keyword.Keyword
 codec =
   Arm.tagged
@@ -70,7 +71,11 @@ codec =
       Arm.payload "Bloodthirst" Common.natural Keyword.Bloodthirst (\x -> case x of Keyword.Bloodthirst y -> Just y; _ -> Nothing),
       Arm.nullary "Haunt" Keyword.Haunt,
       Arm.nullary "SplitSecond" Keyword.SplitSecond,
-      Arm.payload "Vanishing" Common.natural Keyword.Vanishing (\x -> case x of Keyword.Vanishing y -> Just y; _ -> Nothing),
+      -- CR 702.63b's numberless vanishing is the ABSENT "value" key, hexproof's
+      -- spelling and for its reason: the two forms are one constructor, and the
+      -- N-carrying form (Waning Wurm's @{"type":"Vanishing","value":2}@) is
+      -- untouched by this arm being optional.
+      Arm.optionalPayload "Vanishing" Common.natural Keyword.Vanishing (\x -> case x of Keyword.Vanishing y -> Just y; _ -> Nothing),
       Arm.payload "Frenzy" Common.natural Keyword.Frenzy (\x -> case x of Keyword.Frenzy y -> Just y; _ -> Nothing),
       Arm.payload "Poisonous" Common.natural Keyword.Poisonous (\x -> case x of Keyword.Poisonous y -> Just y; _ -> Nothing),
       Arm.payload "Annihilator" Common.natural Keyword.Annihilator (\x -> case x of Keyword.Annihilator y -> Just y; _ -> Nothing),

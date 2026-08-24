@@ -1295,8 +1295,10 @@ rewriteKeyword pairs keyword = case keyword of
   -- CR 702.43a's N is a number and not a word, so CR 612.2 has nothing to swap;
   -- "+1/+1 counter" is the rule's own noun and no card prints it.
   Keyword.Type.Modular _ -> keyword
-  -- CR 702.63a's N is a number and not a word, so CR 612.2 has nothing to swap;
-  -- "time counter" is the rule's own noun and no card prints it.
+  -- CR 702.63a's N is a number and not a word -- and rule 702.63b's is absent
+  -- altogether -- so CR 612.2 has nothing to swap here. "Time counter" is the
+  -- rule's own noun; where a card does print it (Tidewalker) it rides that card's
+  -- own entry rewrite and its CDA rather than this value.
   Keyword.Type.Vanishing _ -> keyword
   -- CR 702.32a's N is a number and not a word, so CR 612.2 has nothing to swap;
   -- "fade counter" is in the replacement and the ability Pawl.Engine.Keyword mints
