@@ -841,6 +841,7 @@ castOf event = case event of
   GameEvent.Scried _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
+  GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
   GameEvent.Exerted _ -> Nothing
@@ -903,6 +904,7 @@ discardOf event = case event of
   GameEvent.Scried _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
+  GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
   GameEvent.Exerted _ -> Nothing
@@ -963,6 +965,7 @@ enteredBattlefield event = case event of
   GameEvent.Scried _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
+  GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
   GameEvent.Exerted _ -> Nothing
@@ -1038,6 +1041,7 @@ damageRecipient event = case event of
   GameEvent.Scried _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
+  GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
   GameEvent.Exerted _ -> Nothing

@@ -768,6 +768,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PlayerLosesLife _ -> []
   -- CR 714.2b carries a counter kind and a Natural, neither of which is a Count.
   TriggerCondition.SelfCountersReached {} -> []
+  TriggerCondition.SelfBecomesClassLevel _ -> []
   -- CR 310.12b carries a counter kind alone.
   TriggerCondition.SelfLastCounterRemoved _ -> []
   -- And so does its any-amount mirror.
@@ -3152,6 +3153,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PlayerLosesLife _ -> []
   -- CR 714.2b carries a counter kind and a Natural, neither of which is a Count.
   TriggerCondition.SelfCountersReached {} -> []
+  TriggerCondition.SelfBecomesClassLevel _ -> []
   -- CR 310.12b carries a counter kind alone.
   TriggerCondition.SelfLastCounterRemoved _ -> []
   -- And so does its any-amount mirror.

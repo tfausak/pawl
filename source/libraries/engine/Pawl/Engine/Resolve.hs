@@ -79,6 +79,8 @@ import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
+import qualified Pawl.Types.ClassLevel as ClassLevel
+import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.Clause as Clause
 import Pawl.Types.ClauseIndex (ClauseIndex)
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
@@ -5235,17 +5237,29 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- A player recipient, an illegal slot (CR 608.2b) and an id naming no object all
   -- write nothing -- Designate's postures.
   --
-  -- Not implemented: CR 716's "when this Class becomes level N" triggered
-  -- abilities, which want an event carrying the level before and after, the way
-  -- GameEvent.CountersPut carries a counter tally for CR 603.2's threshold
-  -- crossing (#1944).
+  -- GameEvent.ClassLevelSet is emitted only on a TRANSITION, the Designate arm
+  -- above's posture: CR 716.2a's ladder cannot set a level a Class already has, but
+  -- this opcode is not the ladder, and a CR 603.2 event for a change that did not
+  -- happen would fire "when this Class becomes level N" for a level it never
+  -- became. The level BEFORE is read through CR 716.2d's default, so a Class that
+  -- has never been levelled crosses from 1.
+  --
+  -- One writer, every road: this arm is the only place in the engine that writes
+  -- Object.classLevel, so there is no second road to record on.
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel level slot) ->
     case legalOne slot legal of
       Just recipient -> case Recipient.objectOf recipient of
         Nothing -> pure ()
-        Just target ->
-          State.modify'
-            (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.classLevel = Just level}) target (GameState.objects g)})
+        Just target -> do
+          gs <- State.get
+          case Game.lookupObject target gs of
+            Nothing -> pure ()
+            Just object -> do
+              let before = ClassLevel.MkClassLevel (ClassLevel.defaulted (Object.classLevel object))
+              Monad.when (before /= level) $ do
+                State.modify'
+                  (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.classLevel = Just level}) target (GameState.objects g)})
+                State.modify' (Event.recordEvent (GameEvent.ClassLevelSet (ClassLevelChange.MkClassLevelChange target before level)))
       _ -> pure ()
   -- CR 701.60a's other ending: undoes Designate's write for that one designation.
   -- CR 701.60c's menace and can't-block are read off the set live, so nothing

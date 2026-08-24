@@ -45,6 +45,8 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.ClassLevel as ClassLevel
+import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Compares as Compares
@@ -1928,6 +1930,9 @@ representativeEvents cond =
         -- bearer here is `departed`, the id Event.matchesTrigger is asked about
         -- below, and the counts straddle N so the event really matches.
         TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached kind n) -> one (GameEvent.CountersPut (CounterChange.MkCounterChange departed kind 0 n))
+        -- CR 716.2a's own event, on `departed` and not the bearer, the arm above's
+        -- shape: the pair does not match, which is what pins the floor.
+        TriggerCondition.SelfBecomesClassLevel n -> one (GameEvent.ClassLevelSet (ClassLevelChange.MkClassLevelChange departed (ClassLevel.MkClassLevel 1) n))
         -- CR 310.12b: a removal on the BEARER that took the last counter, so the
         -- event really matches the condition Event.matchesTrigger is asked about.
         TriggerCondition.SelfLastCounterRemoved kind -> one (GameEvent.CountersRemoved (CounterChange.MkCounterChange departed kind 1 0))
@@ -2128,6 +2133,7 @@ everyTriggerCondition =
     TriggerCondition.PlayerGainsLife PlayerRelation.You,
     TriggerCondition.PlayerLosesLife PlayerRelation.Opponent,
     TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached CounterKind.Lore 1),
+    TriggerCondition.SelfBecomesClassLevel (ClassLevel.MkClassLevel 2),
     TriggerCondition.SelfLastCounterRemoved CounterKind.Defense,
     TriggerCondition.SelfCountersRemoved CounterKind.Loyalty,
     -- BOTH scopes, unlike StepBegins' one above: the TurnScope is new on this
