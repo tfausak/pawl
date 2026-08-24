@@ -1300,6 +1300,10 @@ scopeOffends scope = case scope of
   -- PlayerRef names rather than a copy of a zone each of them owns, so the
   -- pairing the lint rejects cannot arise.
   Scope.OverPlayers _ -> False
+  -- No zone at all either: this scope folds the objects a binding names,
+  -- wherever they are, so there is no per-player copy of a zone for the pairing
+  -- the lint rejects to arise in.
+  Scope.OverBound _ -> False
 
 cardOffendsSharedZoneScope :: Face.Face Card.Type.Card -> Bool
 cardOffendsSharedZoneScope card =

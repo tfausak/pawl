@@ -592,6 +592,39 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     Spec.assertEqWith s "and reached no hand" (S.handSize S.alice after) 0
     Spec.assertEqWith s "bob's hand emptied" (S.handSize S.bob after) 0
     Spec.assertEqWith s "bob's graveyard holds the piker" (namesIn Zone.Graveyard S.bob after) [Just (S.printingName piker)]
+  -- The same rider read through a CR 614 redirect. Rest in Peace replaces the
+  -- discard's destination with exile, which CR 400.2 lists among the public
+  -- zones, so CR 400.7j keeps the discarded card findable by a later part of the
+  -- same effect and the rider must still fire. The land leg above is this same
+  -- board without the one permanent.
+  --
+  -- The asserted quantity is again Psychic Miasma's own zone, and it separates
+  -- the two implementations: a rider reading the target's GRAVEYARD counts zero,
+  -- leaves the return unrun, and lets Psychic Miasma head for alice's graveyard
+  -- -- where Rest in Peace exiles it too -- while a rider folding the bound set
+  -- finds the swamp in exile and returns the spell to alice's hand.
+  --
+  -- Rest in Peace goes under ALICE so bob's side is byte-identical to the legs
+  -- above; its replacement is symmetric, so the controller does not matter. It is
+  -- PLACED rather than cast, which is what keeps its own "exile all graveyards"
+  -- trigger out of the way -- and both graveyards are empty at setup regardless.
+  Spec.it s "CR 400.7j a land discarded into exile still returns Psychic Miasma to its owner's hand" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    miasma <- S.printingOf s registry "Psychic Miasma"
+    restInPeace <- S.printingOf s registry "Rest in Peace"
+    let base = S.landsInPlay swamp 3
+        (_, withRip) = S.addCreature restInPeace S.alice base
+        withHand = handCards swamp S.bob 1 withRip
+        (gs, spellId) = S.handOne miasma withHand
+        cast = snd (Engine.runGamePure atBobAnswer gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop)
+    Spec.assertEqWith s "psychic miasma returned to alice's hand" (namesIn Zone.Hand S.alice after) [Just (S.printingName miasma)]
+    Spec.assertEqWith s "and was not itself exiled on the way" (namesIn Zone.Exile S.alice after) []
+    -- The guard against a fix that reaches the right answer by suppressing the
+    -- redirect: the discard really did land somewhere other than a graveyard.
+    Spec.assertEqWith s "bob's discarded swamp is in exile" (namesIn Zone.Exile S.bob after) [Just (S.printingName swamp)]
+    Spec.assertEqWith s "and bob's graveyard is empty" (namesIn Zone.Graveyard S.bob after) []
+    Spec.assertEqWith s "bob's hand emptied" (S.handSize S.bob after) 0
   -- CR 701.9's OTHER arity: Tinybones Joins Up's "any number of target players
   -- each discard a card", where the slot names three seats rather than Mind
   -- Rot's one. CR 101.4 is the ordering rule -- its own worked example is a
