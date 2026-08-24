@@ -33,7 +33,9 @@
 -- Artificial Evolution and Magical Hack join Edgewalker for CR 612.1, the second
 -- rule reaching this axis from outside it: the word naming which spells a player
 -- static ability discounts is printed text like any other, so a text change moves
--- the discount off it.
+-- the discount off it. Magical Hack reaches the STORED carrier too, at Synthetic
+-- Conditional Silence on the stack, where the word it swaps is the one CR
+-- 611.2b's duration counts.
 --
 -- The Ten Rings and Sea Gate Restoration are the CR 613.11 TIMESTAMP pair, and
 -- they are a pair on purpose: a set maximum hand size and a removed one disagree,
@@ -2997,6 +2999,153 @@ conditionalSilenceSpec s registry =
       Spec.assertEqWith s "nothing stored" (GameState.playerEffects resolved) []
       Spec.assertBool s (elem (Action.Type.Cast bobsPiker (S.printingName piker) Facing.FaceUp) (conditionalSilenceCasts S.bob settled)) "so bob may cast"
 
+-- Aims a text changer's one target slot at `oid` -- the SpellsAndPermanents
+-- pool's recipient shape -- and answers the basic-land-type swap with
+-- (from, to). The offered set is FILTERED rather than rebuilt, so CR 608.2b's
+-- re-read at resolution sees the recipient the engine itself offered rather than
+-- a hand-built one that merely looks the same.
+hackSpellAt :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
+hackSpellAt oid from to p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter (== Recipient.ToObject oid) candidates) sets
+  Prompt.ChooseLandTypeSwap {} -> (from, to)
+  _ -> S.identityAnswer p
+
+-- conditionalSilenceBoard's no-Swamp shape, plus the two things a Magical Hack
+-- needs: a SECOND Island (two {U} spells are cast, so two lands pay) and the
+-- Hack in hand. alice controls no Swamp on either board here, so the
+-- Silence's printed "for as long as you control a Swamp" can never start and the
+-- Islands are the only thing the hacked word can count.
+--
+-- bob and carol each hold a Goblin Piker over two Mountains, so both opponents
+-- genuinely could cast -- an empty action list later is the prohibition and not
+-- an unaffordable Piker.
+--
+-- Returns the Silence, the Hack, alice's two Islands, bob's Piker and carol's.
+hackedSilenceBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+hackedSilenceBoard island hush magicalHack mountain piker =
+  let gs0 = Setup.emptyGame S.threePlayers
+      (firstIsland, gs1) = S.addCreature island S.alice gs0
+      (secondIsland, gs2) = S.addCreature island S.alice gs1
+      (hushId, gs3) = S.addHandCard hush S.alice gs2
+      (hackId, gs4) = S.addHandCard magicalHack S.alice gs3
+      (_, gs5) = S.addCreature mountain S.bob gs4
+      (_, gs6) = S.addCreature mountain S.bob gs5
+      (bobsPiker, gs7) = S.addHandCard piker S.bob gs6
+      (_, gs8) = S.addCreature mountain S.carol gs7
+      (_, gs9) = S.addCreature mountain S.carol gs8
+      (carolsPiker, gs10) = S.addHandCard piker S.carol gs9
+   in ( hushId,
+        hackId,
+        firstIsland,
+        secondIsland,
+        bobsPiker,
+        carolsPiker,
+        gs10
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- alice casts the Silence; when `hack`, she then casts the Magical Hack at the
+-- Silence SPELL on the stack and lets it resolve, swapping Swamp -> Island; then
+-- the Silence itself resolves. The Hack is cast SECOND so it resolves first and
+-- the Silence resolves already rewritten -- theftChain's ordering.
+--
+-- Stack.resolveTop and not the priority loop, for the reason
+-- conditionalSilenceSpec's never-starts case gives: a settle runs
+-- Expiry.sweepConditional, which deletes an effect whose condition is already
+-- false, so a loop cannot tell "the duration never started" from "it started and
+-- was swept an instant later".
+hackedSilenceAfter :: Bool -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+hackedSilenceAfter hack hushId hackId before =
+  let onStack = S.runPure S.identityAnswer before (S.cast S.alice hushId)
+      spellId = case GameState.stack onStack of
+        top : _ -> top
+        [] -> S.noSource
+      hacked =
+        if hack
+          then S.runPure (hackSpellAt spellId Subtype.Swamp Subtype.Island) onStack $ do
+            S.cast S.alice hackId
+            Stack.resolveTop
+          else onStack
+   in S.runPure S.identityAnswer hacked Stack.resolveTop
+
+-- CR 612.1 reaching the duration a SPELL stores over players, which is the half
+-- of Effect.AffectPlayers a word swap can touch: the Filter inside the
+-- PlayerEffect is not rewritten on this road yet (#2223), and the players axis is
+-- a PlayerScope or a SlotName, neither of which is a word.
+--
+-- The printed carrier already had this -- Edgewalker under a Magical Hack, above
+-- -- so what is new here is the STORED one: Synthetic Conditional Silence hacked
+-- while it sits on the stack.
+hackedSilenceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hackedSilenceSpec s registry =
+  Spec.describe s "Synthetic Conditional Silence" $ do
+    -- THE CONTROL TWIN, differing from the case below in the Hack alone: it sits
+    -- unspent in alice's hand and her second Island stays untapped. Without a
+    -- Swamp the printed duration never starts, so nothing is stored.
+    Spec.it s "CR 611.2b unhacked, with no Swamp the duration never starts" $ do
+      island <- S.printingOf s registry "Island"
+      hush <- S.printingOf s registry "Synthetic Conditional Silence"
+      magicalHack <- S.printingOf s registry "Magical Hack"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (hushId, hackId, _, _, bobsPiker, carolsPiker, before) = hackedSilenceBoard island hush magicalHack mountain piker
+          after = hackedSilenceAfter False hushId hackId before
+      Spec.assertBool s (elem (Action.Type.Cast bobsPiker (S.printingName piker) Facing.FaceUp) (conditionalSilenceCasts S.bob after)) "bob is still offered his Piker"
+      Spec.assertBool s (elem (Action.Type.Cast carolsPiker (S.printingName piker) Facing.FaceUp) (conditionalSilenceCasts S.carol after)) "and carol hers"
+      Spec.assertEqWith s "the Silence really did resolve" (length (GameState.stack after)) 0
+      Spec.assertEqWith s "and nothing is stored" (GameState.playerEffects after) []
+
+    -- THE UNIT'S POINT. The same Swamp-less board, with the word the duration
+    -- names swapped for one alice does control. The gameplay assertion leads: an
+    -- arm that dropped the rewrite would leave the clause counting Swamps, the
+    -- duration would never start, and both opponents would still be offered their
+    -- Pikers.
+    Spec.it s "CR 612.1 a Magical Hack on the Silence rewrites the duration's own word" $ do
+      island <- S.printingOf s registry "Island"
+      hush <- S.printingOf s registry "Synthetic Conditional Silence"
+      magicalHack <- S.printingOf s registry "Magical Hack"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (hushId, hackId, _, _, _, _, before) = hackedSilenceBoard island hush magicalHack mountain piker
+          after = hackedSilenceAfter True hushId hackId before
+      Spec.assertEqWith s "nothing is offered to either opponent" (conditionalSilenceCasts S.bob after <> conditionalSilenceCasts S.carol after) []
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell after) "bob is prohibited"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.carol anySpellId anySpell after) "carol is prohibited too"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell after)) "alice is not"
+      Spec.assertEqWith s "and both spells resolved" (length (GameState.stack after)) 0
+      case fmap ActivePlayerEffect.expiry (GameState.playerEffects after) of
+        [Expiry.Type.While (While.MkWhile who _)] -> Spec.assertEqWith s "the duration is keyed to its controller" who S.alice
+        other -> Spec.assertFailure s ("expected one conditional player effect, got " <> show other)
+
+    -- And the rewritten clause is still a CONDITION rather than an open-ended
+    -- one: hand alice's two Islands to bob (CR 613.1b) and CR 611.2b's period is
+    -- over, so the effect is deleted. Without this an arm that stored the effect
+    -- unconditionally would pass the case above.
+    Spec.it s "CR 611.2b the rewritten clause counts Islands, so losing them ends it" $ do
+      island <- S.printingOf s registry "Island"
+      hush <- S.printingOf s registry "Synthetic Conditional Silence"
+      magicalHack <- S.printingOf s registry "Magical Hack"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (hushId, hackId, firstIsland, secondIsland, bobsPiker, _, before) = hackedSilenceBoard island hush magicalHack mountain piker
+          after = hackedSilenceAfter True hushId hackId before
+          stolen = S.giveControl secondIsland S.bob (S.giveControl firstIsland S.bob after)
+          settled = S.runPure S.identityAnswer stolen Engine.settleForPriority
+          kept = S.runPure S.identityAnswer after Engine.settleForPriority
+      Spec.assertBool s (elem (Action.Type.Cast bobsPiker (S.printingName piker) Facing.FaceUp) (conditionalSilenceCasts S.bob settled)) "bob may cast once the Islands are his"
+      Spec.assertEqWith s "and nothing is stored any more" (GameState.playerEffects settled) []
+      Spec.assertEqWith s "while a sweep that leaves them with alice changes nothing" (length (GameState.playerEffects kept)) 1
+      Spec.assertEqWith s "so bob is still stopped there" (conditionalSilenceCasts S.bob kept) []
+
 -- Loaded fresh inside each case that needs it -- equivalent because loading
 -- is deterministic and cached (batch-recipe.md).
 matchesObjectBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
@@ -4594,6 +4743,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   ceaseFireSpec s registry
   blossomingCalmSpec s registry
   conditionalSilenceSpec s registry
+  hackedSilenceSpec s registry
   extraLandDropsSpec s registry
   matchesObjectSpec s registry
   vedalkenOrrerySpec s registry
