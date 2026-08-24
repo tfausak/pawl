@@ -398,7 +398,7 @@ enterTapped oid =
 -- Pawl.Engine.Cost.tapObject for a cost component, Pawl.Engine.Resolve's
 -- Effect.Tap opcode, CR 508.1f's attacker declaration in
 -- Pawl.Engine.Combat.declareAttackers, and CR 701.19a's regeneration in `apply`
--- below -- so that a card watching for a tap sees all four.
+-- below -- so that a card watching for a tap sees every one of them.
 --
 -- Rule 701.26a's SECOND sentence is the guard: "only untapped permanents can be
 -- tapped", so an already-tapped permanent is left alone and nothing is recorded.
@@ -410,7 +410,7 @@ enterTapped oid =
 -- (`enterTapped` above, and Pawl.Engine.Resolve.putTapped) -- CR 603.2e's other
 -- sentence, and the reason those two stay direct writes.
 --
--- CR 110.1 makes tapped a PERMANENT's status, which every caller above already
+-- CR 110.5 makes tapped a PERMANENT's status, which every caller above already
 -- has: a cost's tap candidates, an attacker, a regenerating permanent and the
 -- Effect.Tap opcode's victims are all on the battlefield.
 tap :: ObjectId -> Game ()
@@ -1791,14 +1791,18 @@ apply batch candidate event =
     (ReplacementEffect.DestructionR rewrite, ProposedEvent.WouldBeDestroyed oid _ _) -> case rewrite of
       DestructionRewrite.Regenerate -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
-        State.modify' $ \gs ->
-          let heal obj = obj {Object.damage = 0}
-              healed = gs {GameState.objects = Map.adjust heal oid (GameState.objects gs)}
-           in Game.removeFromCombat oid healed
-        -- CR 701.19a's "its controller taps it" through the shared funnel, so a
-        -- regeneration is a becomes-tapped event like any other. Split out of the
-        -- damage-and-combat write above only because `tap` is a Game action.
+        -- Rule 701.19a's three instructions in the order it prints them: remove
+        -- all marked damage, tap it, then remove it from combat. The ORDER is
+        -- observable now that the middle one records an event -- a trigger
+        -- gathered off the tap reads the board as it stands, and doing the combat
+        -- removal first would show it a creature already out of combat.
+        --
+        -- Three statements rather than one write because `tap` is a Game action;
+        -- the funnel is what makes a regeneration a becomes-tapped event like any
+        -- other route.
+        State.modify' (\gs -> gs {GameState.objects = Map.adjust (\obj -> obj {Object.damage = 0}) oid (GameState.objects gs)})
         tap oid
+        State.modify' (Game.removeFromCombat oid)
         pure Nothing
       -- CR 122.1c: "instead remove a shield counter from it". The destruction does
       -- not happen, and NONE of regeneration's own work above does either --
