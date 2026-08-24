@@ -294,11 +294,16 @@ awaitingChapter pcs events gs oid =
         _ -> False
       -- Triggered but not yet placed: an unscanned CR 122.6 placement on this
       -- permanent that crossed one of its chapters. The same comparison
-      -- Pawl.Engine.Event.matchesTrigger makes, through the same `crossed`.
-      -- NARROWED by CR 702.155a exactly as the matcher is, through the same
-      -- `chapterTriggers`: a chapter this Saga's read ahead stopped from
-      -- triggering is owed no resolution, so it must not exempt the Saga from CR
-      -- 704.5s either.
+      -- Pawl.Engine.Event.matchesTrigger makes, through the same
+      -- `chapterTriggers` -- so CR 702.155a narrows this exactly as it narrows
+      -- the matcher: a chapter this Saga's read ahead stopped from triggering is
+      -- owed no resolution, and must not exempt the Saga from CR 704.5s.
+      --
+      -- A REGRESSION FENCE rather than a proven behaviour: no board in
+      -- `data/cards` tells the two readings apart, because a read-ahead Saga
+      -- reaches CR 704.5s's threshold only at the chapter it chose, which is the
+      -- one the equality admits anyway. Kept because `crossed` above requires
+      -- the SBA and the matcher to agree, not because a test reddens without it.
       restricted = any (\pc -> readAheadRestricted pc gs oid) (Map.lookup oid pcs)
       pending event = case event of
         GameEvent.CountersPut (CounterChange.MkCounterChange target CounterKind.Lore before after) ->

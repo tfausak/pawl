@@ -10,12 +10,14 @@
 -- where a card reaches them: CounterKind.Lore, GameEvent.CountersPut (the CR
 -- 122.6 record) and TriggerCondition.SelfCountersReached.
 --
--- History of Benalia is the whole card pool for this file. Chapters I and II
--- create a 2/2 white Knight token with vigilance -- CR 714.2c's "I, II --"
--- shorthand, written as the two abilities that rule says it means -- and
--- chapter III gives Knights its controller controls +2/+1 until end of turn.
+-- Two cards. History of Benalia carries every group but the last: chapters I and
+-- II create a 2/2 white Knight token with vigilance -- CR 714.2c's "I, II --"
+-- shorthand, written as the two abilities that rule says it means -- and chapter
+-- III gives Knights its controller controls +2/+1 until end of turn. Love Song of
+-- Night and Day carries the Read ahead group, and rule 702.155 is the whole
+-- reason it is here.
 --
--- `data/cards` holds a second Saga, Old Fat Spider Can't See Me, whose four
+-- `data/cards` holds a third Saga, Old Fat Spider Can't See Me, whose four
 -- chapters run under Pawl.ExpirySpec's OldFatSpiderCantSeeMe group: rule 714 is
 -- read here, and that group reads what its chapters' CR 611.2b durations do.
 module Pawl.SagaSpec where

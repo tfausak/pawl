@@ -1403,32 +1403,6 @@ apply batch candidate event =
                in gs2 {GameState.objects = Map.adjust note oid (GameState.objects gs2)}
             Monad.mapM_ (\k -> putOwnCountersIn batch oid k many) kind
             pure (Just event)
-      -- CR 702.136a: riot. "You may have this permanent enter with an additional
-      -- +1/+1 counter on it. If you don't, it gains haste."
-      --
-      -- NEVER ELIDED. A +1/+1 counter and haste are two outcomes a player can
-      -- tell apart on any board -- the whole reason the keyword exists -- so this
-      -- prompt is raised every time the entering object has a controller to ask,
-      -- the posture ChooseColor's arm takes and not ChoiceOf's one-option
-      -- elision.
-      --
-      -- The counter goes through putCounters, CR 122.6's funnel, exactly as the
-      -- WithCounters arm above does, so CR 614.16 applies to it and Doubling
-      -- Season sees riot's counter.
-      --
-      -- The haste is a STORED continuous effect (CR 611.2) rather than a stamp on
-      -- the object: rule 702.136a says the permanent "gains haste" and names no
-      -- end, which is CR 611.2a's rest-of-the-game duration, and a stored effect
-      -- is what puts the grant in CR 613.1f's layer 6 with a timestamp for
-      -- Humility and every other ability-remover to be ordered against. Its
-      -- source is the entering permanent itself, the object whose riot ability
-      -- generated it (CR 113.7).
-      --
-      -- The timestamp is a FRESH one, taken here. CR 613.7a would give a static
-      -- ability's continuous effect the timestamp of the object the ability is
-      -- on, which for this one is the permanent that entered a moment ago and has
-      -- the newest object timestamp on the board -- so the two coincide at every
-      -- ordering question a card in this pool can ask.
       -- CR 702.155b / 714.3b: read ahead's two intrinsic abilities, applied as
       -- one rewrite -- choose a number between one and this Saga's final chapter
       -- number, then enter with that many lore counters.
@@ -1474,6 +1448,32 @@ apply batch candidate event =
                 pure (max 1 (min bound answer))
         Monad.when (picked > 0) (Monad.void (putOwnCountersIn batch oid CounterKind.Lore picked))
         pure (Just event)
+      -- CR 702.136a: riot. "You may have this permanent enter with an additional
+      -- +1/+1 counter on it. If you don't, it gains haste."
+      --
+      -- NEVER ELIDED. A +1/+1 counter and haste are two outcomes a player can
+      -- tell apart on any board -- the whole reason the keyword exists -- so this
+      -- prompt is raised every time the entering object has a controller to ask,
+      -- the posture ChooseColor's arm takes and not ChoiceOf's one-option
+      -- elision.
+      --
+      -- The counter goes through putCounters, CR 122.6's funnel, exactly as the
+      -- WithCounters arm above does, so CR 614.16 applies to it and Doubling
+      -- Season sees riot's counter.
+      --
+      -- The haste is a STORED continuous effect (CR 611.2) rather than a stamp on
+      -- the object: rule 702.136a says the permanent "gains haste" and names no
+      -- end, which is CR 611.2a's rest-of-the-game duration, and a stored effect
+      -- is what puts the grant in CR 613.1f's layer 6 with a timestamp for
+      -- Humility and every other ability-remover to be ordered against. Its
+      -- source is the entering permanent itself, the object whose riot ability
+      -- generated it (CR 113.7).
+      --
+      -- The timestamp is a FRESH one, taken here. CR 613.7a would give a static
+      -- ability's continuous effect the timestamp of the object the ability is
+      -- on, which for this one is the permanent that entered a moment ago and has
+      -- the newest object timestamp on the board -- so the two coincide at every
+      -- ordering question a card in this pool can ask.
       EntryRewrite.Riot -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         gs <- State.get
