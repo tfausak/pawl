@@ -1273,7 +1273,7 @@ savePointSpec s registry = Spec.describe s "Save Point" $ do
         -- The sweep, at gameplay level. A reader that removed only the head of
         -- the group would leave the UNBLOCKED Piker attacking and bob would take
         -- its 2, which is the same 18 a no-op leaves.
-        Spec.assertEqWith s "CR 510.1c: bob takes nothing, so the unblocked Piker left combat too" (S.lifeOf S.bob atEnd) (Just 20)
+        Spec.assertEqWith s "CR 510.1a: bob takes nothing, so the unblocked Piker left combat too" (S.lifeOf S.bob atEnd) (Just 20)
         Spec.assertEqWith s "CR 506.4: nothing is an attacking creature any more" (Combat.Type.attackers (GameState.combat atEnd)) Map.empty
         Spec.assertEqWith s "CR 506.4: and the blocker is blocking nothing" (Combat.blockersOf blocked atEnd) Set.empty
         Spec.assertBool s (all (`S.onBattlefield` atEnd) [blocked, unblocked, blocker]) "so the blocked pair never traded"
