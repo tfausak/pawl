@@ -8,6 +8,7 @@ import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Expiry as Expiry
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
+import qualified Pawl.Codec.Timestamp as Timestamp
 import qualified Pawl.Codec.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Codec.TurnWindow as TurnWindow
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -29,6 +30,8 @@ codec = Fields.object $ do
   window <- Fields.required "window" TurnWindow.codec DelayedTrigger.window
   -- CR 603.7b: absent for an ability with no stated duration.
   expiry <- Fields.defaulted "expiry" Nothing (Common.maybe Expiry.codec) DelayedTrigger.expiry
+  -- CR 603.7a: always present, an entry having been created at some moment.
+  createdAt <- Fields.required "createdAt" Timestamp.codec DelayedTrigger.createdAt
   pure
     DelayedTrigger.MkDelayedTrigger
       { DelayedTrigger.ability = ability,
@@ -36,5 +39,6 @@ codec = Fields.object $ do
         DelayedTrigger.controller = controller,
         DelayedTrigger.bindings = bindings,
         DelayedTrigger.window = window,
-        DelayedTrigger.expiry = expiry
+        DelayedTrigger.expiry = expiry,
+        DelayedTrigger.createdAt = createdAt
       }

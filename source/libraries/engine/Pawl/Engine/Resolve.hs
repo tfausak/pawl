@@ -1833,35 +1833,45 @@ turnOver pcs resolving now gs oid objects
   | Daytime.restrictsTransform pcs oid = objects
   | otherwise = Game.turnFaceOver now gs oid objects
 
--- CR 701.27f, first sentence. True when this resolution must be ignored. Two
--- conditions, and BOTH narrow: the resolving object is an ability whose SOURCE is
--- the very permanent being turned over (CR 113.7a) -- a spell is not one, and
--- neither is an ability of some other permanent -- and the permanent's last turn
--- is later than that ability object's CR 613.7d timestamp. Both stamps come from
--- GameState.nextTimestamp, so one `>` decides it and equality cannot arise.
+-- CR 701.27f. True when this resolution must be ignored: the resolving object is
+-- an ability whose SOURCE is the very permanent being turned over (CR 113.7a),
+-- and that permanent's last turn is later than the moment the rule measures that
+-- ability from.
 --
--- The rule's SECOND sentence measures a delayed triggered ability from when it
--- was CREATED rather than from when it reached the stack, and that half is not
--- implemented: Pawl.Types.DelayedTrigger records no creation moment, so this
--- measures it from the stack like any other trigger (#694).
+-- WHICH moment is the rule's two sentences, and they differ observably. An
+-- ordinary ability is measured from when it was put onto the stack, which is its
+-- own CR 613.7d timestamp. A DELAYED triggered ability is measured from when it
+-- was CREATED, which is earlier and can sit on the far side of a turn-over its
+-- placement stamp is on the near side of -- Pawl.TransformSpec's Aang pair is
+-- the board that tells the two apart. Every stamp comes from
+-- GameState.nextTimestamp, so one `>` decides it and equality cannot arise.
 alreadyTurnedFor :: ObjectId -> ObjectId -> GameState -> Bool
 alreadyTurnedFor resolving victim gs = case Game.lookupObject resolving gs of
   Nothing -> False
-  Just ability ->
-    abilityOf (Object.source ability)
-      && maybe False (> Object.timestamp ability) (Game.lookupObject victim gs >>= Object.turnedOverAt)
+  Just ability -> case startedAt ability of
+    Nothing -> False
+    Just started -> maybe False (> started) (Game.lookupObject victim gs >>= Object.turnedOverAt)
   where
-    -- A CLASSIFICATION of the resolving object, never which card it is. CR
-    -- 725.2's sourceless inherent trigger has no permanent to be an ability OF,
-    -- so it falls out with the spells.
-    abilityOf source = case source of
-      Source.OfAbility activated -> ActivatedAbilitySource.source activated == victim
-      Source.OfTrigger triggered -> TriggeredAbilitySource.source triggered == victim
-      Source.OfCard _ -> False
-      Source.OfToken _ -> False
-      Source.OfEmblem _ -> False
-      Source.OfSpellCopy _ -> False
-      Source.OfInherentTrigger _ -> False
+    -- Both of the rule's narrowings at once, and a CLASSIFICATION of the
+    -- resolving object throughout, never which card it is: Nothing unless the
+    -- object is an ability OF the victim, and otherwise the moment to measure
+    -- from. CR 725.2's sourceless inherent trigger has no permanent to be an
+    -- ability of, so it falls out with the spells.
+    startedAt ability = case Object.source ability of
+      Source.OfAbility activated
+        | ActivatedAbilitySource.source activated == victim -> Just (Object.timestamp ability)
+        | otherwise -> Nothing
+      Source.OfTrigger triggered
+        | TriggeredAbilitySource.source triggered == victim ->
+            -- CR 603.7a's creation moment when there is one, and the placement
+            -- stamp otherwise: an ability the source itself has carries none.
+            Just (Maybe.fromMaybe (Object.timestamp ability) (TriggeredAbilitySource.createdAt triggered))
+        | otherwise -> Nothing
+      Source.OfCard _ -> Nothing
+      Source.OfToken _ -> Nothing
+      Source.OfEmblem _ -> Nothing
+      Source.OfSpellCopy _ -> Nothing
+      Source.OfInherentTrigger _ -> Nothing
 
 -- CR 608.2b: the ONE recipient still legal in `slot`, for a reader that can take
 -- only one -- nothing when the slot named none, its target became illegal, or it
@@ -4715,6 +4725,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- ability AS IT RESOLVED, baked in now. CR 603.7a: an entry appended here
         -- never fires on an event that already happened.
         let captured = maybe Map.empty Object.bindings (Game.lookupObject resolving gs)
+            -- CR 603.7a's creation moment, from the same counter every other
+            -- moment comes from, so CR 701.27f can compare it against
+            -- Object.turnedOverAt. Minted here rather than reusing the resolving
+            -- object's stamp: one resolution can arm several entries, and each is
+            -- created as its own opcode runs.
+            (createdAt, gs1) = Game.freshTimestamp gs
             entry =
               DelayedTrigger.MkDelayedTrigger
                 { DelayedTrigger.ability = ability,
@@ -4728,9 +4744,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- CR 603.7b's stated duration. The OUTER Maybe is the card
                   -- printing no duration; the inner one is Expiry.arm reporting
                   -- that a printed duration never STARTED (CR 611.2b).
-                  DelayedTrigger.expiry = duration >>= \d -> Expiry.arm (Binding.playersIn legal) controller source d gs
+                  DelayedTrigger.expiry = duration >>= \d -> Expiry.arm (Binding.playersIn legal) controller source d gs,
+                  DelayedTrigger.createdAt = createdAt
                 }
-         in State.put gs {GameState.delayedTriggers = GameState.delayedTriggers gs Seq.|> entry}
+         in State.put gs1 {GameState.delayedTriggers = GameState.delayedTriggers gs1 Seq.|> entry}
   Effect.Replace (Replace.MkReplace duration uses origin condition re) ->
     -- CR 614.3 / 615.3: install the floating replacement. Targetless and
     -- unprompted. CR 113.7: the SOURCE is this effect's source, which with the

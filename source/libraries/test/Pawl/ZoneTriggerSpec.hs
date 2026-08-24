@@ -4253,7 +4253,7 @@ screamsFromWithinSpec s registry =
             s
             "CR 113.6m the Aura's death trigger is on the stack"
             (fmap (\oid -> fmap Object.source (Game.lookupObject oid after)) (GameState.stack after))
-            (fmap (\ab -> Just (Source.OfTrigger TriggeredAbilitySource.MkTriggeredAbilitySource {TriggeredAbilitySource.source = aura, TriggeredAbilitySource.ability = ab})) (Face.triggeredAbilities (S.combinedFace screams)))
+            (fmap (\ab -> Just (Source.OfTrigger TriggeredAbilitySource.MkTriggeredAbilitySource {TriggeredAbilitySource.source = aura, TriggeredAbilitySource.ability = ab, TriggeredAbilitySource.createdAt = Nothing})) (Face.triggeredAbilities (S.combinedFace screams)))
           -- The preconditions the assertion above rests on, AFTER it so neither
           -- can absorb a mutation aimed at the clause.
           Spec.assertEqWith s "the enchanted Hill Giant really died" (Game.lookupObject enchanted after) Nothing
@@ -4277,7 +4277,7 @@ screamsFromWithinSpec s registry =
             s
             "CR 603.10a the Aura's death trigger is still on the stack"
             (fmap (\oid -> fmap Object.source (Game.lookupObject oid after)) (GameState.stack after))
-            (fmap (\ab -> Just (Source.OfTrigger TriggeredAbilitySource.MkTriggeredAbilitySource {TriggeredAbilitySource.source = aura, TriggeredAbilitySource.ability = ab})) (Face.triggeredAbilities (S.combinedFace screams)))
+            (fmap (\ab -> Just (Source.OfTrigger TriggeredAbilitySource.MkTriggeredAbilitySource {TriggeredAbilitySource.source = aura, TriggeredAbilitySource.ability = ab, TriggeredAbilitySource.createdAt = Nothing})) (Face.triggeredAbilities (S.combinedFace screams)))
           Spec.assertEqWith s "and both really left the battlefield in one batch" (fmap (`Game.lookupObject` after) [enchanted, aura]) [Nothing, Nothing]
         -- CR 400.7f's second sentence, and the unit's own proving leg: the Aura
         -- reached the graveyard "as a result of being put there as a state-based

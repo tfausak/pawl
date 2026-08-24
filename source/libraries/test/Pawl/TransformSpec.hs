@@ -20,7 +20,14 @@
 -- Pawl.Engine.Projection.viewOfCharacteristics. See transformedPermanentSpec,
 -- whose fixture is Tovolar and Mutagen Connoisseur rather than the Gargoyle.
 --
--- Every case but those three groups runs against the printed Thraben Gargoyle //
+-- Also CR 701.27f's SECOND sentence, which measures a DELAYED triggered
+-- ability's transform from when that ability was created rather than from when
+-- it reached the stack. Its pair of cases needs a permanent whose own delayed
+-- ability turns it over and something else able to turn it over in between, so
+-- they add Aang, at the Crossroads // Aang, Destined Savior and Moonmist. See
+-- aangBoard.
+--
+-- Every case but those groups runs against the printed Thraben Gargoyle //
 -- Stonewing Antagonizer, a nonmodal double-faced card (CR 712.2) whose front
 -- face is a {1} 2/2 Artifact Creature -- Gargoyle with defender and "{6}:
 -- Transform this creature", and whose back face is a 4/2 Artifact Creature --
@@ -76,6 +83,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Transformed as Transformed
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -116,6 +124,72 @@ faceReadings oid gs =
 frontFace, backFace :: (Set.Set CardName.CardName, Maybe (Integer, Integer), Set.Set Subtype.Subtype, Bool, Bool, Int)
 frontFace = (Set.singleton gargoyleName, Just (2, 2), Set.singleton Subtype.Gargoyle, True, False, 1)
 backFace = (Set.singleton antagonizerName, Just (4, 2), Set.fromList [Subtype.Gargoyle, Subtype.Horror], False, True, 0)
+
+-- CR 701.27f's SECOND sentence needs a permanent whose own DELAYED ability turns
+-- it over, and something else able to turn it over in between. Aang, at the
+-- Crossroads // Aang, Destined Savior is that permanent, and Moonmist is that
+-- something else: of the Transform opcodes in `data/cards/`, Moonmist's is the
+-- only one whose ObjectRef is not `InSlot "self"`, so it is what can turn a
+-- permanent over without being an ability of it -- and it names Humans, which
+-- Aang's front face is. A second such card in the corpus would give this
+-- fixture a choice; today there is none.
+--
+-- WHY Aang and not Archangel Avacyn, which prints the same shape: Avacyn is an
+-- Angel, and nothing in `data/cards/` can turn an Angel over, so a board built
+-- on it agrees under both clocks. Scryfall
+-- `o:transform o:"beginning of the next" include:extras`, 2026-08-24, returns
+-- eight cards; of the four whose front face is a Human, Liliana, Heretical
+-- Healer and Loyal Cathar return transformed from another zone rather than
+-- transforming a permanent, and Sun-Blessed Guardian transforms through an
+-- activated ability with no delayed one. A printing whose delayed ability
+-- transforms it and whose front face shares a subtype with a corpus
+-- transformer would refute the choice, not the rule.
+--
+-- Not implemented: Aang's back face prints "at the beginning of combat on your
+-- turn, earthbend 2", and CR 701.66a's keyword action does not exist, so the
+-- transcription omits that ability (#2216). The omission runs the card
+-- STRICTER than printed and no case here reads the back face for anything but
+-- its name and its power/toughness.
+aangFront, aangBack :: CardName.CardName
+aangFront = CardName.MkCardName (Text.pack "Aang, at the Crossroads")
+aangBack = CardName.MkCardName (Text.pack "Aang, Destined Savior")
+
+-- Which face of Aang is up: the name and the power/toughness, which are 3/3 on
+-- the front and 4/4 on the back. Two readers rather than one, so a case that
+-- reads the right face for its name and the wrong one for its size fails here.
+aangReadings :: ObjectId.ObjectId -> GameState.GameState -> (Set.Set CardName.CardName, Maybe (Integer, Integer))
+aangReadings oid gs = (Projection.namesOf oid gs, S.powerToughnessOf oid gs)
+
+aangFrontUp, aangBackUp :: (Set.Set CardName.CardName, Maybe (Integer, Integer))
+aangFrontUp = (Set.singleton aangFront, Just (3, 3))
+aangBackUp = (Set.singleton aangBack, Just (4, 4))
+
+-- alice's Aang with a Goblin Piker beside it, Moonmist in hand and two Forests
+-- to cast it with. The Piker is the "another creature you control" whose
+-- departure arms Aang's delayed ability; it is a Goblin rather than a Human, so
+-- Moonmist reaches Aang and nothing else on the board.
+aangBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+aangBoard aang piker moonmist forest =
+  let (aangId, g0) = S.addCreature aang S.alice (S.landsInPlay forest 2)
+      (pikerId, g1) = S.addCreature piker S.alice g0
+      (moonmistId, g2) = S.addHandCard moonmist S.alice g1
+   in (aangId, pikerId, moonmistId, g2 {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice})
+
+-- The Piker takes lethal damage and CR 704.5g destroys it, Aang's
+-- leaves-the-battlefield trigger reaches the stack and resolves, and CR 603.7a
+-- creates the delayed ability. Everything before the clock this unit is about.
+armAangsDelayedAbility :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+armAangsDelayedAbility pikerId board =
+  S.runPure S.identityAnswer (S.settleSba (S.markDamage pikerId 5 board)) (Engine.placePendingTriggers *> Stack.resolveTop)
+
+-- The next upkeep arrives, the delayed ability triggers, and it resolves. The
+-- ability object gets its CR 613.7d timestamp HERE, which is what the rule's
+-- first sentence would measure from and its second sentence does not.
+atNextUpkeep :: GameState.GameState -> GameState.GameState
+atNextUpkeep gs =
+  let upkeep = Phase.Beginning BeginningStep.Upkeep
+      began = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice)) (gs {GameState.phase = upkeep})
+   in S.runPure S.identityAnswer began (Engine.placePendingTriggers *> Stack.resolveTop)
 
 -- "Transform all creatures", the shape CR 701.27a takes when a spell rather than
 -- the permanent's own ability asks -- Moonmist's "transform all Humans" with a
@@ -273,6 +347,62 @@ spec s registry = Spec.describe s "Transform" $ do
         Spec.assertEqWith s "its own {6} turned it over" (faceReadings oid byItsOwnAbility) backFace
         Spec.assertEqWith s "and a spell turns it straight back, same turn" (faceReadings oid thenBySomethingElse) frontFace
       abilities -> Spec.assertFailure s ("expected one activated ability, got " <> show (length abilities))
+  -- CR 701.27f's SECOND sentence: "If a delayed triggered ability of a permanent
+  -- tries to transform that permanent, the permanent does so only if it hasn't
+  -- transformed or converted since that delayed triggered ability was created."
+  --
+  -- Three moments, in order. The Piker dies and Aang's trigger CREATES the
+  -- delayed ability. Moonmist then turns Aang over, so Object.turnedOverAt is
+  -- later than that creation. Only at the next upkeep does the delayed ability
+  -- reach the stack and take its own CR 613.7d timestamp, which is later still.
+  --
+  -- The two clocks therefore disagree, and this is the case that says which one
+  -- the rule means: measured from the PLACEMENT stamp the turn-over is earlier
+  -- and the instruction runs, flipping Aang back to the 3/3 front face;
+  -- measured from CREATION it is later and the instruction is ignored, leaving
+  -- the 4/4 back face up. The case below is its pair -- same board, no Moonmist
+  -- -- and shows the delayed transform is not simply refused.
+  Spec.it s "CR 701.27f a delayed transform is measured from when the ability was created" $ do
+    aang <- S.printingOf s registry "Aang, at the Crossroads"
+    piker <- S.printingOf s registry "Goblin Piker"
+    moonmist <- S.printingOf s registry "Moonmist"
+    forest <- S.printingOf s registry "Forest"
+    let (aangId, pikerId, moonmistId, board) = aangBoard aang piker moonmist forest
+        armed = armAangsDelayedAbility pikerId board
+        turned = S.runPure S.identityAnswer armed (S.cast S.alice moonmistId *> Stack.resolveTop)
+        fired = atNextUpkeep turned
+    Spec.assertEqWith s "the Piker's death armed exactly one delayed ability" (Seq.length (GameState.delayedTriggers armed)) 1
+    Spec.assertEqWith s "which left Aang on its front face" (aangReadings aangId armed) aangFrontUp
+    Spec.assertEqWith s "and Moonmist then turned it over, Aang being a Human" (aangReadings aangId turned) aangBackUp
+    Spec.assertEqWith
+      s
+      "CR 701.27f: Aang turned over since the delayed ability was created, so the instruction is ignored and the back face stays up"
+      (aangReadings aangId fired)
+      aangBackUp
+    Spec.assertEqWith s "with the delayed ability spent and nothing left on the stack" (Seq.length (GameState.delayedTriggers fired), length (GameState.stack fired)) (0, 0)
+  -- The pair to the case above, differing in exactly one thing: no Moonmist, so
+  -- nothing turns Aang over between the delayed ability's creation and its
+  -- resolution. CR 701.27f then has nothing to ignore and the delayed ability
+  -- does transform the permanent.
+  --
+  -- Without this, a gate that refused EVERY delayed transform would pass the
+  -- case above.
+  Spec.it s "CR 701.27f a delayed transform of a permanent that has not turned over still happens" $ do
+    aang <- S.printingOf s registry "Aang, at the Crossroads"
+    piker <- S.printingOf s registry "Goblin Piker"
+    moonmist <- S.printingOf s registry "Moonmist"
+    forest <- S.printingOf s registry "Forest"
+    let (aangId, pikerId, _, board) = aangBoard aang piker moonmist forest
+        armed = armAangsDelayedAbility pikerId board
+        fired = atNextUpkeep armed
+    Spec.assertEqWith s "the Piker's death armed exactly one delayed ability" (Seq.length (GameState.delayedTriggers armed)) 1
+    Spec.assertEqWith s "and nothing turned Aang over in the meantime" (Maybe.isNothing (Game.lookupObject aangId armed >>= Object.turnedOverAt)) True
+    Spec.assertEqWith
+      s
+      "CR 701.27f: the delayed ability turns Aang over, so the 4/4 back face is up"
+      (aangReadings aangId fired)
+      aangBackUp
+    Spec.assertEqWith s "with the delayed ability spent and nothing left on the stack" (Seq.length (GameState.delayedTriggers fired), length (GameState.stack fired)) (0, 0)
   -- CR 712.8e: "While a nonmodal double-faced permanent has its back face up, it
   -- has only the characteristics of its back face. However, its mana value is
   -- calculated using the mana cost of its front face." CR 202.3a exempts that

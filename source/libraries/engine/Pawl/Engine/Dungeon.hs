@@ -136,7 +136,7 @@ roomPending events gs = Maybe.mapMaybe pendingFor events
       GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered pid oid room) -> do
         entered <- roomAt room (roomsOf oid gs)
         Monad.guard (fmap Object.owner (Game.lookupObject oid gs) == Just pid)
-        Just (PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) pid (roomAbility room entered) Map.empty)
+        Just (PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) pid (roomAbility room entered) Map.empty Nothing)
       _ -> Nothing
 
 -- | CR 704.5t \/ 309.6: the dungeon cards whose owner must remove them from the
