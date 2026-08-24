@@ -13,7 +13,7 @@ import qualified Pawl.Types.SlotName as SlotName
 -- and the fourth takes its candidates from the resolution's bindings rather
 -- than from the board.
 --
--- A MANA POOL is deliberately not a fourth arm: the pool is none of CR 400.1's
+-- A MANA POOL is deliberately not an arm of its own: the pool is none of CR 400.1's
 -- zones (CR 106.4 attaches it to a player instead), and a Count's Filter and
 -- Aggregation have nothing to say about a mana unit. Pawl.Types.ManaCount is the
 -- parallel axis, and its haddock carries the argument in full.

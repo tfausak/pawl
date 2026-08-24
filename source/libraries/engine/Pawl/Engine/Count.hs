@@ -135,11 +135,13 @@ evaluate viewOf quantityOf context gs count = case Count.Type.scope count of
 -- be counted anyway: a card discarded into a hidden zone has every
 -- characteristic undefined, so no Filter has an honest answer about it.
 --
--- NOT OBSERVABLE by any card in data/cards/: nothing in the pool replaces a
--- move into a graveyard with one into a hidden zone, so every candidate this
--- sees today is public and inverting the test leaves the suite green. Kept
--- because CR 400.7j states it, as a regression fence rather than as a proven
--- behaviour (#2230).
+-- The EXCLUSION is not observable by any card in data/cards/: nothing in the
+-- pool replaces a move into a graveyard with one into a hidden zone, so every
+-- candidate this sees today is public and dropping the test altogether leaves
+-- the suite green. Kept because CR 400.7j states it, as a regression fence
+-- rather than as a proven behaviour (#2230). Admitting a PUBLIC candidate is
+-- proven -- Pawl.ZoneChangeSpec's Psychic Miasma leg under Rest in Peace reads
+-- a discarded card out of exile.
 --
 -- False for an id with no object, which is one that has ceased to exist since
 -- the binding was written -- CR 111.7's token, whose exile leaves nothing.

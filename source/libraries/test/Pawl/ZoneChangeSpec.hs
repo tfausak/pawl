@@ -595,7 +595,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
   -- The same rider read through a CR 614 redirect. Rest in Peace replaces the
   -- discard's destination with exile, which CR 400.2 lists among the public
   -- zones, so CR 400.7j keeps the discarded card findable by a later part of the
-  -- same effect and the rider must still fire. The two legs above are this same
+  -- same effect and the rider must still fire. The land leg above is this same
   -- board without the one permanent.
   --
   -- The asserted quantity is again Psychic Miasma's own zone, and it separates
