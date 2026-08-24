@@ -549,6 +549,51 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         gs = S.withEffectAt oid (Timestamp.MkTimestamp 100) (Modification.GainKeyword Keyword.Deathtouch) gs0
     Spec.assertBool s (Projection.hasKeyword Keyword.Deathtouch oid gs) "has deathtouch"
 
+  -- CR 613.1f's removal narrowed to ONE rule-702 keyword, and the half of it the
+  -- combat cases cannot see: what Sky Tether does NOT take. Kird Ape's "+1/+2 as
+  -- long as you control a Forest" is a static ability of the enchanted creature
+  -- whose only part lands in layer 7c, which is exactly the shape
+  -- Projection.removesAbilities gates -- a wipe would drop it and leave a 1/1.
+  -- The defender assertion is the anti-vacuity control: the Aura is attached and
+  -- applying, so the surviving +1/+2 is the narrowness talking rather than an
+  -- Aura that did nothing.
+  Spec.it s "CR 613.1f a keyword removal leaves the host's other abilities alone" $ do
+    kirdApe <- S.printingOf s registry "Kird Ape"
+    forest <- S.printingOf s registry "Forest"
+    skyTether <- S.printingOf s registry "Sky Tether"
+    let (apeId, withApe) = S.addCreature kirdApe S.alice (S.landsInPlay forest 1)
+        (aura, withAura) = S.addCreature skyTether S.alice withApe
+        board = S.attach aura apeId withAura
+    Spec.assertEqWith s "the Ape keeps its own +1/+2" (S.powerToughnessOf apeId board) (Just (2, 3))
+    Spec.assertBool s (Projection.hasKeyword Keyword.Defender apeId board) "while the Aura is attached and applying"
+
+  -- CR 613.9's first Example, in so many words: a grant of flying and a removal
+  -- of flying do not depend on each other (CR 613.8a), so CR 613.1f puts both in
+  -- layer 6 and CR 613.7's timestamp decides which "wins".
+  --
+  -- Both readings on one board, off the Aura's own stamp: a grant
+  -- stamped before it is undone, a grant stamped after it stands. A Piker rather
+  -- than a flier, so the removal has nothing printed to bite on and the grant is
+  -- the only flying in the fold -- which is what makes the first assertion fail
+  -- if the removal were classified into any layer ahead of 6.
+  Spec.it s "CR 613.7 a flying grant stamped after Sky Tether stands, one stamped before it does not" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    skyTether <- S.printingOf s registry "Sky Tether"
+    let (pikerId, withPiker) = S.addCreature piker S.alice (S.landsInPlay mountain 1)
+        (aura, withAura) = S.addCreature skyTether S.alice withPiker
+        board = S.attach aura pikerId withAura
+        auraStamp = maybe 0 (Timestamp.unwrap . Object.timestamp) (Game.lookupObject aura board)
+        grantAt n = S.withEffectAt pikerId (Timestamp.MkTimestamp n) (Modification.GainKeyword Keyword.Flying) board
+    -- Guards the subtractions below, Timestamp holding a Natural.
+    Spec.assertBool s (auraStamp > 1) "the Aura entered after something"
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying pikerId (grantAt (auraStamp - 1)))) "the earlier grant is undone by the Aura"
+    Spec.assertBool s (Projection.hasKeyword Keyword.Flying pikerId (grantAt (auraStamp + 1))) "the later grant stands"
+    -- The removal takes the ABILITY, not one instance of it: TWO earlier grants
+    -- leave nothing behind either. A decrementing removal reads flying here.
+    let twoEarly = S.withEffectAt pikerId (Timestamp.MkTimestamp (auraStamp - 2)) (Modification.GainKeyword Keyword.Flying) (grantAt (auraStamp - 1))
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying pikerId twoEarly)) "two earlier grants are both undone"
+
   -- CR 702.164b's own example: "If a creature with toxic 2 gains toxic 1 due
   -- to another effect, its total toxic value is 3." The two abilities are
   -- distinct, so they sum rather than shadow each other.
