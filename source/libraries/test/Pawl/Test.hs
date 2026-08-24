@@ -233,6 +233,7 @@ import qualified Pawl.Codec.PhaseSelectorSpec
 import qualified Pawl.Codec.PhaseSpec
 import qualified Pawl.Codec.PhasedOutSpec
 import qualified Pawl.Codec.PlayPermissionOriginSpec
+import qualified Pawl.Codec.PlayerAttacksWithSpec
 import qualified Pawl.Codec.PlayerCounterKindSpec
 import qualified Pawl.Codec.PlayerCounterTallySpec
 import qualified Pawl.Codec.PlayerCountersSpec
@@ -733,6 +734,7 @@ spec s registry = do
   Pawl.Codec.PhasedOutSpec.spec s
   Pawl.Codec.PlayPermissionOriginSpec.spec s
   Pawl.Codec.PlayerCounterKindSpec.spec s
+  Pawl.Codec.PlayerAttacksWithSpec.spec s
   Pawl.Codec.PlayerCounterTallySpec.spec s
   Pawl.Codec.PlayerCountersSpec.spec s
   Pawl.Codec.PlayerDrawsNthCardSpec.spec s

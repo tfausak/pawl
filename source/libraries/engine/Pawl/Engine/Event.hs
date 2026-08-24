@@ -129,6 +129,7 @@ import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesign
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
 import Pawl.Types.PlayerId (PlayerId)
@@ -5121,6 +5122,81 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
+  -- CR 508.3c: the player the payload names declared one or more attackers the
+  -- Filter admits. The arm above narrowed, against the same once-per-DECLARATION
+  -- event, because that is the arity every printing of "attacks with" takes --
+  -- the quantifier is in the printed sentence ("one or more Birds"), so a
+  -- declaration naming two Birds fires it once. CR 508.3a's per-attacker event
+  -- sits below answering False: matching it here would fire once per declared
+  -- Bird instead.
+  --
+  -- The creatures come from Combat.declaredAttackers rather than from the event,
+  -- which carries only who declared, and NOT from Combat.attackers as
+  -- SelfAttacksWithAnother reads it: CR 508.4 says a creature put onto the
+  -- battlefield attacking never "attacked", and putOntoBattlefieldAttacking
+  -- writes the second map and not this one. Exact at this moment for
+  -- SelfAttacksWithAnother's reason -- CR 508.2b puts every trigger from this
+  -- declaration on the stack together, so no player has had priority since.
+  --
+  -- Rule 508.3c's "that player CONTROLS" is Combat.joinedUnder, CR 506.4's
+  -- record of who controlled each combatant as it joined. Not independently
+  -- observable: CR 508.1a lets only the active player declare, so every id in
+  -- declaredAttackers joined under the declarer, and dropping the comparison
+  -- leaves the suite green. It is here because the rule says it.
+  --
+  -- viewWithLastKnown and the Filter context framed by the bearer, exactly as
+  -- SelfBlocksOneOrMore's arm below does it. Nothing is bound, so the context's
+  -- empty slot map is honest here.
+  TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith relation f) -> case event of
+    GameEvent.AttackersDeclared attacker
+      | PlayerRelation.holds relation you attacker ->
+          let combat = GameState.combat gs
+              admits oid =
+                Map.lookup oid (Combat.joinedUnder combat) == Just attacker
+                  && maybe False (\view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f) (Projection.viewWithLastKnown oid gs oid)
+           in any admits (Set.toList (Combat.declaredAttackers combat))
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
   -- CR 508.3b: the player this ability's source is attached to was attacked.
   -- CreatureAttacksYou's question asked once per DECLARATION instead, which is
   -- the whole of what separates them: this matches the grouped
@@ -8019,6 +8095,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.CreatureAttacksYou -> False
   TriggerCondition.AttachedPlayerIsAttacked -> False
   TriggerCondition.PlayerAttacks _ -> False
+  TriggerCondition.PlayerAttacksWith {} -> False
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature _ -> False
@@ -8741,6 +8818,9 @@ eventBindingSlots cond = case cond of
   -- and "the attacking player" need (#2154). Both must move together with
   -- eventBindings, which Pawl.ZoneTriggerSpec pins against this.
   TriggerCondition.PlayerAttacks _ -> Set.empty
+  -- The arm above's reason verbatim: rule 508.3c's subject is a player and the
+  -- Filter names a SET of creatures, so there is nothing to point at either.
+  TriggerCondition.PlayerAttacksWith {} -> Set.empty
   -- NOTHING, for SelfAttacksWithAnother's reason: rule 702.105a's payload names
   -- only "this creature", so the attacked player is compared and then never
   -- pointed at. That is also why this condition needs no arm in eventBindings.
@@ -9152,6 +9232,7 @@ looksBack condition = case condition of
   TriggerCondition.CreatureAttacksYou -> False
   TriggerCondition.AttachedPlayerIsAttacked -> False
   TriggerCondition.PlayerAttacks _ -> False
+  TriggerCondition.PlayerAttacksWith {} -> False
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature _ -> False
@@ -10219,6 +10300,7 @@ zonesTriggeredFrom cond = case cond of
   TriggerCondition.CreatureAttacksYou -> battlefield
   TriggerCondition.AttachedPlayerIsAttacked -> battlefield
   TriggerCondition.PlayerAttacks _ -> battlefield
+  TriggerCondition.PlayerAttacksWith {} -> battlefield
   TriggerCondition.SelfAttacksPlayerWithMostLife -> battlefield
   TriggerCondition.SelfBlocks -> battlefield
   TriggerCondition.SelfBlocksCreature _ -> battlefield
@@ -10476,6 +10558,10 @@ controllerTurnScoped cond = case cond of
   -- the declarer -- a stolen creature attacks on its thief's turn -- which is
   -- the comparison this arm does make.
   TriggerCondition.PlayerAttacks relation -> relation == PlayerRelation.You
+  -- The arm above's comparison, over the same relation: rule 508.3c's Filter
+  -- narrows WHICH creatures were declared and says nothing about whose turn it
+  -- is.
+  TriggerCondition.PlayerAttacksWith payload -> PlayerAttacksWith.player payload == PlayerRelation.You
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature _ -> False
@@ -10653,6 +10739,7 @@ stateTriggers gs
               TriggerCondition.CreatureAttacksYou -> False
               TriggerCondition.AttachedPlayerIsAttacked -> False
               TriggerCondition.PlayerAttacks _ -> False
+              TriggerCondition.PlayerAttacksWith {} -> False
               TriggerCondition.SelfAttacksPlayerWithMostLife -> False
               TriggerCondition.SelfBlocks -> False
               TriggerCondition.SelfBlocksCreature _ -> False

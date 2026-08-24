@@ -19,6 +19,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
@@ -221,6 +222,16 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PlayerAttacks PlayerRelation.AnyPlayer)
       " {\"type\":\"PlayerAttacks\",\"value\":{\"type\":\"AnyPlayer\"}} "
+  -- CR 508.3c, the arm above with a Filter beside the relation -- Hermes,
+  -- Overseer of Elpis' "whenever you attack with one or more Birds". A named
+  -- object rather than a bare payload, so the floor Aurelia, the Law Above
+  -- wants (#2226) becomes a third key and not a new wire shape.
+  Spec.it s "PlayerAttacksWith" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith PlayerRelation.You (Filter.HasSubtype Subtype.Bird)))
+      " {\"type\":\"PlayerAttacksWith\",\"value\":{\"player\":{\"type\":\"You\"},\"filter\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Bird\"}}}} "
   -- CR 508.3b, nullary for the sibling above's reason and one of its own: the
   -- subject is whom the ability's own source is attached to.
   Spec.it s "AttachedPlayerIsAttacked" $

@@ -8,6 +8,7 @@ import qualified Pawl.Codec.CreatureBecomesBlockedByAtLeast as CreatureBecomesBl
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.PermanentBecomesDesignated as PermanentBecomesDesignated
+import qualified Pawl.Codec.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Codec.PlayerDrawsNthCard as PlayerDrawsNthCard
 import qualified Pawl.Codec.PlayerRelation as PlayerRelation
 import qualified Pawl.Codec.RoomIndex as RoomIndex
@@ -46,6 +47,7 @@ codec =
       Arm.payload "CreatureAttacksAlone" filterCodec TriggerCondition.CreatureAttacksAlone (\x -> case x of TriggerCondition.CreatureAttacksAlone y -> Just y; _ -> Nothing),
       Arm.nullary "CreatureAttacksYou" TriggerCondition.CreatureAttacksYou,
       Arm.payload "PlayerAttacks" PlayerRelation.codec TriggerCondition.PlayerAttacks (\x -> case x of TriggerCondition.PlayerAttacks y -> Just y; _ -> Nothing),
+      Arm.payload "PlayerAttacksWith" PlayerAttacksWith.codec TriggerCondition.PlayerAttacksWith (\x -> case x of TriggerCondition.PlayerAttacksWith y -> Just y; _ -> Nothing),
       Arm.nullary "AttachedPlayerIsAttacked" TriggerCondition.AttachedPlayerIsAttacked,
       Arm.nullary "SelfAttacksPlayerWithMostLife" TriggerCondition.SelfAttacksPlayerWithMostLife,
       Arm.nullary "SelfBlocks" TriggerCondition.SelfBlocks,
