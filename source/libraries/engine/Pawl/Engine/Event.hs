@@ -8934,9 +8934,11 @@ eventBindingSlots cond = case cond of
   TriggerCondition.PermanentDies _ -> Set.singleton Binding.became
   -- Empty where PermanentDies binds CR 400.7e's graveyard card, and NECESSARILY
   -- so: the trigger event is a whole CR 704.3 batch, which may have buried
-  -- several cards, and one slot cannot name them all. No printing of the
-  -- one-or-more wording says "it" -- Vengeful Townsfolk's payload acts on
-  -- itself -- so the lint has nothing to reject (#505).
+  -- several cards, and one slot cannot name them all. Nothing in print asks for
+  -- one either: Scryfall o:"one or more other creatures you control die",
+  -- 2026-08-24, matches Vengeful Townsfolk and Vraan, Executioner Thane, whose
+  -- payloads act on the bearer and on the players. A printing whose payload said
+  -- "it" would refute this, and the lint would reject it (#505).
   TriggerCondition.PermanentsDie _ -> Set.empty
   -- The same slot and rule as SelfDies, but bound only for a PUBLIC destination
   -- (CR 400.7e's proviso over CR 400.2's hidden zones), so the guaranteed floor is
@@ -9356,8 +9358,9 @@ looksBack condition = case condition of
 --
 -- CR 603.1b lets one ability carry several conditions, and `any` makes such an
 -- ability batch-scoped as a whole: a mixed AnyOf would fire at most once per group
--- rather than once per group plus once per member. No printing mixes the two
--- readings, and CardSpec's anyOfOffends already narrows what an AnyOf may hold.
+-- rather than once per group plus once per member. Nothing in data/cards mixes
+-- the two readings, and CardSpec's anyOfOffends already narrows what an AnyOf may
+-- hold; a card that did would need this arm re-derived rather than reused.
 batchScoped :: TriggerCondition -> Bool
 batchScoped condition = case condition of
   TriggerCondition.RoomEntered _ -> False

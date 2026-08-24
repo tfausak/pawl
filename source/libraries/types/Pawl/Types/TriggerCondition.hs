@@ -488,7 +488,8 @@ data TriggerCondition
     -- which is the only reader that has it.
     --
     -- Binds nothing where PermanentDies binds CR 400.7e's graveyard card: a batch
-    -- may bury several, and no printing of this wording names one of them.
+    -- may bury several, so one slot could not name them all.
+    -- Pawl.Engine.Event's eventBindingSlots arm records the query behind that.
     PermanentsDie (Filter.Filter Keyword.Keyword)
   | -- | CR 603.6c's first written form taken whole -- "when [this object] leaves
     -- the battlefield", so an exile, a bounce and a shuffle into a library all
