@@ -329,6 +329,18 @@ combatReplaySpec s =
         -- five, and it is the one ChooseLandTypeSwap's fallback already names.
         Spec.it s "defaultAnswer chooses Mountain" $
           Spec.assertEqWith s "Mountain" (Replay.defaultAnswer (Prompt.ChooseBasicLandType decider S.alice oid)) Subtype.Mountain
+        -- CR 702.155b / 714.3b: the chapter a Saga with read ahead enters on.
+        -- Round-tripped at 2 and 3 rather than at 1, since 1 is what
+        -- defaultAnswer falls back to and a collapsing codec would hide behind
+        -- it -- the same trap ChooseBasicLandType's Mountain names.
+        Spec.it s "ChooseReadAheadChapter records and replays a Natural" $ do
+          let p = Prompt.ChooseReadAheadChapter decider S.alice oid 3
+          Monad.forM_ [1, 2, 3] $ \chapter ->
+            Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p chapter)) (Just chapter)
+        -- CR 702.155b's range opens at one, so a transcript that runs short
+        -- answers with the floor -- always legal wherever the prompt is raised.
+        Spec.it s "defaultAnswer chooses chapter I" $
+          Spec.assertEqWith s "one" (Replay.defaultAnswer (Prompt.ChooseReadAheadChapter decider S.alice oid 3)) 1
         -- CR 201.4 / 614.1c: a card name chosen as a permanent enters (Null
         -- Chamber). Unlike the two prompts above the answer is not drawn from a
         -- fixed five, so what a collapsing codec would lose is any name at all
