@@ -282,14 +282,15 @@ intrinsicManaCost =
 -- The instruction the ability above gives: CR 305.6 writes it out as "{T}: Add
 -- [mana symbol]" and nothing more, so every field beyond the type takes the
 -- value an unwritten clause means -- CR 109.5's "you", CR 106.4's ordinary loss
--- as the step ends, and no CR 106.6 restriction.
+-- as the step ends, and neither of CR 106.6's two clauses.
 intrinsicManaAddition :: ManaType -> ManaAddition.ManaAddition
 intrinsicManaAddition manaType =
   ManaAddition.MkManaAddition
     { ManaAddition.player = PlayerRef.Relative PlayerRelation.You,
       ManaAddition.production = ManaProduction.OfType manaType,
       ManaAddition.retention = ManaRetention.Ordinary,
-      ManaAddition.restriction = Nothing
+      ManaAddition.restriction = Nothing,
+      ManaAddition.rider = Nothing
     }
 
 -- What tapping this object for mana could actually put in a pool: every route
@@ -398,6 +399,13 @@ manaOptionsOfGiven pcs oid gs =
       -- what then refuses to spend it on the wrong thing (spendableFor), and
       -- payableResolutionsGiven is what keeps the offer in step with that.
       --
+      -- The RIDER is stamped by the same sentence and copied the same way
+      -- (Boseiju, Who Shelters All). It is not consulted here or anywhere on the
+      -- offer side: a rider narrows nothing about what the mana may pay for, so
+      -- folding it into supplyRestricted would make Boseiju's colourless refuse
+      -- a nested mana ability's own cost. Pawl.Engine.ManaRider reads it off the
+      -- payment CR 400.7d recorded, long after this.
+      --
       -- Not implemented: the retention the same instruction may carry
       -- (Pawl.Types.ManaRetention). This is CR 605.3b's inline payment, and
       -- Ordinary is stamped here whatever the addition says, so a mana ability
@@ -409,7 +417,8 @@ manaOptionsOfGiven pcs oid gs =
           { ManaUnit.manaType = manaType,
             ManaUnit.tags = tags,
             ManaUnit.retention = ManaRetention.Ordinary,
-            ManaUnit.restriction = ManaAddition.restriction addition
+            ManaUnit.restriction = ManaAddition.restriction addition,
+            ManaUnit.rider = ManaAddition.rider addition
           }
       expand (cost, restrictions, additions) =
         fmap

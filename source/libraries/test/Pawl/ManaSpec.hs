@@ -190,7 +190,7 @@ conquerorCounter = CounterKind.Named (CounterName.UnsafeMkCounterName (Text.pack
 -- One mana unit of `mt`, untagged -- what tapping a land for its one mana ability
 -- floats.
 oneUnit :: ManaType.ManaType -> Mana.Type.Mana
-oneUnit mt = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = mt, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}]
+oneUnit mt = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = mt, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}]
 
 pikerCost :: ManaCost.ManaCost
 pikerCost = ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Red)]
@@ -261,7 +261,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
           s
           "pool"
           (Game.poolOf S.alice after)
-          (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}])
+          (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}])
 
   Spec.it s "two Mountains can pay {1}{R}" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -492,7 +492,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     let ab =
           ActivatedAbility.MkActivatedAbility
             { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
-              ActivatedAbility.modal = singleModeAbility [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary Nothing)] Map.empty,
+              ActivatedAbility.modal = singleModeAbility [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary Nothing Nothing)] Map.empty,
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing,
               ActivatedAbility.name = Nothing
@@ -505,7 +505,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
             { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
               ActivatedAbility.modal =
                 singleModeAbility
-                  [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary Nothing)]
+                  [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary Nothing Nothing)]
                   (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSlot.required Pool.AnyTarget Nothing)),
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing,
@@ -712,7 +712,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
 prefersColor :: Color.Color -> Prompt.Prompt r -> r
 prefersColor wanted p = case p of
   Prompt.ChooseManaYield _ _ _ candidates ->
-    S.optionYielding (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored wanted, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}]) candidates
+    S.optionYielding (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored wanted, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}]) candidates
   _ -> S.identityAnswer p
 
 -- Alice controls `permanents` and holds `spell`; she casts it and resolves it,
@@ -1452,8 +1452,8 @@ palladiumMyrSpec s registry = Spec.describe s "Palladium Myr" $ do
     palladiumMyr <- S.printingOf s registry "Palladium Myr"
     let (_, g1) = S.addCreature ashaya S.alice (Setup.emptyGame S.bothPlayers)
         (myrId, gs) = S.addCreature palladiumMyr S.alice g1
-        green = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
-        colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
+        green = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
+        colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
     Spec.assertEqWith
       s
       "the Forest's {G} and the artifact's {C}{C}"
@@ -1773,7 +1773,7 @@ manaConfluenceSpec s registry = Spec.describe s "Mana Confluence" $ do
     urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
     let (confluenceId, g1) = S.addCreature manaConfluence S.alice (Setup.emptyGame S.bothPlayers)
         (_, gs) = S.addCreature urborg S.alice g1
-        black = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Black, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}]
+        black = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Black, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}]
         -- The offered black option that is CR 305.6's free one, or the printed
         -- one that charges the life -- `printed` picks which.
         buysBlack :: Bool -> Prompt.Prompt r -> r
@@ -1799,7 +1799,7 @@ manaConfluenceSpec s registry = Spec.describe s "Mana Confluence" $ do
 prefersDoubleBlack :: Prompt.Prompt r -> r
 prefersDoubleBlack p = case p of
   Prompt.ChooseManaYield _ _ _ candidates ->
-    let unit = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Black, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
+    let unit = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Black, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
      in S.optionYielding (Mana.Type.MkMana [unit, unit]) candidates
   _ -> S.identityAnswer p
 
@@ -2179,7 +2179,7 @@ nextColor p = case p of
       Nothing -> S.identityAnswer p
       Just color ->
         S.optionYielding
-          (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}])
+          (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}])
           candidates
   _ -> pure (S.identityAnswer p)
 
@@ -3211,7 +3211,7 @@ burningTreeArranged bte pid =
 -- One green mana with no production tags, plainRed's twin: what the Emissary's
 -- trigger adds alongside it.
 plainGreen :: ManaUnit.ManaUnit
-plainGreen = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
+plainGreen = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
 
 -- plainGreen's twin, differing in EXACTLY one field: what Shizuko, Caller of
 -- Autumn's trigger adds. The pair is what makes the group below discriminating
@@ -3640,7 +3640,8 @@ restrictedRed =
       ManaUnit.tags = Set.empty,
       ManaUnit.retention = ManaRetention.Ordinary,
       ManaUnit.restriction =
-        Just (ManaRestriction.onlyCasts (Filter.Or [Filter.HasCardType CardType.Artifact, Filter.HasCardType CardType.Creature]))
+        Just (ManaRestriction.onlyCasts (Filter.Or [Filter.HasCardType CardType.Artifact, Filter.HasCardType CardType.Creature])),
+      ManaUnit.rider = Nothing
     }
 
 -- CR 106.6 on the OTHER road: a mana ability's restricted mana, added inline at
@@ -3702,7 +3703,8 @@ restrictedColorless =
     { ManaUnit.manaType = ManaType.Colorless,
       ManaUnit.tags = Set.empty,
       ManaUnit.retention = ManaRetention.Ordinary,
-      ManaUnit.restriction = Just (ManaRestriction.onlyCasts (Filter.HasCardType CardType.Artifact))
+      ManaUnit.restriction = Just (ManaRestriction.onlyCasts (Filter.HasCardType CardType.Artifact)),
+      ManaUnit.rider = Nothing
     }
 
 -- CR 106.6's OTHER subject, and the one no card in the pool reached before: a
@@ -3811,7 +3813,8 @@ hawkerMana manaType =
           ManaRestriction.MkManaRestriction
             { ManaRestriction.casts = Nothing,
               ManaRestriction.activations = Just (Filter.And [])
-            }
+            },
+      ManaUnit.rider = Nothing
     }
 
 -- CR 105.4's half of the same arm: an ability that adds mana whose TYPE is not
@@ -3901,7 +3904,7 @@ recordingManaTypes manaType p = case p of
 -- One mana of `color` carrying no production tag, plainRed's and plainGreen's
 -- generalisation: CR 107.4h reads the SOURCE, and Quirion Sentinel is not snow.
 plainColor :: Color.Color -> ManaUnit.ManaUnit
-plainColor color = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
+plainColor color = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
 
 -- These printings on the battlefield under alice's control, untapped and settled.
 alicePermanents :: [Printing.Printing] -> GameState.GameState
@@ -4139,7 +4142,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
 -- One mana of one type carrying no production tag: what a basic land really puts
 -- in a pool, and the unit the Celestial Dawn cases below seat directly.
 plainOf :: ManaType.ManaType -> ManaUnit.ManaUnit
-plainOf manaType = ManaUnit.MkManaUnit {ManaUnit.manaType = manaType, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
+plainOf manaType = ManaUnit.MkManaUnit {ManaUnit.manaType = manaType, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
 
 -- A cost of exactly one symbol, so a payability answer is about that symbol and
 -- nothing else.
@@ -4228,7 +4231,7 @@ celestialDawnSpec s registry = Spec.describe s "Celestial Dawn" $ do
   -- spent AS without making a nonsnow mana snow.
   Spec.it s "CR 107.4h the clause does not make a nonsnow white mana pay {S}" $ do
     dawn <- S.printingOf s registry "Celestial Dawn"
-    let snowWhite = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.White, ManaUnit.tags = Set.singleton ProductionTag.Snow, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
+    let snowWhite = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.White, ManaUnit.tags = Set.singleton ProductionTag.Snow, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
         (plainBoard, _) = dawnBoards dawn [plainOf (ManaType.Colored Color.White)]
         (snowBoard, _) = dawnBoards dawn [snowWhite]
     Spec.assertBool s (not (payable S.alice snowCost plainBoard)) "the nonsnow white mana does not pay {S}"
@@ -4306,11 +4309,12 @@ snowRed =
     { ManaUnit.manaType = ManaType.Colored Color.Red,
       ManaUnit.tags = Set.singleton ProductionTag.Snow,
       ManaUnit.retention = ManaRetention.Ordinary,
-      ManaUnit.restriction = Nothing
+      ManaUnit.restriction = Nothing,
+      ManaUnit.rider = Nothing
     }
 
 plainRed :: ManaUnit.ManaUnit
-plainRed = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
+plainRed = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
 
 -- CR 107.4h: "When used in a cost, the snow mana symbol {S} represents a cost
 -- that can be paid with one mana of any type produced by a snow source (see rule
@@ -4409,7 +4413,7 @@ snowSpec s registry = Spec.describe s "Snow" $ do
 -- {S}" into when the source is not snow, and the unit every assertion below
 -- compares against.
 plainColorless :: ManaUnit.ManaUnit
-plainColorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
+plainColorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
 
 -- CR 106.11: "If an effect would add mana represented by one or more snow mana
 -- symbols to a player's mana pool, that much colorless mana is added to that
@@ -4809,8 +4813,8 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
   -- does is a special action's cost (#1990) and a cost to attack (#1991),
   -- which is why this calls `spend` directly.
   Spec.it s "CR 118.13c with nothing announced, spend takes a {2/R}'s one-mana half (#1990)" $
-    let red = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
-        colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}
+    let red = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
+        colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
      in Spec.assertEqWith
           s
           "the {R} is spent and both {C} remain -- the other half would spend both {C} and leave the {R}"

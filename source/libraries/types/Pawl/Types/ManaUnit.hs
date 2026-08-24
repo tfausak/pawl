@@ -3,12 +3,13 @@ module Pawl.Types.ManaUnit where
 import qualified Data.Set as Set
 import qualified Pawl.Types.ManaRestriction as ManaRestriction
 import qualified Pawl.Types.ManaRetention as ManaRetention
+import qualified Pawl.Types.ManaRider as ManaRider
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ProductionTag as ProductionTag
 
 -- | One unit of mana in a pool.
 --
--- FOUR axes, and only the first is a fact about how the mana was made.
+-- FIVE axes, and only the first is a fact about how the mana was made.
 -- Pawl.Types.ProductionTag is the CLOSED half -- snow-ness, "this activation
 -- caused you to lose life" -- observable facts about the production event that
 -- the engine determines with no card knowledge.
@@ -55,11 +56,29 @@ data ManaUnit = MkManaUnit
     -- BOTH producers read it -- Pawl.Engine.Mana.manaOptionsOfGiven for a mana
     -- ability paid inline (Mishra's Workshop) and Pawl.Engine.Resolve's
     -- Effect.AddMana arm for one that resolves off the stack (Geosurge).
+    restriction :: Maybe ManaRestriction.ManaRestriction,
+    -- | CR 106.6's second shape: what this mana DOES to the spell it is spent
+    -- on -- Nothing for mana that does nothing to it, which is almost every
+    -- mana. @Just r@ names the objects the clause is about and what happens to
+    -- one (Pawl.Types.ManaRider).
     --
-    -- Not implemented: CR 106.6's other two shapes -- an additional effect on
-    -- the spell the mana is spent on (Cavern of Souls' "can't be countered"),
-    -- and a delayed triggered ability that triggers when the mana is spent
-    -- (#1977).
-    restriction :: Maybe ManaRestriction.ManaRestriction
+    -- Stamped off the ADDITION (Pawl.Types.ManaAddition) exactly as the
+    -- restriction beside it is, and for CR 106.6a's same sentence. BOTH
+    -- producers stamp it -- Pawl.Engine.Mana.manaOptionsOfGiven for a mana
+    -- ability paid inline (Boseiju, Who Shelters All) and Pawl.Engine.Resolve's
+    -- Effect.AddMana arm for one that resolves off the stack.
+    --
+    -- READ off the spent units and not off this pool: CR 400.7d keeps the
+    -- payment as Pawl.Types.Object.manaSpent, and Pawl.Engine.ManaRider is the
+    -- one reader. Deliberately NOT read by Pawl.Engine.Mana.spendableAmong: a
+    -- rider narrows nothing about what the mana may pay for, so folding it in
+    -- there would turn an unconditional rider into an unconditional restriction.
+    --
+    -- Not implemented: CR 106.6's THIRD shape -- a delayed triggered ability
+    -- (CR 603.7a) that triggers when the mana is spent, which Pyromancer's
+    -- Goggles and Path of Ancestry print. It carries a whole ability rather
+    -- than the closed word Pawl.Types.ManaRiderEffect holds, so it is a
+    -- different carrier and not a further arm (#2245).
+    rider :: Maybe ManaRider.ManaRider
   }
   deriving (Eq, Ord, Show)

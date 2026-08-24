@@ -443,7 +443,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
         picksGreen :: Prompt.Prompt r -> r
         picksGreen p = case p of
           Prompt.ChooseManaYield _ _ _ candidates ->
-            S.optionYielding (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}]) candidates
+            S.optionYielding (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}]) candidates
           _ -> S.identityAnswer p
         after = snd (Engine.runGamePure picksGreen gs (S.cast S.alice oid))
     Spec.assertEqWith s "nothing on the stack" (length (GameState.stack after)) 0
@@ -463,7 +463,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
         picksRed :: Prompt.Prompt r -> r
         picksRed p = case p of
           Prompt.ChooseManaYield _ _ _ candidates ->
-            S.optionYielding (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing}]) candidates
+            S.optionYielding (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}]) candidates
           _ -> S.identityAnswer p
         after = snd (Engine.runGamePure picksRed gs (S.cast S.alice oid))
     Spec.assertEqWith s "the Bolt is on the stack" (length (GameState.stack after)) 1

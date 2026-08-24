@@ -28,7 +28,8 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
           { ManaAddition.player = PlayerRef.Relative PlayerRelation.You,
             ManaAddition.production = ManaProduction.OfType (ManaType.Colored Color.Green),
             ManaAddition.retention = ManaRetention.Ordinary,
-            ManaAddition.restriction = Nothing
+            ManaAddition.restriction = Nothing,
+            ManaAddition.rider = Nothing
           }
       )
       " {\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}}} "
@@ -42,7 +43,8 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
           { ManaAddition.player = PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer")),
             ManaAddition.production = ManaProduction.OfType (ManaType.Colored Color.Green),
             ManaAddition.retention = ManaRetention.Ordinary,
-            ManaAddition.restriction = Nothing
+            ManaAddition.restriction = Nothing,
+            ManaAddition.rider = Nothing
           }
       )
       " {\"player\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"},\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}}} "
@@ -59,7 +61,8 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
           { ManaAddition.player = PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer")),
             ManaAddition.production = ManaProduction.OfType (ManaType.Colored Color.Green),
             ManaAddition.retention = ManaRetention.UntilEndOfTurn,
-            ManaAddition.restriction = Nothing
+            ManaAddition.restriction = Nothing,
+            ManaAddition.rider = Nothing
           }
       )
       " {\"player\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"},\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}},\"retention\":{\"type\":\"UntilEndOfTurn\"}} "
@@ -74,7 +77,8 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
           { ManaAddition.player = PlayerRef.Relative PlayerRelation.You,
             ManaAddition.production = ManaProduction.OfType (ManaType.Colored Color.Red),
             ManaAddition.retention = ManaRetention.Ordinary,
-            ManaAddition.restriction = Just (ManaRestriction.onlyCasts (Filter.Or [Filter.HasCardType CardType.Artifact, Filter.HasCardType CardType.Creature]))
+            ManaAddition.restriction = Just (ManaRestriction.onlyCasts (Filter.Or [Filter.HasCardType CardType.Artifact, Filter.HasCardType CardType.Creature])),
+            ManaAddition.rider = Nothing
           }
       )
       " {\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}}},\"restriction\":{\"casts\":{\"type\":\"Or\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}},{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}]}}} "
@@ -90,7 +94,8 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
           { ManaAddition.player = PlayerRef.Relative PlayerRelation.You,
             ManaAddition.production = ManaProduction.OfType ManaType.Colorless,
             ManaAddition.retention = ManaRetention.Ordinary,
-            ManaAddition.restriction = Just (ManaRestriction.MkManaRestriction {ManaRestriction.casts = Nothing, ManaRestriction.activations = Just (Filter.And [])})
+            ManaAddition.restriction = Just (ManaRestriction.MkManaRestriction {ManaRestriction.casts = Nothing, ManaRestriction.activations = Just (Filter.And [])}),
+            ManaAddition.rider = Nothing
           }
       )
       " {\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colorless\"}},\"restriction\":{\"activations\":{\"type\":\"And\",\"value\":[]}}} "
