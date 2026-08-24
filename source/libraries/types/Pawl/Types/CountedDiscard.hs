@@ -27,14 +27,16 @@ data CountedDiscard = MkCountedDiscard
     -- reader of the destination zone can see.
     --
     -- Bound wherever the card wound up rather than only in a graveyard: CR
-    -- 701.9c takes a card put into a hidden zone instead of a graveyard to have
-    -- been discarded all the same, and CR 400.7j is what decides whether a later
-    -- part of the effect can then FIND it -- a public destination yes, a hidden
-    -- one no. That is a question about the reader, not about this slot.
+    -- 701.9a's move happened whatever CR 614 replaced its destination with, and
+    -- CR 400.7j is what decides whether a later part of the effect can then FIND
+    -- it -- a public destination yes, a hidden one no. That is a question about
+    -- the reader, not about this slot.
     --
-    -- Not implemented: Pawl.Types.Scope cannot fold over the objects a slot
-    -- names, so the only reader a card can write is a Count over one ZONE, and a
-    -- discard CR 614 redirected to another public zone falls outside it (#2080).
+    -- Pawl.Types.Scope's OverBound is the reader that asks it: a Count over this
+    -- slot folds the incarnations themselves, so a discard redirected into
+    -- another public zone still answers, where a Count over one ZONE filtered by
+    -- Filter.IsBound sees nothing. Pawl.ZoneChangeSpec's Psychic Miasma leg
+    -- under Rest in Peace is what proves it.
     --
     -- Absent for a discard nothing looks back at, which is every discard in
     -- data/cards/ but Psychic Miasma. Pawl.Types.Discard's These arm has no such
