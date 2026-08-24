@@ -175,6 +175,16 @@ raceAnswer preferred victim p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature victim))) sets
   _ -> S.identityAnswer p
 
+-- Announce X as 3 and pay Soul Immolation's blight onto `wall`. Pinned by index
+-- rather than left to the identity answer: on the Vorinclex board alice controls
+-- two creatures, so CR 701.68a raises a real prompt, and the two boards below
+-- must blight the SAME creature for their counts to be comparable.
+blightAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+blightAnswer wall p = case p of
+  Prompt.ChooseX {} -> 3
+  Prompt.ChooseBlight {} -> wall
+  _ -> S.identityAnswer p
+
 -- Aim every target slot at one object. Recipient.ToObject, not ToCreature as
 -- raceAnswer above uses: both slots this answers -- Liquimetal Coating's and
 -- Skilled Animator's -- are Pool.Permanents, and a recipient tagged for the wrong
@@ -3617,6 +3627,45 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
               Spec.assertEqWith s "(1 * 2) + 1" (countersOn CounterKind.PlusOnePlusOne piker seasonFirst) 3
               Spec.assertEqWith s "(1 + 1) * 2" (countersOn CounterKind.PlusOnePlusOne piker scalesFirst) 4
       _ -> Spec.assertFailure s "fixture did not build three permanents"
+  -- CR 614.16 read against CR 601.2h, and the pair that says which of the two
+  -- subjects an answer is about. Soul Immolation's "as an additional cost to cast
+  -- this spell, blight X" is paid while the spell is being CAST, so CR 609.1
+  -- gives the placement no resolving spell or ability to be the effect of and
+  -- rule 614.16's row does not apply -- Pawl.Types.CounterCause.ByPayment, which
+  -- Pawl.Engine.Cost.counterCause chooses off the payment's moment (#1647).
+  --
+  -- Wall of Stone is 0/8 so BOTH readings leave it alive: three counters and six
+  -- are each an assertable count, where a creature that died under the doubled
+  -- reading would report zero and confuse "not doubled" with "gone".
+  Spec.it s "CR 614.16 Doubling Season does NOT double a blight paid to cast the spell" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    doublingSeason <- S.printingOf s registry "Doubling Season"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
+    immolation <- S.printingOf s registry "Soul Immolation"
+    let (_, g1) = S.addCreature doublingSeason S.alice (S.landsInPlay mountain 5)
+        (wall, g2) = S.addCreature wallOfStone S.alice g1
+        (g3, spellId) = S.handOne immolation g2
+        after = castAndResolve (blightAnswer wall) g3 spellId
+    Spec.assertEqWith s "X counters, not 2X" (countersOn CounterKind.MinusOneMinusOne wall after) 3
+    -- The spell really resolved, so the count above is the paid cost's and not a
+    -- reversed announcement's: CR 601.2e would have left bob on 20.
+    Spec.assertEqWith s "and the spell dealt its three" (S.lifeOf S.bob after) (Just 17)
+  -- The CONTROL, one thing changed: Vorinclex, Monstrous Raider's clause names a
+  -- PLAYER ("if you would put") rather than an effect, and the payer is a player
+  -- whatever moment they pay at -- so this one DOES double the same blight. A fix
+  -- that made a cost-paid placement invisible to CR 614.1 altogether, rather than
+  -- to rule 614.16's subject alone, fails here.
+  Spec.it s "CR 614.1 Vorinclex DOES double the same blight" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    vorinclex <- S.printingOf s registry "Vorinclex, Monstrous Raider"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
+    immolation <- S.printingOf s registry "Soul Immolation"
+    let (_, g1) = S.addCreature vorinclex S.alice (S.landsInPlay mountain 5)
+        (wall, g2) = S.addCreature wallOfStone S.alice g1
+        (g3, spellId) = S.handOne immolation g2
+        after = castAndResolve (blightAnswer wall) g3 spellId
+    Spec.assertEqWith s "twice that many" (countersOn CounterKind.MinusOneMinusOne wall after) 6
+    Spec.assertEqWith s "and the spell dealt its three" (S.lifeOf S.bob after) (Just 17)
   -- #79: resolveDestruction answers with the SETTLED object, not a Bool. The
   -- identity of what the CR 616.1 loop hands back is what Event.destroy must
   -- put into the graveyard; collapsing it to a predicate is what made a
