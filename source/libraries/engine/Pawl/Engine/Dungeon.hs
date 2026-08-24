@@ -115,10 +115,14 @@ roomAbility room dungeonRoom =
 -- Gathered here rather than by Event.gatherTriggers for the reason
 -- Monarch.inherentMonarchPending is: that scan asks each BATTLEFIELD permanent
 -- what it triggers, plus the graveyards, the just-cast spell and -- under CR
--- 114.4 -- the EMBLEMS in the command zone, which a dungeon card is not (#1411).
+-- 114.4 -- the EMBLEMS in the command zone, which a dungeon card is not.
 -- A room ability is minted rather than printed besides, so there is nothing on
--- the card's face for that scan to read. Unlike the
--- monarch's, these abilities do have a source, so they carry
+-- the card's face for that scan to read: widening it to offer dungeon cards
+-- would find nothing, and unifying the two means teaching it to mint the
+-- ability, which is this code moved rather than a divergence fixed. Nor can the
+-- two answer differently -- CR 309.4c gives every room ability the same unprinted
+-- trigger condition, so only the effect varies and neither collector reads it.
+-- Unlike the monarch's, these abilities do have a source, so they carry
 -- TriggerSource.OfObject and Engine.placeBorne puts them on the stack with no
 -- special case -- which is what lets a room ability choose targets (CR 603.3d).
 --

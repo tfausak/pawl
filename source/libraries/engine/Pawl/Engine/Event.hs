@@ -7578,11 +7578,13 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.LifeGained {} -> False
   -- CR 309.4c: "when you move your venture marker into THIS room", so the
   -- dungeon card the marker is on must be the bearer and the room must be this
-  -- ability's own. Never reached today -- eventTriggers' command-zone source is
-  -- CR 114.4's and takes emblems alone, so a dungeon card is not offered and
-  -- Pawl.Engine.Dungeon.roomPending is still what gathers a room ability (#1411)
-  -- -- so this is a regression fence rather than a proven path, and it is written
-  -- to agree with that gatherer rather than to differ.
+  -- ability's own. Not reached from here: eventTriggers' command-zone source is
+  -- CR 114.4's and takes emblems alone, so a dungeon card is never offered and
+  -- Pawl.Engine.Dungeon.roomPending is what gathers a room ability. A regression
+  -- fence, written to agree with that gatherer rather than to differ. The two
+  -- cannot disagree on any dungeon card: CR 309.4c gives every room ability the
+  -- same trigger condition, which the rulebook supplies and the card does not
+  -- print, so only the effect varies and neither collector reads it.
   TriggerCondition.RoomEntered room -> case event of
     GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered _ oid entered) -> oid == bearer && entered == room
     GameEvent.BecameTarget {} -> False
@@ -9205,7 +9207,10 @@ looksBack condition = case condition of
 -- just became cast is offered from the STACK for the same rule, the card a player
 -- revealed as they drew it is offered from their HAND for it too, and an EMBLEM is
 -- offered from the command zone under CR 114.4. The rest of the command zone is
--- unscanned (#1411).
+-- unscanned: the only other thing it holds is a dungeon card, whose room
+-- abilities CR 309.4c mints rather than prints, leaving this scan nothing on a
+-- face to read.
+-- Pawl.Engine.Dungeon.roomPending gathers those.
 --
 -- Two holes are left in the BATTLEFIELD half of that reading, and last known
 -- information fills both. A permanent that left WITHIN its own group is missing
@@ -10102,7 +10107,7 @@ zonesTriggeredFrom cond = case cond of
   -- CR 309.4c: "as long as a dungeon card is in the command zone, its abilities
   -- may trigger". The honest answer, and inert: eventTriggers' command-zone source
   -- is CR 114.4's and takes emblems alone, so nothing consults this arm --
-  -- Pawl.Engine.Dungeon.roomPending is what gathers a room ability (#1411).
+  -- Pawl.Engine.Dungeon.roomPending is what gathers a room ability.
   TriggerCondition.RoomEntered _ -> Set.singleton Zone.Command
   -- CR 113.6's default for the three whose watcher is an ordinary permanent:
   -- Matoya, Archon Elder and Wildgrowth Walker are creatures, and neither the

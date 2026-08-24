@@ -500,8 +500,8 @@ placePendingTriggers = do
       irradiated = Rad.inherentPending evs gs
       -- CR 309.4c's room abilities, gathered separately because
       -- Event.gatherTriggers reads the command zone for CR 114.4's emblems alone
-      -- and a dungeon card is not one (#1411). Unlike the four above these DO have
-      -- a source, so they carry TriggerSource.OfObject and go through placeBorne.
+      -- and a dungeon card is not one. Unlike the four above these DO have a
+      -- source, so they carry TriggerSource.OfObject and go through placeBorne.
       entered = Dungeon.roomPending evs gs
   State.put
     gs
