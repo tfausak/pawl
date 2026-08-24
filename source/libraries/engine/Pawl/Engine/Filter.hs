@@ -1192,6 +1192,11 @@ rewriteKeyword pairs keyword = case keyword of
   -- unchanged because its atom holds no subtype word. CR 702.11b's unqualified
   -- hexproof is the Nothing, which `fmap` leaves standing.
   Keyword.Type.Hexproof quality -> Keyword.Type.Hexproof (fmap (rewrite pairs) quality)
+  -- CR 702.16a's "[quality]", which CR 612.2 asks the same question of: a
+  -- protection quality naming a creature type is swapped, and Apostle of
+  -- Purifying Light's colour comes back unchanged. Rule 702.16a always states a
+  -- quality, so there is no Nothing to leave standing.
+  Keyword.Type.Protection quality -> Keyword.Type.Protection (rewrite pairs quality)
   Keyword.Type.Deathtouch -> keyword
   Keyword.Type.Defender -> keyword
   Keyword.Type.DoubleStrike -> keyword

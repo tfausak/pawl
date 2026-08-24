@@ -23,6 +23,13 @@ spec s = Spec.describe s "Pawl.Codec.KeywordFamily" $ do
       KeywordFamily.Landwalk
       " {\"type\":\"Landwalk\"} "
 
+  Spec.it s "Protection" $
+    Common.assertCodec
+      s
+      KeywordFamily.codec
+      KeywordFamily.Protection
+      " {\"type\":\"Protection\"} "
+
   Spec.it s "Cycling" $
     Common.assertCodec
       s
