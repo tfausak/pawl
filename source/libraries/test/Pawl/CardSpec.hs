@@ -5390,6 +5390,21 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
     Spec.assertEqWith s "control belongs on a static ability, never in a stored effect" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 106.6 restricts how mana "can be spent"; it never forbids spending it
+  -- outright. A Pawl.Types.ManaRestriction with neither half set is mana no
+  -- payment may ever use, which is mana the card might as well not have added --
+  -- so it is card data that means nothing rather than a rule pawl implements.
+  -- Nothing in the codec can refuse it: both fields default to Nothing, which is
+  -- what lets Mishra's Workshop write one key and Omen Hawker the other.
+  Spec.it s "no card adds mana no payment could spend (CR 106.6)" $ do
+    ps <- S.allPrintings s
+    let offends effect = case effect of
+          Effect.AddMana addition -> case ManaAddition.restriction addition of
+            Just restriction -> null (restrictionFilters restriction)
+            Nothing -> False
+          _ -> False
+        offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
+    Spec.assertEqWith s "a restriction admitting neither casts nor activations is unspendable mana" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 612.2's family gate lives on a modification's CONSTRUCTOR:
   -- Pawl.Engine.Projection.rewriteModificationWith swaps a land-type word only
   -- inside the two land arms and a creature-type word only inside the two creature

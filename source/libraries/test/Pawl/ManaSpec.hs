@@ -3755,6 +3755,13 @@ omenHawkerSpec s registry = Spec.describe s "Omen Hawker" $ do
         -- carries the clause, which is what says the inline road (CR 605.3b)
         -- stamped it onto every unit the instruction added.
         Spec.assertEqWith s "CR 106.4 the unspent one floats, restriction and all" (poolOf S.alice equipped) [hawkerMana ManaType.Colorless]
+        -- The BOUNDARY the new subject must not cross. CR 400.7d's record is
+        -- kept for a spell being cast and for nothing else, which is why
+        -- Cost.payMana writes it through PaymentSubject.castOf rather than
+        -- through the subject: an activation paid with this same mana records
+        -- nothing (#2007), and widening the subject is exactly the change that
+        -- would start it recording.
+        Spec.assertEqWith s "CR 400.7d the equip records no mana spent" (fmap Object.manaSpent (Game.lookupObject equipId equipped)) (Just (Mana.Type.MkMana []))
 
   -- The CONTROL, one Island apart. Everything the assertions above rest on that
   -- is not CR 106.6 -- the Hawker being unsick enough to tap (CR 302.6), the
