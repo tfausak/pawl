@@ -602,6 +602,9 @@ modificationCounts modification = case modification of
   Modification.LoseAllAbilities -> []
   -- Carries a name, which reaches no Count.
   Modification.LoseNamedAbility _ -> []
+  -- Carries a Keyword, whose Filter is reached through modificationFilters below
+  -- rather than through this sweep -- the answer GainKeyword gives above.
+  Modification.LoseKeyword _ -> []
   Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> quantityCounts p <> quantityCounts t
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityCounts p <> quantityCounts t
   Modification.SetLandSubtype _ -> []
@@ -2920,14 +2923,15 @@ durationFilters duration =
     Duration.UntilEndOfCombat -> []
 
 -- A Modification reaches a Filter two ways: through its layer-7 quantities (a
--- Count) and through the keyword a layer-6 grant hands out (CR 702.29e again).
+-- Count) and through the keyword a layer-6 grant hands out or takes away (CR
+-- 702.29e again).
 modificationFilters :: Projection.Modification -> [Filter.Type.Filter Keyword.Keyword]
 modificationFilters modification = case modification of
   Modification.GainKeyword keyword -> keywordFilters keyword
   -- CR 702.5a again: the granted slot's own Filter, which is card text like any
-  -- other and has to be swept. NOT [] -- of the arms that answer with something,
-  -- this and GainKeyword above are the two, and every arm below carries no Filter
-  -- at all.
+  -- other and has to be swept. NOT [] -- this, GainKeyword above and LoseKeyword
+  -- below are the arms that answer with something, and every other one carries no
+  -- Filter at all.
   Modification.GainEnchant slot -> targetSlotFilters slot
   -- Nothing HERE, and that is not a hole: a granted ability's Filters are swept
   -- by grantedActivatedAbilities and grantedTriggeredAbilities below, at the
@@ -2939,6 +2943,9 @@ modificationFilters modification = case modification of
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityFilters p <> quantityFilters t
   Modification.LoseAllAbilities -> []
   Modification.LoseNamedAbility _ -> []
+  -- CR 702.14a again, from the other side: a removal names the keyword in full,
+  -- so its Filter is card text this sweep has to reach.
+  Modification.LoseKeyword keyword -> keywordFilters keyword
   Modification.SetLandSubtype _ -> []
   Modification.SetLandSubtypeToChosen -> []
   Modification.AddLandSubtype _ -> []

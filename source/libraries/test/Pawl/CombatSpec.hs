@@ -761,6 +761,44 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
       (a : _, b : _) ->
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+  -- CR 613.1f's layer-6 removal on the case directly above: Sky Tether
+  -- ("enchanted creature has defender and loses flying") takes the blocker's
+  -- printed flying away, and CR 702.9b then refuses it the flier it could have
+  -- blocked a moment ago. The pool's first single-keyword removal -- Humility
+  -- takes every ability and a Licid takes back the one it named, and neither can
+  -- write this clause.
+  --
+  -- TWO Bird Maidens on bob's side, differing only in the Aura, so a blanket
+  -- "nobody may block a flier" bug cannot pass: the one beside the tethered
+  -- creature still blocks.
+  Spec.it s "CR 613.1f a flier that loses flying to Sky Tether may no longer block a flier" $ do
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    skyTether <- S.printingOf s registry "Sky Tether"
+    let (gs, mine, theirs) = attacking [birdMaiden] [birdMaiden, birdMaiden]
+    case (mine, theirs) of
+      (a : _, [tethered, other]) -> do
+        let board = withAttachment skyTether tethered gs
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton tethered (Set.singleton a)) board)) "the tethered creature may not block the flier"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton other (Set.singleton a)) board) "the one beside it still may"
+        Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying tethered board)) "and it is flying the Aura took, not the declaration that broke"
+        Spec.assertBool s (Projection.hasKeyword Keyword.Flying other board) "the other keeps its printed flying"
+      _ -> Spec.assertFailure s "fixture should have an attacker and two blockers"
+  -- The same Aura's other half, so the card is proved whole rather than in the
+  -- clause this unit needed: CR 702.3b's defender stops the host attacking. On
+  -- ALICE's creatures, since CR 508.1a asks the active player, and again as a
+  -- pair on one board.
+  Spec.it s "CR 702.3b Sky Tether's other half gives the host defender" $ do
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    skyTether <- S.printingOf s registry "Sky Tether"
+    let (gs, mine, _) = S.combatBoardOf [birdMaiden, birdMaiden] []
+    case mine of
+      [tethered, other] -> do
+        let (aura, withAura) = S.addCreature skyTether S.alice gs
+            board = S.attach aura tethered withAura
+        Spec.assertBool s (not (Combat.canAttack S.alice tethered board)) "the tethered creature cannot attack"
+        Spec.assertBool s (Combat.canAttack S.alice other board) "the one beside it can"
+        Spec.assertBool s (Projection.hasKeyword Keyword.Defender tethered board) "defender is what stops it"
+      _ -> Spec.assertFailure s "fixture should have two creatures"
   -- CR 509.1b's second paragraph on a CARD rather than on the rulebook: Questing
   -- Beast's "can't be blocked by creatures with power 2 or less" is the pool's
   -- first card-authored CombatRestriction.CantBeBlockedBy, where CR 701.54c's

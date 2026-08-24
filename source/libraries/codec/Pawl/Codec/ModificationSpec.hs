@@ -69,6 +69,15 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       codec
       (Modification.LoseNamedAbility (AbilityName.MkAbilityName (Text.pack "animate")))
       " {\"type\":\"LoseNamedAbility\",\"value\":\"animate\"} "
+  -- layer 6, CR 613.1f: the removal that names ONE rule-702 keyword (Sky
+  -- Tether). The payload is a whole Keyword, so a written instance round-trips
+  -- with its payload -- Scarwood Hag's "loses forestwalk" is what needs that.
+  Spec.it s "LoseKeyword carries the keyword" $
+    Common.assertCodec
+      s
+      codec
+      (Modification.LoseKeyword Keyword.Flying)
+      " {\"type\":\"LoseKeyword\",\"value\":{\"type\":\"Flying\"}} "
   -- layer 7b (Humility 1/1; Opalescence mana value).
   Spec.it s "SetBasePowerToughness" $
     Common.assertCodec
