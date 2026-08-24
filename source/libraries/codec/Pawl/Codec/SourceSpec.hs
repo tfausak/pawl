@@ -53,7 +53,8 @@ spec s = Spec.describe s "Pawl.Codec.Source" $ do
       ( Source.OfTrigger
           TriggeredAbilitySource.MkTriggeredAbilitySource
             { TriggeredAbilitySource.source = ObjectId.MkObjectId 6,
-              TriggeredAbilitySource.ability = TriggeredAbilitySourceSpec.ability
+              TriggeredAbilitySource.ability = TriggeredAbilitySourceSpec.ability,
+              TriggeredAbilitySource.createdAt = Nothing
             }
       )
       " {\"type\":\"OfTrigger\",\"value\":{\"source\":6,\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}}}} "

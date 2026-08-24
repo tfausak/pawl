@@ -10,6 +10,7 @@ import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -42,8 +43,21 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbilitySource" $ do
       TriggeredAbilitySource.codec
       TriggeredAbilitySource.MkTriggeredAbilitySource
         { TriggeredAbilitySource.source = ObjectId.MkObjectId 6,
-          TriggeredAbilitySource.ability = ability
+          TriggeredAbilitySource.ability = ability,
+          TriggeredAbilitySource.createdAt = Nothing
         }
       " {\"source\":6,\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}}} "
+  -- CR 603.7a: the same record for an ability that fired from a delayed entry,
+  -- which is the one case the key is present for.
+  Spec.it s "a delayed triggered ability, which carries when it was created" $
+    Common.assertCodec
+      s
+      TriggeredAbilitySource.codec
+      TriggeredAbilitySource.MkTriggeredAbilitySource
+        { TriggeredAbilitySource.source = ObjectId.MkObjectId 6,
+          TriggeredAbilitySource.ability = ability,
+          TriggeredAbilitySource.createdAt = Just (Timestamp.MkTimestamp 3)
+        }
+      " {\"source\":6,\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"createdAt\":3} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s TriggeredAbilitySource.codec

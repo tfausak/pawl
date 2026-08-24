@@ -9951,7 +9951,7 @@ eventTriggers events gs =
             -- last known information or out of a sample taken while it stood.
             bindings = maybe Map.empty Object.bindings (Game.lookupObject oid gs)
             fires ab = matchesTriggerGiven bindings gs oid ctrl (TriggeredAbility.condition ab) event
-            pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings (Map.lookup oid becameInGraveyard) (TriggeredAbility.condition ab) event)
+            pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings (Map.lookup oid becameInGraveyard) (TriggeredAbility.condition ab) event) Nothing
          in fmap pend (filter fires abilities)
       -- Map.unions is left-biased, so the battlefield reading wins over a
       -- last-known one, a cycled card and a graveyard reading. That rules out a
@@ -10601,7 +10601,12 @@ stateTriggers gs
     -- pair re-arm while the other's instance still sits there
     -- (TriggerSpec, "one instance leaving re-arms ITS ability").
     instancesOnStack srcId ab =
-      let isInstance sid = fmap Object.source (Game.lookupObject sid gs) == Just (Source.OfTrigger TriggeredAbilitySource.MkTriggeredAbilitySource {TriggeredAbilitySource.source = srcId, TriggeredAbilitySource.ability = ab})
+      let isInstance sid = case fmap Object.source (Game.lookupObject sid gs) of
+            -- The SOURCE and the ABILITY, rather than the whole record: CR
+            -- 603.7a's creation moment also rides on that arm, and an instance
+            -- of this ability is an instance of it however it got here.
+            Just (Source.OfTrigger triggered) -> TriggeredAbilitySource.source triggered == srcId && TriggeredAbilitySource.ability triggered == ab
+            _ -> False
        in length (filter isInstance (GameState.stack gs))
     forOne oid = case Projection.controllerOfGiven grants Set.empty oid gs of
       Nothing -> []
@@ -10764,7 +10769,7 @@ stateTriggers gs
             -- instancesOnStack describes, written without ever needing an Ord on
             -- a triggered ability.
             armed (before, ab) = 1 + length (filter (ab ==) before) > instancesOnStack oid ab
-            pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab Map.empty
+            pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab Map.empty Nothing
          in fmap (pend . snd) (filter armed (zip (List.inits lives) lives))
 
 -- CR 603.7: delayed abilities whose trigger event is among these events. An entry
@@ -10848,6 +10853,9 @@ delayedPending events gs =
           -- entry's captured environment (CR 603.7c) is where what it knows about
           -- its own object comes from.
           (Map.union (eventBindings Nothing (TriggeredAbility.condition (DelayedTrigger.ability entry)) event) (DelayedTrigger.bindings entry))
+          -- CR 603.7a: what tells the ability this becomes apart from one its
+          -- source simply has, once it is on the stack.
+          (Just (DelayedTrigger.createdAt entry))
       store = GameState.delayedTriggers gs
       -- CR 603.12's exception to all of the above, and the ONE place the reflexive
       -- form differs from an ordinary CR 603.7 entry: it is "checked immediately
@@ -10877,6 +10885,11 @@ delayedPending events gs =
           (DelayedTrigger.controller entry)
           (DelayedTrigger.ability entry)
           (DelayedTrigger.bindings entry)
+          -- CR 603.12: a reflexive ability follows CR 603.7, so it carries the
+          -- creation moment too. No card exercises the pairing -- nothing
+          -- reflexive transforms -- so this is CR 701.27f as the rule states it
+          -- rather than a behaviour a test pins.
+          (Just (DelayedTrigger.createdAt entry))
       -- CR 603.2 plus CR 603.4: the event matched AND the intervening "if" held,
       -- which together are what "triggered" means. Per occurrence, since CR 603.4
       -- asks about the moment the event occurs. AFTER firedBy rather than inside

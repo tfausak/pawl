@@ -7,6 +7,7 @@ import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnWindow as TurnWindow
 
@@ -58,6 +59,15 @@ data DelayedTrigger = MkDelayedTrigger
     -- EVENT; nothing here can say the second, so an entry settled on the right
     -- turn still fires only on the step its TriggerCondition names.
     window :: TurnWindow.TurnWindow,
-    expiry :: Maybe Expiry.Expiry
+    expiry :: Maybe Expiry.Expiry,
+    -- | CR 603.7a: the moment this ability was CREATED. Not the moment it fires,
+    -- and not the moment the ability it becomes reaches the stack -- both are
+    -- later, and CR 701.27f/701.28e measure a delayed ability's own transform or
+    -- convert from this one.
+    --
+    -- A Timestamp from the same GameState.nextTimestamp counter every other
+    -- moment in the game comes from, so it compares against Object.turnedOverAt
+    -- and Object.timestamp without a second clock.
+    createdAt :: Timestamp.Timestamp
   }
   deriving (Eq, Ord, Show)
