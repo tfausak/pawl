@@ -176,10 +176,10 @@ raceAnswer preferred victim p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature victim))) sets
   _ -> S.identityAnswer p
 
--- Announce X as 3 and pay Soul Immolation's blight onto `wall`. Pinned by index
--- rather than left to the identity answer: on the Vorinclex board alice controls
--- two creatures, so CR 701.68a raises a real prompt, and the two boards below
--- must blight the SAME creature for their counts to be comparable.
+-- Announce X as 3 and pay a blight onto `wall`. The creature is named rather
+-- than left to the identity answer: on the Vorinclex board alice controls two
+-- creatures, so CR 701.68a raises a real prompt, and the three boards below must
+-- blight the SAME creature for their counts to be comparable.
 blightAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 blightAnswer wall p = case p of
   Prompt.ChooseX {} -> 3

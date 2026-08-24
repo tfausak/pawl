@@ -1948,7 +1948,7 @@ payTagged :: PlayerId -> [(ObjectId, [CostComponent.CostComponent Keyword.Type.K
 payTagged pid charges = case charges of
   [] -> pure bindsNothing
   (oid, components) : rest -> do
-    -- CR 508.1i / 509.1e: a toll is paid during the declaration, which is a
+    -- CR 508.1j / 509.1f: a toll is paid during the declaration, which is a
     -- turn-based action and not a resolution (PaymentMoment's own reason).
     outcome <- payComponents PaymentMoment.OutsideResolution pid oid components
     case outcome of
@@ -2521,6 +2521,7 @@ payComponent moment pid oid component = case component of
   -- ACTIVATING (CR 601.2h), which CR 609.1 gives no resolution to hang it on.
   -- That is what makes Doubling Season double a planeswalker's starting loyalty
   -- (CR 306.5b, through the funnel) and leave its +1 alone.
+  --
   -- Not implemented: a player-grain counter replacement (Vorinclex, Monstrous
   -- Raider's "if you would put") reaches a cost-paid placement and so should
   -- reach this one, where the direct edit gives it no opportunity. CR 614.16's
@@ -2626,15 +2627,15 @@ payComponent moment pid oid component = case component of
 -- have a resolving spell or ability's effect behind it?
 --
 -- CR 609.1 says it does exactly when the cost is paid under CR 118.12, as the
--- object resolves; CR 601.2h's payment and CR 508.1i's toll are made while a
+-- object resolves; CR 601.2h's payment and CR 508.1j's toll are made while a
 -- spell is cast, an ability activated or a declaration is being made, and none of
--- those is a resolution. The PLAYER is the payer either way -- CR 122.6a's "the
--- effect doesn't specify a player" case for the first, and the payer being the
--- only player in sight for the second.
+-- those is a resolution. The PLAYER is the payer either way: rule 118.12 names
+-- the player who takes the action, and rule 601.2h's payer is the one casting or
+-- activating.
 --
 -- What this buys is Soul Immolation beside Doubling Season: the blight is the
--- payer's, and no effect's, so rule 614.16's row does not apply and X counters
--- go on rather than 2X; see #1647. Vorinclex, Monstrous Raider's row names a player
+-- payer's, and no effect's, so rule 614.16's row does not apply and X counters go
+-- on rather than 2X; see #1647. Vorinclex, Monstrous Raider's row names a player
 -- instead and still applies, which is the pair that says the answer is about the
 -- CAUSE and not about counters-during-costs.
 counterCause :: PaymentMoment.PaymentMoment -> PlayerId -> CounterCause.CounterCause

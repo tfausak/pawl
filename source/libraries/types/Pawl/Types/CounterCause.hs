@@ -33,7 +33,7 @@ data CounterCause
     -- kind; CR 714.3a's Saga entry and CR 702.136a's riot are the second.
     ByEffect PlayerId.PlayerId
   | -- | A player, paying a cost with no resolution behind it -- CR 601.2h's
-    -- payment and CR 508.1i \/ 509.1e's combat toll, which
+    -- payment and CR 508.1j \/ 509.1f's combat toll, which
     -- Pawl.Types.PaymentMoment tells apart from CR 118.12's. Soul Immolation's
     -- "blight X" is the case. Not an effect, CR 609.1 giving it no resolution to
     -- be the result of, so CR 614.16's rows do not reach it; still a player
