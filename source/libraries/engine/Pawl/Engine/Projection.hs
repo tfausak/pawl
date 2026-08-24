@@ -115,6 +115,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
+import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.Plus as Plus
@@ -2102,6 +2103,10 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.CreatureAttacksYou -> condition
   TriggerCondition.AttachedPlayerIsAttacked -> condition
   TriggerCondition.PlayerAttacks _ -> condition
+  -- DESCENDS, where the arm above does not: rule 508.3c's Filter names a
+  -- creature type, which is exactly what CR 612.1's text-changing effect
+  -- rewrites.
+  TriggerCondition.PlayerAttacksWith payload -> TriggerCondition.PlayerAttacksWith payload {PlayerAttacksWith.filter = Filter.rewrite pairs (PlayerAttacksWith.filter payload)}
   TriggerCondition.SelfAttacksPlayerWithMostLife -> condition
   TriggerCondition.SelfBlocks -> condition
   TriggerCondition.SelfBlocksCreature f -> TriggerCondition.SelfBlocksCreature (Filter.rewrite pairs f)

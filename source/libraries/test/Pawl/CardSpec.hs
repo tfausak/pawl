@@ -184,6 +184,7 @@ import qualified Pawl.Types.PerCreature as PerCreature
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
+import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -696,6 +697,10 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- EVENT's grouping for the arm above's reason, not a number this condition
   -- counts.
   TriggerCondition.PlayerAttacks _ -> []
+  -- CR 508.3c's "one or more" is the printed sentence's quantifier and not a
+  -- number this condition counts, and its Filter holds no Count for
+  -- PermanentEnters' reason.
+  TriggerCondition.PlayerAttacksWith {} -> []
   -- CR 702.105a compares life totals rather than counting objects, so no Count.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> []
   TriggerCondition.SelfBlocks -> []
@@ -3059,6 +3064,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- payload is a PlayerRelation and not a Filter, and the creatures it counts
   -- are the DECLARATION's.
   TriggerCondition.PlayerAttacks _ -> []
+  -- CR 508.3c names a quality the declared creatures must have, so this one DOES
+  -- carry a Filter -- Hermes, Overseer of Elpis' "Birds".
+  TriggerCondition.PlayerAttacksWith payload -> [PlayerAttacksWith.filter payload]
   -- CR 702.105a names no quality of the attacker, only a fact about whom it
   -- attacked, so no Filter.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> []
