@@ -3724,7 +3724,7 @@ omenHawkerSpec s registry = Spec.describe s "Omen Hawker" $ do
   -- The board is chosen so that the two readings of the field cannot agree:
   -- alice has NO LANDS, so the Hawker is the only mana in the game, and the
   -- equip cost ({1}) and Ancestral Recall ({U}) are both drawn from its one
-  -- yield. Bonesplitter is its own equip target, so one creature does.
+  -- yield. The Hawker is also the equip's target, so one creature does.
   --
   -- Neither assertion discriminates alone. The POWER separates "refuses the
   -- activation" (1) from "allows it" (3); the CASTABLE separates "allows it
@@ -3735,20 +3735,29 @@ omenHawkerSpec s registry = Spec.describe s "Omen Hawker" $ do
     hawker <- S.printingOf s registry "Omen Hawker"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     recall <- S.printingOf s registry "Ancestral Recall"
+    solRing <- S.printingOf s registry "Sol Ring"
     case Face.activatedAbilities (S.combinedFace bonesplitter) of
       [] -> Spec.assertFailure s "Bonesplitter should print an equip ability"
       equipAbility : _ -> do
         let (hawkerId, g1) = S.addCreature hawker S.alice (Setup.emptyGame S.bothPlayers)
             (equipId, g2) = S.addCreature bonesplitter S.alice g1
-            (recallId, g3) = S.addHandCard recall S.alice g2
-            board = g3 {GameState.priority = Just S.alice}
+            -- S.handOne rather than a second S.addHandCard: it is what puts the
+            -- board in a MAIN PHASE with priority, which both the equip's
+            -- "activate only as a sorcery" (CR 702.6a) and Sol Ring's sorcery
+            -- timing need.
+            (g3, recallId) = S.handOne recall g2
+            (ringId, board) = S.addHandCard solRing S.alice g3
             equipped =
               let activated = S.runPure S.identityAnswer board (Activate.activateAbility S.alice equipId equipAbility)
                in S.runPure S.identityAnswer activated Stack.resolveTop
         Spec.assertEqWith s "unequipped the Hawker is 1/1" (S.powerToughnessOf hawkerId board) (Just (1, 1))
         Spec.assertEqWith s "CR 602.2b the Hawker's own mana pays the equip, so it is 3/1" (S.powerToughnessOf hawkerId equipped) (Just (3, 1))
         Spec.assertBool s (not (S.castable S.alice recallId board)) "CR 106.6 and the same mana casts no spell"
-        Spec.assertBool s (not (S.castable S.alice recallId equipped)) "nor does the unit still floating after the equip was paid"
+        -- The same refusal asked of the mana that is still FLOATING once the
+        -- equip has been paid, and of a COLOURLESS demand so that the colour is
+        -- not what refuses: Sol Ring's {1} is exactly what the leftover unit
+        -- could serve if nothing were said about it.
+        Spec.assertBool s (not (S.castable S.alice ringId equipped)) "CR 106.4 nor does the unit still floating afterwards"
         -- WHICH of the two paid the generic {1} is the payer's
         -- (Mana.spendChosen), and S.identityAnswer takes the first offered, so
         -- the blue went and the colourless floats. Either way the leftover
@@ -3765,26 +3774,28 @@ omenHawkerSpec s registry = Spec.describe s "Omen Hawker" $ do
 
   -- The CONTROL, one Island apart. Everything the assertions above rest on that
   -- is not CR 106.6 -- the Hawker being unsick enough to tap (CR 302.6), the
-  -- equip's sorcery-speed rider (CR 702.6b), a legal equip target, the phase --
+  -- equip's sorcery-speed rider (CR 702.6a), a legal equip target, the phase --
   -- is unchanged here, and both the equip and the cast go through. So the
   -- refusal above is the restriction and not the board.
   Spec.it s "CR 106.6 one Island casts the same spell, so the refusal above is the restriction" $ do
     hawker <- S.printingOf s registry "Omen Hawker"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     recall <- S.printingOf s registry "Ancestral Recall"
+    solRing <- S.printingOf s registry "Sol Ring"
     island <- S.printingOf s registry "Island"
     case Face.activatedAbilities (S.combinedFace bonesplitter) of
       [] -> Spec.assertFailure s "Bonesplitter should print an equip ability"
       equipAbility : _ -> do
         let (hawkerId, g1) = S.addCreature hawker S.alice (S.landsInPlay island 1)
             (equipId, g2) = S.addCreature bonesplitter S.alice g1
-            (recallId, g3) = S.addHandCard recall S.alice g2
-            board = g3 {GameState.priority = Just S.alice}
+            (g3, recallId) = S.handOne recall g2
+            (ringId, board) = S.addHandCard solRing S.alice g3
             equipped =
               let activated = S.runPure S.identityAnswer board (Activate.activateAbility S.alice equipId equipAbility)
                in S.runPure S.identityAnswer activated Stack.resolveTop
         Spec.assertEqWith s "the equip still resolves" (S.powerToughnessOf hawkerId equipped) (Just (3, 1))
         Spec.assertBool s (S.castable S.alice recallId board) "and the Island casts the instant"
+        Spec.assertBool s (S.castable S.alice ringId board) "and the artifact spell too, so neither demand is what refused above"
 
 -- One of the Hawker's two: from a source that is not snow, lost as the phase
 -- ends, and spendable only to activate an ability -- any ability, the card

@@ -672,8 +672,8 @@ serves supply demand =
 -- payment left, so mana a cost could not use is mana the next cost still has.
 --
 -- The perspective is the PAYER (CR 109.5's "you"), which is who the spell's
--- controller is at CR 601.2h and the ability's at CR 602.2b. Not implemented: a restriction that reads the
--- SOURCE that produced the mana. Pawl.Types.ManaUnit carries no source id by
+-- controller is at CR 601.2h and the ability's at CR 602.2b. Not implemented: a
+-- restriction that reads the SOURCE that produced the mana. Pawl.Types.ManaUnit carries no source id by
 -- construction, so the context has none and a source-relative atom would be
 -- vacuously False; Cavern of Souls' "of the chosen type" is the printing that
 -- wants one (#1978).
@@ -684,7 +684,7 @@ spendableFor subject pid gs = spendableAmong subject pid gs (unitsOf (Game.poolO
 -- source's yield would be worth to this payment. CR 605.3b's mana ability adds
 -- its mana inline, restriction and all (manaOptionsOfGiven's stamp), so
 -- payableResolutionsGiven has to ask this of a yield before counting it as
--- supply -- otherwise the offer admits a cast the payment then refuses.
+-- supply -- otherwise the offer admits a payment it then refuses.
 --
 -- THE one reader of Pawl.Types.ManaUnit.restriction, which is what keeps the two
 -- roads' answers the same.
