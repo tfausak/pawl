@@ -9,6 +9,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaProduction as ManaProduction
+import qualified Pawl.Types.ManaRestriction as ManaRestriction
 import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -73,8 +74,24 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
           { ManaAddition.player = PlayerRef.Relative PlayerRelation.You,
             ManaAddition.production = ManaProduction.OfType (ManaType.Colored Color.Red),
             ManaAddition.retention = ManaRetention.Ordinary,
-            ManaAddition.restriction = Just (Filter.Or [Filter.HasCardType CardType.Artifact, Filter.HasCardType CardType.Creature])
+            ManaAddition.restriction = Just (ManaRestriction.onlyCasts (Filter.Or [Filter.HasCardType CardType.Artifact, Filter.HasCardType CardType.Creature]))
           }
       )
-      " {\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}}},\"restriction\":{\"type\":\"Or\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}},{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}]}} "
+      " {\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}}},\"restriction\":{\"casts\":{\"type\":\"Or\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}},{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}]}}} "
+  -- CR 106.6's other subject, and the pair that keeps the two halves of
+  -- Pawl.Types.ManaRestriction from collapsing on the wire: Omen Hawker's "spend
+  -- this mana only to activate abilities" writes the OTHER key, with the trivial
+  -- predicate, since the card says nothing about which abilities.
+  Spec.it s "MkManaAddition, a restriction whose subject is an activation" $
+    Common.assertCodec
+      s
+      ManaAddition.codec
+      ( ManaAddition.MkManaAddition
+          { ManaAddition.player = PlayerRef.Relative PlayerRelation.You,
+            ManaAddition.production = ManaProduction.OfType ManaType.Colorless,
+            ManaAddition.retention = ManaRetention.Ordinary,
+            ManaAddition.restriction = Just (ManaRestriction.MkManaRestriction {ManaRestriction.casts = Nothing, ManaRestriction.activations = Just (Filter.And [])})
+          }
+      )
+      " {\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colorless\"}},\"restriction\":{\"activations\":{\"type\":\"And\",\"value\":[]}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ManaAddition.codec

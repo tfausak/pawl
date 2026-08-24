@@ -1,8 +1,7 @@
 module Pawl.Types.ManaUnit where
 
 import qualified Data.Set as Set
-import qualified Pawl.Types.Filter as Filter
-import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ManaRestriction as ManaRestriction
 import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ProductionTag as ProductionTag
@@ -22,7 +21,7 @@ import qualified Pawl.Types.ProductionTag as ProductionTag
 --
 -- The RESTRICTION is the OPEN half, and conflating it with the tags would be a
 -- mistake: Geosurge's "spend this mana only to cast artifact or creature spells"
--- is a predicate over the spell being paid for, not a fact about this mana, so
+-- is a predicate over the object being paid for, not a fact about this mana, so
 -- payment evaluates it through the one generic matcher
 -- (Pawl.Engine.Filter.matches) and never cases on what it says.
 --
@@ -45,9 +44,10 @@ data ManaUnit = MkManaUnit
     -- clause today (#1808).
     retention :: ManaRetention.ManaRetention,
     -- | CR 106.6: what this mana may be spent on -- Nothing for mana that may
-    -- be spent on anything, which is almost every mana. @Just f@ reads "spend
-    -- this mana only to cast a spell matching @f@", so a payment that is not a
-    -- CAST cannot use it at all (Pawl.Engine.Mana.spendableAmong).
+    -- be spent on anything, which is almost every mana. @Just r@ names the
+    -- payment kinds it admits and the predicate each of them owes
+    -- (Pawl.Types.ManaRestriction), read by
+    -- Pawl.Engine.Mana.spendableAmong against the payment's subject.
     --
     -- Stamped off the ADDITION (Pawl.Types.ManaAddition) rather than off the
     -- source, for CR 106.6a's reason: the restriction belongs to the spell or
@@ -59,9 +59,7 @@ data ManaUnit = MkManaUnit
     -- Not implemented: CR 106.6's other two shapes -- an additional effect on
     -- the spell the mana is spent on (Cavern of Souls' "can't be countered"),
     -- and a delayed triggered ability that triggers when the mana is spent
-    -- (#1977). Not implemented either: the restriction whose subject is an
-    -- ACTIVATION rather than a cast, Dalakos, Crafter of Wonders' "or activate
-    -- abilities of artifacts" (#1975).
-    restriction :: Maybe (Filter.Filter Keyword.Keyword)
+    -- (#1977).
+    restriction :: Maybe ManaRestriction.ManaRestriction
   }
   deriving (Eq, Ord, Show)

@@ -45,6 +45,7 @@ import Pawl.Types.ManaOption (ManaOption)
 import qualified Pawl.Types.ManaOption as ManaOption
 import Pawl.Types.ManaProduction (ManaProduction)
 import qualified Pawl.Types.ManaProduction as ManaProduction
+import qualified Pawl.Types.ManaRestriction as ManaRestriction
 import qualified Pawl.Types.ManaRetention as ManaRetention
 import Pawl.Types.ManaSpending (ManaSpending)
 import qualified Pawl.Types.ManaSpending as ManaSpending
@@ -56,6 +57,7 @@ import Pawl.Types.ManaUnit (ManaUnit)
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
@@ -624,11 +626,11 @@ data Demand = MkDemand
 -- an untapped source is the open one, where the choice has not been made yet.
 --
 -- The RESTRICTION is a Bool and not the restriction itself, because the units
--- reaching here have already been asked about the object being cast
+-- reaching here have already been asked about the object THIS payment is for
 -- (`spendableAmong`): what is left to know is whether this mana is admissible to
--- a payment that is NO cast -- a mana ability's own activation cost -- and every
--- restriction in the vocabulary reads "spend this mana only to cast ...", so a
--- restricted unit is refused by all of them (`spendableAmong`'s Nothing arm).
+-- a payment that is a different one -- a nested mana ability's own activation
+-- cost -- and `payableResolutionsGiven`'s `admits` answers no for every
+-- restricted unit, exactly and over-strictly as its own comment argues.
 data Supply = MkSupply
   { supplyTypes :: Set.Set ManaType,
     supplyTags :: Set.Set ProductionTag.ProductionTag,
@@ -658,24 +660,25 @@ serves supply demand =
 -- about which mana is available -- the reason `serves` just above gives for
 -- being one relation.
 --
--- `casting` is the object being CAST, and Nothing says the payment is not a
--- cast: an activation cost, an attack cost, a special action's cost, CR 118.12's
--- resolution-time payment. Every restriction in the vocabulary reads "spend this
--- mana only to cast ...", so a payment with no spell to be about can use none of
--- it -- which is the rules-correct answer and not a conservative one.
+-- `subject` is WHAT the payment is for (Pawl.Types.PaymentSubject), which is the
+-- question CR 106.6's restrictions ask: Mishra's Workshop's mana admits CR
+-- 601.2h's cast and Omen Hawker's admits CR 602.2b's activation, each under its
+-- own predicate. A payment that is neither -- a special action's cost, a combat
+-- toll, CR 118.12's resolution-time payment -- can spend no restricted mana at
+-- all, since no clause in the vocabulary names it.
 --
 -- A SPLIT rather than a filter, because the withheld units are still in the pool
 -- (CR 106.4): Pawl.Engine.Cost.payMana puts them back beside whatever the
 -- payment left, so mana a cost could not use is mana the next cost still has.
 --
 -- The perspective is the PAYER (CR 109.5's "you"), which is who the spell's
--- controller is at CR 601.2h. Not implemented: a restriction that reads the
+-- controller is at CR 601.2h and the ability's at CR 602.2b. Not implemented: a restriction that reads the
 -- SOURCE that produced the mana. Pawl.Types.ManaUnit carries no source id by
 -- construction, so the context has none and a source-relative atom would be
 -- vacuously False; Cavern of Souls' "of the chosen type" is the printing that
 -- wants one (#1978).
-spendableFor :: Maybe ObjectId -> PlayerId -> GameState -> ([ManaUnit], [ManaUnit])
-spendableFor casting pid gs = spendableAmong casting pid gs (unitsOf (Game.poolOf pid gs))
+spendableFor :: PaymentSubject.PaymentSubject -> PlayerId -> GameState -> ([ManaUnit], [ManaUnit])
+spendableFor subject pid gs = spendableAmong subject pid gs (unitsOf (Game.poolOf pid gs))
 
 -- The same split asked of units that are NOT in the pool: what an untapped
 -- source's yield would be worth to this payment. CR 605.3b's mana ability adds
@@ -687,15 +690,23 @@ spendableFor casting pid gs = spendableAmong casting pid gs (unitsOf (Game.poolO
 -- roads' answers the same.
 --
 -- The subject's view is built ONCE per call and shared across the units, the
--- restriction being a question about the spell rather than about the mana.
-spendableAmong :: Maybe ObjectId -> PlayerId -> GameState -> [ManaUnit] -> ([ManaUnit], [ManaUnit])
-spendableAmong casting pid gs units =
-  let subject = fmap (\oid -> (Filter.contextFor (Just pid) Nothing, Projection.viewOfObject oid gs)) casting
+-- restriction being a question about the object being paid for rather than about
+-- the mana. WHICH half of Pawl.Types.ManaRestriction is read is settled by the
+-- subject for the same reason, once for the whole call.
+spendableAmong :: PaymentSubject.PaymentSubject -> PlayerId -> GameState -> [ManaUnit] -> ([ManaUnit], [ManaUnit])
+spendableAmong subject pid gs units =
+  let paidFor = case subject of
+        PaymentSubject.ForNeither -> Nothing
+        PaymentSubject.Casting oid -> Just (ManaRestriction.casts, oid)
+        PaymentSubject.Activating oid -> Just (ManaRestriction.activations, oid)
+      asked = fmap (\(half, oid) -> (half, Filter.contextFor (Just pid) Nothing, Projection.viewOfObject oid gs)) paidFor
       admits unit = case ManaUnit.restriction unit of
         Nothing -> True
-        Just wanted -> case subject of
+        Just restriction -> case asked of
           Nothing -> False
-          Just (context, view) -> Filter.matches context view wanted
+          Just (half, context, view) -> case half restriction of
+            Nothing -> False
+            Just wanted -> Filter.matches context view wanted
    in List.partition admits units
 
 -- A pool unit as a supply. Its type is settled, so the option set is a
@@ -1186,8 +1197,8 @@ monocoloredHybridGeneric = 2
 -- permission to spend mana of any type the off-colour route is a real one.
 --
 -- FILTERED, NOT TRUSTED, the chooseSource posture.
-announce :: Maybe ObjectId -> Capacity -> ManaSpending -> PlayerId -> ObjectId -> (ManaCost -> [ManaCost]) -> Natural -> [Claim] -> ManaCost -> Game (ManaCost, Natural, Natural)
-announce casting capacity spending pid oid total outside claimed (ManaCost.MkManaCost symbols) = go [] 0 0 symbols
+announce :: PaymentSubject.PaymentSubject -> Capacity -> ManaSpending -> PlayerId -> ObjectId -> (ManaCost -> [ManaCost]) -> Natural -> [Claim] -> ManaCost -> Game (ManaCost, Natural, Natural)
+announce subject capacity spending pid oid total outside claimed (ManaCost.MkManaCost symbols) = go [] 0 0 symbols
   where
     -- "Payable" here means SOME completion of the remaining announcements pays
     -- it, which is what CR 601.2b's last sentence makes the question. Enumerated
@@ -1201,7 +1212,7 @@ announce casting capacity spending pid oid total outside claimed (ManaCost.MkMan
     stillPayable done rest gs extra ways =
       let candidate (tail_, life) =
             any
-              (\totalled -> canPayCommitting casting capacity spending pid (outside + extra + life) claimed totalled gs)
+              (\totalled -> canPayCommitting subject capacity spending pid (outside + extra + life) claimed totalled gs)
               (total (ManaCost.MkManaCost (reverse done <> ways <> tail_)))
        in any candidate (completions rest)
     -- One symbol's announcement. Asked only where two routes are payable, and
@@ -1391,12 +1402,12 @@ hybridHalves a b = if a == b then [a] else [a, b]
 -- nothing claimed and no CR 118.14 permission, which is the spending rule every
 -- cost takes when no effect has spoken about it.
 --
--- NOT A CAST either, so CR 106.6-restricted mana is no supply for it
--- (spendableFor). Every caller is asking about a cost that is not a spell's --
--- Pawl.Engine.Cost.canPay's own callers, and the specs -- and a caller that WAS
--- casting would want canPayCommitting with the spell.
+-- NEITHER A CAST NOR AN ACTIVATION either, so CR 106.6-restricted mana is no
+-- supply for it (spendableFor). Every caller is asking about a cost that is
+-- neither -- Pawl.Engine.Cost.canPay's own callers, and the specs -- and a
+-- caller that WAS one would want canPayCommitting with its subject.
 canPay :: Capacity -> PlayerId -> ManaCost -> GameState -> Bool
-canPay capacity pid = canPayCommitting Nothing capacity ManaSpending.AsProduced pid 0 []
+canPay capacity pid = canPayCommitting PaymentSubject.ForNeither capacity ManaSpending.AsProduced pid 0 []
 
 -- The same question with the payer's CR 118.14 permission and with resources
 -- already spoken for: `spending`, which `relax` applies to the demands;
@@ -1405,8 +1416,8 @@ canPay capacity pid = canPayCommitting Nothing capacity ManaSpending.AsProduced 
 -- will spend, whether by taking them out of a zone or by tapping them
 -- (Pawl.Types.ClaimAxis).
 --
--- `casting` is spendableFor's, and it is what makes this the function a CAST
--- asks: the wrapper above hard-codes Nothing.
+-- `subject` is spendableFor's, and it is what makes this the function a CAST or
+-- an ACTIVATION asks: the wrapper above hard-codes ForNeither.
 --
 -- Two callers commit life: `announce`, for CR 118.13a's choices -- both those
 -- already made and those a `completions` entry is standing in for -- and
@@ -1417,15 +1428,15 @@ canPay capacity pid = canPayCommitting Nothing capacity ManaSpending.AsProduced 
 -- Village Rites' "sacrifice a creature" and Phyrexian Tower's are one demand on
 -- one creature under CR 118.3, exactly as two sources' are (#1134). Zero and
 -- empty everywhere else, which is what `canPay` is.
-canPayCommitting :: Maybe ObjectId -> Capacity -> ManaSpending -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> Bool
-canPayCommitting casting capacity spending pid committed claimed cost gs =
+canPayCommitting :: PaymentSubject.PaymentSubject -> Capacity -> ManaSpending -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> Bool
+canPayCommitting subject capacity spending pid committed claimed cost gs =
   let pcs = Projection.projectAll gs
-   in canPayCommittingGiven casting capacity spending (manaSourcesGiven (supplyCapacity capacity) (Projection.controlGrants gs) pcs pid gs) pcs pid committed claimed cost gs
+   in canPayCommittingGiven subject capacity spending (manaSourcesGiven (supplyCapacity capacity) (Projection.controlGrants gs) pcs pid gs) pcs pid committed claimed cost gs
 
 -- The same question given a board already walked -- see payableResolutionsGiven
 -- for what `sources` and `pcs` are and why handing them in changes no answer.
-canPayCommittingGiven :: Maybe ObjectId -> Capacity -> ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> Bool
-canPayCommittingGiven casting capacity spending sources pcs pid committed claimed cost gs = not (null (payableResolutionsGiven casting capacity spending sources pcs pid committed claimed cost gs))
+canPayCommittingGiven :: PaymentSubject.PaymentSubject -> Capacity -> ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> Bool
+canPayCommittingGiven subject capacity spending sources pcs pid committed claimed cost gs = not (null (payableResolutionsGiven subject capacity spending sources pcs pid committed claimed cost gs))
 
 -- One source's contribution to the supply side, as the OPTIONS it offers: one
 -- option per group of yields (see the collapse below), and each option is that
@@ -1639,10 +1650,10 @@ sourceOptions clauses contended supplies =
 -- into charging {2/B} a single mana. CR 107.4f's {G/P} rides on the same
 -- enumeration: its life way is a resolution with one fewer demand, so neither
 -- has to learn about a symbol that consumes no supply at all.
-payableResolutions :: Maybe ObjectId -> Capacity -> ManaSpending -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
-payableResolutions casting capacity spending pid committed claimed cost gs =
+payableResolutions :: PaymentSubject.PaymentSubject -> Capacity -> ManaSpending -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
+payableResolutions subject capacity spending pid committed claimed cost gs =
   let pcs = Projection.projectAll gs
-   in payableResolutionsGiven casting capacity spending (manaSourcesGiven (supplyCapacity capacity) (Projection.controlGrants gs) pcs pid gs) pcs pid committed claimed cost gs
+   in payableResolutionsGiven subject capacity spending (manaSourcesGiven (supplyCapacity capacity) (Projection.controlGrants gs) pcs pid gs) pcs pid committed claimed cost gs
 
 -- The same list given a board the CALLER has already walked, which is the half
 -- Action.legalActions' enumeration wants: the wrapper above takes one
@@ -1692,15 +1703,15 @@ payableResolutions casting capacity spending pid committed claimed cost gs =
 -- additional cost, not both
 -- (#1134). It is the whole cost's claims and not the remainder's, which is
 -- exact: `Cost.canPay` asks this before any part of the cost is paid.
-payableResolutionsGiven :: Maybe ObjectId -> Capacity -> ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
-payableResolutionsGiven casting capacity spending sources pcs pid committed claimed cost gs =
+payableResolutionsGiven :: PaymentSubject.PaymentSubject -> Capacity -> ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
+payableResolutionsGiven subject capacity spending sources pcs pid committed claimed cost gs =
   let -- CR 106.6, resolved for BOTH halves of the board: mana this payment may
       -- not spend is no supply for it, whether it is already in the pool or
       -- would be added by tapping a source (`spendableSupply` below). The two
       -- halves have to be filtered by the same question, or the offer and the
       -- payment disagree -- Mishra's Workshop's three colourless would buy a
       -- creature spell the payment then cannot pay for.
-      (units, _) = spendableFor casting pid gs
+      (units, _) = spendableFor subject pid gs
       -- CR 609.4b, resolved ONCE for this whole question and applied to both
       -- halves of the board: a rewrite reaching the pool but not the untapped
       -- sources (or the other way round) would make this disagree with `spend`
@@ -1720,7 +1731,7 @@ payableResolutionsGiven casting capacity spending sources pcs pid committed clai
       -- carries the answer down to `admits` below. Pawl.ManaSpec's "CR 106.6 the
       -- restricted red cannot pay the Star's {1}" is what proves it.
       spendableSupply (activations, yield, manaCost) =
-        (activations, Mana.MkMana (fst (spendableAmong casting pid gs (unitsOf yield))), manaCost)
+        (activations, Mana.MkMana (fst (spendableAmong subject pid gs (unitsOf yield))), manaCost)
       activationsOf (activations, _, _) = Activations.claims activations
       -- WHICH sources are worth taking fewer times: the ones whose claims meet
       -- another source's, or the cost's own. Asked GROUPWISE, one group per
@@ -1779,11 +1790,20 @@ payableResolutionsGiven casting capacity spending sources pcs pid committed clai
                   -- and demands share a position.
                   wanted_ = fmap ((,) costPosition) demands <> eaten
                   -- CR 106.6 asked of the demand rather than of the mana: a
-                  -- restricted unit may pay the cast this walk is about and
+                  -- restricted unit pays the payment this walk is about and
                   -- nothing else, so it serves the cost's own demands and never a
-                  -- mana ability's activation cost -- which is exactly what
-                  -- Pawl.Engine.Cost.payActivation does, paying with `casting`
-                  -- Nothing.
+                  -- nested mana ability's activation cost.
+                  --
+                  -- Exact for a CAST and for a payment that is neither: a mana
+                  -- restricted to casts can never pay an activation cost, and
+                  -- one restricted at all can never pay for a special action.
+                  -- Not implemented: mana whose restriction admits ACTIVATIONS
+                  -- paying a nested mana ability's own cost, which CR 602.2b
+                  -- makes an activation like any other -- Omen Hawker's {C} into
+                  -- Chromatic Star's {1} is refused here, where
+                  -- Pawl.Engine.Cost.payActivation's own subject would admit it.
+                  -- The disagreement is the STRICT way round, so the gate offers
+                  -- less than the payment would take rather than more (#2239).
                   admits (from, supply) (wantedAt, demand) =
                     serves supply demand
                       && from < wantedAt
@@ -1817,7 +1837,7 @@ payableResolutionsGiven casting capacity spending sources pcs pid committed clai
 -- cost's claims would be partly spent ones. Refusing an unpayable cost is the
 -- gates' job (Pawl.Engine.Cost.canPay); all this picks is which resolution the
 -- mana is spent under.
-lifeNeeded :: Maybe ObjectId -> Capacity -> ManaSpending -> PlayerId -> ManaCost -> GameState -> Maybe Natural
-lifeNeeded casting capacity spending pid cost gs = case payableResolutions casting capacity spending pid 0 [] cost gs of
+lifeNeeded :: PaymentSubject.PaymentSubject -> Capacity -> ManaSpending -> PlayerId -> ManaCost -> GameState -> Maybe Natural
+lifeNeeded subject capacity spending pid cost gs = case payableResolutions subject capacity spending pid 0 [] cost gs of
   (_, _, life) : _ -> Just life
   [] -> Nothing

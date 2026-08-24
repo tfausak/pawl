@@ -55,6 +55,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
 import qualified Pawl.Types.PaymentMoment as PaymentMoment
+import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Prompt as Prompt
@@ -276,7 +277,8 @@ payableCost = payableCostAt 0
 --
 -- CR 106.6's spending restriction is asked here too, and `oid` is what it is
 -- asked ABOUT: this is the only payability gate in the engine whose payment is a
--- CAST, so it is the only one that hands Cost.canPaySomeCompletion a spell. At
+-- CAST, so it is the only one that hands Cost.canPaySomeCompletion a
+-- PaymentSubject.Casting. At
 -- the gate `oid` is the card in a hand and at CR 601.2f it is the stack
 -- incarnation, and the restrictions in the vocabulary read characteristics both
 -- share.
@@ -290,7 +292,7 @@ payableCost = payableCostAt 0
 payableCostAt :: Natural -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAt x spending pid oid gs cost =
   let adjustments = Cost.spellAdjustments pid oid gs
-   in Cost.canPaySomeCompletion (Just oid) spending pid oid (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs
+   in Cost.canPaySomeCompletion (PaymentSubject.Casting oid) spending pid oid (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs
 
 -- CR 601.2b: the greatest value of X this player could actually pay for, which is
 -- what Prompt.ChooseX carries -- measured on the cost the cast is measuring, with
@@ -1513,7 +1515,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                   -- Swamp" in view would be offered against a board that has one
                   -- Swamp too many.
                   let gathered = Cost.spellAdjustments pid sid gs
-                  (announcedCost, phyrexianLifePaid) <- Cost.announce (Just sid) spending pid sid (Cost.totalManas gathered) (Cost.plusComponents gathered announcedAtX)
+                  (announcedCost, phyrexianLifePaid) <- Cost.announce (PaymentSubject.Casting sid) spending pid sid (Cost.totalManas gathered) (Cost.plusComponents gathered announcedAtX)
                   -- CR 400.7d's cost record, stamped on the SPELL and carried
                   -- onto the permanent it becomes by
                   -- Pawl.Engine.Event.changeZoneAttaching, `Object.kicked`'s
@@ -1565,7 +1567,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                       -- Reap still costs {B}).
                       adjustments <- Cost.announceReductions pid sid gs announcedCost (Cost.spellAdjustments pid sid gs)
                       let paidCost = Cost.totalWith adjustments announcedCost
-                      payment <- Cost.pay PaymentMoment.OutsideResolution (Just sid) spending pid sid paidCost
+                      payment <- Cost.pay PaymentMoment.OutsideResolution (PaymentSubject.Casting sid) spending pid sid paidCost
                       case payment of
                         -- CR 601.2h: the payment failed, so the cast is illegal
                         -- and CR 601.2 returns the game to before it was proposed

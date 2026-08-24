@@ -161,6 +161,7 @@ import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaRestriction as ManaRestriction
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Mill as Mill
@@ -3594,6 +3595,14 @@ sourceHosted = fmap ((,) SourceHostFramed)
 searchFramed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 searchFramed = fmap ((,) SearchFramed)
 
+-- Both predicates a CR 106.6 restriction can carry. Its own type has two fields
+-- and no traversal, so a lint that reached only one of them would go quiet on
+-- the other -- which is why this is a function and not an inlined selector.
+restrictionFilters :: ManaRestriction.ManaRestriction -> [Filter.Type.Filter Keyword.Keyword]
+restrictionFilters restriction =
+  Maybe.maybeToList (ManaRestriction.casts restriction)
+    <> Maybe.maybeToList (ManaRestriction.activations restriction)
+
 -- Every Filter one effect carries, paired with its Framing. Two arms answer
 -- AttachDestination -- Effect.AttachTarget's destination and
 -- Effect.AttachTargetToEach's, which are the only CARD-AUTHORED Filter positions
@@ -3623,10 +3632,13 @@ effectFilters effect = case effect of
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     unframed (durationFilters duration <> modificationFilters (Projection.widenModification modification)) <> sourceHosted (objectRefFilters ref)
   Effect.ChangeText {} -> []
-  -- CR 106.6's spending restriction. UNFRAMED: it is evaluated against the spell
-  -- being paid for (Pawl.Engine.Mana.spendableAmong), which is neither an attach
-  -- destination nor a target slot.
-  Effect.AddMana addition -> unframed (Maybe.maybeToList (ManaAddition.restriction addition))
+  -- CR 106.6's spending restriction, BOTH halves of it: the cast's predicate and
+  -- the activation's are each an ordinary Filter, and collecting one of them
+  -- would take every lint in this module off the other. UNFRAMED: each is
+  -- evaluated against the object being paid for
+  -- (Pawl.Engine.Mana.spendableAmong), which is neither an attach destination
+  -- nor a target slot.
+  Effect.AddMana addition -> unframed (concatMap restrictionFilters (Maybe.maybeToList (ManaAddition.restriction addition)))
   -- THE one search-framed position. CR 701.3a from the candidate's side:
   -- Auratouched Mage's "an Aura card that could enchant it", where the host is
   -- fixed for the whole evaluation and the Aura varies per candidate.

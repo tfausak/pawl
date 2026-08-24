@@ -82,6 +82,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
 import qualified Pawl.Types.PaymentMoment as PaymentMoment
+import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerEffect as PlayerEffect.Type
@@ -668,15 +669,15 @@ maximumX pid oid face gs =
 -- could hide a route and this function elide the prompt. It answers a LIST
 -- because CR 118.7e's choice of half is not made until CR 601.2f. `spending` is
 -- CR 118.14's permission, here for the same reason.
-announce :: Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, Natural)
-announce casting spending pid oid total_ cost = case Cost.mana cost of
+announce :: PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, Natural)
+announce subject spending pid oid total_ cost = case Cost.mana cost of
   -- CR 118.6: an object with no mana cost has no mana symbols to announce.
   Nothing -> pure (cost, 0)
   Just manaCost -> do
     -- The claims are read here rather than inside Mana.announce, which cannot
     -- reach claimOf -- this module imports that one, not the other way about.
     gs <- State.get
-    (announced, life, paidWithLife) <- Mana.announce casting (manaActivationsGiven (PlayerEffect.applyingTo pid gs)) spending pid oid total_ (lifeOwedBy (Cost.components cost)) (claimsOf pid oid (Cost.components cost) gs) manaCost
+    (announced, life, paidWithLife) <- Mana.announce subject (manaActivationsGiven (PlayerEffect.applyingTo pid gs)) spending pid oid total_ (lifeOwedBy (Cost.components cost)) (claimsOf pid oid (Cost.components cost) gs) manaCost
     pure
       ( cost
           { Cost.mana = Just announced,
@@ -1243,8 +1244,9 @@ canPay pid oid cost gs = case Cost.mana cost of
     -- CR 118.14's permission is a CAST's, and no caller of this one is casting --
     -- what reaches here is a special action's cost and CR 118.12's
     -- resolution-time payment -- so the mana is spent as it is, and CR
-    -- 106.6-restricted mana is no supply for any of them (`casting` is Nothing).
-    Mana.canPayCommitting Nothing (manaActivationsGiven (PlayerEffect.applyingTo pid gs)) ManaSpending.AsProduced pid (lifeOwedBy (Cost.components cost)) (claimsOf pid oid (Cost.components cost) gs) manaCost gs
+    -- 106.6-restricted mana is no supply for any of them: neither of CR 106.6's
+    -- two subjects is one of these payments (ForNeither).
+    Mana.canPayCommitting PaymentSubject.ForNeither (manaActivationsGiven (PlayerEffect.applyingTo pid gs)) ManaSpending.AsProduced pid (lifeOwedBy (Cost.components cost)) (claimsOf pid oid (Cost.components cost) gs) manaCost gs
       && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
       && jointlyPayable pid oid (Cost.components cost) gs
 
@@ -1387,7 +1389,7 @@ manaPartPayable effects adjustments pid oid cost gs = case Cost.mana cost of
     any
       ( \totalled ->
           Mana.canPayCommitting
-            Nothing
+            (PaymentSubject.Activating oid)
             (manaActivationsGiven effects)
             ManaSpending.AsProduced
             pid
@@ -1516,10 +1518,10 @@ lifeTotalOf pid gs = case Map.lookup pid (GameState.players gs) of
 -- nothing double-counts and CR 118.3 makes it one demand with the components'.
 -- `total` answers MANY totals, one per CR 118.7e resolution, and this asks `any`
 -- of them: a cost this gate refuses has to be one NO half could have paid (#595).
-canPaySomeCompletion :: Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
-canPaySomeCompletion casting spending pid oid total_ cost gs =
+canPaySomeCompletion :: PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
+canPaySomeCompletion subject spending pid oid total_ cost gs =
   let pcs = Projection.projectAll gs
-   in canPaySomeCompletionGiven casting spending (supplyManaSourcesGiven (Projection.controlGrants gs) pcs pid gs) pcs pid oid total_ cost gs
+   in canPaySomeCompletionGiven subject spending (supplyManaSourcesGiven (Projection.controlGrants gs) pcs pid gs) pcs pid oid total_ cost gs
 
 -- The mana sources CR 605.3a OFFERS: every permanent this player could tap for
 -- mana right now, whatever that tap itself costs. ONE function pairing
@@ -1585,8 +1587,8 @@ stackedManaActivations effects measure pcs pid oid cost restrictions gs =
 -- above and nothing else. ONLY the mana half gets the pre-walked board -- the
 -- COMPONENTS are still asked through canPayComponent, whose Sacrifice and
 -- TapForTotalPower arms make per-object walks of their own (#1448).
-canPaySomeCompletionGiven :: Maybe ObjectId -> ManaSpending.ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
-canPaySomeCompletionGiven casting spending sources pcs pid oid total_ cost gs = case Cost.mana cost of
+canPaySomeCompletionGiven :: PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
+canPaySomeCompletionGiven subject spending sources pcs pid oid total_ cost gs = case Cost.mana cost of
   Nothing -> False
   Just (ManaCost.MkManaCost symbols) ->
     let outside = lifeOwedBy (Cost.components cost)
@@ -1613,7 +1615,7 @@ canPaySomeCompletionGiven casting spending sources pcs pid oid total_ cost gs = 
         hoisted = stackedManaActivations (PlayerEffect.applyingTo pid gs)
         payable (completed, life) =
           any
-            (\totalled -> Mana.canPayCommittingGiven casting hoisted spending sources pcs pid (outside + life) claimed totalled gs)
+            (\totalled -> Mana.canPayCommittingGiven subject hoisted spending sources pcs pid (outside + life) claimed totalled gs)
             (total_ (ManaCost.MkManaCost completed))
      in any payable (Mana.completions symbols)
           && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
@@ -1856,14 +1858,15 @@ canPayComponent pid oid component gs = case component of
 -- parameter is what makes a new caller state its moment rather than inherit a
 -- default.
 --
--- `casting` is the SPELL this payment is for, and it is Just at exactly one
--- caller: Pawl.Engine.Cast. It is not `oid` under another name -- `oid` is
--- whatever object the cost belongs to, which for a special action or CR 118.12's
--- resolution-time payment is not a spell being cast -- and CR 106.6's
--- restrictions all read "spend this mana only to CAST", so the two questions are
--- different ones. Mana.spendableFor is what reads it.
-pay :: PaymentMoment.PaymentMoment -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
-pay moment casting spending pid oid cost = do
+-- `subject` is WHAT this payment is for (Pawl.Types.PaymentSubject): CR 601.2h's
+-- spell at Pawl.Engine.Cast, CR 602.2b's ability source at Pawl.Engine.Activate,
+-- and neither at the special actions and CR 118.12's resolution-time payment. It
+-- is not `oid` under another name -- `oid` is whatever object the cost belongs
+-- to, which for a special action is no spell and no ability -- and CR 106.6's
+-- restrictions name one of the two subjects, so the two questions are different
+-- ones. Mana.spendableFor is what reads it.
+pay :: PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
+pay moment subject spending pid oid cost = do
   before <- State.get
   case Cost.mana cost of
     -- CR 118.6: attempting to pay an unpayable cost is an illegal action.
@@ -1871,7 +1874,7 @@ pay moment casting spending pid oid cost = do
     -- CR 601.2g: payMana PROMPTS for which sources to activate, so it is monadic
     -- and restores the pre-payment state itself when it cannot be paid.
     Just manaCost -> do
-      paidMana <- payMana casting spending pid manaCost
+      paidMana <- payMana subject spending pid manaCost
       if not paidMana
         then pure Payment.Unpaid
         else do
@@ -1926,10 +1929,10 @@ payToll pid charges = do
       paidMana <-
         if null (ManaCost.unwrap pooled)
           then pure True
-          -- Not a cast (`casting` is Nothing), so CR 106.6-restricted mana cannot
-          -- pay a combat toll. Exact: every restriction in the vocabulary reads
-          -- "only to cast".
-          else payMana Nothing ManaSpending.AsProduced pid pooled
+          -- Neither a cast nor an activation (ForNeither), so CR 106.6-restricted
+          -- mana cannot pay a combat toll. Exact: CR 106.6's restrictions name a
+          -- cast or an activation, and CR 508.1j's toll is neither.
+          else payMana PaymentSubject.ForNeither ManaSpending.AsProduced pid pooled
       if not paidMana
         then pure False
         else do
@@ -2088,9 +2091,9 @@ orderSensitive component = case component of
 --
 -- The window in full. `inFlight` is the set of permanents whose mana ability is
 -- mid-activation, which is the one thing that has to bound the recursion CR
--- 602.2b creates; `casting` is payMana's own first argument, the spell being
--- cast. `inFlight` is non-empty only where `casting` is Nothing: an activation is
--- not a cast.
+-- 602.2b creates; `subject` is payMana's own first argument, what this payment is
+-- for. `inFlight` is non-empty only where `subject` is not a Casting: an
+-- activation is not a cast.
 --
 -- CR 605.3c is what the set says -- an ability being activated cannot be
 -- activated again until it has resolved -- and it TERMINATES the recursion,
@@ -2101,8 +2104,8 @@ orderSensitive component = case component of
 -- A permanent with two mana abilities, one of which could pay the other, is
 -- refused here where the rules allow it. No printing in `data/cards/` has two
 -- mana routes of which either eats mana (#2205).
-payManaExcept :: Set.Set ObjectId -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
-payManaExcept inFlight casting spending pid cost = do
+payManaExcept :: Set.Set ObjectId -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
+payManaExcept inFlight subject spending pid cost = do
   before <- State.get
   paid <- window Set.empty
   Monad.unless paid (State.put before)
@@ -2115,7 +2118,7 @@ payManaExcept inFlight casting spending pid cost = do
     -- permission the cast carried in, so a Celestial Dawn that leaves
     -- mid-payment stops applying (CR 604.2) -- the opposite of `spending`, which
     -- rule 118.14 fixes when the cast was permitted.
-    settlement gs = Mana.spend (PlayerEffect.spendManaAsThough pid gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded casting (manaActivationsGiven (PlayerEffect.applyingTo pid gs)) spending pid cost gs)) cost (Mana.Type.MkMana (fst (Mana.spendableFor casting pid gs)))
+    settlement gs = Mana.spend (PlayerEffect.spendManaAsThough pid gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded subject (manaActivationsGiven (PlayerEffect.applyingTo pid gs)) spending pid cost gs)) cost (Mana.Type.MkMana (fst (Mana.spendableFor subject pid gs)))
     window refused = do
       gs <- State.get
       let covered = Maybe.isJust (settlement gs)
@@ -2155,8 +2158,8 @@ payManaExcept inFlight casting spending pid cost = do
       -- CR 106.6: the payment sees only the mana it may spend, and the rest of
       -- the pool goes back beside what it leaves (CR 106.4 -- unspent mana stays
       -- unspent, it does not vanish because one cost could not use it).
-      let (available, withheld) = Mana.spendableFor casting pid gs
-      case Mana.plan (PlayerEffect.spendManaAsThough pid gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded casting (manaActivationsGiven (PlayerEffect.applyingTo pid gs)) spending pid cost gs)) cost (Mana.Type.MkMana available) of
+      let (available, withheld) = Mana.spendableFor subject pid gs
+      case Mana.plan (PlayerEffect.spendManaAsThough pid gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded subject (manaActivationsGiven (PlayerEffect.applyingTo pid gs)) spending pid cost gs)) cost (Mana.Type.MkMana available) of
         Nothing -> pure False
         Just (steps, life) -> do
           (Mana.Type.MkMana left, spent) <- Mana.spendChosen pid (PlayerEffect.spendManaAsThough pid gs) steps (Mana.Type.MkMana available)
@@ -2167,20 +2170,21 @@ payManaExcept inFlight casting spending pid cost = do
     -- used to refer to mana of any type produced by a snow source spent to pay a
     -- cost". Berg Strider is the reader.
     --
-    -- `casting` is the object it goes on, and it is Just only where the payment
-    -- is for a spell being cast (see `pay`), which is the whole of what any
-    -- printed card asks about ("if {S} was spent to CAST this spell"). An
-    -- activation's mana is not recorded (#2007).
+    -- `PaymentSubject.castOf` is the object it goes on, and it answers Just only
+    -- where the payment is for a spell being cast (see `pay`), which is the whole
+    -- of what any printed card asks about ("if {S} was spent to CAST this
+    -- spell"). An activation's mana is not recorded (#2007) -- the narrowing is
+    -- deliberate and is why this reads `castOf` rather than the subject.
     --
     -- Written HERE rather than by the caller because this is the one place that
     -- knows which units went. An unpaid cost writes nothing: `payMana` restores
     -- the state it entered with, and this line is only reached once the payment
     -- has settled.
-    recordSpent spent gs = case casting of
+    recordSpent spent gs = case PaymentSubject.castOf subject of
       Nothing -> gs
       Just sid -> gs {GameState.objects = Map.adjust (\o -> o {Object.manaSpent = spent}) sid (GameState.objects gs)}
 
-payMana :: Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
+payMana :: PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
 payMana = payManaExcept Set.empty
 
 -- Which source to tap next, or none. `covered` says whether the pool already
@@ -2306,10 +2310,12 @@ payActivation inFlight pid oid cost = do
   paid <- case Cost.mana cost of
     Just (ManaCost.MkManaCost []) -> pure True
     -- CR 118.14's permission is granted to CAST a spell and never to activate an
-    -- ability, so an activation cost is paid with the mana it is -- and CR
-    -- 106.6-restricted mana cannot pay it at all, which is the same sentence
-    -- read the other way (`casting` is Nothing).
-    Just manaCost -> payManaExcept (Set.insert oid inFlight) Nothing ManaSpending.AsProduced pid manaCost
+    -- ability, so an activation cost is paid with the mana it is. CR 106.6 is a
+    -- different sentence and answers differently: this is CR 602.2b's payment,
+    -- so mana restricted to activations may pay it -- Omen Hawker's {C} into
+    -- Chromatic Star's {1} -- and mana restricted to casts may not. `oid` is the
+    -- ability's SOURCE, which is what "abilities of artifacts" reads.
+    Just manaCost -> payManaExcept (Set.insert oid inFlight) (PaymentSubject.Activating oid) ManaSpending.AsProduced pid manaCost
     -- CR 118.6: attempting to pay an unpayable cost is an illegal action.
     Nothing -> pure False
   -- CR 602.2b sends this through CR 601.2h, so the payment is made while the

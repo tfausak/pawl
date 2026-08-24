@@ -41,6 +41,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
 import qualified Pawl.Types.PaymentMoment as PaymentMoment
+import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
@@ -140,7 +141,7 @@ foretell pid oid = do
   if not (canForetell pid oid before)
     then pure ()
     else do
-      payment <- Cost.pay PaymentMoment.OutsideResolution Nothing ManaSpending.AsProduced pid oid actionCost
+      payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither ManaSpending.AsProduced pid oid actionCost
       case payment of
         Payment.Unpaid -> State.put before
         -- Dropped, Pawl.Engine.Ignore's reason: this action exiles a card and

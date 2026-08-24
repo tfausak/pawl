@@ -72,6 +72,7 @@ import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaProduction as ManaProduction
+import qualified Pawl.Types.ManaRestriction as ManaRestriction
 import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -577,7 +578,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     -- 605.3b's inline payment needs to stamp CR 106.6's restriction onto the
     -- units it adds (Mana.manaOptionsOfGiven). Mishra's Workshop is the
     -- printing, and Pawl.ManaSpec's group of that name is where it is paid.
-    let restricted = ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) ManaProduction.AnyColor ManaRetention.Ordinary (Just (Filter.Type.HasCardType CardType.Artifact))
+    let restricted = ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) ManaProduction.AnyColor ManaRetention.Ordinary (Just (ManaRestriction.onlyCasts (Filter.Type.HasCardType CardType.Artifact)))
     Spec.assertEqWith s "a spending restriction rides along" (ManaAbility.manaProduced (Effect.AddMana restricted)) (Just restricted)
     -- CR 605.1a asks whether the ability could add mana to "a player's" pool, so a
     -- recipient the card names is carried rather than disqualifying: an ability
