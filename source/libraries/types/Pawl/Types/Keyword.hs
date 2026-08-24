@@ -552,14 +552,18 @@ data Keyword
     -- and a permanent with vanishing twice enters with both lots of counters
     -- and counts them down twice.
     --
+    -- A MAYBE, which is rule 702.63b: vanishing printed WITHOUT a number states
+    -- only the last two abilities, so Nothing mints no entry replacement and the
+    -- two triggers are unchanged. The time counters then come from elsewhere on
+    -- the card (Tidewalker's own "enters with a time counter for each Island you
+    -- control"), and the countdown and the sacrifice read whatever is there.
+    -- Hexproof's payload is the same shape for CR 702.11b's reason, and the
+    -- codec spells both the same way: no @value@ key at all.
+    --
     -- NOT a permanent-type-specific keyword: rule 702.63a says "permanent", and
     -- Reality Acid (an Aura) and Four Knocks (an enchantment) print it, so
     -- nothing here or in the mint asks whether the bearer is a creature.
-    --
-    -- Not implemented: CR 702.63b's vanishing WITHOUT a number, which is the
-    -- last two abilities and no entry rewrite -- the payload would have to be a
-    -- Maybe (#1186).
-    Vanishing Natural.Natural
+    Vanishing (Maybe Natural.Natural)
   | -- | 702.68a: frenzy N, "whenever this creature attacks and isn't blocked,
     -- it gets +N/+0 until end of turn". A TRIGGERED ability, which
     -- Pawl.Engine.Keyword.frenzy mints in bushido's position: its condition is

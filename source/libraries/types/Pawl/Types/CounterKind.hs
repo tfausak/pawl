@@ -73,7 +73,9 @@ data CounterKind keyword
     -- Contributes nothing to the CR 613 layer system, so
     -- Pawl.Engine.Projection.counterGathered grants nothing for this kind. Its
     -- readers are vanishing's own three abilities, minted by
-    -- Pawl.Engine.Keyword, which count Object.counters directly.
+    -- Pawl.Engine.Keyword, which count Object.counters directly -- and a CARD's
+    -- own text, which may both place them (Tidewalker's entry rewrite) and count
+    -- them (its CR 208.2a power and toughness, a Quantity.ObjectCounters).
     Time
   | -- | CR 702.32a: the counters fading counts down. Rule 122.1 gives fade
     -- counters no lettered clause either, so rule 702.32 is the whole citation,
