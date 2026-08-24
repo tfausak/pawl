@@ -1161,13 +1161,24 @@ namesEveryToken quantity = quantity /= Quantity.Type.Literal 1
 -- computed power or toughness is settled here and stamped as a literal. Left as a
 -- quantity it would be re-read on every projection, and GameState.events is
 -- cleared at the turn handoff -- the token would have no P/T next turn and die to
--- a state-based action. An UNDETERMINABLE quantity is left standing, which keeps
--- CR 208.2's star working for Projection.seedCharacteristicPT. P/T is the whole
--- of it: the only printed characteristics a Face holds as a Quantity.
+-- a state-based action. P/T is the whole of it: the only printed characteristics
+-- a Face holds as a Quantity.
+--
+-- A box holding CR 208.2's STAR is left standing, so Projection.seedCharacteristicPT
+-- still has a star to substitute the token's characteristic-defining ability into
+-- at layer 7a. Everything else is settled even when it cannot be evaluated, on CR
+-- 208.2a's terms (Quantity.determineWith: an undeterminable number is 0, including
+-- inside a calculation) -- Miming Slime with no creatures makes a 0/0 Ooze, which
+-- CR 704.5f puts away unless something is raising its toughness. Left standing it
+-- would instead be a board-reading box on a permanent, which is not a thing CR
+-- 208 allows a token to have.
 bakeTokenCharacteristics :: (Quantity.Type.Quantity -> Maybe Integer) -> Card.Type.Card -> Card.Type.Card
 bakeTokenCharacteristics eval card = card {Card.Type.faces = fmap bakeFace (Card.Type.faces card)}
   where
-    bake quantity = Maybe.maybe quantity Quantity.Type.Literal (eval quantity)
+    bake quantity =
+      if Quantity.containsStar quantity
+        then quantity
+        else Quantity.Type.Literal (Quantity.determineWith eval quantity)
     bakeFace face =
       face
         { Face.power = fmap (Power.MkPower . bake . Power.unwrap) (Face.power face),
