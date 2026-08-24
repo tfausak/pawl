@@ -27,11 +27,9 @@
                             }
                           },
                           "restriction": {
-                            "casts": {
-                              "type": "HasCardType",
-                              "value": {
-                                "type": "Artifact"
-                              }
+                            "activations": {
+                              "type": "And",
+                              "value": []
                             }
                           }
                         }
@@ -42,34 +40,16 @@
                           "production": {
                             "type": "OfType",
                             "value": {
-                              "type": "Colorless"
+                              "type": "Colored",
+                              "value": {
+                                "type": "Blue"
+                              }
                             }
                           },
                           "restriction": {
-                            "casts": {
-                              "type": "HasCardType",
-                              "value": {
-                                "type": "Artifact"
-                              }
-                            }
-                          }
-                        }
-                      },
-                      {
-                        "type": "AddMana",
-                        "value": {
-                          "production": {
-                            "type": "OfType",
-                            "value": {
-                              "type": "Colorless"
-                            }
-                          },
-                          "restriction": {
-                            "casts": {
-                              "type": "HasCardType",
-                              "value": {
-                                "type": "Artifact"
-                              }
+                            "activations": {
+                              "type": "And",
+                              "value": []
                             }
                           }
                         }
@@ -82,11 +62,38 @@
           }
         }
       ],
-      "name": "Mishra's Workshop",
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Omen Hawker",
+      "power": {
+        "type": "Literal",
+        "value": 1
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
       "typeLine": {
+        "subtypes": [
+          {
+            "type": "Advisor"
+          },
+          {
+            "type": "Octopus"
+          }
+        ],
         "types": [
           {
-            "type": "Land"
+            "type": "Creature"
           }
         ]
       }

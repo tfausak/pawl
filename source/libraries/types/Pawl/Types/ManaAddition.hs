@@ -1,8 +1,7 @@
 module Pawl.Types.ManaAddition where
 
-import qualified Pawl.Types.Filter as Filter
-import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaProduction as ManaProduction
+import qualified Pawl.Types.ManaRestriction as ManaRestriction
 import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.PlayerRef as PlayerRef
 
@@ -48,6 +47,6 @@ data ManaAddition = MkManaAddition
     -- | CR 106.6: what the mana this instruction adds may be spent on, stamped
     -- onto every unit it produces (Pawl.Types.ManaUnit.restriction). Nothing is
     -- the unrestricted default every printing but a CR 106.6 one means.
-    restriction :: Maybe (Filter.Filter Keyword.Keyword)
+    restriction :: Maybe ManaRestriction.ManaRestriction
   }
   deriving (Eq, Ord, Show)
