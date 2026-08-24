@@ -14,6 +14,20 @@ cabal configure \
 
 Use all the normal Cabal commands like `cabal build`.
 
+For a fast edit-test loop, prefer the REPL over relinking. `cabal repl
+pawl:test` takes about twenty seconds to load, after which a subset runs in
+well under a second and `:r` reloads only what changed:
+
+``` sh
+ghci> System.Environment.withArgs ["-p", "Engine.Trigger"] Pawl.Test.main
+```
+
+`ghcid --command 'cabal repl pawl:test'` does the same on every save.
+
+When you do want a binary, `cabal build pawl` links one executable instead of
+three, and it reaches the other two: `cabal run pawl -- test -p Engine.Trigger`
+and `cabal run pawl -- bench`.
+
 Prefer clarity over cleverness: code that is easy to read, debug, and modify.
 See the [style guide][3] for specifics.
 

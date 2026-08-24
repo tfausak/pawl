@@ -128,6 +128,7 @@
               pkgs.fzf
               pkgs.gh
               pkgs.ghc
+              pkgs.ghcid
               pkgs.git
               pkgs.hlint
               pkgs.jq
