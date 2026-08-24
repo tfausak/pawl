@@ -85,7 +85,10 @@
               "rewrite": {
                 "type": "WithCounters",
                 "value": {
-                  "amount": 1,
+                  "amount": {
+                    "type": "Literal",
+                    "value": 1
+                  },
                   "kind": {
                     "type": "PlusOnePlusOne"
                   }

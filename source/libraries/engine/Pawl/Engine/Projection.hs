@@ -2029,10 +2029,17 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
   -- ability's clauses.
   EntryRewrite.RunEffects es -> EntryRewrite.RunEffects (fmap (rewriteEffect pairs) es)
 
--- CR 122.1b's keyword counter is the one counter kind holding a word; the amount
--- is a number.
+-- CR 122.1b's keyword counter is the one counter kind holding a word. The amount
+-- holds a second, on the same axis Effect.PutCounters' quantity does: CR 614.1c
+-- admits "a number of +1/+1 counters equal to the number of creature cards in all
+-- graveyards" (Undergrowth Scavenger), and a Count inside it names a card type or
+-- a subtype CR 612.2 licenses swapping.
 rewriteWithCounters :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> WithCounters.WithCounters -> WithCounters.WithCounters
-rewriteWithCounters pairs w = w {WithCounters.kind = Filter.rewriteCounterKind pairs (WithCounters.kind w)}
+rewriteWithCounters pairs w =
+  w
+    { WithCounters.kind = Filter.rewriteCounterKind pairs (WithCounters.kind w),
+      WithCounters.amount = rewriteQuantity pairs (WithCounters.amount w)
+    }
 
 -- The modal payload both abilities carry. Both halves of a mode: its clauses'
 -- effects, and its TARGET SLOTS, whose Filter is the candidate set CR 601.2c
@@ -3852,7 +3859,7 @@ intrinsicReplacementsOf :: Natural -> Natural -> ProjectedCharacteristics -> [Re
 intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
   [ -- CR 614.1c: the entering object is the ability's own source, so the pattern
   -- is Filter.IsSource.
-  ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Loyalty n)))
+  ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Loyalty (Quantity.Type.Literal (toInteger n)))))
   | Set.member CardType.Planeswalker (PC.cardTypes pc),
     printed <- Maybe.maybeToList (PC.loyalty pc),
     let base = case printed of
@@ -3869,7 +3876,7 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
   ]
     -- CR 310.4b's intrinsic defense counters -- CR 306.5b's clause one rule
     -- number over, keyed on the projected card type.
-    <> [ ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Defense n)))
+    <> [ ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Defense (Quantity.Type.Literal (toInteger n)))))
        | Set.member CardType.Battle (PC.cardTypes pc),
          Defense.MkDefense n <- Maybe.maybeToList (PC.defense pc)
        ]

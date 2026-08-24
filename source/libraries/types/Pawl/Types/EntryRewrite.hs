@@ -92,8 +92,10 @@ data EntryRewrite effect
     -- and passed to the prompt so the answerer can obey it; the engine does not
     -- check the answer against it (#663).
     ChooseCardNames (Filter.Filter Keyword.Keyword)
-  | -- | CR 614.1c's other shape: "[This permanent] enters with ...". CR 306.5b's
-    -- intrinsic loyalty ability is the one producer today.
+  | -- | CR 614.1c's other shape: "[This permanent] enters with ...". Printed
+    -- (Barkhide Troll, Workhorse) and minted alike -- CR 306.5b's intrinsic
+    -- loyalty, CR 310.4b's defense, CR 714.3a's lore counter, and the three
+    -- keywords Pawl.Engine.Keyword mints it for.
     --
     -- The counters are placed through Pawl.Engine.Event.putCounters, the CR
     -- 122.6 funnel, and NOT written into the copiable snapshot AsCopy and
@@ -102,10 +104,12 @@ data EntryRewrite effect
     -- is what makes CR 614.16 hold, which is why Doubling Season doubles a
     -- planeswalker's starting loyalty.
     --
-    -- Carries the count rather than reading it back off the source, because the
-    -- intrinsic ability is minted per object from the PROJECTION
-    -- (Pawl.Engine.Projection.intrinsicReplacementsOf) and the number is settled
-    -- there, where CR 707.2's copiable loyalty is visible.
+    -- Carries the count rather than reading it back off the source, because a
+    -- MINTED row's number is settled at the PROJECTION
+    -- (Pawl.Engine.Projection.intrinsicReplacementsOf), where CR 707.2's copiable
+    -- loyalty is visible. A PRINTED row may still carry a variable one --
+    -- Pawl.Types.WithCounters' amount is a Quantity (Undergrowth Scavenger) --
+    -- evaluated as the permanent enters rather than when the row was minted.
     WithCounters WithCounters.WithCounters
   | -- | CR 616.1b's shape: a replacement modifying UNDER WHOSE CONTROL an object
     -- enters the battlefield. Gather Specimens is the one producer, and the whole
