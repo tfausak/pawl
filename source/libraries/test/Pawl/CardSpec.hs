@@ -161,6 +161,7 @@ import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaRestriction as ManaRestriction
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Mill as Mill
@@ -3601,6 +3602,14 @@ sourceHosted = fmap ((,) SourceHostFramed)
 searchFramed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 searchFramed = fmap ((,) SearchFramed)
 
+-- Both predicates a CR 106.6 restriction can carry. Its own type has two fields
+-- and no traversal, so a lint that reached only one of them would go quiet on
+-- the other -- which is why this is a function and not an inlined selector.
+restrictionFilters :: ManaRestriction.ManaRestriction -> [Filter.Type.Filter Keyword.Keyword]
+restrictionFilters restriction =
+  Maybe.maybeToList (ManaRestriction.casts restriction)
+    <> Maybe.maybeToList (ManaRestriction.activations restriction)
+
 -- Every Filter one effect carries, paired with its Framing. Two arms answer
 -- AttachDestination -- Effect.AttachTarget's destination and
 -- Effect.AttachTargetToEach's, which are the only CARD-AUTHORED Filter positions
@@ -3630,10 +3639,13 @@ effectFilters effect = case effect of
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     unframed (durationFilters duration <> modificationFilters (Projection.widenModification modification)) <> sourceHosted (objectRefFilters ref)
   Effect.ChangeText {} -> []
-  -- CR 106.6's spending restriction. UNFRAMED: it is evaluated against the spell
-  -- being paid for (Pawl.Engine.Mana.spendableAmong), which is neither an attach
-  -- destination nor a target slot.
-  Effect.AddMana addition -> unframed (Maybe.maybeToList (ManaAddition.restriction addition))
+  -- CR 106.6's spending restriction, BOTH halves of it: the cast's predicate and
+  -- the activation's are each an ordinary Filter, and collecting one of them
+  -- would take every lint in this module off the other. UNFRAMED: each is
+  -- evaluated against the object being paid for
+  -- (Pawl.Engine.Mana.spendableAmong), which is neither an attach destination
+  -- nor a target slot.
+  Effect.AddMana addition -> unframed (concatMap restrictionFilters (Maybe.maybeToList (ManaAddition.restriction addition)))
   -- THE one search-framed position. CR 701.3a from the candidate's side:
   -- Auratouched Mage's "an Aura card that could enchant it", where the host is
   -- fixed for the whole evaluation and the Aura varies per candidate.
@@ -5385,6 +5397,21 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
     Spec.assertEqWith s "control belongs on a static ability, never in a stored effect" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 106.6 restricts how mana "can be spent"; it never forbids spending it
+  -- outright. A Pawl.Types.ManaRestriction with neither half set is mana no
+  -- payment may ever use, which is mana the card might as well not have added --
+  -- so it is card data that means nothing rather than a rule pawl implements.
+  -- Nothing in the codec can refuse it: both fields default to Nothing, which is
+  -- what lets Mishra's Workshop write one key and Omen Hawker the other.
+  Spec.it s "no card adds mana no payment could spend (CR 106.6)" $ do
+    ps <- S.allPrintings s
+    let offends effect = case effect of
+          Effect.AddMana addition -> case ManaAddition.restriction addition of
+            Just restriction -> null (restrictionFilters restriction)
+            Nothing -> False
+          _ -> False
+        offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
+    Spec.assertEqWith s "a restriction admitting neither casts nor activations is unspendable mana" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 612.2's family gate lives on a modification's CONSTRUCTOR:
   -- Pawl.Engine.Projection.rewriteModificationWith swaps a land-type word only
   -- inside the two land arms and a creature-type word only inside the two creature

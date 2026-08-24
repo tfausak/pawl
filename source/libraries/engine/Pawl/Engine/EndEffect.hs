@@ -24,6 +24,7 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PaidExpiry as PaidExpiry
 import qualified Pawl.Types.Payment as Payment
 import qualified Pawl.Types.PaymentMoment as PaymentMoment
+import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import Pawl.Types.PlayerId (PlayerId)
 
 -- The offer ending this object's effect, if it stored one that a payment can end
@@ -88,7 +89,7 @@ endEffect pid oid = do
   case offerToEnd oid before of
     Nothing -> pure ()
     Just offer -> do
-      payment <- Cost.pay PaymentMoment.OutsideResolution Nothing ManaSpending.AsProduced pid oid (PaidExpiry.cost offer)
+      payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither ManaSpending.AsProduced pid oid (PaidExpiry.cost offer)
       case payment of
         Payment.Unpaid -> State.put before
         Payment.Paid _ -> State.modify' (Expiry.dropWhenPaidBy oid)

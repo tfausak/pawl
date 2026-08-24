@@ -190,6 +190,7 @@ import qualified Pawl.Codec.ManaCostSpec
 import qualified Pawl.Codec.ManaCountSpec
 import qualified Pawl.Codec.ManaFilterSpec
 import qualified Pawl.Codec.ManaProductionSpec
+import qualified Pawl.Codec.ManaRestrictionSpec
 import qualified Pawl.Codec.ManaRetentionSpec
 import qualified Pawl.Codec.ManaSpec
 import qualified Pawl.Codec.ManaSpendingSpec
@@ -690,6 +691,7 @@ spec s registry = do
   Pawl.Codec.ManaCountSpec.spec s
   Pawl.Codec.ManaFilterSpec.spec s
   Pawl.Codec.ManaProductionSpec.spec s
+  Pawl.Codec.ManaRestrictionSpec.spec s
   Pawl.Codec.ManaRetentionSpec.spec s
   Pawl.Codec.ManaSpec.spec s
   Pawl.Codec.ManaSpendingSpec.spec s
