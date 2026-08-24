@@ -40,6 +40,7 @@ import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
+import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Zone as Zone
 
@@ -150,7 +151,7 @@ unlock pid oid half = do
     else case filter ((== half) . Face.name) (lockedHalves oid before) of
       [] -> pure ()
       face : _ -> do
-        payment <- Cost.pay Nothing ManaSpending.AsProduced pid oid (unlockCostOf face)
+        payment <- Cost.pay PaymentMoment.OutsideResolution Nothing ManaSpending.AsProduced pid oid (unlockCostOf face)
         case payment of
           Payment.Unpaid -> State.put before
           -- Dropped, Pawl.Engine.Ignore's reason: CR 116.2m's special action

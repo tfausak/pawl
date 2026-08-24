@@ -43,6 +43,7 @@ import qualified Pawl.Types.Modal as Modal.Type
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
+import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
@@ -700,7 +701,7 @@ activateAbility pid srcId ability = do
               -- mis-tapped colour is a choice the engine must honour (Cost.payMana).
               -- Reject-not-repair restores the whole activation, including the
               -- ability object this function put on the stack.
-              payment <- Cost.pay Nothing ManaSpending.AsProduced pid srcId paidCost
+              payment <- Cost.pay PaymentMoment.OutsideResolution Nothing ManaSpending.AsProduced pid srcId paidCost
               case payment of
                 -- CR 606.3: record that a loyalty ability of THIS PERMANENT was
                 -- activated, which is the whole of the once-per-turn limit's storage

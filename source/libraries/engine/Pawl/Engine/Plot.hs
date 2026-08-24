@@ -39,6 +39,7 @@ import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
+import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Zone as Zone
 
@@ -121,7 +122,7 @@ plot pid oid = do
   if not (canPlot pid oid before)
     then pure ()
     else do
-      payment <- Cost.pay Nothing ManaSpending.AsProduced pid oid (Maybe.fromMaybe Cost.unpayable (plotCostOf oid before))
+      payment <- Cost.pay PaymentMoment.OutsideResolution Nothing ManaSpending.AsProduced pid oid (Maybe.fromMaybe Cost.unpayable (plotCostOf oid before))
       case payment of
         Payment.Unpaid -> State.put before
         -- Dropped, Pawl.Engine.Foretell's reason exactly: the card is exiled and
