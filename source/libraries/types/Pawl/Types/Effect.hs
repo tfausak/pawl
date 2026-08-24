@@ -732,8 +732,11 @@ data Effect card
     -- no inverse opcode and no duration. CR 506.4a and CR 506.4b bound what
     -- removal is NOT and neither reaches this opcode.
     --
-    -- Not implemented: removing a swept SET from combat (#1397).
-    RemoveFromCombat SlotName.SlotName
+    -- An ObjectRef rather than a slot, for Counter's reason: CR 109.2's "each
+    -- creature" is a sweep of the battlefield with nothing targeted (Save Point),
+    -- and ObjectRef.InSlot is still the single named permanent (Labyrinth of
+    -- Skophos).
+    RemoveFromCombat ObjectRef.ObjectRef
   | -- | CR 509.1h's escape clause: an effect SAYS an attacking creature becomes
     -- blocked (Curtain of Light). CR 508.4d names the same clause for a creature
     -- that entered the battlefield attacking after the declaration.

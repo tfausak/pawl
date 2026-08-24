@@ -1126,13 +1126,22 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Fight (Fight.MkFight (SlotName.MkSlotName (Text.pack "mine")) (SlotName.MkSlotName (Text.pack "theirs"))))
       " {\"type\":\"Fight\",\"value\":{\"first\":\"mine\",\"second\":\"theirs\"}} "
-  Spec.it s "RemoveFromCombat" $
+  -- CR 506.4. Both ObjectRef arms, since the pool prints one of each: Labyrinth
+  -- of Skophos' "remove target creature from combat" is the slot, and Save
+  -- Point's "remove each creature from combat" the CR 109.2 sweep.
+  Spec.it s "RemoveFromCombat round-trips both ObjectRef arms" $ do
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.RemoveFromCombat (SlotName.MkSlotName (Text.pack "target")))
-      " {\"type\":\"RemoveFromCombat\",\"value\":\"target\"} "
+      (Effect.RemoveFromCombat (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      " {\"type\":\"RemoveFromCombat\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.RemoveFromCombat (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
+      " {\"type\":\"RemoveFromCombat\",\"value\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   Spec.it s "BecomesBlocked" $
     Common.assertJsonCodec
       s

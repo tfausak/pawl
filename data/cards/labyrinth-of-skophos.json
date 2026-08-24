@@ -57,7 +57,10 @@
                     "effects": [
                       {
                         "type": "RemoveFromCombat",
-                        "value": "target"
+                        "value": {
+                          "type": "InSlot",
+                          "value": "target"
+                        }
                       }
                     ]
                   }

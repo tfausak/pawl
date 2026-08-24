@@ -449,7 +449,7 @@ slotsOf effect = case effect of
   Effect.Sacrifice slot -> oneSlot slot
   Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown slot _) -> oneSlot slot
   Effect.TurnFaceUp slot -> oneSlot slot
-  Effect.RemoveFromCombat slot -> oneSlot slot
+  Effect.RemoveFromCombat ref -> objectRefSlots ref
   Effect.BecomesBlocked slot -> oneSlot slot
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _) -> joinTwo (objectRefSlots ref) (joinSlots (fmap quantitySlots (riderQuantities riders)))
   -- CR 121.1's bound slot is a DEFINITION, not a read: see boundSlots below.
@@ -3623,18 +3623,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       Just target -> FaceDown.turnFaceUpByEffect target
     -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
     _ -> pure ()
-  Effect.RemoveFromCombat slot ->
+  Effect.RemoveFromCombat ref ->
     State.modify' $ \gs ->
-      case legalOne slot legal of
-        Just recipient -> case Recipient.objectOf recipient of
-          Nothing -> gs -- a player recipient is not in combat
-          -- CR 506.4: through Game.removeFromCombat, the one performer of every
-          -- clause of that rule, so CR 509.1h's asymmetry comes along for free.
-          -- Unprompted and undirected: the rule leaves nothing to ask.
-          Just target -> Game.removeFromCombat target gs
-        -- Illegal slot (CR 608.2b) or a non-object recipient: no-op. A target
-        -- already out of combat needs no guard either.
-        _ -> gs
+      -- CR 506.4: through Game.removeFromCombat, the one performer of every
+      -- clause of that rule, so CR 509.1h's asymmetry comes along for free.
+      -- Unprompted and undirected: the rule leaves nothing to ask.
+      --
+      -- The victims are enumerated ONCE (CR 608.2f), as Untap's fold above does;
+      -- an illegal slot (CR 608.2b), a player recipient and an empty match all
+      -- remove nothing, and a permanent already out of combat needs no guard.
+      foldr Game.removeFromCombat gs (objectRefObjects legal resolving controller source gs ref)
   Effect.BecomesBlocked slot ->
     State.modify' $ \gs ->
       case legalOne slot legal of

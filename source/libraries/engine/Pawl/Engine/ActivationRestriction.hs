@@ -98,6 +98,11 @@ restrictionMet pid gs restriction = case restriction of
   -- so this is Turn.afterBlockersDeclared verbatim, the reader Pawl.Engine.Cast's arm
   -- of this name uses. Trap Runner is the card.
   ActivationRestriction.AfterBlockersDeclared -> Turn.afterBlockersDeclared gs
+  -- CR 506.7 through CR 506.7g, the same extension to abilities that governs
+  -- AfterBlockersDeclared above. Turn.beforeCombatDamage reads the phase rather
+  -- than the combat record, since CR 510.2's damage is a turn-based action of one
+  -- step and CR 506.7c admits every combat phase of the turn. Save Point.
+  ActivationRestriction.BeforeCombatDamage -> Turn.beforeCombatDamage (GameState.phase gs)
 
 -- CR 307.5's empty-stack conjunct asked ABOUT THE RIDER rather than about the
 -- board: does this clause need an empty stack to be met?
@@ -123,3 +128,4 @@ needsEmptyStack restriction = case restriction of
   ActivationRestriction.DuringTurn _ -> False
   ActivationRestriction.AttackedThisStep -> False
   ActivationRestriction.AfterBlockersDeclared -> False
+  ActivationRestriction.BeforeCombatDamage -> False

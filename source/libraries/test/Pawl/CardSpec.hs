@@ -3686,7 +3686,7 @@ effectFilters effect = case effect of
   Effect.TurnFaceDown _ -> []
   Effect.TurnFaceUp _ -> []
   Effect.Fight _ -> []
-  Effect.RemoveFromCombat _ -> []
+  Effect.RemoveFromCombat ref -> sourceHosted (objectRefFilters ref)
   Effect.BecomesBlocked _ -> []
   -- Swift Silence's "all other spells" is an ObjectRef Filter like Destroy's,
   -- so the lint reaches it.

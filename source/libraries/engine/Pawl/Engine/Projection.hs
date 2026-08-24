@@ -1648,7 +1648,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Sacrifice _ -> effect
   Effect.TurnFaceDown _ -> effect
   Effect.TurnFaceUp _ -> effect
-  Effect.RemoveFromCombat _ -> effect
+  Effect.RemoveFromCombat ref -> Effect.RemoveFromCombat (rewriteObjectRef pairs ref)
   Effect.BecomesBlocked _ -> effect
   -- Not implemented: a CR 122.1b keyword counter named in the riders keeps its
   -- printed keyword through the swap (#1190).

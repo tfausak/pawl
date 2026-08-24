@@ -110,4 +110,17 @@ data ActivationRestriction
     -- chosen player's, so a second axis here would be strictly narrower than the
     -- card.
     AfterBlockersDeclared
+  | -- | CR 506.7, through CR 506.7g: "Activate only during combat before combat
+    -- damage has been dealt" (Save Point). CR 506.7c is the "during combat" half
+    -- -- a turn with two combat phases admits the ability in either -- and the
+    -- rest of CR 506.7 the "before the combat damage step" half.
+    -- Pawl.Engine.Turn.beforeCombatDamage is the reader.
+    --
+    -- NOT DuringPhase over PhaseSelector.CombatPhase, which would be strictly
+    -- more permissive than the card: Turn.inWindow is a containment test, so that
+    -- window also admits the combat damage step (CR 510.3 gives priority only
+    -- after CR 510.2's turn-based action, so damage HAS been dealt there) and the
+    -- end of combat step. Nor the negation of AfterBlockersDeclared above, which
+    -- would exclude the declare blockers step the card admits.
+    BeforeCombatDamage
   deriving (Eq, Ord, Show)
