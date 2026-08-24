@@ -1260,6 +1260,15 @@ permanentsDieSpec s registry =
             (aliceThird, withThird) = S.addCreature piker S.alice withSecond
             (bobs, gs) = S.addCreature piker S.bob withThird
         pure (bearer, aliceFirst, aliceSecond, aliceThird, bobs, gs)
+      -- Every trigger the settle put on the stack, resolved. Resolving only the TOP
+      -- would leave the power/toughness assertions below vacuous: a broken engine's
+      -- extra triggers would still be sitting on the stack, unread, and the bearer
+      -- would answer the correct number either way. The stack strictly shrinks --
+      -- nothing here is a settle, and a +1/+1 counter puts nothing back on.
+      resolveWholeStack gs =
+        if null (GameState.stack gs)
+          then gs
+          else resolveWholeStack (S.runPure S.identityAnswer gs Stack.resolveTop)
       -- A Goblin Piker is a 2/1, so one marked damage is CR 704.5g lethal.
       lethal = 1 :: Natural
    in Spec.describe s "PermanentsDie" $ do
@@ -1272,7 +1281,7 @@ permanentsDieSpec s registry =
           (bearer, aliceFirst, aliceSecond, _, bobs, board) <- townsfolkBoard
           let damaged = S.markDamage aliceFirst lethal (S.markDamage aliceSecond lethal (S.markDamage bobs lethal board))
               settled = S.runPure S.identityAnswer damaged Engine.settleForPriority
-              after = S.runPure S.identityAnswer settled Stack.resolveTop
+              after = resolveWholeStack settled
           Spec.assertEqWith s "the Townsfolk is a 4/4: one +1/+1 counter for the whole batch" (S.powerToughnessOf bearer after) (Just (4, 4))
           Spec.assertEqWith s "it was a 3/3 before the batch" (S.powerToughnessOf bearer board) (Just (3, 3))
           Spec.assertEqWith s "all three creatures died" (fmap (\oid -> Game.lookupObject oid settled) [aliceFirst, aliceSecond, bobs]) [Nothing, Nothing, Nothing]
@@ -1289,9 +1298,9 @@ permanentsDieSpec s registry =
           (bearer, aliceFirst, aliceSecond, aliceThird, bobs, board) <- townsfolkBoard
           let damaged = S.markDamage aliceFirst lethal (S.markDamage aliceSecond lethal (S.markDamage bobs lethal board))
               settled = S.runPure S.identityAnswer damaged Engine.settleForPriority
-              after = S.runPure S.identityAnswer settled Stack.resolveTop
+              after = resolveWholeStack settled
               again = S.runPure S.identityAnswer (S.markDamage aliceThird lethal after) Engine.settleForPriority
-              afterAgain = S.runPure S.identityAnswer again Stack.resolveTop
+              afterAgain = resolveWholeStack again
           Spec.assertEqWith s "the Townsfolk is a 5/5 after the second batch" (S.powerToughnessOf bearer afterAgain) (Just (5, 5))
           Spec.assertEqWith s "it was a 4/4 after the first" (S.powerToughnessOf bearer after) (Just (4, 4))
           Spec.assertEqWith s "the third Piker died in a group of its own" (length (deathGroups again)) 2
@@ -1330,8 +1339,7 @@ permanentsDieSpec s registry =
               afterCast = S.runPure answer withSpell (S.cast S.alice spell)
               resolved = S.runPure answer afterCast Stack.resolveTop
               settled = S.runPure answer resolved Engine.settleForPriority
-              once = S.runPure answer settled Stack.resolveTop
-              twice = S.runPure answer once Stack.resolveTop
+              twice = resolveWholeStack settled
           Spec.assertEqWith s "the Townsfolk is a 4/4: 2/2 under Night, plus two counters" (S.powerToughnessOf bearer twice) (Just (4, 4))
           Spec.assertEqWith s "it was a 2/2 before either batch" (S.powerToughnessOf bearer withLands) (Just (2, 2))
           Spec.assertEqWith s "the Piker and both tokens reached a graveyard" (length (filter (\zc -> ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard) (S.zoneChangesOf settled))) 3
@@ -1346,12 +1354,17 @@ permanentsDieSpec s registry =
         Spec.it s "CR 109.5 you control: a batch holding only an opponent's creature fires nothing" $ do
           (bearer, _, _, _, bobs, board) <- townsfolkBoard
           let settled = S.runPure S.identityAnswer (S.markDamage bobs lethal board) Engine.settleForPriority
-          Spec.assertEqWith s "the Townsfolk is still a 3/3" (S.powerToughnessOf bearer settled) (Just (3, 3))
+              after = resolveWholeStack settled
+          Spec.assertEqWith s "the Townsfolk is still a 3/3 once the stack is drained" (S.powerToughnessOf bearer after) (Just (3, 3))
           Spec.assertEqWith s "though bob's Piker did die" (Game.lookupObject bobs settled) Nothing
           Spec.assertEqWith s "and nothing reached the stack" (length (GameState.stack settled)) 0
         -- "OTHER", the Filter's Not IsSource arm, and the pair to the board below:
         -- the Townsfolk's own death IS a creature alice controls dying, so the
         -- silence has to come from the exclusion.
+        --
+        -- The stack rather than a counter, here and below, for the same reason: this
+        -- card's payload acts on itself and the bearer is gone, so "the ability
+        -- triggered" is the whole of what a board can show.
         Spec.it s "CR 603.6c other: the Townsfolk dying alone fires nothing" $ do
           (bearer, _, _, _, _, board) <- townsfolkBoard
           let settled = S.runPure S.identityAnswer (S.markDamage bearer 3 board) Engine.settleForPriority
