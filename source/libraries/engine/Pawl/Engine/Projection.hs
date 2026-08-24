@@ -1766,6 +1766,7 @@ rewriteEffect pairs effect = case effect of
   Effect.ChooseOpponent _ -> effect
   Effect.ChooseOpponentAtRandom _ -> effect
   Effect.RollDie {} -> effect
+  Effect.FlipCoin {} -> effect
   Effect.TakeExtraTurn {} -> effect
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named ref) -> Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named (rewriteObjectRef pairs ref))
   Effect.OfferCast {} -> effect

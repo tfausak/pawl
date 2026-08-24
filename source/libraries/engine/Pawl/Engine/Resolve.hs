@@ -132,6 +132,7 @@ import qualified Pawl.Types.FaceDownState as FaceDownState
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -585,6 +586,8 @@ slotsOf effect = case effect of
   -- the suite green. A card whose roll added "the number of cards you drew this
   -- way" would refute that. The same holds of the two arms below.
   Effect.RollDie rollDie -> maybe Map.empty quantitySlots (RollDie.modifier rollDie)
+  -- And a DEFINITION too: CR 705.1's coin has no payload but the slot it writes.
+  Effect.FlipCoin {} -> Map.empty
   Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn ref _) -> playerRefSlots ref
   -- Both halves may name a slot: what is shuffled, and whose library.
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named ref) -> joinTwo (maybe Map.empty playerRefSlots named) (objectRefSlots ref)
@@ -837,6 +840,7 @@ slotsAreExhaustive effect = case effect of
   Effect.ChooseOpponent _ -> True
   Effect.ChooseOpponentAtRandom _ -> True
   Effect.RollDie rollDie -> all Quantity.slotsAreExhaustive (RollDie.modifier rollDie)
+  Effect.FlipCoin {} -> True
   Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn _ _) -> True
   Effect.ShuffleIntoLibrary {} -> True
   Effect.OfferCast {} -> True
@@ -980,6 +984,7 @@ readsX = any effectReadsX
       -- CR 706.2's modifier is an ordinary Quantity, so it may be the X the
       -- caster announced (CR 601.2b).
       Effect.RollDie rollDie -> any Quantity.readsX (RollDie.modifier rollDie)
+      Effect.FlipCoin {} -> False
       Effect.TakeExtraTurn {} -> False
       Effect.ShuffleIntoLibrary {} -> False
       Effect.OfferCast {} -> False
@@ -1053,6 +1058,9 @@ boundSlots effect = case effect of
   -- CR 706.4: the number the die came up, for a later effect of this resolution
   -- to read as Quantity.InSlot.
   Effect.RollDie rollDie -> Set.singleton (RollDie.slot rollDie)
+  -- CR 705.2: 1 if the flipping player won the flip and 0 if they lost, for a
+  -- later effect of this resolution to read as Quantity.InSlot.
+  Effect.FlipCoin flipCoin -> Set.singleton (FlipCoin.slot flipCoin)
   -- Three slots CR 701.8's destruction may define: how many permanents it
   -- ACTUALLY destroyed, for a later "for each ... destroyed this way"; the cards
   -- it put into a graveyard, for a later clause that NAMES them (CR 400.7's
@@ -3578,6 +3586,44 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         result = Integer.toNaturalSaturating (toInteger natural + modifier)
     State.modify' (bindAmountSlot source (RollDie.slot rollDie) result)
     State.modify' (Event.recordEvent (GameEvent.DiceRolled controller))
+  -- CR 705.1's flip, in RollDie's holder and for its reason: bindAmountSlot's
+  -- `source` is the resolving object, and on a SPELL -- which Winter Sky is --
+  -- `source` and `resolving` are the same object, so the ambiguity the arm above
+  -- documents does not arise there. A triggered ability that flipped would land
+  -- on that arm's reasoning instead, which says either holder answers.
+  --
+  -- TWO questions, in CR 705.2's own order. The CALL comes first and through
+  -- Game.choose, because it is a choice: the flipping player weighs heads
+  -- against tails, and CR 723 lets a controller make it for them. The FACE comes
+  -- second and through Game.ask, because it is not: nobody decides how a coin
+  -- lands, so there is nothing to usurp and the question goes to the
+  -- INTERPRETER. Asking in the other order would let the call be made with the
+  -- face already known, which is a different game. No board reaches the
+  -- difference: both orders leave the same slot bound, so Pawl.CoinSpec's "only
+  -- the flipping player calls" case proves the order by what the engine ASKED
+  -- rather than by anything the board shows.
+  --
+  -- No filtering back, unlike RollDie: CR 705.1's coin has exactly two sides and
+  -- Pawl.Types.CoinFace has exactly two constructors, so every answer is in
+  -- range.
+  --
+  -- The flipper is `controller`, CR 109.5's "you" on a resolving object, and CR
+  -- 705.2's last sentence keeps everyone else out of it -- so the PlayerId on
+  -- the call is the same seat and no opponent is ever asked.
+  --
+  -- The bound value is CR 705.2's win or loss, 1 or 0, and NOT the face.
+  --
+  -- Not implemented: CR 705.2's face-only flips, which have no winner and ask no
+  -- call (#2251); CR 705.3's stated result (#2252); CR 614's replacement over
+  -- the flip, which Krark's Thumb wants (#2253); and the flip event a trigger
+  -- would watch, which Tavern Scoundrel wants (#2254) -- so unlike the roll
+  -- above this arm records nothing.
+  Effect.FlipCoin flipCoin -> do
+    gs <- State.get
+    called <- Game.choose (Prompt.CallCoin (Decide.deciderFor controller gs) controller)
+    face <- Game.ask Prompt.FlipCoin
+    let won = if face == called then 1 else 0 :: Natural
+    State.modify' (bindAmountSlot source (FlipCoin.slot flipCoin) won)
   Effect.ControlPlayerNextTurn slot ->
     State.modify' $ \gs ->
       case legalOne slot legal of
