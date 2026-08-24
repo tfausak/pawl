@@ -734,6 +734,28 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
         (Filter.rewrite [(Subtype.Goblin, Subtype.Zombie)] (Filter.Type.HasKeyword (Keyword.Hexproof Nothing)))
         (Filter.Type.HasKeyword (Keyword.Hexproof Nothing))
 
+    -- CR 702.16a's "[quality]" is the same carrier one rule along, and CR 612.2
+    -- reaches it on the same terms. Apostle of Purifying Light's quality is a
+    -- colour, so nothing in the pool changes an answer here today; the arm exists
+    -- because rewriteKeyword classifies a keyword by whether it holds a word, and
+    -- this one does. It is a REGRESSION FENCE and not a proof: nothing else in the
+    -- tree observes it, which the PR that landed protection says outright.
+    Spec.it s "descends into a protection quality" $ do
+      Spec.assertEqWith
+        s
+        "protection from Goblins became protection from Zombies"
+        (Filter.rewrite [(Subtype.Goblin, Subtype.Zombie)] (Filter.Type.HasKeyword (Keyword.Protection (Filter.Type.HasSubtype Subtype.Goblin))))
+        (Filter.Type.HasKeyword (Keyword.Protection (Filter.Type.HasSubtype Subtype.Zombie)))
+
+    -- The colour Apostle of Purifying Light actually prints: no subtype word
+    -- inside it, so the swap reaches nothing.
+    Spec.it s "leaves a protection quality that names no subtype alone" $ do
+      Spec.assertEqWith
+        s
+        "protection from black untouched"
+        (Filter.rewrite [(Subtype.Goblin, Subtype.Zombie)] (Filter.Type.HasKeyword (Keyword.Protection (Filter.Type.HasColor Color.Black))))
+        (Filter.Type.HasKeyword (Keyword.Protection (Filter.Type.HasColor Color.Black)))
+
   Spec.describe s "AttackedThisTurn" $ do
     Spec.it s "matches a view whose history says so" $ do
       Spec.assertBool s (Filter.matches self (blackCreature {Filter.attackedThisTurn = True}) Filter.Type.AttackedThisTurn) "attacked"
