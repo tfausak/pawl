@@ -3515,13 +3515,27 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- With nothing in the pool that modifies a roll (#2083), CR 706.2's natural
   -- result and result coincide, and this one binding is both.
   --
-  -- Not implemented: any record that a roll happened, so nothing can trigger on
-  -- one (#2084). Not implemented: CR 706.1's other half, how MANY dice (#2085).
+  -- CR 706.1's roll is also the event TriggerCondition.PlayerRollsDice watches
+  -- (Feywild Trickster). Recorded under `controller`, not `source`: rule 706.1's
+  -- instruction is aimed at a PLAYER, RollDie names none of its own, and an
+  -- unnamed player on a resolving object is CR 109.5's "you" -- its controller. A
+  -- card telling ANOTHER player to roll would put the seat on Pawl.Types.RollDie.
+  --
+  -- One writer, one road: Prompt.RollDie is asked from this arm and from no
+  -- other place in the engine, so there is no second road to record on.
+  --
+  -- Recorded AFTER the binding, so a trigger placed by CR 603.3 sees the same
+  -- state a later effect of this resolution would. Nothing observes the order --
+  -- the trigger goes on the stack only once this resolution finishes.
+  --
+  -- Not implemented: CR 706.1's other half, how MANY dice (#2085), so one entry
+  -- here is one roll instruction.
   Effect.RollDie rollDie -> do
     let sides = RollDie.sides rollDie
     rolled <- Game.ask (Prompt.RollDie sides)
     let result = if rolled >= 1 && rolled <= sides then rolled else 1
     State.modify' (bindAmountSlot source (RollDie.slot rollDie) result)
+    State.modify' (Event.recordEvent (GameEvent.DiceRolled controller))
   Effect.ControlPlayerNextTurn slot ->
     State.modify' $ \gs ->
       case legalOne slot legal of

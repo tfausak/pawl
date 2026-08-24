@@ -2156,6 +2156,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.RoomEntered _ -> condition
   TriggerCondition.PlayerScries _ -> condition
   TriggerCondition.PlayerSurveils _ -> condition
+  TriggerCondition.PlayerRollsDice _ -> condition
   TriggerCondition.SelfBecomesPlotted -> condition
   TriggerCondition.PermanentExplores f -> TriggerCondition.PermanentExplores (Filter.rewrite pairs f)
   TriggerCondition.SelfExerted -> condition

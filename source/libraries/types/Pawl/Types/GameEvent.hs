@@ -877,6 +877,23 @@ data GameEvent
     -- rather than surveils performed, and would miss a surveil that binned
     -- nothing.
     Surveiled PlayerId.PlayerId
+  | -- | CR 706.1: a player rolled a die. Recorded by
+    -- Pawl.Engine.Resolve's Effect.RollDie arm, which is the only roller,
+    -- AFTER CR 706.1a's result is settled and bound.
+    --
+    -- The PlayerId is the resolving ability's controller. Pawl.Types.RollDie
+    -- carries no player of its own, so an effect instructing SOMEONE ELSE to
+    -- roll would add the field there and pass it through; nothing in
+    -- data/cards prints that today.
+    --
+    -- No result and no die kind. CR 706.7's planar die is ignored by every
+    -- effect reading a numerical result while still firing this trigger, so a
+    -- reader wanting the number should take it from Pawl.Types.RollDie's own
+    -- slot instead; #934 is the planar die itself.
+    --
+    -- Not implemented: how MANY dice one roll instruction threw (#2085), so
+    -- one entry is one Effect.RollDie.
+    DiceRolled PlayerId.PlayerId
   | -- | CR 702.170a: a card became a plotted card. The ObjectId is the card AS
     -- IT SITS IN EXILE -- Pawl.Engine.Plot.plot's `newId` and not the object
     -- that was in the hand -- because CR 400.7 mints a new object as it moves

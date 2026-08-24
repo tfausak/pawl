@@ -649,6 +649,7 @@ abilityTriggeredOf event = case event of
   GameEvent.Milled {} -> Nothing
   GameEvent.Scried _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
+  GameEvent.DiceRolled _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
   GameEvent.Exerted _ -> Nothing
