@@ -60,18 +60,6 @@
           ],
           "modifications": [
             {
-              "type": "AddCardType",
-              "value": {
-                "type": "Creature"
-              }
-            },
-            {
-              "type": "AddCreatureSubtype",
-              "value": {
-                "type": "Insect"
-              }
-            },
-            {
               "type": "SetBasePowerToughness",
               "value": {
                 "power": {
@@ -82,6 +70,18 @@
                   "type": "Literal",
                   "value": 1
                 }
+              }
+            },
+            {
+              "type": "AddCreatureSubtype",
+              "value": {
+                "type": "Insect"
+              }
+            },
+            {
+              "type": "AddCardType",
+              "value": {
+                "type": "Creature"
               }
             }
           ]

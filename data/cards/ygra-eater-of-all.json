@@ -76,15 +76,15 @@
           },
           "modifications": [
             {
-              "type": "AddCardType",
-              "value": {
-                "type": "Artifact"
-              }
-            },
-            {
               "type": "AddSubtype",
               "value": {
                 "type": "Food"
+              }
+            },
+            {
+              "type": "AddCardType",
+              "value": {
+                "type": "Artifact"
               }
             },
             {
