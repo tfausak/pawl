@@ -1629,11 +1629,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- The other direction, and the reason CR 205.3d is asked against the card types
   -- the WHOLE effect gives rather than the ones the object started with: Song of
   -- the Dryads' one static ability makes the enchanted permanent a Forest land,
-  -- and CR 613.7 orders effects rather than the parts of one. The card is transcribed in
-  -- printed order -- "a colorless Forest land", so the SetLandSubtype precedes the
-  -- SetCardType -- and a check reading either the object's base card types or the
-  -- ones the fold had reached would refuse the Forest and leave a colourless land
-  -- that taps for nothing.
+  -- and CR 613.7 orders effects rather than the parts of one. The card is
+  -- transcribed in printed order -- "a colorless Forest land", so the
+  -- SetLandSubtype precedes the SetCardType -- and a check reading either the
+  -- object's base card types or the ones the fold had reached would refuse the
+  -- Forest and leave a colourless land that taps for nothing.
   --
   -- Song of the Dryads is Affected.Attached, which nothing can move, so layer 4
   -- holds no movable effect on this board and projectDeciding takes its flat road
@@ -1831,16 +1831,16 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
 
   -- CR 613.7 orders effects within a layer and nothing orders one effect's own
   -- parts against each other, so a card naming the subtype ahead of the card type
-  -- that licenses it (CR 205.3d) gets both. Life and Limb is
-  -- printed "are 1/1 green Saproling creatures and Forest lands in addition to
-  -- their other types" (Scryfall) and is transcribed in that order, so both of its
-  -- subtype parts precede the AddCardType CR 205.3d asks them against.
+  -- that licenses it (CR 205.3d) gets both. Life and Limb is printed "are 1/1
+  -- green Saproling creatures and Forest lands in addition to their other types"
+  -- (Scryfall) and is transcribed in that order, so both of its subtype parts
+  -- precede the AddCardType CR 205.3d asks them against.
   --
-  -- The OTHER fold from the Song of the Dryads case above. Life and Limb's
+  -- The OTHER road from the Song of the Dryads case above. Life and Limb's
   -- affected set is Affected.Matching, which CR 613.8 could reorder, so layer 4
   -- takes projectDeciding's dependency road; Song of the Dryads is
-  -- Affected.Attached and takes the flat one. Both go through applyUnit, and a fix
-  -- reaching only one of them leaves the other refusing the subtype.
+  -- Affected.Attached and takes the flat one. The two roads are separately
+  -- mutable, so a change to one leaves this pair disagreeing.
   --
   -- The observable is CR 305.6's {G} on a permanent nothing else makes a land.
   -- Shroofus Sproutsire ({2}{G} Legendary Creature -- Saproling with trample,

@@ -452,7 +452,8 @@ correspondsTo types subtype =
 -- land-type direction (Pawl.ProjectionSpec's Synthetic Marsh Song case) and is a
 -- regression fence at the creature-type one, where every grant in data/cards
 -- names creatures in its affected set (Turn to Frog, Slivdrazi Monstrosity) or
--- adds the Creature card type first (Life and Limb, Grist).
+-- gives the Creature card type in the same effect (Life and Limb, Grist), which
+-- `types` already accounts for.
 gainSubtype :: Set CardType.CardType -> Subtype.Type.Subtype -> ProjectedCharacteristics -> ProjectedCharacteristics
 gainSubtype types s pc
   | correspondsTo types s = pc {PC.subtypes = Set.insert s (PC.subtypes pc)}
@@ -1190,7 +1191,9 @@ applyColorDefining pc =
 -- makes Turn to Frog's SetCreatureSubtype win over it. CR 205.3d gates it like
 -- any other grant, which on a printed changeling object refuses nothing: CR
 -- 702.73b puts the ability on creature and Kindred cards, and both correlate
--- with CR 205.3m's list.
+-- with CR 205.3m's list. Judged against the object's OWN card types rather than
+-- any unit's: a CDA is an effect of its own (CR 613.3), not a part of one of the
+-- modification units applyUnit folds.
 applySubtypeDefining :: ProjectedCharacteristics -> ProjectedCharacteristics
 applySubtypeDefining pc =
   if definesEveryCreatureType (Map.keysSet (PC.keywords pc))
@@ -3670,7 +3673,7 @@ projectDeciding admits cands = forObject
                     -- per candidate.
                     --
                     -- Still grouped into CR 613.6's units, because applyUnit's CR
-                    -- 613.1 question is asked of a whole unit and a flat fold
+                    -- 205.3d question is asked of a whole unit and a flat fold
                     -- cannot answer it. Grouping AFTER the sort is sound because
                     -- CR 613.7a gives every part of one ability its source's
                     -- timestamp and List.sortOn is stable, so gatherStatic's
