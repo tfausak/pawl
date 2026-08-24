@@ -5494,18 +5494,18 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- count for its reason: zero is an answer, where an unbound slot would leave a
     -- later clause's quantity unevaluable instead.
     State.modify' (bindAmountSlot source slot paid)
-  Effect.Tap ref ->
-    State.modify' $ \gs ->
-      -- CR 701.26a: turn each named permanent sideways. The victims are
-      -- enumerated ONCE (CR 608.2f), so an illegal slot (CR 608.2b), a player
-      -- recipient and a set that matched nothing all tap nothing. Rule 701.26a's
-      -- "only untapped permanents can be tapped" needs no guard: the assignment
-      -- is idempotent.
-      let tap o = o {Object.tapped = TapState.Tapped}
-       in gs
-            { GameState.objects =
-                foldr (Map.adjust tap) (GameState.objects gs) (objectRefObjects legal resolving controller source gs ref)
-            }
+  -- CR 701.26a: turn each named permanent sideways. The victims are enumerated
+  -- ONCE (CR 608.2f) and off the board as it stands before any of them is tapped,
+  -- so an illegal slot (CR 608.2b), a player recipient and a set that matched
+  -- nothing all tap nothing.
+  --
+  -- Through Pawl.Engine.Event.tap rather than a direct write, which is what makes
+  -- each one a becomes-tapped event. Rule 701.26a's "only untapped permanents can
+  -- be tapped" lives in that funnel, and it earns its keep now that an event rides
+  -- on the write: the assignment was idempotent and the event is not.
+  Effect.Tap ref -> do
+    gs <- State.get
+    Monad.forM_ (objectRefObjects legal resolving controller source gs ref) Event.tap
   Effect.Untap ref ->
     State.modify' $ \gs ->
       -- CR 701.26b: rotate each named permanent back upright. The victims are
@@ -6061,6 +6061,11 @@ putFound searcher source destination cardId = case destination of
 
 -- Put a found card onto the battlefield tapped (CR 701.23's Evolving Wilds
 -- shape). changeZone mints a new object; tap it by id after the move.
+--
+-- A direct write and NOT Pawl.Engine.Event.tap, for CR 603.2e's reason: this is
+-- the permanent ENTERING the battlefield tapped, and an ability that triggers when
+-- a permanent "becomes tapped" doesn't trigger if the permanent enters in that
+-- state. Routing it through the funnel would fire such an ability.
 putTapped :: ObjectId -> Game ()
 putTapped cardId = do
   before <- State.get

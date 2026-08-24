@@ -146,13 +146,13 @@ noCombat =
 -- earlier spell on the stack is visible. Pawl.ManaSpec's "an Elf a spell on the
 -- stack targets is a candidate of its own" case is the two-step proof.
 --
--- The ATTACHMENT arm is a regression fence rather than a proved behaviour: every
--- rider in data/cards changes what it is attached to, so the projection refuses
--- the pair before this line is reached, and no mutation of it reddens the suite.
--- Overgrowth ("Whenever enchanted land is tapped for mana, its controller adds
--- an additional {G}{G}") is the shape that would need it -- the trigger is the
--- AURA's, so the enchanted land projects exactly like the one beside it -- and
--- it is unexpressible while no trigger condition watches a tap (#1970).
+-- The ATTACHMENT arm is proved rather than a fence, and Betrayal ({U} Aura,
+-- "Whenever enchanted creature becomes tapped, you draw a card") is what proves
+-- it: it changes nothing about its host, so the enchanted permanent projects
+-- exactly like the one beside it, and only this line tells the two apart.
+-- Pawl.ManaSpec's "an Elf enchanted by an Aura that changes nothing about it is
+-- still a candidate of its own" is the case, and it asserts the identical
+-- projection alongside the offer so the reason is pinned as well as the answer.
 namedByAnother :: ObjectId -> GameState -> Bool
 namedByAnother oid gs = any names (Map.toList (GameState.objects gs))
   where

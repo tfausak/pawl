@@ -1108,10 +1108,13 @@ attemptAttackDeclaration pid defender rejected = do
             -- CR 508.1f: declaring an attacker taps it -- unless it has vigilance
             -- (CR 702.20b), which does not change WHETHER it attacks, only what
             -- attacking does to it.
-            tapIt g oid =
-              if Projection.hasKeyword Keyword.Vigilance oid g
-                then g
-                else g {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects g)}
+            --
+            -- Through Pawl.Engine.Event.tap, because rule 508.1f says outright that
+            -- "attacking simply causes creatures to become tapped": it is not a
+            -- cost, but it IS a tap, and a card watching for one must see it.
+            tapIt oid = do
+              g <- State.get
+              Monad.unless (Projection.hasKeyword Keyword.Vigilance oid g) (Event.tap oid)
             -- CR 506.4's comparand, taken where the creature joins combat. `pid`
             -- and not a fresh controllerOf: canAttack already required it.
             joined = Map.fromList (fmap (\oid -> (oid, pid)) attacking)
@@ -1166,7 +1169,7 @@ attemptAttackDeclaration pid defender rejected = do
         -- only 508.1k makes the creatures attacking. The order is observable -- a
         -- Birds of Paradise just declared as an attacker is tapped, so it is no
         -- longer a mana source for the very cost its attack incurred.
-        State.modify' (\g -> List.foldl' tapIt g attacking)
+        Monad.forM_ attacking tapIt
         -- CR 508.1g: the OPTIONAL costs to attack, after CR 508.1f's tapping and
         -- before CR 508.1h's determination. Asked per creature, and of `attacking`
         -- rather than `chosen` so a creature the CR 508.1d degradation dropped is
