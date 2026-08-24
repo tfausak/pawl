@@ -823,6 +823,31 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
       (a : _, b : _) ->
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+  -- CR 702.16f: "Attacking creatures with protection can't be blocked by
+  -- creatures that have the stated quality." Rule 702.16 stated as CR 509.1b's
+  -- pairwise restriction, and the one clause of protection that is already a
+  -- printed shape -- Questing Beast's row above with the quality in the blocker
+  -- position, minted from the keyword rather than authored on a face.
+  --
+  -- A PAIR ON ONE BOARD, differing only in the blocker's COLOUR: Cabal Evangel is
+  -- a black 2/2 with no abilities at all and Goblin Piker a red 2/1 with none, so
+  -- neither declaration can be refused for a reason the rule does not name. An
+  -- implementation that stopped every blocker fails the second leg; one that
+  -- ignored the quality fails the first.
+  --
+  -- The Apostle is WHITE, which is what makes the first leg discriminating: an
+  -- implementation matching the quality against the ATTACKER rather than the
+  -- blocker finds no black on it and admits the Evangel.
+  Spec.it s "CR 702.16f Apostle of Purifying Light can't be blocked by a black creature, and can by a red one" $ do
+    apostle <- S.printingOf s registry "Apostle of Purifying Light"
+    evangel <- S.printingOf s registry "Cabal Evangel"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [apostle] [evangel, piker]
+    case (mine, theirs) of
+      (a : _, [black, red]) -> do
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton black (Set.singleton a)) gs)) "the black Cabal Evangel may not block it (CR 702.16f)"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton red (Set.singleton a)) gs) "the red Goblin Piker beside it may"
+      _ -> Spec.assertFailure s "fixture should have an attacker and two blockers"
   Spec.it s "CR 509.1a a ground creature is still a legal blocker while a flier attacks" $ do
     -- 509.1a is about the blocker ALONE: it can block SOMETHING. This test
     -- fails if evasion is wrongly implemented as a filter on the candidates.
