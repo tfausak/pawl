@@ -66,7 +66,11 @@ canBlight pid gs = not (null (candidates pid gs))
 -- an unpaid cost.
 --
 -- The ObjectId is the object the prompt names -- the spell or ability resolving,
--- or the one whose cost is being paid.
+-- or the one whose cost is being paid. The CounterCause is the caller's, and the
+-- blighting player is read off it (CounterCause.putter): rule 701.68a's "you" is
+-- the player putting the counters, so one argument cannot disagree with itself.
+-- CR 601.2h's cost is CounterCause.ByPayment, CR 118.12's and an effect's
+-- alike CounterCause.ByEffect -- one procedure, three provenances; see #1647.
 --
 -- CHOOSE, not target: rule 701.68a says "a creature you control" without saying
 -- "target", so nothing was declared on the stack (CR 601.2c) and there is no CR
@@ -86,8 +90,9 @@ canBlight pid gs = not (null (candidates pid gs))
 -- 701.68a's process is "put N -1\/-1 counters on a creature you control", so the
 -- creature is chosen whatever N is, and CR 701.68c's "blighted creature" is that
 -- creature. Nothing records it yet (gap #1492).
-blight :: PlayerId -> ObjectId -> Natural -> Game Bool
-blight pid resolving n = do
+blight :: CounterCause.CounterCause -> ObjectId -> Natural -> Game Bool
+blight cause resolving n = do
+  let pid = CounterCause.putter cause
   gs <- State.get
   case candidates pid gs of
     -- CR 701.68b for a cost, CR 101.3 for an effect: a player controlling no
@@ -100,8 +105,9 @@ blight pid resolving n = do
           let offered = first NonEmpty.:| (second : more)
           answer <- Game.choose (Prompt.ChooseBlight (Decide.deciderFor pid gs) pid resolving offered)
           pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
-      -- CR 122.6: through the single funnel, so CR 614.16's counter replacements
-      -- (Vorinclex, Monstrous Raider) get their opportunity.
+      -- CR 122.6: through the single funnel, so CR 614.1's counter replacements
+      -- (Vorinclex, Monstrous Raider) get their opportunity -- and, where the
+      -- cause is an effect, CR 614.16's (Doubling Season).
       Monad.when (n > 0) . Monad.void $
-        Event.putCounters (CounterCause.ByEffect pid) blighted CounterKind.MinusOneMinusOne n
+        Event.putCounters cause blighted CounterKind.MinusOneMinusOne n
       pure True

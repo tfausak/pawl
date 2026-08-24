@@ -86,6 +86,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
+import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.Player as Player
@@ -588,8 +589,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
         green = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]
         cost = Cost.Type.MkCost (Just green) []
         tappedElf g = fmap Object.tapped (Game.lookupObject elfId g)
-    Spec.assertEqWith s "asked to tap the Elf, it is tapped" (tappedElf (S.runPure (prefersSource elfId) gs (Cost.pay Nothing ManaSpending.AsProduced S.alice elfId cost))) (Just TapState.Tapped)
-    Spec.assertEqWith s "asked to spare the Elf, it is untapped" (tappedElf (S.runPure (avoidsSource elfId) gs (Cost.pay Nothing ManaSpending.AsProduced S.alice elfId cost))) (Just TapState.Untapped)
+    Spec.assertEqWith s "asked to tap the Elf, it is tapped" (tappedElf (S.runPure (prefersSource elfId) gs (Cost.pay PaymentMoment.OutsideResolution Nothing ManaSpending.AsProduced S.alice elfId cost))) (Just TapState.Tapped)
+    Spec.assertEqWith s "asked to spare the Elf, it is untapped" (tappedElf (S.runPure (avoidsSource elfId) gs (Cost.pay PaymentMoment.OutsideResolution Nothing ManaSpending.AsProduced S.alice elfId cost))) (Just TapState.Untapped)
 
   -- The other half of the invariant: WHEN the window asks, counted directly --
   -- without which an implementation that never asks would still pass the test

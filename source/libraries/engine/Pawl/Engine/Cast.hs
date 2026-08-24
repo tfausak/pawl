@@ -54,6 +54,7 @@ import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
+import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Prompt as Prompt
@@ -1564,7 +1565,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                       -- Reap still costs {B}).
                       adjustments <- Cost.announceReductions pid sid gs announcedCost (Cost.spellAdjustments pid sid gs)
                       let paidCost = Cost.totalWith adjustments announcedCost
-                      payment <- Cost.pay (Just sid) spending pid sid paidCost
+                      payment <- Cost.pay PaymentMoment.OutsideResolution (Just sid) spending pid sid paidCost
                       case payment of
                         -- CR 601.2h: the payment failed, so the cast is illegal
                         -- and CR 601.2 returns the game to before it was proposed

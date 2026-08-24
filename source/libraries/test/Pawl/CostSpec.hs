@@ -77,6 +77,7 @@ import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Payment as Payment
+import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -165,7 +166,7 @@ doorSpec s registry =
     Spec.it s "CR 701.9a paying DiscardThis puts that card in the graveyard" $ do
       piker <- S.printingOf s registry "Goblin Piker"
       let (inHand, gs0) = S.addHandCard piker S.alice (Setup.emptyGame S.bothPlayers)
-          after = S.runPure S.identityAnswer gs0 (Cost.payComponent S.alice inHand (CostComponent.DiscardThis DiscardCause.Ordinary))
+          after = S.runPure S.identityAnswer gs0 (Cost.payComponent PaymentMoment.OutsideResolution S.alice inHand (CostComponent.DiscardThis DiscardCause.Ordinary))
       Spec.assertEqWith s "the hand is empty" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
       Spec.assertEqWith s "and the card is in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
     -- CR 118.6 vs CR 118.5a: the distinction the Maybe carries. Nothing is an
@@ -230,7 +231,7 @@ doorSpec s registry =
     Spec.it s "CR 118.6 paying an unpayable cost changes nothing" $ do
       mountain <- S.printingOf s registry "Mountain"
       let gs = S.landsInPlay mountain 3
-          (outcome, after) = S.runPureWith S.identityAnswer gs (Cost.pay Nothing ManaSpending.AsProduced S.alice S.noSource (Cost.Type.MkCost Nothing []))
+          (outcome, after) = S.runPureWith S.identityAnswer gs (Cost.pay PaymentMoment.OutsideResolution Nothing ManaSpending.AsProduced S.alice S.noSource (Cost.Type.MkCost Nothing []))
       Spec.assertEqWith s "Unpaid" outcome Payment.Unpaid
       Spec.assertEqWith s "no land tapped" (S.tappedCount S.alice after) 0
     -- CR 701.21a: enough controlled permanents matching the criterion.
@@ -260,7 +261,7 @@ doorSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           three = S.addPlayerCounter PlayerCounterKind.Energy 3 S.alice gs0
-          after = S.runPure S.identityAnswer three (Monad.void (Cost.payComponent S.alice oid (CostComponent.PayEnergy 2)))
+          after = S.runPure S.identityAnswer three (Monad.void (Cost.payComponent PaymentMoment.OutsideResolution S.alice oid (CostComponent.PayEnergy 2)))
       Spec.assertEqWith s "one energy left" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 1
     -- CR 118.12's counter-placing cost (CR 701.63a's endure). The gate is the
     -- permanent still being on the battlefield to take the counters, and NOT
