@@ -13,7 +13,7 @@ import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 
--- | Every constructor, and each printing id DISTINCT: the three card-shaped
+-- | Every constructor, and each printing id DISTINCT: the card-shaped
 -- arms carry the same payload type, so equal ids would round trip whichever tag
 -- the encoder wrote.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -64,6 +64,14 @@ spec s = Spec.describe s "Pawl.Codec.Source" $ do
       Source.codec
       (Source.OfEmblem (PrintingId.MkPrintingId 4))
       " {\"type\":\"OfEmblem\",\"value\":4} "
+  -- CR 707.10 / 112.1a: the copied spell's printing, which is again the same
+  -- payload as OfCard's and again told apart only by the tag.
+  Spec.it s "OfSpellCopy" $
+    Common.assertCodec
+      s
+      Source.codec
+      (Source.OfSpellCopy (PrintingId.MkPrintingId 7))
+      " {\"type\":\"OfSpellCopy\",\"value\":7} "
   -- CR 725.2 / CR 702.179d: the same ability as OfTrigger above, under a
   -- controller instead of a source id. The two arms differ only there, so an
   -- arm writing the other's tag would still have to write the other's key.
