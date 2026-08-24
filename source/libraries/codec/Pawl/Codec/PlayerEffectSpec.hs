@@ -43,7 +43,7 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       (PlayerEffect.CantCastMoreThan 1)
       " {\"type\":\"CantCastMoreThan\",\"value\":1} "
   -- CR 601.3 / Null Chamber's cast half. Payload-free: the names come from the
-  -- source's Object.chosenNames, which no card can write.
+  -- source's Object.chosenNames, which no card can write INTO THE PAYLOAD.
   Spec.it s "CantCastChosenName" $
     Common.assertCodec
       s

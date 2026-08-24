@@ -433,6 +433,10 @@ slotsOf effect = case effect of
     joinSlots (playerRefSlots searcher : playerRefSlots owner : fmap quantitySlots (Maybe.maybeToList quantity))
   Effect.ExileAllGraveyards -> Map.empty
   Effect.Proliferate -> Map.empty
+  -- CR 201.4's name is not an object, so the choice binds no slot and the
+  -- restriction Filter names none either -- a Filter reads a slot only through
+  -- Filter.boundSlots, and no card writes one of those atoms here.
+  Effect.ChooseCardName _ -> Map.empty
   Effect.Bolster quantity -> quantitySlots quantity
   Effect.Amass (Amass.Type.MkAmass quantity _) -> quantitySlots quantity
   Effect.Blight (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
@@ -707,6 +711,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Search (Search.MkSearch _ _ _ quantity _ _ _) -> all Quantity.slotsAreExhaustive quantity
   Effect.ExileAllGraveyards -> True
   Effect.Proliferate -> True
+  Effect.ChooseCardName _ -> True
   Effect.Bolster quantity -> Quantity.slotsAreExhaustive quantity
   Effect.Amass (Amass.Type.MkAmass quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
@@ -871,6 +876,8 @@ readsX = any effectReadsX
       Effect.Search (Search.MkSearch _ _ _ quantity _ _ _) -> any Quantity.readsX quantity
       Effect.ExileAllGraveyards -> False
       Effect.Proliferate -> False
+      -- No Quantity: rule 201.4 chooses one name and states no count.
+      Effect.ChooseCardName _ -> False
       Effect.Bolster quantity -> Quantity.readsX quantity
       Effect.Amass (Amass.Type.MkAmass quantity _) -> Quantity.readsX quantity
       Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
@@ -1061,6 +1068,9 @@ boundSlots effect = case effect of
   Effect.Search {} -> Set.empty
   Effect.ExileAllGraveyards -> Set.empty
   Effect.Proliferate -> Set.empty
+  -- Binds nothing: the name goes on the SOURCE (Object.chosenNames) and is read
+  -- back off it by Filter.HasChosenName, so no slot carries it.
+  Effect.ChooseCardName _ -> Set.empty
   Effect.Bolster _ -> Set.empty
   Effect.Amass _ -> Set.empty
   Effect.Blight _ -> Set.empty
@@ -3227,12 +3237,21 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     --
     -- No recursion to bound: this is called from a resolution rather than from
     -- inside a CR 613 fold, so the projections attachmentFor reaches start fresh.
-    let searchContext = Filter.contextFor Nothing Nothing
+    --
+    -- CR 201.4: the ONE field the context does fill is the SOURCE's chosen names,
+    -- which is what Filter.HasChosenName reads (Ancient Vendetta's "cards with
+    -- that name"). A function of the board rather than a value, so the read is
+    -- LIVE: CR 608.2c has the controller follow the instructions in order, and the
+    -- clause that chose the name is an earlier one of this same resolution. A
+    -- context built once when the arm was entered would have been the stale read.
+    -- Pawl.CardSpec's "CR 201.4 no card asks HasChosenName outside a search's
+    -- filter" is what keeps the atom to this position, the one that answers.
+    let searchContext g = (Filter.contextFor Nothing Nothing) {Filter.sourceChosenNames = PlayerEffect.chosenNamesOf (Just source) g}
         viewOfCandidate g oid =
           (Projection.viewOfObject oid g)
             { Filter.canAttachToSubject = Maybe.isJust (Attach.attachmentFor oid (Recipient.ToObject source) g)
             }
-        matches1 g oid = Filter.matches searchContext (viewOfCandidate g oid) filter_
+        matches1 g oid = Filter.matches (searchContext g) (viewOfCandidate g oid) filter_
         -- CR 400.2: the library and the hand are the hidden zones. CR 701.23b,
         -- CR 701.23c and CR 701.23d are each scoped to a hidden zone, so this is
         -- what decides, PER ZONE, whether a find may be declined.
@@ -5325,6 +5344,35 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       Just n ->
         Monad.when (n > 0) . Monad.forM_ targets $ \target ->
           Event.putCounters (CounterCause.ByEffect controller) target kind (Integer.toNaturalSaturating n)
+  -- CR 201.4 via CR 608.2c: the resolving controller names a card, and the name
+  -- is stamped on the SOURCE so a later clause of the same resolution can read it
+  -- (Ancient Vendetta). Object.chosenNames is the same store CR 614.1c's
+  -- as-enters twin writes (Pawl.Engine.Event's EntryRewrite.ChooseCardNames arm),
+  -- and Pawl.Engine.Filter's HasChosenName is the one reader on the match side.
+  --
+  -- CHOOSE, not target: no CR 608.2b legality to re-check, and the prompt is
+  -- raised unconditionally because CR 201.4's offer is every card in the Oracle
+  -- card reference -- there is no candidate list to be short, so the "ask only
+  -- where two or more make it a choice" shortcut the sibling prompts take cannot
+  -- apply here.
+  --
+  -- The answer is NOT filtered against the restriction, the posture the entry
+  -- twin already takes: pawl holds no Oracle card reference, so there is nothing
+  -- to check it against (#663).
+  --
+  -- Set.insert rather than a fresh singleton: CR 201.4g's interchangeable names
+  -- aside, nothing in rule 201.4 says a second choice unmakes the first, and a
+  -- source that chose as it entered keeps that name too. No printed card chooses
+  -- twice, so the two readings agree on the pool.
+  --
+  -- Written to the SOURCE and not to `resolving`: Pawl.Engine.PlayerEffect
+  -- .chosenNamesOf and the search arm's context both ask about a source (CR
+  -- 113.7), and for a spell the two ids are the same object anyway.
+  Effect.ChooseCardName restriction -> do
+    gs <- State.get
+    answer <- Game.choose (Prompt.ChooseCardName (Decide.deciderFor controller gs) controller source restriction)
+    let stamp o = o {Object.chosenNames = Set.insert answer (Object.chosenNames o)}
+    State.modify' $ \g -> g {GameState.objects = Map.adjust stamp source (GameState.objects g)}
   -- CR 122: PutCounters' mirror, deliberately NOT through a CR 614.16 gate --
   -- nothing in CR 614 replaces a removal.
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind quantity slot) -> do

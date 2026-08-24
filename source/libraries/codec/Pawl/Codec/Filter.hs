@@ -70,6 +70,7 @@ codec keywordCodec =
       Arm.nullary "IsSource" Filter.IsSource,
       Arm.payload "IsBound" SlotName.codec Filter.IsBound (\x -> case x of Filter.IsBound y -> Just y; _ -> Nothing),
       Arm.payload "SameNameAsBound" SlotName.codec Filter.SameNameAsBound (\x -> case x of Filter.SameNameAsBound y -> Just y; _ -> Nothing),
+      Arm.nullary "HasChosenName" Filter.HasChosenName,
       Arm.nullary "IsAttacking" Filter.IsAttacking,
       Arm.nullary "IsBlocking" Filter.IsBlocking,
       Arm.nullary "IsBlocked" Filter.IsBlocked,

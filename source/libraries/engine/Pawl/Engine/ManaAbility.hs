@@ -110,6 +110,7 @@ manaProduced effect = case effect of
   Effect.Search {} -> Nothing
   Effect.ExileAllGraveyards -> Nothing
   Effect.Proliferate -> Nothing
+  Effect.ChooseCardName _ -> Nothing
   Effect.Bolster _ -> Nothing
   Effect.Amass _ -> Nothing
   Effect.Blight _ -> Nothing
@@ -290,6 +291,7 @@ movesLibraryCard effect = case effect of
   Effect.ChangeText {} -> False
   Effect.ExileAllGraveyards -> False
   Effect.Proliferate -> False
+  Effect.ChooseCardName _ -> False
   Effect.Bolster _ -> False
   Effect.Amass _ -> False
   Effect.Blight _ -> False
