@@ -51,10 +51,11 @@ data Filter keyword
     -- joined string they render as is not among them (see #650), so an atom that
     -- compared to a single name would miss the halves it is spelling.
     --
-    -- The PRINTED name, and not Pawl.Types.EntryRewrite.ChooseCardNames' chosen
-    -- one: that machinery answers "what did a player name?", read by
-    -- PlayerEffect.CantCastChosenName, where this is a name another card's own
-    -- text prints. The two are different questions and neither can express the
+    -- The PRINTED name, and not a chosen one -- Pawl.Types.EntryRewrite
+    -- .ChooseCardNames' as the permanent enters, or Effect.ChooseCardName's on
+    -- resolution. That machinery answers "what did a player name?", read by
+    -- PlayerEffect.CantCastChosenName and by HasChosenName below, where this is a
+    -- name another card's own text prints. The two are different questions and neither can express the
     -- other -- a card cannot choose on the player's behalf, and a player cannot
     -- be asked to name what a card already says.
     HasName CardName.CardName

@@ -4060,8 +4060,11 @@ hasChosenNameCounts card =
 -- traversal found the atom outside a search, or the traversal and the codec
 -- disagree about how many the card holds -- the second being a blind spot in
 -- cardFilters, in which an atom would be reported as zero rather than as an
--- offence. The second disjunct is a REGRESSION FENCE for sameNameAsBoundOffends'
--- reason.
+-- offence. Unlike its three siblings' the second disjunct is PROVED here rather
+-- than a regression fence: Effect.ChooseCardName's own restriction is a Filter
+-- position cardFilters walks, so the self-test's fixture for it goes to (0, 0)
+-- when effectFilters stops reporting it and the codec half is what still catches
+-- the atom.
 hasChosenNameOffends :: Face.Face Card.Type.Card -> Bool
 hasChosenNameOffends card =
   let (framed, elsewhere) = hasChosenNameCounts card

@@ -712,6 +712,12 @@ data Context = MkContext
 -- per-recipient effect matches nothing, which is PlayerRef.Candidate's posture one
 -- type over rather than a hole -- an evaluation that has reached no recipient has
 -- no honest player to substitute.
+--
+-- CR 201.4's chosen-name atom is a further one a CARD may write (Ancient
+-- Vendetta), and it reads the empty set here in every position but the ONE that
+-- supplies it -- Pawl.Engine.Resolve's Effect.Search arm, which builds its
+-- context from this function and then overlays sourceChosenNames. See that field
+-- above for the lint that keeps a card to that position.
 contextFor :: Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
 contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty}
 

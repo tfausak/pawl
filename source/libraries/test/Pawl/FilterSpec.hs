@@ -6,6 +6,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
@@ -580,6 +581,33 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "CR 601.2c a singular reader takes the single binding and declines the group" $ do
       Spec.assertEqWith s "the singleton is answerable" (Filter.slotOneObject slot (bound [7])) (Just (ObjectId.MkObjectId 7))
       Spec.assertEqWith s "and the group is not" (Filter.slotOneObject slot (bound [6, 7, 8])) Nothing
+
+  -- CR 201.4: what the SOURCE named, against what the candidate is called. The
+  -- two sides are set intersection, so CR 201.4g's interchangeable names and CR
+  -- 709.4a's two-named objects each fall out.
+  Spec.describe s "HasChosenName" $ do
+    let named ns = self {Filter.sourceChosenNames = Set.fromList (fmap (CardName.MkCardName . Text.pack) ns)}
+        called ns = blackCreature {Filter.names = Set.fromList (fmap (CardName.MkCardName . Text.pack) ns)}
+    Spec.it s "matches a candidate whose name the source chose" $ do
+      Spec.assertBool s (Filter.matches (named ["Chromatic Star"]) (called ["Chromatic Star"]) Filter.Type.HasChosenName) "the chosen name"
+
+    Spec.it s "does not match a candidate with some other name" $ do
+      Spec.assertBool s (not (Filter.matches (named ["Chromatic Star"]) (called ["Crucible of Worlds"]) Filter.Type.HasChosenName)) "a different name"
+
+    -- CR 709.4a's membership at the candidate's end: a split card off the stack
+    -- shows two names, and sharing either is sharing one.
+    Spec.it s "CR 709.4a matches a candidate showing the chosen name among others" $ do
+      Spec.assertBool s (Filter.matches (named ["Wax"]) (called ["Wax", "Wane"]) Filter.Type.HasChosenName) "one of two names"
+
+    -- The posture every context-relative atom takes, and the reason the position
+    -- lint exists: outside the one context that fills the field this is False
+    -- rather than an error.
+    Spec.it s "a source that chose nothing is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self (called ["Chromatic Star"]) Filter.Type.HasChosenName)) "contextFor leaves it empty"
+
+    -- CR 708.2a: a face-down object has no name at all, so it shares none.
+    Spec.it s "a nameless candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches (named ["Chromatic Star"]) blackCreature Filter.Type.HasChosenName)) "no names"
 
   Spec.describe s "IsAttacking" $ do
     Spec.it s "matches a view whose combat status says so" $ do

@@ -797,8 +797,8 @@ prohibitsBecomingMonarch pid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
    in any (prohibits . snd) (applying pid gs)
 
--- CR 614.1c: the card names chosen as this effect's source entered
--- (Object.chosenNames). Empty for an effect with no source -- a stored CR 611.2c
+-- CR 201.4: the card names chosen for this effect's source, as it entered (CR
+-- 614.1c) or while it resolved (CR 608.2c) -- Object.chosenNames. Empty for an effect with no source -- a stored CR 611.2c
 -- row -- and for a permanent that chose nothing.
 --
 -- The empty set is the answer that matches NO object rather than every object,
