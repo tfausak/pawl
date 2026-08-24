@@ -1260,19 +1260,15 @@ canPay pid oid cost gs = case Cost.mana cost of
 -- than through this function: asking back through the plain capacity would not
 -- terminate -- Transmogrant Altar's "{B}, {T}, Sacrifice a creature" would ask
 -- whether its own {B} is payable by a walk that asks the same of the Altar --
--- and the supply capacity asks with the mana part EMPTIED, which lands on
--- `manaPartPayable`'s empty arm and walks nothing.
+-- and Mana.ForSupply cuts that question, the mana being carried as a DEMAND one
+-- level up instead.
 --
--- CR 118.3 wants that read, the same sentence Mana.manaSourcesGiven applies to a
--- Phyrexian Tower with no creature to give: an activation whose mana part
--- nothing on the board pays is not an offer, and offering it costs a player a
--- priority action that changes nothing. The walk under it counts a mana-eating
--- route as a supply that also carries a demand, so one Altar's {B} may be paid
--- out of another's yield here -- while `payManaExcept`'s in-payment window will
--- not offer that second Altar (#2094). No board in `data/cards/` tells them
--- apart: the Altar's {C}{C}{C} pays no {B}, and the pool's one other mana-eating
--- route is Grinning Ignus's, which `stackedManaActivations` below keeps off both
--- of the gates that would weigh it.
+-- CR 118.3 wants the Mana.ForOffer read, the same sentence Mana.manaSourcesGiven
+-- applies to a Phyrexian Tower with no creature to give: an activation whose mana
+-- part nothing on the board pays is not an offer, and offering it costs a player
+-- a priority action that changes nothing. `payManaExcept`'s in-payment window is
+-- judged against this same list, so the gate and that window agree about which
+-- routes a mana ability's own payment may take (CR 605.3a).
 --
 -- The CLAIMS and the LIFE ride along with the count, which alone is a fact about
 -- this source in isolation: two sources whose costs both sacrifice a creature
@@ -1285,7 +1281,7 @@ canPay pid oid cost gs = case Cost.mana cost of
 -- rules charge {2} for. `manaActivationAdjustments` is the gather, and
 -- Cost.tapForManaVia charges the same total off the same one.
 manaActivations :: Mana.Capacity
-manaActivations pcs pid oid cost restrictions gs = manaActivationsGiven (PlayerEffect.applyingTo pid gs) pcs pid oid cost restrictions gs
+manaActivations measure pcs pid oid cost restrictions gs = manaActivationsGiven (PlayerEffect.applyingTo pid gs) measure pcs pid oid cost restrictions gs
 
 -- The same capacity given the player effects the CALLER has already gathered.
 -- `manaActivationAdjustments` is a walk of everything in play asking each what
@@ -1302,7 +1298,7 @@ manaActivations pcs pid oid cost restrictions gs = manaActivationsGiven (PlayerE
 -- board this is then called with, exactly as `pcs` must be that board's
 -- projection; the wrapper above is what a caller with no list of its own uses.
 manaActivationsGiven :: [PlayerEffect.Type.PlayerEffect] -> Mana.Capacity
-manaActivationsGiven effects pcs pid oid printedCost restrictions gs =
+manaActivationsGiven effects measure pcs pid oid printedCost restrictions gs =
   let adjustments = manaActivationAdjustmentsGiven effects oid gs
       -- The COMPONENT half of CR 601.2f, applied here so every conjunct below
       -- measures the components an effect added as well as the printed ones. The
@@ -1311,7 +1307,16 @@ manaActivationsGiven effects pcs pid oid printedCost restrictions gs =
       -- whether SOME total is payable, `totalManas`' shape and
       -- canPaySomeCompletionGiven's posture.
       cost = plusComponents adjustments printedCost
-   in if manaPartPayable effects adjustments pid oid cost gs
+      -- CR 118.3 asked of the route's OWN mana part, which is the one conjunct
+      -- the two readers differ on. Mana.ForSupply models that mana as a DEMAND
+      -- instead (Mana.payableResolutionsGiven), so asking it here would both
+      -- double-charge the route and recurse forever -- an Altar asking whether
+      -- its own {B} is payable by a walk that asks the same of the Altar. CR
+      -- 118.6's Nothing is still unpayable under both.
+      payable = case measure of
+        Mana.ForOffer -> manaPartPayable effects adjustments pid oid cost gs
+        Mana.ForSupply -> Maybe.isJust (Cost.mana cost)
+   in if payable
         && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
         && jointlyPayable pid oid (Cost.components cost) gs
         && sicknessOkGiven pcs pid oid cost gs
@@ -1334,9 +1339,8 @@ manaActivationsGiven effects pcs pid oid printedCost restrictions gs =
           Activations.MkActivations
             { -- The PRINTED mana part, which is what `repeatsOf` reads: a
               -- reduction that emptied it would make the route repeatable where
-              -- every activation still has to find that mana again.
-              -- Mana.supplyCapacity hands this function an emptied mana part on
-              -- purpose and caps the count at 1 itself, so the two agree.
+              -- every activation still has to find that mana again. Both readers
+              -- hand this function the same cost, so both get the same count.
               Activations.times = repeatsOf pid oid cost gs,
               Activations.claims = claimsOf pid oid (Cost.components cost) gs,
               Activations.life = lifeOwedBy (Cost.components cost)
@@ -1410,9 +1414,10 @@ manaPartPayable effects adjustments pid oid cost gs = case Cost.mana cost of
 -- Anything else caps the answer at 1 (`uncountedCeiling`), and so does a MANA
 -- part, repeating which would spend mana this function has not measured. The
 -- offer paths (Mana.manaSourcesGiven, tapForMana) read only whether the count
--- exceeds 0, so that arm decides nothing for them; the SUPPLY walk hands this
--- function a mana part it has emptied and applies the same cap of 1 itself
--- (Mana.supplyCapacity), which is where the sentence is load-bearing.
+-- exceeds 0, so that arm decides nothing for them; the SUPPLY walk reads the
+-- count itself, and a mana-eating route counted twice would owe its own cost
+-- twice over while Mana.payableResolutionsGiven charged it once -- which is where
+-- the sentence is load-bearing.
 -- Understating is the safe direction, and why the uncounted components cap
 -- rather than divide: a supply too large offers a cast that then cannot be paid,
 -- and an offer that changes nothing is offered again forever.
@@ -1529,11 +1534,12 @@ activationManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven (manaActiva
 -- states and its type cannot. NEITHER list contains the other, and the two
 -- wrappers are why:
 --
---   * Mana.supplyCapacity is the offer capacity asked with the route's mana part
---     emptied, which only ADDS sources -- Transmogrant Altar beside no Swamp is a
---     supply source that is no offer. Nothing is overstated by it: such a
---     permanent's option carries the mana part as a DEMAND the board must then
---     serve, and taking it zero times is always among its options.
+--   * Mana.supplyCapacity is the same capacity asked Mana.ForSupply, which drops
+--     the CR 118.3 read of the route's own mana part and so only ADDS sources --
+--     Transmogrant Altar beside no Swamp is a supply source that is no offer.
+--     Nothing is overstated by it: such a permanent's option carries the mana
+--     part as a DEMAND the board must then serve, and taking it zero times is
+--     always among its options.
 --
 --   * `stackedManaActivations` only REMOVES them, and it is the whole of what
 --     both gates below are: every caller is gating an action CR 601.2a or CR
@@ -1566,10 +1572,10 @@ supplyManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven (Mana.supplyCap
 -- reads the real stack there and refuses the same routes. The gate and the
 -- payment agree because this function states exactly the move between them.
 stackedManaActivations :: [PlayerEffect.Type.PlayerEffect] -> Mana.Capacity
-stackedManaActivations effects pcs pid oid cost restrictions gs =
+stackedManaActivations effects measure pcs pid oid cost restrictions gs =
   if any ActivationRestriction.needsEmptyStack restrictions
     then Mana.noActivations
-    else manaActivationsGiven effects pcs pid oid cost restrictions gs
+    else manaActivationsGiven effects measure pcs pid oid cost restrictions gs
 
 -- The same question given a board the CALLER has already walked; handing the
 -- board in changes no answer. Build `sources` with supplyManaSourcesGiven
@@ -2069,32 +2075,28 @@ orderSensitive component = case component of
 -- it -- a Birds of Paradise tapped for blue takes the mana way to an unannounced
 -- {G/P} off the board, leaving CR 107.4f's 2 life.
 --
--- The window in full, with the one narrowing a MANA ability's own payment takes.
--- `activating` is the permanent whose mana ability is being paid for, and it is
--- the one caller that has to bound the recursion CR 602.2b creates; `casting` is
--- payMana's own first argument, the spell being cast. TWO Maybe ObjectIds side
--- by side, and never both Just: an activation is not a cast.
+-- The window in full. `inFlight` is the set of permanents whose mana ability is
+-- mid-activation, which is the one thing that has to bound the recursion CR
+-- 602.2b creates; `casting` is payMana's own first argument, the spell being
+-- cast. `inFlight` is empty exactly when `casting` may be Just: an activation is
+-- not a cast.
 --
--- Not implemented: CR 605.3a's window in full. Two narrowings apply while
--- `activating` is Just -- the permanent itself is off the candidate list, and
--- what is left is a permanent with a MANA-FREE route (Mana.manaFreeCapacity) --
--- so a mana ability whose cost holds mana cannot pay another one's (#2094).
-payManaExcept :: Maybe ObjectId -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
-payManaExcept activating casting spending pid cost = do
+-- CR 605.3c is what the set says -- an ability being activated cannot be
+-- activated again until it has resolved -- and it TERMINATES the recursion,
+-- since every nested activation adds one permanent to a set the battlefield
+-- bounds.
+--
+-- Not implemented: CR 605.3c read of the ABILITY rather than of the permanent.
+-- A permanent with two mana abilities, one of which could pay the other, is
+-- refused here where the rules allow it. No printing in `data/cards/` has two
+-- mana routes of which either eats mana (#2205).
+payManaExcept :: Set.Set ObjectId -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
+payManaExcept inFlight casting spending pid cost = do
   before <- State.get
   paid <- window Set.empty
   Monad.unless paid (State.put before)
   pure paid
   where
-    -- Taken on the board of the PASS rather than once for the payment: a tap
-    -- changes the board, and Pawl.Engine.PlayerEffect.applyingTo is a function
-    -- of it. `pid` is the payer, and manaSourcesGiven below offers only what
-    -- that player controls, so the capacity's own `pid` is this one.
-    windowCapacityOn gs = case activating of
-      Nothing -> hoisted
-      Just _ -> Mana.manaFreeCapacity hoisted
-      where
-        hoisted = manaActivationsGiven (PlayerEffect.applyingTo pid gs)
     -- What the pool would leave if the cost were paid out of it right now.
     --
     -- CR 609.4b's clauses are resolved from the board on EVERY pass rather than
@@ -2110,11 +2112,17 @@ payManaExcept activating casting spending pid cost = do
           -- interchangeability test rather than computed twice: Mana.manaSources
           -- is this same call.
           pcs = Projection.projectAll gs
-          -- CR 605.3a offers every source; `activating` takes the permanent
-          -- paying this cost off its own window, and windowCapacity takes every
-          -- mana-eating route off it besides (#2094).
-          windowCapacity = windowCapacityOn gs
-          offered = filter (\oid -> Just oid /= activating) (Mana.manaSourcesGiven windowCapacity (Projection.controlGrants gs) pcs pid gs)
+          -- CR 605.3a offers every source, and this window narrows it by CR
+          -- 605.3c alone: a permanent whose mana ability is mid-activation is
+          -- off its own window and off every window nested inside it.
+          --
+          -- The capacity is taken on the board of the PASS rather than once for
+          -- the payment: a tap changes the board, and
+          -- Pawl.Engine.PlayerEffect.applyingTo is a function of it. `pid` is the
+          -- payer, and manaSourcesGiven offers only what that player controls, so
+          -- the capacity's own `pid` is this one.
+          windowCapacity = manaActivationsGiven (PlayerEffect.applyingTo pid gs)
+          offered = filter (`Set.notMember` inFlight) (Mana.manaSourcesGiven windowCapacity (Projection.controlGrants gs) pcs pid gs)
       case filter (`Set.notMember` refused) offered of
         [] -> settle
         candidate : rest -> do
@@ -2122,7 +2130,7 @@ payManaExcept activating casting spending pid cost = do
           case answer of
             Nothing -> settle
             Just oid -> do
-              produced <- tapForManaVia windowCapacity oid
+              produced <- tapForManaWith inFlight oid
               window (if produced then refused else Set.insert oid refused)
     -- CR 601.2h: the window is closed, so the cost is paid out of what is there
     -- -- and simply is not paid when the player floated too little.
@@ -2162,7 +2170,7 @@ payManaExcept activating casting spending pid cost = do
       Just sid -> gs {GameState.objects = Map.adjust (\o -> o {Object.manaSpent = spent}) sid (GameState.objects gs)}
 
 payMana :: Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
-payMana = payManaExcept Nothing
+payMana = payManaExcept Set.empty
 
 -- Which source to tap next, or none. `covered` says whether the pool already
 -- pays the cost, which picks between CR 118.3c's question and CR 601.2g's.
@@ -2210,16 +2218,15 @@ chooseSource covered pid candidates gs = do
 -- damage to you". Running them needs Pawl.Engine.Resolve, above this module
 -- (#1118).
 tapForMana :: ObjectId -> Game Bool
-tapForMana = tapForManaVia manaActivations
+tapForMana = tapForManaWith Set.empty
 
--- The same activation with the ROUTES narrowed, which is payManaExcept's second
--- guard: inside a mana ability's own payment window `capacity` is
--- Mana.manaFreeCapacity manaActivations, so only a route whose own cost holds no
--- mana may be taken and the recursion bottoms out one level down; see #2094 for
--- what that narrowing elides. CR 605.3a's priority window narrows nothing and
--- takes the plain capacity above.
-tapForManaVia :: Mana.Capacity -> ObjectId -> Game Bool
-tapForManaVia capacity oid = do
+-- The same activation carrying the permanents whose mana ability is already
+-- mid-activation (CR 605.3c), which is payManaExcept's one narrowing: this
+-- activation's own permanent joins the set before its cost opens a window of its
+-- own, so the recursion cannot revisit it. CR 605.3a's priority window starts
+-- from the empty set, nothing being in flight there.
+tapForManaWith :: Set.Set ObjectId -> ObjectId -> Game Bool
+tapForManaWith inFlight oid = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure False
@@ -2233,7 +2240,7 @@ tapForManaVia capacity oid = do
       -- This path adds the whole yield to `controller`; a resolving ability
       -- reads the reference instead (#1673).
       let controller = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
-      case filter (\option -> Activations.times (capacity Map.empty controller oid (ManaOption.cost option) (ManaOption.restrictions option) gs) > 0) (Mana.manaOptionsOf oid gs) of
+      case filter (\option -> Activations.times (manaActivations Mana.ForOffer Map.empty controller oid (ManaOption.cost option) (ManaOption.restrictions option) gs) > 0) (Mana.manaOptionsOf oid gs) of
         [] -> pure False
         first : rest -> do
           chosen <- chooseManaYield controller oid (first NonEmpty.:| rest) gs
@@ -2252,7 +2259,7 @@ tapForManaVia capacity oid = do
           -- elided by announceReductions wherever the answers cannot differ,
           -- which is every board `data/cards/` can build today.
           announced <- announceReductions controller oid gs withComponents gathered
-          outcome <- payActivation controller oid (totalWith announced withComponents)
+          outcome <- payActivation inFlight controller oid (totalWith announced withComponents)
           case outcome of
             Payment.Unpaid -> pure False
             -- CR 605.3b: a mana ability's cost binds nothing this path could
@@ -2278,8 +2285,8 @@ tapForManaVia capacity oid = do
 --
 -- The recursion CR 602.2b makes of that window is bounded by payManaExcept, not
 -- by the order.
-payActivation :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
-payActivation pid oid cost = do
+payActivation :: Set.Set ObjectId -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
+payActivation inFlight pid oid cost = do
   before <- State.get
   paid <- case Cost.mana cost of
     Just (ManaCost.MkManaCost []) -> pure True
@@ -2287,7 +2294,7 @@ payActivation pid oid cost = do
     -- ability, so an activation cost is paid with the mana it is -- and CR
     -- 106.6-restricted mana cannot pay it at all, which is the same sentence
     -- read the other way (`casting` is Nothing).
-    Just manaCost -> payManaExcept (Just oid) Nothing ManaSpending.AsProduced pid manaCost
+    Just manaCost -> payManaExcept (Set.insert oid inFlight) Nothing ManaSpending.AsProduced pid manaCost
     -- CR 118.6: attempting to pay an unpayable cost is an illegal action.
     Nothing -> pure False
   outcome <- if paid then payComponents pid oid (Cost.components cost) else pure Payment.Unpaid

@@ -261,9 +261,9 @@ legalActions pid gs =
       -- TWO sweeps and not one, because the two questions differ: CR 605.3a's
       -- offer at the end of this list is every source that could be tapped right
       -- now (`manaSources`), while the cost gate is judged against what the
-      -- supply walk can count (`supplySources`, Mana.supplyCapacity), which asks
-      -- each route with its own mana part emptied and carries that mana as a
-      -- demand instead, and which drops what CR 601.2a's and CR 602.2a's move
+      -- supply walk can count (`supplySources`, Mana.supplyCapacity), which drops
+      -- the CR 118.3 read of each route's own mana part and carries that mana as
+      -- a demand instead, and which drops what CR 601.2a's and CR 602.2a's move
       -- puts out of reach (Cost.stackedManaActivations). NEITHER list contains
       -- the other: in `data/cards/` a Transmogrant Altar beside no black source
       -- is a supply source and no offer, and a Grinning Ignus in CR 307.5's
@@ -291,8 +291,8 @@ legalActions pid gs =
       --
       -- Cost.activationManaSourcesGiven is the whole gate, and it is the SAME
       -- list CR 605.3a's other two windows are served from (Cost.payMana's
-      -- candidates, where a mana ability's own window narrows it further; see
-      -- #2094): controlled, and offering some route Cost.manaActivations admits
+      -- candidates, where CR 605.3c drops whatever is already mid-activation):
+      -- controlled, and offering some route Cost.manaActivations admits
       -- -- CR 118.3's payability of the ability's own cost (CR 602.2b), which
       -- carries CR 107.5's tapped permanent and CR 302.6's sick creature with
       -- it, plus CR 602.5's printed "activate only ..." rider, which CR 605.1

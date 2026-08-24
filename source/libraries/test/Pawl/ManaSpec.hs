@@ -2203,10 +2203,39 @@ transmograntAltarSpec s registry = Spec.describe s "Transmogrant Altar" $ do
     Spec.assertEqWith s "CR 601.2h and the same Birds is then what the sacrifice took" (S.creaturesInPlay S.alice after) 0
     Spec.assertEqWith s "leaving the Altar itself as the one tapped permanent she still controls" (S.tappedCount S.alice after) 1
 
-  -- The window's own candidate list. CR 605.3a would offer every mana source;
-  -- this one offers the Birds alone, both guards at payManaExcept being what
-  -- takes the Altar itself off it (#2094). Recorded rather than inferred, since
-  -- the pool is the same whichever source the answerer would have declined.
+  -- CR 605.3a's in-payment window in full: a mana ability whose OWN cost holds
+  -- mana may be activated inside it. Chromatic Star ("{1}, {T}, Sacrifice this
+  -- artifact: Add one mana of any color") is that ability, the Plains pays its
+  -- {1}, and the colour it mints is the Altar's {B} -- a chain no board could
+  -- reach while the window offered only mana-free routes.
+  --
+  -- CR 605.3c is what still bounds it: the Altar is mid-activation, so its own
+  -- window and every window nested inside it are closed to it.
+  --
+  -- The pool assertion comes FIRST and is the gameplay one. Under the narrowed
+  -- window the payment simply fails and CR 601.2h leaves the pool empty; the
+  -- library is stocked because the Star's death trigger draws (CR 104.3c).
+  Spec.it s "CR 605.3a a mana ability whose cost holds mana may be activated inside the window" $ do
+    altar <- S.printingOf s registry "Transmogrant Altar"
+    star <- S.printingOf s registry "Chromatic Star"
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    let (altarId, g1) = S.addCreature altar S.alice (Setup.emptyGame S.bothPlayers)
+        (starId, g2) = S.addCreature star S.alice g1
+        (_, g3) = S.addCreature piker S.alice g2
+        (plainsId, g4) = S.addCreature plains S.alice g3
+        (_, g5) = S.addLibraryCard piker S.alice g4
+        board = g5 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
+        after = snd (State.evalState (Engine.runGame (takesAltarOnce altarId starId) board Engine.priorityLoop) (0 :: Int))
+        asked = snd (State.execState (Engine.runGame (recordsSources altarId starId) board Engine.priorityLoop) (0 :: Int, []))
+    Spec.assertEqWith s "CR 602.2b the Star's any-colour mana pays the {B}, so the Altar's three colorless reach her pool" (poolTypes S.alice after) [ManaType.Colorless, ManaType.Colorless, ManaType.Colorless]
+    Spec.assertEqWith s "CR 605.3a the Altar's window offers the Star, and the Star's own window then offers the Plains" asked [[starId, plainsId], [plainsId]]
+
+  -- The window's own candidate list where nothing nested is on offer. CR 605.3c
+  -- is the whole of the narrowing now: the Birds is mana-free and the Altar is
+  -- mid-activation, so the Birds is the only candidate. Recorded rather than
+  -- inferred, since the pool is the same whichever source the answerer would have
+  -- declined.
   Spec.it s "CR 605.3a the Altar's own window offers the Birds and not the Altar" $ do
     altar <- S.printingOf s registry "Transmogrant Altar"
     birds <- S.printingOf s registry "Birds of Paradise"
@@ -2259,6 +2288,36 @@ transmograntAltarSpec s registry = Spec.describe s "Transmogrant Altar" $ do
     Spec.assertBool s (holding ancestor) "CR 605.3a and a {B} she casts by declining the Altar, the one Swamp being both payments"
     Spec.assertBool s (holding splitter) "and a {1} the Swamp alone covers is still castable"
 
+  -- A CHAIN of mana-eating routes. CR 605.3c orders them -- an ability cannot be
+  -- activated again before it has resolved -- so one activation's yield is in the
+  -- pool (CR 106.4) before the next one's cost is paid (CR 601.2g, CR 601.2h),
+  -- and the Swamp's {B} buys the Altar's three colorless, which buy Coal Golem's
+  -- ("{3}, Sacrifice this creature: Add {R}{R}{R}") three red. Neither route
+  -- carries {T}, so CR 302.6 gates nothing and the Golem is spendable the turn it
+  -- arrives.
+  --
+  -- A VECTOR of three spells, because any single generic cost leaves the chained
+  -- reading and the one-step reading agreeing. The one-step board reaches the
+  -- Altar's {C}{C}{C} and no red at all; the chain reaches {R}{R}{R}; and both
+  -- stop at three mana. So the red spell separates the two, the {3} says the
+  -- board is not simply broken, and the {4} catches a reading that forgot to
+  -- charge the links their own costs.
+  Spec.it s "CR 605.3c one mana ability's yield pays the next one's cost" $ do
+    altar <- S.printingOf s registry "Transmogrant Altar"
+    golem <- S.printingOf s registry "Coal Golem"
+    piker <- S.printingOf s registry "Goblin Piker"
+    swamp <- S.printingOf s registry "Swamp"
+    wall <- S.printingOf s registry "Wall of Stone"
+    crucible <- S.printingOf s registry "Crucible of Worlds"
+    statue <- S.printingOf s registry "Jade Statue"
+    let board = altarChainBoard altar golem piker swamp
+        casts printing =
+          let (oid, held) = S.addHandCard printing S.alice board
+           in S.castable S.alice oid held
+    Spec.assertBool s (casts wall) "CR 605.3c the {B} buys {C}{C}{C}, which buy {R}{R}{R}, which pay Wall of Stone's {1}{R}{R}"
+    Spec.assertBool s (casts crucible) "and the same board still pays a plain {3}"
+    Spec.assertBool s (not (casts statue)) "CR 118.3 but not a {4}: every link charges its own cost, so three mana is the ceiling"
+
 -- alice, active, in her precombat main phase: one Transmogrant Altar, one Goblin
 -- Piker for the sacrifice to take, and optionally a Swamp to pay the {B} and a
 -- pair of spells in her hand. Returns the Altar and whichever spells were dealt.
@@ -2275,6 +2334,18 @@ altarSupplyBoard altar piker swamp spell =
         Nothing -> (g3, Nothing)
         Just printing -> let (g3a, oid) = S.handOne printing g3 in (g3a, Just oid)
    in (altarId, g4 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}, held)
+
+-- alice, active, in her precombat main phase, with an empty pool: one Swamp, one
+-- Transmogrant Altar, one Coal Golem and one Goblin Piker. Two mana-eating routes
+-- and one creature each may claim -- the Altar takes the Piker and the Golem
+-- takes itself -- so CR 118.3's joint payability admits both at once.
+altarChainBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> GameState.GameState
+altarChainBoard altar golem piker swamp =
+  let (_, g1) = S.addCreature altar S.alice (Setup.emptyGame S.bothPlayers)
+      (_, g2) = S.addCreature golem S.alice g1
+      (_, g3) = S.addCreature piker S.alice g2
+      (_, g4) = S.addCreature swamp S.alice g3
+   in g4 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
 
 -- Activates the ALTAR and nothing else, pays its {B} off the Birds, and asks the
 -- Birds for black. Never the Birds at priority: floating the {B} before the
@@ -2555,6 +2626,29 @@ activationAdjustmentSpec s registry = Spec.describe s "CR 601.2f a mana ability'
         offers gs = length (filter (== Action.Type.ActivateManaAbility altarId) (Action.legalActions S.alice gs))
     Spec.assertEqWith s "with the Drought and no Swamp to give, the Altar is off the menu" (offers taxed) 0
     Spec.assertEqWith s "without it the same board offers the same activation" (offers untaxed) 1
+
+  -- The SUPPLY walk's half of the same addition, which the offer case above
+  -- cannot reach: that one asks Cost.activationManaSourcesGiven, which has always
+  -- measured the printed cost, while a CAST is gated against what
+  -- Mana.supplyCapacity counts. The two used to disagree, the supply walk having
+  -- asked about a mana part it had emptied -- and an emptied mana part is what CR
+  -- 601.2f's per-coloured-symbol scale counts its symbols in.
+  --
+  -- The Birds is the black source again, so alice controls no Swamp to give, and
+  -- the Drought is once more the only difference between the two boards.
+  Spec.it s "CR 601.2f the supply walk charges the added component too" $ do
+    altar <- S.printingOf s registry "Transmogrant Altar"
+    piker <- S.printingOf s registry "Goblin Piker"
+    birds <- S.printingOf s registry "Birds of Paradise"
+    drought <- S.printingOf s registry "Drought"
+    crucible <- S.printingOf s registry "Crucible of Worlds"
+    let (_, taxed) = altarDroughtBoard altar piker birds (Just drought)
+        (_, untaxed) = altarDroughtBoard altar piker birds Nothing
+        casts gs =
+          let (crucibleId, held) = S.addHandCard crucible S.alice gs
+           in S.castable S.alice crucibleId held
+    Spec.assertBool s (not (casts taxed)) "CR 118.3 the Altar is no supply, so the Birds' one mana is the whole board and {3} is out of reach"
+    Spec.assertBool s (casts untaxed) "without the Drought the Birds pays the {B} and the Altar's three colorless pay the {3}"
 
 -- alice, active, in her precombat main phase: one Coal Golem, two Mountains, and
 -- the Heartstone or not. Returns the Golem.
@@ -3500,6 +3594,30 @@ geosurgeSpec s registry = Spec.describe s "Geosurge" $ do
     Spec.assertBool s (S.castable S.alice boltId withBolt) "the spare Mountain makes the instant castable"
     Spec.assertEqWith s "Lightning Bolt is on the stack" (length (GameState.stack after)) 1
     Spec.assertEqWith s "and the seven restricted red are untouched" (poolOf S.alice after) (replicate 7 restrictedRed)
+
+  -- CR 106.6 asked of a payment that is NO cast. Chromatic Star ("{1}, {T},
+  -- Sacrifice this artifact: Add one mana of any color") is a mana ability whose
+  -- own cost holds mana, and paying it is an activation cost (CR 602.2b) -- so
+  -- none of Geosurge's seven may go toward it, and the white pip it would have
+  -- minted is out of reach. Doomed Traveler ({W} Creature) is the spell, a
+  -- CREATURE spell so the restriction admits the seven to the cast itself: what
+  -- separates the two readings is the Star's {1} alone.
+  --
+  -- Two boards differing in ONE untapped Mountain, which is one unrestricted mana
+  -- and exactly what the Star's {1} wants -- so the control casts the same spell
+  -- off the same Star, and the refusal cannot be "she has no white".
+  Spec.it s "CR 106.6 the restricted seven cannot pay a mana ability's own {1}" $ do
+    geosurge <- S.printingOf s registry "Geosurge"
+    mountain <- S.printingOf s registry "Mountain"
+    star <- S.printingOf s registry "Chromatic Star"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    let after = snd (geosurgeBoards geosurge mountain)
+        withStar = snd (S.addCreature star S.alice after)
+        casts gs =
+          let (travelerId, held) = S.addHandCard traveler S.alice gs
+           in S.castable S.alice travelerId held
+    Spec.assertBool s (not (casts withStar)) "CR 106.6 nothing unrestricted pays the Star's {1}, so its any-colour mana is never made"
+    Spec.assertBool s (casts (S.landsFor mountain S.alice 1 withStar)) "one untapped Mountain pays that same {1}, and the Star then mints the {W}"
 
 -- alice with four untapped Mountains and Geosurge in hand, before and after she
 -- casts it and the sorcery resolves. The pair differs in nothing a test set up:
