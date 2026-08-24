@@ -3817,6 +3817,182 @@ hawkerMana manaType =
       ManaUnit.rider = Nothing
     }
 
+-- CR 106.6's SECOND shape, and the one no card in the pool reached before: a
+-- mana-producing ability with "an additional effect that affects the spell or
+-- ability that mana is spent on". Boseiju, Who Shelters All (Legendary Land,
+-- "Boseiju enters tapped." / "{T}, Pay 2 life: Add {C}. If that mana is spent on
+-- an instant or sorcery spell, that spell can't be countered.") is the printing
+-- -- Champions of Kamigawa is the paper set.
+--
+-- Nothing is omitted from the card, so pawl's Boseiju is neither stricter nor
+-- weaker than printed.
+--
+-- THE producer for this rule rather than Delighted Halfling below, for two
+-- reasons that are both about what the board can tell apart. Boseiju prints NO
+-- CR 106.6 restriction, so an engine that read the restriction's filter as the
+-- rider's predicate cannot come out right here by luck; and its rider carries a
+-- real predicate -- "an instant or sorcery spell" -- where the Halfling's
+-- narrows nothing, so the condition field is proven rather than merely present.
+boseijuSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+boseijuSpec s registry = Spec.describe s "Boseiju, Who Shelters All" $ do
+  -- The pair, one mana source apart. Divination ({2}{U} Sorcery, "Draw two
+  -- cards") is the victim, and alice's three lands are exactly its three mana --
+  -- so on the Boseiju board its colourless necessarily goes in, and no answerer
+  -- decides that.
+  --
+  -- The asserted quantity is alice's HAND once the stack is empty, which is
+  -- Divination's own effect and not the zone it ends in: CR 701.6a puts a
+  -- countered sorcery in the graveyard and CR 608.2m puts a resolved one there
+  -- too, so a zone read cannot tell the two apart for an instant or a sorcery --
+  -- which is exactly the class Boseiju's rider is about.
+  --
+  -- The stack is walked ALL the way down rather than resolved once: resolving
+  -- only the top object resolves Cancel, and PR #1806's counter case is the
+  -- recorded failure of reading the board at that moment.
+  Spec.it s "CR 106.6 the rider on the mana that paid stops the sorcery being countered" $ do
+    boseiju <- S.printingOf s registry "Boseiju, Who Shelters All"
+    island <- S.printingOf s registry "Island"
+    divination <- S.printingOf s registry "Divination"
+    cancel <- S.printingOf s registry "Cancel"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, withBoseiju) = counteredAfter piker cancel island (S.landsFor boseiju S.alice 1 (S.landsInPlay island 2)) divination
+        (_, allIslands) = counteredAfter piker cancel island (S.landsInPlay island 3) divination
+    Spec.assertEqWith s "CR 106.6 Cancel counters nothing, so Divination resolves and draws two" (S.handSize S.alice withBoseiju) 2
+    Spec.assertEqWith s "and one Island in Boseiju's place lets the same Cancel counter the same sorcery" (S.handSize S.alice allIslands) 0
+    -- Only now the proxies, both of them behind the assertion above.
+    Spec.assertBool s (not (any isSpellCountered (S.eventsOf withBoseiju))) "CR 701.6a nothing was countered"
+    Spec.assertBool s (any isSpellCountered (S.eventsOf allIslands)) "and on the control board something was"
+
+  -- The rider's CONDITION, which the case above cannot reach: its board would
+  -- pass with the predicate widened to Pawl.Types.Filter's trivial @And []@.
+  -- Erudite Wizard ({2}{U} Creature) costs what Divination costs and is paid the
+  -- same way off the same three lands, so the boards differ in the victim's card
+  -- type and in nothing else -- and CR 106.6's clause names instants and
+  -- sorceries, so this one IS counterable.
+  Spec.it s "CR 106.6 the same mana leaves a creature spell counterable" $ do
+    boseiju <- S.printingOf s registry "Boseiju, Who Shelters All"
+    island <- S.printingOf s registry "Island"
+    wizard <- S.printingOf s registry "Erudite Wizard"
+    cancel <- S.printingOf s registry "Cancel"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let alicesLands = S.landsFor boseiju S.alice 1 (S.landsInPlay island 2)
+        (_, after) = counteredAfter piker cancel island alicesLands wizard
+    Spec.assertEqWith s "CR 701.6a the creature spell was countered, so no creature reached the battlefield" (S.creaturesInPlay S.alice after) 0
+    Spec.assertEqWith s "and it is in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+
+-- alice casts `victim` off the lands `alicesLands` already gives her, bob
+-- answers with Cancel, and the stack is then walked all the way down. bob's three
+-- Islands are Cancel's {1}{U}{U} exactly, so the counter never fails for want of
+-- mana; alice's library is stocked so that a drawing victim is not decked (CR
+-- 104.3c) before the assertion runs.
+--
+-- S.cast and not S.spellOnStack: that helper bypasses cost payment, which leaves
+-- Pawl.Types.Object.manaSpent empty and makes every assertion here vacuous.
+counteredAfter ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  GameState.GameState ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, GameState.GameState)
+counteredAfter filler cancel island alicesLands victim =
+  let stocked = foldr (\p gs -> snd (S.addLibraryCard p S.alice gs)) alicesLands (replicate 3 filler)
+      withBob = S.landsFor island S.bob 3 stocked
+      (g1, victimId) = S.handOne victim withBob
+      (cancelId, board) = S.addHandCard cancel S.bob g1
+      cast_ = S.runPure S.identityAnswer board (S.cast S.alice victimId)
+      answered = S.runPure S.identityAnswer cast_ (S.cast S.bob cancelId)
+   in (victimId, List.foldl' (\gs _ -> S.runPure S.identityAnswer gs Stack.resolveTop) answered [1 .. 2 :: Int])
+
+-- Was anything countered at all? The proxy the cases above read only after the
+-- gameplay-level assertion has already run.
+isSpellCountered :: GameEvent.GameEvent -> Bool
+isSpellCountered event = case event of
+  GameEvent.SpellCountered _ -> True
+  _ -> False
+
+-- CR 106.6's two shapes on ONE instruction, which Boseiju cannot show: Delighted
+-- Halfling ({G} 1/2 Creature -- Halfling Citizen, "{T}: Add {C}." / "{T}: Add
+-- one mana of any color. Spend this mana only to cast a legendary spell, and
+-- that spell can't be countered.") is the printing -- The Lord of the Rings:
+-- Tales of Middle-earth is the paper set -- and its second ability writes a
+-- restriction and a rider at once.
+--
+-- Nothing is omitted from the card, so pawl's Halfling is neither stricter nor
+-- weaker than printed.
+--
+-- Its rider narrows NOTHING -- "that spell" with no predicate, which is
+-- Pawl.Types.Filter's trivial @And []@ -- because the restriction beside it has
+-- already forced the mana onto a legendary spell. That is why it cannot stand in
+-- for Boseiju above: an implementation reading the RESTRICTION where the rider
+-- belongs passes every case here.
+delightedHalflingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+delightedHalflingSpec s registry = Spec.describe s "Delighted Halfling" $ do
+  -- alice has the Halfling and NO LANDS, so its mana is the only mana in the
+  -- game and Tinybones Joins Up ({B} Legendary Enchantment) is paid off it and
+  -- off nothing else. An ENCHANTMENT and not an instant, so the countered and
+  -- the resolved boards put it in different zones.
+  --
+  -- The control twin is one Swamp in the Halfling's place: the same {B}, the
+  -- same spell, the same Cancel -- and no CR 106.6 clause on it at all.
+  Spec.it s "CR 106.6 a restriction and a rider on one instruction are both honoured" $ do
+    halfling <- S.printingOf s registry "Delighted Halfling"
+    swamp <- S.printingOf s registry "Swamp"
+    island <- S.printingOf s registry "Island"
+    tinybones <- S.printingOf s registry "Tinybones Joins Up"
+    cancel <- S.printingOf s registry "Cancel"
+    let withHalfling = snd (S.addCreature halfling S.alice (Setup.emptyGame S.bothPlayers))
+        (_, offHalfling) = counteredWith blackYield tinybones cancel island withHalfling
+        (_, offSwamp) = counteredWith S.identityAnswer tinybones cancel island (S.landsInPlay swamp 1)
+    Spec.assertEqWith s "CR 106.6 the Halfling's mana casts the legendary spell and its rider stops the Cancel" (S.countOnBattlefieldByName (S.printingName tinybones) S.alice offHalfling) 1
+    Spec.assertEqWith s "and one Swamp in its place lets the same Cancel counter the same spell" (S.countOnBattlefieldByName (S.printingName tinybones) S.alice offSwamp) 0
+    Spec.assertEqWith s "CR 701.6a which put it in alice's graveyard instead" (length (Game.zoneMembers Zone.Graveyard S.alice offSwamp)) 1
+
+  -- The RESTRICTION half of the same instruction, which the case above cannot
+  -- separate from the rider: the Halfling's mana is refused to a spell that is
+  -- not legendary. Lightning Bolt ({R} Instant) is one mana as Tinybones is, so
+  -- what refuses is CR 106.6 and not the amount.
+  Spec.it s "CR 106.6 the same mana casts no spell that is not legendary" $ do
+    halfling <- S.printingOf s registry "Delighted Halfling"
+    tinybones <- S.printingOf s registry "Tinybones Joins Up"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let withHalfling = snd (S.addCreature halfling S.alice (Setup.emptyGame S.bothPlayers))
+        (g1, tinybonesId) = S.handOne tinybones withHalfling
+        (boltId, board) = S.addHandCard bolt S.alice g1
+    Spec.assertBool s (S.castable S.alice tinybonesId board) "the legendary spell is castable off the Halfling"
+    Spec.assertBool s (not (S.castable S.alice boltId board)) "CR 106.6 and the one-mana instant beside it is not"
+
+-- counteredAfter's shape for a PERMANENT victim: no library stocking, since
+-- nothing draws, and the caster's answerer is the caller's -- the Halfling's
+-- any-colour ability needs its colour pinned, a Swamp does not.
+counteredWith ::
+  (forall r. Prompt.Prompt r -> r) ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  GameState.GameState ->
+  (ObjectId.ObjectId, GameState.GameState)
+counteredWith answer victim cancel island alicesBoard =
+  let withBob = S.landsFor island S.bob 3 alicesBoard
+      (g1, victimId) = S.handOne victim withBob
+      (cancelId, board) = S.addHandCard cancel S.bob g1
+      cast_ = S.runPure answer board (S.cast S.alice victimId)
+      answered = S.runPure S.identityAnswer cast_ (S.cast S.bob cancelId)
+   in (victimId, List.foldl' (\gs _ -> S.runPure S.identityAnswer gs Stack.resolveTop) answered [1 .. 2 :: Int])
+
+-- Pins CR 105.4's colour choice on the Halfling's second ability to BLACK, by
+-- the yield's TYPE alone. Deliberately not by the whole unit the way
+-- S.optionYielding matches: the Halfling's units carry a restriction and a
+-- rider, so an answerer spelling the expected unit out would have to be edited
+-- to keep passing after a mutation dropped either -- which is an answerer
+-- repairing the assertion.
+blackYield :: Prompt.Prompt r -> r
+blackYield p = case p of
+  Prompt.ChooseManaYield _ _ _ candidates ->
+    let isBlack option = fmap ManaUnit.manaType (Mana.Type.unwrap (ManaOption.yield option)) == [ManaType.Colored Color.Black]
+     in Maybe.fromMaybe (NonEmpty.head candidates) (List.find isBlack (NonEmpty.toList candidates))
+  _ -> S.identityAnswer p
+
 -- CR 105.4's half of the same arm: an ability that adds mana whose TYPE is not
 -- settled. Quirion Sentinel ({1}{G} 2/1 Creature -- Elf Druid, "When this
 -- creature enters, add one mana of any color") is the printing, and CR 605.1b
@@ -4133,6 +4309,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   geosurgeSpec s registry
   workshopSpec s registry
   omenHawkerSpec s registry
+  boseijuSpec s registry
+  delightedHalflingSpec s registry
   quirionSpec s registry
   celestialDawnSpec s registry
   spendChoiceSpec s registry

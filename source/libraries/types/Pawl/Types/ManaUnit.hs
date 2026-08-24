@@ -78,7 +78,7 @@ data ManaUnit = MkManaUnit
     -- (CR 603.7a) that triggers when the mana is spent, which Pyromancer's
     -- Goggles and Path of Ancestry print. It carries a whole ability rather
     -- than the closed word Pawl.Types.ManaRiderEffect holds, so it is a
-    -- different carrier and not a further arm (#2245).
+    -- different carrier and not a further arm (#2248).
     rider :: Maybe ManaRider.ManaRider
   }
   deriving (Eq, Ord, Show)

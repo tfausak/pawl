@@ -26,10 +26,10 @@ import qualified Pawl.Types.ObjectId as ObjectId
 -- spent to pay those costs" -- rather than off a stored continuous effect. CR
 -- 106.6a says such an effect "is created once for each mana produced", so the
 -- eager reading would mint one per unit at payment time; the lazy one answers
--- the same at every moment anything can ask, because CR 113.6g's question is
--- only ever asked at Pawl.Engine.Event.counterOne and the record is written
--- before CR 601.2i makes the spell cast. That equivalence rests on pawl having
--- no per-object continuous-effect carrier (#2246) and on this type's one arm
+-- the same at every moment anything can ask, because CR 701.6a's question is
+-- only ever asked at Pawl.Engine.Event.counterOne and CR 601.2h's payment
+-- writes the record before CR 601.2i makes the spell cast. That equivalence rests on pawl having
+-- no per-object continuous-effect carrier (#2249) and on this type's one arm
 -- having no other observer; a payload with an independently observable
 -- existence -- a haste grant, a +1\/+1 counter -- would need the eager route.
 --
