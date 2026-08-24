@@ -103,9 +103,9 @@ data Modification ability
     --
     -- A NAME and not an index, Pawl.Types.ActivatedAbility's own posture: that
     -- type's header rules an index out for Action.Activate, and the same argument
-    -- rules it out here. The name is written on the ability by its own card
-    -- (ActivatedAbility.name) and joined back here, so the removal survives a
-    -- card whose list of abilities is reordered.
+    -- rules it out here. The name is written on the ability by its own card and
+    -- joined back here, so the removal survives a card whose list of abilities is
+    -- reordered.
     --
     -- An ACTIVATED ability (ActivatedAbility.name) and a PRINTED REPLACEMENT
     -- (PrintedReplacement.name) are the two carriers of a name, so those are what
@@ -128,8 +128,8 @@ data Modification ability
     --
     -- Distinct from both removals above, and observably so. LoseAllAbilities
     -- would take the enchanted creature's other abilities with the flying, and
-    -- LoseNamedAbility reaches only an ability the card that prints it named
-    -- (ActivatedAbility.name), which no printed keyword carries.
+    -- LoseNamedAbility reaches only an ability the card that prints it named,
+    -- which no printed keyword carries.
     --
     -- Carries a WRITTEN Keyword rather than a KeywordFamily, which is what the
     -- printings ask for: every one that removes a single keyword names the

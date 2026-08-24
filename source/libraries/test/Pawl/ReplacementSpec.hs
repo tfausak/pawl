@@ -1639,6 +1639,9 @@ glitteringLionSpec s registry = Spec.describe s "Glittering Lion (CR 613.1f)" $ 
         -- The SCOPE of the removal, after the behaviour: the {3} names one
         -- ability, so the Lion's own activated ability is untouched by it.
         Spec.assertEqWith s "CR 613.1f and the removal took one ability rather than every one" (length (Projection.abilitiesOf lion resolved)) 1
+        -- CR 602.2b: the {3} was really paid, so the removal above is the
+        -- ability's effect rather than something a free activation produced.
+        Spec.assertEqWith s "CR 602.2b: and the three lands paid for it" (S.tappedCount S.alice resolved) 3
 
 -- CR 615.12's damage that "can't be prevented", whose one producer in the pool
 -- is Spider-Punk ({1}{R} Legendary Creature -- Spider Human Hero 2/1, Marvel's
