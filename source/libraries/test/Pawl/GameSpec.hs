@@ -2184,6 +2184,7 @@ namedIs wanted gs mo =
           Source.OfAbility _ -> False
           Source.OfTrigger _ -> False
           Source.OfEmblem _ -> False
+          Source.OfSpellCopy printingId -> named printingId
           Source.OfInherentTrigger _ -> False
         Nothing -> False
 

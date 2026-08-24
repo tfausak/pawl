@@ -123,6 +123,9 @@ zoneFunctionedFrom effect = case effect of
   -- CR 707.4 changes a permanent's copiable values while it stays on the
   -- battlefield, so nothing leaves a zone and this functions from none.
   Effect.BecomeCopy {} -> Nothing
+  -- CR 707.10 mints a new object onto the stack; nothing the ability is on
+  -- moves out of a zone.
+  Effect.CopySpell {} -> Nothing
   Effect.Replace {} -> Nothing
   Effect.SkipNextPhase {} -> Nothing
   -- CR 615.5's rider is not descended into, and the answer stands: the rider

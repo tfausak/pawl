@@ -16,5 +16,6 @@ codec =
       Arm.payload "OfAbility" ActivatedAbilitySource.codec Source.OfAbility (\x -> case x of Source.OfAbility y -> Just y; _ -> Nothing),
       Arm.payload "OfTrigger" TriggeredAbilitySource.codec Source.OfTrigger (\x -> case x of Source.OfTrigger y -> Just y; _ -> Nothing),
       Arm.payload "OfEmblem" PrintingId.codec Source.OfEmblem (\x -> case x of Source.OfEmblem y -> Just y; _ -> Nothing),
+      Arm.payload "OfSpellCopy" PrintingId.codec Source.OfSpellCopy (\x -> case x of Source.OfSpellCopy y -> Just y; _ -> Nothing),
       Arm.payload "OfInherentTrigger" InherentTriggerSource.codec Source.OfInherentTrigger (\x -> case x of Source.OfInherentTrigger y -> Just y; _ -> Nothing)
     ]
