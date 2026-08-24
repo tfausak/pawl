@@ -17,40 +17,36 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Expiry as Expiry
-import qualified Pawl.Engine.Projection as Projection
-import qualified Pawl.Types.Cost as Cost.Type
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
-import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.PaidExpiry as PaidExpiry
 import qualified Pawl.Types.Payment as Payment
 import Pawl.Types.PlayerId (PlayerId)
 
--- What ending this object's effect costs, if it stored one that a payment can
--- end at all.
+-- The offer ending this object's effect, if it stored one that a payment can end
+-- at all: CR 116.2c's price, and CR 109.5's "you" as baked when the effect was
+-- stored.
 --
 -- FIRST offer wins where an object somehow stored two. No printing does: a Licid
 -- that has activated has lost the ability, so it cannot animate itself twice,
 -- and no other card prints the clause.
-costToEnd :: ObjectId -> GameState -> Maybe (Cost.Type.Cost Keyword)
-costToEnd oid gs = List.lookup oid (Expiry.paidExpiries gs)
+offerToEnd :: ObjectId -> GameState -> Maybe PaidExpiry.PaidExpiry
+offerToEnd oid gs = List.lookup oid (Expiry.paidExpiries gs)
 
 -- CR 116.2c: may this player end this object's effect right now? Three
 -- conjuncts:
 --
 --   * an effect of that object states a price at all, which is the whole of the
 --     permission -- "for as long as the effect allows it";
---   * this player is the one the effect allows it to. CR 109.5 makes the "you"
---     of "you may pay" the effect's controller, and a stored effect remembers
---     its source rather than a controller, so the source's CURRENT controller is
---     read (Projection.controllerOf). That is the same object whose ability
---     created the effect and, for every producer, the same seat -- a Licid
---     animating itself is its own source, so a control-change moves the offer
---     with the permanent. Not implemented: an effect whose controller is not its
---     source's current controller, which needs a controller on
---     Pawl.Types.ContinuousEffect and has no producer while the Licids are the
---     only ones (#2137);
+--   * this player is the one the effect allows it to. Every producer prints the
+--     clause inside an ACTIVATED ability, so CR 109.5's "you" is the player who
+--     activated it and not the current controller of the object it is on. That
+--     seat rides the stored effect (PaidExpiry.player), baked by
+--     Pawl.Engine.Expiry.arm, so a control change afterwards leaves the offer
+--     where it was -- proved by Pawl.AuraSpec's "CR 109.5 the activator keeps the
+--     pay-to-end offer after Confiscate steals the animated Licid";
 --   * the cost is payable. An action the player cannot take is not offered,
 --     Pawl.Engine.Action.legalActions' posture throughout.
 --
@@ -62,9 +58,9 @@ costToEnd oid gs = List.lookup oid (Expiry.paidExpiries gs)
 -- reason: that rule totals the cost of a spell being cast or an ability being
 -- activated, and a special action is neither (#90).
 canEnd :: PlayerId -> ObjectId -> GameState -> Bool
-canEnd pid oid gs = case costToEnd oid gs of
+canEnd pid oid gs = case offerToEnd oid gs of
   Nothing -> False
-  Just cost -> Projection.controllerOf oid gs == Just pid && Cost.canPay pid oid cost gs
+  Just offer -> PaidExpiry.player offer == pid && Cost.canPay pid oid (PaidExpiry.cost offer) gs
 
 -- Every object whose effect this player may pay to end right now, in object
 -- order -- what Action.EndEffect is built from, Ignore.ignorable's shape.
@@ -72,9 +68,9 @@ canEnd pid oid gs = case costToEnd oid gs of
 -- Read off the STORED EFFECTS rather than off the battlefield, which is where
 -- this differs from every other special action: CR 116.2c's permission belongs
 -- to the effect, not to a permanent's printed text, and a stored effect outlives
--- its source leaving the battlefield (CR 611.2's duration is what ends it).
--- canEnd's controller conjunct is then what declines to offer one whose source
--- has no controller to read.
+-- its source leaving the battlefield (CR 611.2's duration is what ends it). The
+-- baked seat is then what settles who is offered one whose source has left, and
+-- it needs no board to read.
 endable :: PlayerId -> GameState -> [ObjectId]
 endable pid gs = filter (\oid -> canEnd pid oid gs) (List.nub (fmap fst (Expiry.paidExpiries gs)))
 
@@ -88,10 +84,10 @@ endable pid gs = filter (\oid -> canEnd pid oid gs) (List.nub (fmap fst (Expiry.
 endEffect :: PlayerId -> ObjectId -> Game ()
 endEffect pid oid = do
   before <- State.get
-  case costToEnd oid before of
+  case offerToEnd oid before of
     Nothing -> pure ()
-    Just cost -> do
-      payment <- Cost.pay Nothing ManaSpending.AsProduced pid oid cost
+    Just offer -> do
+      payment <- Cost.pay Nothing ManaSpending.AsProduced pid oid (PaidExpiry.cost offer)
       case payment of
         Payment.Unpaid -> State.put before
         Payment.Paid _ -> State.modify' (Expiry.dropWhenPaidBy oid)
