@@ -579,6 +579,11 @@ slotsOf effect = case effect of
   -- A DEFINITION for the result slot (boundSlots below), but CR 706.2's modifier
   -- is a READ: the instruction's own Quantity may name a slot an earlier effect
   -- of this same resolution bound (CR 400.7).
+  --
+  -- A SHAPE CORRECTION, not a tested behaviour: every modifier in data/cards/ is
+  -- a Count naming no slot (Diviner's Portent), so leaving this Map.empty leaves
+  -- the suite green. A card whose roll added "the number of cards you drew this
+  -- way" would refute that. The same holds of the two arms below.
   Effect.RollDie rollDie -> maybe Map.empty quantitySlots (RollDie.modifier rollDie)
   Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn ref _) -> playerRefSlots ref
   -- Both halves may name a slot: what is shuffled, and whose library.
