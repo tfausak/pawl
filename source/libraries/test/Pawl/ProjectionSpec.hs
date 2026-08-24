@@ -3728,10 +3728,10 @@ hiddenZoneStaticSpec s registry = Spec.describe s "HiddenZoneStatics" $ do
               (_, b2) = S.addLibraryCard mountain S.alice b1
               (_, b3) = S.addLibraryCard mountain S.alice b2
               (_, b4) = S.addHandCard mountain S.alice b3
-              (_, b5) = S.addHandCard subject S.alice b4
-           in (entomberId, b5 {GameState.priority = Just S.alice})
-        (gristEntomber, gristBoard) = board grist
-        (jaceEntomber, jaceBoard) = board jace
+              (subjectId, b5) = S.addHandCard subject S.alice b4
+           in (entomberId, subjectId, b5 {GameState.priority = Just S.alice})
+        (gristEntomber, gristHandId, gristBoard) = board grist
+        (jaceEntomber, _, jaceBoard) = board jace
         ability = soleActivatedAbility entomber
         resolved = S.runPure S.identityAnswer gristBoard (do Activate.activateAbility S.alice gristEntomber ability; Stack.resolveTop)
     -- Named rather than identified: the discarded card takes a FRESH object id
@@ -3751,6 +3751,15 @@ hiddenZoneStaticSpec s registry = Spec.describe s "HiddenZoneStatics" $ do
       "payable with the Grist in hand, not with an ordinary planeswalker card"
       (Activate.activatable S.alice gristEntomber ability gristBoard, Activate.activatable S.alice jaceEntomber ability jaceBoard)
       (True, False)
+    -- CR 205.1b/205.3d on the same ability, and the reason Grist is transcribed
+    -- in printed order ("a 1/1 Insect creature"): the AddCreatureSubtype comes
+    -- before the AddCardType that licenses it, so the Insect sticks only because
+    -- correspondsTo asks what the whole effect gives.
+    Spec.assertEqWith
+      s
+      "and CR 205.1b keeps its printed Grist type beside the granted Insect"
+      (Projection.subtypesOf gristHandId gristBoard)
+      (Set.fromList [Subtype.Type.Grist, Subtype.Type.Insect])
 
   -- The STACK, where CR 113.6b's stated set overrides CR 113.6's own first
   -- sentence rather than a hidden zone's absence of one: a planeswalker spell's
