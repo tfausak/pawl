@@ -2841,29 +2841,35 @@ suspecting oid p = case p of
   Prompt.ChooseTargets _ _ _ offers -> S.preferring (\r -> Recipient.objectOf r == Just oid) offers
   _ -> S.identityAnswer p
 
--- bob's two Pikers and his two Islands, with `ahead` placed under him BEFORE the
--- Pikers and `behind` after them -- which is how the pair below puts one Humility on
--- either side of the same permanent and changes nothing else. Placement order is
--- timestamp order (Pawl.Support.addCreature allocates one per object), so the two
--- boards differ in exactly one timestamp comparison.
+-- bob's suspect, a Goblin Piker beside it and his two Islands, with `ahead`
+-- placed under him BEFORE the pair and `behind` after them -- which is how the
+-- pair below puts one Humility on either side of the same permanent and changes
+-- nothing else. Placement order is timestamp order (Pawl.Support.addCreature
+-- allocates one per object), so the two boards differ in exactly one timestamp
+-- comparison.
 --
 -- Then alice attacks, a Goblin Piker spell of hers goes on the stack to be
--- Reasonable Doubt's counter target, and bob casts the Doubt suspecting his FIRST
--- Piker. Returns the settled board, the suspected Piker, the one beside it,
--- alice's attacker and the spell the Doubt countered.
+-- Reasonable Doubt's counter target, and bob casts the Doubt suspecting the
+-- FIRST of the two. Returns the settled board, the suspected permanent, the one
+-- beside it, alice's attacker and the spell the Doubt countered.
+--
+-- `suspected` is the printing the designation lands on: a Goblin Piker for the
+-- timestamp pair, a Dryad Arbor for the CR 305.7 case, which needs a permanent a
+-- basic-land-type set can reach.
 suspectBoard ::
   (Monad m) =>
   Spec.Spec m n ->
   Registry.Registry m ->
+  Printing.Printing ->
   [Printing.Printing] ->
   [Printing.Printing] ->
   m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
-suspectBoard s registry ahead behind = do
+suspectBoard s registry suspected ahead behind = do
   piker <- S.printingOf s registry "Goblin Piker"
   island <- S.printingOf s registry "Island"
   doubt <- S.printingOf s registry "Reasonable Doubt"
   let (gs0, mine, _) = S.combatBoardOf [piker] []
-      (suspect, gsA) = S.addCreature piker S.bob (withPermanents S.bob ahead gs0)
+      (suspect, gsA) = S.addCreature suspected S.bob (withPermanents S.bob ahead gs0)
       (other, gsB) = S.addCreature piker S.bob gsA
       gs2 = withPermanents S.bob (behind <> [island, island]) gsB
       declared = S.runPure S.aggressiveAnswer gs2 (Combat.declareAttackers S.alice)
@@ -2879,6 +2885,16 @@ suspectBoard s registry ahead behind = do
 -- left, which no assertion below wants to pass for.
 suspectedOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Bool
 suspectedOf oid gs = fmap (Set.member Designation.Suspected . Object.designations) (Game.lookupObject oid gs)
+
+-- Convincing Mirage's two prompts: its CR 303.4a enchant slot, forced onto the
+-- one land this group cares about, and its CR 614.1c as-enters basic land type.
+-- Recipient.ToObject and not ToCreature: the Aura's slot is over lands, which is
+-- what Pawl.Support's stillLegalEnchant note warns about.
+mirageOn :: ObjectId.ObjectId -> Subtype.Subtype -> Prompt.Prompt r -> r
+mirageOn landId subtype p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject landId))) sets
+  Prompt.ChooseBasicLandType {} -> subtype
+  _ -> S.identityAnswer p
 
 -- CR 701.60c against CR 613.1f, ordered by CR 613.7 -- proved by Reasonable Doubt
 -- {1}{U} Instant, "Counter target spell unless its controller pays {2}. Suspect up
@@ -2902,7 +2918,8 @@ suspectedAbilityRemovalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.R
 suspectedAbilityRemovalSpec s registry = Spec.describe s "SuspectedAbilityRemoval" $ do
   Spec.it s "CR 613.7 a Humility older than the suspect leaves rule 701.60c's ability in place" $ do
     humility <- S.printingOf s registry "Humility"
-    (gs, suspect, other, attacker, victim) <- suspectBoard s registry [humility] []
+    piker <- S.printingOf s registry "Goblin Piker"
+    (gs, suspect, other, attacker, victim) <- suspectBoard s registry piker [humility] []
     Spec.assertEqWith s "the Doubt resolved and suspected the Piker it named, not the one beside it" (suspectedOf suspect gs, suspectedOf other gs) (Just True, Just False)
     -- The Doubt's other clause, so the card is exercised whole rather than only in
     -- the half this pair turns on: alice paid nothing, so her spell was countered.
@@ -2916,11 +2933,55 @@ suspectedAbilityRemovalSpec s registry = Spec.describe s "SuspectedAbilityRemova
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton other (Set.singleton attacker)) gs) "while the unsuspected Piker beside it blocks"
   Spec.it s "CR 613.7 a Humility younger than the suspect removes it" $ do
     humility <- S.printingOf s registry "Humility"
-    (gs, suspect, other, attacker, _) <- suspectBoard s registry [] [humility]
+    piker <- S.printingOf s registry "Goblin Piker"
+    (gs, suspect, other, attacker, _) <- suspectBoard s registry piker [] [humility]
     Spec.assertEqWith s "the same designation, on the same Piker: CR 701.60b makes it no ability, so no removal reaches it" (suspectedOf suspect gs, suspectedOf other gs) (Just True, Just False)
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Menace suspect gs)) "CR 613.1f: the later removal wipes the grant, so the menace half is gone"
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton suspect (Set.singleton attacker)) gs) "CR 613.1f: and the can't-block half with it"
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton other (Set.singleton attacker)) gs) "as the Piker beside it could all along"
+  -- CR 305.7's carve-out, which the case above's Humility cannot reach: that rule
+  -- strips "all abilities generated from its rules text" and then says outright
+  -- that it "doesn't remove any abilities that were granted to the land by other
+  -- effects". Rule 701.60c grants this one, so the strip must spare it.
+  --
+  -- Dryad Arbor is the suspect because it is a PRINTED Land Creature -- no
+  -- animation, so there is no second effect to confuse the read, and CR 305.7's
+  -- own "doesn't add or remove any card types" keeps it a creature and therefore
+  -- a would-be blocker afterwards. Convincing Mirage {1}{U} ("Enchant land / As
+  -- this Aura enters, choose a basic land type. / Enchanted land is the chosen
+  -- type.") is the setter, CAST rather than attached by hand: the chosen type is
+  -- a CR 614.1c as-enters rewrite, and an Aura placed without it would leave
+  -- Object.chosenSubtype empty and strip nothing at all.
+  Spec.it s "CR 305.7 setting a suspected land's subtype spares the ability rule 701.60c granted" $ do
+    dryadArbor <- S.printingOf s registry "Dryad Arbor"
+    island <- S.printingOf s registry "Island"
+    mirage <- S.printingOf s registry "Convincing Mirage"
+    -- Two Islands behind the pair, so bob can pay for the Mirage after the Doubt:
+    -- untouched mana is what keeps the negative leg below about the designation.
+    (board, arbor, other, attacker, _) <- suspectBoard s registry dryadArbor [] [island, island]
+    let (mirageId, withMirage) = S.addHandCard mirage S.bob board
+        cast = S.runPure (mirageOn arbor Subtype.Island) withMirage (S.cast S.bob mirageId)
+        settled = S.settleSba (S.runPure (mirageOn arbor Subtype.Island) cast Stack.resolveTop)
+        -- Dryad Arbor is a LAND, so bob's two casts may have tapped it for mana.
+        -- CR 509.1a lets only an untapped creature block, and a tapped one would
+        -- make the first assertion pass without the restriction being read at
+        -- all. Untapped here rather than by juggling which land pays: nothing in
+        -- this case is about mana.
+        gs = settled {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Untapped}) arbor (GameState.objects settled)}
+    -- THE assertion, gameplay level and first.
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton arbor (Set.singleton attacker)) gs)) "CR 305.7: the rulebook-granted can't-block survives the subtype set"
+    -- The third leg the pair above uses: an unsuspected permanent beside it still
+    -- blocks, so a board on which nothing can block fails here.
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton other (Set.singleton attacker)) gs) "while the unsuspected Piker beside it blocks"
+    -- The other half of rule 701.60c's one sentence, which goes through the layer
+    -- fold instead: the two must agree.
+    Spec.assertBool s (Projection.hasKeyword Keyword.Menace arbor gs) "CR 701.60c: and the menace half, which no layer-4 strip touches, is there too"
+    -- ANTI-VACUITY, and not optional: if the Aura failed to attach or the chosen
+    -- type went unset, there are no set-land-subtype effects at all, the gate this
+    -- case exists to remove is vacuously satisfied, and the first assertion passes
+    -- under the wrong implementation too.
+    Spec.assertEqWith s "CR 305.7: the set really happened -- an Island, and no longer a Forest Dryad" (Projection.subtypesOf arbor gs) (Set.fromList [Subtype.Island, Subtype.Dryad])
+    Spec.assertEqWith s "on the permanent the Doubt suspected, which is still suspected" (suspectedOf arbor gs, suspectedOf other gs) (Just True, Just False)
 
 -- CR 508.1c's and CR 509.1b's SECOND clause -- "or that it can't attack unless
 -- some condition is met" -- proved by Blind-Spot Giant ("This creature can't

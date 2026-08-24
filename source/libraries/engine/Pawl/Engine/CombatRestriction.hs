@@ -315,24 +315,26 @@ inForce gs =
       --     earlier and leaves both in place, and one that arrived later wipes
       --     both. `keepsAbilities`'s blanket removal question cannot tell the two
       --     apart, which is what CombatSpec's pair of boards proves.
-      --   * CR 305.7's layer-4 strip is asked, as `keepsRulesText`. Not
-      --     implemented: that rule reaches "all abilities generated from its rules
-      --     text" and says outright that it "doesn't remove any abilities that were
-      --     granted to the land by other effects", so it should not reach this one
-      --     at all -- and the menace half, which no layer-4 strip touches, already
-      --     does not (#1606).
+      --   * CR 305.7's layer-4 strip is NOT asked, unlike the printed rows below.
+      --     That rule reaches "all abilities generated from its rules text" and
+      --     then says outright that it "doesn't remove any abilities that were
+      --     granted to the land by other effects" -- this one is granted by rule
+      --     701.60c, so the strip spares it, and the menace half, which no layer-4
+      --     strip touches, is spared alike. Proved by CombatSpec's "CR 305.7
+      --     setting a suspected land's subtype spares the ability rule 701.60c
+      --     granted", on a Convincing Mirage'd Dryad Arbor.
       designationRows source = case Game.lookupObject source gs of
         Just obj
           | Set.member Designation.Suspected (Object.designations obj),
-            keepsRulesText source,
             not (removedAfter (Object.timestamp obj) source) ->
               [(source, [], CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless (Affected.Matching Filter.Type.IsSource) Nothing))]
         _ -> []
       -- The two ability losses the printed rows below check for: CR 305.7's
       -- basic-land subtype set, and CR 604.2 against a CR 613.1f layer-6 removal.
-      -- Split, because the designation row above asks the first and not the second:
-      -- what a layer-6 removal costs a RULES-granted ability is a timestamp
-      -- question, and only the printed rows can settle it with a bare bit.
+      -- Split, because the designation row above asks NEITHER -- rule 701.60c's
+      -- grant is not generated from rules text, and what a layer-6 removal costs a
+      -- RULES-granted ability is a timestamp question that only the printed rows
+      -- can settle with a bare bit.
       keepsRulesText source = null setEffs || Projection.liveAfterLayers setEffs source gs
       keepsAbilities source = keepsRulesText source && not (removed source)
       fromPermanent source = case Game.faceOf source gs of
