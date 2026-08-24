@@ -3199,6 +3199,9 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 601.3a's Filter half, which is exactly a quality of the spell (Damping
   -- Engine's "artifact, creature, or enchantment spells").
   PlayerEffect.CantCastMatching f -> [f]
+  -- CR 307.5 narrows a MOMENT rather than a class of spell, so there is no
+  -- quality here either (Teferi, Mage of Zhalfir).
+  PlayerEffect.CastOnlyAtSorcerySpeed -> []
   -- CR 305.1's unrestricted prohibition narrows nothing: every land is stopped.
   PlayerEffect.CantPlayLands -> []
   -- CR 601.3's zone permission, narrowed by the card's own qualities exactly as
@@ -3261,6 +3264,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.CastAsThoughItHadFlash _ -> False
   PlayerEffect.CantBeCountered _ -> False
   PlayerEffect.CantCastMatching _ -> False
+  PlayerEffect.CastOnlyAtSorcerySpeed -> False
   PlayerEffect.CantPlayLands -> False
   PlayerEffect.CastFromGraveyard _ -> False
   PlayerEffect.PlayLandsFromGraveyard -> False
@@ -3307,6 +3311,7 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.CastAsThoughItHadFlash _ -> False
   PlayerEffect.CantBeCountered _ -> False
   PlayerEffect.CantCastMatching _ -> False
+  PlayerEffect.CastOnlyAtSorcerySpeed -> False
   PlayerEffect.CantPlayLands -> False
   PlayerEffect.CastFromGraveyard _ -> False
   PlayerEffect.PlayLandsFromGraveyard -> False

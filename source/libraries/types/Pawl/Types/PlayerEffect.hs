@@ -470,6 +470,31 @@ data PlayerEffect
     -- is from. No second constructor for the zone axis: the prohibition is the
     -- same one, and CR 601.3a reads whatever quality the sentence names.
     CantCastMatching (Filter.Filter Keyword.Keyword)
+  | -- | CR 307.5 / Teferi, Mage of Zhalfir: this player can cast spells only at
+    -- the moment CR 307.5 defines -- a main phase of their own turn with an
+    -- empty stack, priority in hand.
+    --
+    -- A PROHIBITION and not a window, which is what puts it in this family
+    -- rather than beside CastAsThoughItHadFlash. The printed sentence reads as a
+    -- permission ("can cast spells only ..."), but CR 601.3's two limbs are
+    -- allow and prohibit and "only" is the prohibit one: outside that moment no
+    -- cast is permitted. CR 101.2 then settles every collision -- a Vedalken
+    -- Orrery, a flash keyword, or an instant's own CR 117.1a window is a "can"
+    -- this "can't" outvotes, which is Teferi, Time Raveler's own ruling about a
+    -- second Teferi's +1.
+    --
+    -- Not a Duration either: the clause lasts as long as its carrier does, which
+    -- is what every arm here already means.
+    --
+    -- NULLARY, for CantPlayLands' reason. Scryfall
+    -- @o:"only any time they could cast a sorcery"@, 2026-08-24, returns exactly
+    -- two cards -- this Teferi and Teferi, Time Raveler -- and neither narrows
+    -- WHICH spells, so there is nothing for a Filter to state. One that said
+    -- "creature spells" would want one here.
+    --
+    -- WHOSE casting is the carrier's PlayerScope, as for every arm here: both
+    -- printings say "each opponent", so PlayerScope.Opponents.
+    CastOnlyAtSorcerySpeed
   | -- | CR 305.1 / Damping Engine: this player can't play lands.
     --
     -- The unrestricted twin of CantPlayLandChosenName above, and a separate arm

@@ -293,6 +293,13 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       (PlayerEffect.CantCastMatching (Filter.Or [Filter.HasCardType CardType.Artifact, Filter.HasCardType CardType.Creature]))
       " {\"type\":\"CantCastMatching\",\"value\":{\"type\":\"Or\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}},{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}]}} "
+  -- CR 307.5 / Teferi, Mage of Zhalfir's third clause, nullary.
+  Spec.it s "CastOnlyAtSorcerySpeed" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      PlayerEffect.CastOnlyAtSorcerySpeed
+      " {\"type\":\"CastOnlyAtSorcerySpeed\"} "
   -- CR 305.1 / Damping Engine's land half.
   Spec.it s "CantPlayLands" $
     Common.assertCodec
