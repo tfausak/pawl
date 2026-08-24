@@ -1081,7 +1081,18 @@ mintedReplacementsFor keyword count = case keyword of
   -- position. Riot's rewrite asks a question and this one does not, so the count
   -- rides the rewrite rather than a prompt. ONE ROW PER INSTANCE, and CR 702.63c
   -- makes the counters add up, each rewrite placing its own N.
-  Keyword.Vanishing n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Time (Quantity.Literal (toInteger n))))))
+  --
+  -- NO ROW AT ALL for rule 702.63b's numberless vanishing, whatever the count:
+  -- that form states only the two triggers, and there is no N to enter with. The
+  -- permanent's own text is what puts the time counters on (Tidewalker's "for
+  -- each Island you control").
+  --
+  -- A row of Quantity.Literal 0 would be a regression fence rather than a proof:
+  -- Pawl.Engine.Event's WithCounters arm places nothing for a zero, so no board
+  -- tells the two apart today, and Pawl.KeywordTriggerSpec's numberless case says
+  -- so. The empty list is what rule 702.63b states, and a row minting ANY
+  -- positive number is what that case's 3/3 catches.
+  Keyword.Vanishing n -> foldMap (List.genericReplicate count . ReplacementEffect.EntryR . EntryR.MkEntryR Filter.IsSource . EntryRewrite.WithCounters . WithCounters.MkWithCounters CounterKind.Time . Quantity.Literal . toInteger) n
   -- CR 702.32a's FIRST ability, vanishing's row in the fade counter. One row per
   -- instance for riot's reason, rule 702.32 stating no multiplicity clause.
   Keyword.Fading n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Fade (Quantity.Literal (toInteger n))))))

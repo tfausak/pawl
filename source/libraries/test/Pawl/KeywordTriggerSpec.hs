@@ -3288,12 +3288,12 @@ vanishingSpec s registry =
           Spec.assertEqWith
             s
             "vanishing 2 held twice mints four triggers, two of each kind"
-            (fmap TriggeredAbility.condition (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Vanishing 2) 2)))
+            (fmap TriggeredAbility.condition (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Vanishing (Just 2)) 2)))
             [counted, emptied, counted, emptied]
           Spec.assertEqWith
             s
             "and two entry rewrites of two time counters each, which is what makes them add up"
-            (Keyword.mintedReplacementsFor (Keyword.Type.Vanishing 2) 2)
+            (Keyword.mintedReplacementsFor (Keyword.Type.Vanishing (Just 2)) 2)
             (replicate 2 (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Time (Quantity.Type.Literal 2))))))
 
 -- CR 702.32 fading, vanishing's neighbour and the reason the two are separate
