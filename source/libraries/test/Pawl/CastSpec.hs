@@ -2748,9 +2748,9 @@ flashSpec s registry = Spec.describe s "Flash" $ do
   -- puts it there on neither. Only an effect applying to a card SITTING in a hand
   -- puts it there on exactly one.
   --
-  -- Not implemented, so the card file omits it: Teferi's third clause, "each
-  -- opponent can cast spells only any time they could cast a sorcery" (#1860).
-  -- Bob casts nothing here, so nothing below turns on it.
+  -- Teferi's third clause is on the card and reaches nothing here: it is scoped
+  -- to his controller's opponents, and alice both controls him and takes every
+  -- cast below. teferiSorcerySpeedSpec is where that clause is proved.
   Spec.it s "CR 702.8a/613.1f Teferi gives a creature card in hand flash, and it is cast on bob's turn" $ do
     forest <- S.printingOf s registry "Forest"
     warMammoth <- S.printingOf s registry "War Mammoth"
@@ -3645,6 +3645,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   multiTargetCastSpec s registry
   soulImmolationSpec s registry
   drannithMagistrateSpec s registry
+  teferiSorcerySpeedSpec s registry
   grafdiggersCageCastSpec s registry
 
 -- CR 115.6's "up to one target", read at cast time. Rat Out {B} Instant is "Up
@@ -3984,6 +3985,117 @@ drannithMagistrateSpec s registry = Spec.describe s "Drannith Magistrate" $ do
         cast = S.runPure S.identityAnswer board (S.cast S.bob bobHand)
     Spec.assertEqWith s "the hand cast is on the stack" (length (GameState.stack cast)) 1
     Spec.assertBool s (not (S.castable S.bob bobGrave cast)) "and the graveyard copy is still refused with it there"
+
+-- Teferi, Mage of Zhalfir {2}{U}{U}{U} Legendary Creature -- Human Wizard 3/4:
+-- "Flash / Creature cards you own that aren't on the battlefield have flash. /
+-- Each opponent can cast spells only any time they could cast a sorcery." The
+-- THIRD clause, which PlayerEffect.CastOnlyAtSorcerySpeed states and
+-- Pawl.Engine.PlayerEffect.prohibitsCasting reads. The first two are flashSpec's
+-- two Teferi cases above.
+--
+-- CR 307.5 defines the printed phrase, and as three conjuncts rather than as "a
+-- sorcery could be cast": priority, a main phase of the player's own turn, and
+-- an empty stack. That is Turn.sorcerySpeedWindow verbatim, which is why no
+-- fourth copy of the window is written here.
+--
+-- Lightning Bolt {R} Instant is the spell, and an INSTANT deliberately: CR
+-- 117.1a hands an instant every priority its controller has, so a wrong engine
+-- offers it on alice's turn, where a creature card would be refused by CR 302.1
+-- and the board could not tell Teferi from the rules.
+--
+-- THREE seats, so PlayerScope.Opponents is not a two-seat coincidence and a fix
+-- that hardcoded "the player whose turn it isn't" fails carol. ONE Mountain and
+-- ONE Bolt per seat, alice included: she controls Teferi and is no opponent of
+-- her own, so her copy is what fails an over-broad fix, and the identical mana
+-- is what keeps affordability from being any seat's reason.
+teferiSorcerySpeedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+teferiSorcerySpeedSpec s registry = Spec.describe s "Teferi, Mage of Zhalfir" $ do
+  -- THE PROVING CASE. The two refusals come first, because every assertion after
+  -- them holds on today's engine too and would absorb a mutation.
+  Spec.it s "CR 307.5 an opponent's instant is refused in alice's main phase, offered in his own, and alice's own is untouched" $ do
+    teferi <- S.printingOf s registry "Teferi, Mage of Zhalfir"
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (aliceBolt, bobBolt, carolBolt, open) = teferiSorceryBoard mountain bolt
+        board = addTeferi teferi open
+        bobsTurn gs = gs {GameState.activePlayer = S.bob}
+        busy gs = gs {GameState.stack = [ObjectId.MkObjectId 999]}
+        casting pid oid gs = elem (A.Cast oid (S.printingName bolt) Facing.FaceUp) (offeredTo pid gs)
+    Spec.assertBool s (not (casting S.bob bobBolt board)) "bob may not cast an instant in alice's main phase"
+    Spec.assertBool s (not (casting S.carol carolBolt board)) "and neither may carol, the third seat"
+    Spec.assertBool s (casting S.alice aliceBolt board) "while alice, who controls Teferi, is no opponent of her own"
+    -- The SAME control at a moment alice is outside CR 307.5's window, which is
+    -- what tells PlayerScope.Opponents from PlayerScope.EachPlayer: on bob's turn
+    -- her own instant is still hers to cast, and an EachPlayer carrier would take
+    -- it away.
+    Spec.assertBool s (casting S.alice aliceBolt (bobsTurn board)) "and still is on bob's turn, where the clause would bite if it reached her"
+    Spec.assertBool s (casting S.bob bobBolt (bobsTurn board)) "and bob's own main phase with an empty stack still admits it"
+    -- CR 307.5's third conjunct, which the two boards above share and so cannot
+    -- separate: his own main phase is not enough while something is on the stack.
+    Spec.assertBool s (not (casting S.bob bobBolt (busy (bobsTurn board)))) "not even on his own turn with a spell already on the stack"
+  -- The paired board, differing in exactly one permanent: without Teferi bob's
+  -- Bolt is offered off the same Mountain at the same moment, so neither his mana
+  -- nor CR 117.1a was ever the reason it was refused above.
+  Spec.it s "CR 307.5 the pair: with no Teferi on the battlefield the same instant is offered" $ do
+    teferi <- S.printingOf s registry "Teferi, Mage of Zhalfir"
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (_, bobBolt, _, open) = teferiSorceryBoard mountain bolt
+        offered gs = elem (A.Cast bobBolt (S.printingName bolt) Facing.FaceUp) (offeredTo S.bob gs)
+    Spec.assertBool s (offered open) "no Teferi, so the instant is legal"
+    Spec.assertBool s (not (offered (addTeferi teferi open))) "and the one permanent is the whole difference"
+  -- CR 305.1: the clause narrows CASTING, and playing a land is a special action
+  -- that never uses the stack, so Teferi stops no land. bob's own turn is the
+  -- moment that shows it -- CR 305.3 forbids a land play on anyone else's turn,
+  -- so a board on alice's turn could not tell the two readings apart -- and this
+  -- is what gives prohibitsPlayingLand's arm an observer.
+  Spec.it s "CR 305.1 the clause stops no land play" $ do
+    teferi <- S.printingOf s registry "Teferi, Mage of Zhalfir"
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (_, _, _, open) = teferiSorceryBoard mountain bolt
+        (bobLand, stocked) = S.addHandCard mountain S.bob open
+        board = (addTeferi teferi stocked) {GameState.activePlayer = S.bob}
+    Spec.assertBool s (elem (A.Play bobLand Nothing) (offeredTo S.bob board)) "bob may still play a land with Teferi standing"
+  -- THE OTHER PATH, and the reason the clause is read in prohibitsCasting rather
+  -- than conjoined onto Cast.timingOk: Cast.castableWhileSearching asks
+  -- castableWhenOffered, which omits timingOk on purpose (CR 601.3's timing limb
+  -- is what Panglacial Wurm's permission excepts) and keeps the prohibit limb.
+  -- A timingOk conjunct would leave this offer standing.
+  --
+  -- THREE boards over one Wurm and one library: bob mid-search on alice's turn,
+  -- the same without Teferi, and the same on bob's own turn. The last is what
+  -- says the arm answers by CR 307.5's window rather than refusing every offer.
+  Spec.it s "CR 307.5 the offered path: an opponent's mid-search cast is refused too" $ do
+    teferi <- S.printingOf s registry "Teferi, Mage of Zhalfir"
+    forest <- S.printingOf s registry "Forest"
+    wurm <- S.printingOf s registry "Panglacial Wurm"
+    let open = S.landsFor forest S.bob 7 (aliceOnTurn S.threePlayerGame)
+        stocked = snd (S.addLibraryCard wurm S.bob open)
+        board = addTeferi teferi stocked
+        offers gs = length (Cast.castableWhileSearching S.bob gs)
+    Spec.assertEqWith s "bob's mid-search cast is refused on alice's turn" (offers board) 0
+    Spec.assertEqWith s "without Teferi the same offer stands, off the same seven Forests" (offers stocked) 1
+    Spec.assertEqWith s "and with Teferi it stands again once it is bob's own turn" (offers (board {GameState.activePlayer = S.bob})) 1
+
+-- Three seats, one untapped Mountain and one Lightning Bolt in hand each, alice
+-- on her own turn in her precombat main phase with an empty stack. No Teferi yet
+-- -- `addTeferi` adds him, so the two boards differ in exactly that permanent.
+teferiSorceryBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+teferiSorceryBoard mountain bolt =
+  let gs1 = S.landsFor mountain S.alice 1 S.threePlayerGame
+      gs2 = S.landsFor mountain S.bob 1 gs1
+      gs3 = S.landsFor mountain S.carol 1 gs2
+      (aliceBolt, gs4) = S.addHandCard bolt S.alice gs3
+      (bobBolt, gs5) = S.addHandCard bolt S.bob gs4
+      (carolBolt, gs6) = S.addHandCard bolt S.carol gs5
+   in (aliceBolt, bobBolt, carolBolt, aliceOnTurn gs6)
+
+addTeferi :: Printing.Printing -> GameState.GameState -> GameState.GameState
+addTeferi teferi gs = snd (S.addCreature teferi S.alice gs)
 
 -- Grafdigger's Cage {1} Artifact (DKA 150): "Creature cards in graveyards and
 -- libraries can't enter the battlefield. / Players can't cast spells from

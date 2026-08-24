@@ -302,9 +302,10 @@ actionSpec s registry = Spec.describe s "Action" $ do
   -- goes onto the battlefield either way -- and priorityLoop advances no step,
   -- so alice never reaches a main phase inside it.
   --
-  -- Not implemented, so the card file omits it: Teferi's third clause, "each
-  -- opponent can cast spells only any time they could cast a sorcery" (#1860).
-  -- Bob plays nothing here, so nothing below turns on it.
+  -- Teferi's third clause is on the card and reaches nothing here: it is scoped
+  -- to his controller's opponents, alice both controls him and takes the action,
+  -- and the action is a land PLAY, which CR 305.1 makes a special action rather
+  -- than a cast.
   Spec.it s "CR 702.8a/116.2a a land card with flash is played during its controller's upkeep" $ do
     dryadArbor <- S.printingOf s registry "Dryad Arbor"
     teferi <- S.printingOf s registry "Teferi, Mage of Zhalfir"
