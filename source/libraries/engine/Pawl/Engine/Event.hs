@@ -6987,8 +6987,9 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- is an opcode, not a bar, and this is the reading the rule states.
   --
   -- Saga.crossed says the same sentence for lore counters and is deliberately not
-  -- reused: its haddock ties it to CR 714.2b and to CR 704.5s's state-based
-  -- action, and a class level has no state-based action to agree with.
+  -- reused: it is over Naturals, and its haddock ties it to CR 714.2b and to the
+  -- agreement CR 704.5s's state-based action needs with it. A class level is a
+  -- ClassLevel and has no state-based action to agree with.
   TriggerCondition.SelfBecomesClassLevel n -> case event of
     GameEvent.ClassLevelSet (ClassLevelChange.MkClassLevelChange oid before after) -> oid == bearer && before < n && n <= after
     GameEvent.CountersPut {} -> False
