@@ -9570,6 +9570,9 @@ batchScoped condition = case condition of
   TriggerCondition.SelfLeavesTheBattlefield -> False
   TriggerCondition.PermanentLeavesTheBattlefield _ -> False
   TriggerCondition.AttachedCreatureDies -> False
+  -- CR 603.2e names the MOMENT a permanent becomes tapped, and a moment holds one
+  -- occurrence; no printing of that event says "one or more".
+  TriggerCondition.AttachedCreatureBecomesTapped -> False
   TriggerCondition.HauntedCreatureDies -> False
   TriggerCondition.PermanentSacrificed -> False
   TriggerCondition.AnyOf conditions -> any batchScoped conditions
