@@ -33,6 +33,7 @@ import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Decide as Decide
@@ -73,6 +74,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
+import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ControlChanged as ControlChanged
 import qualified Pawl.Types.ControllerBecomesTarget as ControllerBecomesTarget
@@ -596,7 +598,8 @@ unscannedEvents = fmap LoggedEvent.event . unscannedGrouped
 
 -- The events the STATE-BASED ACTION check has not yet consumed -- CR 704.5h's
 -- "since the last state-based action check", and the same boundary CR 903.9a
--- names. Pawl.Engine.Commander.returnable is the other reader.
+-- names. Pawl.Engine.Sba hands these to Pawl.Engine.Commander.returnable, the
+-- other reader.
 unscannedSbaEvents :: GameState -> [GameEvent]
 unscannedSbaEvents gs =
   fmap LoggedEvent.event (Foldable.toList (Seq.drop (Natural.toIntSaturating (GameState.damageScannedThrough gs)) (GameState.events gs)))
@@ -701,7 +704,55 @@ createEmblem pid card = do
 resolveZoneChange :: Maybe GameState -> ZoneChange -> Game (Maybe ZoneChange, Maybe ObjectId)
 resolveZoneChange asOf zc = do
   (outcome, _, exiledBy) <- applyReplacementsFully asOf Set.empty (ProposedEvent.WouldChangeZone zc)
-  pure (outcome >>= Replacement.asZoneChange, exiledBy)
+  case outcome >>= Replacement.asZoneChange of
+    Nothing -> pure (Nothing, exiledBy)
+    Just settled -> do
+      redirected <- offerCommandZone settled
+      pure (Just redirected, exiledBy)
+
+-- CR 903.9b: "if a commander would be put into its owner's hand or library from
+-- anywhere, its owner may put it into the command zone instead". The question;
+-- Pawl.Engine.Commander.commandZoneOffer is the condition, and says why the owner
+-- is who is asked.
+--
+-- A RULES step in the funnel rather than a third segment of
+-- Pawl.Engine.Replacement.collect, which holds a battlefield permanent's printed
+-- static abilities and the floating rows a resolution installed -- both things a
+-- CARD carries. Synthesizing a ReplacementEffect.ZoneChangeR from rule 903.9b
+-- would put a rules-invented value into the structure whose whole point is that it
+-- came from data, and rule 903.9b's "may" has no home on that type in any case:
+-- every ZoneChangeR is unconditional, so the prompt would have to be asked from
+-- `apply`'s generic arm under a guard on WHICH candidate this is. Pawl.Engine.Cast's
+-- CR 205.4e legend restriction and EntryRestriction.prohibited below take the same
+-- posture -- a rule the rulebook states is asked here, not modelled as a card.
+--
+-- AFTER the CR 616.1 loop and asked of the SETTLED destination, CR 614.6's
+-- reading: a printed redirect that already moved this move off a hand or a library
+-- is the event that happens, and rule 903.9b has nothing to say about it.
+--
+-- Not implemented: a position in CR 616.1e's ordering among the other applicable
+-- replacements (#2266). Unobservable while no ZoneChangeR in data/cards/ matches a
+-- hand or a library -- all six match a graveyard or the stack and redirect to exile
+-- -- so no second candidate can be applicable to the same event; a printed redirect
+-- naming a hand or a library as the destination it watches (Wheel of Sun and Moon
+-- is the shape) would refute that.
+--
+-- No case on effect identity: the question is a proposed event's destination ZONE
+-- and whether its subject is a commander.
+offerCommandZone :: ZoneChange -> Game ZoneChange
+offerCommandZone zc = do
+  gs <- State.get
+  case Commander.commandZoneOffer zc gs of
+    Nothing -> pure zc
+    Just owner -> do
+      decision <- Game.choose (Prompt.ReturnCommander (Decide.deciderFor owner gs) owner (ZoneChange.departed zc))
+      pure $ case decision of
+        -- CR 614.6: the modified event is what happens, so the destination is
+        -- rewritten rather than the card being moved twice. changeZoneAttaching
+        -- places it under Object.owner, which is rule 903.9b's "its owner" for a
+        -- stolen commander too.
+        CommandZoneDecision.Returns -> zc {ZoneChange.to = Zone.Command}
+        CommandZoneDecision.Leaves -> zc
 
 -- CR 616.1's loop. `Nothing` means the event DOES NOT HAPPEN (CR 615.6, CR
 -- 701.19a). A rewrite that cancels an event has already performed its own
