@@ -87,6 +87,7 @@ encode p answer = case p of
   Prompt.AnnounceTargets {} -> Response.AnnouncedTargets answer
   Prompt.ChooseLandTypeSwap {} -> Response.ChoseLandTypeSwap answer
   Prompt.ChooseCreatureTypeSwap {} -> Response.ChoseCreatureTypeSwap answer
+  Prompt.ChooseSearchZones {} -> Response.ChoseSearchZones answer
   Prompt.Search {} -> Response.Searched answer
   Prompt.CastWhileSearching {} -> Response.CastWhileSearched answer
   Prompt.ChooseX {} -> Response.ChoseX answer
@@ -274,6 +275,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseCreatureTypeSwap {} -> case response of
     Response.ChoseCreatureTypeSwap pair -> Just pair
+    _ -> Nothing
+  Prompt.ChooseSearchZones {} -> case response of
+    Response.ChoseSearchZones zones -> Just zones
     _ -> Nothing
   Prompt.Search {} -> case response of
     Response.Searched found -> Just found
@@ -596,6 +600,12 @@ defaultAnswer p = case p of
   -- Not implemented: neither swap prompt's stated restrictions are checked
   -- against the answer that comes back (#641).
   Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Frog, Subtype.Frog)
+  -- Every zone the card named. Always legal -- "and/or" permits all of them --
+  -- and deliberately the MAXIMAL answer rather than a least-eventful one: it is
+  -- what pawl did before the searcher was asked at all, so a board that does not
+  -- care about the choice plays exactly as it did. Least-eventful would be one
+  -- zone, and there is no principled way to say which.
+  Prompt.ChooseSearchZones _ _ offered -> offered
   -- CR 701.23b: failing to find is always legal, and the empty answer is that
   -- outcome for a search of any size.
   Prompt.Search {} -> []
