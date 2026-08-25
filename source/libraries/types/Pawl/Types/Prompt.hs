@@ -838,6 +838,28 @@ data Prompt r where
   -- CLASSIFICATION rather than their identity; a modal payload mixing a live mode
   -- with a dead one is what reaches it ahead of CR 608.2b's fizzle.
   ChooseOptional :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> ClauseIndex.ClauseIndex -> Prompt OptionalDecision.OptionalDecision
+  -- | CR 608.2d's "or": which of a resolving mode's mutually exclusive clauses
+  -- happens, announced "while applying the effect" -- Twiddle's "you may tap or
+  -- untap target artifact, creature, or land". The NonEmpty is the branches in
+  -- printed order (CR 608.2c), and the answer is filtered back through it, so
+  -- one naming no offered branch takes the first.
+  --
+  -- The ObjectId is the object RESOLVING and the ModeIndex says which instance
+  -- (CR 700.2d), both for ChooseOptional's reasons. Asked ONCE per exclusive
+  -- group, at whichever branch the resolution reaches first, and answered by the
+  -- controller alone: CR 608.2d's "the player" is the one applying the effect,
+  -- where CR 603.5's "may" can name other seats (Pawl.Types.Optionality).
+  --
+  -- NOT ChooseModes. CR 700.2 makes a spell modal only for two or more options
+  -- "in a bulleted list preceded by instructions for a player to choose", and CR
+  -- 601.2b fixes those as the spell is cast; this is announced on resolution.
+  --
+  -- Asked BEFORE ChooseOptional, so a card printing one "may" over an either-or
+  -- raises one "may" and not one per branch.
+  --
+  -- Never elided: two branches are two different instruction lists, so the board
+  -- they leave differs whenever either does anything at all.
+  ChooseClause :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> NonEmpty.NonEmpty ClauseIndex.ClauseIndex -> Prompt ClauseIndex.ClauseIndex
   -- | CR 608.2g: a cast a RESOLVING effect specifically allows. CR 310.12b's
   -- "then you may cast it transformed without paying its mana cost" is the
   -- producer. The ObjectId is the CARD being offered -- the exiled incarnation
