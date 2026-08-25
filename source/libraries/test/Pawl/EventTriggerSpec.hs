@@ -26,6 +26,7 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Goad as Goad
 import qualified Pawl.Engine.Plot as Plot
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
@@ -3288,6 +3289,147 @@ anafenzaAttackSpec s registry =
             Spec.assertEqWith s "and neither is a creature bob controls" (countersOn theirs settled) (Just 0)
           _ -> Spec.assertFailure s "fixture should give alice Anafenza, a Piker and a Wall, and bob a Piker"
 
+-- CR 508.3e: "whenever [a player] attacks [another player]" -- the last of rule
+-- 508.3's arities, and the only one whose subject is a PAIR of players.
+--
+-- Seifer, Balamb Rival {2}{B}{R} Legendary Creature -- Human Mercenary 4/3 is
+-- the card, and this group is its SECOND line: "whenever you attack a player,
+-- goad target creature that player controls". Its third line is CR 509.3e's and
+-- lives in Pawl.KeywordTriggerSpec; its first is first strike.
+--
+-- The payload is what makes the condition's second subject observable at all.
+-- "That player" is the ATTACKED player, bound under
+-- Pawl.Engine.Binding.triggerPlayer, and the target slot's
+-- Filter.ControlledByBound reads it -- so an arm that bound the attacking player
+-- instead offers alice's own creatures, and one that bound nothing offers
+-- nobody and CR 603.3d removes the trigger. Both are visible below, because the
+-- goaded creature is asserted by IDENTITY: bob controls two Giants, the
+-- answerer pins the second, and alice's attacking Elves is asserted untouched
+-- beside them.
+--
+-- The Jace board proves rule 508.3e's last sentence, "it won't trigger if a
+-- creature attacks a planeswalker or a battle", and it is the firing board with
+-- one permanent added and the announcement moved. Rule 508.3e's other exclusion
+-- -- a creature put onto the battlefield attacking -- is not tested here: CR
+-- 508.4 says such a creature was never declared and
+-- Pawl.Engine.Combat.putOntoBattlefieldAttacking records no event at all, so no
+-- board can tell a correct implementation from any other.
+--
+-- The third board moves Seifer to the DEFENDING seat, which is what proves the
+-- relation is read: CR 109.5's "you" is Seifer's controller, bob does not
+-- declare, and a reading of AnyPlayer would goad one of bob's own Giants.
+seiferSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+seiferSpec s registry =
+  let board mine theirs = do
+        ours <- mapM (S.printingOf s registry) mine
+        yours <- mapM (S.printingOf s registry) theirs
+        pure (S.combatBoardOf ours yours)
+      -- Declares `attacker` alone, announces it at `target`, and points the
+      -- goad's one target slot at `victim`. Both choices are FILTERED out of
+      -- what the engine offered rather than built, so a recipient CR 608.2b
+      -- would drop at resolution cannot pass for the right one, and a mutation
+      -- cannot be repaired by an answerer that hunts for something legal.
+      answering :: ObjectId.ObjectId -> AttackTarget.AttackTarget -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+      answering attacker target victim p = case p of
+        Prompt.DeclareAttackers _ _ ids -> filter (== attacker) ids
+        Prompt.ChooseAttackTarget _ _ _ options -> Maybe.fromMaybe (NonEmpty.head options) (List.find (== target) (NonEmpty.toList options))
+        Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just victim) . Recipient.objectOf) . snd) sets
+        _ -> S.aggressiveAnswer p
+      -- One declaration naming TWO attackers, announced at two different things
+      -- CR 508.1b admits: `one` at bob and `two` at bob's planeswalker. The goad
+      -- still points at `victim`, and everything else is `answering` above.
+      splitting :: ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+      splitting one two jace victim p = case p of
+        Prompt.DeclareAttackers _ _ ids -> filter (\oid -> oid == one || oid == two) ids
+        Prompt.ChooseAttackTarget _ _ oid options ->
+          let wanted = if oid == one then AttackTarget.OfPlayer S.bob else AttackTarget.OfPlaneswalker jace
+           in Maybe.fromMaybe (NonEmpty.head options) (List.find (== wanted) (NonEmpty.toList options))
+        _ -> answering one (AttackTarget.OfPlayer S.bob) victim p
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+      sentAt gs = Combat.Type.attackers (GameState.combat gs)
+      -- How many of rule 508.3e's triggers CR 603.2 wrote down. Read off the log
+      -- rather than at gameplay level because a trigger this condition should
+      -- not have fired leaves NO gameplay trace on these boards: `thatPlayer` is
+      -- bound only off an AttackTarget.OfPlayer, so a spurious firing finds no
+      -- legal target and CR 603.3d removes it. The count is the closest
+      -- observable there is, and it is what the two silent boards below lead
+      -- with.
+      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacksPlayer (AbilityTriggered.condition record)]
+   in Spec.describe s "Seifer, Balamb Rival" $ do
+        -- The proving test: alice attacks bob, so rule 508.3e's two subjects are
+        -- alice and bob, and the goad lands on the Giant the trigger named.
+        Spec.it s "CR 508.3e attacking a player goads a creature that player controls" $ do
+          (gs, mine, theirs) <- board ["Llanowar Elves", "Seifer, Balamb Rival"] ["Hill Giant", "Hill Giant"]
+          case (mine, theirs) of
+            ([elves, _], [first, second]) -> do
+              let after = atBlockers (answering elves (AttackTarget.OfPlayer S.bob) second) gs
+              Spec.assertEqWith s "CR 701.15a the named Giant is goaded by Seifer's controller" (Goad.goadedBy second after) (Set.singleton S.alice)
+              Spec.assertEqWith s "and the Giant the trigger did not name is not" (Goad.goadedBy first after) Set.empty
+              -- "That player controls" is bob's, so alice's own attacker was
+              -- never a candidate -- the leg that parts the attacked player from
+              -- the attacking one.
+              Spec.assertEqWith s "and neither is alice's own attacker" (Goad.goadedBy elves after) Set.empty
+              Spec.assertEqWith s "CR 508.1 and the Elves really was declared at bob" (sentAt after) (Map.fromList [(elves, AttackTarget.OfPlayer S.bob)])
+            _ -> Spec.assertFailure s "fixture should give alice an Elves and a Seifer, and bob two Giants"
+        -- The same board with a Jace added and the one announcement moved to it.
+        -- CR 508.5 still makes bob the defending player, so this is the leg an
+        -- arm reading that field instead of the event's AttackTarget gets wrong.
+        --
+        -- Jace is stocked with loyalty by hand: S.addCreature puts a printing
+        -- onto the battlefield with no counters, and CR 704.5i would take a
+        -- loyalty-0 planeswalker away before attackers are declared.
+        Spec.it s "CR 508.3e attacking a planeswalker that player controls leaves it silent" $ do
+          (gs, mine, theirs) <- board ["Llanowar Elves", "Seifer, Balamb Rival"] ["Hill Giant", "Hill Giant", "Jace Beleren"]
+          case (mine, theirs) of
+            ([elves, _], [first, second, jace]) -> do
+              let ready = S.addCounter CounterKind.Loyalty 3 jace gs
+                  after = atBlockers (answering elves (AttackTarget.OfPlaneswalker jace) second) ready
+              Spec.assertEqWith s "CR 508.3e no trigger at all" (fired after) 0
+              Spec.assertEqWith s "CR 701.15a and neither Giant is goaded" (Goad.goadedBy second after, Goad.goadedBy first after) (Set.empty, Set.empty)
+              Spec.assertEqWith s "and the attack really was declared at Jace" (sentAt after) (Map.fromList [(elves, AttackTarget.OfPlaneswalker jace)])
+            _ -> Spec.assertFailure s "fixture should give alice an Elves and a Seifer, and bob two Giants and a Jace"
+        -- CR 109.5's "you": the relation is read against the ability's
+        -- CONTROLLER, so a Seifer bob controls watches bob's declarations and
+        -- not alice's. The firing board with Seifer moved one seat, and nothing
+        -- else changed -- and bob's Giants are exactly the creatures a misread
+        -- would goad, since the attacked player is bob either way.
+        Spec.it s "CR 508.3e a Seifer the defending player controls is silent" $ do
+          (gs, mine, theirs) <- board ["Llanowar Elves"] ["Hill Giant", "Hill Giant", "Seifer, Balamb Rival"]
+          case (mine, theirs) of
+            ([elves], [first, second, _]) -> do
+              let after = atBlockers (answering elves (AttackTarget.OfPlayer S.bob) second) gs
+              Spec.assertEqWith s "CR 701.15a neither Giant is goaded" (Goad.goadedBy second after, Goad.goadedBy first after) (Set.empty, Set.empty)
+              Spec.assertEqWith s "CR 508.3e and no trigger fired to be removed" (fired after) 0
+              Spec.assertEqWith s "and the Elves really was declared at bob" (sentAt after) (Map.fromList [(elves, AttackTarget.OfPlayer S.bob)])
+            _ -> Spec.assertFailure s "fixture should give alice an Elves, and bob two Giants and a Seifer"
+        -- Rule 508.3e's ARITY, which is CR 508.3b's and not rule 508.3d's: one
+        -- trigger per player attacked. alice sends one Elves at bob and one at
+        -- bob's Jace, which is ONE declaration, ONE attacked player and one
+        -- trigger -- a reading against GameEvent.AttackersDeclared would fire
+        -- once here too, so the number is not what parts them; the Jace board
+        -- above is.
+        --
+        -- Counted off the event log rather than at gameplay level because this
+        -- card cannot show the difference: goading the same Giant twice is
+        -- indistinguishable from goading it once (CR 701.15a, the Set the
+        -- goadedBy field keeps).
+        Spec.it s "CR 508.3e a declaration split across a player and a planeswalker fires it once" $ do
+          (gs, mine, theirs) <- board ["Llanowar Elves", "Llanowar Elves", "Seifer, Balamb Rival"] ["Hill Giant", "Hill Giant", "Jace Beleren"]
+          case (mine, theirs) of
+            ([one, two, _], [_, second, jace]) -> do
+              let ready = S.addCounter CounterKind.Loyalty 3 jace gs
+                  after = atBlockers (splitting one two jace second) ready
+              Spec.assertEqWith s "one trigger from the one attacked PLAYER" (fired after) 1
+              Spec.assertEqWith s "CR 701.15a and the Giant it named is goaded" (Goad.goadedBy second after) (Set.singleton S.alice)
+              Spec.assertEqWith s "CR 508.1b and the declaration really did split" (sentAt after) (Map.fromList [(one, AttackTarget.OfPlayer S.bob), (two, AttackTarget.OfPlaneswalker jace)])
+            _ -> Spec.assertFailure s "fixture should give alice two Elves and a Seifer, and bob two Giants and a Jace"
+
+-- Rule 508.3e's condition, read off the log entry CR 603.2 writes for a trigger.
+isPlayerAttacksPlayer :: TriggerCondition.TriggerCondition -> Bool
+isPlayerAttacksPlayer condition = case condition of
+  TriggerCondition.PlayerAttacksPlayer _ -> True
+  _ -> False
+
 -- CR 122.1's experience counters READ, with Ezuri, Claw of Progress {2}{G}{U}
 -- Legendary Creature -- Phyrexian Elf Warrior 3/3: "Whenever a creature you
 -- control with power 2 or less enters, you get an experience counter. At the
@@ -4740,6 +4882,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   boggartPranksterSpec s registry
   avatarRokuSpec s registry
   hermesSpec s registry
+  seiferSpec s registry
   ezuriExperienceSpec s registry
   youngPyromancerSpec s registry
   whisperingWizardSpec s registry
