@@ -1404,12 +1404,11 @@ rewriteCost pairs cost = cost {Cost.components = fmap (rewriteComponent pairs) (
 --
 -- Of the six, only Sacrifice has a producer: Dark Heart of the Wood on an
 -- activation cost, and Lithophage on the cost a trigger offers as it resolves
--- (CR 118.12). The
--- TapForTotalPower, TapPermanents, DiscardCards, ExileCardsFromGraveyard and
--- ExileTopFromGraveyard arms are a regression fence: no printing pairs any of
--- them with a basic land type, so no test can falsify them. Magmatic Insight's
--- "a land card" comes closest and is still not one -- CR 612.2 swaps a SUBTYPE
--- word, and the land CARD TYPE is not one.
+-- (CR 118.12). The TapForTotalPower, TapPermanents, DiscardCards,
+-- ExileCardsFromGraveyard and ExileTopFromGraveyard arms are a regression fence:
+-- no printing pairs any of them with a basic land type, so no test can falsify
+-- them. Magmatic Insight's "a land card" comes closest and is still not one --
+-- CR 612.2 swaps a SUBTYPE word, and the land CARD TYPE is not one.
 rewriteComponent :: [(Subtype.Subtype, Subtype.Subtype)] -> CostComponent.CostComponent Keyword.Type.Keyword -> CostComponent.CostComponent Keyword.Type.Keyword
 rewriteComponent pairs component = case component of
   CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) -> CostComponent.Sacrifice (Sacrifice.MkSacrifice n (rewrite pairs criterion))
