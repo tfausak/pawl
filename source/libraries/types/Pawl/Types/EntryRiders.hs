@@ -94,10 +94,10 @@ import qualified Pawl.Types.TapState as TapState
 -- INSIDE whichever door the object arrives by: inside the CR 400.7 funnel for a
 -- move, before its entry loop and before the Moved event, and for a batch of
 -- created tokens after all of them are minted but before any entry loop, so CR
--- 614.12's reading of that batch sees them. Through Event.putCounters either way,
--- CR 122.6's funnel, so CR 614.16 applies and Doubling Season sees them -- the
--- posture EntryRewrite.WithCounters takes for the counters a permanent's OWN text
--- asks for.
+-- 614.12's reading of that batch sees them. Through Event.addEnteringCounters
+-- either way, so CR 614.16 applies inside the entry's own CR 616.1 loop and
+-- Doubling Season sees them -- the posture EntryRewrite.WithCounters takes for the
+-- counters a permanent's OWN text asks for.
 --
 -- READ BY BOTH opcodes, unlike `transformed` above: a Create hands it to
 -- Event.createTokens and a MoveToZone to Event.changeZoneEntering.

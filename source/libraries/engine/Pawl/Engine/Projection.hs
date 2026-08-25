@@ -23,7 +23,6 @@ import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype
-import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
@@ -2116,6 +2115,10 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
   EntryRewrite.Riot -> rewrite
   EntryRewrite.Unleash -> rewrite
   EntryRewrite.Bloodthirst _ -> rewrite
+  -- CR 702.150a states compleated whole, the symbol count being CR 118.13a's
+  -- announced payment rather than card text, so there is no word here for CR
+  -- 612.1 either.
+  EntryRewrite.Compleated _ -> rewrite
   -- CR 614.1d's bare "enters tapped", and the life total CR 614.1c's alternative
   -- to it asks for: a tap status and a number.
   EntryRewrite.Tapped -> rewrite
@@ -4010,17 +4013,12 @@ shieldCounters oid gs = case Game.lookupObject oid gs of
 -- keyword, is inside it. `announcedX` is CR 107.3m's, and the loyalty arm is its
 -- one reader: a printed loyalty of X is settled at CR 601.2b before it arrives.
 --
--- CR 702.150a's compleated lands INSIDE the loyalty arm rather than beside it as
--- a minted row of its own, and rule 702.150a's wording is why: it says the
--- permanent "instead enters the battlefield with THAT MANY loyalty counters minus
--- two", which changes the number this row places rather than placing any. Read
--- off the same finished projection, so a compleated ability the CR 613 fold
--- removed is gone -- which is what a keyword needs, where CR 306.5b's loyalty
--- itself is a rule and stays.
---
--- Not implemented: CR 616.1's choice of order between rule 702.150a and another
--- replacement modifying the same entry -- CR 614.16's counter multipliers are the
--- ones that would differ, and no such card is in `data/cards/` (#1996).
+-- CR 702.150a's compleated is a ROW OF ITS OWN below rather than arithmetic
+-- inside the loyalty arm, so CR 616.1e can order it against CR 614.16's counter
+-- multipliers -- Tamiyo, Compleated Sage under a Doubling Season is the board
+-- where the two orders disagree. Read off the same finished projection, so a
+-- compleated ability the CR 613 fold removed is gone -- which is what a keyword
+-- needs, where CR 306.5b's loyalty itself is a rule and stays.
 intrinsicReplacementsOf :: Natural -> Natural -> ProjectedCharacteristics -> [ReplacementEffect (Effect.Effect Card.Type.Card)]
 intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
   [ -- CR 614.1c: the entering object is the ability's own source, so the pattern
@@ -4028,18 +4026,20 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
   ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Loyalty (Quantity.Type.Literal (toInteger n)))))
   | Set.member CardType.Planeswalker (PC.cardTypes pc),
     printed <- Maybe.maybeToList (PC.loyalty pc),
-    let base = case printed of
+    let n = case printed of
           Loyalty.Literal m -> m
-          Loyalty.Variable -> announcedX,
-    -- CR 702.150a: "minus two for each of those mana symbols". Saturating,
-    -- because a counter count is a Natural and rule 122.1 knows no negative
-    -- number of them -- rule 702.150a's own "would enter with one or more" is
-    -- what makes the floor unreachable on a printed card anyway.
-    let n =
-          if Map.member Keyword.Type.Compleated (PC.keywords pc)
-            then Natural.minusSaturating base (2 * phyrexianLifePaid)
-            else base
+          Loyalty.Variable -> announcedX
   ]
+    -- CR 702.150a's compleated, minted as its own CR 614.1c row so CR 616.1e
+    -- orders it against every other row modifying the same entry. Minted only
+    -- when life was actually paid, because rule 702.150a's own condition is
+    -- "chose to pay life": a row that subtracted nothing would still cost the
+    -- controller an ordering prompt.
+    <> [ ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.Compleated phyrexianLifePaid))
+       | Set.member CardType.Planeswalker (PC.cardTypes pc),
+         Map.member Keyword.Type.Compleated (PC.keywords pc),
+         phyrexianLifePaid > 0
+       ]
     -- CR 310.4b's intrinsic defense counters -- CR 306.5b's clause one rule
     -- number over, keyed on the projected card type.
     <> [ ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Defense (Quantity.Type.Literal (toInteger n)))))

@@ -13,6 +13,7 @@ import qualified Pawl.Types.BattlefieldCandidate as BattlefieldCandidate
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
@@ -20,6 +21,7 @@ import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
 import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.IgnoredAbility as IgnoredAbility
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
@@ -305,6 +307,24 @@ data GameState = MkGameState
     -- Empty at every priority window the engine reaches, exactly as the two
     -- queues above are: it is non-empty only for the span of one entry loop.
     enteringBeside :: Set.Set ObjectId.ObjectId,
+    -- | CR 614.1c: the counters each entering permanent is so far going to enter
+    -- WITH, pending. Written by Pawl.Engine.Event's entry rewrites and by the two
+    -- doors that dress a permanent before its entry loop, rewritten by the
+    -- CounterR and Compleated rows that CR 616.1 orders against each other, and
+    -- flushed onto the object by runEntry once the loop drains.
+    --
+    -- SEPARATE from Object.counters, not folded into it, because the two doors
+    -- above run before runEntry and their comments rest on no entry replacement
+    -- reading a counter the object already has. A pending map keeps that true:
+    -- nothing here is on the object yet.
+    --
+    -- Keyed by ObjectId rather than held as one map, because an entry rewrite can
+    -- reach another entry (SacrificeAnyNumber sacrifices, RunEffects resolves) and
+    -- the outer subject's pending count has to survive the inner one.
+    --
+    -- Empty outside an entry. An id is inserted when the first row gives that
+    -- object counters and deleted by the flush.
+    enteringCounters :: Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural),
     -- | CR 611.1 / 613.11: stored PLAYER and RULES-modifying continuous effects
     -- from resolutions (Silence), each with an expiry the Pawl.Engine.Expiry
     -- sweeps consult. A permanent's printed player abilities are NOT here --

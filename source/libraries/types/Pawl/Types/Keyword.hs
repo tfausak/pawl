@@ -1030,8 +1030,9 @@ data Keyword
     -- twice and may take a counter for one and haste for the other.
     --
     -- The two halves are deliberately NOT split across two constructors or
-    -- folded into an existing rewrite. The counter half goes through CR 122.6's
-    -- funnel so CR 614.16 sees it (Doubling Season doubles riot's counter), and
+    -- folded into an existing rewrite. The counter half joins the counters the
+    -- permanent is entering with, where CR 614.16 sees it (Doubling Season doubles
+    -- riot's counter), and
     -- the haste half is a CR 611.2 continuous effect with no duration -- neither
     -- is a copiable value, which is what rules out reusing
     -- Pawl.Types.EntryOption's keyword set (CR 707.2).
@@ -1141,19 +1142,16 @@ data Keyword
     -- subtract twice for one symbol, which the rule's own "for each of those mana
     -- symbols" already counts.
     --
-    -- NOT a minted EntryRewrite row, where riot and unleash are. A second row
-    -- alongside CR 306.5b's intrinsic loyalty would place its own counters rather
-    -- than change how many that row places, so this is read inside
-    -- Pawl.Engine.Projection.intrinsicReplacementsOf, off the same finished
-    -- projection -- which keeps it inside the CR 613 layer fold, where a keyword
-    -- belongs and where LoseAllAbilities can reach it.
+    -- A MINTED EntryRewrite row, where riot and unleash are, and NOT arithmetic
+    -- folded into CR 306.5b's count: rule 702.150a's "that many minus two" is a
+    -- rewrite of the PENDING loyalty count rather than a placement of its own,
+    -- so only a row can be ORDERED against CR 614.16's counter multipliers under
+    -- CR 616.1e. Pawl.Engine.Projection.intrinsicReplacementsOf mints it off the
+    -- same finished projection -- which keeps it inside the CR 613 layer fold,
+    -- where a keyword belongs and where LoseAllAbilities can reach it.
     --
     -- The COST RECORD it reads is Object.phyrexianLifePaid, CR 400.7d's
     -- exception carried onto the permanent exactly as Object.kicked is.
-    --
-    -- Not implemented: CR 616.1's choice of order between this and another
-    -- replacement modifying the same entry -- Doubling Season's is the one that
-    -- would differ, and no counter-multiplying card is in `data/cards/` (#1996).
     Compleated
   | -- | 702.155a: read ahead, a keyword found on some Saga cards. "Chapter
     -- abilities of this Saga can't trigger the turn it entered the battlefield

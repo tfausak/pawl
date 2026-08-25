@@ -201,7 +201,7 @@ tracksLore pc = isSaga pc && not (null (chaptersOf pc))
 --
 -- The shape CR 306.5b's starting loyalty already uses, and minted the same way --
 -- from the finished projection, by Pawl.Engine.Projection.intrinsicReplacementsOf
--- -- so the counters go through Pawl.Engine.Event.putCounters and CR 614.16 holds:
+-- -- so the counters join the ones the Saga is entering with and CR 614.16 holds:
 -- Doubling Season gives a Saga two lore counters as it enters, and CR 714.2b's
 -- chapters I and II both fire off that one placement.
 --

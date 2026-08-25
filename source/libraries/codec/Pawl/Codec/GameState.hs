@@ -13,6 +13,7 @@ import qualified Pawl.Codec.BattlefieldCandidate as BattlefieldCandidate
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Combat as Combat
 import qualified Pawl.Codec.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Daytime as Daytime
 import qualified Pawl.Codec.Decider as Decider
 import qualified Pawl.Codec.DelayedTrigger as DelayedTrigger
@@ -20,6 +21,7 @@ import qualified Pawl.Codec.EndTurnSignal as EndTurnSignal
 import qualified Pawl.Codec.EventGroup as EventGroup
 import qualified Pawl.Codec.ExtraTurn as ExtraTurn
 import qualified Pawl.Codec.IgnoredAbility as IgnoredAbility
+import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.LastKnown as LastKnown
 import qualified Pawl.Codec.LoggedEvent as LoggedEvent
 import qualified Pawl.Codec.Mana as Mana
@@ -86,6 +88,7 @@ codec = Fields.object $ do
   ambientAmounts <- Fields.required "ambientAmounts" (Common.textMap SlotName.Type.unwrap (Right . SlotName.Type.MkSlotName) Common.natural) GameState.ambientAmounts
   pendingEntryEffects <- Fields.required "pendingEntryEffects" (Common.seq PendingEntryEffect.codec) GameState.pendingEntryEffects
   enteringBeside <- Fields.required "enteringBeside" (Common.set ObjectId.codec) GameState.enteringBeside
+  enteringCounters <- Fields.required "enteringCounters" (Common.naturalMap ObjectId.codec (Common.multiset (CounterKind.codec Keyword.codec))) GameState.enteringCounters
   playerEffects <- Fields.required "playerEffects" (Common.list ActivePlayerEffect.codec) GameState.playerEffects
   blockRequirements <- Fields.required "blockRequirements" (Common.list ActiveBlockRequirement.codec) GameState.blockRequirements
   attackRequirements <- Fields.required "attackRequirements" (Common.list ActiveAttackRequirement.codec) GameState.attackRequirements
@@ -150,6 +153,7 @@ codec = Fields.object $ do
         GameState.ambientAmounts = ambientAmounts,
         GameState.pendingEntryEffects = pendingEntryEffects,
         GameState.enteringBeside = enteringBeside,
+        GameState.enteringCounters = enteringCounters,
         GameState.playerEffects = playerEffects,
         GameState.blockRequirements = blockRequirements,
         GameState.attackRequirements = attackRequirements,

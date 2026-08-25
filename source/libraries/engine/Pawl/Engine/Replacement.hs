@@ -429,6 +429,24 @@ applies gs event candidate =
           Maybe.isNothing (CounterPattern.whichKind pat)
             && matchesPutter gs src (CounterPattern.byWhom pat) cause
             && maybe False (\rel -> matchesPlayer gs src rel pid) (CounterPattern.onWho pat)
+        -- CR 614.16 at the ENTRY level: the counters this permanent is entering
+        -- with are a placement this row may scale, and CR 616.1 orders it against
+        -- every other row modifying the same entry. What it scales is the PENDING
+        -- count; see GameState.enteringCounters.
+        --
+        -- The cause is synthesized as the one the entry counters WOULD have been
+        -- placed under -- CR 122.6a's default putter, the object's controller --
+        -- so matchesPutter still parts Vorinclex's "if you would put" from CR
+        -- 614.16's "if an effect would put" (#847). Reading it off the flush
+        -- rather than off the event is what keeps the two levels answering alike.
+        (ReplacementEffect.CounterR (CounterR.MkCounterR pat _), ProposedEvent.WouldEnter oid) ->
+          case Projection.controllerOf oid gs of
+            Nothing -> False
+            Just putter ->
+              not (Map.null (matchingEnteringCounters gs pat oid))
+                && matchesPutter gs src (CounterPattern.byWhom pat) (CounterCause.ByEffect putter)
+                && matchesController gs src (CounterPattern.whose pat) oid
+                && matchesPermanent gs Nothing (CounterPattern.onWhat pat) oid
         -- CR 109.5: "under YOUR control" -- the tokens' controller against the
         -- effect source's controller. CR 102.2's Opponents has no producer today.
         (ReplacementEffect.TokenR (TokenR.MkTokenR pat _), ProposedEvent.WouldCreateTokens pid _ _) ->
@@ -562,6 +580,19 @@ admitsEntry gs oid rewrite = case rewrite of
   EntryRewrite.Bloodthirst _ ->
     let context = Filter.contextFor (Projection.controllerOf oid gs) (Just oid)
      in maybe False (> 0) (Quantity.evaluate (Projection.fullView gs) context gs oid (Quantity.Type.PlayersDealtDamageThisTurn (PlayerRef.Relative PlayerRelation.Opponent)))
+  -- CR 702.150a's own first condition, the ability's rather than the pattern's:
+  -- "If this permanent WOULD ENTER WITH ONE OR MORE LOYALTY COUNTERS ON IT". The
+  -- pending count is what that asks about (GameState.enteringCounters), so the
+  -- row is inapplicable until CR 306.5b's has placed something -- which is also
+  -- what makes CR 616.2 sequence the two: this row and CR 614.16's multiplier
+  -- become applicable together on the pass after the loyalty row applied.
+  --
+  -- Rule 702.150a's SECOND condition -- "chose to pay life for any part of its
+  -- cost" -- is asked where the row is minted instead
+  -- (Pawl.Engine.Projection.intrinsicReplacementsOf), since CR 118.13a's
+  -- announcement is recorded on the SPELL and this function is handed the
+  -- permanent.
+  EntryRewrite.Compleated _ -> Map.findWithDefault 0 CounterKind.Loyalty (enteringCountersOf gs oid) > 0
   EntryRewrite.Tapped -> True
   EntryRewrite.PayLifeOrTapped _ -> True
   EntryRewrite.RevealOrTapped _ -> True
@@ -883,6 +914,21 @@ candidateContext candidate =
     (Just (ReplacementCandidate.source candidate))
     (ReplacementCandidate.slots candidate)
 
+-- The counters `oid` is so far entering with, empty outside an entry (see
+-- GameState.enteringCounters).
+enteringCountersOf :: GameState -> ObjectId -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural
+enteringCountersOf gs oid = Map.findWithDefault Map.empty oid (GameState.enteringCounters gs)
+
+-- Those of them a pattern's kind admits. CR 614.16's rows name no kind (Doubling
+-- Season doubles any counter), and `whichKind = Nothing` is this module's "any
+-- kind" for the reason the WouldPutCounters arm gives.
+matchingEnteringCounters :: GameState -> CounterPattern.CounterPattern -> ObjectId -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural
+matchingEnteringCounters gs pat oid =
+  let pending = enteringCountersOf gs oid
+   in case CounterPattern.whichKind pat of
+        Nothing -> pending
+        Just kind -> Map.filterWithKey (\k _ -> k == kind) pending
+
 -- CR 614.1a: apply a scaling to a number. "Plus one" and "twice that many" are
 -- the same operation with different data, and so is Furnace of Rath's doubling
 -- -- which is why CounterR, TokenR (CR 614.16's two shapes) and DamageR all
@@ -960,6 +1006,11 @@ bucketOfEffect re = case re of
   -- what the permanent enters WITH. Its condition does not change the bucket --
   -- `admitsEntry` has already kept an unsatisfied row out of the collection.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.Bloodthirst _)) -> ReplacementBucket.Other
+  -- CR 616.1a-d name self-replacement, control on entry, copy on entry and back
+  -- face up; CR 702.150a is none of them -- compleated rewrites HOW MANY loyalty
+  -- counters the permanent enters with. So CR 616.1e, the same bucket CR 614.16's
+  -- counter multipliers fall in, which is what puts the two rows in one race.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.Compleated _)) -> ReplacementBucket.Other
   -- CR 614.1d is none of CR 616.1a-d either: a tap-state rewrite changes the
   -- STATUS the permanent enters with (CR 110.5b), never whose it is, what it
   -- copies or which face is up. So CR 616.1e.
@@ -1080,6 +1131,11 @@ readsApplier re = case re of
   -- applier, so two bloodthirst rows on one permanent are admitted together and
   -- place the same counters in either order.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.Bloodthirst _)) -> False
+  -- CR 702.150a: no chooser at all, and the symbol count rides the effect.
+  -- Applying it reads the row's payload and the entering object's pending
+  -- counters, nothing off the candidate -- so two compleated rows of equal count
+  -- subtract the same amount in either order.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.Compleated _)) -> False
   -- CR 614.1d: no chooser at all, and no payload -- the rewrite sets one status on
   -- the object the event already named (CR 110.5b), so it applies the same way
   -- whoever's row is applying it. Two such rows are the same write twice.

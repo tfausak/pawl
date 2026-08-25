@@ -1601,6 +1601,7 @@ oneMountainState mountain ph =
           GameState.ambientAmounts = Map.empty,
           GameState.pendingEntryEffects = Seq.empty,
           GameState.enteringBeside = Set.empty,
+          GameState.enteringCounters = Map.empty,
           GameState.playerEffects = [],
           GameState.blockRequirements = [],
           GameState.unregeneratables = [],

@@ -156,6 +156,20 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       s
       (Codec.encode (EntryRewrite.codec (Effect.codec Card.codec)) (EntryRewrite.Bloodthirst 1) /= Codec.encode (EntryRewrite.codec (Effect.codec Card.codec)) (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1))))
       "bloodthirst 1 is not an unconditional +1/+1 counter"
+  -- CR 702.150a: compleated's rewrite, whose payload is the number of PHYREXIAN
+  -- MANA SYMBOLS life was paid for rather than the counters subtracted -- rule
+  -- 702.150a's "two" is the rule's. Encoded distinctly from Bloodthirst, which
+  -- carries the same Natural and means something else entirely.
+  Spec.it s "Compleated (Tamiyo, Compleated Sage)" $ do
+    Common.assertCodec
+      s
+      (EntryRewrite.codec (Effect.codec Card.codec))
+      (EntryRewrite.Compleated 1)
+      " {\"type\":\"Compleated\",\"value\":1} "
+    Spec.assertBool
+      s
+      (Codec.encode (EntryRewrite.codec (Effect.codec Card.codec)) (EntryRewrite.Compleated 1) /= Codec.encode (EntryRewrite.codec (Effect.codec Card.codec)) (EntryRewrite.Bloodthirst 1))
+      "one Phyrexian symbol paid with life is not bloodthirst 1"
   -- CR 614.1d: the tap-state rewrite a permanent's own text prints, payload-free
   -- because rule 614.1d and CR 110.5b fix both halves.
   Spec.it s "Tapped (Zof Bloodbog)" $

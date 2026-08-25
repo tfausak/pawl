@@ -913,6 +913,13 @@ loop asOf batch applied prevented exiledBy event = do
       -- a floating row's source is a spell or ability that has already changed
       -- zones and taken a new id, so no id in a batch of entering permanents can
       -- name one.
+      --
+      -- THE ONLY SEAM the exclusion is enforced at for a permanent's entering
+      -- counters, which used to reach it a second time through the counter funnel:
+      -- those counters are settled by rows offered against WouldEnter here (see
+      -- addEnteringCounters), so a sibling's Corpsejack Menace is filtered out
+      -- once, in this loop. Pawl.ReplacementSpec's "a Corpsejack Menace reanimated
+      -- beside a modular creature doubles nothing" is the proof.
       notSibling candidate = not (Set.member (ReplacementCandidate.source candidate) batch)
       fresh = filter (\candidate -> unused candidate && notSibling candidate) (Replacement.applicable asOf gs event)
   case Replacement.highestBucket fresh of
@@ -1356,20 +1363,20 @@ apply batch candidate event =
           let stamp o = o {Object.chosenNames = picked}
            in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
         pure (Just event)
-      -- CR 306.5b via CR 614.1c: this permanent enters with N counters. Through
-      -- Event.putCounters, the CR 122.6 funnel, and NOT a direct write to
+      -- CR 306.5b via CR 614.1c: this permanent enters with N counters. Into the
+      -- pending map through addEnteringCounters, and NOT a direct write to
       -- Object.counters, because CR 614.16 makes a counter-scaling replacement
-      -- apply even when the original event was not itself an effect -- so
-      -- Doubling Season has to see these. That nested CR 616.1 loop is why the
-      -- counters are placed here rather than folded into the entry event's own
-      -- payload. Consumed like every other arm, so CR 614.5 keeps the loop's next
-      -- iteration from placing them twice.
+      -- apply even when the original event was not itself an effect -- so Doubling
+      -- Season has to see these. It sees them in THIS loop, as a row against the
+      -- same WouldEnter event, which is what lets CR 616.1 order the two. Consumed
+      -- like every other arm, so CR 614.5 keeps the loop's next iteration from
+      -- counting them twice.
       --
       -- CR 614.1c also admits "a number of ... counters ... equal to [something]"
       -- (Undergrowth Scavenger), so the amount is a Quantity and is evaluated ONCE
-      -- here (CR 608.2f) rather than inside the CR 122.6 funnel, which would
-      -- re-read it per replacement iteration. CR 107.1b clamps a negative result
-      -- to zero, which is Integer.toNaturalSaturating.
+      -- here (CR 608.2f), when this row applies, rather than per iteration of the
+      -- entry loop around it. CR 107.1b clamps a negative result to zero, which is
+      -- Integer.toNaturalSaturating.
       --
       -- The permanent is already materialized on the battlefield when this loop
       -- runs (see runEntry), so the CR 613 projection answers for it. The Context
@@ -1388,7 +1395,7 @@ apply batch candidate event =
         Replacement.consume (ReplacementCandidate.identity candidate)
         case Quantity.evaluate viewOf context gs oid quantity of
           Nothing -> pure () -- unevaluable quantity: no counters (Resolve's PutCounters posture)
-          Just n -> Monad.when (n > 0) (Monad.void (putOwnCountersIn batch oid kind (Integer.toNaturalSaturating n)))
+          Just n -> addEnteringCounters oid kind (Integer.toNaturalSaturating n)
         pure (Just event)
       -- CR 616.1b / 110.2: Gather Specimens. The entering object's CR 110.2
       -- DEFAULT controller becomes CR 109.5's "you" -- the candidate's
@@ -1442,10 +1449,11 @@ apply batch candidate event =
       -- The only entry arm that PERFORMS a game action rather than stamping a
       -- value, which is why this module and not Pawl.Engine.Replacement holds
       -- `apply`: the sacrifice is `sacrifice` below, CR 701.21a's one funnel, and
-      -- the counters go through `putCounters`, CR 122.6's. Both are the ordinary
-      -- doors, so Rest in Peace redirects a sacrificed permanent and Doubling
-      -- Season (CR 614.16) doubles the counters, with nothing written here to
-      -- make either happen.
+      -- the counters go through addEnteringCounters into the pending map, so CR
+      -- 614.16 applies to them in this same loop. Both are the ordinary doors, so
+      -- Rest in Peace redirects a sacrificed permanent and Doubling Season sees
+      -- these counters as it sees riot's, with nothing written here to make
+      -- either happen.
       --
       -- THE ENTERING OBJECT IS NOT A CANDIDATE, nor is a permanent entering
       -- beside it. CR 614.13a states it outright -- "you can't choose the object
@@ -1522,7 +1530,7 @@ apply batch candidate event =
             State.modify' $ \gs2 ->
               let note obj = obj {Object.bindings = Map.insert Binding.sacrificedCount (Binding.toAmount many) (Object.bindings obj)}
                in gs2 {GameState.objects = Map.adjust note oid (GameState.objects gs2)}
-            Monad.mapM_ (\k -> putOwnCountersIn batch oid k many) kind
+            Monad.mapM_ (\k -> addEnteringCounters oid k many) kind
             pure (Just event)
       -- CR 702.155b / 714.3b: read ahead's two intrinsic abilities, applied as
       -- one rewrite -- choose a number between one and this Saga's final chapter
@@ -1534,8 +1542,8 @@ apply batch candidate event =
       -- effect could have changed which chapter abilities the Saga has since, and
       -- rule 714.2d asks about the abilities it HAS.
       --
-      -- The counters go through putOwnCountersIn, CR 122.6's funnel, so CR 614.16
-      -- applies to them exactly as it does to riot's counter below.
+      -- The counters go through addEnteringCounters, so CR 614.16 reaches them in
+      -- the entry's own CR 616.1 pool, exactly as it does riot's counter below.
       EntryRewrite.ReadAhead -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         gs <- State.get
@@ -1567,7 +1575,7 @@ apply batch candidate event =
                 -- chapter outside it would put the Saga past its final chapter
                 -- (CR 704.5s) or leave it on none.
                 pure (max 1 (min bound answer))
-        Monad.when (picked > 0) (Monad.void (putOwnCountersIn batch oid CounterKind.Lore picked))
+        addEnteringCounters oid CounterKind.Lore picked
         pure (Just event)
       -- CR 702.136a: riot. "You may have this permanent enter with an additional
       -- +1/+1 counter on it. If you don't, it gains haste."
@@ -1578,8 +1586,8 @@ apply batch candidate event =
       -- the posture ChooseColor's arm takes and not ChoiceOf's one-option
       -- elision.
       --
-      -- The counter goes through putCounters, CR 122.6's funnel, exactly as the
-      -- WithCounters arm above does, so CR 614.16 applies to it and Doubling
+      -- The counter goes into the pending map, exactly as the WithCounters arm
+      -- above does, so CR 614.16 applies to it in this same loop and Doubling
       -- Season sees riot's counter.
       --
       -- The haste is a STORED continuous effect (CR 611.2) rather than a stamp on
@@ -1609,7 +1617,7 @@ apply batch candidate event =
             let decider = Decide.deciderFor controller gs
             answer <- Game.choose (Prompt.ChooseRiot decider controller oid)
             case answer of
-              OptionalDecision.Exercises -> Monad.void (putOwnCountersIn batch oid CounterKind.PlusOnePlusOne 1)
+              OptionalDecision.Exercises -> addEnteringCounters oid CounterKind.PlusOnePlusOne 1
               OptionalDecision.Declines ->
                 State.modify' $ \gs2 ->
                   -- CR 611.2a: "gains haste" with no stated end lasts until the
@@ -1645,8 +1653,8 @@ apply batch candidate event =
       -- second static ability on, so the two answers are a bigger creature that
       -- cannot block against a smaller one that can.
       --
-      -- Through putCounters, CR 122.6's funnel, exactly as riot's is, so CR 614.16
-      -- applies and Doubling Season sees unleash's counter.
+      -- Into the pending map, exactly as riot's is, so CR 614.16 applies in this
+      -- same loop and Doubling Season sees unleash's counter.
       EntryRewrite.Unleash -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         gs <- State.get
@@ -1657,14 +1665,14 @@ apply batch candidate event =
             let decider = Decide.deciderFor controller gs
             answer <- Game.choose (Prompt.ChooseUnleash decider controller oid)
             case answer of
-              OptionalDecision.Exercises -> Monad.void (putOwnCountersIn batch oid CounterKind.PlusOnePlusOne 1)
+              OptionalDecision.Exercises -> addEnteringCounters oid CounterKind.PlusOnePlusOne 1
               OptionalDecision.Declines -> pure ()
             pure (Just event)
       -- CR 702.54a via CR 614.1c: bloodthirst N on Bloodrage Vampire. The
       -- WithCounters arm above with the kind fixed at +1/+1 by rule 702.54a, and
-      -- through putCounters for that arm's reason -- CR 122.6's funnel is what
-      -- makes CR 614.16 reach these, so Doubling Season sees bloodthirst's
-      -- counters as it sees riot's.
+      -- through addEnteringCounters for that arm's reason -- the pending map is
+      -- what makes CR 614.16 reach these in the entry's own CR 616.1 pool, so
+      -- Doubling Season sees bloodthirst's counters as it sees riot's.
       --
       -- NO CONDITION HERE. Rule 702.54a's "if an opponent was dealt damage this
       -- turn" is asked by Pawl.Engine.Replacement.admitsEntry, which is why the
@@ -1674,7 +1682,40 @@ apply batch candidate event =
       -- No prompt, and none is owed: rule 702.54a states no choice.
       EntryRewrite.Bloodthirst n -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
-        Monad.void (putOwnCountersIn batch oid CounterKind.PlusOnePlusOne n)
+        addEnteringCounters oid CounterKind.PlusOnePlusOne n
+        pure (Just event)
+      -- CR 702.150a via CR 614.1c: compleated on Tamiyo, Compleated Sage. "It
+      -- instead enters the battlefield with that many loyalty counters MINUS TWO
+      -- FOR EACH OF THOSE MANA SYMBOLS" -- the payload is the symbol count, so the
+      -- two is rule 702.150a's and appears only here.
+      --
+      -- A SUBTRACTION FROM THE PENDING MAP, not a removal from Object.counters:
+      -- rule 702.150a removes nothing, it changes how many arrive, so nothing
+      -- keyed on counter removal may see this. Sitting in the pending map is also
+      -- what puts the row in the entry's own CR 616.1 pool beside CR 614.16's
+      -- multipliers, which is the whole of #1996 -- the orders reach 6 and 8 on
+      -- Tamiyo under a Doubling Season.
+      --
+      -- Map.adjust rather than insert, for the CounterR arm's reason: an absent
+      -- id means nothing is entering, which `admitsEntry` has already ruled out.
+      --
+      -- Saturating, because a counter count is a Natural and CR 122.1 knows no
+      -- negative number of them. Rule 702.150a's own "would enter with one or more
+      -- loyalty counters" -- asked in `admitsEntry` -- is what keeps the floor out
+      -- of reach on a printed card anyway.
+      --
+      -- NO CONDITION HERE. Rule 702.150a's two are asked before this point: "one
+      -- or more loyalty counters" in Pawl.Engine.Replacement.admitsEntry, and
+      -- "chose to pay life" where the row is minted.
+      --
+      -- No prompt, and none is owed: rule 702.150a states no choice.
+      EntryRewrite.Compleated symbols -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        State.modify' $ \gs ->
+          gs
+            { GameState.enteringCounters =
+                Map.adjust (Map.adjust (\n -> Natural.minusSaturating n (2 * symbols)) CounterKind.Loyalty) oid (GameState.enteringCounters gs)
+            }
         pure (Just event)
       -- CR 614.1d / 110.5b: "This permanent enters tapped" (Zof Bloodbog's land,
       -- Headless Skaab's creature -- the arm gates on no card type). CR 110.5b
@@ -2002,7 +2043,28 @@ apply batch candidate event =
     (ReplacementEffect.CounterR (CounterR.MkCounterR _ scaling), ProposedEvent.WouldPutPlayerCounters cause pid kind n) -> do
       Replacement.consume (ReplacementCandidate.identity candidate)
       pure (Just (ProposedEvent.WouldPutPlayerCounters cause pid kind (Replacement.scale scaling n)))
-    -- Unreachable: `applies` admits CounterR only against the two counter events.
+    -- CR 614.16 at the ENTRY level: the counters this permanent is entering with,
+    -- scaled where they sit -- in the pending map, before flushEnteringCounters
+    -- places them. The same rewrite as the arm above, one level up, which is what
+    -- puts this row in the entry's own CR 616.1 pool.
+    --
+    -- Map.union is left-biased, so the scaled kinds win and a kind the pattern did
+    -- not match is left as it was. Map.adjust rather than insert: an absent id
+    -- means nothing is entering, which `applies` has already ruled out.
+    --
+    -- Not implemented: a row that matches two pending kinds at once scales both in
+    -- this one application, where the nested-loop shape it replaced gave the row a
+    -- fresh CR 614.5 opportunity per kind. No card in the pool enters with two
+    -- kinds one pattern matches (#2312).
+    (ReplacementEffect.CounterR (CounterR.MkCounterR pat scaling), ProposedEvent.WouldEnter oid) -> do
+      Replacement.consume (ReplacementCandidate.identity candidate)
+      gs <- State.get
+      let scaled = fmap (Replacement.scale scaling) (Replacement.matchingEnteringCounters gs pat oid)
+      State.modify' $ \gs2 ->
+        gs2 {GameState.enteringCounters = Map.adjust (Map.union scaled) oid (GameState.enteringCounters gs2)}
+      pure (Just event)
+    -- Unreachable: `applies` admits CounterR only against the three counter events
+    -- above.
     (ReplacementEffect.CounterR {}, _) -> pure (Just event)
     -- CR 614.16: Doubling Season scales token creation.
     (ReplacementEffect.TokenR (TokenR.MkTokenR _ scaling), ProposedEvent.WouldCreateTokens pid card n) -> do
@@ -2046,10 +2108,12 @@ apply batch candidate event =
     -- a +1/+1 counter on it", applied WHILE the permanent turns over (CR 708.11)
     -- because FaceDown.performTurnFaceUp raises this event there and nowhere else.
     --
-    -- The counters go through putCounters, the CR 122.6 funnel, exactly as the
-    -- EntryR WithCounters arm's do -- so CR 614.16 applies and Hardened Scales
-    -- sees a megamorph counter the way it sees a riot one. The amount is
-    -- evaluated the same way too, though rule 702.37b states its own number and
+    -- The counters go through putCounters, the CR 122.6 funnel -- so CR 614.16
+    -- applies and Hardened Scales sees a megamorph counter the way it sees a riot
+    -- one. NOT the pending map the EntryR arms write: CR 614.1e's turning face up
+    -- is not an entry, so there is no entry loop for a row to be ordered in.
+    --
+    -- The amount is evaluated the same way too, though rule 702.37b states its own number and
     -- Pawl.CardSpec holds that no printing authors a turn-up counter rewrite, so
     -- the only quantity that reaches here today is that arm's Literal 1.
     --
@@ -2196,8 +2260,29 @@ runEntry batch oid = do
   before <- State.gets GameState.enteringBeside
   State.modify' (\gs -> gs {GameState.enteringBeside = batch})
   Monad.void (applyReplacementsIn Nothing batch (ProposedEvent.WouldEnter oid))
+  flushEnteringCounters oid
   designateProtector oid
   State.modify' (\gs -> gs {GameState.enteringBeside = before})
+
+-- CR 614.1c: the counters the entering permanent turned out to be entering WITH,
+-- placed once, after CR 616.1's loop has finished deciding how many that is.
+--
+-- Through settleCounters and NOT putCounters, because the CR 616.1 loop the
+-- funnel's door opens has already run at the entry level -- see the CounterR arm
+-- of `apply`. Going back through the door would offer every counter-scaling row a
+-- second opportunity CR 614.5 has already spent.
+--
+-- Ascending by kind so the CountersPut events are ordered deterministically; no
+-- rule fixes the order, and nothing between them can observe it, since a trigger
+-- scan runs only once this whole entry finishes.
+--
+-- The id is deleted whether or not anything was pending, so a nested entry cannot
+-- inherit an outer subject's leftovers.
+flushEnteringCounters :: ObjectId -> Game ()
+flushEnteringCounters oid = do
+  pending <- State.gets (Map.findWithDefault Map.empty oid . GameState.enteringCounters)
+  State.modify' (\gs -> gs {GameState.enteringCounters = Map.delete oid (GameState.enteringCounters gs)})
+  Monad.mapM_ (\(kind, n) -> Monad.void (settleCounters oid kind n)) (Map.toAscList pending)
 
 -- CR 310.9a: "as a battle enters the battlefield, its controller chooses a player
 -- to be its protector." Run for every entering object, and a no-op for all but a
@@ -2385,10 +2470,10 @@ strengthen gs oid regenerability =
 -- already on the battlefield and counters an object is given as it enters. A zero
 -- count after the loop puts nothing on.
 --
--- Beside the other change-and-emit funnels of this module, and `apply`'s
--- EntryRewrite arms reach it through putOwnCounters for CR 122.6's as-it-enters
--- clause. A copy of the body anywhere else would be a second funnel, which is the
--- one thing a funnel must not have.
+-- Beside the other change-and-emit funnels of this module. A copy of the body
+-- anywhere else would be a second funnel, which is the one thing a funnel must not
+-- have; addEnteringCounters below is not one, since it settles nothing and writes
+-- nothing -- flushEnteringCounters shares this door's tail instead.
 --
 -- The CounterCause is the placement's PROVENANCE and nothing else -- who is putting
 -- the counters, and whether an effect is what put them. Only a row reads it; see
@@ -2400,68 +2485,88 @@ strengthen gs oid regenerability =
 -- it -- CR 702.100b and CR 702.149c, at Pawl.Engine.Resolve's Effect.Evolve and
 -- Effect.Train arms; every other caller places and moves on.
 putCounters :: CounterCause.CounterCause -> ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game Natural
-putCounters = putCountersIn Set.empty
-
--- putCounters with CR 614.12's same-batch exclusion: `batch` is the permanents
--- entering beside `oid`, and only an entry path has one to pass.
-putCountersIn :: Set ObjectId -> CounterCause.CounterCause -> ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game Natural
-putCountersIn batch cause oid kind n = do
-  resolved <- resolveCounters batch cause oid kind n
+putCounters cause oid kind n = do
+  resolved <- resolveCounters cause oid kind n
   case resolved of
     Nothing -> pure 0
-    Just (target, settledKind, settledCount)
-      | settledCount == 0 -> pure 0
-      | otherwise -> do
-          gs <- State.get
-          -- No write and no event for an object that is not there. Map.adjust on a
-          -- missing id is a silent no-op, so proceeding would record a placement
-          -- the state does not show. ONE lookup answers both questions -- whether
-          -- the object exists, and how many counters of the kind it already had.
-          case Game.lookupObject target gs of
-            Nothing -> pure 0
-            Just obj -> do
-              -- CR 613.7c: the counters arriving get a timestamp, and the ones of
-              -- that kind already there get the same one.
-              ts <- State.state Game.freshTimestamp
-              let before = Map.findWithDefault 0 settledKind (Object.counters obj)
-                  bump o =
-                    o
-                      { Object.counters = Map.insertWith (+) settledKind settledCount (Object.counters o),
-                        Object.counterTimestamps = Map.insert settledKind ts (Object.counterTimestamps o)
-                      }
-                  bumped g = g {GameState.objects = Map.adjust bump target (GameState.objects g)}
-              -- CR 122.6's placement, recorded AFTER the write and from the SETTLED
-              -- count, so a Doubling Season that turned one counter into two records
-              -- the crossing the board actually saw. The before/after pair is what
-              -- CR 714.2b's chapter ability reads.
-              --
-              -- Guarded by the same `settledCount > 0` the write is: an event
-              -- recorded for a placement that did not happen would fire a chapter
-              -- ability off nothing.
-              State.modify' (recordEvent (GameEvent.CountersPut (CounterChange.MkCounterChange target settledKind before (before + settledCount))) . bumped)
-              pure settledCount
+    Just (target, settledKind, settledCount) -> settleCounters target settledKind settledCount
+
+-- The WRITE-AND-EMIT half of putCounters, with no CR 616.1 loop in front of it:
+-- the counters have already been settled and this records them. Its second caller
+-- is flushEnteringCounters below, where CR 616.1 ran at the ENTRY level and running
+-- it again here would let one row apply twice.
+--
+-- Not a second funnel. putCounters is still the only door that both settles and
+-- writes; this is that door's tail, shared rather than copied.
+settleCounters :: ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game Natural
+settleCounters target settledKind settledCount
+  | settledCount == 0 = pure 0
+  | otherwise = do
+      gs <- State.get
+      -- No write and no event for an object that is not there. Map.adjust on a
+      -- missing id is a silent no-op, so proceeding would record a placement
+      -- the state does not show. ONE lookup answers both questions -- whether
+      -- the object exists, and how many counters of the kind it already had.
+      case Game.lookupObject target gs of
+        Nothing -> pure 0
+        Just obj -> do
+          -- CR 613.7c: the counters arriving get a timestamp, and the ones of
+          -- that kind already there get the same one.
+          ts <- State.state Game.freshTimestamp
+          let before = Map.findWithDefault 0 settledKind (Object.counters obj)
+              bump o =
+                o
+                  { Object.counters = Map.insertWith (+) settledKind settledCount (Object.counters o),
+                    Object.counterTimestamps = Map.insert settledKind ts (Object.counterTimestamps o)
+                  }
+              bumped g = g {GameState.objects = Map.adjust bump target (GameState.objects g)}
+          -- CR 122.6's placement, recorded AFTER the write and from the SETTLED
+          -- count, so a Doubling Season that turned one counter into two records
+          -- the crossing the board actually saw. The before/after pair is what
+          -- CR 714.2b's chapter ability reads.
+          --
+          -- Guarded by the same `settledCount > 0` the write is: an event
+          -- recorded for a placement that did not happen would fire a chapter
+          -- ability off nothing.
+          State.modify' (recordEvent (GameEvent.CountersPut (CounterChange.MkCounterChange target settledKind before (before + settledCount))) . bumped)
+          pure settledCount
 
 -- CR 122.6a: putCounters with the rule's DEFAULT putter -- "if the effect doesn't
 -- specify a player, the object's controller puts those counters on it". Every
--- placement onto the RECEIVING object's own account goes through here: the entry
--- rewrites of `apply` above (CR 614.1c-d), CR 702.37b's megamorph counter, and the
--- counters a spell's entry riders give. No printing in the pool exercises the
--- rule's exception by naming a player, so nothing needs to pass one.
+-- placement onto the RECEIVING object's own account goes through here. One caller
+-- is left: CR 702.37b's megamorph counter, at `apply`'s TurnUpR arm. The entry
+-- roads -- CR 614.1c-d's rewrites and a spell's entry riders -- accumulate through
+-- addEnteringCounters below and reach this module's tail by the other route, and
+-- rule 122.6a's default putter is what the flush places under either way. No
+-- printing in the pool exercises the rule's exception by naming a player, so
+-- nothing needs to pass one.
 --
 -- An object with no controller is one that is not on the battlefield, and
 -- putCounters places nothing on such an object anyway -- so answering 0 without
 -- raising the event is the same answer, reached one step earlier.
 putOwnCounters :: ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game Natural
-putOwnCounters = putOwnCountersIn Set.empty
-
--- putOwnCounters with CR 614.12's same-batch exclusion; `batch` is
--- putCountersIn's.
-putOwnCountersIn :: Set ObjectId -> ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game Natural
-putOwnCountersIn batch oid kind n = do
+putOwnCounters oid kind n = do
   gs <- State.get
   case Projection.controllerOf oid gs of
     Nothing -> pure 0
-    Just putter -> putCountersIn batch (CounterCause.ByEffect putter) oid kind n
+    Just putter -> putCounters (CounterCause.ByEffect putter) oid kind n
+
+-- CR 614.1c: this permanent is going to enter with n more counters of a kind than
+-- it was a moment ago. Written to the pending map rather than to the object; see
+-- GameState.enteringCounters and flushEnteringCounters, which places them once the
+-- entry's own CR 616.1 loop has finished saying how many that is.
+--
+-- The replacement for putOwnCounters at every ENTRY door. No batch of entering
+-- siblings is passed and none is owed: CR 614.12's same-batch exclusion is the
+-- entry loop's own `notSibling`, and it now covers these counters too, since the
+-- row that would scale them is offered inside that loop.
+addEnteringCounters :: ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game ()
+addEnteringCounters oid kind n =
+  Monad.when (n > 0) . State.modify' $ \gs ->
+    gs
+      { GameState.enteringCounters =
+          Map.insertWith (Map.unionWith (+)) oid (Map.singleton kind n) (GameState.enteringCounters gs)
+      }
 
 -- CR 122: take counters off an object, recording a CountersRemoved event from
 -- the before/after pair so a trigger can read the crossing. That event's other
@@ -2519,14 +2624,15 @@ removeCounters oid kind n =
 -- every representable counter replacement was one of rule 614.16's; Vorinclex is
 -- not one, so the gate moved into the row filter (#847).
 --
--- `batch` is applyReplacementsIn's: the permanents entering the battlefield
--- BESIDE the object being counted, empty for every placement that is not part of
--- an entry. A counter a permanent enters with is part of how it enters (CR
--- 614.1c), so CR 614.12 settles which effects may scale it, and a Corpsejack
--- Menace arriving in the same batch is not one of them.
-resolveCounters :: Set ObjectId -> CounterCause.CounterCause -> ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game (Maybe (ObjectId, CounterKind.CounterKind Keyword.Type.Keyword, Natural))
-resolveCounters batch cause oid kind n = do
-  outcome <- applyReplacementsIn Nothing batch (ProposedEvent.WouldPutCounters cause oid kind n)
+-- NO ENTERING BATCH is passed, and CR 614.12's sibling exclusion is not asked
+-- here: a counter a permanent enters with is part of how it enters (CR 614.1c),
+-- so it is settled in the entry loop instead, where `notSibling` answers rule
+-- 614.12 for it. What reaches THIS door is a placement onto a permanent that has
+-- already entered, which rule 614.12 says nothing about, so the exclusion has no
+-- subject here.
+resolveCounters :: CounterCause.CounterCause -> ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game (Maybe (ObjectId, CounterKind.CounterKind Keyword.Type.Keyword, Natural))
+resolveCounters cause oid kind n = do
+  outcome <- applyReplacements (ProposedEvent.WouldPutCounters cause oid kind n)
   pure (outcome >>= Replacement.asCounters)
 
 -- CR 122.1 / 122.6: putCounters' player half -- the ONE place a player's counters
@@ -3338,17 +3444,29 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- 614.13a).
               Monad.when (dest == Zone.Battlefield) $ do
                 -- CR 122.6a: the counters the EFFECT says the object enters with --
-                -- undying's and persist's "with a +1/+1 counter on it". Inside the
-                -- move, before the entry loop and before the Moved event below, so
-                -- nothing can see the permanent without them (the tap state's reason,
-                -- one field over). Through putCounters, CR 122.6's funnel, so CR
-                -- 614.16 applies and Doubling Season sees them, exactly as the
-                -- EntryRewrite.WithCounters arm inside the loop does.
+                -- undying's and persist's "with a +1/+1 counter on it". Into the
+                -- pending map before the entry loop, so the loop's own CR 616.1 pool
+                -- can scale them and flushEnteringCounters places what it settles on
+                -- -- exactly as the EntryRewrite.WithCounters arm inside the loop
+                -- does. Still inside the move and before the Moved event below, so
+                -- nothing outside the entry can see the permanent without them (the
+                -- tap state's reason, one field over).
                 --
-                -- Before the loop rather than after it, which no card observes: no
+                -- Before the loop rather than during it, which no card observes: no
                 -- entry replacement in the pool reads a counter the entering object
                 -- already has, and the two are simultaneous in the rules anyway.
-                Monad.mapM_ (\(kind, n) -> Monad.void (putOwnCountersIn batch newId kind n)) (Map.toAscList entering)
+                --
+                -- That claim is WIDER than it was. These counters used to be on the
+                -- object by the time the loop began; now they sit pending for the
+                -- loop's whole duration, so a row reading them would answer
+                -- differently at every iteration rather than only before the first.
+                -- Checked when the pending map landed: Filter.HasCounters and
+                -- Replacement.admitsEntry are two readers a row could reach a
+                -- counter through, and a filter naming power or toughness is a
+                -- third, via Projection.counterGathered (CR 614.12); none of the
+                -- three is fed by an entering permanent's own pending counters
+                -- today.
+                Monad.mapM_ (uncurry (addEnteringCounters newId)) (Map.toAscList entering)
                 runEntry batch newId
               -- CR 709.5h: an ability that triggers on a door opening fires "regardless
               -- of whether it was given that designation while entering the
@@ -4028,21 +4146,23 @@ createTokens controller card copy n tapped entering = do
                     Object.exertedBy = Set.empty
                   }
           ids <- Monad.replicateM (Natural.toIntSaturating count) (placeObject owner mkObj Zone.Battlefield LibraryPosition.defaultValue)
-          -- CR 122.6a: the counters the EFFECT says these tokens enter with, placed
-          -- through putCounters -- CR 122.6's funnel, so CR 614.16 applies and
-          -- Vorinclex sees them -- exactly as changeZoneEntering's door does for the
-          -- move that carries the same rider.
+          -- CR 122.6a: the counters the EFFECT says these tokens enter with, gathered
+          -- into the pending map -- so CR 614.16 applies inside each token's own entry
+          -- loop and Vorinclex sees them -- exactly as changeZoneEntering's door does
+          -- for the move that carries the same rider.
           --
           -- The WHOLE BATCH is dressed before any token runs its entry loop, rather
-          -- than each token being dressed and then entered: CR 614.12 checks "the
-          -- characteristics of the permanent as it would exist on the battlefield",
-          -- and every sibling of this batch is already there by then, so the counters
-          -- they entered with belong to that reading too. No card observes the
-          -- difference -- no entry replacement in the pool reads a counter the
-          -- entering object already has -- so this buys the ordering rather than a
-          -- passing test.
+          -- than each token being dressed and then entered. That order buys CR 614.12
+          -- nothing any more and is kept only because it costs nothing: what the
+          -- rule's "characteristics of the permanent as it would exist on the
+          -- battlefield" reads is the OBJECTS, and these counters are no longer on
+          -- them -- Pawl.Engine.Projection cannot see GameState.enteringCounters, and
+          -- the map is per-object, so no sibling's loop reads another's pending
+          -- counters whenever they were written. What CR 614.12 does rest on is
+          -- `placeObject` above having materialized every token first, which is what
+          -- `siblingsOf` then hands each entry loop.
           let siblingsOf oid = Set.delete oid (Set.fromList ids)
-          Monad.mapM_ (\oid -> Monad.mapM_ (\(kind, many) -> Monad.void (putOwnCountersIn (siblingsOf oid) oid kind many)) (Map.toAscList entering)) ids
+          Monad.mapM_ (\oid -> Monad.mapM_ (uncurry (addEnteringCounters oid)) (Map.toAscList entering)) ids
           Monad.mapM_ (\oid -> runEntry (siblingsOf oid) oid) ids
           -- No prior incarnation to snapshot, so a token's last known information
           -- IS what it is now (CR 111.3). Recorded after every entry loop, so the
