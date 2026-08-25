@@ -106,6 +106,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Commander" $ do
   designationSpec s registry
   castSpec s registry
   taxSpec s registry
+  bounceSpec s registry
   commanderDamageSpec s registry
   subgameSpec s registry
   restartSpec s registry
@@ -230,6 +231,131 @@ taxSpec s registry = Spec.describe s "Tax" $ do
             Spec.assertEqWith s "and the tax is {4} for the next one" (fmap (\o -> Commander.tax S.alice o twice) (inCommandZone twice)) [4]
           _ -> Spec.assertBool s False "expected it back in the command zone"
       _ -> Spec.assertBool s False "expected one commander"
+
+-- Answers CR 903.9b's offer with Returns for exactly one seat and Leaves for every
+-- other, which is what tells "asked alice" apart from "asked bob" and from "never
+-- asked at all": bob is the one casting the bounce here, so an answerer that said
+-- yes to everybody could not distinguish the three.
+--
+-- Also sacrifices ONE permanent as Shimatsu enters, so it resolves as a 1/1 and
+-- survives CR 704.5f. A 0/0 dies before anything can bounce it and is then offered
+-- back by CR 903.9a -- the other rule -- which would pass every case below for the
+-- wrong reason. Replay.defaultAnswer's own arm sacrifices ALL the candidates,
+-- which would take alice's whole board, so this arm is not it.
+answering :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+answering who p = case p of
+  Prompt.ReturnCommander _ pid _ -> if pid == who then CommandZoneDecision.Returns else CommandZoneDecision.Leaves
+  Prompt.ChooseAnyNumberToSacrifice _ _ _ candidates -> Set.fromList (take 1 candidates)
+  _ -> S.identityAnswer p
+
+-- alice's commander cast from the command zone and resolved, so it is a 1/1 on the
+-- battlefield; bob holding `bounce` with `islands` untapped Islands to cast it.
+--
+-- BOB bounces ALICE's commander, which is load-bearing: rule 903.9b's "may" is the
+-- OWNER's (CR 400.3 sends the card to its owner's hand or library in the first
+-- place), and if alice bounced her own the owner and the spell's controller would
+-- coincide and every assertion about who was asked would be vacuous.
+bounceBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (GameState.GameState, ObjectId.ObjectId)
+bounceBoard mountain island shimatsu bounce islands =
+  let start = commanderBoard mountain shimatsu 10
+      answer = answering S.alice
+      inPlay = case inCommandZone start of
+        -- CR 903.6 puts exactly one card there, which the Designation group
+        -- asserts; the empty list cannot arise, and the cases below assert the
+        -- commander reached the battlefield before bouncing it either way.
+        oid : _ -> S.runPure answer (S.runPure answer start (S.cast S.alice oid)) Stack.resolveTop
+        [] -> start
+      (bounceId, board) = S.addHandCard bounce S.bob (S.landsFor island S.bob islands inPlay)
+   in (board, bounceId)
+
+-- bob casts the bounce spell at the only creature on the board -- alice's
+-- commander, unless a case strips her designation first -- and lets it resolve.
+bouncing :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+bouncing answer bounceId gs = S.runPure answer (S.runPure answer gs (S.cast S.bob bounceId)) Stack.resolveTop
+
+bounceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+bounceSpec s registry = Spec.describe s "Bounce" $ do
+  -- CR 903.9b: "if a commander would be put into its owner's hand or library from
+  -- anywhere, its owner may put it into the command zone instead". Unsummon's
+  -- "return target creature to its owner's hand" is the hand half.
+  --
+  -- The answerer says yes to ALICE alone, so this case fails three ways: if the
+  -- engine never asks, if it asks bob (the spell's controller), or if it moves the
+  -- card without asking anyone.
+  Spec.it s "CR 903.9b a commander bounced to its owner's hand may go to the command zone" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+    unsummon <- S.printingOf s registry "Unsummon"
+    let (board, bounceId) = bounceBoard mountain island shimatsu unsummon 1
+    Spec.assertEqWith s "her commander is on the battlefield to be bounced" (S.creaturesInPlay S.alice board) 1
+    Spec.assertEqWith s "and the command zone is empty" (length (inCommandZone board)) 0
+    let after = bouncing (answering S.alice) bounceId board
+    Spec.assertEqWith s "it is in the command zone" (length (inCommandZone after)) 1
+    Spec.assertEqWith s "and not in her hand" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
+    Spec.assertEqWith s "still her commander" (fmap (\oid -> Commander.isCommander oid after) (inCommandZone after)) [True]
+  -- CR 903.9b is a "may". Declining leaves the commander where the spell sent it,
+  -- which is the falsifier for an engine that redirected without asking.
+  Spec.it s "CR 903.9b declining leaves it in her hand" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+    unsummon <- S.printingOf s registry "Unsummon"
+    let (board, bounceId) = bounceBoard mountain island shimatsu unsummon 1
+        after = bouncing S.identityAnswer bounceId board
+    Spec.assertEqWith s "the command zone is empty" (length (inCommandZone after)) 0
+    Spec.assertEqWith s "and it is in her hand" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
+  -- CR 400.3 sends the card to its OWNER's hand, and rule 903.9b gives that owner
+  -- the choice -- not the player who cast the bounce. The same board as the
+  -- accepting case with the answerer's yes moved from alice to bob: if the engine
+  -- asked the spell's controller, this would land in the command zone.
+  Spec.it s "CR 903.9b the owner is asked, not the player who bounced it" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+    unsummon <- S.printingOf s registry "Unsummon"
+    let (board, bounceId) = bounceBoard mountain island shimatsu unsummon 1
+        after = bouncing (answering S.bob) bounceId board
+    Spec.assertEqWith s "bob's yes moves nothing" (length (inCommandZone after)) 0
+    Spec.assertEqWith s "and it is in alice's hand" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
+  -- Rule 903.9b names a LIBRARY as well as a hand, and Griptide's "put target
+  -- creature on top of its owner's library" is that half. The discriminator for a
+  -- fix that read Zone.Hand alone.
+  Spec.it s "CR 903.9b a commander put on top of its owner's library may go to the command zone" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+    griptide <- S.printingOf s registry "Griptide"
+    let (board, bounceId) = bounceBoard mountain island shimatsu griptide 4
+    Spec.assertEqWith s "alice's library is empty to begin with" (length (Game.zoneMembers Zone.Library S.alice board)) 0
+    let after = bouncing (answering S.alice) bounceId board
+    Spec.assertEqWith s "it is in the command zone" (length (inCommandZone after)) 1
+    Spec.assertEqWith s "and not in her library" (length (Game.zoneMembers Zone.Library S.alice after)) 0
+  -- The library half's own anti-vacuity control: declining puts it in the library,
+  -- so the accepting case above is not passing on a board where nothing moved.
+  Spec.it s "CR 903.9b declining leaves it in her library" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+    griptide <- S.printingOf s registry "Griptide"
+    let (board, bounceId) = bounceBoard mountain island shimatsu griptide 4
+        after = bouncing S.identityAnswer bounceId board
+    Spec.assertEqWith s "the command zone is empty" (length (inCommandZone after)) 0
+    Spec.assertEqWith s "and it is in her library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
+  -- Rule 903.9b is about a COMMANDER. The paired negative differs from the
+  -- accepting case in exactly one thing -- alice's designation, stripped as
+  -- Cast's non-commander case strips it -- so the same creature bounced by the
+  -- same spell under the same answerer goes to her hand and is offered nothing.
+  Spec.it s "CR 903.9b an ordinary creature is not offered the command zone" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+    unsummon <- S.printingOf s registry "Unsummon"
+    let (board, bounceId) = bounceBoard mountain island shimatsu unsummon 1
+        undesignated = board {GameState.players = Map.adjust (\p -> p {Player.commander = Nothing}) S.alice (GameState.players board)}
+        after = bouncing (answering S.alice) bounceId undesignated
+    Spec.assertEqWith s "nothing reaches the command zone" (length (inCommandZone after)) 0
+    Spec.assertEqWith s "and it is in her hand" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
 
 -- CR 903.10a's pool, which Shimatsu cannot serve: a 0/0 dies to CR 704.5f before
 -- it can attack.
