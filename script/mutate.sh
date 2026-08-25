@@ -9,9 +9,12 @@
 # - The backup lives outside the tree and comes back from a `trap`, because
 #   `git checkout` has lost real edits and a stray `Foo.hs.bak` shows up in a
 #   concurrent session's `git status`.
-# - `--test-show-details=direct` is mandatory. `cabal test` otherwise captures
-#   output to a log file and the caller sees a summary with no assertion
-#   message, which is exactly the failure this script exists to retire.
+# - `--test-show-details=direct` is passed rather than relied on. Measured
+#   2026-08-24 on cabal 3.16.1.0, the default (`failures`) does print the
+#   failing case's message, so this is not what makes the parser work -- it
+#   pins the setting, and streams rather than routing through a log file, so a
+#   `cabal.project` that ever set `never` or `failures`-by-log cannot silently
+#   leave the caller with a summary and no assertion.
 # - No `--timeout` is passed. `Pawl.Test.testTree` sets per-subtree budgets with
 #   `Tasty.localOption`, which beats the command line, so one here would be
 #   ineffective for those subtrees and misleading everywhere else (#2113).
