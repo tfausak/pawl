@@ -769,6 +769,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SpellOrAbilityCounters _ -> []
   -- CR 615.13's prevention condition is a PlayerRelation too.
   TriggerCondition.DamageToPlayerPrevented _ -> []
+  -- Rule 615.13's other reading is nullary, so it holds no Count either.
+  TriggerCondition.SelfPreventsDamage -> []
   TriggerCondition.PlayerGainsLife _ -> []
   TriggerCondition.PlayerLosesLife _ -> []
   -- CR 714.2b carries a counter kind and a Natural, neither of which is a Count.
@@ -3201,6 +3203,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.HauntedCreatureDies -> []
   TriggerCondition.SpellOrAbilityCounters _ -> []
   TriggerCondition.DamageToPlayerPrevented _ -> []
+  TriggerCondition.SelfPreventsDamage -> []
   TriggerCondition.PlayerGainsLife _ -> []
   TriggerCondition.PlayerLosesLife _ -> []
   -- CR 714.2b carries a counter kind and a Natural, neither of which is a Count.

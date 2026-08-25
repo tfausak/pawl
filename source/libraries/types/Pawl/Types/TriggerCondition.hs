@@ -602,9 +602,29 @@ data TriggerCondition
     -- recipient, which is the printed sentence -- CR 615.13 itself says nothing
     -- about who the damage was addressed to.
     --
-    -- Not implemented: a link to the prevention effect that fired it, which a
-    -- card printing "prevented this way" would need (#687).
+    -- Deliberately blind to WHICH prevention effect applied, which is the
+    -- Squire's own 2016-11-08 ruling: "any effect that uses the word 'prevent'
+    -- will cause it to trigger". SelfPreventsDamage below is the reading that
+    -- does look, over the same record.
     DamageToPlayerPrevented PlayerRelation.PlayerRelation
+  | -- | CR 615.13 the other way round: "when damage is prevented THIS WAY"
+    -- (Phyrexian Vindicator), against GameEvent.DamagePrevented. Matches when the
+    -- applying instance's CR 614.5 identity names the bearer as its source --
+    -- the bearer's own prevention effect did the preventing, not anybody's.
+    --
+    -- The whole of the match, with no recipient scope where
+    -- DamageToPlayerPrevented above has one: rule 615.13 says nothing about whom
+    -- the damage was addressed to, and the printed sentence does not either --
+    -- the prevention effect this is paired with already fixes the recipient it
+    -- can cover.
+    --
+    -- The SOURCE and not the whole identity, because card data can name no
+    -- CandidateId: two prevention effects PRINTED on one object would be
+    -- indistinguishable here, and no printing has two (Scryfall
+    -- o:"prevented this way", 2026-08-25). CR 122.1c's shield-counter pair is a
+    -- prevention the RULES mint onto a permanent rather than one its card prints,
+    -- and Pawl.Engine.Replacement.printedBy is what tells the two apart.
+    SelfPreventsDamage
   | -- | CR 119.9: "whenever [a player] gains life" (Ajani's Pridemate). That
     -- rule rewrites the sentence as "whenever a SOURCE causes [a player] to gain
     -- life", which is why this matches GameEvent.LifeGained -- recorded only

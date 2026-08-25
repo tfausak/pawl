@@ -6832,12 +6832,68 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- sentence says "to you", and the recipient the event carries is what
   -- distinguishes the two.
   TriggerCondition.DamageToPlayerPrevented relation -> case event of
-    GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented recipient _) -> case recipient of
+    GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented _ recipient _) -> case recipient of
       Recipient.ToPlayer pid -> PlayerRelation.holds relation you pid
       Recipient.ToCreature _ -> False
       Recipient.ToPlaneswalker _ -> False
       Recipient.ToBattle _ -> False
       Recipient.ToObject _ -> False
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+  -- CR 615.13's other reading: the damage was prevented THIS WAY -- by a
+  -- prevention effect the BEARER's own card prints (Phyrexian Vindicator).
+  -- Replacement.printedBy is that question, and it is the whole of the match:
+  -- rule 615.13 says nothing about whom the damage was addressed to, and neither
+  -- does the printed sentence.
+  --
+  -- The identity, never the recipient: the Vindicator's shield covers only
+  -- itself, so a recipient test would be a second name for a fact the identity
+  -- already settles -- and one prevention effect of another object covering the
+  -- SAME recipient is exactly the case this arm has to answer False for.
+  TriggerCondition.SelfPreventsDamage -> case event of
+    GameEvent.DamagePrevented prevented -> Replacement.printedBy (DamagePrevented.by prevented) == Just bearer
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -8747,6 +8803,9 @@ reactsToAbilityTriggering cond = case cond of
   -- triggering, so Baral takes the first pass like every other watcher.
   TriggerCondition.SpellOrAbilityCounters _ -> False
   TriggerCondition.DamageToPlayerPrevented _ -> False
+  -- CR 603.3b again: a prevention is something that happens to a damage event,
+  -- not an ability triggering.
+  TriggerCondition.SelfPreventsDamage -> False
   TriggerCondition.PlayerGainsLife _ -> False
   TriggerCondition.PlayerLosesLife _ -> False
   -- CR 714.2b's own condition is a counter placement, which is what makes a
@@ -9051,7 +9110,14 @@ eventBindings bearerBecame cond event = case (cond, event) of
   -- The recipient is NOT bound alongside it. Every payload in the pool acts on
   -- the ability's own source (Selfless Squire counters itself), and the player
   -- the recipient names under this condition is CR 109.5's "you", already bound.
-  (TriggerCondition.DamageToPlayerPrevented _, GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented _ amount)) ->
+  (TriggerCondition.DamageToPlayerPrevented _, GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented _ _ amount)) ->
+    Binding.setEventAmount amount Map.empty
+  -- CR 615.13's "that much" once more, off the same event and into the same
+  -- reserved slot: the Vindicator deals what its own prevention stopped. The
+  -- recipient is not bound alongside it for the arm above's reason -- the payload
+  -- acts on a target it chooses, never on whoever the prevented damage was
+  -- addressed to.
+  (TriggerCondition.SelfPreventsDamage, GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented _ _ amount)) ->
     Binding.setEventAmount amount Map.empty
   -- CR 119.9's "that much": how much life the gain was, which CR 603.2 makes part
   -- of the event that fired the trigger -- Sanguine Bond's "target opponent loses
@@ -9557,6 +9623,9 @@ eventBindingSlots cond = case cond of
   -- unconditionally, so unlike SelfLeavesTheBattlefield's `became` there is no
   -- shape of the event that withholds it.
   TriggerCondition.DamageToPlayerPrevented _ -> Set.singleton Binding.eventAmount
+  -- The same slot the arm above declares, off the same event: this condition's
+  -- payload reads "that much" too.
+  TriggerCondition.SelfPreventsDamage -> Set.singleton Binding.eventAmount
   -- CR 119.9's amount, guaranteed given a match for the prevention arm's reason:
   -- GameEvent.LifeGained carries a Natural unconditionally, so no shape of the
   -- event withholds it. Sanguine Bond's "that much" is what reads it.
@@ -9917,6 +9986,7 @@ looksBack condition = case condition of
   TriggerCondition.SelfAttacksUnblocked -> False
   TriggerCondition.SpellOrAbilityCounters _ -> False
   TriggerCondition.DamageToPlayerPrevented _ -> False
+  TriggerCondition.SelfPreventsDamage -> False
   TriggerCondition.PlayerGainsLife _ -> False
   TriggerCondition.PlayerLosesLife _ -> False
   TriggerCondition.SelfCountersReached {} -> False
@@ -10048,6 +10118,11 @@ batchScoped condition = case condition of
   TriggerCondition.SelfAttacksUnblocked -> False
   TriggerCondition.SpellOrAbilityCounters _ -> False
   TriggerCondition.DamageToPlayerPrevented _ -> False
+  -- Per PREVENTION, which is what the record already is: groupPreventions
+  -- collapsed the batch to one entry per applying instance, so rule 615.13's "one
+  -- or more simultaneous damage events" is spent before this is asked -- the
+  -- DamageToPlayerPrevented arm above's reasoning, one identity over.
+  TriggerCondition.SelfPreventsDamage -> False
   TriggerCondition.PlayerGainsLife _ -> False
   TriggerCondition.PlayerLosesLife _ -> False
   TriggerCondition.SelfCountersReached {} -> False
@@ -11247,6 +11322,9 @@ zonesTriggeredFrom cond = case cond of
   -- The same default: Selfless Squire watches damage addressed to its controller from
   -- the battlefield, and a card in a graveyard sees nothing prevented.
   TriggerCondition.DamageToPlayerPrevented _ -> battlefield
+  -- CR 113.6's default: the Vindicator's prevention ability functions on the
+  -- battlefield, so the trigger paired with it watches from there too.
+  TriggerCondition.SelfPreventsDamage -> battlefield
   -- CR 113.6's default once more: Ajani's Pridemate has to be on the battlefield
   -- to receive the counter its own ability puts on it.
   TriggerCondition.PlayerGainsLife _ -> battlefield
@@ -11454,6 +11532,8 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SpellOrAbilityCounters _ -> False
   -- Damage can be prevented on anybody's turn.
   TriggerCondition.DamageToPlayerPrevented _ -> False
+  -- Damage can be prevented on anybody's turn, the arm above's reason.
+  TriggerCondition.SelfPreventsDamage -> False
   -- Life can be gained on anybody's turn. CR 702.179d's loss condition above says
   -- "during your turn" and this one does not, which is the two rules' own
   -- difference rather than an omission here.
@@ -11641,6 +11721,7 @@ stateTriggers gs
               TriggerCondition.HauntedCreatureDies -> False
               TriggerCondition.SpellOrAbilityCounters _ -> False
               TriggerCondition.DamageToPlayerPrevented _ -> False
+              TriggerCondition.SelfPreventsDamage -> False
               TriggerCondition.PlayerGainsLife _ -> False
               TriggerCondition.PlayerLosesLife _ -> False
               -- CR 603.3b's condition is an EVENT trigger too, and the event is

@@ -2199,6 +2199,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.HauntedCreatureDies -> condition
   TriggerCondition.SpellOrAbilityCounters _ -> condition
   TriggerCondition.DamageToPlayerPrevented _ -> condition
+  TriggerCondition.SelfPreventsDamage -> condition
   TriggerCondition.PlayerGainsLife _ -> condition
   TriggerCondition.PlayerLosesLife _ -> condition
   TriggerCondition.SelfCountersReached {} -> condition

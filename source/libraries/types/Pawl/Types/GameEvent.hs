@@ -70,9 +70,10 @@ data GameEvent
     -- there is no DamageDealt to subtract from -- and even a partly prevented one
     -- records only what got through.
     --
-    -- Carries no identity for the prevention EFFECT. The pool's one reader
-    -- (Selfless Squire) triggers on any prevention at all, by its own ruling, and
-    -- a card saying "prevented this way" is what must add one (#687).
+    -- Carries the applying instance's CR 614.5 identity too, which is what a
+    -- card saying "prevented this way" compares against (Phyrexian Vindicator).
+    -- Selfless Squire ignores it and fires on any prevention at all, by its own
+    -- 2016-11-08 ruling; both readings are conditions over one record.
     DamagePrevented DamagePrevented.DamagePrevented
   | -- | CR 603.2b: a phase or step began, on whose turn (the active player). What
     -- both an "at the beginning of each end step" step trigger and a CR 603.7
