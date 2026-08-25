@@ -419,12 +419,19 @@ data TriggerCondition
     --
     -- No blocker is bound: the form names a SET, not an object.
     --
-    -- Not implemented: rule 509.3e's "effects that add or remove blockers".
-    -- CreatureBecomesBlockedByAtLeast below reaches the arrival of a creature
-    -- put onto the battlefield blocking, and this one wants the same second arm
-    -- with the count traded for the Filter (#2297); an effect that causes a
-    -- creature already on the battlefield to block records no event at all
-    -- (#1146).
+    -- Rule 509.3e's "effects that add or remove blockers" reaches it too,
+    -- through the pool's one producer: a creature PUT ONTO THE BATTLEFIELD
+    -- blocking an attacker that was already blocked, matched against
+    -- GameEvent.BecameBlocking rather than the grouped event -- CR 509.3c's "was
+    -- an unblocked creature at that time" keeps the grouped one off that
+    -- arrival. The arm fires only where the arrival is the FIRST admitted
+    -- blocker, which is what makes it a becoming rather than an addition.
+    -- Aetherplasm swapping itself out for a black creature card is the pooled
+    -- pair, and Pawl.KeywordTriggerSpec's SelfBlocksOneOrMore group is the
+    -- proof. Removing blockers can only shrink the admitted set.
+    --
+    -- Not implemented: an effect that causes a creature already on the
+    -- battlefield to block records no event at all (#1146).
     SelfBecomesBlockedByOneOrMore (Filter.Filter Keyword.Keyword)
   | -- | CR 509.3e read by a BYSTANDER on the ATTACKING side: "whenever a
     -- creature attacking one of your opponents becomes blocked by two or more
