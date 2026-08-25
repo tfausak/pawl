@@ -241,7 +241,7 @@ admittedGiven pcs grants pools perspective bindings source slot gs =
 -- 702.39a are the only clauses that write them in a slot. CR 508.1c's gate
 -- is where the other defending-player read is
 -- (Pawl.Engine.CombatRestriction.inForce, Armored Galleon), and no target
--- slot can reach it. Both are thunks, like `pcs` above: a slot whose
+-- slot can reach it. Both are thunks, like the caller's `pcs`: a slot whose
 -- filter never names an atom pays for neither the source's projection nor
 -- the combat lookup.
 slotContext :: Map ObjectId PC.ProjectedCharacteristics -> Maybe PlayerId -> Map SlotName (Set Recipient) -> ObjectId -> GameState -> Filter.Context
@@ -336,12 +336,23 @@ lastKnownAdmits perspective source slot host gs =
 -- build here rather than default to an answer.
 --
 -- Every battlefield pool reads the last known CARD TYPES, since CR 110.1 makes
--- being a permanent a fact about the object's types; the record carries no zone
--- of its own, and the caller only ever asks about an ability's source, which was
--- a permanent while it existed. The zone pools answer False: CR 400.7 makes a
--- card that changed zones a new object, so an id the game has forgotten names
--- nothing in a graveyard, in exile or on the stack, and no player is ever
--- forgotten (CR 800.4a leaves a departed seat's row in place).
+-- being a permanent a fact about the object's types. The record carries no zone
+-- of its own, so what is read is what the object WAS rather than where it was;
+-- the caller only ever asks about an ability's source, which was a permanent
+-- while it existed.
+--
+-- A REGRESSION FENCE in one direction only. Answering False for every pool
+-- reddens Pawl.AuraSpec's "the Aura the dead Mage could have hosted is in
+-- alice's hand", so the creature test is paid for; answering True for every pool
+-- reddens nothing, because the one card that asks this question is a CREATURE
+-- and Pool.Creatures is what its Aura's slot names. A card searching for an Aura
+-- from a noncreature source would be the observer.
+--
+-- The other pools answer False. CR 400.7 makes an object that changed zones a
+-- new object, so the id this is asked about names nothing in a graveyard, in
+-- exile or on the stack -- and Pool.Players is not even asked, its candidates
+-- being players, which have no last known information and are looked up by
+-- PlayerId rather than by ObjectId.
 poolHeldLastKnown :: Pool.Pool -> Filter.View -> Bool
 poolHeldLastKnown pool view =
   let types = Filter.cardTypes view

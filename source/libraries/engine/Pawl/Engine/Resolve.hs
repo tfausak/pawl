@@ -6264,6 +6264,12 @@ putFound searcher source destination cardId = case destination of
   -- into its owner's hand (CR 608.2h; CR 113.7a is what keeps the ability
   -- resolving at all with its source gone). Branching on Nothing alone would
   -- send the first of those to the hand.
+  --
+  -- The ORDER of those two questions is a REGRESSION FENCE rather than a proven
+  -- behaviour: rule 303.4i's Nothing is unreachable for the one card that reaches
+  -- this arm, whose filter names Filter.CanAttachToSubject, so both readings
+  -- produce the same board and swapping them reddens nothing. A card whose search
+  -- filter did NOT ask rule 701.3a would be its observer.
   SearchDestination.BattlefieldAttachedToSource -> do
     gs <- State.get
     if Set.member source (GameState.battlefield gs)
