@@ -15,6 +15,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.EntryRiders as EntryRiders
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
@@ -1029,6 +1030,30 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "CR 603.5 the declined clause did nothing: the Piker is still untapped" (twiddleTapState (thirdOf board) after) (Just TapState.Untapped)
     Spec.assertEqWith s "CR 608.2d the branch was still announced first, and only once" (branchesAnnounced asked) [ClauseIndex.MkClauseIndex 0]
     Spec.assertEqWith s "and the loser's \"may\" was never offered as a second chance" (optionalsAnswered asked) [OptionalDecision.Declines]
+  -- The SAME rider on the other resolution path. Pawl.Engine.Resolve keeps two
+  -- hand-duplicated clause loops -- one for a spell, one for an activated or
+  -- triggered ability (CR 113.7's separate source) -- and a Twiddle board reaches
+  -- only the first, so mutating the second goes green on every case above. Teardrop
+  -- Kami -- "Sacrifice this creature: You may tap or untap target creature" -- is
+  -- the printed producer for the second, and the pair below is the first pair's
+  -- discrimination argument transplanted onto it.
+  Spec.it s "CR 608.2d announcing Teardrop Kami's tap taps the untapped Piker" $ do
+    (gs, ability, kamiId, pikerId) <- kamiBoard s registry False
+    case ability of
+      Nothing -> Spec.assertFailure s "Teardrop Kami should declare one activated ability"
+      Just abil -> do
+        let (asked, after) = kamiResolved (ClauseIndex.MkClauseIndex 0) OptionalDecision.Exercises gs abil kamiId pikerId
+        Spec.assertEqWith s "CR 608.2d the announced branch ran and its sibling did not: the Piker is tapped" (twiddleTapState pikerId after) (Just TapState.Tapped)
+        Spec.assertEqWith s "and the question was put exactly once, naming the tap" (branchesAnnounced asked) [ClauseIndex.MkClauseIndex 0]
+        Spec.assertEqWith s "CR 603.5's \"may\" was asked once, for the winning branch alone" (optionalsAnswered asked) [OptionalDecision.Exercises]
+  Spec.it s "CR 608.2d announcing Teardrop Kami's untap untaps the tapped Piker" $ do
+    (gs, ability, kamiId, pikerId) <- kamiBoard s registry True
+    case ability of
+      Nothing -> Spec.assertFailure s "Teardrop Kami should declare one activated ability"
+      Just abil -> do
+        let (asked, after) = kamiResolved (ClauseIndex.MkClauseIndex 1) OptionalDecision.Exercises gs abil kamiId pikerId
+        Spec.assertEqWith s "CR 608.2d the announced branch ran: the Piker is untapped" (twiddleTapState pikerId after) (Just TapState.Untapped)
+        Spec.assertEqWith s "and the question was put exactly once, naming the untap" (branchesAnnounced asked) [ClauseIndex.MkClauseIndex 1]
   -- CR 607.2a's linked set, on the board that can tell it from "every card in
   -- exile": TWO Hoarding Dragons, each of which exiled a different artifact, and
   -- one of them dies. The pair below runs the SAME board twice and differs in
@@ -2356,7 +2381,11 @@ twiddleResolved branch decision (gs, twiddleId, pikerId) =
 -- branch, and CR 603.5's "may".
 twiddleAnswer :: ClauseIndex.ClauseIndex -> OptionalDecision.OptionalDecision -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 twiddleAnswer branch decision target p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToObject target) sets
+  -- By the OBJECT the recipient names rather than by a recipient built by hand:
+  -- Twiddle's Permanents pool offers ToObject and Teardrop Kami's Creatures pool
+  -- offers ToCreature, and a hand-built recipient of the wrong shape is dropped
+  -- by CR 608.2b's re-read with no error.
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring ((== Just target) . Recipient.objectOf) sets
   Prompt.ChooseClause {} -> branch
   Prompt.ChooseOptional {} -> decision
   _ -> S.identityAnswer p
@@ -2372,6 +2401,28 @@ branchesAnnounced responses = [c | Response.ChoseClause c <- responses]
 -- would show up as a second answer.
 optionalsAnswered :: [Response.Response] -> [OptionalDecision.OptionalDecision]
 optionalsAnswered responses = [d | Response.ChoseOptional d <- responses]
+
+-- The board the two Teardrop Kami cases share, built to match twiddleBoard as
+-- closely as an ability can: alice's Kami is the source, bob's Goblin Piker the
+-- target, tapped or not as the case needs. The Kami is itself a legal target
+-- until its own sacrifice cost is paid (CR 601.2c chooses targets before CR
+-- 601.2h pays), so the offer again holds more than the answerer takes.
+kamiBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (GameState.GameState, Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card), ObjectId.ObjectId, ObjectId.ObjectId)
+kamiBoard s registry startTapped = do
+  kami <- S.printingOf s registry "Teardrop Kami"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let (kamiId, g0) = S.addCreature kami S.alice (Setup.emptyGame S.bothPlayers)
+      (pikerId, g1) = S.addCreature piker S.bob g0
+      placed = if startTapped then S.tapObject pikerId g1 else g1
+  pure (placed {GameState.priority = Just S.alice}, Maybe.listToMaybe (Face.activatedAbilities (S.combinedFace kami)), kamiId, pikerId)
+
+-- One activation and resolution of that board, keeping the transcript for
+-- twiddleResolved's reason. The ability is read off the PRINTING rather than
+-- conjured, so what is proved is the card in data/cards/.
+kamiResolved :: ClauseIndex.ClauseIndex -> OptionalDecision.OptionalDecision -> GameState.GameState -> ActivatedAbility.ActivatedAbility Card.Type.Card -> ObjectId.ObjectId -> ObjectId.ObjectId -> ([Response.Response], GameState.GameState)
+kamiResolved branch decision gs ability kamiId pikerId =
+  let ((_, after), asked) = Replay.record (twiddleAnswer branch decision pikerId) gs (Activate.activateAbility S.alice kamiId ability >> Stack.resolveTop)
+   in (asked, after)
 
 -- The board the two Jungle Wayfinder cases share: alice casts it off three
 -- Forests, and every seat's library holds three of ONE basic plus a Goblin Piker

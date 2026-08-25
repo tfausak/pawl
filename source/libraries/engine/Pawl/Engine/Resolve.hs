@@ -1518,9 +1518,12 @@ resolveModesWith runSubgame stackId srcId modes = do
                       let legalNowForMay = instanceView (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
                           boundNowForMay = Map.keysSet (instanceView gateBindings)
                       -- CR 608.2d's "or" next, and BEFORE the "may", off the same
-                      -- helper the spell path uses. UNPROVEN on this path: no
-                      -- ability in data/cards/ prints an either-or, so mutating
-                      -- this line leaves the suite green (#2288).
+                      -- helper the spell path uses. Proved on THIS loop and not
+                      -- merely on the spell's twin: Teardrop Kami's "sacrifice
+                      -- this creature: you may tap or untap target creature" is
+                      -- Pawl.ResolveSpec's "CR 608.2d announcing Teardrop Kami's
+                      -- tap taps the untapped Piker", which reddens when this
+                      -- conjunct is defeated.
                       (branch, picked') <- if gated then chosenBranch stackId effectController idx cIdx picked clause else pure (False, picked)
                       taken <- if branch then exercises stackId effectController idx cIdx boundNowForMay legalNowForMay clause else pure False
                       -- CR 118.12: then the cost paid on resolution, against the
