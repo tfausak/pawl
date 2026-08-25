@@ -711,6 +711,9 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- number this condition counts, and its Filter holds no Count for
   -- PermanentEnters' reason.
   TriggerCondition.PlayerAttacksWith {} -> []
+  -- Two PlayerRelations hold no Count, and rule 508.3e's "one or more" is the
+  -- EVENT's grouping for AttachedPlayerIsAttacked's reason.
+  TriggerCondition.PlayerAttacksPlayer {} -> []
   -- CR 702.105a compares life totals rather than counting objects, so no Count.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> []
   TriggerCondition.SelfBlocks -> []
@@ -3146,6 +3149,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 508.3c names a quality the declared creatures must have, so this one DOES
   -- carry a Filter -- Hermes, Overseer of Elpis' "Birds".
   TriggerCondition.PlayerAttacksWith payload -> [PlayerAttacksWith.filter payload]
+  -- CR 508.3e names two players and no quality of anything, so no Filter --
+  -- rule 508.3d's answer, twice over.
+  TriggerCondition.PlayerAttacksPlayer {} -> []
   -- CR 702.105a names no quality of the attacker, only a fact about whom it
   -- attacked, so no Filter.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> []

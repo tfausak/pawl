@@ -62,6 +62,7 @@ import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BattlefieldCandidate as BattlefieldCandidate
 import qualified Pawl.Types.BecameAttached as BecameAttached
+import qualified Pawl.Types.BecameAttacked as BecameAttacked
 import qualified Pawl.Types.BecameBlocking as BecameBlocking
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
@@ -5483,10 +5484,89 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- sent at a planeswalker the enchanted player controls leaves this silent --
   -- where CreatureAttacksYou, reading CR 508.5's defending player, would fire.
   TriggerCondition.AttachedPlayerIsAttacked -> case event of
-    GameEvent.BecameAttacked target ->
+    GameEvent.BecameAttacked payload ->
       case Recipient.playerOf =<< (Object.attachedTo =<< Game.lookupObject bearer gs) of
-        Just enchanted -> target == AttackTarget.OfPlayer enchanted
+        Just enchanted -> BecameAttacked.target payload == AttackTarget.OfPlayer enchanted
         Nothing -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+  -- CR 508.3e: the player the payload names declared attackers, and at least one
+  -- of them was sent at a PLAYER. AttachedPlayerIsAttacked's event and its
+  -- per-TARGET arity, with the subject read off a relation instead of off the
+  -- bearer's attachment -- so one declaration split across two opponents fires
+  -- this TWICE where PlayerAttacks above fires once, which is what parts rule
+  -- 508.3e from rule 508.3d.
+  --
+  -- Both sides come off the EVENT. Combat.declareAttackers stamps CR 508.1's
+  -- declaring player onto it beside the target, which is what lets this arm ask
+  -- rule 508.3e's question at all; reading GameState.activePlayer for the
+  -- attacker would agree today, rule 508.1 letting only the active player
+  -- declare, but the rule asks who declared.
+  --
+  -- The attacked side is UNQUALIFIED, rule 508.3e's "[another player]" as every
+  -- printing of this shape leaves it -- Pawl.Types.TriggerCondition's arm says
+  -- which cards would narrow it (#2281). A relation there would be nearly
+  -- unobservable besides: CR 506.2 and CR 802.2 make every defending player an
+  -- opponent of the attacker, so Opponent and AnyPlayer would pick the same
+  -- seats on every legal declaration.
+  --
+  -- ONLY AttackTarget.OfPlayer, which is rule 508.3e's last sentence in as many
+  -- words: "it won't trigger if a creature attacks a planeswalker or a battle".
+  -- The other exclusion in that sentence -- a creature put onto the battlefield
+  -- attacking -- holds by construction instead, CR 508.4 saying such a creature
+  -- was never declared and Combat.putOntoBattlefieldAttacking recording no
+  -- event.
+  --
+  -- No bearer test, PlayerAttacks' bystanding posture above: rule 508.3e's two
+  -- subjects are both players, so a Seifer held out of combat still triggers on
+  -- its controller's attack.
+  TriggerCondition.PlayerAttacksPlayer relation -> case event of
+    GameEvent.BecameAttacked payload -> case BecameAttacked.target payload of
+      AttackTarget.OfPlayer _ -> PlayerRelation.holds relation you (BecameAttacked.attacker payload)
+      AttackTarget.OfPlaneswalker _ -> False
+      AttackTarget.OfBattle _ -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BecameBlocking {} -> False
     GameEvent.BlocksDeclared {} -> False
@@ -8782,6 +8862,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.AttachedPlayerIsAttacked -> False
   TriggerCondition.PlayerAttacks _ -> False
   TriggerCondition.PlayerAttacksWith {} -> False
+  TriggerCondition.PlayerAttacksPlayer {} -> False
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature _ -> False
@@ -9088,7 +9169,20 @@ eventBindings bearerBecame cond event = case (cond, event) of
   -- event to name. Bound rather than left to the ability's own attachment because
   -- the payload reads it as a player -- Curse of Vitality's "each opponent
   -- attacking that player" -- and Object.attachedTo is a Recipient.
-  (TriggerCondition.AttachedPlayerIsAttacked, GameEvent.BecameAttacked (AttackTarget.OfPlayer attacked)) ->
+  (TriggerCondition.AttachedPlayerIsAttacked, GameEvent.BecameAttacked (BecameAttacked.MkBecameAttacked _ (AttackTarget.OfPlayer attacked))) ->
+    Binding.setTriggerPlayer attacked Map.empty
+  -- CR 508.3e's SECOND subject, off the same event and under the same reserved
+  -- slot: whom the declaration was aimed at, which is what "that player" means
+  -- in Seifer, Balamb Rival's "goad target creature that player controls". The
+  -- ATTACKING player the event also carries goes unbound, the CreatureAttacksYou
+  -- arm above's reasoning -- no printing of this shape points back at it that
+  -- CR 109.5's "you" cannot say, and #2154 is where the ones that do are
+  -- tracked.
+  --
+  -- The narrowing to AttackTarget.OfPlayer is matchesTrigger's, re-stated here
+  -- because this function is not given its answer: an event this condition
+  -- rejected reaches no binding at all.
+  (TriggerCondition.PlayerAttacksPlayer {}, GameEvent.BecameAttacked (BecameAttacked.MkBecameAttacked _ (AttackTarget.OfPlayer attacked))) ->
     Binding.setTriggerPlayer attacked Map.empty
   -- CR 509.3e's "that attacking creature", off the grouped blocking event: the
   -- attacker the event names, and again not the bearer, which is a bystander.
@@ -9536,6 +9630,14 @@ eventBindingSlots cond = case cond of
   -- The arm above's reason verbatim: rule 508.3c's subject is a player and the
   -- Filter names a SET of creatures, so there is nothing to point at either.
   TriggerCondition.PlayerAttacksWith {} -> Set.empty
+  -- The ATTACKED player, where the two arms above bind nothing: rule 508.3e
+  -- names a second player, and that is the one the printed payloads read --
+  -- Seifer, Balamb Rival's "that player controls".
+  --
+  -- Unconditional, as this classification has to be, although matchesTrigger
+  -- admits only AttackTarget.OfPlayer: every event this condition MATCHES
+  -- carries a player, and eventBindings is consulted for no other.
+  TriggerCondition.PlayerAttacksPlayer {} -> Set.singleton Binding.triggerPlayer
   -- NOTHING, for SelfAttacksWithAnother's reason: rule 702.105a's payload names
   -- only "this creature", so the attacked player is compared and then never
   -- pointed at. That is also why this condition needs no arm in eventBindings.
@@ -9978,6 +10080,7 @@ looksBack condition = case condition of
   TriggerCondition.AttachedPlayerIsAttacked -> False
   TriggerCondition.PlayerAttacks _ -> False
   TriggerCondition.PlayerAttacksWith {} -> False
+  TriggerCondition.PlayerAttacksPlayer {} -> False
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature _ -> False
@@ -10101,6 +10204,7 @@ batchScoped condition = case condition of
   TriggerCondition.AttachedPlayerIsAttacked -> False
   TriggerCondition.PlayerAttacks _ -> False
   TriggerCondition.PlayerAttacksWith {} -> False
+  TriggerCondition.PlayerAttacksPlayer {} -> False
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature _ -> False
@@ -11240,6 +11344,7 @@ zonesTriggeredFrom cond = case cond of
   TriggerCondition.AttachedPlayerIsAttacked -> battlefield
   TriggerCondition.PlayerAttacks _ -> battlefield
   TriggerCondition.PlayerAttacksWith {} -> battlefield
+  TriggerCondition.PlayerAttacksPlayer {} -> battlefield
   TriggerCondition.SelfAttacksPlayerWithMostLife -> battlefield
   TriggerCondition.SelfBlocks -> battlefield
   TriggerCondition.SelfBlocksCreature _ -> battlefield
@@ -11514,6 +11619,10 @@ controllerTurnScoped cond = case cond of
   -- narrows WHICH creatures were declared and says nothing about whose turn it
   -- is.
   TriggerCondition.PlayerAttacksWith payload -> PlayerAttacksWith.player payload == PlayerRelation.You
+  -- The same comparison over the ATTACKING side, which is the field rule
+  -- 508.3e's event pins to the active player; the attacked side says nothing
+  -- about whose turn it is.
+  TriggerCondition.PlayerAttacksPlayer relation -> relation == PlayerRelation.You
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature _ -> False
@@ -11699,6 +11808,7 @@ stateTriggers gs
               TriggerCondition.AttachedPlayerIsAttacked -> False
               TriggerCondition.PlayerAttacks _ -> False
               TriggerCondition.PlayerAttacksWith {} -> False
+              TriggerCondition.PlayerAttacksPlayer {} -> False
               TriggerCondition.SelfAttacksPlayerWithMostLife -> False
               TriggerCondition.SelfBlocks -> False
               TriggerCondition.SelfBlocksCreature _ -> False

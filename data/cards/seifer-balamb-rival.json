@@ -42,6 +42,44 @@
       "triggeredAbilities": [
         {
           "condition": {
+            "type": "PlayerAttacksPlayer",
+            "value": {
+              "type": "You"
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Goad",
+                        "value": {
+                          "type": "InSlot",
+                          "value": "target"
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "targetSlots": {
+                  "target": {
+                    "filter": {
+                      "type": "ControlledByBound",
+                      "value": "thatPlayer"
+                    },
+                    "pool": {
+                      "type": "Creatures"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "condition": {
             "type": "CreatureBecomesBlockedByAtLeast",
             "value": {
               "attacked": {

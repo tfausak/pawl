@@ -1,10 +1,10 @@
 module Pawl.Types.GameEvent where
 
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
-import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecameAttached as BecameAttached
+import qualified Pawl.Types.BecameAttacked as BecameAttacked
 import qualified Pawl.Types.BecameBlocking as BecameBlocking
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
@@ -226,8 +226,8 @@ data GameEvent
     -- NOT the AttackTarget itself. That is a wider payload for a different
     -- question, and a different ARITY: BecameAttacked below is where it rides.
     AttackerDeclared AttackerDeclared.AttackerDeclared
-  | -- | CR 508.3b: a player, planeswalker or battle WAS ATTACKED -- one event per
-    -- distinct target the CR 508.1 declaration named, appended by
+  | -- | CR 508.3b: a player, planeswalker or battle WAS ATTACKED, and by whom --
+    -- one event per distinct target the CR 508.1 declaration named, appended by
     -- Pawl.Engine.Combat.declareAttackers alone.
     --
     -- AttackerDeclared's grouping sibling, and the pair stands to each other as
@@ -256,10 +256,12 @@ data GameEvent
     -- battlefield attacking goes through Combat.putOntoBattlefieldAttacking, which
     -- records no event at all.
     --
-    -- No attacking player is carried. CR 508.3e's "[a player] attacks [another
-    -- player]" is the shape that needs one, and no trigger condition writes it
-    -- (#538).
-    BecameAttacked AttackTarget.AttackTarget
+    -- The ATTACKING player rides beside the target, which is what CR 508.3e's
+    -- "[a player] attacks [another player]" needs and what no other event of the
+    -- declaration can offer -- AttackerDeclared names a creature and CR 508.5's
+    -- defending player, AttackersDeclared below a player and no target.
+    -- Pawl.Types.TriggerCondition's PlayerAttacksPlayer is the reader.
+    BecameAttacked BecameAttacked.BecameAttacked
   | -- | CR 508.3d: a player DECLARED ATTACKERS -- ONE event per CR 508.1
     -- declaration, naming the attacking player, appended by
     -- Pawl.Engine.Combat.declareAttackers alone.
@@ -286,9 +288,10 @@ data GameEvent
     -- Combat.putOntoBattlefieldAttacking records nothing, and CR 508.4 says such
     -- a creature was never declared.
     --
-    -- Carries no attacked target. CR 508.3e's "[a player] attacks [another
-    -- player]" is the shape that wants one beside this player, and no trigger
-    -- condition writes it (#538).
+    -- Carries no attacked target, where BecameAttacked above carries both
+    -- sides: CR 508.3e's "[a player] attacks [another player]" is written
+    -- against that event, at that event's per-target arity, and rule 508.3d's
+    -- subject is the declaration alone.
     AttackersDeclared PlayerId.PlayerId
   | -- | CR 509.1g: a creature BECAME A BLOCKING CREATURE, naming it and one
     -- attacking creature it is blocking. AttackerDeclared's mirror, with TWO
