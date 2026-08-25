@@ -4479,13 +4479,22 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "the lint itself catches an either-or whose sibling does not name it back" $ do
     twiddle <- S.printingOf s registry "Twiddle"
     let face = S.combinedFace twiddle
-        rewrite i orElse =
-          let overMode mode = mode {Mode.clauses = Seq.adjust' (\clause -> clause {Clause.orElse = orElse}) i (Mode.clauses mode)}
+        -- Every offender is built by rewriting BOTH clauses where the defect is
+        -- symmetric, so that each assertion fails for the arm it names: leaving
+        -- one clause pointing at a healthy sibling would make the OTHER clause
+        -- the offender and the assertion pass without the arm under test.
+        rewrite :: [(Int, Maybe ClauseIndex.ClauseIndex)] -> Face.Face Card.Type.Card
+        rewrite edits =
+          let overClauses clauses = foldr (\(i, orElse) -> Seq.adjust' (\clause -> clause {Clause.orElse = orElse}) i) clauses edits
+              overMode mode = mode {Mode.clauses = overClauses (Mode.clauses mode)}
            in face {Face.spell = (Face.spell face) {Modal.modes = fmap overMode (Modal.modes (Face.spell face))}}
+        selfNaming, dangling :: [(Int, Maybe ClauseIndex.ClauseIndex)]
+        selfNaming = [(0, Just (ClauseIndex.MkClauseIndex 0)), (1, Just (ClauseIndex.MkClauseIndex 1))]
+        dangling = [(0, Just (ClauseIndex.MkClauseIndex 7)), (1, Just (ClauseIndex.MkClauseIndex 7))]
     Spec.assertBool s (not (cardBranchesAreAsymmetric face)) "Twiddle's tap and untap name each other, and are accepted"
-    Spec.assertBool s (cardBranchesAreAsymmetric (rewrite 1 Nothing)) "a branch whose sibling names nobody back is rejected"
-    Spec.assertBool s (cardBranchesAreAsymmetric (rewrite 0 (Just (ClauseIndex.MkClauseIndex 0)))) "a branch naming itself is rejected"
-    Spec.assertBool s (cardBranchesAreAsymmetric (rewrite 0 (Just (ClauseIndex.MkClauseIndex 7)))) "and a branch naming an ordinal no clause has is rejected"
+    Spec.assertBool s (cardBranchesAreAsymmetric (rewrite [(1, Nothing)])) "a branch whose sibling names nobody back is rejected"
+    Spec.assertBool s (cardBranchesAreAsymmetric (rewrite selfNaming)) "two branches each naming themselves are rejected"
+    Spec.assertBool s (cardBranchesAreAsymmetric (rewrite dangling)) "and branches naming an ordinal no clause has are rejected"
   -- The filing convention, now that no lookup enforces it (#649): a file's stem
   -- must be the slug Registry.filedAs derives from the card inside it.
   --
