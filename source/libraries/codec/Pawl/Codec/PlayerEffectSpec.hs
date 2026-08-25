@@ -94,7 +94,7 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost (Filter.HasCardType CardType.Creature) Nothing (ManaCost.MkManaCost [ManaSymbol.Generic 1]) 1))
+      (PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost (Filter.HasCardType CardType.Creature) Nothing Nothing (ManaCost.MkManaCost [ManaSymbol.Generic 1]) 1))
       " {\"type\":\"ReduceActivationCost\",\"value\":{\"whichAbilities\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"reduction\":[{\"type\":\"Generic\",\"value\":1}],\"floor\":1}} "
   -- Training Grounds' amount and floor, which differ from each other -- a codec
   -- that swapped the two payloads would round-trip Heartstone's above and not
@@ -103,7 +103,7 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost (Filter.HasCardType CardType.Creature) Nothing (ManaCost.MkManaCost [ManaSymbol.Generic 2]) 1))
+      (PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost (Filter.HasCardType CardType.Creature) Nothing Nothing (ManaCost.MkManaCost [ManaSymbol.Generic 2]) 1))
       " {\"type\":\"ReduceActivationCost\",\"value\":{\"whichAbilities\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"reduction\":[{\"type\":\"Generic\",\"value\":2}],\"floor\":1}} "
   -- CR 613.11 / 601.2f / Brutal Suppression: the criterion, and the components
   -- it adds spelled exactly as a Cost's own components are.

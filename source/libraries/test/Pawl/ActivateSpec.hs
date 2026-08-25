@@ -1081,6 +1081,52 @@ equipSpec s registry = Spec.describe s "Equip" $ do
     Spec.assertEqWith s "while alice's is offered on her own turn" (length (activationsOf aliceSplitter (Action.legalActions S.alice gs))) 1
     Spec.assertEqWith s "and one Swamp of his own does offer it" (length (activationsOf bobSplitter (Action.legalActions S.bob (S.landsFor swamp S.bob 1 bobsTurn)))) 1
 
+  -- CR 601.2f's reductions asked about CR 601.2c's TARGETS. Dwarven Mauler ({R}
+  -- Creature -- Dwarf Warrior 2/1, "Equip abilities you activate that target this
+  -- creature cost {2} less to activate", checked against Scryfall on 2026-08-25)
+  -- is that whole sentence and nothing else, so no other clause of the card can
+  -- be what these assertions read.
+  --
+  -- The ordering is the point: pawl gathers the adjustments once at CR 601.2b's
+  -- position, where no target exists yet, and again after Target.chooseTargets.
+  -- Only the second gather can see this reducer.
+  --
+  -- WHY AEGIS OF THE LEGION AND THREE MOUNTAINS. Its equip is {3}, so the reduced
+  -- cost is {1} -- neither 0 nor the printed 3, which puts every answer out of
+  -- reach of the floor and of a "reduced to nothing" path, and leaves the two
+  -- readings two Mountains apart. Three Mountains pay the PRINTED cost either
+  -- way, so Activate's target-blind gate (#2300) offers both activations and what
+  -- discriminates is what each PAYS.
+  --
+  -- WHY THE MAMMOTH. A reducer that ignored the target criterion applies to both
+  -- activations and both pay {1}; the correct reading pays {1} and {3}. The two
+  -- readings AGREE on the Mauler-targeting run, so the Mammoth run is the one
+  -- that discriminates them -- and the Mauler run catches the third reading, a
+  -- criterion asked against the ability's SOURCE (the Equipment), under which
+  -- neither run is reduced and both pay {3}.
+  Spec.it s "CR 601.2f the reduction reaches only the equip that targets the Mauler" $ do
+    mauler <- S.printingOf s registry "Dwarven Mauler"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    aegis <- S.printingOf s registry "Aegis of the Legion"
+    mountain <- S.printingOf s registry "Mountain"
+    let (maulerId, g0) = S.addCreature mauler S.alice (Setup.emptyGame S.bothPlayers)
+        (mammothId, g1) = S.addCreature mammoth S.alice g0
+        (aegisId, g2) = S.addCreature aegis S.alice g1
+        board = (S.landsFor mountain S.alice 3 g2) {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+    case Projection.abilitiesOf aegisId board of
+      [ability] -> do
+        let equipOnto victim = S.runPure (aimAtOffered victim) board (Activate.activateAbility S.alice aegisId ability)
+            resolve victim activated = S.runPure (aimAtOffered victim) activated Stack.resolveTop
+            ontoMauler = equipOnto maulerId
+            ontoMammoth = equipOnto mammothId
+        Spec.assertEqWith s "CR 601.2f the equip aimed at the Mauler pays {3} minus {2}, so one Mountain is tapped" (S.tappedCount S.alice ontoMauler) 1
+        Spec.assertEqWith s "while the same equip aimed at the Mammoth pays the printed {3}" (S.tappedCount S.alice ontoMammoth) 3
+        Spec.assertEqWith s "CR 701.3a and the Aegis really landed on the Mauler" (fmap Object.attachedTo (Game.lookupObject aegisId (resolve maulerId ontoMauler))) (Just (Just (Recipient.ToCreature maulerId)))
+        Spec.assertEqWith s "and on the Mammoth in the other run" (fmap Object.attachedTo (Game.lookupObject aegisId (resolve mammothId ontoMammoth))) (Just (Just (Recipient.ToCreature mammothId)))
+        Spec.assertEqWith s "setup: rule 702.6a minted the Aegis's printed equip {3}" (ActivatedAbility.cost ability) (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) [])
+        Spec.assertEqWith s "setup: nothing was tapped before either activation" (S.tappedCount S.alice board) 0
+      abilities -> Spec.assertFailure s ("expected exactly one equip ability, got " <> show (length abilities))
+
   -- The card's OTHER sentence, on CR 118.7's spell side. Bonesplitter is {1}, so
   -- with no land in the game an Equipment spell is castable only if the
   -- reduction ran. Braidwood Sextant is the discriminating control: a {1}

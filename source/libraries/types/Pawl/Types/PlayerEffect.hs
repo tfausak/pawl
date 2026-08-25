@@ -117,12 +117,12 @@ data PlayerEffect
     -- ReduceActivationCost.grantedBy, which names a rule-702 family rather than a
     -- Filter; see that type for why the two cannot be one field.
     --
-    -- Not implemented: narrowing by what an ability TARGETS. Helitrooper's
-    -- "equip abilities you activate that target this creature" names the equip
-    -- family this arm can now designate, and then a target its criteria cannot
-    -- read; stated as "the activated abilities of a permanent matching X" it
-    -- would be WEAKER than the card prints, so no such card belongs in the pool
-    -- (#2292).
+    -- A THIRD criterion beside those two names what the ability TARGETS --
+    -- Dwarven Mauler's "equip abilities you activate that target this creature"
+    -- -- and rides ReduceActivationCost.whichTargets. It is a Filter like the
+    -- first, and an object question like the first, but asked of CR 601.2c's
+    -- chosen target rather than of the ability's source, and therefore asked at
+    -- a later moment than either of the others.
     --
     -- The FLOOR is carried rather than assumed, because it is card text (CR
     -- 101.1) and not a rule: both printings say "This effect can't reduce the

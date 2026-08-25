@@ -48,6 +48,7 @@ import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
@@ -347,14 +348,21 @@ payableCostGiven sources pcs = payableCostAtGiven sources pcs 0
 -- announcement exposes.
 payableCostAt :: Natural -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAt x family pid srcId gs cost =
-  let adjustments = Cost.activationAdjustments family pid srcId gs
+  let -- Not implemented: this gate is TARGET-BLIND, so a reduction that names
+      -- the ability's targets (Dwarven Mauler's "that target this creature") is
+      -- never counted here and the gate runs STRICTER than printed -- an
+      -- activation affordable only under that reduction is not offered (#2300).
+      -- CR 601.2e's legality check sits after CR 601.2c for exactly the reason
+      -- this cannot: measuring it honestly means searching Target.legalSets.
+      adjustments = Cost.activationAdjustments Set.empty family pid srcId gs
    in Cost.canPaySomeCompletion (PaymentSubject.Activating srcId) ManaSpending.AsProduced pid srcId (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs
 
 -- The same predicate on a board the caller already walked -- see
 -- Cost.canPaySomeCompletionGiven.
 payableCostAtGiven :: [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Natural -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAtGiven sources pcs x family pid srcId gs cost =
-  let adjustments = Cost.activationAdjustments family pid srcId gs
+  let -- Target-blind for payableCostAt's stated reason, and the same #2300.
+      adjustments = Cost.activationAdjustments Set.empty family pid srcId gs
    in Cost.canPaySomeCompletionGiven (PaymentSubject.Activating srcId) ManaSpending.AsProduced sources pcs pid srcId (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs
 
 -- CR 601.2b via 602.2b: the greatest X this player could actually pay for, which
@@ -644,7 +652,15 @@ activateAbility pid srcId ability = do
           -- offers are filtered against the claims a component makes on a zone,
           -- so a Phyrexian symbol offered without the added "Sacrifice a land"
           -- in view would be offered against a board that has one land too many.
-          let gathered = Cost.activationAdjustments family pid srcId gs
+          -- TARGET-BLIND, and it has to be: CR 601.2c's targets are announced
+          -- below, so nothing at CR 601.2b's position can read them. What that
+          -- costs is nothing here -- CR 118.13a's announcement is a choice of
+          -- halves, every activation-cost reducer in the pool reduces by GENERIC
+          -- mana, and a target-aware reduction therefore cannot change which
+          -- nonhybrid equivalent or Phyrexian half a player would announce. The
+          -- reductions themselves are gathered again below, once the targets
+          -- exist.
+          let gathered = Cost.activationAdjustments Set.empty family pid srcId gs
           -- The Phyrexian life record is DISCARDED here: CR 702.150a reads what
           -- the player who CAST a spell announced, and no rule asks the same of
           -- an activation cost.
@@ -693,7 +709,18 @@ activateAbility pid srcId ability = do
               -- animated Mishra's Foundry is two orders at two prices. The ANNOUNCED
               -- cost goes in because the order is chosen against the cost it will be
               -- applied to.
-              adjustments <- Cost.announceReductions pid srcId gs announcedCost gathered
+              -- CR 601.2c's announced targets, gathered a SECOND time now that
+              -- they exist: Dwarven Mauler's "equip abilities you activate that
+              -- target this creature" is a reduction the pre-target gather above
+              -- cannot see, and CR 601.2f's position after 601.2c is what makes
+              -- reading them here the rule's own order rather than a shortcut.
+              -- Only the REDUCTIONS can differ between the two records --
+              -- ReduceActivationCost is the one arm carrying a target criterion
+              -- -- so the increases and the CR 601.2f components the announcement
+              -- above measured are the same ones charged below.
+              let aimedAt = Set.fromList (concatMap (Maybe.mapMaybe Recipient.objectOf . Set.toList) (Map.elems chosen))
+                  targeted = Cost.activationAdjustments aimedAt family pid srcId gs
+              adjustments <- Cost.announceReductions pid srcId gs announcedCost targeted
               let paidCost = Cost.totalWith adjustments announcedCost
               -- CR 601.2g/h via Pawl.Engine.Cost.pay: the mana window, then the
               -- components. The gates above prove SOME sequence of choices pays for
