@@ -27,6 +27,7 @@ import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -44,6 +45,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.Clause as Clause
+import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
@@ -102,6 +104,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Search as Search
@@ -988,6 +991,44 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "and her library still holds all three" (length (Game.zoneMembers Zone.Library S.alice after)) 3
     Spec.assertEqWith s "nothing was discarded -- only Tweeze itself is in the graveyard" (namesIn Zone.Graveyard S.alice after) [nameOf "Tweeze"]
     Spec.assertEqWith s "CR 608.2c the ungated first clause still happened: bob took the 3 damage" (S.lifeOf S.bob after) (Just 17)
+  -- CR 608.2d's either-or, on the three boards that tell its four readings
+  -- apart: Twiddle -- "You may tap or untap target artifact, creature, or land"
+  -- -- aimed at bob's Goblin Piker. One mode, two clauses naming each other
+  -- (Clause.orElse) over ONE target slot, which is what makes this not Dream's
+  -- Grip: that card prints two MODES and CR 601.2b fixes them as it is cast.
+  --
+  -- The first case is the load-bearing one. On an UNTAPPED Piker, announcing the
+  -- tap is the only reading that ends Tapped: both clauses running would tap then
+  -- untap (CR 608.2c's written order), announcing the untap does nothing to an
+  -- untapped permanent, and a prompt never raised leaves it alone too. The other
+  -- two cases separate the readings that first one cannot -- see each.
+  Spec.it s "CR 608.2d announcing Twiddle's tap taps the untapped Piker" $ do
+    board <- twiddleBoard s registry False
+    let (asked, after) = twiddleResolved (ClauseIndex.MkClauseIndex 0) OptionalDecision.Exercises board
+    Spec.assertEqWith s "CR 608.2d the announced branch ran and its sibling did not: the Piker is tapped" (twiddleTapState (thirdOf board) after) (Just TapState.Tapped)
+    Spec.assertEqWith s "and the question was put exactly once, naming the tap" (branchesAnnounced asked) [ClauseIndex.MkClauseIndex 0]
+    Spec.assertEqWith s "CR 603.5's \"may\" was asked once, for the branch that won and not for the one that lost" (optionalsAnswered asked) [OptionalDecision.Exercises]
+  -- The same rule the other way up, and the case that separates "announced the
+  -- untap" from "declined": on a TAPPED Piker only the untap ends Untapped. It is
+  -- also what fails if the branch prompt is raised and its answer discarded, the
+  -- default being the tap (Replay.defaultAnswer).
+  Spec.it s "CR 608.2d announcing Twiddle's untap untaps the tapped Piker" $ do
+    board <- twiddleBoard s registry True
+    let (asked, after) = twiddleResolved (ClauseIndex.MkClauseIndex 1) OptionalDecision.Exercises board
+    Spec.assertEqWith s "CR 608.2d the announced branch ran: the Piker is untapped" (twiddleTapState (thirdOf board) after) (Just TapState.Untapped)
+    Spec.assertEqWith s "and the question was put exactly once, naming the untap" (branchesAnnounced asked) [ClauseIndex.MkClauseIndex 1]
+    Spec.assertEqWith s "CR 603.5's \"may\" was asked once, for the winning branch alone" (optionalsAnswered asked) [OptionalDecision.Exercises]
+  -- CR 603.5 composed with CR 608.2d, on the FIRST case's board with exactly one
+  -- answer changed: the "may" is declined, so the announced tap does not happen.
+  -- That pairing is what stops the first case passing because the clause ran
+  -- unconditionally, and it pins the ORDER -- the branch is announced before the
+  -- "may", so declining still leaves one ChoseClause in the transcript.
+  Spec.it s "CR 603.5 declining Twiddle's \"may\" leaves the announced tap undone" $ do
+    board <- twiddleBoard s registry False
+    let (asked, after) = twiddleResolved (ClauseIndex.MkClauseIndex 0) OptionalDecision.Declines board
+    Spec.assertEqWith s "CR 603.5 the declined clause did nothing: the Piker is still untapped" (twiddleTapState (thirdOf board) after) (Just TapState.Untapped)
+    Spec.assertEqWith s "CR 608.2d the branch was still announced first, and only once" (branchesAnnounced asked) [ClauseIndex.MkClauseIndex 0]
+    Spec.assertEqWith s "and the loser's \"may\" was never offered as a second chance" (optionalsAnswered asked) [OptionalDecision.Declines]
   -- CR 607.2a's linked set, on the board that can tell it from "every card in
   -- exile": TWO Hoarding Dragons, each of which exiled a different artifact, and
   -- one of them dies. The pair below runs the SAME board twice and differs in
@@ -2282,6 +2323,55 @@ tweezeAnswer decision toDiscard p = case p of
   Prompt.ChooseOptional {} -> decision
   Prompt.ChooseDiscard _ _ ids n -> List.genericTake n (filter (== toDiscard) ids)
   _ -> S.identityAnswer p
+
+-- The board the three Twiddle cases share: alice casts it off two Islands, and
+-- bob's Goblin Piker is the target, tapped or not as the case needs. Two seats,
+-- so the "artifact, creature, or land" pool cannot be satisfied by something
+-- alice controls by accident -- and the Islands are legal targets too, so the
+-- offer holds more than the one recipient the answerer filters down to.
+twiddleBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+twiddleBoard s registry startTapped = do
+  island <- S.printingOf s registry "Island"
+  twiddle <- S.printingOf s registry "Twiddle"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let (pikerId, withPiker) = S.addCreature piker S.bob (S.landsInPlay island 2)
+      placed = if startTapped then S.tapObject pikerId withPiker else withPiker
+      (gs, twiddleId) = S.handOne twiddle placed
+  pure (gs, twiddleId, pikerId)
+
+-- The victim's id, so a case reads the board it built rather than rebuilding it.
+thirdOf :: (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId) -> ObjectId.ObjectId
+thirdOf (_, _, pikerId) = pikerId
+
+-- One cast and resolution of that board, KEEPING the transcript: the prompts a
+-- case asserts about are the ones actually raised, rather than a claim about
+-- what the engine would have asked.
+twiddleResolved :: ClauseIndex.ClauseIndex -> OptionalDecision.OptionalDecision -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId) -> ([Response.Response], GameState.GameState)
+twiddleResolved branch decision (gs, twiddleId, pikerId) =
+  let ((_, after), asked) = Replay.record (twiddleAnswer branch decision pikerId) gs (S.cast S.alice twiddleId >> Stack.resolveTop)
+   in (asked, after)
+
+-- Twiddle's three answers in one: the target FILTERED out of the offer (CR
+-- 608.2b re-reads it, so a hand-built recipient would be dropped), CR 608.2d's
+-- branch, and CR 603.5's "may".
+twiddleAnswer :: ClauseIndex.ClauseIndex -> OptionalDecision.OptionalDecision -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+twiddleAnswer branch decision target p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToObject target) sets
+  Prompt.ChooseClause {} -> branch
+  Prompt.ChooseOptional {} -> decision
+  _ -> S.identityAnswer p
+
+twiddleTapState :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
+twiddleTapState oid gs = fmap Object.tapped (Game.lookupObject oid gs)
+
+-- Which branches CR 608.2d actually asked about, in the order asked.
+branchesAnnounced :: [Response.Response] -> [ClauseIndex.ClauseIndex]
+branchesAnnounced responses = [c | Response.ChoseClause c <- responses]
+
+-- And which "may"s CR 603.5 asked about, so a second offer to the losing branch
+-- would show up as a second answer.
+optionalsAnswered :: [Response.Response] -> [OptionalDecision.OptionalDecision]
+optionalsAnswered responses = [d | Response.ChoseOptional d <- responses]
 
 -- The board the two Jungle Wayfinder cases share: alice casts it off three
 -- Forests, and every seat's library holds three of ONE basic plus a Goblin Piker
