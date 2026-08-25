@@ -6128,13 +6128,17 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- the bearer dropped -- Seifer, Balamb Rival watches everybody's attackers,
   -- including its own controller's, so nothing here compares an id to the bearer.
   --
-  -- The GROUPED event, so the whole declaration fires it once; the count comes
-  -- from Combat.blockers, which GameEvent.AttackerBlocked does not carry, and is
+  -- TWO events, which is rule 509.3e's two producers. The GROUPED
+  -- GameEvent.AttackerBlocked is the declaration's, so the whole declaration
+  -- fires it once, and there `>=` and never `==` is rule 509.3e's last sentence.
+  -- GameEvent.BecameBlocking is the arrival's, and the arm on it argues its own
+  -- comparison; the two are read together below because the count is the same
+  -- reading either way.
+  --
+  -- The count comes from Combat.blockers, which neither event carries, and is
   -- exact at this moment for the arm above's reason -- CR 509.2a puts these
   -- triggers on the stack before any player gets priority, so the record still
-  -- holds the declaration that made the event.
-  --
-  -- `>=`, never `==`, which is rule 509.3e's last sentence.
+  -- holds the declaration and the arrivals that made the event.
   --
   -- Whom the attacker attacked comes from Combat.attackers and only
   -- AttackTarget.OfPlayer answers: CR 508.1b lists player, planeswalker and
@@ -6142,57 +6146,96 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- attacking that opponent -- where CR 508.5's defending player, which the event
   -- carries, would resolve to them. SelfAttacksPlayerWithMostLife reads the same
   -- record for the same reason.
-  TriggerCondition.CreatureBecomesBlockedByAtLeast (CreatureBecomesBlockedByAtLeast.MkCreatureBecomesBlockedByAtLeast relation n) -> case event of
-    GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked attacker _) ->
-      let attacksAdmittedPlayer = case Map.lookup attacker (Combat.attackers (GameState.combat gs)) of
-            Just (AttackTarget.OfPlayer attacked) -> PlayerRelation.holds relation you attacked
-            _ -> False
-          blocked = Natural.length (Map.findWithDefault Set.empty attacker (Combat.blockers (GameState.combat gs)))
-       in attacksAdmittedPlayer && blocked >= n
-    GameEvent.AttackerUnblocked _ -> False
-    GameEvent.BecameBlocking {} -> False
-    GameEvent.BlocksDeclared {} -> False
-    GameEvent.AttackerDeclared {} -> False
-    GameEvent.Moved {} -> False
-    GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan {} -> False
-    GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented {} -> False
-    GameEvent.BecameMonarch _ -> False
-    GameEvent.Discarded {} -> False
-    GameEvent.Drew {} -> False
-    GameEvent.Revealed {} -> False
-    GameEvent.SpellCountered _ -> False
-    GameEvent.HalfUnlocked {} -> False
-    GameEvent.TurnedFaceUp _ -> False
-    GameEvent.Transformed {} -> False
-    GameEvent.BecameDesignated {} -> False
-    GameEvent.Evolved _ -> False
-    GameEvent.Mentored {} -> False
-    GameEvent.Trained _ -> False
-    GameEvent.PermanentSacrificed {} -> False
-    GameEvent.AbilityTriggered {} -> False
-    GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost {} -> False
-    GameEvent.LifeGained {} -> False
-    GameEvent.CountersPut {} -> False
-    GameEvent.CountersRemoved {} -> False
-    GameEvent.ControlChanged {} -> False
-    GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.BecameTarget {} -> False
-    GameEvent.BecameAttached {} -> False
-    GameEvent.LeftTheGame _ -> False
-    GameEvent.Milled {} -> False
-    GameEvent.Scried _ -> False
-    GameEvent.Surveiled _ -> False
-    GameEvent.DiceRolled _ -> False
-    GameEvent.ClassLevelSet _ -> False
-    GameEvent.Plotted _ -> False
-    GameEvent.Explored _ -> False
-    GameEvent.Exerted _ -> False
-    GameEvent.BecameAttacked _ -> False
-    GameEvent.AttackersDeclared _ -> False
-    GameEvent.BecameTapped _ -> False
+  TriggerCondition.CreatureBecomesBlockedByAtLeast (CreatureBecomesBlockedByAtLeast.MkCreatureBecomesBlockedByAtLeast relation n) ->
+    let attacksAdmittedPlayer attacker = case Map.lookup attacker (Combat.attackers (GameState.combat gs)) of
+          Just (AttackTarget.OfPlayer attacked) -> PlayerRelation.holds relation you attacked
+          _ -> False
+        blockedBy attacker = Natural.length (Map.findWithDefault Set.empty attacker (Combat.blockers (GameState.combat gs)))
+     in case event of
+          GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked attacker _) -> attacksAdmittedPlayer attacker && blockedBy attacker >= n
+          -- Rule 509.3e's second sentence -- "effects that add or remove
+          -- blockers can also cause such abilities to trigger" -- for the one
+          -- producer the pool has: a creature PUT ONTO THE BATTLEFIELD
+          -- blocking an attacker that was ALREADY blocked, which is Flash
+          -- Foliage's Saproling joining a declared blocker. That road records
+          -- no GameEvent.AttackerBlocked at all --
+          -- Combat.putOntoBattlefieldBlocking withholds it under CR 509.3c's
+          -- "only if the attacking creature was an unblocked creature at that
+          -- time" -- so the arm above never sees the arrival, and the guard
+          -- there is CR 509.3c's own and must not be weakened to reach it.
+          --
+          -- Removing blockers cannot reach THIS form of the rule: the count
+          -- only falls, and a floor is never crossed upwards by a departure.
+          --
+          -- The flag is load-bearing. Combat.declareBlockers records this same
+          -- constructor once per declared PAIR with it clear, so an unguarded
+          -- arm would answer an ordinary declaration the arm above has already
+          -- answered, once more per blocker.
+          --
+          -- `== n` here where the arm above reads `>= n`, and the two are not
+          -- in disagreement. The rule's "at least" is about how many creatures
+          -- blocked when blockers were declared, which is one number the arm
+          -- above reads once. An arrival adds exactly one blocker, so the count
+          -- crosses the floor at most once; `>=` would fire again on the next
+          -- arrival, where the attacker did not newly become blocked by that
+          -- many creatures.
+          --
+          -- `n >= 2` is "GameEvent.AttackerBlocked was not recorded for this
+          -- same arrival", stated in terms of the floor: that event rides an
+          -- arrival only when the attacker had no blocker before it, which
+          -- together with `== n` means n == 1. Seifer, Balamb Rival is the only
+          -- printing and reads two, but the codec admits one, and both events
+          -- would otherwise answer the one arrival.
+          --
+          -- Not implemented: several creatures put onto the battlefield
+          -- blocking one attacker at once, where the count jumps past the floor
+          -- rather than landing on it (#2298).
+          GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.attacker = attacker, BecameBlocking.putOntoBattlefield = True}) ->
+            attacksAdmittedPlayer attacker && n >= 2 && blockedBy attacker == n
+          GameEvent.BecameBlocking {} -> False
+          GameEvent.AttackerUnblocked _ -> False
+          GameEvent.BlocksDeclared {} -> False
+          GameEvent.AttackerDeclared {} -> False
+          GameEvent.Moved {} -> False
+          GameEvent.DamageDealt _ -> False
+          GameEvent.StepBegan {} -> False
+          GameEvent.SpellCast {} -> False
+          GameEvent.DamagePrevented {} -> False
+          GameEvent.BecameMonarch _ -> False
+          GameEvent.Discarded {} -> False
+          GameEvent.Drew {} -> False
+          GameEvent.Revealed {} -> False
+          GameEvent.SpellCountered _ -> False
+          GameEvent.HalfUnlocked {} -> False
+          GameEvent.TurnedFaceUp _ -> False
+          GameEvent.Transformed {} -> False
+          GameEvent.BecameDesignated {} -> False
+          GameEvent.Evolved _ -> False
+          GameEvent.Mentored {} -> False
+          GameEvent.Trained _ -> False
+          GameEvent.PermanentSacrificed {} -> False
+          GameEvent.AbilityTriggered {} -> False
+          GameEvent.LoyaltyAbilityActivated _ -> False
+          GameEvent.LifeLost {} -> False
+          GameEvent.LifeGained {} -> False
+          GameEvent.CountersPut {} -> False
+          GameEvent.CountersRemoved {} -> False
+          GameEvent.ControlChanged {} -> False
+          GameEvent.VentureMarkerEntered {} -> False
+          GameEvent.BecameTarget {} -> False
+          GameEvent.BecameAttached {} -> False
+          GameEvent.LeftTheGame _ -> False
+          GameEvent.Milled {} -> False
+          GameEvent.Scried _ -> False
+          GameEvent.Surveiled _ -> False
+          GameEvent.DiceRolled _ -> False
+          GameEvent.ClassLevelSet _ -> False
+          GameEvent.Plotted _ -> False
+          GameEvent.Explored _ -> False
+          GameEvent.Exerted _ -> False
+          GameEvent.BecameAttacked _ -> False
+          GameEvent.AttackersDeclared _ -> False
+          GameEvent.BecameTapped _ -> False
   -- CR 509.1h: the bearer became an UNBLOCKED creature, which the glossary's
   -- "attacks and isn't blocked" entry sends here. SelfBecomesBlocked's arm above
   -- is the other branch of the same turn-based action, and no attacker can
@@ -9191,6 +9234,25 @@ eventBindings bearerBecame cond event = case (cond, event) of
   -- required whom the attacker attacked to be a player the PlayerRelation
   -- admits.
   (TriggerCondition.CreatureBecomesBlockedByAtLeast {}, GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked attacker _)) ->
+    Binding.setAttackingCreature attacker Map.empty
+  -- The same slot off matchesTrigger's OTHER road into this condition (rule
+  -- 509.3e's "effects that add or remove blockers"): the attacker
+  -- GameEvent.BecameBlocking names, which is the creature that just became
+  -- blocked by one more. Without this arm the trigger fires with an empty
+  -- binding map and Seifer's "that attacking creature" resolves to nothing --
+  -- a board indistinguishable from one where it never fired, which is why
+  -- Pawl.ZoneTriggerSpec's representativeEvents lists BOTH events for this
+  -- condition and intersects what they stamp.
+  --
+  -- The BLOCKER the event also names goes unbound: this form names a number
+  -- rather than an object, and eventBindingSlots promises
+  -- Binding.attackingCreature alone.
+  --
+  -- Unguarded on putOntoBattlefield where matchesTrigger is not, for the
+  -- PlayerAttacksPlayer arm's converse reason: an event this condition
+  -- rejected reaches no binding at all, so a declaration's clear flag has
+  -- already been answered by the time anything asks here.
+  (TriggerCondition.CreatureBecomesBlockedByAtLeast {}, GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.attacker = attacker})) ->
     Binding.setAttackingCreature attacker Map.empty
   -- CR 702.130a's "defending player", the same phrase and the same reserved slot
   -- as the arm above -- CR 508.5 resolves it for an ability of an ATTACKING

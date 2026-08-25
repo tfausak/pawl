@@ -419,7 +419,12 @@ data TriggerCondition
     --
     -- No blocker is bound: the form names a SET, not an object.
     --
-    -- Not implemented: rule 509.3e's other producers record no event (#1146).
+    -- Not implemented: rule 509.3e's "effects that add or remove blockers".
+    -- CreatureBecomesBlockedByAtLeast below reaches the arrival of a creature
+    -- put onto the battlefield blocking, and this one wants the same second arm
+    -- with the count traded for the Filter (#2297); an effect that causes a
+    -- creature already on the battlefield to block records no event at all
+    -- (#1146).
     SelfBecomesBlockedByOneOrMore (Filter.Filter Keyword.Keyword)
   | -- | CR 509.3e read by a BYSTANDER on the ATTACKING side: "whenever a
     -- creature attacking one of your opponents becomes blocked by two or more
@@ -444,10 +449,22 @@ data TriggerCondition
     --
     -- The attacker is bound under Pawl.Engine.Binding.attackingCreature, which
     -- is Seifer's "that attacking creature". No blocker is bound: the form
-    -- names a number, not an object.
+    -- names a number, not an object. Both events bind it, which
+    -- Pawl.ZoneTriggerSpec's representativeEvents pins by listing both.
     --
-    -- Not implemented: rule 509.3e's "effects that add or remove blockers",
-    -- which record no event (#1146).
+    -- Rule 509.3e's "effects that add or remove blockers" reaches it too, and
+    -- this is the one form of rule 509.3e they can reach: a creature put onto
+    -- the battlefield blocking an attacker that was ALREADY blocked pushes the
+    -- count over the floor, against GameEvent.BecameBlocking rather than the
+    -- grouped event -- CR 509.3c's "was an unblocked creature at that time"
+    -- keeps the grouped one off that arrival. Flash Foliage's Saproling joining
+    -- a declared Hill Giant is the pooled pair, and Pawl.KeywordTriggerSpec's
+    -- CreatureBecomesBlockedByAtLeast group is the proof. Removing blockers
+    -- cannot reach a floor from above.
+    --
+    -- Not implemented: several creatures put onto the battlefield blocking one
+    -- attacker at once (#2298), and an effect that causes a creature already on
+    -- the battlefield to block, which records no event (#1146).
     CreatureBecomesBlockedByAtLeast CreatureBecomesBlockedByAtLeast.CreatureBecomesBlockedByAtLeast
   | -- | "Whenever this creature attacks and isn't blocked" -- Eternal of Harsh
     -- Truths', and CR 702.68a's frenzy, which Pawl.Engine.Keyword.frenzy mints.

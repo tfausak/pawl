@@ -1159,6 +1159,51 @@ creatureBecomesBlockedByAtLeastSpec s registry =
       afterCombatAt walker attacker blockers = S.runToStep (Phase.Combat CombatStep.EndOfCombat) (declaringAt walker attacker blockers)
       giants :: GameState.GameState -> Int
       giants = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Hill Giant")) S.bob
+      -- `board` with the defending seat stocked to cast Flash Foliage `copies`
+      -- times in the declare blockers step: three Forests per copy for its
+      -- {2}{G}, that many copies in hand, and that many cards left in the
+      -- library so its draw is never a CR 104.3c loss. Everything else is held
+      -- fixed against `board`.
+      --
+      -- Duplicated from Pawl.CombatEffectSpec's foliageBoard rather than hoisted
+      -- into Pawl.Support, which rebuilds every spec in the tree.
+      foliageBoard copies mine theirs = do
+        (gs0, ours, yours) <- board mine theirs
+        forest <- S.printingOf s registry "Forest"
+        foliage <- S.printingOf s registry "Flash Foliage"
+        let lands = List.foldl' (\g _ -> snd (S.addCreature forest S.bob g)) gs0 (replicate (3 * copies) ())
+            stocked = List.foldl' (\g _ -> snd (S.addLibraryCard forest S.bob (snd (S.addHandCard foliage S.bob g)))) lands (replicate copies ())
+        pure (stocked, ours, yours)
+      -- The attack declared and the game handed over AT the declare blockers
+      -- step. S.runToStep stops when the phase first matches, which is BEFORE CR
+      -- 509.1's turn-based action, so the declaration itself is still ahead: the
+      -- answerer each leg continues with is the one that makes it, and an
+      -- answerer returning Map.empty here silently unblocks the attacker. Flash
+      -- Foliage's "only during combat after blockers are declared" reads
+      -- Combat.blockersDeclared, so no leg can cast it before that point either
+      -- way.
+      atBlockers :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+      atBlockers attacker = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (declaring attacker [])
+      -- Declares `blockers`, casts every Flash Foliage bob can afford at
+      -- `victim`, and pins CR 510.1c's division of `attacker`'s damage onto
+      -- `wall`.
+      --
+      -- The offered target set is FILTERED rather than replaced, so a leg whose
+      -- victim the card's own slot does not admit takes no target at all instead
+      -- of quietly succeeding on a hand-built recipient that CR 608.2b's re-read
+      -- would drop.
+      --
+      -- The division is pinned BY ID because it is the one prompt a second
+      -- blocker raises: S.identityAnswer would dump the attacker's whole point
+      -- onto whichever recipient the Map surfaced first, and the 1/1 Saproling
+      -- dies to it under every reading.
+      casting :: ObjectId.ObjectId -> [ObjectId.ObjectId] -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+      casting attacker blockers victim wall p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, rs) -> Set.filter (== Recipient.ToCreature victim) rs) sets
+        Prompt.ChooseAction {} -> S.castAnswer p
+        Prompt.AssignCombatDamage _ _ damager _ _
+          | damager == attacker -> Map.singleton (Recipient.ToCreature wall) 1
+        _ -> declaring attacker blockers p
       -- Scoped to rule 509.3e's CONDITION and not merely to Seifer: the card's
       -- other trigger (CR 508.3e) fires off the same declaration, so counting
       -- the source alone would count both.
@@ -1254,6 +1299,131 @@ creatureBecomesBlockedByAtLeastSpec s registry =
                 (firedBy seifer (afterCombat elves [first, second] gs))
                 1
             _ -> Spec.assertFailure s "fixture should give alice an Elves and a Seifer, and bob two Giants"
+        -- Rule 509.3e's SECOND sentence, "effects that add or remove blockers
+        -- can also cause such abilities to trigger", and the one producer the
+        -- pool has for it: a creature PUT ONTO THE BATTLEFIELD blocking. The
+        -- Elves is declared blocked by ONE Hill Giant, which leaves the floor
+        -- uncrossed and Seifer silent, and then Flash Foliage's Saproling joins
+        -- the block and crosses it. That arrival records no
+        -- GameEvent.AttackerBlocked at all -- CR 509.3c's "only if the attacking
+        -- creature was an unblocked creature at that time" withholds it, and
+        -- that guard is the rule's own and not a shortcut -- so the arm the
+        -- cases above exercise cannot see it.
+        --
+        -- WHAT DOES NOT DISCRIMINATE, and each is a board a reader reaches for
+        -- before this one:
+        --
+        --   * the cases above's TWO-Giant declaration with the token added as a
+        --     third blocker. The trigger fired at the declaration already, so
+        --     both readings agree at one dead Giant.
+        --   * the token as the attacker's FIRST blocker, which is how
+        --     Pawl.CombatEffectSpec's Flash Foliage boards are built. The count
+        --     reaches one against a floor of two and both readings stay silent.
+        --     The declared Hill Giant is not decoration: it is what makes the
+        --     arrival a CROSSING rather than an arrival.
+        --   * leaving CR 510.1c's division to the fixture. Two blockers really
+        --     do ask the attacker's controller, and the Elves' single point
+        --     landing on the 1/1 Saproling instead kills one creature under both
+        --     readings and leaves the Giant standing under both. Pinned by id in
+        --     `casting`.
+        --   * counting Seifer's triggers. A partial fix that fires the trigger
+        --     with nothing bound under `thatAttackingCreature` grants deathtouch
+        --     to nobody and passes a count. The Giant's death is the quantity;
+        --     the count comes after it.
+        Spec.it s "CR 509.3e whole card: a Saproling put onto the battlefield blocking pushes an already-blocked attacker over the floor" $ do
+          (gs, mine, theirs) <- foliageBoard 1 ["Llanowar Elves", "Seifer, Balamb Rival"] ["Hill Giant"]
+          case (mine, theirs) of
+            ([elves, seifer], [giant]) -> do
+              let declared = atBlockers elves gs
+                  joined = S.runToStep (Phase.Combat CombatStep.EndOfCombat) (casting elves [giant] elves giant) declared
+                  -- The control: the same board and the same declaration, with
+                  -- the spell left in bob's hand. One blocker, floor uncrossed,
+                  -- no deathtouch.
+                  alone = S.runToStep (Phase.Combat CombatStep.EndOfCombat) (declaring elves [giant]) declared
+              Spec.assertEqWith
+                s
+                "the Giant dies to the 1/1 once the token joins the block, and lives when it does not"
+                (giants joined, giants alone)
+                (0, 1)
+              -- The control leg really fought, so the difference above is CR
+              -- 704.5h and not a combat that did not happen.
+              Spec.assertEqWith
+                s
+                "control: the lone blocker took the Elves' one point and lived through it"
+                (S.damageOf giant alone)
+                (Just 1)
+              -- Anti-vacuity on the firing leg: the token did arrive and did
+              -- join THIS attacker's block, so the Giant's death is the
+              -- crossing rather than a spell that fizzled.
+              Spec.assertEqWith
+                s
+                "CR 509.4: two creatures are blocking the Elves on the firing leg"
+                (Set.size (Combat.blockersOf elves (S.runToStep (Phase.Combat CombatStep.CombatDamage) (casting elves [giant] elves giant) declared)))
+                2
+              -- Rule 509.3e's arity, after the gameplay quantity: the arrival
+              -- fires it once, and the declaration that preceded it fired it not
+              -- at all.
+              Spec.assertEqWith
+                s
+                "and Seifer triggered exactly once across the whole combat"
+                (firedBy seifer joined)
+                1
+            _ -> Spec.assertFailure s "fixture should give alice an Elves and a Seifer, and bob one Giant"
+        -- The floor really is a floor: the same arrival with NO declared blocker
+        -- under it takes the count to one, not two, and nothing fires. Paired
+        -- with the case above, the two boards differ in exactly one thing --
+        -- whether bob declared his Hill Giant -- so what fires the trigger is
+        -- the CROSSING and not the arrival.
+        --
+        -- Counted off the event log rather than read at gameplay level, and the
+        -- reason is the card: the Elves' one point kills a 1/1 Saproling with or
+        -- without deathtouch, so nothing on the board moves. The case above is
+        -- where the gameplay quantity lives.
+        Spec.it s "CR 509.3e a Saproling blocking an unblocked attacker leaves the floor uncrossed" $ do
+          (gs, mine, theirs) <- foliageBoard 1 ["Llanowar Elves", "Seifer, Balamb Rival"] []
+          case (mine, theirs) of
+            ([elves, seifer], []) -> do
+              let joined = S.runToStep (Phase.Combat CombatStep.CombatDamage) (casting elves [] elves elves) (atBlockers elves gs)
+              Spec.assertEqWith
+                s
+                "one blocker is under rule 509.3e's floor of two, so Seifer never triggered"
+                (firedBy seifer joined)
+                0
+              -- Anti-vacuity: the token really did arrive and really is blocking,
+              -- so the silence is the count and not a spell that never resolved.
+              Spec.assertEqWith
+                s
+                "and the Saproling is blocking the Elves all the same"
+                (Combat.blockersOf elves joined)
+                (Set.fromList (S.tokensOf joined))
+            _ -> Spec.assertFailure s "fixture should give alice an Elves and a Seifer, and bob no creature"
+        -- The other side of the same comparison: once the floor HAS been
+        -- crossed, a further arrival does not cross it again. Two Flash Foliages
+        -- against one declared Hill Giant take the block from one to three, and
+        -- the attacker becomes blocked by two or more creatures exactly once.
+        --
+        -- Off the event log for the case above's reason, and here it is forced:
+        -- a second grant of deathtouch to a creature that already has it moves
+        -- nothing at all on any board.
+        Spec.it s "CR 509.3e a further arrival past the floor does not cross it again" $ do
+          (gs, mine, theirs) <- foliageBoard 2 ["Llanowar Elves", "Seifer, Balamb Rival"] ["Hill Giant"]
+          case (mine, theirs) of
+            ([elves, seifer], [giant]) -> do
+              let joined = S.runToStep (Phase.Combat CombatStep.CombatDamage) (casting elves [giant] elves giant) (atBlockers elves gs)
+              -- Anti-vacuity FIRST here, because the assertion under test is a
+              -- count that a board where the second spell never resolved would
+              -- also satisfy.
+              Spec.assertEqWith
+                s
+                "both Saprolings arrived, so the Elves is blocked by three creatures"
+                (Set.size (Combat.blockersOf elves joined))
+                3
+              Spec.assertEqWith
+                s
+                "and Seifer triggered once, on the arrival that took the count to two"
+                (firedBy seifer joined)
+                1
+            _ -> Spec.assertFailure s "fixture should give alice an Elves and a Seifer, and bob one Giant"
 
 -- CR 509.3c: "Whenever [a creature] becomes blocked, . . ." -- the ATTACKING
 -- side of the same declaration selfBlocksSpec reads, matched against
@@ -1315,6 +1485,50 @@ selfBecomesBlockedSpec s registry =
         Spec.it s "CR 509.3c blocking is not becoming blocked, so a blocking Sacred Prey gains nothing" $ do
           (gs, _, _) <- board ["Goblin Piker"] ["Sacred Prey"]
           Spec.assertEqWith s "bob gained nothing" (S.lifeOf S.bob (S.runCombat S.aggressiveAnswer gs)) (Just 20)
+        -- CR 509.3c's guard on its THIRD producer, and the one thing rule
+        -- 509.3e's arrival road must not cost: "It will also trigger if that
+        -- creature becomes blocked by an effect or by a creature that's put onto
+        -- the battlefield as a blocker, but only if the attacking creature was
+        -- an unblocked creature at that time." The Prey is already blocked by a
+        -- declared Piker when Flash Foliage's Saproling joins it, so the arrival
+        -- finds a blocked creature and this trigger must stay silent.
+        --
+        -- A REGRESSION FENCE with a NAMED falsifier rather than a pair of legs,
+        -- because both legs of any pair read 21 and only a wrong engine reads
+        -- 22. Combat.putOntoBattlefieldBlocking withholds
+        -- GameEvent.AttackerBlocked for exactly this, and dropping that guard is
+        -- the shortest-looking way to make an arrival reach
+        -- CreatureBecomesBlockedByAtLeast above. It is the wrong way, and this
+        -- is the number that says so: nothing else in the suite reads it.
+        Spec.it s "CR 509.3c a Saproling joining an already-blocked attacker does not make it become blocked twice" $ do
+          (gs0, mine, theirs) <- board ["Sacred Prey"] ["Goblin Piker"]
+          forest <- S.printingOf s registry "Forest"
+          foliage <- S.printingOf s registry "Flash Foliage"
+          case (mine, theirs) of
+            ([prey], [piker]) -> do
+              -- Three Forests for Flash Foliage's {2}{G} and one card left in
+              -- bob's library so its draw is not a CR 104.3c loss.
+              let lands = List.foldl' (\g _ -> snd (S.addCreature forest S.bob g)) gs0 (replicate 3 ())
+                  gs = snd (S.addLibraryCard forest S.bob (snd (S.addHandCard foliage S.bob lands)))
+                  -- Handed over AT the declare blockers step, which is before
+                  -- CR 509.1's turn-based action: `casting` below is what
+                  -- declares the Piker, through its S.aggressiveAnswer base, and
+                  -- Flash Foliage's "after blockers are declared" restriction is
+                  -- what keeps the spell behind that declaration.
+                  declared = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+                  casting :: Prompt.Prompt r -> r
+                  casting p = case p of
+                    Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, rs) -> Set.filter (== Recipient.ToCreature prey) rs) sets
+                    Prompt.ChooseAction {} -> S.castAnswer p
+                    Prompt.AssignCombatDamage {} -> Map.singleton (Recipient.ToCreature piker) 1
+                    _ -> S.aggressiveAnswer p
+                  joined = S.runToStep (Phase.Combat CombatStep.CombatDamage) casting declared
+              Spec.assertEqWith s "alice gained 1 for the declaration and nothing for the arrival" (S.lifeOf S.alice joined) (Just 21)
+              -- Anti-vacuity: the Saproling really did arrive and really is
+              -- blocking the Prey, so the silence is CR 509.3c's guard and not a
+              -- spell that never resolved.
+              Spec.assertEqWith s "CR 509.4: two creatures are blocking the Prey" (Set.size (Combat.blockersOf prey joined)) 2
+            _ -> Spec.assertFailure s "fixture should give alice a Sacred Prey and bob a Goblin Piker"
 
 -- CR 509.1h read from the UNBLOCKED side: "an attacking creature ... with no
 -- creatures declared as blockers for it becomes an unblocked creature", which
