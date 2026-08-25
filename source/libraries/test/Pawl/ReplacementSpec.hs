@@ -289,6 +289,11 @@ sentryAnswer face p = case p of
   Prompt.CallCoin {} -> face
   _ -> S.identityAnswer p
 
+isFlip :: GameEvent.GameEvent -> Bool
+isFlip e = case e of
+  GameEvent.CoinFlipped _ -> True
+  _ -> False
+
 wasCall :: Response.Response -> Bool
 wasCall r = case r of
   Response.CalledCoin _ -> True
@@ -3834,11 +3839,15 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
       (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Treasure Token") S.alice after)
       0
     -- The flip HAPPENED and was recorded with no outcome, which keeps the zero
-    -- above from passing for a Sentry that never flipped at all.
-    Spec.assertBool
+    -- above from passing for a Sentry that never flipped at all. Asserted as the
+    -- WHOLE list of flips rather than as membership: CR 705.1's sentence
+    -- instructs one flip, so a rewrite applied twice is as wrong as one applied
+    -- never.
+    Spec.assertEqWith
       s
-      (elem (GameEvent.CoinFlipped CoinFlipped.MkCoinFlipped {CoinFlipped.flipper = S.alice, CoinFlipped.won = Nothing}) (S.eventsOf after))
-      "CR 705.1: the flip was recorded, and CR 705.2 left it with no winner"
+      "CR 705.1: one flip, and CR 705.2 left it with no winner"
+      (filter isFlip (S.eventsOf after))
+      [GameEvent.CoinFlipped CoinFlipped.MkCoinFlipped {CoinFlipped.flipper = S.alice, CoinFlipped.won = Nothing}]
     case newestNamed (CardName.MkCardName $ Text.pack "Molten Sentry") after of
       Nothing -> Spec.assertFailure s "Molten Sentry did not reach the battlefield"
       Just sentryId -> do

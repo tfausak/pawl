@@ -2083,8 +2083,12 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
   EntryRewrite.AsCopy c -> EntryRewrite.AsCopy c {AsCopy.eligible = Filter.rewrite pairs (AsCopy.eligible c)}
   -- CR 702.14a's word again, this time inside a keyword an option grants.
   EntryRewrite.ChoiceOf os -> EntryRewrite.ChoiceOf (fmap (\o -> o {EntryOption.keywords = Set.map (Filter.rewriteKeyword pairs) (EntryOption.keywords o)}) os)
-  -- The same word again, in an option a coin picks rather than a player (Molten
-  -- Sentry's haste and defender).
+  -- The same word again, in an option a coin picks rather than a player. NO
+  -- BOARD OBSERVES IT, and cannot: rewriteKeyword only ever changes a keyword
+  -- that CARRIES a word (landwalk, typecycling, hexproof from, protection from),
+  -- and Molten Sentry's two options grant haste and defender, which carry none.
+  -- The arm is the rule (CR 612.1) rather than a proven behaviour -- an option
+  -- granting islandwalk would be what proves it.
   EntryRewrite.ChoiceByCoinFlip f ->
     let rewriteOption o = o {EntryOption.keywords = Set.map (Filter.rewriteKeyword pairs) (EntryOption.keywords o)}
      in EntryRewrite.ChoiceByCoinFlip f {EntryFlip.heads = rewriteOption (EntryFlip.heads f), EntryFlip.tails = rewriteOption (EntryFlip.tails f)}
