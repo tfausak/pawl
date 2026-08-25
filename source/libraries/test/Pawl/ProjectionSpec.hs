@@ -3680,11 +3680,12 @@ conditionalAbilitySpec s registry = Spec.describe s "ConditionalActivatedAbility
 -- Grist, the Hunger Tide ({1}{B}{G} Legendary Planeswalker -- Grist, "As long as
 -- Grist isn't on the battlefield, it's a 1/1 Insect creature in addition to its
 -- other types", Oracle text fetched from Scryfall 2026-08-20) is the pool's
--- statement of CR 113.6c, and pawl's card carries that ability alone.
+-- statement of CR 113.6c. Its -2 and -5 are Pawl.PlaneswalkerSpec's GristLoyalty
+-- group, which no board here reaches: Grist is only ever a card in a hidden zone
+-- or a spell on the stack below.
 --
--- Not implemented: Grist's three loyalty abilities (#1932). That leaves the card
--- STRICTER than printed, and it never touches these boards, where Grist is only
--- ever a card in a hidden zone or a spell on the stack.
+-- Not implemented: the +1's "repeat this process" (#1932). That leaves the card
+-- STRICTER than printed.
 hiddenZoneStaticSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 hiddenZoneStaticSpec s registry = Spec.describe s "HiddenZoneStatics" $ do
   -- CR 113.6b/c: gatherGiven walks the two HIDDEN zones (CR 400.2), which no
