@@ -750,6 +750,12 @@ takesTheMay p = case p of
   Prompt.ChooseOptional {} -> OptionalDecision.Exercises
   _ -> S.identityAnswer p
 
+-- The same decision over S.castAnswer, for the case that CASTS the Piper.
+castsAndTakesTheMay :: Prompt.Prompt r -> r
+castsAndTakesTheMay p = case p of
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  _ -> S.castAnswer p
+
 -- `gather` and `resolveStack` under that answerer. Separate functions rather than
 -- a parameter on those two: the answerer is a rank-2 argument, and this module
 -- takes no language pragma to say so.
@@ -938,6 +944,39 @@ transformTriggerSpec s registry = Spec.describe s "TransformsInto" $ do
     Spec.assertEqWith s "the permanent really did turn over" (faceNameOf piperId after) (Just howlerName)
     Spec.assertEqWith s "it really is night" (GameState.daytime after) (Just Daytime.Night)
     Spec.assertEqWith s "and it was day before the untap step, so CR 502.2 had a designation to change" (GameState.daytime day) (Just Daytime.Day)
+  -- The printed condition's OTHER limb, so the AnyOf is not proved by one side
+  -- alone -- the pair the Thallid cases above make with CR 700.4's "or dies".
+  -- CR 712.13a through CR 702.145b's first static ability gets there on the same
+  -- card: the Piper is CAST at night, so it ENTERS as Wildsong Howler and the
+  -- SelfEnters limb fires with no transform anywhere on the board.
+  --
+  -- Tovolar is what gives the game a designation at all before the Piper is cast
+  -- (CR 702.145d wants a daybound permanent on the battlefield, and the Piper is
+  -- in hand), Pawl.DaytimeSpec's expertBoard exactly. He turns over at nightfall
+  -- himself and triggers nothing on the way: his back face's abilities are an
+  -- upkeep trigger and a combat-damage trigger.
+  Spec.it s "CR 712.13a/701.27e the same trigger's enters limb fires on a Piper cast at night" $ do
+    tovolar <- S.printingOf s registry "Tovolar, Dire Overlord"
+    forest <- S.printingOf s registry "Forest"
+    piper <- S.printingOf s registry "Howlpack Piper"
+    deck <- mapM (S.printingOf s registry) ["Forest", "Mountain", "Goblin Piker", "Island", "Swamp", "Plains", "Lightning Bolt", "Ancestral Recall", "Giant Growth"]
+    let (_, withTovolar) = S.addCreature tovolar S.alice (S.landsInPlay forest 4)
+        (inHand, piperSpell) = S.handOne piper (stockLibrary deck withTovolar)
+        night = untapStepAfter 0 (settleDaytime inHand)
+        cast = S.runPure castsAndTakesTheMay night (S.cast S.alice piperSpell)
+        entered = S.runPure castsAndTakesTheMay cast Stack.resolveTop
+        after = resolveStackTakingTheMay (gatherTakingTheMay entered)
+    Spec.assertEqWith s "the one creature card among the top six is in alice's hand" (zoneNames Zone.Hand after) ["Goblin Piker"]
+    Spec.assertEqWith s "the three cards under the looked-at six are now the top three" (take 3 (zoneNames Zone.Library after)) ["Lightning Bolt", "Ancestral Recall", "Giant Growth"]
+    -- Asserted on `entered` rather than on `after`, which is what separates CR
+    -- 712.13a's entry rewrite from the CR 702.145c sweep: the sweep runs in the
+    -- settle that comes after this board.
+    -- The FACES, not S.countOnBattlefieldByName: that helper reads the card's
+    -- name (CR 712.8a's front face), which cannot tell the two faces apart. The
+    -- whole battlefield, so "Howlpack Piper" is asserted absent as well as
+    -- "Wildsong Howler" present.
+    Spec.assertEqWith s "the permanent was showing Wildsong Howler the moment it entered, and never its front face" (List.sort (zoneNames Zone.Battlefield entered)) ["Forest", "Forest", "Forest", "Forest", "Tovolar, the Midnight Scourge", "Wildsong Howler"]
+    Spec.assertEqWith s "it was night when the spell resolved" (GameState.daytime night) (Just Daytime.Night)
 
 -- "Destroy each Fungus", which on this board is the Thallid alone -- the
 -- Saproling the transform limb made is a Phyrexian Saproling and not one.
