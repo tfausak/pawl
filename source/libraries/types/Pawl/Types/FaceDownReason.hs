@@ -43,4 +43,22 @@ data FaceDownReason
     -- down this way is still turnable by CR 702.37e if the card would have a
     -- morph cost, and that rule asks about the CARD rather than about this.
     TurnedFaceDown
+  | -- | CR 708.3's producer that names no keyword action: an effect that puts a
+    -- permanent onto the battlefield face down without manifesting it, which is
+    -- Yedora, Grave Gardener's "return it to the battlefield face down" and
+    -- Missy's "return it to the battlefield under your control face down".
+    --
+    -- Its own arm and not Manifested reused, which is the whole of CR 708.7:
+    -- manifest's allower also allows turning face up (CR 701.40b) and these
+    -- effects' allowers allow nothing of the kind, so answering CR 708.6 with
+    -- Manifested would hand the permanent a special action its printing never
+    -- grants. Not TurnedFaceDown either -- that arm's subject is a face-up
+    -- permanent turned over where it stood, and nothing here is turned over:
+    -- CR 708.3 turns the object face down BEFORE it enters.
+    --
+    -- Names no procedure, as TurnedFaceDown names none: CR 702.37e's and CR
+    -- 702.168d's subjects ask about the CARD, so a Yedora'd morph card is still
+    -- turnable by those, and Pawl.Types.TurnUpProcedure has no arm this one
+    -- opens.
+    EnteredFaceDown
   deriving (Bounded, Enum, Eq, Ord, Show)

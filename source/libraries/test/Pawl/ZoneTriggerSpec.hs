@@ -50,6 +50,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
+import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
@@ -2082,6 +2083,10 @@ representativeEvents cond =
         -- the floor for the wrong keyword action.
         TriggerCondition.PlayerSurveils _ -> one (GameEvent.Surveiled S.bob)
         TriggerCondition.PlayerRollsDice _ -> one (GameEvent.DiceRolled S.bob)
+        -- CR 705.2's own event, and the only one this condition admits. A WON
+        -- flip, since a lost one does not match at all -- and bob rather than the
+        -- perspective player, on the PlayerScries arm's reasoning.
+        TriggerCondition.PlayerWinsCoinFlip _ -> one (GameEvent.CoinFlipped CoinFlipped.MkCoinFlipped {CoinFlipped.flipper = S.bob, CoinFlipped.won = True})
         -- CR 702.170a's own event, and the only one this condition admits. On
         -- `departed`, which is not the bearer on the board below -- so the pair
         -- does not match, which pins the floor for a matching pair too, this
@@ -2232,6 +2237,8 @@ everyTriggerCondition =
     TriggerCondition.PlayerSurveils PlayerRelation.Opponent,
     TriggerCondition.PlayerRollsDice PlayerRelation.You,
     TriggerCondition.PlayerRollsDice PlayerRelation.Opponent,
+    TriggerCondition.PlayerWinsCoinFlip PlayerRelation.You,
+    TriggerCondition.PlayerWinsCoinFlip PlayerRelation.Opponent,
     TriggerCondition.SelfBecomesPlotted,
     TriggerCondition.PermanentExplores (Filter.Type.And []),
     TriggerCondition.SelfExerted,

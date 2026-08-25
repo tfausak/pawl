@@ -753,6 +753,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PlayerScries _ -> []
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
+  TriggerCondition.PlayerWinsCoinFlip _ -> []
   TriggerCondition.SelfBecomesPlotted -> []
   TriggerCondition.PermanentExplores _ -> []
   -- CR 701.43d carries nothing at all, so no Count either.
@@ -3198,6 +3199,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PlayerScries _ -> []
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
+  TriggerCondition.PlayerWinsCoinFlip _ -> []
   TriggerCondition.SelfBecomesPlotted -> []
   -- CR 701.44b DOES carry one, a predicate over the explorer -- Wildgrowth
   -- Walker's "a creature you control" -- which the card lint must sweep.
@@ -5897,17 +5899,18 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "no effect enters face down anywhere but the battlefield" $ do
     ps <- S.allPrintings s
     let offends effect = case effect of
-          Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone riders _ _ _) -> EntryRiders.faceDown riders && zone /= Zone.Battlefield
-          Effect.Create (Create.MkCreate _ _ riders _ _) -> EntryRiders.faceDown riders
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone riders _ _ _) -> Maybe.isJust (EntryRiders.faceDown riders) && zone /= Zone.Battlefield
+          Effect.Create (Create.MkCreate _ _ riders _ _) -> Maybe.isJust (EntryRiders.faceDown riders)
           _ -> False
-        manifests effect = case effect of
-          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _) -> EntryRiders.faceDown riders
+        entersFaceDown effect = case effect of
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _) -> Maybe.isJust (EntryRiders.faceDown riders)
           _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
     -- Guards against a vacuous sweep: with no face-down entry in the pool at all
-    -- this would pass whatever a card said. Soul Summons and Cloudform are the
-    -- cards that print one.
-    Spec.assertBool s (any (anyFace (any manifests . cardResolutionEffects) . Printing.card) ps) "the pool has a card putting a permanent onto the battlefield face down"
+    -- this would pass whatever a card said. Soul Summons and Cloudform manifest
+    -- (CR 701.40a) and Yedora, Grave Gardener lists its own characteristics (CR
+    -- 708.2a), so the guard holds under either shape of the rider.
+    Spec.assertBool s (any (anyFace (any entersFaceDown . cardResolutionEffects) . Printing.card) ps) "the pool has a card putting a permanent onto the battlefield face down"
     Spec.assertEqWith s "only the battlefield takes a face-down entry (CR 708.3)" (fmap (S.nameOf . Printing.card) offenders) []
   -- Effect.CreateCopy carries the SAME EntryRiders record Create and MoveToZone
   -- do, but Pawl.Engine.Resolve's arm reads only CR 122.6's `counters` -- what

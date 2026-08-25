@@ -84,6 +84,7 @@ import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.Clause as Clause
 import Pawl.Types.ClauseIndex (ClauseIndex)
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
+import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
@@ -3689,17 +3690,37 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   --
   -- The bound value is CR 705.2's win or loss, 1 or 0, and NOT the face.
   --
+  -- CR 705.1's flip is also the event TriggerCondition.PlayerWinsCoinFlip
+  -- watches (Tavern Scoundrel), recorded under `controller` for the reason the
+  -- roll above gives: the instruction is aimed at a player, Pawl.Types.FlipCoin
+  -- names none of its own, and CR 705.2's last sentence keeps every other seat
+  -- out of it. EVERY flip is recorded, won or lost -- Pawl.Types.CoinFlipped
+  -- says why the outcome is a field rather than the presence of an entry.
+  --
+  -- One writer, one road: Prompt.FlipCoin is asked from this arm and from no
+  -- other place in the engine, so there is no second road to record on.
+  --
+  -- Recorded AFTER the binding, the roll's order and for its reason.
+  --
   -- Not implemented: CR 705.2's face-only flips, which have no winner and ask no
-  -- call (#2251); CR 705.3's stated result (#2252); CR 614's replacement over
-  -- the flip, which Krark's Thumb wants (#2253); and the flip event a trigger
-  -- would watch, which Tavern Scoundrel wants (#2254) -- so unlike the roll
-  -- above this arm records nothing.
+  -- call (#2251); CR 705.3's stated result (#2252); and CR 614's replacement
+  -- over the flip, which Krark's Thumb wants (#2253).
   Effect.FlipCoin flipCoin -> do
     gs <- State.get
     called <- Game.choose (Prompt.CallCoin (Decide.deciderFor controller gs) controller)
     face <- Game.ask Prompt.FlipCoin
-    let won = if face == called then 1 else 0 :: Natural
+    let matched = face == called
+        won = if matched then 1 else 0 :: Natural
     State.modify' (bindAmountSlot source (FlipCoin.slot flipCoin) won)
+    State.modify'
+      ( Event.recordEvent
+          ( GameEvent.CoinFlipped
+              CoinFlipped.MkCoinFlipped
+                { CoinFlipped.flipper = controller,
+                  CoinFlipped.won = matched
+                }
+          )
+      )
   Effect.ControlPlayerNextTurn slot ->
     State.modify' $ \gs ->
       case legalOne slot legal of

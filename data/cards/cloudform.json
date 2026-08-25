@@ -115,7 +115,12 @@
                             }
                           },
                           "riders": {
-                            "faceDown": true
+                            "faceDown": {
+                              "listed": {},
+                              "reason": {
+                                "type": "Manifested"
+                              }
+                            }
                           },
                           "slot": "manifested",
                           "zone": {

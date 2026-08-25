@@ -10,6 +10,7 @@ import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
+import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.ControlChanged as ControlChanged
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.Countering as Countering
@@ -996,4 +997,13 @@ data GameEvent
     -- board answers every other question about the permanent live. Adding the
     -- field is the job of the card that reads it.
     BecameTapped ObjectId.ObjectId
+  | -- | CR 705.1: a player flipped a coin, and CR 705.2 decided whether they won
+    -- it. Recorded by Pawl.Engine.Resolve's Effect.FlipCoin arm, which is the
+    -- only flipper, AFTER the outcome is settled and bound -- DiceRolled's
+    -- posture beside it.
+    --
+    -- What TriggerCondition.PlayerWinsCoinFlip watches (Tavern Scoundrel). The
+    -- outcome is a FIELD rather than a second constructor, and
+    -- Pawl.Types.CoinFlipped's own comment says why.
+    CoinFlipped CoinFlipped.CoinFlipped
   deriving (Eq, Ord, Show)
