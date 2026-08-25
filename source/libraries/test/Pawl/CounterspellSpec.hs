@@ -1158,7 +1158,7 @@ fortressKinGuardSpec s registry = Spec.describe s "FortressKinGuard" $ do
   -- because CR 118.12 pays this cost as the ability resolves and CR 609.1 makes
   -- what happens then an effect of that ability. A payment routed around the
   -- counter funnel reads 2/3 here.
-  Spec.it s "CR 614.16 Hardened Scales sees endure's counter, so the Kin-Guard reads 3/4" $ do
+  Spec.it s "CR 614.1 Hardened Scales sees endure's counter, so the Kin-Guard reads 3/4" $ do
     plains <- S.printingOf s registry "Plains"
     kinGuard <- S.printingOf s registry "Fortress Kin-Guard"
     scales <- S.printingOf s registry "Hardened Scales"

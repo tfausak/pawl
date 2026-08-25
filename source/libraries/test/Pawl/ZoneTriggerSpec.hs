@@ -3246,7 +3246,7 @@ fabricateSpec s registry =
         -- the first case in nothing but the Hardened Scales, and it applies,
         -- because CR 118.12 pays this cost as the ability resolves and CR 609.1
         -- makes what happens then an effect of that ability.
-        Spec.it s "CR 614.16 Hardened Scales sees fabricate's counter, so the Artisan reads 4/4" $ do
+        Spec.it s "CR 614.1 Hardened Scales sees fabricate's counter, so the Artisan reads 4/4" $ do
           onStack <- board ["Hardened Scales"]
           let after = S.runPure (paysFor S.alice) onStack Stack.resolveTop
           case artisansOn onStack of

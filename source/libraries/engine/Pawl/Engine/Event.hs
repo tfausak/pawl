@@ -849,7 +849,7 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 --      in this pool are CR 614.1c's self-only `IsSource` (Clone, Primal Plasma,
 --      CR 306.5b's loyalty), which no sibling can satisfy, so the exclusion bites
 --      on the other-objects forms: Kismet's CR 614.1d "enter tapped" and
---      Corpsejack Menace's CR 614.16 counter doubling. Pawl.ReplacementSpec's
+--      Corpsejack Menace's CR 614.1 counter doubling. Pawl.ReplacementSpec's
 --      "a Corpsejack Menace reanimated beside a modular creature doubles nothing"
 --      is the proof, over a Rise of the Dark Realms batch; without it an Arcbound
 --      Worker returned beside the Menace enters 2/2 instead of 1/1, and which
@@ -2041,7 +2041,7 @@ apply batch candidate event =
         pure Nothing
     -- Unreachable: `applies` admits DestructionR only against WouldBeDestroyed.
     (ReplacementEffect.DestructionR _, _) -> pure (Just event)
-    -- CR 122.6/614.16: Hardened Scales/Doubling Season scale a counter placement.
+    -- CR 122.6/614.1: Hardened Scales/Doubling Season scale a counter placement.
     (ReplacementEffect.CounterR (CounterR.MkCounterR _ scaling), ProposedEvent.WouldPutCounters cause oid kind n) -> do
       Replacement.consume (ReplacementCandidate.identity candidate)
       pure (Just (ProposedEvent.WouldPutCounters cause oid kind (Replacement.scale scaling n)))
@@ -2133,9 +2133,9 @@ apply batch candidate event =
     -- a +1/+1 counter on it", applied WHILE the permanent turns over (CR 708.11)
     -- because FaceDown.performTurnFaceUp raises this event there and nowhere else.
     --
-    -- The counters go through putCounters, the CR 122.6 funnel -- so CR 614.16
-    -- applies and Hardened Scales sees a megamorph counter the way it sees a riot
-    -- one. NOT the pending map the EntryR arms write: CR 614.1e's turning face up
+    -- The counters go through putCounters, the CR 122.6 funnel -- so a CR 614.1
+    -- counter replacement applies and Hardened Scales sees a megamorph counter
+    -- the way it sees a riot one. NOT the pending map the EntryR arms write: CR 614.1e's turning face up
     -- is not an entry, so there is no entry loop for a row to be ordered in.
     --
     -- The amount is evaluated the same way too, though rule 702.37b states its own number and

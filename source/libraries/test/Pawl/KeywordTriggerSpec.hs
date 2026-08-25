@@ -2258,7 +2258,7 @@ mentorsTriggerSpec s registry =
         -- control, that many plus one are put instead") reaches rule 702.134a's
         -- counter and not rule 702.134c's, so the Piker ends on two +1/+1 counters
         -- and one shield counter -- a pair no other reading of this board produces.
-        Spec.it s "CR 614.16 Hardened Scales reaches the +1/+1 counter alone" $ do
+        Spec.it s "CR 614.1 Hardened Scales reaches the +1/+1 counter alone" $ do
           (gs, mine, _) <- board ["Hill Giant", "Goblin Piker", "Aegis of the Legion", "Hardened Scales"]
           case mine of
             [giant, piker, aegis, _] -> do
