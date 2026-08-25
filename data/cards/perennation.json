@@ -1,0 +1,153 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Perennation",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "MoveToZone",
+                    "value": {
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "target"
+                      },
+                      "riders": {
+                        "counters": [
+                          {
+                            "count": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "kind": {
+                              "type": "Keyword",
+                              "value": {
+                                "type": "Hexproof"
+                              }
+                            }
+                          },
+                          {
+                            "count": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "kind": {
+                              "type": "Keyword",
+                              "value": {
+                                "type": "Indestructible"
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "zone": {
+                        "type": "Battlefield"
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "targetSlots": {
+              "target": {
+                "filter": {
+                  "type": "Or",
+                  "value": [
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Artifact"
+                      }
+                    },
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Battle"
+                      }
+                    },
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Creature"
+                      }
+                    },
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Enchantment"
+                      }
+                    },
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Land"
+                      }
+                    },
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Planeswalker"
+                      }
+                    }
+                  ]
+                },
+                "pool": {
+                  "type": "CardsInGraveyard",
+                  "value": {
+                    "type": "Scoped",
+                    "value": {
+                      "type": "You"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}
