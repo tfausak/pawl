@@ -108,6 +108,7 @@ codec =
       Arm.payload "PlayerScries" PlayerRelation.codec TriggerCondition.PlayerScries (\x -> case x of TriggerCondition.PlayerScries y -> Just y; _ -> Nothing),
       Arm.payload "PlayerSurveils" PlayerRelation.codec TriggerCondition.PlayerSurveils (\x -> case x of TriggerCondition.PlayerSurveils y -> Just y; _ -> Nothing),
       Arm.payload "PlayerRollsDice" PlayerRelation.codec TriggerCondition.PlayerRollsDice (\x -> case x of TriggerCondition.PlayerRollsDice y -> Just y; _ -> Nothing),
+      Arm.payload "PlayerWinsCoinFlip" PlayerRelation.codec TriggerCondition.PlayerWinsCoinFlip (\x -> case x of TriggerCondition.PlayerWinsCoinFlip y -> Just y; _ -> Nothing),
       Arm.nullary "SelfBecomesPlotted" TriggerCondition.SelfBecomesPlotted,
       Arm.payload "PermanentExplores" filterCodec TriggerCondition.PermanentExplores (\x -> case x of TriggerCondition.PermanentExplores y -> Just y; _ -> Nothing),
       Arm.nullary "SelfExerted" TriggerCondition.SelfExerted,

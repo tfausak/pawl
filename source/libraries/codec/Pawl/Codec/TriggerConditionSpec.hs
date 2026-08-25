@@ -772,6 +772,19 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PlayerRollsDice PlayerRelation.Opponent)
       " {\"type\":\"PlayerRollsDice\",\"value\":{\"type\":\"Opponent\"}} "
+  -- CR 705.2. Both relations, PlayerRollsDice's shape: Tavern Scoundrel is the
+  -- You form.
+  Spec.it s "PlayerWinsCoinFlip round-trips both relations" $ do
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerWinsCoinFlip PlayerRelation.You)
+      " {\"type\":\"PlayerWinsCoinFlip\",\"value\":{\"type\":\"You\"}} "
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerWinsCoinFlip PlayerRelation.Opponent)
+      " {\"type\":\"PlayerWinsCoinFlip\",\"value\":{\"type\":\"Opponent\"}} "
   -- CR 702.170a. Nullary, SelfCycled's shape: the ability is printed on the card
   -- that becomes plotted, so there is nothing to select among.
   Spec.it s "SelfBecomesPlotted round-trips" $
