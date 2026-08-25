@@ -3096,9 +3096,9 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
             -- the one kind whose recipient is not its bearer. Affected.Attached
             -- rather than the bearer's own id: it is the same affected set an
             -- Equipment's printed "equipped creature gets +N/+0" names, and it
-            -- reads CR 303.4b's host live, so the bonus follows the Equipment
-            -- when it moves and is gone the moment it comes off. Unattached, the
-            -- set is empty and the part reaches nothing.
+            -- reads CR 301.5a's equipped creature live, so the bonus follows
+            -- the Equipment when it moves and is gone the moment it comes off.
+            -- Unattached, the set is empty and the part reaches nothing.
             --
             -- Not implemented: rule 122.1j says an Equipment and this asks only
             -- that the bearer is attached to something, so a hone counter on an

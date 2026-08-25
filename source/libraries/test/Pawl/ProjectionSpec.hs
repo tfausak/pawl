@@ -3197,7 +3197,7 @@ honeCounterSpec s registry = Spec.describe s "HoneCounter" $ do
     Spec.assertEqWith s "the same counters on an UNATTACHED Bonesplitter reach nothing" (Projection.powerOf pikerId loose) (Just 2)
     Spec.assertEqWith s "and the Bonesplitter alone, with no counters, is the 4 this board would otherwise report" (Projection.powerOf pikerId (S.attach equip pikerId g2)) (Just 4)
 
-  -- The bonus is read through CR 303.4b's attachment live, so moving the
+  -- The bonus is read through CR 301.5a's attachment live, so moving the
   -- Equipment moves it. Two boards differing in exactly one thing again: which
   -- creature the one honed Bonesplitter is on. A Hill Giant beside the Piker so
   -- no two readings of the board share a number.
@@ -3221,7 +3221,7 @@ honeCounterSpec s registry = Spec.describe s "HoneCounter" $ do
   -- Warrior 2/1, "First strike" / "Whenever Dwalin enters or attacks, put a hone
   -- counter on each Equipment you control." (name, cost, type line and Oracle
   -- text checked against api.scryfall.com 2026-08-25). Only the ENTERS half of
-  -- CR 603.2's AnyOf condition is driven here; the attacks half is the same
+  -- the card's two-event condition is driven here; the attacks half is the same
   -- shape Blossoming Tortoise's condition already carries.
   --
   -- bob's equipped Bonesplitter is what "you control" is read against, and his
