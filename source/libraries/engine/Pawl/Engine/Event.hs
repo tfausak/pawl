@@ -2815,10 +2815,12 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
     --
     -- Asked BEFORE the CR 616.1 replacement loop rather than after it, which is
     -- CR 101.2: a "can't" beats whatever would allow the move, so there is no
-    -- event for a replacement to modify. Indistinguishable from asking after it
-    -- today, and not on a claim about Magic: every ReplacementEffect.ZoneChangeR
-    -- in data/cards/ names a destination this arm never reaches, since the move
-    -- it would rewrite does not happen at all.
+    -- event left for a replacement to choose among. Ordering it after the loop
+    -- would answer the same, and not on a claim about Magic: the predicate reads
+    -- the object and its CURRENT zone, neither of which any ZoneChangeR rewrites
+    -- -- they rewrite the destination -- and that loop leaves the board alone on
+    -- this path (see resolveZoneChange, which restricts it to ZoneChangeR
+    -- candidates, so the one state-writing arm is out of reach).
     Just obj | Game.leftTheBattlefield obj -> pure Nothing
     Just obj -> do
       let pid = Object.owner obj

@@ -3743,9 +3743,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     --     all and is already Nothing.
     --   * a CARD. CR 111.6 says a token is not a card, and every printed reader
     --     of this slot says "card" -- "if a creature CARD is put into a graveyard
-    --     this way", "return each CARD put into a graveyard this way". The filter
-    --     also keeps CR 111.8 (a token that has left the battlefield can't come
-    --     back) out of reach of the one shape that would ask for it (gap #1950).
+    --     this way", "return each CARD put into a graveyard this way". A second
+    --     rule would refuse the same token one step later -- CR 111.8, which
+    --     Pawl.Engine.Event's zone-change funnel states -- so this filter is what
+    --     the CARD says rather than the only thing standing in the way.
     --
     -- Nothing is bound when nothing qualifies, MoveToZone's rule: no slot names
     -- an empty set, so the later clause finds an unbound slot and does nothing --
