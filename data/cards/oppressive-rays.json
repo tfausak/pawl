@@ -59,6 +59,22 @@
         }
       ],
       "name": "Oppressive Rays",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "IncreaseActivationCost",
+            "value": {
+              "amount": 3,
+              "whichAbilities": {
+                "type": "IsHostOfSource"
+              }
+            }
+          },
+          "scope": {
+            "type": "EachPlayer"
+          }
+        }
+      ],
       "typeLine": {
         "subtypes": [
           {

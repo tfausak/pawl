@@ -174,6 +174,7 @@ import qualified Pawl.Codec.HandActionSpec
 import qualified Pawl.Codec.HybridSpec
 import qualified Pawl.Codec.IgnoredAbilitySpec
 import qualified Pawl.Codec.InZoneSpec
+import qualified Pawl.Codec.IncreaseActivationCostSpec
 import qualified Pawl.Codec.IncreaseSpellCostSpec
 import qualified Pawl.Codec.InherentTriggerSourceSpec
 import qualified Pawl.Codec.InstanceOrdinalSpec
@@ -682,6 +683,7 @@ spec s registry = do
   Pawl.Codec.HybridSpec.spec s
   Pawl.Codec.IgnoredAbilitySpec.spec s
   Pawl.Codec.InZoneSpec.spec s
+  Pawl.Codec.IncreaseActivationCostSpec.spec s
   Pawl.Codec.IncreaseSpellCostSpec.spec s
   Pawl.Codec.InherentTriggerSourceSpec.spec s
   Pawl.Codec.InstanceOrdinalSpec.spec s

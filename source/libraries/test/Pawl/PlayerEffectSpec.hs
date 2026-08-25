@@ -56,6 +56,11 @@
 -- Pawl.Engine.Event's countering funnel. Prowling Serpopard is its NARROWED
 -- counterpart, and the pair is the point: one board, one Cancel, and the filter
 -- alone deciding whether the victim spell survives.
+--
+-- Oppressive Rays is CR 601.2f's ACTIVATION side, on a criterion no other group
+-- here has: CR 303.4b's "enchanted", answered off the source the row carries.
+-- Brothers of Fire is the taxed ability, and the group runs two of them so that
+-- "the tax reached this object" is told apart from "the tax reached everything".
 module Pawl.PlayerEffectSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -3168,25 +3173,25 @@ matchesObjectSpec s registry =
       lightningBolt <- S.printingOf s registry "Lightning Bolt"
       piker <- S.printingOf s registry "Goblin Piker"
       let (bolt, _, gs) = matchesObjectBoard lightningBolt piker
-      Spec.assertBool s (PlayerEffect.matchesObject noncreature bolt gs) "Lightning Bolt is a noncreature spell"
+      Spec.assertBool s (PlayerEffect.matchesObjectFrom Nothing noncreature bolt gs) "Lightning Bolt is a noncreature spell"
 
     Spec.it s "CR 613.1d a creature spell fails the noncreature criterion" $ do
       lightningBolt <- S.printingOf s registry "Lightning Bolt"
       piker <- S.printingOf s registry "Goblin Piker"
       let (_, pikerId, gs) = matchesObjectBoard lightningBolt piker
-      Spec.assertBool s (not (PlayerEffect.matchesObject noncreature pikerId gs)) "Goblin Piker is a creature spell"
+      Spec.assertBool s (not (PlayerEffect.matchesObjectFrom Nothing noncreature pikerId gs)) "Goblin Piker is a creature spell"
 
     Spec.it s "CR 613.1e a colour criterion admits a matching-colour spell" $ do
       lightningBolt <- S.printingOf s registry "Lightning Bolt"
       piker <- S.printingOf s registry "Goblin Piker"
       let (bolt, _, gs) = matchesObjectBoard lightningBolt piker
-      Spec.assertBool s (PlayerEffect.matchesObject (Filter.Type.HasColor Color.Red) bolt gs) "Lightning Bolt is red"
+      Spec.assertBool s (PlayerEffect.matchesObjectFrom Nothing (Filter.Type.HasColor Color.Red) bolt gs) "Lightning Bolt is red"
 
     Spec.it s "CR 613.1e a colour criterion rejects a non-matching colour" $ do
       lightningBolt <- S.printingOf s registry "Lightning Bolt"
       piker <- S.printingOf s registry "Goblin Piker"
       let (bolt, _, gs) = matchesObjectBoard lightningBolt piker
-      Spec.assertBool s (not (PlayerEffect.matchesObject (Filter.Type.HasColor Color.Blue) bolt gs)) "Lightning Bolt is not blue"
+      Spec.assertBool s (not (PlayerEffect.matchesObjectFrom Nothing (Filter.Type.HasColor Color.Blue) bolt gs)) "Lightning Bolt is not blue"
 
 -- Null Chamber {3}{W} World Enchantment: "As this enchantment enters, you and an
 -- opponent each choose a card name other than a basic land card name. Spells
@@ -4697,8 +4702,8 @@ voidWinnowerSpec s registry =
       disaster <- S.printingOf s registry "Molten Disaster"
       winnower <- S.printingOf s registry "Void Winnower"
       let (_, bobsPiker, _, bobsDisaster, board) = voidWinnowerBoard mountain piker bolt disaster [winnower]
-      Spec.assertBool s (PlayerEffect.matchesObject Filter.Type.ManaValueIsEven bobsPiker board) "the fixed spell's mana value is even"
-      Spec.assertBool s (PlayerEffect.matchesObject Filter.Type.ManaValueIsEven bobsDisaster board) "and so is the {X} spell's, while it sits in hand"
+      Spec.assertBool s (PlayerEffect.matchesObjectFrom Nothing Filter.Type.ManaValueIsEven bobsPiker board) "the fixed spell's mana value is even"
+      Spec.assertBool s (PlayerEffect.matchesObjectFrom Nothing Filter.Type.ManaValueIsEven bobsDisaster board) "and so is the {X} spell's, while it sits in hand"
       Spec.assertBool s (not (any (S.isCastOf bobsPiker) (askedOf S.bob board))) "the fixed one is refused"
       Spec.assertBool s (any (S.isCastOf bobsDisaster) (askedOf S.bob board)) "and the {X} one is offered"
 
@@ -4716,9 +4721,95 @@ voidWinnowerSpec s registry =
       disaster <- S.printingOf s registry "Molten Disaster"
       let (_, bobsPiker, _, bobsDisaster, board) = voidWinnowerBoard mountain piker bolt disaster []
           cheap = Filter.Type.ManaValueAtMost 5
-      Spec.assertBool s (PlayerEffect.matchesObject cheap bobsDisaster board) "the {X} spell is inside the class as it sits in hand"
-      Spec.assertBool s (PlayerEffect.choiceCouldEscape cheap bobsDisaster board) "and a large enough X takes it out"
-      Spec.assertBool s (not (PlayerEffect.choiceCouldEscape cheap bobsPiker board)) "while the fixed spell beside it has no choice to make"
+      Spec.assertBool s (PlayerEffect.matchesObjectFrom Nothing cheap bobsDisaster board) "the {X} spell is inside the class as it sits in hand"
+      Spec.assertBool s (PlayerEffect.choiceCouldEscape Nothing cheap bobsDisaster board) "and a large enough X takes it out"
+      Spec.assertBool s (not (PlayerEffect.choiceCouldEscape Nothing cheap bobsPiker board)) "while the fixed spell beside it has no choice to make"
+
+-- CR 601.2f / 602.2b: the MANA half of a cost increase, at the activation
+-- moment. Oppressive Rays -- "{W} Enchantment -- Aura. Enchant creature.
+-- Enchanted creature can't attack or block unless its controller pays {3}.
+-- Activated abilities of enchanted creature cost {3} more to activate" (checked
+-- against Scryfall) -- is the pool's producer, and its third line is what these
+-- cases are about; the other two are Pawl.CombatEffectSpec's.
+--
+-- CR 303.4b is half the point of the group. The criterion is
+-- Filter.IsHostOfSource and nothing else, so the tax reaches exactly the object
+-- the Aura is attached to -- which the engine can only answer because
+-- Pawl.Engine.PlayerEffect.matchesObjectFrom is handed the row's own source. It
+-- was handed Nothing until then (see #1242), and every case below would have
+-- passed the WRONG WAY: the atom would have been vacuously False and the taxed
+-- Brothers would have activated for its printed cost.
+--
+-- TWO Brothers of Fire and not one, which is what separates the three readings a
+-- single-creature board cannot tell apart -- the tax reached this object, the tax
+-- reached everything, the tax reached nothing. They are the same card, so the
+-- Aura is the only difference between them.
+--
+-- Brothers of Fire is "{1}{R}{R}, {T}: Brothers of Fire deals 1 damage to any
+-- target. Brothers of Fire deals 1 damage to you", so the printed activation is
+-- three mana and the taxed one is six. THREE Mountains is the discriminating
+-- board: it is exactly the printed cost and one short of half the taxed one.
+oppressiveRaysBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+oppressiveRaysBoard rays brothers mountain n =
+  let (taxed, g1) = S.addCreature brothers S.alice (S.landsInPlay mountain n)
+      (untaxed, g2) = S.addCreature brothers S.alice g1
+      (aura, g3) = S.addCreature rays S.alice g2
+   in (taxed, untaxed, (S.attach aura taxed g3) {GameState.priority = Just S.alice})
+
+oppressiveRaysSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+oppressiveRaysSpec s registry =
+  Spec.describe s "OppressiveRays" $ do
+    -- CR 118.3's offer gate, reached at an activation by CR 602.2b, asked of both
+    -- creatures on ONE board: three Mountains pay the printed {1}{R}{R} and
+    -- cannot pay the taxed {4}{R}{R}, so the two answers are the whole of the
+    -- criterion.
+    Spec.it s "CR 601.2f the enchanted creature's activation is off the menu at its printed cost" $ do
+      rays <- S.printingOf s registry "Oppressive Rays"
+      brothers <- S.printingOf s registry "Brothers of Fire"
+      mountain <- S.printingOf s registry "Mountain"
+      let (taxed, untaxed, gs) = oppressiveRaysBoard rays brothers mountain 3
+          offers = Action.legalActions S.alice gs
+      Spec.assertEqWith s "CR 303.4b three Mountains cannot pay the enchanted creature's {4}{R}{R}" (length (activationsOf taxed offers)) 0
+      Spec.assertEqWith s "CR 303.4b and the identical creature beside it, unenchanted, activates off the same three" (length (activationsOf untaxed offers)) 1
+
+    -- The other side of the same pair: SIX Mountains pay the taxed cost, so the
+    -- refusal above is the {3} and not a "never".
+    Spec.it s "CR 601.2f six Mountains do pay it, so the tax is {3} and not a prohibition" $ do
+      rays <- S.printingOf s registry "Oppressive Rays"
+      brothers <- S.printingOf s registry "Brothers of Fire"
+      mountain <- S.printingOf s registry "Mountain"
+      let (taxed, untaxed, gs) = oppressiveRaysBoard rays brothers mountain 6
+          offers = Action.legalActions S.alice gs
+      Spec.assertEqWith s "the enchanted creature is offered once the mana is there" (length (activationsOf taxed offers)) 1
+      Spec.assertEqWith s "and the unenchanted one still is" (length (activationsOf untaxed offers)) 1
+
+    -- The PAYMENT, which the offer cases cannot reach: CR 601.2f's total is what
+    -- Pawl.Engine.Cost charges, and a gate that read the taxed total while the
+    -- payment read the printed one would pass both cases above. Six Mountains on
+    -- both runs, so the tapped count is the only difference.
+    Spec.it s "CR 601.2h the payment charges the taxed total, not the printed one" $ do
+      rays <- S.printingOf s registry "Oppressive Rays"
+      brothers <- S.printingOf s registry "Brothers of Fire"
+      mountain <- S.printingOf s registry "Mountain"
+      let (taxed, untaxed, gs) = oppressiveRaysBoard rays brothers mountain 6
+          activate oid = case Activate.abilitiesFor oid gs of
+            [ability] -> Just (S.runPure S.identityAnswer gs (Activate.activateAbility S.alice oid ability))
+            _ -> Nothing
+      case (activate taxed, activate untaxed) of
+        (Just afterTaxed, Just afterUntaxed) -> do
+          Spec.assertEqWith s "CR 601.2f the enchanted creature's {1}{R}{R} came to six mana" (S.tappedCount S.alice afterTaxed) 6
+          Spec.assertEqWith s "and the unenchanted one's, off the same six Mountains, came to three" (S.tappedCount S.alice afterUntaxed) 3
+          Spec.assertEqWith s "both activations reached the stack" (length (GameState.stack afterTaxed) + length (GameState.stack afterUntaxed)) 2
+        _ -> Spec.assertFailure s "expected exactly one activated ability on each Brothers of Fire"
+
+-- The activations offered for ONE source, so a board carrying two activatable
+-- permanents can say which of them was offered.
+activationsOf :: ObjectId.ObjectId -> [Action.Type.Action] -> [Action.Type.Action]
+activationsOf oid = filter isIt
+  where
+    isIt a = case a of
+      Action.Type.Activate o _ -> o == oid
+      _ -> False
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
@@ -4753,3 +4844,4 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   spiderPunkSpec s registry
   prowlingSerpopardSpec s registry
   jaredSpec s registry
+  oppressiveRaysSpec s registry
