@@ -159,8 +159,9 @@ dueToTurn gs = case GameState.daytime gs of
 -- is Howlpack Piper // Wildsong Howler: its back face prints "whenever this
 -- creature enters or transforms into Wildsong Howler", and the permanent is
 -- placed rather than cast so only the transform limb can fire. Removing the
--- record here reddens that case's hand assertion while leaving its turned-over
--- assertion green.
+-- record here reddens that case's hand assertion and leaves every case in
+-- Pawl.DaytimeSpec green, the one asserting the permanent turned over included:
+-- the record is what is lost, not the turn.
 turnDue :: ([ObjectId] -> GameState -> GameState) -> Game Bool
 turnDue record = do
   gs <- State.get

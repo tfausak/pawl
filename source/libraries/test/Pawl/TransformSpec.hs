@@ -770,6 +770,18 @@ resolveStackTakingTheMay gs = foldr (\_ g -> S.runPure takesTheMay g Stack.resol
 stockLibrary :: [Printing.Printing] -> GameState.GameState -> GameState.GameState
 stockLibrary printings gs = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.alice g)) gs (reverse printings)
 
+-- The nine cards Wildsong Howler's trigger reads, top down, shared by both of its
+-- cases.
+--
+-- NINE, not six: the top six are what the trigger looks at, and the three beneath
+-- them are what makes "on the BOTTOM" observable -- with a six-card library the
+-- bottom and the top are the same set. Exactly one of the six is a creature card,
+-- so the reveal has one legal answer and neither case is about who picks. Every
+-- name distinct, so an assertion over the library reads positions rather than a
+-- multiset of Forests.
+howlerDeck :: [String]
+howlerDeck = ["Forest", "Mountain", "Goblin Piker", "Island", "Swamp", "Plains", "Lightning Bolt", "Ancestral Recall", "Giant Growth"]
+
 -- The names of alice's cards in a zone, in that zone's own order --
 -- Pawl.LibraryOrderSpec's zoneNames, which this module keeps its own copy of
 -- rather than hoisting to Pawl.Support.
@@ -907,8 +919,8 @@ transformTriggerSpec s registry = Spec.describe s "TransformsInto" $ do
   -- second fixture: no spell and no activated ability turns this permanent over.
   -- NIGHTFALL does, through Pawl.Engine.Daytime's sweep, which reaches
   -- Game.turnFaceOver directly and records CR 701.27a's event through the same
-  -- Event.recordTransformed. Howlpack Piper // Wildsong Howler is the pool's only
-  -- card that watches it: a {3}{G} 2/2 Creature -- Human Werewolf with daybound
+  -- Event.recordTransformed. The fixture is Howlpack Piper // Wildsong Howler, a
+  -- {3}{G} 2/2 Creature -- Human Werewolf with daybound
   -- whose back face is a 4/4 Creature -- Werewolf with nightbound reading
   -- "Whenever this creature enters or transforms into Wildsong Howler, look at
   -- the top six cards of your library. You may reveal a creature card from among
@@ -920,14 +932,11 @@ transformTriggerSpec s registry = Spec.describe s "TransformsInto" $ do
   -- transform limb specifically. A later reader who "simplifies" this by casting
   -- the card destroys that.
   --
-  -- Nine cards in the library, not six: the top six are what the trigger looks
-  -- at, and the three beneath them are what makes "on the BOTTOM" observable --
-  -- with a six-card library the bottom and the top are the same set. Exactly one
-  -- of the six is a creature card, so the reveal has one legal answer and the
-  -- case is about the trigger rather than about who picks.
+  -- `howlerDeck` above says why the library is nine cards and how they are
+  -- chosen.
   Spec.it s "CR 702.145c/701.27e nightfall turns the Piper over and the back face's trigger fires" $ do
     piper <- S.printingOf s registry "Howlpack Piper"
-    deck <- mapM (S.printingOf s registry) ["Forest", "Mountain", "Goblin Piker", "Island", "Swamp", "Plains", "Lightning Bolt", "Ancestral Recall", "Giant Growth"]
+    deck <- mapM (S.printingOf s registry) howlerDeck
     let (piperId, placed) = S.addCreature piper S.alice emptyBoard
         -- CR 702.145d: alice controls a daybound permanent and it is neither day
         -- nor night, so the settle makes it day.
@@ -948,34 +957,43 @@ transformTriggerSpec s registry = Spec.describe s "TransformsInto" $ do
   -- alone -- the pair the Thallid cases above make with CR 700.4's "or dies".
   -- CR 712.13a through CR 702.145b's first static ability gets there on the same
   -- card: the Piper is CAST at night, so it ENTERS as Wildsong Howler and the
-  -- SelfEnters limb fires with no transform anywhere on the board.
+  -- SelfEnters limb fires without the Piper ever transforming.
   --
   -- Tovolar is what gives the game a designation at all before the Piper is cast
   -- (CR 702.145d wants a daybound permanent on the battlefield, and the Piper is
-  -- in hand), Pawl.DaytimeSpec's expertBoard exactly. He turns over at nightfall
-  -- himself and triggers nothing on the way: his back face's abilities are an
-  -- upkeep trigger and a combat-damage trigger.
+  -- in hand), Pawl.DaytimeSpec's expertBoard exactly. He DOES transform at
+  -- nightfall, so this board is not free of CR 701.27a events -- his names
+  -- "Tovolar, the Midnight Scourge" and the condition is self-scoped besides, so
+  -- it cannot reach the Piper. He triggers nothing else on the way either: his
+  -- back face's abilities are an upkeep trigger and a combat-damage trigger.
+  --
+  -- The face assertion comes FIRST because the payload assertions cannot tell the
+  -- limbs apart on their own: an engine that skipped CR 712.13a would put the
+  -- Piper on the battlefield front face up, and the settle's CR 702.145c sweep
+  -- would then turn it over and fire the SAME trigger on its transform limb.
+  -- `entered` is read before that settle, and stripping the record from
+  -- Daytime.turnDue leaves this case green, which is the other half of the
+  -- separation.
   Spec.it s "CR 712.13a/701.27e the same trigger's enters limb fires on a Piper cast at night" $ do
     tovolar <- S.printingOf s registry "Tovolar, Dire Overlord"
     forest <- S.printingOf s registry "Forest"
     piper <- S.printingOf s registry "Howlpack Piper"
-    deck <- mapM (S.printingOf s registry) ["Forest", "Mountain", "Goblin Piker", "Island", "Swamp", "Plains", "Lightning Bolt", "Ancestral Recall", "Giant Growth"]
+    deck <- mapM (S.printingOf s registry) howlerDeck
     let (_, withTovolar) = S.addCreature tovolar S.alice (S.landsInPlay forest 4)
         (inHand, piperSpell) = S.handOne piper (stockLibrary deck withTovolar)
         night = untapStepAfter 0 (settleDaytime inHand)
         cast = S.runPure castsAndTakesTheMay night (S.cast S.alice piperSpell)
         entered = S.runPure castsAndTakesTheMay cast Stack.resolveTop
         after = resolveStackTakingTheMay (gatherTakingTheMay entered)
+    -- Read on `entered`, the board the spell's resolution leaves, which is BEFORE
+    -- the settle the CR 702.145c sweep runs in. The FACES, not
+    -- S.countOnBattlefieldByName: that helper reads the card's name (CR 712.8a's
+    -- front face), which cannot tell the two faces apart. The whole battlefield,
+    -- so "Howlpack Piper" is asserted absent as well as "Wildsong Howler"
+    -- present.
+    Spec.assertEqWith s "the permanent was showing Wildsong Howler the moment it entered, and never its front face" (List.sort (zoneNames Zone.Battlefield entered)) ["Forest", "Forest", "Forest", "Forest", "Tovolar, the Midnight Scourge", "Wildsong Howler"]
     Spec.assertEqWith s "the one creature card among the top six is in alice's hand" (zoneNames Zone.Hand after) ["Goblin Piker"]
     Spec.assertEqWith s "the three cards under the looked-at six are now the top three" (take 3 (zoneNames Zone.Library after)) ["Lightning Bolt", "Ancestral Recall", "Giant Growth"]
-    -- Asserted on `entered` rather than on `after`, which is what separates CR
-    -- 712.13a's entry rewrite from the CR 702.145c sweep: the sweep runs in the
-    -- settle that comes after this board.
-    -- The FACES, not S.countOnBattlefieldByName: that helper reads the card's
-    -- name (CR 712.8a's front face), which cannot tell the two faces apart. The
-    -- whole battlefield, so "Howlpack Piper" is asserted absent as well as
-    -- "Wildsong Howler" present.
-    Spec.assertEqWith s "the permanent was showing Wildsong Howler the moment it entered, and never its front face" (List.sort (zoneNames Zone.Battlefield entered)) ["Forest", "Forest", "Forest", "Forest", "Tovolar, the Midnight Scourge", "Wildsong Howler"]
     Spec.assertEqWith s "it was night when the spell resolved" (GameState.daytime night) (Just Daytime.Night)
 
 -- "Destroy each Fungus", which on this board is the Thallid alone -- the
