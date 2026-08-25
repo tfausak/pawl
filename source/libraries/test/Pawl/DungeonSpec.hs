@@ -2,9 +2,9 @@
 {-# LANGUAGE RankNTypes #-}
 
 -- Covers: Pawl.Engine.Dungeon (CR 309 and CR 701.49, "venture into the dungeon"),
--- the two fields it writes -- Pawl.Types.Object's ventureRoom and
--- Pawl.Types.Player's dungeon -- Pawl.Engine.Resolve's Effect.Venture arm, and
--- Pawl.Engine.Sba's CR 704.5t pass.
+-- the three fields it reads or writes -- Pawl.Types.Object's ventureRoom and
+-- Pawl.Types.Player's dungeon and completedDungeons -- Pawl.Engine.Resolve's
+-- Effect.Venture arm, and Pawl.Engine.Sba's CR 704.5t pass.
 --
 -- Gameplay-level throughout: every case activates Secret Door's "{4}{U}: Venture
 -- into the dungeon" and resolves it through the stack rather than calling
