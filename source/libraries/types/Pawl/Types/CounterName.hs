@@ -1,6 +1,5 @@
 module Pawl.Types.CounterName where
 
-import qualified Data.Set as Set
 import qualified Data.Text as Text
 
 -- | The NAME a card prints for a counter kind no rule in the CR reads --
@@ -9,9 +8,13 @@ import qualified Data.Text as Text
 -- or description are interchangeable", so the name IS the kind's identity and
 -- exact equality on this text is exact equality of kind.
 --
--- AbilityName's and SlotName's shape, with one difference: 'UnsafeMkCounterName'
--- rather than @MkCounterName@, because 'make' maintains an invariant the bare
--- constructor sidesteps. Ord is load-bearing for the same reason
+-- AbilityName's and SlotName's shape, with one difference:
+-- 'UnsafeMkCounterName' rather than @MkCounterName@, because the bare
+-- constructor sidesteps an invariant. The invariant is CR 122.1's
+-- interchangeability sentence, and the door that maintains it is
+-- Pawl.Codec.CounterName.make -- it lives there rather than here because it
+-- must consult every Pawl.Types.CounterKind constructor's spelling, and that
+-- module imports this one. Ord is load-bearing for the same reason
 -- 'Pawl.Types.CounterKind.CounterKind''s is: this ends up inside a Map key.
 --
 -- NOT normalized -- no case folding, no slugging. CR 122.1 says nothing about
@@ -21,64 +24,3 @@ newtype CounterName = UnsafeMkCounterName
   { unwrap :: Text.Text
   }
   deriving (Eq, Ord, Show)
-
--- | The spellings a card may NOT name, because 'Pawl.Types.CounterKind' already
--- has a constructor for each: a card writing @Named "flying"@ while another
--- writes @Keyword Flying@ would make two Map keys on @Object.counters@ for one
--- rules object, and every count read would split between them. CR 122.1 says
--- those two counters are interchangeable, so representing them apart is a
--- rules-observable divergence rather than an inconvenience.
---
--- Not implemented: nothing forces this list. A new 'Pawl.Types.CounterKind'
--- constructor compiles with no entry here, since answering "not reserved" is a
--- legal answer, and CR 122.1b's "as well as any variants of those keywords" is
--- not a closed list so a variant spelling is not fenced either (#2062).
--- Deriving the list from an exhaustive case over 'Pawl.Types.CounterKind' is not
--- open, because that module imports this one.
---
--- CR 122.1b's keyword spellings sit alongside the kind spellings, for the
--- 'Pawl.Types.CounterKind.Keyword' arm.
-reserved :: Set.Set Text.Text
-reserved =
-  Set.fromList $
-    fmap
-      Text.pack
-      [ "+1/+1",
-        "-1/-1",
-        "defense",
-        "fade",
-        "hone",
-        "level",
-        "lore",
-        "loyalty",
-        "shield",
-        "time",
-        -- CR 122.1b's list, in the rule's own order.
-        "flying",
-        "first strike",
-        "double strike",
-        "deathtouch",
-        "decayed",
-        "exalted",
-        "haste",
-        "hexproof",
-        "indestructible",
-        "lifelink",
-        "menace",
-        "reach",
-        "shadow",
-        "trample",
-        "vigilance"
-      ]
-
--- | The only door in. Rejects a 'reserved' spelling, and rejects the empty name,
--- which no card prints and which would read as "the counter with no name".
-make :: Text.Text -> Either Text.Text CounterName
-make text
-  | Text.null text = Left (Text.pack "CounterName: a counter's name must not be empty")
-  | Set.member text reserved =
-      Left
-        ( Text.pack "CounterName: CR 122.1 makes counters with the same name interchangeable, and Pawl.Types.CounterKind already names "
-            <> text
-        )
-  | otherwise = Right (UnsafeMkCounterName text)

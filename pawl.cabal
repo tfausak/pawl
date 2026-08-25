@@ -1313,6 +1313,7 @@ library types
     Pawl.Types.CounterChange
     Pawl.Types.Countering
     Pawl.Types.CounterKind
+    Pawl.Types.CounterKindFamily
     Pawl.Types.CounterName
     Pawl.Types.CounterPattern
     Pawl.Types.CounterR
