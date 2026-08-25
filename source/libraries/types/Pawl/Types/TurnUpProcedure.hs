@@ -29,4 +29,4 @@ data TurnUpProcedure
   | -- | CR 701.40b: show that the card is a creature card, pay that card's mana
     -- cost.
     Manifest
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

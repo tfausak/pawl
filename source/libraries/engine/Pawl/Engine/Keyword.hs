@@ -120,6 +120,7 @@ import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
+import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.TypeLine as TypeLine
@@ -1222,13 +1223,16 @@ mintedReplacementsFor keyword count = case keyword of
   -- turn it face up." Filter.IsSource, because CR 614.1e's ability is the turning
   -- permanent's own.
   --
-  -- The rule's "IF ITS MEGAMORPH COST WAS PAID" is checked at the row's match,
-  -- Replacement.applies: CR 701.40c gives a manifested megamorph card a second
-  -- road face up at its MANA cost, and the row is refused down that one
-  -- (Pawl.FaceDownSpec's Misthoof Kirin pair). morphCost answers one cost per
-  -- permanent, so the rest of the condition needs no test.
+  -- The rule's "IF ITS MEGAMORPH COST WAS PAID" rides the ROW, as
+  -- TurnUpR.requiring: CR 702.37e's procedure is the only one that pays a
+  -- megamorph cost, and CR 701.40c gives a manifested megamorph card a second
+  -- road face up at its MANA cost, down which Replacement.applies refuses the row
+  -- (Pawl.FaceDownSpec's Misthoof Kirin pair). On the row rather than on the
+  -- WithCounters class, because a CARD's own CR 614.1e counter clause carries no
+  -- such condition; see #987. morphCost answers one cost per permanent, so the rest
+  -- of the condition needs no test.
   Keyword.Morph (Morph.MkMorph _ MorphVariant.Mega) ->
-    List.genericReplicate count (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR Filter.IsSource (TurnUpRewrite.WithCounters (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.Literal 1)))))
+    List.genericReplicate count (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR Filter.IsSource (Just TurnUpProcedure.Morph) (TurnUpRewrite.WithCounters (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.Literal 1)))))
   Keyword.Menace -> []
   Keyword.Renown _ -> []
   Keyword.Cycling {} -> []

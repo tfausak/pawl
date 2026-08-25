@@ -2129,9 +2129,10 @@ apply batch candidate event =
       pure Nothing
     -- Unreachable: `applies` admits PhaseR only against WouldBeginPhase.
     (ReplacementEffect.PhaseR _, _) -> pure (Just event)
-    -- CR 614.1e / 702.37b: megamorph's "as this permanent is turned face up, put
-    -- a +1/+1 counter on it", applied WHILE the permanent turns over (CR 708.11)
-    -- because FaceDown.performTurnFaceUp raises this event there and nowhere else.
+    -- CR 614.1e: "as [this permanent] is turned face up, put N counters on it" --
+    -- rule 702.37b's megamorph counter and Bubble Smuggler's four +1/+1 counters
+    -- alike -- applied WHILE the permanent turns over (CR 708.11) because
+    -- FaceDown.performTurnFaceUp raises this event there and nowhere else.
     --
     -- The counters go through putCounters, the CR 122.6 funnel -- so a CR 614.1
     -- counter replacement applies and Hardened Scales sees a megamorph counter
@@ -2139,18 +2140,17 @@ apply batch candidate event =
     -- CR 614.1e's turning face up is not an entry, so there is no entry loop
     -- for a row to be ordered in.
     --
-    -- The amount is evaluated the same way too, though rule 702.37b states its own number and
-    -- Pawl.CardSpec holds that no printing authors a turn-up counter rewrite, so
-    -- the only quantity that reaches here today is that arm's Literal 1.
+    -- The amount is evaluated the same way too, though every row that reaches here
+    -- today states its own number: megamorph's Literal 1 and the Smuggler's
+    -- Literal 4.
     --
     -- Every kind on the row is placed in this ONE application, the entry arm's
-    -- posture (#2314), though rule 702.37b's megamorph -- the only producer, per
-    -- Pawl.CardSpec -- always writes exactly one.
+    -- posture (#2314), though both producers write exactly one kind.
     --
     -- The event survives: turning face up is not replaced by the counter, only
     -- accompanied by it, so Just is returned and FaceDown.performTurnFaceUp goes on to
     -- record CR 708.7's event.
-    (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ rewrite), ProposedEvent.WouldTurnFaceUp oid _) -> case rewrite of
+    (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ _ rewrite), ProposedEvent.WouldTurnFaceUp oid _) -> case rewrite of
       TurnUpRewrite.WithCounters (WithCounters.MkWithCounters counters) -> do
         gs <- State.get
         let viewOf = Projection.viewWithLastKnown oid gs

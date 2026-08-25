@@ -256,6 +256,7 @@ import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 import qualified Pawl.Types.TurnScope as TurnScope
+import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.TypeLine as TypeLine
@@ -1773,6 +1774,32 @@ engineMintedDestruction rewrite = case rewrite of
 isPhaseR :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> Bool
 isPhaseR replacement = case replacement of
   ReplacementEffect.PhaseR _ -> True
+  _ -> False
+
+-- phasePatternOffends one replacement class over, for the other field the codec
+-- accepts and only the engine writes: TurnUpR.requiring, CR 702.37b's "if its
+-- megamorph cost was paid to turn it face up". That is a RULE's condition, minted
+-- by Pawl.Engine.Keyword.mintedReplacementsFor; a card's own CR 614.1e clause
+-- states no procedure and applies down every road (Bubble Smuggler); see #987.
+--
+-- Exhaustive rather than a wildcard, phasePatternOffends' discipline: a second
+-- engine-baked field on this class must break this build rather than pass.
+turnUpRequiringOffends :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> Bool
+turnUpRequiringOffends replacement = case replacement of
+  ReplacementEffect.TurnUpR turnUpR -> Maybe.isJust (TurnUpR.requiring turnUpR)
+  ReplacementEffect.CounterR {} -> False
+  ReplacementEffect.ZoneChangeR {} -> False
+  ReplacementEffect.EntryR {} -> False
+  ReplacementEffect.DamageR {} -> False
+  ReplacementEffect.DestructionR _ -> False
+  ReplacementEffect.TokenR {} -> False
+  ReplacementEffect.PhaseR _ -> False
+
+-- isPhaseR's twin: did the sweep above have anything to look at? A wildcard for
+-- the same reason.
+isTurnUpR :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> Bool
+isTurnUpR replacement = case replacement of
+  ReplacementEffect.TurnUpR _ -> True
   _ -> False
 
 -- CR 615.5: "SOME PREVENTION EFFECTS also include an additional effect." So a
@@ -3543,8 +3570,10 @@ entryRewriteFilters entryRewrite = case entryRewrite of
 turnUpRewriteFilters :: TurnUpRewrite.TurnUpRewrite -> [Filter.Type.Filter Keyword.Keyword]
 turnUpRewriteFilters turnUpRewrite = case turnUpRewrite of
   -- entryRewriteFilters' WithCounters arm, on the rewrite that shares the payload.
-  -- Vacuous over `data/cards/` while the CR 702.37b lint below holds, and walked
-  -- anyway so the two halves of one payload cannot be swept differently.
+  -- Vacuous over `data/cards/` while Bubble Smuggler's four +1/+1 counters are the
+  -- pool's only authored turn-up rewrite of this shape and their count is a
+  -- literal, and walked anyway so the two halves of one payload cannot be swept
+  -- differently.
   TurnUpRewrite.WithCounters w -> foldMap quantityFilters (Map.elems (WithCounters.counters w))
   TurnUpRewrite.MayAttachTo f -> [f]
 
@@ -3577,7 +3606,7 @@ replacementEffectFilters replacementEffect = case replacementEffect of
     DamagePattern.whatSource damagePattern : Maybe.maybeToList (DamagePattern.whatRecipient damagePattern)
   ReplacementEffect.DestructionR _ -> []
   ReplacementEffect.TokenR {} -> []
-  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR turnUpPattern turnUpRewrite) -> turnUpPattern : turnUpRewriteFilters turnUpRewrite
+  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR turnUpPattern _ turnUpRewrite) -> turnUpPattern : turnUpRewriteFilters turnUpRewrite
   ReplacementEffect.PhaseR _ -> []
 
 -- A face's printed replacement ability reaches a Filter on a second axis beside
@@ -5955,30 +5984,43 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- prints one.
     Spec.assertBool s (any (anyFace (any counters . cardResolutionEffects) . Printing.card) ps) "the pool has a card creating a copy token with counters on it"
     Spec.assertEqWith s "a copy token reads only CR 122.6's counters" (fmap (S.nameOf . Printing.card) offenders) []
-  -- What Pawl.Engine.Replacement.applies rests on when it gates a WithCounters
-  -- turn-up rewrite on CR 702.37b's "if its megamorph cost was paid": the only
-  -- producer of that rewrite is the megamorph arm of
-  -- Pawl.Engine.Keyword.mintedReplacementsFor, whose rule carries the condition.
-  -- A printing that authored one of its own would be gated by a rule it does not
-  -- have, so this holds that none does.
+  -- The lint this used to be held that no printing authored a WithCounters
+  -- turn-up rewrite, which is what Pawl.Engine.Replacement.applies rested on when
+  -- it gated that whole rewrite CLASS on CR 702.37b's "if its megamorph cost was
+  -- paid". Bubble Smuggler authors one, so the condition moved onto the ROW it
+  -- belongs to (TurnUpR.requiring) and this moved with it; see #987. What must
+  -- stay unauthored is the CONDITION, not the rewrite.
   --
-  -- Guarded against a vacuous sweep by the MayAttachTo half: Gift of Doom prints
-  -- the other TurnUpRewrite, so the pool really does reach this constructor and an
-  -- empty offender list is a fact about the rewrites rather than about the type.
-  Spec.it s "no printing authors a counter rewrite on being turned face up (CR 702.37b)" $ do
+  -- A card's own CR 614.1e clause states no procedure -- it applies down every
+  -- road the rule reaches -- so a printing writing one would be claiming a rule it
+  -- has not got. Pawl.Types.PhasePattern's whosePhase is the same shape of field
+  -- and the lint below it the same shape of sweep.
+  --
+  -- Guarded against a vacuous sweep by the rows themselves: Gift of Doom and
+  -- Bubble Smuggler print the two TurnUpRewrites between them, so an empty
+  -- offender list is a fact about what those rows say rather than about the pool
+  -- reaching TurnUpR at all.
+  Spec.it s "no printing authors a turn-up procedure condition (CR 702.37b)" $ do
     ps <- S.allPrintings s
-    let rewrites effect = case effect of
-          ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ rewrite) -> [rewrite]
-          _ -> []
-        withCounters rewrite = case rewrite of
-          TurnUpRewrite.WithCounters {} -> True
-          TurnUpRewrite.MayAttachTo {} -> False
-        attaches rewrite = not (withCounters rewrite)
-        writes p = anyFace (any (any p . rewrites) . cardReplacementEffects) . Printing.card
-        offenders = filter (writes withCounters) ps
-        attachers = filter (writes attaches) ps
-    Spec.assertBool s (not (null attachers)) "the pool prints a turn-up rewrite at all (Gift of Doom)"
-    Spec.assertEqWith s "only CR 702.37b's megamorph mints a turn-up counter" (fmap (S.nameOf . Printing.card) offenders) []
+    let writes p = anyFace (any p . cardReplacementEffects) . Printing.card
+        offenders = filter (writes turnUpRequiringOffends) ps
+        rows = filter (writes isTurnUpR) ps
+    Spec.assertBool s (not (null rows)) "the pool prints a turn-up replacement at all (Gift of Doom, Bubble Smuggler)"
+    Spec.assertEqWith s "requiring is baked by the engine, never authored" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The sweep passes because the pool is authored correctly, so the REJECTING
+  -- direction is proven here against Bubble Smuggler with a procedure baked into
+  -- it -- never a card file, since a card that offends a lint must not be
+  -- loadable. The whosePhase pair below is the model.
+  Spec.it s "the lint itself catches a baked turn-up procedure" $ do
+    smuggler <- S.printingOf s registry "Bubble Smuggler"
+    let card = S.combinedFace smuggler
+        bake replacement = case replacement of
+          ReplacementEffect.TurnUpR turnUpR ->
+            ReplacementEffect.TurnUpR turnUpR {TurnUpR.requiring = Just TurnUpProcedure.Morph}
+          other -> other
+        baked = card {Face.replacementEffects = fmap (\pr -> pr {PrintedReplacement.effect = bake (PrintedReplacement.effect pr)}) (Face.replacementEffects card)}
+    Spec.assertBool s (not (any turnUpRequiringOffends (cardReplacementEffects card))) "the real Bubble Smuggler names no procedure and is accepted"
+    Spec.assertBool s (any turnUpRequiringOffends (cardReplacementEffects baked)) "and the same card naming CR 702.37e's is rejected"
   -- The sibling of the lint above, for the OTHER PlayerId the engine bakes and
   -- the codec accepts. See phasePatternOffends for why a card cannot name a
   -- player, and for why this is a lint rather than a type split (#437).
