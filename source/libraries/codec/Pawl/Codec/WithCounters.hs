@@ -1,18 +1,19 @@
-{-# LANGUAGE ApplicativeDo #-}
-
 module Pawl.Codec.WithCounters where
 
-import qualified Pawl.Codec.CounterKind as CounterKind
-import qualified Pawl.Codec.Keyword as Keyword
-import qualified Pawl.Codec.Quantity as Quantity
+import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.JsonCodec.Codec as Codec
-import qualified Pawl.JsonCodec.Fields as Fields
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.WithCounters as WithCounters
 
--- | A bare object keyed by the record's field names, replacing the two-element
--- array this payload used to be (#1464).
+-- | An array of kind/count pairs ascending by kind, which is EntryRiders'
+-- counter spelling reused rather than re-spelled: the two payloads say the same
+-- thing about the same rule (CR 614.1c and CR 122.6), so one wire form serves
+-- both. It replaced the single @{"kind":...,"amount":...}@ object when the row
+-- grew to several kinds (#2314), which itself replaced a two-element array
+-- (#1464).
+--
+-- 'Common.nonEmptyKeyedList' and not 'Common.keyedList': an empty array would be
+-- a row that places nothing, which no card prints.
 codec :: Codec.Codec WithCounters.WithCounters
-codec = Fields.object $ do
-  kind <- Fields.required "kind" (CounterKind.codec Keyword.codec) WithCounters.kind
-  amount <- Fields.required "amount" Quantity.codec WithCounters.amount
-  pure WithCounters.MkWithCounters {WithCounters.kind = kind, WithCounters.amount = amount}
+codec =
+  Common.wrapper (Common.nonEmptyKeyedList EntryRiders.counter) WithCounters.MkWithCounters WithCounters.counters

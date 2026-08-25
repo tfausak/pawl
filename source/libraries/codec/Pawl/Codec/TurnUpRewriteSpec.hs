@@ -16,8 +16,8 @@ spec s = Spec.describe s "Pawl.Codec.TurnUpRewrite" $ do
     Common.assertCodec
       s
       TurnUpRewrite.codec
-      (TurnUpRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1)))
-      " {\"type\":\"WithCounters\",\"value\":{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"amount\":{\"type\":\"Literal\",\"value\":1}}} "
+      (TurnUpRewrite.WithCounters (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.Literal 1)))
+      " {\"type\":\"WithCounters\",\"value\":[{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"count\":{\"type\":\"Literal\",\"value\":1}}]} "
   Spec.it s "MayAttachTo (Gift of Doom, CR 303.4k)" $
     Common.assertCodec
       s

@@ -21,11 +21,8 @@ spec s = Spec.describe s "Pawl.Codec.TurnUpR" $ do
           { TurnUpR.matching = Filter.IsSource,
             TurnUpR.rewrite =
               TurnUpRewrite.WithCounters
-                WithCounters.MkWithCounters
-                  { WithCounters.kind = CounterKind.PlusOnePlusOne,
-                    WithCounters.amount = Quantity.Literal 1
-                  }
+                (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.Literal 1))
           }
       )
-      " {\"matching\":{\"type\":\"IsSource\"},\"rewrite\":{\"type\":\"WithCounters\",\"value\":{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"amount\":{\"type\":\"Literal\",\"value\":1}}}} "
+      " {\"matching\":{\"type\":\"IsSource\"},\"rewrite\":{\"type\":\"WithCounters\",\"value\":[{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"count\":{\"type\":\"Literal\",\"value\":1}}]}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s TurnUpR.codec

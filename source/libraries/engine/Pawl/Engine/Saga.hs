@@ -226,7 +226,7 @@ entryReplacementsOf pc
   | not (isSaga pc) = []
   -- CR 614.1c on both branches: the entering object is the ability's own source.
   | Map.member Keyword.ReadAhead (PC.keywords pc) = [ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource EntryRewrite.ReadAhead)]
-  | otherwise = [ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Lore (Quantity.Literal 1))))]
+  | otherwise = [ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.one CounterKind.Lore (Quantity.Literal 1))))]
 
 -- | The lore counters on a permanent (CR 714.3). Zero for an object the game does
 -- not hold, which is the same answer Pawl.Engine.Cost.loyaltyCountersOn gives for

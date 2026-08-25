@@ -1,34 +1,31 @@
 {
   "faces": [
     {
-      "keywords": [
-        {
-          "type": "Flash"
-        },
-        {
-          "type": "Flying"
-        }
-      ],
       "manaCost": [
         {
           "type": "Generic",
-          "value": 3
+          "value": 1
         },
         {
           "type": "OfType",
           "value": {
             "type": "Colored",
             "value": {
-              "type": "White"
+              "type": "Green"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
             }
           }
         }
       ],
-      "name": "Swooping Protector",
-      "power": {
-        "type": "Literal",
-        "value": 2
-      },
+      "name": "Synthetic Uneven Toolkit",
       "replacementEffects": [
         {
           "effect": {
@@ -43,10 +40,22 @@
                   {
                     "count": {
                       "type": "Literal",
+                      "value": 2
+                    },
+                    "kind": {
+                      "type": "PlusOnePlusOne"
+                    }
+                  },
+                  {
+                    "count": {
+                      "type": "Literal",
                       "value": 1
                     },
                     "kind": {
-                      "type": "Shield"
+                      "type": "Keyword",
+                      "value": {
+                        "type": "Trample"
+                      }
                     }
                   }
                 ]
@@ -55,22 +64,10 @@
           }
         }
       ],
-      "toughness": {
-        "type": "Literal",
-        "value": 1
-      },
       "typeLine": {
-        "subtypes": [
-          {
-            "type": "Bird"
-          },
-          {
-            "type": "Citizen"
-          }
-        ],
         "types": [
           {
-            "type": "Creature"
+            "type": "Artifact"
           }
         ]
       }

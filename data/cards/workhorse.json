@@ -58,15 +58,17 @@
               },
               "rewrite": {
                 "type": "WithCounters",
-                "value": {
-                  "amount": {
-                    "type": "Literal",
-                    "value": 4
-                  },
-                  "kind": {
-                    "type": "PlusOnePlusOne"
+                "value": [
+                  {
+                    "count": {
+                      "type": "Literal",
+                      "value": 4
+                    },
+                    "kind": {
+                      "type": "PlusOnePlusOne"
+                    }
                   }
-                }
+                ]
               }
             }
           }

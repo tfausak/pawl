@@ -1374,9 +1374,10 @@ apply batch candidate event =
       --
       -- CR 614.1c also admits "a number of ... counters ... equal to [something]"
       -- (Undergrowth Scavenger), so the amount is a Quantity and is evaluated ONCE
-      -- here (CR 608.2f), when this row applies, rather than per iteration of the
-      -- entry loop around it. CR 107.1b clamps a negative result to zero, which is
-      -- Integer.toNaturalSaturating.
+      -- here (CR 608.2h: information the effect requires is determined only once,
+      -- when the effect is applied), when this row applies, rather than per
+      -- iteration of the entry loop around it. CR 107.1b clamps a negative result
+      -- to zero, which is Integer.toNaturalSaturating.
       --
       -- The permanent is already materialized on the battlefield when this loop
       -- runs (see runEntry), so the CR 613 projection answers for it. The Context
@@ -1388,14 +1389,25 @@ apply batch candidate event =
       -- Consumed unconditionally: CR 614.5 is about the row having applied, and a
       -- row whose amount would not evaluate has still applied. Consuming only on
       -- the evaluable branch loops.
-      EntryRewrite.WithCounters (WithCounters.MkWithCounters kind quantity) -> do
+      --
+      -- EVERY KIND IN ONE APPLICATION, consuming the candidate once, because the
+      -- row carries a map of kinds -- Agent's Toolkit's "+1/+1 counter, a flying
+      -- counter, a deathtouch counter, and a shield counter" (#2314). CR 614.5
+      -- gives a scaling replacement one opportunity over the whole entry, so a
+      -- kind per row would put an ordering in CR 616.1's pool that the card's own
+      -- sentence does not have; Pawl.ReplacementSpec's Agent's Toolkit stand-in
+      -- reads that off a board where the two orders disagree. The amounts are
+      -- evaluated against the SAME board for the same reason: the row applies
+      -- once, so its amounts are read once.
+      EntryRewrite.WithCounters (WithCounters.MkWithCounters counters) -> do
         gs <- State.get
         let viewOf = Projection.viewWithLastKnown oid gs
             context = Replacement.candidateContext candidate
         Replacement.consume (ReplacementCandidate.identity candidate)
-        case Quantity.evaluate viewOf context gs oid quantity of
-          Nothing -> pure () -- unevaluable quantity: no counters (Resolve's PutCounters posture)
-          Just n -> addEnteringCounters oid kind (Integer.toNaturalSaturating n)
+        Foldable.for_ (Map.toList counters) $ \(kind, quantity) ->
+          case Quantity.evaluate viewOf context gs oid quantity of
+            Nothing -> pure () -- unevaluable quantity: no counters (Resolve's PutCounters posture)
+            Just n -> addEnteringCounters oid kind (Integer.toNaturalSaturating n)
         pure (Just event)
       -- CR 616.1b / 110.2: Gather Specimens. The entering object's CR 110.2
       -- DEFAULT controller becomes CR 109.5's "you" -- the candidate's
@@ -2130,18 +2142,23 @@ apply batch candidate event =
     -- Pawl.CardSpec holds that no printing authors a turn-up counter rewrite, so
     -- the only quantity that reaches here today is that arm's Literal 1.
     --
+    -- Every kind on the row is placed in this ONE application, the entry arm's
+    -- posture (#2314), though rule 702.37b's megamorph -- the only producer, per
+    -- Pawl.CardSpec -- always writes exactly one.
+    --
     -- The event survives: turning face up is not replaced by the counter, only
     -- accompanied by it, so Just is returned and FaceDown.performTurnFaceUp goes on to
     -- record CR 708.7's event.
     (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ rewrite), ProposedEvent.WouldTurnFaceUp oid _) -> case rewrite of
-      TurnUpRewrite.WithCounters (WithCounters.MkWithCounters kind quantity) -> do
+      TurnUpRewrite.WithCounters (WithCounters.MkWithCounters counters) -> do
         gs <- State.get
         let viewOf = Projection.viewWithLastKnown oid gs
             context = Replacement.candidateContext candidate
         Replacement.consume (ReplacementCandidate.identity candidate)
-        case Quantity.evaluate viewOf context gs oid quantity of
-          Nothing -> pure ()
-          Just n -> Monad.when (n > 0) (Monad.void (putOwnCounters oid kind (Integer.toNaturalSaturating n)))
+        Foldable.for_ (Map.toList counters) $ \(kind, quantity) ->
+          case Quantity.evaluate viewOf context gs oid quantity of
+            Nothing -> pure ()
+            Just n -> Monad.when (n > 0) (Monad.void (putOwnCounters oid kind (Integer.toNaturalSaturating n)))
         pure (Just event)
       -- CR 303.4k with CR 614.1e: Gift of Doom's "as this Aura is turned face
       -- up, you may attach it to a creature", applied WHILE the permanent turns

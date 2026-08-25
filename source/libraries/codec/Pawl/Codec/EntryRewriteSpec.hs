@@ -122,8 +122,8 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
     Common.assertCodec
       s
       (EntryRewrite.codec (Effect.codec Card.codec))
-      (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Loyalty (Quantity.Literal 3)))
-      " {\"type\":\"WithCounters\",\"value\":{\"kind\":{\"type\":\"Loyalty\"},\"amount\":{\"type\":\"Literal\",\"value\":3}}} "
+      (EntryRewrite.WithCounters (WithCounters.one CounterKind.Loyalty (Quantity.Literal 3)))
+      " {\"type\":\"WithCounters\",\"value\":[{\"kind\":{\"type\":\"Loyalty\"},\"count\":{\"type\":\"Literal\",\"value\":3}}]} "
   -- CR 702.136a: riot's rewrite, payload-free because rule 702.136a fixes both
   -- halves. Minted from a keyword rather than written by a card, and round-tripped
   -- anyway, because every arm of this type is.
@@ -154,7 +154,7 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       " {\"type\":\"Bloodthirst\",\"value\":1} "
     Spec.assertBool
       s
-      (Codec.encode (EntryRewrite.codec (Effect.codec Card.codec)) (EntryRewrite.Bloodthirst 1) /= Codec.encode (EntryRewrite.codec (Effect.codec Card.codec)) (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1))))
+      (Codec.encode (EntryRewrite.codec (Effect.codec Card.codec)) (EntryRewrite.Bloodthirst 1) /= Codec.encode (EntryRewrite.codec (Effect.codec Card.codec)) (EntryRewrite.WithCounters (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.Literal 1))))
       "bloodthirst 1 is not an unconditional +1/+1 counter"
   -- CR 702.150a: compleated's rewrite, whose payload is the number of PHYREXIAN
   -- MANA SYMBOLS life was paid for rather than the counters subtracted -- rule

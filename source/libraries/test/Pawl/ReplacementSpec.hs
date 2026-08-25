@@ -4189,6 +4189,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   damageCountersSpec s registry
   entryCountersSpec s registry
   perennationSpec s registry
+  toolkitSpec s registry
+  unevenToolkitSpec s registry
   printlifterSpec s registry
   shieldCounterSpec s registry
   warLeechSpec s registry
@@ -6805,6 +6807,159 @@ perennationSpec s registry = Spec.describe s "Perennation (CR 614.5)" $ do
         Spec.assertEqWith s "the praetor first: one halved is none, doubled is none -- both kinds" (hexproofs halved praetorBoard, indestructibles halved praetorBoard) (0, 0)
         Spec.assertEqWith s "and each board asked for exactly ONE order, not one per kind" (seasonAsked, praetorAsked) (1, 1)
       _ -> Spec.assertFailure s "the card did not return to the battlefield"
+
+-- CR 614.5 again, on the permanent's OWN text rather than on a rider an effect
+-- supplied. CR 614.1c's "as this permanent enters" clause can name SEVERAL KINDS
+-- of counter in one sentence, and it is then one row, one candidate in CR 616.1's
+-- pool, and one opportunity for a scaling replacement across every kind (#2314).
+-- A kind per row would put an ordering in that pool the sentence does not have.
+--
+-- Synthetic Toolkit -- {1}{G}{U} Artifact, whole text: "this artifact enters with
+-- a +1/+1 counter, a deathtouch counter, a flying counter, and a shield counter
+-- on it" -- STANDS IN FOR Agent's Toolkit ({1}{G}{U} Artifact - Clue, NCC;
+-- oracle checked on Scryfall 2026-08-25), whose entry line is exactly that and
+-- whose second line, "whenever a creature you control enters, you may move a
+-- counter from this artifact onto that creature", has no effect to write it with
+-- (CR 122.5, gap #2316). Scryfall `o:/enters with .*counter.? and a .*counter/
+-- -is:digital`, 2026-08-25, answers three printings and no more: that one,
+-- Voidpouncer and Dust Animus, and the other two condition the clause on
+-- something no EntryRewrite carries (gap #2317).
+--
+-- THE BOARD IS PERENNATION'S, and for its reasons: alice's Doubling Season and
+-- bob's Vorinclex are order-sensitive against each other (CR 616.1e), the counts
+-- are odd so Replacement.scale's rounding makes the two orders disagree, and
+-- `ordersEntry` answers the first order one way and every later order the other,
+-- so a second opportunity would move the kinds apart. What differs is where the
+-- counters come from: here the entering permanent's own text (CR 614.1c), which
+-- is the half the multi-kind row is for.
+toolkitSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+toolkitSpec s registry = Spec.describe s "Synthetic Toolkit (CR 614.1c)" $ do
+  let toolkitName = CardName.MkCardName (Text.pack "Synthetic Toolkit")
+      -- All four kinds the row names, read off the permanent that entered.
+      kindsOn oid gs =
+        ( countersOn CounterKind.PlusOnePlusOne oid gs,
+          countersOn (CounterKind.Keyword Keyword.Deathtouch) oid gs,
+          countersOn (CounterKind.Keyword Keyword.Flying) oid gs,
+          countersOn CounterKind.Shield oid gs
+        )
+      -- Three untapped lands pay the {1}{G}{U}. `scalers` is the only difference
+      -- between the two boards, exactly as in perennationSpec.
+      board scalers = do
+        plains <- S.printingOf s registry "Plains"
+        forest <- S.printingOf s registry "Forest"
+        island <- S.printingOf s registry "Island"
+        toolkit <- S.printingOf s registry "Synthetic Toolkit"
+        doublingSeason <- S.printingOf s registry "Doubling Season"
+        vorinclex <- S.printingOf s registry "Vorinclex, Monstrous Raider"
+        let bare = S.landsFor forest S.alice 1 (S.landsFor island S.alice 1 (S.landsInPlay plains 1))
+            (seasonId, withSeason) = S.addCreature doublingSeason S.alice bare
+            (_, withPraetor) = S.addCreature vorinclex S.bob withSeason
+            (held, ready) = S.addHandCard toolkit S.alice (if scalers then withPraetor else bare)
+        pure (seasonId, held, ready)
+      castIt seasonFirst (seasonId, held, ready) =
+        let ((_, after), asked) = State.runState (Engine.runGame (toolkitOrders seasonFirst seasonId) ready (S.cast S.alice held >> Stack.resolveTop)) 0
+         in (asked, newestNamed toolkitName after, after)
+  -- The control: one counter of each of the four kinds, and nothing to order.
+  Spec.it s "CR 614.1c the artifact enters with one counter of each kind it names" $ do
+    built <- board False
+    case castIt True built of
+      (asked, Just oid, after) -> do
+        Spec.assertEqWith s "a +1/+1, a deathtouch, a flying and a shield counter" (kindsOn oid after) (1, 1, 1, 1)
+        Spec.assertEqWith s "and with no scaling row in the CR 616.1 pool there was nothing to order" asked 0
+      _ -> Spec.assertFailure s "the artifact did not reach the battlefield"
+  -- The rule. All four kinds move together under whichever row the ONE order put
+  -- first; a per-kind opportunity would ask four times and, since every order
+  -- after the first is answered the other way, would leave the kinds disagreeing.
+  Spec.it s "CR 614.5 one entry is one event, so a multiplier scales all four kinds in its one application" $ do
+    built <- board True
+    case (castIt True built, castIt False built) of
+      ((seasonAsked, Just seasoned, seasonBoard), (praetorAsked, Just halved, praetorBoard)) -> do
+        Spec.assertEqWith s "Doubling Season first: one doubled is two, halved is one -- every kind" (kindsOn seasoned seasonBoard) (1, 1, 1, 1)
+        Spec.assertEqWith s "the praetor first: one halved is none, doubled is none -- every kind" (kindsOn halved praetorBoard) (0, 0, 0, 0)
+        Spec.assertEqWith s "and each board asked for exactly ONE order, not one per kind" (seasonAsked, praetorAsked) (1, 1)
+      _ -> Spec.assertFailure s "the artifact did not reach the battlefield"
+
+-- ordersEntry's answerer, and TOTAL where that one errors: a row per kind offers
+-- pools this one's `wantSeason` is not in, so an error there would preempt the
+-- counter assertions and report itself instead of the behaviour. It falls back to
+-- the first row offered, which leaves the counts free to disagree and the count of
+-- orders free to grow -- both of which the cases below read.
+toolkitOrders :: Bool -> ObjectId.ObjectId -> Prompt.Prompt r -> State.State Int r
+toolkitOrders seasonFirst seasonId p = case p of
+  Prompt.ChooseReplacement _ _ entries -> do
+    asked <- State.get
+    State.put (asked + 1)
+    let wantSeason = if asked <= (0 :: Int) then seasonFirst else not seasonFirst
+    pure (maybe 0 Int.toNaturalSaturating (List.findIndex ((== wantSeason) . (== seasonId) . ReplacementEntry.source) entries))
+  -- Unreachable in a green run: the prompt fires exactly once per `castIt`
+  -- call, on a pool where `wantSeason` matches one of the two rows offered
+  -- (Doubling Season's and Vorinclex's), so `findIndex` always answers `Just`.
+  -- Kept rather than `error`, per toolkitSpec's own comment above: a wrong
+  -- fallback here would fail the counter assertions in a readable way instead
+  -- of an opaque one.
+  _ -> pure (S.identityAnswer p)
+
+-- CR 614.5 again, this time with UNEQUAL counts per kind, so halving and
+-- doubling answer DIFFERENTLY for each -- toolkitSpec's four kinds all carry
+-- Literal 1, so an arm that used one kind's evaluated amount for every kind
+-- would still pass it.
+--
+-- Synthetic Uneven Toolkit -- {1}{G}{U} Artifact, whole text: "this artifact
+-- enters with two +1/+1 counters and a trample counter on it" -- STANDS IN FOR
+-- Voidpouncer ({1}{R} Creature - Eldrazi, oracle checked on Scryfall
+-- 2026-08-25), whose kicked clause reads exactly that but conditions it on the
+-- kicker being paid, which no EntryRewrite carries (gap #2317) and this test
+-- does not exercise -- the counter placement is unconditional here.
+unevenToolkitSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+unevenToolkitSpec s registry = Spec.describe s "Synthetic Uneven Toolkit (CR 614.5)" $ do
+  let toolkitName = CardName.MkCardName (Text.pack "Synthetic Uneven Toolkit")
+      -- The two kinds the row names, at their DIFFERENT printed counts.
+      kindsOn oid gs =
+        ( countersOn CounterKind.PlusOnePlusOne oid gs,
+          countersOn (CounterKind.Keyword Keyword.Trample) oid gs
+        )
+      -- Same board shape as toolkitSpec's, against the uneven printing.
+      board scalers = do
+        plains <- S.printingOf s registry "Plains"
+        forest <- S.printingOf s registry "Forest"
+        island <- S.printingOf s registry "Island"
+        toolkit <- S.printingOf s registry "Synthetic Uneven Toolkit"
+        doublingSeason <- S.printingOf s registry "Doubling Season"
+        vorinclex <- S.printingOf s registry "Vorinclex, Monstrous Raider"
+        let bare = S.landsFor forest S.alice 1 (S.landsFor island S.alice 1 (S.landsInPlay plains 1))
+            (seasonId, withSeason) = S.addCreature doublingSeason S.alice bare
+            (_, withPraetor) = S.addCreature vorinclex S.bob withSeason
+            (held, ready) = S.addHandCard toolkit S.alice (if scalers then withPraetor else bare)
+        pure (seasonId, held, ready)
+      castIt seasonFirst (seasonId, held, ready) =
+        let ((_, after), asked) = State.runState (Engine.runGame (toolkitOrders seasonFirst seasonId) ready (S.cast S.alice held >> Stack.resolveTop)) 0
+         in (asked, newestNamed toolkitName after, after)
+  -- The control: two +1/+1 counters and one trample counter, and nothing to
+  -- order.
+  Spec.it s "CR 614.1c the artifact enters with two +1/+1 counters and one trample counter" $ do
+    built <- board False
+    case castIt True built of
+      (asked, Just oid, after) -> do
+        Spec.assertEqWith s "two +1/+1 counters and a trample counter" (kindsOn oid after) (2, 1)
+        Spec.assertEqWith s "and with no scaling row in the CR 616.1 pool there was nothing to order" asked 0
+      _ -> Spec.assertFailure s "the artifact did not reach the battlefield"
+  -- The rule, made observable per-kind. Both scaling rows are unconditional on
+  -- kind, so BOTH apply in the chosen order (CR 616.1's loop reconsiders the
+  -- modified event): doubling then halving is lossless for any count (2N/2 = N
+  -- exactly), so Doubling Season first leaves every kind exactly as printed.
+  -- Halving then doubling is lossy only for an ODD count (Replacement.scale
+  -- rounds Halve down), so the praetor first leaves the EVEN +1/+1 count of two
+  -- alone and rounds the ODD trample count of one away to zero -- the two kinds
+  -- disagreeing under the SAME order is what an arm using one kind's evaluated
+  -- amount for every kind would miss: it would answer (2, 2) instead of (2, 0).
+  Spec.it s "CR 614.5 one entry is one event, so a multiplier scales each kind by its OWN count" $ do
+    built <- board True
+    case (castIt True built, castIt False built) of
+      ((seasonAsked, Just seasoned, seasonBoard), (praetorAsked, Just halved, praetorBoard)) -> do
+        Spec.assertEqWith s "Doubling Season first: doubling then halving is lossless, so both kinds are as printed" (kindsOn seasoned seasonBoard) (2, 1)
+        Spec.assertEqWith s "the praetor first: the even +1/+1 count survives, the odd trample count rounds to zero" (kindsOn halved praetorBoard) (2, 0)
+        Spec.assertEqWith s "and each board asked for exactly ONE order, not one per kind" (seasonAsked, praetorAsked) (1, 1)
+      _ -> Spec.assertFailure s "the artifact did not reach the battlefield"
 
 -- Answer an entry's CR 616.1 orders and COUNT them. The first order taken is
 -- Doubling Season's row when `seasonFirst`, and every later order taken is the
