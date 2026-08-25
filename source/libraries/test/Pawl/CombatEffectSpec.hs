@@ -3480,7 +3480,29 @@ blockCostSpec s registry = Spec.describe s "BlockCosts" $ do
         Spec.assertEqWith s "and nothing blocked" (blockersOf attacker after) Set.empty
       _ -> Spec.assertFailure s "fixture should have an attacker and two blockers"
 
--- CR 305.7 as the FIVE readers in this module read it, which is one shared gate:
+-- Block the first attacker with ONE named creature, and pay a tap toll with one
+-- named permanent, filtered against what the prompt actually offers.
+--
+-- Not S.aggressiveAnswer, which blocks with every creature bob controls: that
+-- declares the spare a blocker too, and Hollow Warrior's criterion excludes a
+-- creature declared as a blocker this combat -- Combat.declaredBlockers is
+-- written ahead of CR 509.1f's payment. The toll would then have nobody to tap
+-- on any of the four boards below, and the case would read the same under both
+-- readings of the gate.
+blockingWith :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+blockingWith who tapping p = case p of
+  Prompt.DeclareBlockers _ _ _ attackers -> case attackers of
+    [] -> Map.empty
+    a : _ -> Map.singleton who (Set.singleton a)
+  -- Ashaya's own text is "NONTOKEN creatures you control", not "other", so on
+  -- the boards that carry it Ashaya is itself an untapped undeclared creature
+  -- bob controls and the count-1 toll has two candidates. Pinned by identity
+  -- rather than by position, so the case reads the same whichever order
+  -- Cost.tapCandidates hands them over in.
+  Prompt.ChooseTaps _ _ _ candidates _ -> Set.fromList (filter (== tapping) candidates)
+  _ -> S.aggressiveAnswer p
+
+-- CR 305.7 as the SIX readers in this module read it, which is one shared gate:
 -- Pawl.Engine.Projection.liveAfterLayers. Ashaya, Soul of the Wild makes its
 -- controller's nontoken creatures Forest LANDS at layer 4, and Blood Moon then
 -- depends on that (CR 613.8a) and SETS every nonbasic land's subtype to Mountain,
@@ -3504,17 +3526,19 @@ blockCostSpec s registry = Spec.describe s "BlockCosts" $ do
 -- its own copy of the `null setEffs || ...` guard: one case for the gate would
 -- leave a change to any single copy regressing silently.
 --
--- Pawl.Engine.BlockCost is the reader with no case: discriminating it wants a
--- cost to block printed on a nontoken creature, which Hollow Warrior now is, so
--- the board is buildable and unbuilt rather than unavailable (#1999).
--- Pawl.Engine.PlayerEffect's share is pinned in Pawl.PlayerEffectSpec and
--- Pawl.Engine.SacrificeRestriction's in Pawl.SacrificeRestrictionSpec.
+-- No reader in this module is left without one, Hollow Warrior having supplied
+-- the last thing missing: a cost to block printed on a nontoken creature, which
+-- is what Ashaya can animate. Pawl.Engine.PlayerEffect's share is pinned in
+-- Pawl.PlayerEffectSpec and Pawl.Engine.SacrificeRestriction's in
+-- Pawl.SacrificeRestrictionSpec.
 --
 -- A BOARD THAT CANNOT DISCRIMINATE, recorded because it looks like the obvious
 -- one: Glacial Crasher ("this creature can't attack unless you control a
 -- Mountain") is no witness for the restriction reader, since Blood Moon makes
 -- every nonbasic land a Mountain and the gate is satisfied whether or not the
--- Crasher's own sentence survived.
+-- Crasher's own sentence survived. The block-cost case has a second such trap of
+-- its own, which is why it carries the blockingWith answerer above rather than
+-- S.aggressiveAnswer.
 landSubtypeStripSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 landSubtypeStripSpec s registry = Spec.describe s "LandSubtypeStrip" $ do
   Spec.it s "CR 305.7 an animated Palace Guard set to Mountain blocks only one attacker" $ do
@@ -3676,6 +3700,47 @@ landSubtypeStripSpec s registry = Spec.describe s "LandSubtypeStrip" $ do
     -- want of mana (CR 508.1's preamble undoes an unpayable declaration whole).
     Spec.assertEqWith s "the Piker attacked anyway" (S.attackerDeclarationsOf (declared stripped)) mine
     Spec.assertBool s (allUntapped forests (declared stripped)) "and not one Forest went"
+  Spec.it s "CR 305.7 an animated Hollow Warrior set to Mountain costs nothing to block" $ do
+    -- Pawl.Engine.BlockCost.costsOn, the sixth reader of the shared gate and the
+    -- last to get a case. Discriminating it wants a cost to BLOCK printed on a
+    -- nontoken creature, since Ashaya animates nontoken creatures. Hollow
+    -- Warrior {4} 4/4 ("This creature can't attack or block unless you tap an
+    -- untapped creature you control not declared as an attacking or blocking
+    -- creature this combat") is the pool's only such printing: the two other
+    -- Face.blockCosts printings, Oppressive Rays and Synthetic Blocking Tithe,
+    -- are Auras and Ashaya can never reach either.
+    --
+    -- Both extras go under BOB, since CR 509.1a chooses blockers from the
+    -- DEFENDING player's creatures and Ashaya animates its own controller's.
+    --
+    -- The toll is read off the spare Piker's tap state, which is CR 509.1f's
+    -- payment exactly. The spare is part of the fixture rather than one of the
+    -- extras because it has to stand on all four boards: without an eligible
+    -- creature the toll is unpayable and the base leg reads False for the wrong
+    -- reason.
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
+    warrior <- S.printingOf s registry "Hollow Warrior"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (base, mine, theirs) = attacking [piker] [warrior, piker]
+        with extras = withPermanents S.bob extras base
+    case (mine, theirs) of
+      ([attacker], [blocker, spare]) -> do
+        let declared b = S.runPure (blockingWith blocker spare) b Combat.declareBlockers
+            paid b = allTapped [spare] (declared b)
+            stripped = with [ashaya, bloodMoon]
+        Spec.assertEqWith
+          s
+          "the tap is paid until Ashaya and Blood Moon are both on the battlefield"
+          (paid base, paid (with [ashaya]), paid (with [bloodMoon]), paid stripped)
+          (True, True, True, False)
+        -- Two anti-vacuity legs, and the first is the one that matters: nothing
+        -- was tapped because nothing was owed, not because the declaration was
+        -- refused for want of a creature to tap (CR 509.1's preamble unwrites an
+        -- unpayable declaration whole).
+        Spec.assertEqWith s "the Warrior blocked anyway" (blockersOf attacker (declared stripped)) (Set.singleton blocker)
+        Spec.assertBool s (allUntapped [spare] (declared stripped)) "and the spare never went"
+      _ -> Spec.assertFailure s "fixture should have an attacker, a Warrior and a spare"
 
 -- alice attacks with one creature per printing in `mine`; bob defends with a
 -- Goblin Piker, holds Curtain of Light and the two Plains that pay its {1}{W},
