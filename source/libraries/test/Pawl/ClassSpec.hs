@@ -584,6 +584,49 @@ designationSpec s registry = Spec.describe s "Level designation" $ do
       "before the copy the original alone taxes it to {1}{R}"
       (totalManaCost S.bob oneBolt (ManaCost.MkManaCost [red]) oneClass)
       (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, red]))
+  -- CR 604.2's "as long as" clause on a COPY's static ability, which is a
+  -- separate question from whether the copy has the ability at all: the gather's
+  -- cheap precondition (Pawl.Engine.Projection.anyConditional) decides whether
+  -- the real gate is paid for, and answering it off printed faces would leave
+  -- every clause on this board wired open.
+  --
+  -- The ORIGINAL has to be gone from every zone that precondition walks --
+  -- battlefield, command, stack, graveyard, hand and library -- or it answers the
+  -- question itself and the copy's clause is gated for the wrong reason. Exile is
+  -- the one zone it does not walk, so Angelic Edict ({4}{W} Sorcery, "Exile
+  -- target creature or enchantment") is the producer; no card in the pool
+  -- destroys an enchantment.
+  --
+  -- The copy is left at CR 716.2d's level 1, where its own clause is FALSE. So
+  -- an ungated read grants the Piker +1/+1 and a gated one does not: 3/2 against
+  -- the printed 2/1.
+  Spec.it s "CR 604.2 a copy's own as-long-as clause is still gated once the original is exiled" $ do
+    paladinClass <- S.printingOf s registry "Paladin Class"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    copyEnchantment <- S.printingOf s registry "Copy Enchantment"
+    angelicEdict <- S.printingOf s registry "Angelic Edict"
+    let (classId, pikerId, entered, _, copied) = copyBoards paladinClass plains piker copyEnchantment
+        (staged, edictId) = S.handOne angelicEdict copied
+        cast = S.runPure (aimAtObject classId) staged (S.cast S.alice edictId)
+        exiled = S.settleSba (S.runPure (aimAtObject classId) cast Stack.resolveTop)
+    case entered of
+      [copyId] -> do
+        -- The gameplay-level assertion the case exists for, first.
+        Spec.assertEqWith s "CR 604.2 the level-1 copy's level-2 section is off, so the Piker is its printed 2/1" (S.powerToughnessOf pikerId exiled) (Just (2, 1))
+        -- The preconditions it rests on. Without the first the clause is gated
+        -- by the ORIGINAL's own printed face and the case proves nothing; without
+        -- the second there is no copy left to ask about.
+        Spec.assertEqWith s "the original Class really is gone from every zone the precondition walks" (Game.lookupObject classId exiled) Nothing
+        Spec.assertEqWith s "and the copy is still an Enchantment -- Class at level 1" (Projection.cardTypesOf copyId exiled, Projection.subtypesOf copyId exiled, levelOf copyId exiled) (Set.singleton CardType.Enchantment, Set.singleton Subtype.Class, Nothing)
+      _ -> Spec.assertFailure s "the Copy Enchantment did not enter the battlefield as the one new permanent"
+
+-- CR 601.2c's target, pinned to one named permanent. ExpirySpec's aimAtObject,
+-- duplicated rather than hoisted: Pawl.Support rebuilds every spec in the tree.
+aimAtObject :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtObject oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
+  _ -> S.identityAnswer p
 
 -- CR 716.2a's static half at a section that grants a TRIGGERED ability watching
 -- the very level change that turned the section on: "When this Class becomes
