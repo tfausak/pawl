@@ -2052,10 +2052,22 @@ apply batch candidate event =
     -- not match is left as it was. Map.adjust rather than insert: an absent id
     -- means nothing is entering, which `applies` has already ruled out.
     --
-    -- Not implemented: a row that matches two pending kinds at once scales both in
-    -- this one application, where the nested-loop shape it replaced gave the row a
-    -- fresh CR 614.5 opportunity per kind. No card in the pool enters with two
-    -- kinds one pattern matches (#2312).
+    -- One entry is ONE event -- CR 614.1c makes the counters a permanent enters
+    -- with part of it -- so CR 614.5's "only one opportunity" spends this row
+    -- across EVERY pending kind its pattern matches, here, in this one
+    -- application. The nested counter-placement loop this arm replaced raised a
+    -- WouldPutCounters event per kind and so handed the row an opportunity per
+    -- kind: events the rules do not have. Pawl.ReplacementSpec's Perennation
+    -- group is the proof -- a permanent returning with a hexproof counter and an
+    -- indestructible counter is asked for exactly ONE order between Doubling
+    -- Season and an opponent's Vorinclex, and both kinds land on the side that
+    -- one order chose.
+    --
+    -- Two DIFFERENT entry rows feeding one entry are still one event and still
+    -- one opportunity apiece. What a row scales is whatever is PENDING when it
+    -- is applied, so a row applied before a later entry row has added its kind
+    -- never sees that kind, and CR 616.1f offers it no second turn -- which is
+    -- the rule's answer, not a shortcut.
     (ReplacementEffect.CounterR (CounterR.MkCounterR pat scaling), ProposedEvent.WouldEnter oid) -> do
       Replacement.consume (ReplacementCandidate.identity candidate)
       gs <- State.get

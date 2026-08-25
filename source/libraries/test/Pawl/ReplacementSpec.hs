@@ -4188,6 +4188,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   vorinclexSpec s registry
   damageCountersSpec s registry
   entryCountersSpec s registry
+  perennationSpec s registry
   printlifterSpec s registry
   shieldCounterSpec s registry
   warLeechSpec s registry
@@ -6725,6 +6726,99 @@ entryCountersSpec s registry = Spec.describe s "The counters a Create says its t
         Spec.assertEqWith s "0/0 plus six counters" (S.powerToughnessOf twice flipped) (Just (6, 6))
         Spec.assertEqWith s "and 0/0 plus three without the praetor" (S.powerToughnessOf once bare) (Just (3, 3))
       _ -> Spec.assertFailure s "the token did not reach the battlefield"
+
+-- CR 614.5's "only one opportunity", at the entry level. Perennation
+-- ({3}{W}{B}{G} Sorcery, whole text: "Return target permanent card from your
+-- graveyard to the battlefield with a hexproof counter and an indestructible
+-- counter on it." -- oracle checked on Scryfall) is the pool's producer of TWO
+-- KINDS of entry counters from ONE effect, which is the board the rule needs:
+-- CR 614.1c makes both counters part of the permanent's single entry event, so a
+-- scaling row whose pattern matches every kind gets ONE opportunity covering
+-- both, not one per kind.
+--
+-- The arithmetic alone cannot say that -- scaling two kinds together and scaling
+-- each separately give the same numbers -- so the board makes the NUMBER of
+-- opportunities observable instead: two order-sensitive rows, alice's Doubling
+-- Season and bob's Vorinclex (CR 616.1e orders them), answered so that the first
+-- order taken and any second order taken would disagree. One opportunity means
+-- one order asked and both kinds on the side it chose; an opportunity per kind
+-- would ask twice and let the kinds disagree.
+--
+-- Odd counts throughout: Replacement.scale rounds Halve down, so 1 doubled then
+-- halved is 1 where 1 halved then doubled is 0. An even count would read the
+-- same under either order and prove nothing.
+--
+-- The returned card is read by NAME: CR 400.7 mints a new object as it leaves
+-- the graveyard, so the id the fixture buried names nothing on the battlefield.
+perennationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+perennationSpec s registry = Spec.describe s "Perennation (CR 614.5)" $ do
+  let pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
+      hexproofs = countersOn (CounterKind.Keyword (Keyword.Hexproof Nothing))
+      indestructibles = countersOn (CounterKind.Keyword Keyword.Indestructible)
+      -- Six untapped lands in three colours pay the {3}{W}{B}{G}; the Piker in
+      -- alice's graveyard is the permanent card the sorcery targets, and the only
+      -- card there, so the identity answer cannot aim it anywhere else.
+      --
+      -- `scalers` is the only difference between the two boards: alice's Doubling
+      -- Season ("counters would be put on a permanent YOU control") and bob's
+      -- Vorinclex ("if an OPPONENT would put") both reach alice's placement, and
+      -- CR 122.6a's default putter -- the entering permanent's controller -- is
+      -- what makes the praetor's second clause the one that applies.
+      board scalers = do
+        plains <- S.printingOf s registry "Plains"
+        swamp <- S.printingOf s registry "Swamp"
+        forest <- S.printingOf s registry "Forest"
+        piker <- S.printingOf s registry "Goblin Piker"
+        perennation <- S.printingOf s registry "Perennation"
+        doublingSeason <- S.printingOf s registry "Doubling Season"
+        vorinclex <- S.printingOf s registry "Vorinclex, Monstrous Raider"
+        let bare = S.landsFor forest S.alice 2 (S.landsFor swamp S.alice 2 (S.landsInPlay plains 2))
+            (seasonId, withSeason) = S.addCreature doublingSeason S.alice bare
+            (_, withPraetor) = S.addCreature vorinclex S.bob withSeason
+            (_, buried) = S.addGraveyardCard piker S.alice (if scalers then withPraetor else bare)
+            (held, ready) = S.addHandCard perennation S.alice buried
+        pure (seasonId, held, ready)
+      -- Cast and resolve, answering the entry's CR 616.1 orders with
+      -- `ordersEntry` and counting them.
+      returnIt seasonFirst (seasonId, held, ready) =
+        let ((_, after), asked) = State.runState (Engine.runGame (ordersEntry seasonFirst seasonId) ready (S.cast S.alice held >> Stack.resolveTop)) 0
+         in (asked, newestNamed pikerName after, after)
+  -- The control, and the setup every case below rests on: one effect, two kinds,
+  -- one counter each, and nothing on the board that could scale either.
+  Spec.it s "CR 614.1c the returned permanent enters with one counter of each kind" $ do
+    built <- board False
+    case returnIt True built of
+      (asked, Just oid, after) -> do
+        Spec.assertEqWith s "a hexproof counter and an indestructible counter" (hexproofs oid after, indestructibles oid after) (1, 1)
+        Spec.assertEqWith s "and with one row modifying the entry there was nothing to order" asked 0
+      _ -> Spec.assertFailure s "the card did not return to the battlefield"
+  -- The rule itself. Both kinds move together under whichever row the ONE order
+  -- put first, and the mixed pairs (1, 0) and (0, 1) -- which a per-kind
+  -- opportunity would make reachable, since the second order taken answers the
+  -- other way -- are not.
+  Spec.it s "CR 614.5 one entry is one event, so a multiplier scales both kinds in its one application" $ do
+    built <- board True
+    case (returnIt True built, returnIt False built) of
+      ((seasonAsked, Just seasoned, seasonBoard), (praetorAsked, Just halved, praetorBoard)) -> do
+        Spec.assertEqWith s "Doubling Season first: one doubled is two, halved is one -- both kinds" (hexproofs seasoned seasonBoard, indestructibles seasoned seasonBoard) (1, 1)
+        Spec.assertEqWith s "the praetor first: one halved is none, doubled is none -- both kinds" (hexproofs halved praetorBoard, indestructibles halved praetorBoard) (0, 0)
+        Spec.assertEqWith s "and each board asked for exactly ONE order, not one per kind" (seasonAsked, praetorAsked) (1, 1)
+      _ -> Spec.assertFailure s "the card did not return to the battlefield"
+
+-- Answer an entry's CR 616.1 orders and COUNT them. The first order taken is
+-- Doubling Season's row when `seasonFirst`, and every later order taken is the
+-- other row -- deliberately inconsistent, so that a second order, if the engine
+-- ever asked for one, would move the two kinds of counter apart. Stateful rather
+-- than a pure Prompt r -> r for that reason: the two orders are structurally
+-- identical, and a pure answerer would answer them the same way and see nothing.
+ordersEntry :: Bool -> ObjectId.ObjectId -> Prompt.Prompt r -> State.State Int r
+ordersEntry seasonFirst seasonId p = case p of
+  Prompt.ChooseReplacement _ _ entries -> do
+    asked <- State.get
+    State.put (asked + 1)
+    let wantSeason = if asked <= (0 :: Int) then seasonFirst else not seasonFirst
+    pure (maybe 0 Int.toNaturalSaturating (List.findIndex ((== wantSeason) . (== seasonId) . ReplacementEntry.source) entries))
+  _ -> pure (S.identityAnswer p)
 
 -- CR 122.6 with CR 107.3c: an entry rider whose COUNT is not a number. Printlifter
 -- Ooze -- {1}{G} 2/2 Creature -- Ooze with deathtouch and disguise {3}{G} --
