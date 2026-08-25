@@ -97,6 +97,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Stack as Stack
@@ -107,6 +108,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -123,6 +125,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -140,6 +143,7 @@ import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
+import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -151,6 +155,7 @@ spec s registry = Spec.describe s "FaceDown" $ do
   turnFaceDownSpec s registry
   listedSpec s registry
   manifestSpec s registry
+  enteringFaceDownSpec s registry
   faceUpEffectSpec s registry
   disguiseSpec s registry
 
@@ -1575,6 +1580,120 @@ surpriseBoard s registry top = do
   let (g1, spell) = S.handOne surprise manifested
       (bystander, g2) = S.addCreature galleon S.alice g1
   pure (g2, spell, entered, bystander)
+
+-- CR 708.2a's "unless otherwise specified by the effect that put it onto the
+-- battlefield face down", and CR 708.6's "what ability or rules caused the
+-- permanents to be face down" -- the two halves the entry rider carries.
+--
+-- Yedora, Grave Gardener is the producer and the only pooled card that lists
+-- characteristics of its own on an ENTRY: {4}{G} Legendary Creature -- Treefolk
+-- Druid 5/5, "Whenever another nontoken creature you control dies, you may
+-- return it to the battlefield face down under its owner's control. It's a
+-- Forest land." Its listing is chosen against CR 708.2a's default on every axis
+-- the board can read -- a land where the default is a creature, a Forest where
+-- the default has no subtypes, and no power or toughness where the default is
+-- 2/2 (CR 208.3) -- and its allower is not manifest, so CR 701.40b's special
+-- action must not be on offer.
+--
+-- Goblin Piker is what dies, and it is a CREATURE CARD WITH A MANA COST on
+-- purpose: those are CR 701.40b's two parentheticals, so a permanent wrongly
+-- recorded as manifested really would be turnable. The three Mountains are the
+-- third condition -- {2}{R} payable -- without which the turn-up would be off
+-- the menu for want of mana and the absence below would pass on a bug.
+enteringFaceDownSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+enteringFaceDownSpec s registry = Spec.describe s "Entering face down" $ do
+  Spec.it s "CR 708.2a Yedora returns the dead creature as the Forest land it listed" $ do
+    yedora <- S.printingOf s registry "Yedora, Grave Gardener"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    let (yedoraId, g1) = S.addCreature yedora S.alice (S.landsInPlay mountain 3)
+        (pikerId, before) = S.addCreature piker S.alice g1
+        after = S.runPure takingTheMay (S.markDamage pikerId 1 before) Engine.priorityLoop
+    -- The FIXTURE first, so nothing below passes for want of a dead creature or
+    -- a returned permanent: two creatures went in, the Piker died, and one new
+    -- permanent came back.
+    Spec.assertEqWith s "two creatures before" (List.sort (creaturesControlled S.alice before)) (List.sort [yedoraId, pikerId])
+    Spec.assertBool s (notElem pikerId (Game.zoneMembers Zone.Battlefield S.alice after)) "CR 704.5g the Piker died"
+    case Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield before)) of
+      [returned] -> do
+        -- THE HEADLINE, gameplay level: the returned permanent is not a
+        -- creature, so alice is back to one. The default listing would leave
+        -- her two.
+        Spec.assertEqWith s "CR 708.2a only Yedora is a creature" (creaturesControlled S.alice after) [yedoraId]
+        -- WHICH listing, not merely that one was applied: CR 305.6 gives a
+        -- permanent with the Forest subtype "{T}: Add {G}", so the mana it can
+        -- make names the subtype. A listing of a bare Land would pass the
+        -- assertion above and fail this one.
+        Spec.assertEqWith s "CR 305.6 the Forest taps for {G}" (Mana.manaTypesOf returned after) [ManaType.Colored Color.Green]
+        -- CR 208.3: a noncreature permanent has no power or toughness, which is
+        -- why the listing's are Maybe and why they are Nothing here.
+        Spec.assertEqWith s "CR 208.3 and has no power or toughness" (S.powerToughnessOf returned after) Nothing
+        -- CR 708.6/708.7, the half a listing alone would not fix: the allower is
+        -- Yedora's own effect and not manifest, so CR 701.40b's special action
+        -- is not among the actions alice may take. Read after the trigger has
+        -- resolved and alice holds priority again.
+        Spec.assertBool s (notElem (Action.Type.TurnFaceUp returned TurnUpProcedure.Manifest) (Action.legalActions S.alice after)) "CR 701.40b no manifest turn-up is offered"
+        Spec.assertEqWith s "CR 708.3 and it is face down for Yedora's reason" (fmap Object.facing (Game.lookupObject returned after)) (Just (Facing.FaceDown forestLand))
+      permanents -> Spec.assertFailure s ("expected exactly one returned permanent, got " <> show (length permanents))
+
+  -- THE PAIR, and the only thing that differs between the two boards is the
+  -- rider's FaceDownState. Same library card, same three Mountains, same door
+  -- (Event.changeZoneEntering), so neither leg can pass for a reason the other
+  -- did not have. Goblin Piker is the card underneath both times, which is what
+  -- keeps CR 701.40b's two parentheticals satisfied on the manifest leg.
+  Spec.it s "CR 708.6 the manifest leg is turnable face up and the entry leg is not" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    let (pikerId, base) = S.addLibraryCard piker S.alice (S.landsInPlay mountain 3)
+        (manifested, manifestedId) = putOntoBattlefield (Just (FaceDownState.defaultFor FaceDownReason.Manifested)) pikerId base
+        (entered, enteredId) = putOntoBattlefield (Just forestLand) pikerId base
+    case (manifestedId, enteredId) of
+      (Just m, Just e) -> do
+        -- CR 701.40b IS open on the manifest leg. Without this the assertion
+        -- beside it would pass on a board where nothing was ever offered.
+        Spec.assertBool s (elem (Action.Type.TurnFaceUp m TurnUpProcedure.Manifest) (Action.legalActions S.alice manifested)) "CR 701.40b the manifested permanent is turnable"
+        Spec.assertBool s (notElem (Action.Type.TurnFaceUp e TurnUpProcedure.Manifest) (Action.legalActions S.alice entered)) "CR 708.7 and the entered one is not"
+        -- And the listings differ the same way, off the same one field.
+        Spec.assertEqWith s "CR 708.2a the manifest leg is the default 2/2" (S.powerToughnessOf m manifested) (Just (2, 2))
+        Spec.assertEqWith s "CR 708.2a the entry leg is the listed land" (Projection.subtypesOf e entered) (Set.singleton Subtype.Forest)
+      _ -> Spec.assertFailure s "the card did not reach the battlefield"
+
+-- Yedora's "It's a Forest land", as a FaceDownState: CR 708.2a's list under CR
+-- 708.3's reason. No power or toughness, which CR 208.3 is the rule for.
+forestLand :: FaceDownState.FaceDownState
+forestLand =
+  FaceDownState.MkFaceDownState
+    { FaceDownState.reason = FaceDownReason.EnteredFaceDown,
+      FaceDownState.listed =
+        FaceDownCharacteristics.defaultValue
+          { FaceDownCharacteristics.typeLine =
+              TypeLine.MkTypeLine
+                { TypeLine.supertypes = Set.empty,
+                  TypeLine.types = Set.singleton CardType.Land,
+                  TypeLine.subtypes = Set.singleton Subtype.Forest
+                },
+            FaceDownCharacteristics.power = Nothing,
+            FaceDownCharacteristics.toughness = Nothing
+          }
+    }
+
+-- Exercises every printed "may" and passes on everything else, which for the
+-- board above is Yedora's "you may return it".
+takingTheMay :: Prompt.Prompt r -> r
+takingTheMay p = case p of
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  _ -> S.identityAnswer p
+
+-- The creatures a player CONTROLS, asked of the projection. S.creaturesInPlay
+-- reads the printed card instead, which for a face-down permanent is the
+-- creature card underneath rather than what CR 708.2a substituted, and
+-- Game.zoneMembers indexes the battlefield by OWNER (CR 108.3) where control is
+-- the question a "you control" count asks.
+creaturesControlled :: PlayerId.PlayerId -> GameState.GameState -> [ObjectId.ObjectId]
+creaturesControlled pid gs =
+  filter
+    (\oid -> Projection.isCreatureOf oid gs && Projection.controllerOf oid gs == Just pid)
+    (Set.toList (GameState.battlefield gs))
 
 -- CR 701.40g: "if a manifested permanent that's represented by an instant or
 -- sorcery card would turn face up, its controller reveals it and leaves it face
