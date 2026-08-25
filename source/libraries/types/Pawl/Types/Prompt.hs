@@ -253,8 +253,9 @@ data Prompt r where
   -- 0 either, which is CR 714.2d's abilityless Saga -- an empty range, so no
   -- counters and no question.
   ChooseReadAheadChapter :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt Natural.Natural
-  -- | CR 609.7a: which SOURCE OF DAMAGE a player chooses for a prevention
-  -- effect that names one (Healing Grace's "by a source of your choice"). The
+  -- | CR 609.7a: which SOURCE OF DAMAGE a player chooses for a prevention or
+  -- redirection effect that names one (Healing Grace's "by a source of your
+  -- choice", Oracle's Attendants' "by a source of your choice ... instead"). The
   -- ObjectId is the spell or ability resolving; the NonEmpty is the sources it
   -- may choose from, already narrowed to the effect's printed properties, so
   -- every candidate offered is legal. ChooseBolster's posture, constructor
