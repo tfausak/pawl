@@ -16,6 +16,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
@@ -29,6 +30,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Zone as Zone
 
 -- Agent's Toolkit {1}{G}{U} Artifact - Clue (New Capenna Commander; name, cost,
@@ -77,17 +79,35 @@ kindsOn oid gs =
     S.counterOf CounterKind.Shield oid gs
   )
 
+-- toolkitAnswer aiming Reality Ripple's one target at a named object, for the
+-- phasing case below. Everything else is toolkitAnswer's, counter included, so
+-- the two runs stay one answerer.
+rippleAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State Int r
+rippleAnswer victim p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> pure (S.preferring ((== Just victim) . Recipient.objectOf) sets)
+  _ -> toolkitAnswer Lowest p
+
 -- The newest battlefield object whose printed card has this name.
 newestNamed :: CardName.CardName -> GameState.GameState -> Maybe ObjectId.ObjectId
 newestNamed wanted gs =
   let named oid = fmap Face.name (Game.faceOf oid gs) == Just wanted
    in Maybe.listToMaybe (List.sortOn Ord.Down (filter named (Set.toList (GameState.battlefield gs))))
 
+-- The same read of alice's hand: a card `board` stocked through its `extra`,
+-- which hands back a state and not the id it minted.
+handNamed :: CardName.CardName -> GameState.GameState -> Maybe ObjectId.ObjectId
+handNamed wanted gs =
+  let named oid = fmap Face.name (Game.faceOf oid gs) == Just wanted
+   in List.find named (Game.zoneMembers Zone.Hand S.alice gs)
+
 toolkitName :: CardName.CardName
 toolkitName = CardName.MkCardName (Text.pack "Agent's Toolkit")
 
 pikerName :: CardName.CardName
 pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
+
+rippleName :: CardName.CardName
+rippleName = CardName.MkCardName (Text.pack "Reality Ripple")
 
 moveCounterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 moveCounterSpec s registry = Spec.describe s "CR 122.5 moving a counter" $ do
@@ -216,8 +236,10 @@ moveCounterSpec s registry = Spec.describe s "CR 122.5 moving a counter" $ do
             0
     case (newestNamed toolkitName mid, Projection.abilitiesOf `flip` mid) of
       (Just toolkit, abilitiesIn) -> case abilitiesIn toolkit of
-        [] -> Spec.assertFailure s "Agent's Toolkit should offer its Clue ability"
-        clue : _ -> do
+        -- Exactly one, not the first of however many: the card prints one
+        -- activated ability, and a second appearing must fail here rather than
+        -- silently redirect this case at whichever sorted first.
+        [clue] -> do
           let ((_, after), asked) =
                 State.runState
                   ( Engine.runGame
@@ -230,6 +252,7 @@ moveCounterSpec s registry = Spec.describe s "CR 122.5 moving a counter" $ do
           Spec.assertEqWith s "nothing was put on the creature the trigger named" (fmap (`kindsOn` after) (newestNamed pikerName after)) (Just (0, 0, 0, 0))
           Spec.assertEqWith s "the sacrificed artifact is off the battlefield" (newestNamed toolkitName after) Nothing
           Spec.assertEqWith s "and an impossible move is settled before the player is asked anything" asked 0
+        other -> Spec.assertFailure s ("expected Agent's Toolkit to offer exactly its one Clue ability, got " <> show (length other))
       _ -> Spec.assertFailure s "the artifact did not reach the battlefield"
   -- CR 122.5's FIRST impossibility -- "the first and second objects are the same
   -- object". March of the Machines makes the artifact a creature, so its own
@@ -247,3 +270,46 @@ moveCounterSpec s registry = Spec.describe s "CR 122.5 moving a counter" $ do
         Spec.assertEqWith s "the doubled entry counters are untouched -- none removed and none added" (kindsOn toolkit after) (2, 2, 2, 2)
         Spec.assertEqWith s "and a move onto the object the counter is already on asks nothing" asked 0
       _ -> Spec.assertFailure s "the artifact did not reach the battlefield"
+
+  -- CR 122.5's FOURTH impossibility on the FIRST object again, reached WITHOUT a
+  -- zone change, which is what makes it a different board from the sacrifice case
+  -- above rather than a restatement of it. Reality Ripple ({1}{U} instant, "phase
+  -- out target artifact, creature, or land") phases the artifact out in response
+  -- to its own trigger. CR 702.26d says the phasing event causes no zone change
+  -- and that counters remain on a permanent while it is phased out, so unlike the
+  -- sacrificed artifact this source still bears all four kinds when the trigger
+  -- resolves -- and CR 702.26b says it is treated as though it does not exist, so
+  -- none of them may be taken. Pawl.Engine.Phasing spells rule 702.26b by moving
+  -- the object out of GameState.battlefield, which is exactly what the arm's
+  -- source-zone read consults.
+  Spec.it s "CR 702.26b an artifact phased out in response to its own trigger moves nothing" $ do
+    let withRipple gs = do
+          ripple <- S.printingOf s registry "Reality Ripple"
+          pure (snd (S.addHandCard ripple S.alice gs))
+    (heldToolkit, heldPiker, ready) <- board "Goblin Piker" withRipple
+    let ((_, mid), askedFirst) =
+          State.runState
+            ( Engine.runGame
+                (toolkitAnswer Lowest)
+                ready
+                (S.cast S.alice heldToolkit >> Stack.resolveTop >> S.cast S.alice heldPiker >> Stack.resolveTop >> Engine.settleForPriority)
+            )
+            0
+    case (newestNamed toolkitName mid, handNamed rippleName mid) of
+      (Just toolkit, Just heldRipple) -> do
+        let ((_, after), asked) =
+              State.runState
+                ( Engine.runGame
+                    (rippleAnswer toolkit)
+                    mid
+                    (S.cast S.alice heldRipple >> Stack.resolveTop >> Stack.resolveTop)
+                )
+                askedFirst
+        -- Without this the counter assertion below is vacuous: an artifact that
+        -- never phased out reads four either way.
+        Spec.assertEqWith s "CR 702.26b the artifact left GameState.battlefield, phased out" (Set.member toolkit (GameState.battlefield after), Phasing.isPhasedOut toolkit after) (False, True)
+        -- THE ASSERTION THIS CASE EXISTS FOR.
+        Spec.assertEqWith s "CR 702.26d its four counters rode along and none was removed" (kindsOn toolkit after) (1, 1, 1, 1)
+        Spec.assertEqWith s "and the creature the trigger named received none" (fmap (`kindsOn` after) (newestNamed pikerName after)) (Just (0, 0, 0, 0))
+        Spec.assertEqWith s "and an impossible move is settled before the player is asked anything" asked 0
+      _ -> Spec.assertFailure s "expected the artifact on the battlefield and Reality Ripple in hand"

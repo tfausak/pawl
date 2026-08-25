@@ -5682,17 +5682,23 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       (Just from, Just to)
         -- "This may occur if the first and second objects are the same object".
         | from /= to,
-          -- "... or if either object is no longer in the correct zone". A counter
-          -- is a marker on a permanent (CR 122.1), so for both sides of THIS
-          -- opcode's pair the correct zone is the battlefield: a slot bound as
-          -- the ability triggered may name an object CR 400.7 has since moved.
+          -- "... or if either object is no longer in the correct zone". CR 122.1
+          -- puts a counter on "an object or player", and CR 122.1a/122.1b
+          -- contemplate counters on a card in a zone other than the battlefield,
+          -- so the battlefield is not the correct zone by the rule alone -- it is
+          -- the correct zone for THIS opcode because its producer names a
+          -- permanent on each side (Agent's Toolkit binds the artifact itself and
+          -- the creature that entered). A slot bound as the ability triggered may
+          -- name an object CR 400.7 has since moved.
           --
-          -- The `from` half is a REGRESSION FENCE rather than proven behaviour:
-          -- mutating it away leaves the suite green, because CR 122.2 makes a
-          -- permanent's counters cease to exist as it changes zones and CR 400.7
-          -- gives what arrives a new id, so the candidate sweep below already
-          -- finds nothing. Kept because rule 122.5 states it about both objects.
-          -- Pawl.MoveCounterSpec's sacrifice case is the board it fences.
+          -- The `from` half answers CR 702.26b as much as CR 400.7, and both are
+          -- proven boards. Pawl.Engine.Phasing spells "treated as though it does
+          -- not exist" by moving the object OUT of GameState.battlefield, while
+          -- CR 702.26d leaves its counters and its Object.zone alone -- so a
+          -- phased-out source is off the battlefield still bearing every kind,
+          -- and without this read the candidate sweep below would strip one off
+          -- it. Pawl.MoveCounterSpec's Reality Ripple case is that board; its
+          -- sacrifice case is CR 122.2's.
           Set.member from (GameState.battlefield gs),
           Set.member to (GameState.battlefield gs) ->
             -- "... if the first object doesn't have the appropriate kind of
