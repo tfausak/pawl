@@ -151,6 +151,7 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.HandAction as HandAction
 import qualified Pawl.Types.InZone as InZone
+import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layer as Layer
@@ -3187,6 +3188,10 @@ triggerConditionFilters triggerCondition = case triggerCondition of
 playerEffectFilters :: PlayerEffect.PlayerEffect -> [Filter.Type.Filter Keyword.Keyword]
 playerEffectFilters playerEffect = case playerEffect of
   PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f _) -> [f]
+  -- CR 601.2f at the ACTIVATION moment, Oppressive Rays' third line. Its Filter
+  -- names the ability's SOURCE PERMANENT, exactly as ReduceActivationCost's
+  -- below does, and it carries no grantedBy for that arm's comment to be about.
+  PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost f _) -> [f]
   PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost f _ _) -> [f]
   -- CR 601.2f's other moment: Heartstone's Filter narrows the ability's SOURCE
   -- PERMANENT rather than a spell, and is authored the same way. The grantedBy
@@ -3292,6 +3297,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   -- EachPlayer, Silence's stored prohibition says Opponents, and Prowling
   -- Serpopard says You.
   PlayerEffect.IncreaseSpellCost {} -> False
+  PlayerEffect.IncreaseActivationCost {} -> False
   PlayerEffect.ReduceSpellCost {} -> False
   PlayerEffect.ReduceActivationCost {} -> False
   PlayerEffect.AddActivationCost {} -> False
@@ -3339,6 +3345,7 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.CantSearchLibraries -> False
   PlayerEffect.CantBecomeMonarch -> False
   PlayerEffect.IncreaseSpellCost {} -> False
+  PlayerEffect.IncreaseActivationCost {} -> False
   PlayerEffect.ReduceSpellCost {} -> False
   PlayerEffect.ReduceActivationCost {} -> False
   PlayerEffect.AddActivationCost {} -> False
@@ -3561,8 +3568,8 @@ blockPermissionFilters permission =
 -- about position rather than about the atom. Each atom they police is answered
 -- off a field only certain callers fill -- a Filter.View's for CR 701.3a, a
 -- Filter.Context's for CR 709.4a and for CR 303.4b -- so the position IS the
--- soundness question. Two of the three name ONE position; CR 303.4b's names three,
--- which is why this is a tag on the position rather than a Bool.
+-- soundness question. Two of the three name ONE position; CR 303.4b's names
+-- several, which is why this is a tag on the position rather than a Bool.
 --
 --   * AttachDestination -- the destination of Effect.AttachTarget or
 --     Effect.AttachTargetToEach, the positions evaluated against a view whose
@@ -3573,12 +3580,14 @@ blockPermissionFilters permission =
 --     Filter.Context.slotNames. CR 709.4a's Filter.SameNameAsBound belongs here
 --     and nowhere else.
 --   * SourceHostFramed -- a position whose evaluator fills
---     Filter.Context.sourceAttachedTo, which is three rather than one: a static
+--     Filter.Context.sourceAttachedTo, which is four rather than one: a static
 --     ability's CR 604.2 clause (Pawl.Engine.Projection.conditionHolds), a
 --     triggered ability's CR 603.4 clause (Pawl.Engine.Event.interveningHolds and
---     Pawl.Engine.Stack's CR 608.2a re-check), and an effect's
---     Pawl.Types.ObjectRef (Pawl.Engine.Resolve.objectRefObjects). CR 303.4b's
---     Filter.IsHostOfSource belongs in those three and nowhere else.
+--     Pawl.Engine.Stack's CR 608.2a re-check), an effect's
+--     Pawl.Types.ObjectRef (Pawl.Engine.Resolve.objectRefObjects), and a printed
+--     PLAYER ability's own effect (Pawl.Engine.PlayerEffect.matchesObjectFrom,
+--     which takes the source off the row `applying` returns). CR 303.4b's
+--     Filter.IsHostOfSource belongs in those four and nowhere else.
 --   * Unframed -- everything else.
 --
 -- CR 303.4a's enchant slot (Face.enchant) is Unframed rather than InTargetSlot,
@@ -3969,7 +3978,6 @@ cardFilters card =
         <> concatMap alternativeCostFilters (Face.alternativeCosts card)
         <> concatMap (quantityFilters . CostReduction.perEach) (Face.costReductions card)
         <> concatMap specialActionFilters (Face.specialActions card)
-        <> concatMap (playerEffectFilters . PlayerStaticAbility.effect) (Face.playerAbilities card)
         <> concatMap blockRequirementFilters (Face.blockRequirements card)
         <> concatMap blockPermissionFilters (Face.blockPermissions card)
         <> concatMap attackRequirementFilters (Face.attackRequirements card)
@@ -3988,6 +3996,13 @@ cardFilters card =
     -- ability is framed against the permanent that has it, so an IsSource inside
     -- it names that permanent rather than being unframed.
     <> concatMap (sourceHosted . concatMap conditionFilters . Maybe.maybeToList . PlayerStaticAbility.condition) (Face.playerAbilities card)
+    -- And the EFFECT beside that clause, for the same reason and since #1242:
+    -- Pawl.Engine.PlayerEffect.matchesObjectFrom is handed the row's own source,
+    -- so CR 303.4b's atom is answerable in every arm of a printed player ability
+    -- (Oppressive Rays' "enchanted creature"). The STORED CR 611.2c carrier is
+    -- not -- Effect.AffectPlayers' own filters stay unframed above, because a
+    -- resolved spell has no permanent behind it to be attached to anything.
+    <> concatMap (sourceHosted . playerEffectFilters . PlayerStaticAbility.effect) (Face.playerAbilities card)
     <> modalFilters (Face.spell card)
     <> concatMap activatedAbilityFilters (Face.activatedAbilities card)
     <> concatMap activatedAbilityFilters (grantedActivatedAbilities card)
@@ -4181,11 +4196,11 @@ hostOfSourceCounts card =
    in (total True, total False)
 
 -- CR 303.4b's "enchanted" is answerable only where Filter.Context.sourceAttachedTo
--- is filled, which is the three positions Framing's SourceHostFramed names and
+-- is filled, which is the positions Framing's SourceHostFramed names and
 -- nothing else: Filter.contextFor, Filter.contextWithSlots and
 -- Filter.contextComparingPower all leave it Nothing, so Filter.IsHostOfSource in an
--- affected set, a target slot, a search filter or a cost criterion is a silent
--- False rather than a rejected card. This is where that is made loud.
+-- affected set, a target slot or a search filter is a silent False rather than a
+-- rejected card. This is where that is made loud.
 --
 -- Two offences under one name, for canHostSubjectOffends' two reasons: the
 -- traversal found the atom outside those three positions, or the traversal and the
@@ -6351,27 +6366,38 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (length (filter ((== InTargetSlot) . fst) positions) > 10) "and target slot filters for the accepted side to be about"
   -- CR 303.4b's Filter.IsHostOfSource is CR 709.4a's atom one axis over again:
   -- answerable only where Filter.Context.sourceAttachedTo is filled, which is the
-  -- three positions Framing's SourceHostFramed names. See hostOfSourceOffends for
+  -- positions Framing's SourceHostFramed names. See hostOfSourceOffends for
   -- the two offences.
   Spec.it s "CR 303.4b no card asks IsHostOfSource where the source's host is unknown" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace hostOfSourceOffends . Printing.card) ps
     Spec.assertEqWith s "the atom sits only where the host is supplied" (fmap (S.nameOf . Printing.card) offenders) []
-    -- NOT vacuous: the pool authors the atom, and the one card that does is
-    -- ACCEPTED here rather than skipped. Ray of Frost writes it three times, once
-    -- per accepted position -- a CR 604.2 clause, a CR 603.4 clause and an
-    -- Effect.Tap's ObjectRef -- so all three legs of the tagging are exercised.
+    -- NOT vacuous: the pool authors the atom, and the cards that do are ACCEPTED
+    -- here rather than skipped. Ray of Frost writes it three times, once per
+    -- accepted position -- a CR 604.2 clause, a CR 603.4 clause and an
+    -- Effect.Tap's ObjectRef -- so three of the four legs of the tagging are
+    -- exercised there.
     ray <- S.printingOf s registry "Ray of Frost"
     Spec.assertEqWith
       s
       "Ray of Frost's three atoms are all framed"
       (hostOfSourceCounts (S.combinedFace ray))
       (3, 0)
+    -- The fourth leg: a printed PLAYER ability's own effect, which reads the
+    -- source off the row Pawl.Engine.PlayerEffect.applying returns. Its own
+    -- behaviour is Pawl.PlayerEffectSpec's Oppressive Rays group; this is the
+    -- position claim.
+    rays <- S.printingOf s registry "Oppressive Rays"
+    Spec.assertEqWith
+      s
+      "Oppressive Rays' one atom is framed too"
+      (hostOfSourceCounts (S.combinedFace rays))
+      (1, 0)
     Spec.assertEqWith
       s
       "and they are the pool's only ones"
       (sum (fmap (uncurry (+) . hostOfSourceCounts . S.combinedFace) ps))
-      3
+      4
     -- The rejected side, which the sweep above cannot show while the pool has no
     -- offender: the same atom planted in a target slot -- the position a card
     -- author would most plausibly reach for -- IS counted as elsewhere.

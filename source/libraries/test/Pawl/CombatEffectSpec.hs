@@ -3231,11 +3231,9 @@ blockersOf attacker gs = Map.findWithDefault Set.empty attacker (Combat.Type.blo
 -- off the board. The non-mana cases at the end of the group read a land that is
 -- GONE instead, CR 509.1d's list being as wide as CR 508.1h's.
 --
--- Not implemented: Oppressive Rays' third line, "activated abilities of enchanted
--- creature cost {3} more to activate", which the card's JSON omits -- nothing
--- raises an activation cost (#1242). pawl's Oppressive Rays is WEAKER than
--- printed there, and weaker against the Aura's own controller, which is why the
--- card is still the right producer for the two combat lines.
+-- Oppressive Rays' third line, "activated abilities of enchanted creature cost
+-- {3} more to activate", is transcribed too; Pawl.PlayerEffectSpec's Oppressive
+-- Rays group is where it is proved.
 blockCostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 blockCostSpec s registry = Spec.describe s "BlockCosts" $ do
   Spec.it s "CR 509.1d/509.1f blocking under an Oppressive Rays costs {3}, and the mana is paid" $ do
