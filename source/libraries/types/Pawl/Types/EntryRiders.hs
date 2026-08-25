@@ -104,9 +104,10 @@ import qualified Pawl.Types.TapState as TapState
 -- Pawl.ReplacementSpec's Eyes of Gitaxias group proves the Create road, where a
 -- token created with three +1/+1 counters on it takes six from Vorinclex.
 --
--- A Map by kind, Object.counters' shape, rather than WithCounters' one kind and
--- one count: nothing in CR 122.6 limits an effect to a single kind, and empty is
--- the default every other move carries. Perennation returns a permanent card
+-- A Map by kind, Object.counters' shape: nothing in CR 122.6 limits an effect to
+-- a single kind, and empty is the default every other move carries. WithCounters,
+-- the permanent's-own-text side, is keyed the same way and for the same reason,
+-- though there the empty map is unsayable (#2314). Perennation returns a permanent card
 -- "with a hexproof counter and an indestructible counter on it", which is the
 -- shape the Map is for -- and the board Pawl.ReplacementSpec's Perennation group
 -- reads CR 614.5's one opportunity off, since both kinds are pending together

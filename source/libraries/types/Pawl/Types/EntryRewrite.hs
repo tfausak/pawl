@@ -160,7 +160,7 @@ data EntryRewrite effect
     --
     -- ONE constructor rather than a sacrifice arm beside WithCounters, because
     -- the number is not known until the choice is made and WithCounters carries a
-    -- Natural settled at projection time. Splitting them would need a channel
+    -- Quantity settled before the entry. Splitting them would need a channel
     -- from one entry replacement to another that nothing else in CR 614.1c wants.
     --
     -- The CounterKind is a Maybe because the count need not buy counters at all.
@@ -196,8 +196,8 @@ data EntryRewrite effect
     -- `Keyword.Riot` and rule 702.136a says what it means. It still round-trips
     -- through the codec, because every arm of this type does.
     --
-    -- NULLARY, where WithCounters carries a kind and a count: rule 702.136a
-    -- fixes both halves completely, so there is nothing for a card to vary.
+    -- NULLARY, where WithCounters carries a count per kind: rule 702.136a fixes
+    -- both halves completely, so there is nothing for a card to vary.
     --
     -- The two halves land in two different places, which is why this is one arm
     -- and not two. The counter goes through Pawl.Engine.Event.addEnteringCounters,
@@ -256,9 +256,8 @@ data EntryRewrite effect
     -- damage this turn, this permanent enters with N +1/+1 counters on it."
     --
     -- WithCounters with rule 702.54a's condition attached, and its own arm rather
-    -- than a flag on that one for two reasons. WithCounters' amount is an
-    -- unconditional Natural placed by Pawl.Engine.Event whatever the board looks
-    -- like, which is what CR 306.5b's intrinsic loyalty needs it to be; and the
+    -- than a flag on that one for two reasons. WithCounters' amounts are placed
+    -- by Pawl.Engine.Event unconditionally, whatever the board looks like, which is what CR 306.5b's intrinsic loyalty needs it to be; and the
     -- condition is asked in Pawl.Engine.Replacement.admitsEntry, which cases on
     -- the constructor, so a bloodthirst row indistinguishable from a loyalty row
     -- could not be gated without gating loyalty too.

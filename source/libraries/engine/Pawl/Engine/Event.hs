@@ -1396,8 +1396,8 @@ apply batch candidate event =
       -- kind per row would put an ordering in CR 616.1's pool that the card's own
       -- sentence does not have; Pawl.ReplacementSpec's Agent's Toolkit stand-in
       -- reads that off a board where the two orders disagree. The amounts are
-      -- evaluated against the SAME board for the same reason: one application is
-      -- one moment (CR 608.2f).
+      -- evaluated against the SAME board for the same reason: the row applies
+      -- once, so its amounts are read once.
       EntryRewrite.WithCounters (WithCounters.MkWithCounters counters) -> do
         gs <- State.get
         let viewOf = Projection.viewWithLastKnown oid gs

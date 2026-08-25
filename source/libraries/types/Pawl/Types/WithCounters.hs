@@ -32,8 +32,8 @@ newtype WithCounters = MkWithCounters
   deriving (Eq, Ord, Show)
 
 -- | The one-kind row every keyword and every intrinsic ability mints: vanishing's
--- time counters (CR 702.62a), fading's fade counters (CR 702.32a), modular's
--- +1/+1 counters (CR 702.4b), a Saga's lore counter (CR 714.3a), a planeswalker's
--- loyalty (CR 306.5b) and a battle's defense (CR 310.6a).
+-- time counters (CR 702.63a), fading's fade counters (CR 702.32a), modular's
+-- +1/+1 counters (CR 702.43a), a Saga's lore counter (CR 714.3a), a
+-- planeswalker's loyalty (CR 306.5b) and a battle's defense (CR 310.4b).
 one :: CounterKind.CounterKind Keyword.Keyword -> Quantity.Quantity -> WithCounters
 one kind amount = MkWithCounters (Map.singleton kind amount)

@@ -6856,7 +6856,7 @@ toolkitSpec s registry = Spec.describe s "Synthetic Toolkit (CR 614.1c)" $ do
             (held, ready) = S.addHandCard toolkit S.alice (if scalers then withPraetor else bare)
         pure (seasonId, held, ready)
       castIt seasonFirst (seasonId, held, ready) =
-        let ((_, after), asked) = State.runState (Engine.runGame (ordersEntry seasonFirst seasonId) ready (S.cast S.alice held >> Stack.resolveTop)) 0
+        let ((_, after), asked) = State.runState (Engine.runGame (toolkitOrders seasonFirst seasonId) ready (S.cast S.alice held >> Stack.resolveTop)) 0
          in (asked, newestNamed toolkitName after, after)
   -- The control: one counter of each of the four kinds, and nothing to order.
   Spec.it s "CR 614.1c the artifact enters with one counter of each kind it names" $ do
@@ -6877,6 +6877,20 @@ toolkitSpec s registry = Spec.describe s "Synthetic Toolkit (CR 614.1c)" $ do
         Spec.assertEqWith s "the praetor first: one halved is none, doubled is none -- every kind" (kindsOn halved praetorBoard) (0, 0, 0, 0)
         Spec.assertEqWith s "and each board asked for exactly ONE order, not one per kind" (seasonAsked, praetorAsked) (1, 1)
       _ -> Spec.assertFailure s "the artifact did not reach the battlefield"
+
+-- ordersEntry's answerer, and TOTAL where that one errors: a row per kind offers
+-- pools this one's `wantSeason` is not in, so an error there would preempt the
+-- counter assertions and report itself instead of the behaviour. It falls back to
+-- the first row offered, which leaves the counts free to disagree and the count of
+-- orders free to grow -- both of which the cases below read.
+toolkitOrders :: Bool -> ObjectId.ObjectId -> Prompt.Prompt r -> State.State Int r
+toolkitOrders seasonFirst seasonId p = case p of
+  Prompt.ChooseReplacement _ _ entries -> do
+    asked <- State.get
+    State.put (asked + 1)
+    let wantSeason = if asked <= (0 :: Int) then seasonFirst else not seasonFirst
+    pure (maybe 0 Int.toNaturalSaturating (List.findIndex ((== wantSeason) . (== seasonId) . ReplacementEntry.source) entries))
+  _ -> pure (S.identityAnswer p)
 
 -- Answer an entry's CR 616.1 orders and COUNT them. The first order taken is
 -- Doubling Season's row when `seasonFirst`, and every later order taken is the
