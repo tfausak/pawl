@@ -4304,8 +4304,9 @@ feywildTricksterSpec s registry =
 --
 -- THE BOARD is deliberately TWO permanents a seat -- the Scoundrel and one
 -- untapped Mountain -- and that count is load-bearing twice over. The Mountain
--- pays the {1}, CR 601.2g's mana window running before the components, and it is
--- then the ONLY candidate CR 701.21a's cost has, so Prompt.ChooseSacrifices is
+-- pays the {1}, CR 602.2b's window over CR 601.2g running before the
+-- components, and it is then the ONLY candidate CR 701.21a's cost has, so
+-- Prompt.ChooseSacrifices is
 -- elided and no answerer stands between the card's Filter and what dies. The
 -- printed word "another" is Not IsSource: under a bare IsSource the Scoundrel
 -- itself would be the only candidate, so WHICH permanent left the battlefield
