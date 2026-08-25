@@ -928,6 +928,7 @@ spec s registry = do
   Pawl.PlaneswalkerSpec.combinedLoyaltyCostSpec s registry
   Pawl.PlaneswalkerSpec.countersRemovedSpec s registry
   Pawl.PlaneswalkerSpec.variableLoyaltySpec s registry
+  Pawl.PlaneswalkerSpec.gristLoyaltySpec s registry
   Pawl.PlayerEffectSpec.spec s registry
   Pawl.PowerToughnessSpec.spec s registry
   Pawl.ProjectionSpec.spec s registry
