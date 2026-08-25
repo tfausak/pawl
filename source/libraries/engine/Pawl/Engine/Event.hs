@@ -3724,7 +3724,7 @@ becameTarget source kind controller chosen =
 -- attaching a permanent to the object or player it is already attached to "does
 -- nothing", so there is no restamp and no event. Two of the three callers cannot
 -- reach it -- Attach.hostsFor never offers the current host -- and CR 702.6a's
--- equip, whose target is any creature its controller owns, can.
+-- equip, whose target is any creature its controller controls, can.
 --
 -- CR 701.3c: attaching to a DIFFERENT object gives it a new timestamp, which CR
 -- 613.7 orders layer effects by.
