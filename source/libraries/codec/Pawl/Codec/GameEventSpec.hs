@@ -474,7 +474,9 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       " {\"type\":\"BecameAttached\",\"value\":{\"attachment\":14,\"host\":{\"type\":\"ToPlayer\",\"value\":3}}} "
   -- CR 705.2's two outcomes over the same seat. BOTH legs, because the outcome
   -- is the only thing that separates them: a codec that dropped `won` would
-  -- round-trip the won flip and silently turn the lost one into it.
+  -- round-trip the won flip and silently turn the lost one into it. The third
+  -- outcome -- rule 705.2's first sentence, which settles none -- is
+  -- Pawl.Codec.CoinFlippedSpec's, where the key's absence is the assertion.
   Spec.it s "CoinFlipped, a won flip" $
     Common.assertCodec
       s

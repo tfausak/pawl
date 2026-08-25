@@ -1173,9 +1173,9 @@ apply batch candidate event =
       -- Game.ask, never Game.choose, and NO Prompt.CallCoin: "no player wins or
       -- loses a coin flip for this kind of effect", so there is no call to make
       -- and nothing for a CR 723 controller to usurp. Proved by
-      -- Pawl.ReplacementSpec's "CR 705.2 nobody wins Molten Sentry's flip", on a
-      -- board holding a Tavern Scoundrel that would mint two Treasures off a won
-      -- one.
+      -- Pawl.ReplacementSpec's "CR 705.2 nobody wins Molten Sentry's flip, so its
+      -- heads face mints no Treasure", on a board holding a Tavern Scoundrel that
+      -- would mint two Treasures off a won one.
       --
       -- ALWAYS ASKED, where ChoiceOf elides a one-option prompt: a flip is not a
       -- choice, so nothing about it is indistinguishable, and a card whose two
@@ -1190,13 +1190,18 @@ apply batch candidate event =
         let picked = case face of
               CoinFace.Heads -> EntryFlip.heads entryFlip
               CoinFace.Tails -> EntryFlip.tails entryFlip
+        -- CR 614.3, ChoiceOf's call verbatim. UNPROVEN by any board: `consume`
+        -- is a no-op for a permanent's own static ability (CandidateId
+        -- OfPermanent), and Molten Sentry's row is one, so only a FLOATING row of
+        -- this shape could observe the call. It is here because rule 614.3 is
+        -- what governs such a row, not because a test holds it in place.
         Replacement.consume (ReplacementCandidate.identity candidate)
         State.modify' (Replacement.applyEntryOption oid picked)
         -- CR 109.5's "you" on the entering permanent, ChoiceOf's chooser and CR
-        -- 705.2's only involved seat. The Nothing branch is unreachable and
+        -- 705.2's only involved seat. The seatless branch is unreachable and
         -- defensive, ChoiceOf's position: the object is materialized on the
         -- battlefield before this loop runs, so controllerOf falls back to its
-        -- owner. Nothing is recorded there rather than a seat being conjured --
+        -- owner. No event is recorded there rather than a seat being conjured --
         -- the flip still happened and still applied.
         applied <- State.get
         Monad.forM_ (Projection.controllerOf oid applied) $ \flipper ->

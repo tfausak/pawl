@@ -22,7 +22,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- NO BOARD TELLS Nothing FROM Just False TODAY.
 -- TriggerCondition.PlayerWinsCoinFlip is the only reader of this field and
 -- answers False to both. What would tell them apart is a "whenever you lose a
--- coin flip" condition, which does not exist (gap #2309, Karplusan Minotaur).
+-- coin flip" condition, which does not exist (gap #2306, Karplusan Minotaur).
 --
 -- The flipper is CR 109.5's "you" on the resolving object, which CR 705.2's last
 -- sentence ("no other players are involved") makes the only seat this event

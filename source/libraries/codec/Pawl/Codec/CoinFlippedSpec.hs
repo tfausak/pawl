@@ -8,8 +8,9 @@ import qualified Pawl.Types.PlayerId as PlayerId
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.CoinFlipped" $ do
-  -- CR 705.2's two outcomes, both spelled: a codec that dropped the key would
-  -- round-trip one of them by accident.
+  -- CR 705.2's outcomes, all three spelled: a codec that dropped the key would
+  -- round-trip one of them by accident, and one that made it required would turn
+  -- the winnerless flip below into a lost one.
   Spec.it s "MkCoinFlipped, a won flip" $
     Common.assertCodec
       s
