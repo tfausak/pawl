@@ -10,5 +10,6 @@ codec =
   Arm.tagged
     [ Arm.payload "Multiply" Common.natural Scaling.Multiply (\x -> case x of Scaling.Multiply y -> Just y; _ -> Nothing),
       Arm.payload "AddMore" Common.natural Scaling.AddMore (\x -> case x of Scaling.AddMore y -> Just y; _ -> Nothing),
+      Arm.payload "Subtract" Common.natural Scaling.Subtract (\x -> case x of Scaling.Subtract y -> Just y; _ -> Nothing),
       Arm.nullary "Halve" Scaling.Halve
     ]

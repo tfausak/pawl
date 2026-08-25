@@ -153,7 +153,7 @@ armiesOf pid gs =
 --    amassed before, so a player whose Army died gets a second token.
 -- 2. The choice, via Prompt.ChooseAmass, and only when there is one to make.
 -- 3. The counters, through Event.putCounters -- the single funnel (CR 122.6), so
---    CR 614.16's counter replacements (Hardened Scales, Doubling Season) get their
+--    CR 614.1's counter replacements (Hardened Scales, Doubling Season) get their
 --    opportunity.
 -- 4. CR 205.1b's type addition, as an ordinary timestamped layer-4 continuous
 --    effect with Expiry.Never: rule 701.47a states no duration, so nothing ends

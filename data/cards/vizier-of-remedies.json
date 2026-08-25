@@ -4,64 +4,69 @@
       "manaCost": [
         {
           "type": "Generic",
-          "value": 4
+          "value": 1
         },
         {
           "type": "OfType",
           "value": {
             "type": "Colored",
             "value": {
-              "type": "Green"
+              "type": "White"
             }
           }
         }
       ],
-      "name": "Doubling Season",
+      "name": "Vizier of Remedies",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
       "replacementEffects": [
-        {
-          "effect": {
-            "type": "TokenR",
-            "value": {
-              "matching": {
-                "whose": {
-                  "type": "Yours"
-                }
-              },
-              "scaling": {
-                "type": "Multiply",
-                "value": 2
-              }
-            }
-          }
-        },
         {
           "effect": {
             "type": "CounterR",
             "value": {
               "matching": {
                 "onWhat": {
-                  "type": "And",
-                  "value": []
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
                 },
                 "subject": {
-                  "type": "ByEffect"
+                  "type": "ByAnything"
+                },
+                "whichKind": {
+                  "type": "MinusOneMinusOne"
                 },
                 "whose": {
                   "type": "Yours"
                 }
               },
               "scaling": {
-                "type": "Multiply",
-                "value": 2
+                "type": "Subtract",
+                "value": 1
               }
             }
           }
         }
       ],
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
       "typeLine": {
+        "subtypes": [
+          {
+            "type": "Cleric"
+          },
+          {
+            "type": "Human"
+          }
+        ],
         "types": [
           {
-            "type": "Enchantment"
+            "type": "Creature"
           }
         ]
       }

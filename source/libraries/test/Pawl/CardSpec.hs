@@ -113,6 +113,7 @@ import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.CounterR as CounterR
+import qualified Pawl.Types.CounterSubject as CounterSubject
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
@@ -6827,7 +6828,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 { Face.replacementEffects =
                     [ PrintedReplacement.MkPrintedReplacement
                         Nothing
-                        (ReplacementEffect.CounterR (CounterR.MkCounterR (CounterPattern.MkCounterPattern Nothing Nothing ControllerRelation.Yours buried Nothing) (Scaling.AddMore 1)))
+                        (ReplacementEffect.CounterR (CounterR.MkCounterR (CounterPattern.MkCounterPattern Nothing CounterSubject.ByAnything ControllerRelation.Yours buried Nothing) (Scaling.AddMore 1)))
                         Nothing
                     ]
                 }
