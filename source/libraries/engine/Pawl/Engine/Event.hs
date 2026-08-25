@@ -33,6 +33,7 @@ import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Decide as Decide
@@ -73,6 +74,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
+import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ControlChanged as ControlChanged
 import qualified Pawl.Types.ControllerBecomesTarget as ControllerBecomesTarget
@@ -596,7 +598,8 @@ unscannedEvents = fmap LoggedEvent.event . unscannedGrouped
 
 -- The events the STATE-BASED ACTION check has not yet consumed -- CR 704.5h's
 -- "since the last state-based action check", and the same boundary CR 903.9a
--- names. Pawl.Engine.Commander.returnable is the other reader.
+-- names. Pawl.Engine.Sba hands these to Pawl.Engine.Commander.returnable, the
+-- other reader.
 unscannedSbaEvents :: GameState -> [GameEvent]
 unscannedSbaEvents gs =
   fmap LoggedEvent.event (Foldable.toList (Seq.drop (Natural.toIntSaturating (GameState.damageScannedThrough gs)) (GameState.events gs)))
@@ -695,13 +698,66 @@ createEmblem pid card = do
 -- `asOf` is applyReplacementsIn's: Nothing for a lone move, Just the pre-batch
 -- board when this move is one member of a CR 608.2f / 704.3 batch.
 --
+-- CR 903.9b's rules-based offer is asked here too, once the loop has settled a
+-- destination -- see `offerCommandZone`.
+--
 -- Also reports CR 607.2b's link: the object whose replacement effect is what made
 -- the destination exile, or Nothing when the move was headed there on its own
 -- instruction. The caller files it once the arriving incarnation has an id.
 resolveZoneChange :: Maybe GameState -> ZoneChange -> Game (Maybe ZoneChange, Maybe ObjectId)
 resolveZoneChange asOf zc = do
   (outcome, _, exiledBy) <- applyReplacementsFully asOf Set.empty (ProposedEvent.WouldChangeZone zc)
-  pure (outcome >>= Replacement.asZoneChange, exiledBy)
+  case outcome >>= Replacement.asZoneChange of
+    Nothing -> pure (Nothing, exiledBy)
+    Just settled -> do
+      redirected <- offerCommandZone settled
+      pure (Just redirected, exiledBy)
+
+-- CR 903.9b: "if a commander would be put into its owner's hand or library from
+-- anywhere, its owner may put it into the command zone instead". The question;
+-- Pawl.Engine.Commander.commandZoneOffer is the condition, and says why the owner
+-- is who is asked.
+--
+-- A RULES step in the funnel rather than a third segment of
+-- Pawl.Engine.Replacement.collect, which holds a battlefield permanent's printed
+-- static abilities and the floating rows a resolution installed -- both things a
+-- CARD carries. Synthesizing a ReplacementEffect.ZoneChangeR from rule 903.9b
+-- would put a rules-invented value into the structure whose whole point is that it
+-- came from data, and rule 903.9b's "may" has no home on that type in any case:
+-- every ZoneChangeR is unconditional, so the prompt would have to be asked from
+-- `apply`'s generic arm under a guard on WHICH candidate this is.
+-- Pawl.Engine.Cast.legendaryRestrictionOk takes the same posture toward CR 205.4e:
+-- a restriction the rulebook states is asked by the engine, not modelled as
+-- something a card carries.
+--
+-- AFTER the CR 616.1 loop and asked of the SETTLED destination, CR 614.6's
+-- reading: a printed redirect that already moved this move off a hand or a library
+-- is the event that happens, and rule 903.9b has nothing to say about it.
+--
+-- Not implemented: a place in CR 616.1's ordering, where CR 616.1e leaves the
+-- affected player free to pick among the applicable effects and this offer instead
+-- always goes last (#2266). Unobservable while no ZoneChangeR in data/cards/ matches a
+-- hand or a library -- all six match a graveyard or the stack and redirect to exile
+-- -- so no second candidate can be applicable to the same event; a printed redirect
+-- naming a hand or a library as the destination it watches (Wheel of Sun and Moon
+-- is the shape) would refute that.
+--
+-- No case on effect identity: the question is a proposed event's destination ZONE
+-- and whether its subject is a commander.
+offerCommandZone :: ZoneChange -> Game ZoneChange
+offerCommandZone zc = do
+  gs <- State.get
+  case Commander.commandZoneOffer zc gs of
+    Nothing -> pure zc
+    Just owner -> do
+      decision <- Game.choose (Prompt.ReturnCommander (Decide.deciderFor owner gs) owner (ZoneChange.departed zc))
+      pure $ case decision of
+        -- CR 614.6: the modified event is what happens, so the destination is
+        -- rewritten rather than the card being moved twice. changeZoneAttaching
+        -- places it under Object.owner, which is rule 903.9b's "its owner" for a
+        -- stolen commander too.
+        CommandZoneDecision.Returns -> zc {ZoneChange.to = Zone.Command}
+        CommandZoneDecision.Leaves -> zc
 
 -- CR 616.1's loop. `Nothing` means the event DOES NOT HAPPEN (CR 615.6, CR
 -- 701.19a). A rewrite that cancels an event has already performed its own
@@ -918,6 +974,10 @@ loop asOf batch applied prevented exiledBy event = do
 -- rewrite chain that leaves it again. A printed row naming any other zone --
 -- Wheel of Sun and Moon's "into its owner's library instead" is the shape --
 -- would refute that and reach both arms. Only the first has a producer.
+--
+-- `offerCommandZone` is not a second way to reach them either: it runs after this
+-- loop has finished, so no candidate is read off its answer, and rule 903.9b only
+-- fires on a destination of hand or library.
 --
 -- No case on effect identity: the question is a proposed event's destination
 -- ZONE, and the answer is the row's source object.
@@ -2863,7 +2923,9 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- from gating on the request today, and not because of a claim
               -- about Magic: no ReplacementEffect.ZoneChangeR in data/cards/
               -- names the battlefield as its destination -- every one of them
-              -- names exile (see exiledByAfter, which rests on the same fact).
+              -- names exile (see exiledByAfter, which rests on the same fact) --
+              -- and the one RULES-based redirect in this funnel, rule 903.9b's
+              -- offerCommandZone above, answers Zone.Command.
               --
               -- CR 400.7: Object.newIncarnation is the whole forgetting -- the
               -- entry controller (CR 110.2), the as-enters choices (CR 614.1c),

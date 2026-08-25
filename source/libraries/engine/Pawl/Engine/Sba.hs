@@ -685,7 +685,7 @@ performStateBasedActions = Event.simultaneously $ do
   -- cannot arise: rule 903.9a only reaches objects already in a graveyard or in
   -- exile, and every batch below moves things OFF the battlefield.
   returningCommanders <-
-    fmap Maybe.catMaybes . Monad.forM (Commander.returnable gs) $ \(owner, oid) -> do
+    fmap Maybe.catMaybes . Monad.forM (Commander.returnable (Event.unscannedSbaEvents gs) gs) $ \(owner, oid) -> do
       decision <- Game.choose (Prompt.ReturnCommander (Decide.deciderFor owner gs) owner oid)
       pure $ case decision of
         CommandZoneDecision.Returns -> Just oid
