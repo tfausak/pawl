@@ -1346,7 +1346,7 @@ resolveSpellWith runSubgame oid = do
                   -- instructions ran, per instance because CR 700.2d makes a mode
                   -- chosen twice make its offer twice.
                   Monad.foldM_
-                    ( \(answers, ran) (cIdx, clause) -> do
+                    ( \(answers, picked, ran) (cIdx, clause) -> do
                         -- CR 608.2c's "If you do" first: a clause hanging off one
                         -- the fold has not recorded is skipped entirely, so no
                         -- later gate raises a prompt whose answer cannot matter.
@@ -1363,7 +1363,11 @@ resolveSpellWith runSubgame oid = do
                         -- a clause whose every read is dead is not asked about.
                         let legalNowForMay = Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
                             boundNowForMay = Map.keysSet (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) gateBindings)
-                        taken <- if gated then exercises oid effectController idx cIdx boundNowForMay legalNowForMay clause else pure False
+                        -- CR 608.2d's "or" next, and BEFORE the "may": Twiddle
+                        -- prints one "may" over the pair, so the branch the
+                        -- controller did not announce has no "may" left to offer.
+                        (branch, picked') <- if gated then chosenBranch oid effectController idx cIdx picked clause else pure (False, picked)
+                        taken <- if branch then exercises oid effectController idx cIdx boundNowForMay legalNowForMay clause else pure False
                         -- CR 118.12: then the cost paid on resolution, against the
                         -- START-of-resolution targets to match CR 608.2b's single
                         -- re-validation. Both maps are projected into THIS
@@ -1384,9 +1388,9 @@ resolveSpellWith runSubgame oid = do
                                     clause
                             else pure (False, answers)
                         Monad.when admitted (Monad.mapM_ applyOne (Clause.effects clause))
-                        pure (answers', recordTaken admitted cIdx ran)
+                        pure (answers', picked', recordTaken admitted cIdx ran)
                     )
-                    (Map.empty, Set.empty)
+                    (Map.empty, Map.empty, Set.empty)
                     (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode)))
                 finishSpell oid face effectController
 
@@ -1491,7 +1495,7 @@ resolveModesWith runSubgame stackId srcId modes = do
              in -- CR 608.2e's clause is what each gate covers. Run only when
                 -- `fizzles` is False.
                 Monad.foldM_
-                  ( \(answers, ran) (cIdx, clause) -> do
+                  ( \(answers, picked, ran) (cIdx, clause) -> do
                       -- CR 608.2c's "If you do" first, off the same fold the
                       -- spell path keeps. Proved on this path, not merely
                       -- fenced: Aetherplasm's second clause hangs on its first,
@@ -1513,14 +1517,22 @@ resolveModesWith runSubgame stackId srcId modes = do
                       -- clause whose every read is dead is not asked about.
                       let legalNowForMay = instanceView (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
                           boundNowForMay = Map.keysSet (instanceView gateBindings)
-                      taken <- if gated then exercises stackId effectController idx cIdx boundNowForMay legalNowForMay clause else pure False
+                      -- CR 608.2d's "or" next, and BEFORE the "may", off the same
+                      -- helper the spell path uses. Proved on THIS loop and not
+                      -- merely on the spell's twin: Teardrop Kami's "sacrifice
+                      -- this creature: you may tap or untap target creature" is
+                      -- Pawl.ResolveSpec's "CR 608.2d announcing Teardrop Kami's
+                      -- tap taps the untapped Piker", which reddens when this
+                      -- conjunct is defeated.
+                      (branch, picked') <- if gated then chosenBranch stackId effectController idx cIdx picked clause else pure (False, picked)
+                      taken <- if branch then exercises stackId effectController idx cIdx boundNowForMay legalNowForMay clause else pure False
                       -- CR 118.12: then the cost paid on resolution, against the
                       -- START-of-resolution slots.
                       (admitted, answers') <- if taken then payGateAdmits stackId srcId effectController idx cIdx (instanceView legal) answers clause else pure (False, answers)
                       Monad.when admitted (Monad.mapM_ applyOne (Clause.effects clause))
-                      pure (answers', recordTaken admitted cIdx ran)
+                      pure (answers', picked', recordTaken admitted cIdx ran)
                   )
-                  (Map.empty, Set.empty)
+                  (Map.empty, Map.empty, Set.empty)
                   (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode)))
        in do
             Monad.unless fizzles (Monad.forM_ modes resolveOne)
@@ -1572,6 +1584,40 @@ gateHolds controller source chosen groups clause = case Clause.condition clause 
   Just condition -> do
     gs <- State.get
     pure (Condition.holds (Projection.viewWithLastKnownAnywhere gs) (effectContext controller source chosen groups) gs source condition)
+
+-- CR 608.2d: which branch of an either-or clause pair happens -- Twiddle's "you
+-- may tap or untap target artifact, creature, or land". A clause naming no
+-- sibling always happens; one that names an earlier or later clause of this mode
+-- instance happens only if the controller announced IT.
+--
+-- Asked ONCE per pair, at whichever branch the fold reaches first, and the
+-- answer carried in `picked` under the pair's LOWEST ordinal -- the key both
+-- branches compute, so the loser's arrival raises no second prompt. A separate
+-- fold component and not `ifTakenHolds`' `ran`: that set records which clauses'
+-- instructions RAN, which `condition` and `payGate` can pull apart from which
+-- branch was CHOSEN (Clause.ifTaken says why it is keyed that way), and an
+-- either-or must exclude its sibling even when the winner then does nothing.
+--
+-- The branches are offered in CR 608.2c's printed order and the answer is
+-- FILTERED back through them rather than trusted, the posture every choose-don't-
+-- target prompt takes.
+--
+-- Not implemented: CR 608.2d's "can't choose an option that's illegal or
+-- impossible" -- a branch whose own `condition` has already failed is offered
+-- anyway, and choosing it leaves the pair doing nothing (#2167).
+chosenBranch :: ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map ClauseIndex ClauseIndex -> Clause.Clause Card.Type.Card -> Game (Bool, Map.Map ClauseIndex ClauseIndex)
+chosenBranch resolving controller idx cIdx picked clause = case Clause.orElse clause of
+  Nothing -> pure (True, picked)
+  Just sibling ->
+    let branches = NonEmpty.nub (NonEmpty.sort (cIdx NonEmpty.:| [sibling]))
+        key = NonEmpty.head branches
+     in case Map.lookup key picked of
+          Just winner -> pure (winner == cIdx, picked)
+          Nothing -> do
+            gs <- State.get
+            answered <- Game.choose (Prompt.ChooseClause (Decide.deciderFor controller gs) controller resolving idx branches)
+            let winner = if elem answered branches then answered else key
+            pure (winner == cIdx, Map.insert key winner picked)
 
 -- CR 603.5 / 608.2d: does this clause's instruction list happen at all? A
 -- mandatory clause always does; an optional one is its controller's call, made

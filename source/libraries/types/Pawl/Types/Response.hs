@@ -7,6 +7,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
@@ -360,6 +361,13 @@ data Response
     -- usually the resolving controller, and one answer per seat where the clause
     -- names several (Pawl.Types.Optionality.Optional).
     ChoseOptional OptionalDecision.OptionalDecision
+  | -- | CR 608.2d: which branch of an either-or clause pair the resolving
+    -- controller announced (Pawl.Types.Clause.orElse). Distinct from
+    -- ChoseOptional, which records whether the branch that WON is then
+    -- exercised: Twiddle asks both, one after the other, so two answers in one
+    -- replay are not a duplicate. Distinct from ChoseModes, which records CR
+    -- 700.2's cast-time modes and names them by ModeIndex.
+    ChoseClause ClauseIndex.ClauseIndex
   | -- | CR 608.2g: whether a player took a cast a resolving effect offered them.
     -- Distinct from ChoseOptional, which records CR 603.5's "may" over a whole
     -- CLAUSE, and from CastWhileSearched, which records the same rule's
