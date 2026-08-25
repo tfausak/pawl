@@ -15,6 +15,7 @@ import qualified Pawl.Codec.BecameBlocking as BecameBlocking
 import qualified Pawl.Codec.BecameDesignated as BecameDesignated
 import qualified Pawl.Codec.BecameTarget as BecameTarget
 import qualified Pawl.Codec.BlocksDeclared as BlocksDeclared
+import qualified Pawl.Codec.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Codec.ControlChanged as ControlChanged
 import qualified Pawl.Codec.CounterChange as CounterChange
 import qualified Pawl.Codec.Countering as Countering
@@ -82,6 +83,7 @@ codec =
       Arm.payload "Scried" PlayerId.codec GameEvent.Scried (\x -> case x of GameEvent.Scried y -> Just y; _ -> Nothing),
       Arm.payload "Surveiled" PlayerId.codec GameEvent.Surveiled (\x -> case x of GameEvent.Surveiled y -> Just y; _ -> Nothing),
       Arm.payload "DiceRolled" PlayerId.codec GameEvent.DiceRolled (\x -> case x of GameEvent.DiceRolled y -> Just y; _ -> Nothing),
+      Arm.payload "ClassLevelSet" ClassLevelChange.codec GameEvent.ClassLevelSet (\x -> case x of GameEvent.ClassLevelSet y -> Just y; _ -> Nothing),
       Arm.payload "Plotted" ObjectId.codec GameEvent.Plotted (\x -> case x of GameEvent.Plotted y -> Just y; _ -> Nothing),
       Arm.payload "Explored" ObjectId.codec GameEvent.Explored (\x -> case x of GameEvent.Explored y -> Just y; _ -> Nothing),
       Arm.payload "Exerted" ObjectId.codec GameEvent.Exerted (\x -> case x of GameEvent.Exerted y -> Just y; _ -> Nothing),

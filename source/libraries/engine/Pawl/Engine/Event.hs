@@ -70,6 +70,7 @@ import Pawl.Types.CandidateId (CandidateId)
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
@@ -472,6 +473,7 @@ movedOf event = case event of
   GameEvent.Scried _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
+  GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
   GameEvent.Exerted _ -> Nothing
@@ -520,6 +522,7 @@ damageOf event = case event of
   GameEvent.Scried _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
+  GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
   GameEvent.Exerted _ -> Nothing
@@ -568,6 +571,7 @@ revealOf event = case event of
   GameEvent.Scried _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
+  GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
   GameEvent.Exerted _ -> Nothing
@@ -4139,6 +4143,7 @@ countersRemovedFrom bearer wanted event = case event of
   GameEvent.Scried _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
+  GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
   GameEvent.Exerted _ -> Nothing
@@ -4236,6 +4241,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4308,6 +4314,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4355,6 +4362,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4408,6 +4416,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4465,6 +4474,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4530,6 +4540,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4596,6 +4607,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4664,6 +4676,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4719,6 +4732,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4782,6 +4796,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4842,6 +4857,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4902,6 +4918,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -4961,6 +4978,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5021,6 +5039,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5093,6 +5112,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5154,6 +5174,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5214,6 +5235,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5292,6 +5314,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5373,6 +5396,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5435,6 +5459,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5500,6 +5525,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5561,6 +5587,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5636,6 +5663,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5687,6 +5715,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5754,6 +5783,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5811,6 +5841,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5879,6 +5910,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -5937,6 +5969,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6007,6 +6040,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6062,6 +6096,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6117,6 +6152,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6175,6 +6211,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6233,6 +6270,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6304,6 +6342,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6388,6 +6427,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6454,6 +6494,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6488,6 +6529,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6550,6 +6592,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.Scried _ -> False
           GameEvent.Surveiled _ -> False
           GameEvent.DiceRolled _ -> False
+          GameEvent.ClassLevelSet _ -> False
           GameEvent.Plotted _ -> False
           GameEvent.Explored _ -> False
           GameEvent.Exerted _ -> False
@@ -6643,6 +6686,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6701,6 +6745,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6768,6 +6813,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6831,6 +6877,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6899,6 +6946,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -6934,6 +6982,73 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
       oid == bearer && kind == wanted && Saga.chapterTriggers (Saga.readAheadRestricted (Projection.project bearer gs) gs bearer) before after n
     -- Rule 714.2b says "are PUT onto", so a removal crosses nothing: a Saga whose
     -- lore counters were taken off and put back fires its chapters again.
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+  -- CR 716.2a: the BEARER's class level crossed N going up. "When this Class
+  -- becomes level N" is printed inside the level-N section, so CR 716.2a's static
+  -- half is what grants it, and CR 603.10 is what lets it see its own arrival:
+  -- "becomes level N" is not on that rule's exhaustive look-back list, so the
+  -- abilities checked are the ones existing immediately AFTER the level changed.
+  --
+  -- `before < n` is what stops a later bar re-firing an earlier section's
+  -- trigger: a Class going from level 2 to level 3 crosses 3 and nothing else.
+  --
+  -- `n <= after` rather than `n == after`, SelfCountersReached's reading of the
+  -- same shape: one write can cross several thresholds, so a Class set straight
+  -- from level 1 to level 3 fires both sections' triggers. No level bar can do
+  -- that (CR 716.2a's "only if this Class is level N-1"), which is why the two
+  -- readings coincide for every printing in `data/cards/` -- Effect.SetClassLevel
+  -- is an opcode, not a bar, and this is the reading the rule states.
+  --
+  -- Saga.crossed says the same sentence for lore counters and is deliberately not
+  -- reused: it is over Naturals, and its haddock ties it to CR 714.2b and to the
+  -- agreement CR 704.5s's state-based action needs with it. A class level is a
+  -- ClassLevel and has no state-based action to agree with.
+  TriggerCondition.SelfBecomesClassLevel n -> case event of
+    GameEvent.ClassLevelSet (ClassLevelChange.MkClassLevelChange oid before after) -> oid == bearer && before < n && n <= after
+    GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
@@ -7058,6 +7173,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7132,6 +7248,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7160,6 +7277,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7225,6 +7343,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7291,6 +7410,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7349,6 +7469,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7409,6 +7530,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7485,6 +7607,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7539,6 +7662,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7599,6 +7723,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7647,6 +7772,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7704,6 +7830,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7770,6 +7897,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7824,6 +7952,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7913,6 +8042,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -7969,6 +8099,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -8022,6 +8153,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -8105,6 +8237,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried scryer -> PlayerRelation.holds relation you scryer
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -8153,6 +8286,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled surveiller -> PlayerRelation.holds relation you surveiller
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -8210,6 +8344,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled roller -> PlayerRelation.holds relation you roller
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -8260,6 +8395,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted plotted -> plotted == bearer
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -8317,6 +8453,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored explorer -> case Projection.viewWithLastKnown explorer gs explorer of
       Nothing -> False
@@ -8369,6 +8506,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted oid -> oid == bearer
@@ -8435,6 +8573,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
@@ -8552,6 +8691,7 @@ reactsToAbilityTriggering cond = case cond of
   -- chapter ability itself a FIRST-pass trigger -- the other half of the pair
   -- this whole classification exists to separate.
   TriggerCondition.SelfCountersReached {} -> False
+  TriggerCondition.SelfBecomesClassLevel _ -> False
   TriggerCondition.SelfLastCounterRemoved _ -> False
   TriggerCondition.SelfCountersRemoved _ -> False
   TriggerCondition.SpellCast {} -> False
@@ -9382,6 +9522,7 @@ eventBindingSlots cond = case cond of
   -- event carries are the CONDITION's, not the payload's: no chapter ability in
   -- print says "that many", and eventBindings has no arm for this condition.
   TriggerCondition.SelfCountersReached {} -> Set.empty
+  TriggerCondition.SelfBecomesClassLevel _ -> Set.empty
   TriggerCondition.SelfLastCounterRemoved _ -> Set.empty
   -- CR 603.2's "that much", the one thing this condition binds that neither
   -- sibling does: Chandra, Fire Artisan reads the number of counters that came
@@ -9717,6 +9858,7 @@ looksBack condition = case condition of
   TriggerCondition.PlayerGainsLife _ -> False
   TriggerCondition.PlayerLosesLife _ -> False
   TriggerCondition.SelfCountersReached {} -> False
+  TriggerCondition.SelfBecomesClassLevel _ -> False
   TriggerCondition.SelfLastCounterRemoved _ -> False
   TriggerCondition.SelfCountersRemoved _ -> False
   TriggerCondition.SpellCast {} -> False
@@ -9847,6 +9989,7 @@ batchScoped condition = case condition of
   TriggerCondition.PlayerGainsLife _ -> False
   TriggerCondition.PlayerLosesLife _ -> False
   TriggerCondition.SelfCountersReached {} -> False
+  TriggerCondition.SelfBecomesClassLevel _ -> False
   TriggerCondition.SelfLastCounterRemoved _ -> False
   TriggerCondition.SelfCountersRemoved _ -> False
   TriggerCondition.SpellCast {} -> False
@@ -10066,6 +10209,7 @@ eventTriggers events gs =
         GameEvent.Scried _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
         GameEvent.DiceRolled _ -> Map.empty
+        GameEvent.ClassLevelSet _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
         GameEvent.Explored _ -> Map.empty
         GameEvent.Exerted _ -> Map.empty
@@ -10300,6 +10444,7 @@ eventTriggers events gs =
         GameEvent.Scried _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
         GameEvent.DiceRolled _ -> Map.empty
+        GameEvent.ClassLevelSet _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
         GameEvent.Explored _ -> Map.empty
         GameEvent.Exerted _ -> Map.empty
@@ -10501,6 +10646,7 @@ eventTriggers events gs =
         GameEvent.Scried _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
         GameEvent.DiceRolled _ -> Map.empty
+        GameEvent.ClassLevelSet _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
         GameEvent.Explored _ -> Map.empty
         GameEvent.Exerted _ -> Map.empty
@@ -10620,6 +10766,7 @@ eventTriggers events gs =
         GameEvent.Scried _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
         GameEvent.DiceRolled _ -> Map.empty
+        GameEvent.ClassLevelSet _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
         GameEvent.Explored _ -> Map.empty
         GameEvent.Exerted _ -> Map.empty
@@ -11048,6 +11195,7 @@ zonesTriggeredFrom cond = case cond of
   -- Saga's lore counters on the permanent -- so CR 113.6's default holds and a
   -- chapter ability functions from the battlefield alone.
   TriggerCondition.SelfCountersReached {} -> battlefield
+  TriggerCondition.SelfBecomesClassLevel _ -> battlefield
   TriggerCondition.SelfLastCounterRemoved _ -> battlefield
   TriggerCondition.SelfCountersRemoved _ -> battlefield
   -- CR 113.6's default: Young Pyromancer watches the stack from the battlefield,
@@ -11260,6 +11408,7 @@ controllerTurnScoped cond = case cond of
   -- 714.3c's turn-based action is the controller's own turn, and that is the
   -- action's restriction rather than this condition's.
   TriggerCondition.SelfCountersReached {} -> False
+  TriggerCondition.SelfBecomesClassLevel _ -> False
   TriggerCondition.SelfLastCounterRemoved _ -> False
   TriggerCondition.SelfCountersRemoved _ -> False
   -- CR 601.2i says nothing about whose turn it is and CR 117.1a lets an instant
@@ -11499,6 +11648,7 @@ stateTriggers gs
               -- exactly the difference CR 603.8 draws, and the reason a Saga does
               -- not re-run its final chapter for as long as it sits there.
               TriggerCondition.SelfCountersReached {} -> False
+              TriggerCondition.SelfBecomesClassLevel _ -> False
               TriggerCondition.SelfLastCounterRemoved _ -> False
               TriggerCondition.SelfCountersRemoved _ -> False
               TriggerCondition.SpellCast {} -> False

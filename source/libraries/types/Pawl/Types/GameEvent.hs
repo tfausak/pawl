@@ -9,6 +9,7 @@ import qualified Pawl.Types.BecameBlocking as BecameBlocking
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
+import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.ControlChanged as ControlChanged
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.Countering as Countering
@@ -894,6 +895,26 @@ data GameEvent
     -- Not implemented: how MANY dice one roll instruction threw (#2085), so
     -- one entry is one Effect.RollDie.
     DiceRolled PlayerId.PlayerId
+  | -- | CR 716.2a: a permanent's class level BECAME something. Recorded by
+    -- Pawl.Engine.Resolve's Effect.SetClassLevel arm, which is the only writer of
+    -- Object.classLevel in the engine, and what
+    -- TriggerCondition.SelfBecomesClassLevel watches (Stormchaser's Talent).
+    --
+    -- The level BEFORE and the level AFTER, GameEvent.CountersPut's shape and for
+    -- CR 714.2b's reason: "becomes level N" is a threshold crossing, and the new
+    -- level alone cannot say whether it was crossed.
+    --
+    -- Recorded only on a TRANSITION. CR 716.2a's ladder ("activate only if this
+    -- Class is level N-1") makes a bar unable to set a level it already has, but
+    -- Effect.SetClassLevel is an opcode any card could carry, and a CR 603.2 event
+    -- for a change that did not happen would fire a trigger that should not.
+    -- GameEvent.BecameDesignated beside it takes the same posture.
+    --
+    -- No CAUSE tag. Every level in `data/cards/` is set by a class level bar, and
+    -- CR 716.2b makes the level a designation of the permanent rather than of the
+    -- effect, so nothing a reader asks about the change is answered by which
+    -- effect made it.
+    ClassLevelSet ClassLevelChange.ClassLevelChange
   | -- | CR 702.170a: a card became a plotted card. The ObjectId is the card AS
     -- IT SITS IN EXILE -- Pawl.Engine.Plot.plot's `newId` and not the object
     -- that was in the hand -- because CR 400.7 mints a new object as it moves
