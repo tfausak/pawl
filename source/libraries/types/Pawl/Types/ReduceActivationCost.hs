@@ -23,7 +23,8 @@ import qualified Pawl.Types.ManaCost as ManaCost
 -- `grantedBy` names the KIND of ability instead: Nothing is every activated
 -- ability of a matching source, and Just a family is only the ability rule 702
 -- mints for a keyword of that family, which is Fluctuator's "CYCLING abilities
--- you activate" (#1431). A source filter cannot say that -- a Barkhide Mauler in
+-- you activate", and Bureau Headmaster's "EQUIP abilities you activate". A
+-- source filter cannot say that -- a Barkhide Mauler in
 -- a hand is not distinguished from itself by anything about the object -- and an
 -- ability-shaped Filter atom put in `whichAbilities` could never be true there,
 -- since that field is matched against the object and not the ability.

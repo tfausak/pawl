@@ -153,7 +153,8 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
     Spec.assertEqWith s "the first creature is back to 2 power" (Projection.powerOf first after) (Just 2)
     Spec.assertEqWith s "the second is 3+2" (Projection.powerOf second after) (Just 5)
   -- The gameplay-level proof design.md section 4 asks for: cast Bonesplitter,
-  -- activate its printed equip ability through the real activation path, let
+  -- activate the equip ability rule 702.6a mints from its keyword through the
+  -- real activation path, let
   -- it resolve, and see the creature actually hit harder. Everything above
   -- drives Effect.Attach directly; this drives the CARD.
   Spec.it s "CR 702.6 whole card: cast Bonesplitter, equip a Piker, and it swings for 4" $ do

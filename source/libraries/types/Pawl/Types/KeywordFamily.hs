@@ -39,8 +39,8 @@ module Pawl.Types.KeywordFamily where
 data KeywordFamily
   = -- | CR 702.6a: equip [cost]. Bureau Headmaster's "equip abilities you
     -- activate cost {1} less to activate" is the card asking, through
-    -- Pawl.Types.ReduceActivationCost's @grantedBy@ rather than through a Filter
-    -- (#1431).
+    -- Pawl.Types.ReduceActivationCost's @grantedBy@ rather than through a
+    -- Filter.
     Equip
   | -- | CR 702.11d: hexproof from [quality].
     Hexproof

@@ -16,8 +16,8 @@ import qualified Pawl.Types.Keyword as Keyword
 -- enchanted creature" -- and is matched by
 -- Pawl.Engine.PlayerEffect.matchesObjectFrom against that object's projection.
 -- There is no `grantedBy` beside it, because no producer narrows an increase by
--- the KIND of ability: Suppression Field's "unless they're mana abilities" is
--- that narrowing and it has no arm here yet (#1431).
+-- the KIND of ability. Not implemented: CR 605.1a's "unless they're mana
+-- abilities", which Suppression Field prints (#2293).
 data IncreaseActivationCost = MkIncreaseActivationCost
   { whichAbilities :: Filter.Filter Keyword.Keyword,
     amount :: Natural.Natural

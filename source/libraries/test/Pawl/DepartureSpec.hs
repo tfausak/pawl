@@ -347,7 +347,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   -- first clause does not take it with the Song: it is the survivor the effect
   -- has to go on applying to. Its mana value is 1, so the animation is a 1/1
   -- rather than a 0/0 CR 704.5f would bury before the assertion reads it, and
-  -- its printed Equip ability is what makes the layer-6 strip observable at all.
+  -- the equip ability rule 702.6a mints from its keyword is what makes the
+  -- layer-6 strip observable at all.
   --
   -- The three `gone` readings come FIRST, ahead of the two that say the
   -- departure really happened: those two are true whether or not anything was

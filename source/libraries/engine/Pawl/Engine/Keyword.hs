@@ -1465,7 +1465,7 @@ mintsCombatRestriction = not . null . mintedCombatRestrictionsFor
 -- are `counts`, as a family designator -- the classification
 -- Pawl.Types.ReduceActivationCost.grantedBy compares, so that Fluctuator's
 -- "cycling abilities you activate" reaches rule 702.29a's minted ability and
--- nothing else (#1431). Nothing is "no keyword of this object minted it", which
+-- nothing else. Nothing is "no keyword of this object minted it", which
 -- is every ability the card itself prints.
 --
 -- Answered by re-minting rather than by a provenance field on the ability:
@@ -1518,7 +1518,8 @@ familyGranting counts ability =
 familyOf :: Keyword -> Maybe KeywordFamily.KeywordFamily
 familyOf keyword = case keyword of
   -- CR 702.6a's parameterized keyword: "equip abilities" drops the cost, which
-  -- is what Bureau Headmaster's reduction names (#1431).
+  -- is what Bureau Headmaster's reduction names -- Pawl.ActivateSpec's "Equip"
+  -- group is what proves it.
   Keyword.Equip _ -> Just KeywordFamily.Equip
   Keyword.Hexproof _ -> Just KeywordFamily.Hexproof
   Keyword.Landwalk _ -> Just KeywordFamily.Landwalk

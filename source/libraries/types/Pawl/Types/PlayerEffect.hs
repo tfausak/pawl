@@ -117,13 +117,12 @@ data PlayerEffect
     -- ReduceActivationCost.grantedBy, which names a rule-702 family rather than a
     -- Filter; see that type for why the two cannot be one field.
     --
-    -- Not expressible: a reducer that narrows by a kind rule 702 does not name.
-    -- Helitrooper's "equip abilities you activate that target this creature" is
-    -- the shape left out twice over -- pawl models equip as a printed activated
-    -- ability rather than a keyword, so no family designates it, and no criterion
-    -- can read an ability's TARGETS either. This arm can only state it as "the
-    -- activated abilities of a permanent matching X", which is WEAKER than the
-    -- card prints, so no such card belongs in the pool (#1431).
+    -- Not implemented: narrowing by what an ability TARGETS. Helitrooper's
+    -- "equip abilities you activate that target this creature" names the equip
+    -- family this arm can now designate, and then a target its criteria cannot
+    -- read; stated as "the activated abilities of a permanent matching X" it
+    -- would be WEAKER than the card prints, so no such card belongs in the pool
+    -- (#2292).
     --
     -- The FLOOR is carried rather than assumed, because it is card text (CR
     -- 101.1) and not a rule: both printings say "This effect can't reduce the
@@ -135,8 +134,9 @@ data PlayerEffect
     -- floor over the pool.
     --
     -- IncreaseActivationCost above is this arm's sibling. Not implemented:
-    -- narrowing either of them by the KIND of ability, which Suppression Field's
-    -- "unless they're mana abilities" needs (#1431).
+    -- narrowing either of them by CR 605.1a's mana-ability classification, which
+    -- Suppression Field's and Zirda, the Dawnwaker's "aren't mana abilities"
+    -- needs (#2293).
     ReduceActivationCost ReduceActivationCost.ReduceActivationCost
   | -- | CR 613.11 / 601.2f / Brutal Suppression: the activated abilities of
     -- matching permanents cost these additional NON-MANA components to activate

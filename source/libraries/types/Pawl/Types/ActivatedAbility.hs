@@ -23,8 +23,10 @@ data ActivatedAbility card = MkActivatedAbility
   { cost :: Cost.Cost Keyword.Keyword,
     modal :: Modal.Modal card,
     -- | CR 602.5: every clause of the "activate only ..." rider the ability
-    -- prints, ALL of which must hold. Empty for an ability without one, which is
-    -- all of them but equip and a handful of printed windows.
+    -- carries, ALL of which must hold. Empty for an ability without one, which is
+    -- most of them: the riders in the pool are the sorcery-speed ones rule 702
+    -- states for equip (702.6a), level up (702.87a) and outlast (702.107a), plus
+    -- a handful of printed windows.
     restrictions :: [ActivationRestriction.ActivationRestriction],
     -- | The "as long as" clause of a static ability that GRANTS this one, or
     -- Nothing for an ability the object simply has, which is nearly all of them.
