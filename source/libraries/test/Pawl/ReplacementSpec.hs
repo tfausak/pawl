@@ -2334,8 +2334,8 @@ moonmistSpec s registry = Spec.describe s "Moonmist (CR 615.1, CR 609.7b)" $ do
       Spec.assertEqWith s "while a Goblin Warrior, the 2 is prevented whole" (S.lifeOf S.alice asPrinted) (Just 20)
       Spec.assertEqWith s "once a Wolf, the same 2 is dealt" (S.lifeOf S.alice after) (Just 18)
 
--- CR 615.13's trigger, whose one producer in the pool is Selfless Squire ({3}{W}
--- Creature -- Human Soldier 1/1, Flash, "When this creature enters, prevent all
+-- CR 615.13's trigger read BLIND to which prevention applied: Selfless Squire
+-- ({3}{W} Creature -- Human Soldier 1/1, Flash, "When this creature enters, prevent all
 -- damage that would be dealt to you this turn. Whenever damage that would be
 -- dealt to you is prevented, put that many +1/+1 counters on this creature").
 --
@@ -2462,6 +2462,151 @@ selflessSquireSpec s registry = Spec.describe s "Selfless Squire (CR 615.13)" $ 
     Spec.assertEqWith s "alice's 3 was prevented too" (S.lifeOf S.alice playerAfter) (Just 20)
     Spec.assertEqWith s "and THAT fired the Squire" (length (GameState.stack playerDealt)) 1
     Spec.assertEqWith s "for 3 counters, off a prevention its own ability had nothing to do with" (S.powerToughnessOf squire playerAfter) (Just (4, 4))
+
+-- Aim every target slot at the FIRST of `wanted` the offered set actually holds.
+-- The offered set is FILTERED rather than a recipient built by hand: CR 608.2b
+-- re-reads a spell or ability's targets as it resolves, and a hand-built
+-- recipient that is not the one the pool offered is dropped there with no error.
+--
+-- Order matters at the call site: a reach for a recipient the pool must NOT
+-- offer, with a fallback behind it, is how "any OTHER target" is observed --
+-- the fallback is chosen precisely because the first was not there.
+preferTarget :: [Recipient.Recipient] -> Prompt.Prompt r -> r
+preferTarget wanted p = case p of
+  Prompt.ChooseTargets _ _ _ sets ->
+    fmap (\(_, legal) -> maybe Set.empty Set.singleton (List.find (`Set.member` legal) wanted)) sets
+  _ -> S.identityAnswer p
+
+-- CR 616.1's choice between the two prevention effects one shielded Phyrexian
+-- Vindicator offers: the one its card PRINTS and CR 122.1c's minted
+-- shield-counter pair. Both name the same source, so the entries are told apart
+-- by the rewrite -- which is also the only thing that differs between them.
+raceShield :: Bool -> [Recipient.Recipient] -> Prompt.Prompt r -> r
+raceShield wantMinted wanted p = case p of
+  Prompt.ChooseReplacement _ _ entries ->
+    let minted entry = case ReplacementEntry.effect entry of
+          ReplacementEffect.DamageR (DamageR.MkDamageR _ DamageRewrite.PreventRemovingShieldCounter _) -> True
+          _ -> False
+     in maybe 0 Int.toNaturalSaturating (List.findIndex ((== wantMinted) . minted) entries)
+  _ -> preferTarget wanted p
+
+-- CR 616.1's choice between a permanent's own prevention effect and a FLOATING
+-- one somebody else installed, told apart by whose object the entry names.
+raceIsSelf :: Bool -> ObjectId.ObjectId -> [Recipient.Recipient] -> Prompt.Prompt r -> r
+raceIsSelf wantSelf oid wanted p = case p of
+  Prompt.ChooseReplacement _ _ entries ->
+    maybe 0 Int.toNaturalSaturating (List.findIndex ((== wantSelf) . (== oid) . ReplacementEntry.source) entries)
+  _ -> preferTarget wanted p
+
+-- Settle one damage batch, then let whatever it triggered go on the stack and
+-- resolve. selflessSquireSpec's local twin, top-level because the answer is
+-- rank-2 and these cases hand it a different one per case.
+strikeAndSettleWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> [DamageEvent.DamageEvent] -> (GameState.GameState, GameState.GameState)
+strikeAndSettleWith answer gs batch =
+  let dealt = S.runPure answer gs (Damage.applyDamage batch >> Engine.settleForPriority)
+   in (dealt, S.runPure answer dealt Stack.resolveTop)
+
+-- CR 615.13 read the OTHER way -- "prevented THIS WAY". Phyrexian Vindicator
+-- ({W}{W}{W}{W} Creature -- Phyrexian Horror 5/5, "Flying / If damage would be
+-- dealt to this creature, prevent that damage. When damage is prevented this
+-- way, this creature deals that much damage to any other target"), whose trigger
+-- fires for its OWN prevention effect where Selfless Squire above fires for
+-- anybody's.
+--
+-- One prevention on the board cannot tell those two readings apart, so the two
+-- discriminating cases each put a SECOND one on the same creature -- CR 122.1c's
+-- shield-counter pair, and Mending Hands' floating shield. Either stops the same
+-- event, addressed to the same recipient, for the same amount, so the CR 616.1
+-- choice of which applies is the only thing that differs between the branches;
+-- an implementation firing on any prevention at all passes the whole-card case
+-- and fails both of those.
+phyrexianVindicatorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+phyrexianVindicatorSpec s registry = Spec.describe s "Phyrexian Vindicator (CR 615.13)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+      onlyBob = [Recipient.ToPlayer S.bob]
+  -- THE WHOLE CARD: the Vindicator's own prevention stops 4 (CR 615.6), its
+  -- paired trigger reads how much that was, and the 4 lands on bob instead.
+  Spec.it s "CR 615.13 whole card: its own prevention fires the trigger, which deals that much to another target" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    vindicatorPrinting <- S.printingOf s registry "Phyrexian Vindicator"
+    let base = S.landsInPlay plains 1
+        (attacker, g1) = S.addCreature pikerPrinting S.bob base
+        (vindicator, g2) = S.addCreature vindicatorPrinting S.alice g1
+        (dealt, after) = strikeAndSettleWith (preferTarget onlyBob) g2 [hit attacker (Recipient.ToCreature vindicator) 4]
+    Spec.assertEqWith s "setup: the 5/5 is on the battlefield undamaged" (S.damageOf vindicator g2) (Just 0)
+    -- The gameplay assertion, ahead of every proxy: 4 prevented is 4 dealt to
+    -- somebody else, and bob's life is the only place that shows.
+    Spec.assertEqWith s "bob took the 4 the Vindicator's own prevention stopped" (S.lifeOf S.bob after) (Just 16)
+    Spec.assertEqWith s "and the Vindicator itself took none of it (CR 615.6)" (S.damageOf vindicator after) (Just 0)
+    Spec.assertEqWith s "exactly one trigger was gathered" (length (GameState.stack dealt)) 1
+  -- THE DISCRIMINATOR. One shielded Vindicator, one 4-damage event, and a CR
+  -- 616.1 choice answered both ways. Rule 122.1c's pair is minted onto the
+  -- permanent by the rules rather than printed on its card, so the damage it
+  -- prevents was not prevented "this way" and the trigger stays silent -- while
+  -- the very same board, choosing the printed ability instead, fires it.
+  Spec.it s "CR 122.1c a shield counter's prevention is not 'this way', and the same board's printed one is" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    vindicatorPrinting <- S.printingOf s registry "Phyrexian Vindicator"
+    let base = S.landsInPlay plains 1
+        (attacker, g1) = S.addCreature pikerPrinting S.bob base
+        (vindicator, g2) = S.addCreature vindicatorPrinting S.alice g1
+        shielded = S.addCounter CounterKind.Shield 1 vindicator g2
+        batch = [hit attacker (Recipient.ToCreature vindicator) 4]
+        (mintedDealt, mintedAfter) = strikeAndSettleWith (raceShield True onlyBob) shielded batch
+        (printedDealt, printedAfter) = strikeAndSettleWith (raceShield False onlyBob) shielded batch
+    Spec.assertEqWith s "setup: the Vindicator carries one shield counter" (countersOn CounterKind.Shield vindicator shielded) 1
+    -- The pair, in the order that makes the point: the same 4 is prevented on
+    -- both branches, and only the printed prevention reaches bob.
+    Spec.assertEqWith s "the counter's prevention leaves bob untouched" (S.lifeOf S.bob mintedAfter) (Just 20)
+    Spec.assertEqWith s "the printed one deals him the same 4" (S.lifeOf S.bob printedAfter) (Just 16)
+    Spec.assertEqWith s "both prevented the whole 4 off the Vindicator" (fmap (S.damageOf vindicator) [mintedAfter, printedAfter]) [Just 0, Just 0]
+    Spec.assertEqWith s "nothing triggered off the counter's prevention" (length (GameState.stack mintedDealt)) 0
+    Spec.assertEqWith s "and the printed one triggered once" (length (GameState.stack printedDealt)) 1
+    -- CR 122.1c removes a counter as it prevents, which is what pins WHICH
+    -- prevention each branch actually applied.
+    Spec.assertEqWith s "the counter was spent on the minted branch" (countersOn CounterKind.Shield vindicator mintedAfter) 0
+    Spec.assertEqWith s "and left alone on the printed one" (countersOn CounterKind.Shield vindicator printedAfter) 1
+  -- The FLOATING rival, and the Squire's ruling read from the other end. Mending
+  -- Hands ({W} Instant, "Prevent the next 4 damage that would be dealt to any
+  -- target this turn") shields the Vindicator for exactly the amount its own
+  -- ability would have stopped, so the two candidates race for one event and
+  -- neither the recipient nor the amount can tell them apart -- only whose effect
+  -- it was. A prevention of somebody else's is not "this way".
+  Spec.it s "CR 615.13 another card's prevention of the same 4, on the same creature, is not 'this way'" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    vindicatorPrinting <- S.printingOf s registry "Phyrexian Vindicator"
+    mendingHands <- S.printingOf s registry "Mending Hands"
+    let base = S.landsInPlay plains 1
+        (attacker, g1) = S.addCreature pikerPrinting S.bob base
+        (vindicator, g2) = S.addCreature vindicatorPrinting S.alice g1
+        (g3, spellId) = S.handOne mendingHands g2
+        shielded = castAndResolve (preferTarget [Recipient.ToCreature vindicator]) g3 spellId
+        batch = [hit attacker (Recipient.ToCreature vindicator) 4]
+        (theirsDealt, theirsAfter) = strikeAndSettleWith (raceIsSelf False vindicator onlyBob) shielded batch
+        (oursDealt, oursAfter) = strikeAndSettleWith (raceIsSelf True vindicator onlyBob) shielded batch
+    Spec.assertEqWith s "setup: Mending Hands left a floating shield behind" (length (GameState.replacements shielded)) 1
+    Spec.assertEqWith s "Mending Hands' prevention leaves bob untouched" (S.lifeOf S.bob theirsAfter) (Just 20)
+    Spec.assertEqWith s "the Vindicator's own deals him the same 4" (S.lifeOf S.bob oursAfter) (Just 16)
+    Spec.assertEqWith s "both prevented the whole 4 off the Vindicator" (fmap (S.damageOf vindicator) [theirsAfter, oursAfter]) [Just 0, Just 0]
+    Spec.assertEqWith s "nothing triggered off Mending Hands' prevention" (length (GameState.stack theirsDealt)) 0
+    Spec.assertEqWith s "and the Vindicator's own triggered once" (length (GameState.stack oursDealt)) 1
+  -- "Any OTHER target": the answerer reaches for the Vindicator first and takes
+  -- bob only because the pool never offers it. Damage the Vindicator dealt
+  -- ITSELF would be prevented by its own shield (CR 615.6) and so leave no mark,
+  -- which is why bob's life is what this reads.
+  Spec.it s "CR 115.4 the trigger's pool excludes its own source: 'any OTHER target'" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    vindicatorPrinting <- S.printingOf s registry "Phyrexian Vindicator"
+    let base = S.landsInPlay plains 1
+        (attacker, g1) = S.addCreature pikerPrinting S.bob base
+        (vindicator, g2) = S.addCreature vindicatorPrinting S.alice g1
+        (_, after) = strikeAndSettleWith (preferTarget (Recipient.ToCreature vindicator : onlyBob)) g2 [hit attacker (Recipient.ToCreature vindicator) 4]
+    Spec.assertEqWith s "the Vindicator was not offered, so the fallback took the 4" (S.lifeOf S.bob after) (Just 16)
 
 -- alice is mid-combat attacking with `mine`; bob defends holding `spells` and
 -- `lands` untapped Plains that pay for them. Sits at the declare attackers step
@@ -3820,6 +3965,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   luminesceSpec s registry
   moonmistSpec s registry
   selflessSquireSpec s registry
+  phyrexianVindicatorSpec s registry
   turnTheTablesSpec s registry
   oraclesAttendantsSpec s registry
   gatherSpecimensSpec s registry

@@ -42,9 +42,9 @@ import qualified Pawl.Types.Uses as Uses
 -- GameState.nextTimestamp is monotone, so no two floating replacements share one.
 -- That identity is also what CR 615.13's preventions are GROUPED by
 -- (Pawl.Engine.Replacement.groupPreventions), so a shield spent across two
--- simultaneous events fires a "when damage is prevented" ability once. Not
--- implemented: nothing carries it further than the grouping, so a trigger cannot
--- be keyed to the prevention that fired it -- "prevented this way" (#687).
+-- simultaneous events fires a "when damage is prevented" ability once -- and it
+-- rides the recorded event, which is how a trigger is keyed to the prevention
+-- that fired it ("prevented this way"; see Pawl.Types.DamagePrevented).
 --
 -- `origin` is CR 614.15's question, and this carrier is the only one that can be
 -- asked it: a self-replacement is an effect of a resolving spell or ability,

@@ -772,6 +772,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SpellOrAbilityCounters _ -> []
   -- CR 615.13's prevention condition is a PlayerRelation too.
   TriggerCondition.DamageToPlayerPrevented _ -> []
+  -- Rule 615.13's other reading is nullary, so it holds no Count either.
+  TriggerCondition.SelfPreventsDamage -> []
   TriggerCondition.PlayerGainsLife _ -> []
   TriggerCondition.PlayerLosesLife _ -> []
   -- CR 714.2b carries a counter kind and a Natural, neither of which is a Count.
@@ -1769,7 +1771,8 @@ isPhaseR replacement = case replacement of
 -- CR 615.5: "SOME PREVENTION EFFECTS also include an additional effect." So a
 -- rider beside a rewrite that prevents nothing is a shape the type admits and
 -- the rule does not -- Furnace of Rath's doubling with counters hung off it is
--- not a card. Stormwild Capridor's PreventAll is the pool's one producer.
+-- not a card. Stormwild Capridor is the pool's one card printing such a rider;
+-- other cards print a PreventAll without one (Phyrexian Vindicator).
 --
 -- Exhaustive rather than a wildcard, this file's discipline for a sum: an arm
 -- that gains a riders field of its own must be classified here.
@@ -3207,6 +3210,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.HauntedCreatureDies -> []
   TriggerCondition.SpellOrAbilityCounters _ -> []
   TriggerCondition.DamageToPlayerPrevented _ -> []
+  TriggerCondition.SelfPreventsDamage -> []
   TriggerCondition.PlayerGainsLife _ -> []
   TriggerCondition.PlayerLosesLife _ -> []
   -- CR 714.2b carries a counter kind and a Natural, neither of which is a Count.
