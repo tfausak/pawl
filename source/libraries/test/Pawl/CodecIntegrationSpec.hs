@@ -32,6 +32,7 @@ import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Counter as Counter
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
@@ -338,3 +339,16 @@ gameStateRoundTripSpec s registry = do
     let (_, gs) = S.addCreature piker S.alice (S.oneMountainState mountain Phase.PrecombatMain)
     Spec.assertBool s (Map.size (GameState.printings gs) >= 2) "the fixture should hold two printings"
     roundTrips "two interned printings" gs
+
+  -- Task 1 of #1996: enteringCounters is written by nobody yet, so this case
+  -- forces the field non-empty by hand rather than through play.
+  Spec.it s "a pending entry counter round trips" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (oid, gs0) = S.addCreature piker S.alice (S.oneMountainState mountain Phase.PrecombatMain)
+        gs =
+          gs0
+            { GameState.enteringCounters =
+                Map.singleton oid (Map.singleton CounterKind.PlusOnePlusOne 2)
+            }
+    roundTrips "a pending +1/+1 counter" gs
