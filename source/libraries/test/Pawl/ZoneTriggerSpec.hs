@@ -38,6 +38,7 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecameAttached as BecameAttached
+import qualified Pawl.Types.BecameAttacked as BecameAttacked
 import qualified Pawl.Types.BecameBlocking as BecameBlocking
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
@@ -1836,7 +1837,7 @@ representativeEvents cond =
         -- per target the declaration named. carol again, and it is the PLAYER this
         -- one binds -- the arm above binds the attacker off its own event, and the
         -- pin is what keeps the two from drifting together.
-        TriggerCondition.AttachedPlayerIsAttacked -> one (GameEvent.BecameAttacked (AttackTarget.OfPlayer S.carol))
+        TriggerCondition.AttachedPlayerIsAttacked -> one (GameEvent.BecameAttacked (BecameAttacked.MkBecameAttacked S.bob (AttackTarget.OfPlayer S.carol)))
         -- CR 508.3d's third arity: the once-per-DECLARATION event, naming the
         -- player who declared. Nothing is bound off it -- rule 508.3d names a set
         -- of creatures rather than one -- so this pins an EMPTY floor, which is
@@ -1847,6 +1848,11 @@ representativeEvents cond =
         -- 508.3c's Filter narrows the creatures rather than naming one, so there
         -- is nothing to bind here either.
         TriggerCondition.PlayerAttacksWith {} -> one (GameEvent.AttackersDeclared S.carol)
+        -- The GROUPED event once more, and the same PLAYER slot the arm three
+        -- above pins -- CR 508.3e's ATTACKED player, which is bob here and not
+        -- the carol who declared, so an arm that bound the attacking side
+        -- instead would disagree with eventBindingSlots on this event.
+        TriggerCondition.PlayerAttacksPlayer {} -> one (GameEvent.BecameAttacked (BecameAttacked.MkBecameAttacked S.carol (AttackTarget.OfPlayer S.bob)))
         -- The same declaration event once more. Rule 702.105a binds NOTHING off
         -- it, SelfAttacksWithAnother's case: the player it compares is read from
         -- Combat.attackers and then never named again.
@@ -2112,6 +2118,9 @@ everyTriggerCondition =
     TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith PlayerRelation.You (Filter.Type.And [])),
     TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith PlayerRelation.Opponent (Filter.Type.And [])),
     TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith PlayerRelation.AnyPlayer (Filter.Type.And [])),
+    TriggerCondition.PlayerAttacksPlayer PlayerRelation.You,
+    TriggerCondition.PlayerAttacksPlayer PlayerRelation.Opponent,
+    TriggerCondition.PlayerAttacksPlayer PlayerRelation.AnyPlayer,
     TriggerCondition.SelfAttacksPlayerWithMostLife,
     TriggerCondition.SelfBlocks,
     TriggerCondition.SelfBlocksAtLeast 2,

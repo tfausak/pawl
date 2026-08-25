@@ -31,6 +31,7 @@ import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
+import qualified Pawl.Types.BecameAttacked as BecameAttacked
 import qualified Pawl.Types.BecameBlocking as BecameBlocking
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CardType as CardType
@@ -164,7 +165,7 @@ attackableBattles defender gs =
 -- Not implemented: CR 508.3b's planeswalker and battle subjects. The event that
 -- would carry them is there -- GameEvent.BecameAttacked names the permanent --
 -- and no trigger condition asks; Pawl.Types.TriggerCondition's
--- AttachedPlayerIsAttacked records the sweep behind that (#538).
+-- AttachedPlayerIsAttacked records the sweep behind that (#2279).
 stillAttacked :: ObjectId -> GameState -> Bool
 stillAttacked oid gs = case Combat.defender (GameState.combat gs) of
   -- No defending player is no attack (see Pawl.Types.Combat's defender field).
@@ -1245,10 +1246,10 @@ attemptAttackDeclaration pid defender rejected = do
               -- fallback: every target here came from attackTargets, and each of
               -- the three arms answers a player for one of those.
               --
-              -- Not implemented: CR 508.3a's attacks-a-permanent form and CR
-              -- 508.3e, neither of which the two events below can be matched on --
-              -- the first needs the target beside the ATTACKER's identity, the
-              -- second the attacking player beside the target (#538).
+              -- Not implemented: CR 508.3a's attacks-a-permanent form, which
+              -- neither event below can be matched on -- it needs the target
+              -- beside the ATTACKER's identity, and this one carries CR 508.5's
+              -- defending player instead (#2279).
               State.modify'
                 ( \g ->
                     let defendingFor oid = Maybe.fromMaybe defender ((\t -> Defender.playerOf t g) =<< Map.lookup oid recorded)
@@ -1260,13 +1261,18 @@ attemptAttackDeclaration pid defender rejected = do
               -- creatures were sent at was attacked once. A Set is what makes that
               -- structural, and it orders the batch deterministically besides.
               --
+              -- `pid` rides every one of them, which is CR 508.3e's first
+              -- subject: rule 508.1 gives a declaration ONE declaring player, so
+              -- the pair (attacker, target) is already this batch's key and no
+              -- second grouping is needed.
+              --
               -- After the per-creature batch above, since CR 508.2b puts every
               -- trigger from this declaration on the stack together and the order
               -- they triggered in does not matter.
               State.modify'
                 ( \g ->
                     let attacked = Set.fromList (Maybe.mapMaybe (\oid -> Map.lookup oid recorded) attacking)
-                     in List.foldl' (\h t -> Event.recordEvent (GameEvent.BecameAttacked t) h) g (Set.toList attacked)
+                     in List.foldl' (\h t -> Event.recordEvent (GameEvent.BecameAttacked (BecameAttacked.MkBecameAttacked pid t)) h) g (Set.toList attacked)
                 )
               -- CR 508.3d's arity, which is neither of the two above: the
               -- DECLARATION's, so one event however many creatures were named and

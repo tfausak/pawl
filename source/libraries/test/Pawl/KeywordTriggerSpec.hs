@@ -1117,11 +1117,11 @@ selfBlocksOneOrMoreSpec s registry =
 -- blocked by two or more creatures, that attacking creature gains deathtouch
 -- until end of turn", is the card.
 --
--- Not implemented, so the card file omits it: Seifer's second line, "Whenever
--- you attack a player, goad target creature that player controls" -- CR 508.3e's
--- "[a player] attacks [another player]" has no TriggerCondition (#538). That
--- leaves pawl's Seifer STRICTER than printed, doing less for its controller
--- rather than more; goad itself (CR 701.15) is there.
+-- Seifer's second line, "Whenever you attack a player, goad target creature that
+-- player controls", is CR 508.3e's and lives in Pawl.EventTriggerSpec with the
+-- rest of rule 508.3's player subjects. It fires on every board below, which is
+-- why `firedBy` asks which CONDITION triggered rather than counting Seifer's
+-- triggers.
 --
 -- Llanowar Elves 1/1 attacks and Hill Giant 3/3 blocks, which is what makes the
 -- grant observable without depending on how a damage assignment is split: one
@@ -1159,8 +1159,19 @@ creatureBecomesBlockedByAtLeastSpec s registry =
       afterCombatAt walker attacker blockers = S.runToStep (Phase.Combat CombatStep.EndOfCombat) (declaringAt walker attacker blockers)
       giants :: GameState.GameState -> Int
       giants = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Hill Giant")) S.bob
+      -- Scoped to rule 509.3e's CONDITION and not merely to Seifer: the card's
+      -- other trigger (CR 508.3e) fires off the same declaration, so counting
+      -- the source alone would count both.
       firedBy :: ObjectId.ObjectId -> GameState.GameState -> Int
-      firedBy oid gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, AbilityTriggered.source record == oid]
+      firedBy oid gs =
+        length
+          [ ()
+          | GameEvent.AbilityTriggered record <- S.eventsOf gs,
+            AbilityTriggered.source record == oid,
+            case AbilityTriggered.condition record of
+              TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> True
+              _ -> False
+          ]
    in Spec.describe s "CreatureBecomesBlockedByAtLeast" $ do
         -- The proving test and its control on ONE board: the same Elves, the same
         -- two Giants, the same Seifer, and only the size of the block differs. Two
