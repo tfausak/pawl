@@ -450,14 +450,21 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.DamageToPlayerPrevented PlayerRelation.Opponent)
       " {\"type\":\"DamageToPlayerPrevented\",\"value\":{\"type\":\"Opponent\"}} "
-  -- Rule 615.13's other reading, "prevented this way". Nullary: its subject is
-  -- the bearer's own prevention effect, so there is no relation to carry.
-  Spec.it s "SelfPreventsDamage" $
+  -- Rule 615.13's other reading, "prevented this way". No relation -- its subject
+  -- is the bearer's own prevention effect -- but a Filter over the damage's
+  -- source, which Samite Ministration's "black or red" carries and Phyrexian
+  -- Vindicator leaves trivial.
+  Spec.it s "SelfPreventsDamage round-trips with its Filter" $ do
     Common.assertCodec
       s
       TriggerCondition.codec
-      TriggerCondition.SelfPreventsDamage
-      " {\"type\":\"SelfPreventsDamage\"} "
+      (TriggerCondition.SelfPreventsDamage (Filter.And []))
+      " {\"type\":\"SelfPreventsDamage\",\"value\":{\"type\":\"And\",\"value\":[]}} "
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.SelfPreventsDamage (Filter.Or [Filter.HasColor Color.Black, Filter.HasColor Color.Red]))
+      " {\"type\":\"SelfPreventsDamage\",\"value\":{\"type\":\"Or\",\"value\":[{\"type\":\"HasColor\",\"value\":{\"type\":\"Black\"}},{\"type\":\"HasColor\",\"value\":{\"type\":\"Red\"}}]}} "
   -- CR 119.9's life-gain trigger. Both relations, for the same reason.
   Spec.it s "PlayerGainsLife round-trips both relations" $ do
     Common.assertCodec

@@ -2,6 +2,7 @@ module Pawl.Types.Prevention where
 
 import Numeric.Natural (Natural)
 import qualified Pawl.Types.CandidateId as CandidateId
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PreventionRider as PreventionRider
 import qualified Pawl.Types.Recipient as Recipient
 
@@ -19,6 +20,14 @@ import qualified Pawl.Types.Recipient as Recipient
 -- printing "prevented this way" compares against (Phyrexian Vindicator; see
 -- Pawl.Types.DamagePrevented).
 --
+-- `source` is CR 120.1's source of the damage that did not happen, read off the
+-- PROPOSED event for `recipient`'s reason below: the shield watches "damage that
+-- WOULD be dealt", so the event as offered is the one the rule describes. It is
+-- carried so Pawl.Types.DamagePrevented can carry it, a source filter being the
+-- one question CR 615.13's trigger can ask that `by` does not already settle.
+--
+-- Not a grouping key, unlike `by`: see Pawl.Engine.Replacement.groupPreventions.
+--
 -- `amount` is the damage this instance stopped, which is the whole point of the
 -- type: the CR 616.1 loop's own answer is the SURVIVING event, and a caller
 -- holding only that cannot tell a prevented 3 from an event that was never
@@ -32,6 +41,7 @@ import qualified Pawl.Types.Recipient as Recipient
 -- it.
 data Prevention = MkPrevention
   { by :: CandidateId.CandidateId,
+    source :: ObjectId.ObjectId,
     recipient :: Recipient.Recipient,
     amount :: Natural,
     rider :: Maybe PreventionRider.PreventionRider

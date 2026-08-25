@@ -90,13 +90,13 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
           <> "\"dealtByDeathtouch\":true,\"dealtByToxic\":3,\"dealtByLifelink\":2,\"kind\":{\"type\":\"Combat\"}}}"
       )
   -- CR 615.13's record, carrying the applying instance's CR 614.5 identity
-  -- alongside the recipient and the amount.
+  -- alongside the damage's source, the recipient and the amount.
   Spec.it s "DamagePrevented" $
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented (CandidateId.OfFloating (FloatingCandidate.MkFloatingCandidate (ObjectId.MkObjectId 4) (Timestamp.MkTimestamp 6))) (Recipient.ToPlayer (PlayerId.MkPlayerId 1)) 3))
-      ( "{\"type\":\"DamagePrevented\",\"value\":{\"by\":{\"type\":\"OfFloating\",\"value\":{\"source\":4,\"timestamp\":6}},"
+      (GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented (CandidateId.OfFloating (FloatingCandidate.MkFloatingCandidate (ObjectId.MkObjectId 4) (Timestamp.MkTimestamp 6))) (ObjectId.MkObjectId 9) (Recipient.ToPlayer (PlayerId.MkPlayerId 1)) 3))
+      ( "{\"type\":\"DamagePrevented\",\"value\":{\"by\":{\"type\":\"OfFloating\",\"value\":{\"source\":4,\"timestamp\":6}},\"source\":9,"
           <> "\"recipient\":{\"type\":\"ToPlayer\",\"value\":1},\"amount\":3}}"
       )
   Spec.it s "StepBegan" $

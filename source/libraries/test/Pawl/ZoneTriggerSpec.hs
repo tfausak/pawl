@@ -1944,11 +1944,13 @@ representativeEvents cond =
         -- CR 615.13: the recipient has to be a PLAYER, this condition being
         -- scoped to damage that would be dealt to one -- an event naming a
         -- creature matches nothing and would pin the floor at empty.
-        TriggerCondition.DamageToPlayerPrevented _ -> one (GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented preventedByBearer (Recipient.ToPlayer S.bob) 2))
+        TriggerCondition.DamageToPlayerPrevented _ -> one (GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented preventedByBearer arrived (Recipient.ToPlayer S.bob) 2))
         -- The same event read for its IDENTITY instead: rule 615.13's "this way"
         -- needs the prevention to be the BEARER's own, and an event naming
-        -- another object matches nothing and would pin the floor at empty.
-        TriggerCondition.SelfPreventsDamage -> one (GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented preventedByBearer (Recipient.ToCreature departed) 2))
+        -- another object matches nothing and would pin the floor at empty. The
+        -- condition's own Filter is the trivial one in everyTriggerCondition
+        -- below, so the damage's source may be any id.
+        TriggerCondition.SelfPreventsDamage _ -> one (GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented preventedByBearer arrived (Recipient.ToCreature departed) 2))
         -- CR 119.9's own event, and the only one this condition admits: the
         -- payload is a player and an amount, and the amount is the floor.
         TriggerCondition.PlayerGainsLife _ -> one (GameEvent.LifeGained (LifeChange.MkLifeChange S.bob 2))
@@ -2166,7 +2168,7 @@ everyTriggerCondition =
     TriggerCondition.HauntedCreatureDies,
     TriggerCondition.SpellOrAbilityCounters PlayerRelation.You,
     TriggerCondition.DamageToPlayerPrevented PlayerRelation.You,
-    TriggerCondition.SelfPreventsDamage,
+    TriggerCondition.SelfPreventsDamage (Filter.Type.And []),
     TriggerCondition.PlayerGainsLife PlayerRelation.You,
     TriggerCondition.PlayerLosesLife PlayerRelation.Opponent,
     TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached CounterKind.Lore 1),

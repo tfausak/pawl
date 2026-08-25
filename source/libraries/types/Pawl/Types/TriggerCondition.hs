@@ -684,10 +684,17 @@ data TriggerCondition
     -- prevention the RULES mint onto a permanent rather than one its card prints,
     -- and Pawl.Engine.Replacement.printedBy is what tells the two apart.
     --
-    -- Not implemented: any question about the SOURCE of the damage that was
-    -- prevented, which Samite Ministration's "damage from a black or red source"
-    -- needs (#2287).
-    SelfPreventsDamage
+    -- The Filter is over CR 120.1's SOURCE of the damage that was prevented --
+    -- Samite Ministration's "damage from a black or red source". The trivial
+    -- `And []` is the printed sentence that qualifies the damage in no way
+    -- (Phyrexian Vindicator). Read against
+    -- Pawl.Engine.Projection.viewWithLastKnown, CR 608.2h being live for a
+    -- source that died to the very batch this prevented.
+    --
+    -- One filter and no relation, where DamageToPlayerPrevented above has a
+    -- relation and no filter: each names the half of the event its printings ask
+    -- about, and no printing of either shape asks about both.
+    SelfPreventsDamage (Filter.Filter Keyword.Keyword)
   | -- | CR 119.9: "whenever [a player] gains life" (Ajani's Pridemate). That
     -- rule rewrites the sentence as "whenever a SOURCE causes [a player] to gain
     -- life", which is why this matches GameEvent.LifeGained -- recorded only

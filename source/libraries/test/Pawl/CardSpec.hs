@@ -773,8 +773,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SpellOrAbilityCounters _ -> []
   -- CR 615.13's prevention condition is a PlayerRelation too.
   TriggerCondition.DamageToPlayerPrevented _ -> []
-  -- Rule 615.13's other reading is nullary, so it holds no Count either.
-  TriggerCondition.SelfPreventsDamage -> []
+  -- Rule 615.13's other reading carries a Filter, which holds no Count either.
+  TriggerCondition.SelfPreventsDamage _ -> []
   TriggerCondition.PlayerGainsLife _ -> []
   TriggerCondition.PlayerLosesLife _ -> []
   -- CR 714.2b carries a counter kind and a Natural, neither of which is a Count.
@@ -3216,7 +3216,10 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.HauntedCreatureDies -> []
   TriggerCondition.SpellOrAbilityCounters _ -> []
   TriggerCondition.DamageToPlayerPrevented _ -> []
-  TriggerCondition.SelfPreventsDamage -> []
+  -- Rule 615.13's other reading DOES carry one, a predicate over the damage's
+  -- source -- Samite Ministration's "black or red" -- which this sweep must see
+  -- for PermanentExplores' reason.
+  TriggerCondition.SelfPreventsDamage f -> [f]
   TriggerCondition.PlayerGainsLife _ -> []
   TriggerCondition.PlayerLosesLife _ -> []
   -- CR 714.2b carries a counter kind and a Natural, neither of which is a Count.
