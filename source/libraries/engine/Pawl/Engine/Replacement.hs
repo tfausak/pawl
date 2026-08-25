@@ -429,6 +429,24 @@ applies gs event candidate =
           Maybe.isNothing (CounterPattern.whichKind pat)
             && matchesPutter gs src (CounterPattern.byWhom pat) cause
             && maybe False (\rel -> matchesPlayer gs src rel pid) (CounterPattern.onWho pat)
+        -- CR 614.16 at the ENTRY level: the counters this permanent is entering
+        -- with are a placement this row may scale, and CR 616.1 orders it against
+        -- every other row modifying the same entry. What it scales is the PENDING
+        -- count; see GameState.enteringCounters.
+        --
+        -- The cause is synthesized as the one the flush will place under -- CR
+        -- 122.6a's default putter, the object's controller -- so matchesPutter
+        -- still parts Vorinclex's "if you would put" from CR 614.16's "if an
+        -- effect would put" (#847). Reading it off the flush rather than off the
+        -- event is what keeps the two levels answering alike.
+        (ReplacementEffect.CounterR (CounterR.MkCounterR pat _), ProposedEvent.WouldEnter oid) ->
+          case Projection.controllerOf oid gs of
+            Nothing -> False
+            Just putter ->
+              not (Map.null (matchingEnteringCounters gs pat oid))
+                && matchesPutter gs src (CounterPattern.byWhom pat) (CounterCause.ByEffect putter)
+                && matchesController gs src (CounterPattern.whose pat) oid
+                && matchesPermanent gs Nothing (CounterPattern.onWhat pat) oid
         -- CR 109.5: "under YOUR control" -- the tokens' controller against the
         -- effect source's controller. CR 102.2's Opponents has no producer today.
         (ReplacementEffect.TokenR (TokenR.MkTokenR pat _), ProposedEvent.WouldCreateTokens pid _ _) ->
@@ -882,6 +900,21 @@ candidateContext candidate =
     (ReplacementCandidate.controller candidate)
     (Just (ReplacementCandidate.source candidate))
     (ReplacementCandidate.slots candidate)
+
+-- The counters `oid` is so far entering with, empty outside an entry (see
+-- GameState.enteringCounters).
+enteringCountersOf :: GameState -> ObjectId -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural
+enteringCountersOf gs oid = Map.findWithDefault Map.empty oid (GameState.enteringCounters gs)
+
+-- Those of them a pattern's kind admits. CR 614.16's rows name no kind (Doubling
+-- Season doubles any counter), and `whichKind = Nothing` is this module's "any
+-- kind" for the reason the WouldPutCounters arm gives.
+matchingEnteringCounters :: GameState -> CounterPattern.CounterPattern -> ObjectId -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural
+matchingEnteringCounters gs pat oid =
+  let pending = enteringCountersOf gs oid
+   in case CounterPattern.whichKind pat of
+        Nothing -> pending
+        Just kind -> Map.filterWithKey (\k _ -> k == kind) pending
 
 -- CR 614.1a: apply a scaling to a number. "Plus one" and "twice that many" are
 -- the same operation with different data, and so is Furnace of Rath's doubling

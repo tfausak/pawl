@@ -1030,8 +1030,9 @@ data Keyword
     -- twice and may take a counter for one and haste for the other.
     --
     -- The two halves are deliberately NOT split across two constructors or
-    -- folded into an existing rewrite. The counter half goes through CR 122.6's
-    -- funnel so CR 614.16 sees it (Doubling Season doubles riot's counter), and
+    -- folded into an existing rewrite. The counter half joins the counters the
+    -- permanent is entering with, where CR 614.16 sees it (Doubling Season doubles
+    -- riot's counter), and
     -- the haste half is a CR 611.2 continuous effect with no duration -- neither
     -- is a copiable value, which is what rules out reusing
     -- Pawl.Types.EntryOption's keyword set (CR 707.2).

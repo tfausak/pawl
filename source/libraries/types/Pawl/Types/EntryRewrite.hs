@@ -122,10 +122,10 @@ data EntryRewrite effect
     -- loyalty, CR 310.4b's defense, CR 714.3a's lore counter, and the three
     -- keywords Pawl.Engine.Keyword mints it for.
     --
-    -- The counters are placed through Pawl.Engine.Event.putCounters, the CR
-    -- 122.6 funnel, and NOT written into the copiable snapshot AsCopy and
-    -- ChoiceOf write to: counters are not characteristics (CR 122.1) and CR 707.2
-    -- excludes them from the copiable values outright. Going through the funnel
+    -- The counters are accumulated through Pawl.Engine.Event.addEnteringCounters
+    -- and NOT written into the copiable snapshot AsCopy and ChoiceOf write to:
+    -- counters are not characteristics (CR 122.1) and CR 707.2 excludes them from
+    -- the copiable values outright. Their sitting in the entry's own CR 616.1 pool
     -- is what makes CR 614.16 hold, which is why Doubling Season doubles a
     -- planeswalker's starting loyalty.
     --
@@ -199,9 +199,9 @@ data EntryRewrite effect
     -- fixes both halves completely, so there is nothing for a card to vary.
     --
     -- The two halves land in two different places, which is why this is one arm
-    -- and not two. The counter goes through Pawl.Engine.Event.putCounters, CR
-    -- 122.6's funnel, so CR 614.16 applies to it (Doubling Season doubles riot's
-    -- counter). The haste is a stored CR 611.2 continuous effect with CR 611.2a's
+    -- and not two. The counter goes through Pawl.Engine.Event.addEnteringCounters,
+    -- so CR 614.16 applies to it in the entry's own CR 616.1 loop (Doubling Season
+    -- doubles riot's counter). The haste is a stored CR 611.2 continuous effect with CR 611.2a's
     -- "rest of the game" duration, which is what "it gains haste" with no stated
     -- end means -- neither value is copiable (CR 707.2), so neither may be
     -- written into the snapshot AsCopy and ChoiceOf use.
@@ -232,8 +232,8 @@ data EntryRewrite effect
     -- Pawl.Engine.Event's arm takes it from the entering permanent's own
     -- projection rather than from a number baked when the row was minted.
     --
-    -- The counters go through Pawl.Engine.Event.putCounters, CR 122.6's funnel,
-    -- as WithCounters' and riot's do, so CR 614.16 applies to them.
+    -- The counters go through Pawl.Engine.Event.addEnteringCounters, as
+    -- WithCounters' and riot's do, so CR 614.16 applies to them.
     ReadAhead
   | -- | CR 702.98a via CR 614.1c: unleash's FIRST static ability. "You may have
     -- this permanent enter with an additional +1/+1 counter on it."
@@ -248,8 +248,8 @@ data EntryRewrite effect
     -- from the finished projection by Pawl.Engine.Keyword.mintedReplacementsOf,
     -- and rule 702.98a fixes the kind and the count.
     --
-    -- The counter goes through Pawl.Engine.Event.putCounters, CR 122.6's funnel,
-    -- as riot's does, so CR 614.16 applies to it.
+    -- The counter goes through Pawl.Engine.Event.addEnteringCounters, as riot's
+    -- does, so CR 614.16 applies to it.
     Unleash
   | -- | CR 702.54a via CR 614.1c: bloodthirst N. "If an opponent was dealt
     -- damage this turn, this permanent enters with N +1/+1 counters on it."
@@ -271,8 +271,8 @@ data EntryRewrite effect
     -- `Keyword.Bloodthirst 1` and rule 702.54a says what it means. It still
     -- round-trips through the codec, because every arm of this type does.
     --
-    -- The counters go through Pawl.Engine.Event.putCounters, CR 122.6's funnel,
-    -- as WithCounters' and riot's do, so CR 614.16 applies to them.
+    -- The counters go through Pawl.Engine.Event.addEnteringCounters, as
+    -- WithCounters' and riot's do, so CR 614.16 applies to them.
     Bloodthirst Natural.Natural
   | -- | CR 614.1d: "This permanent enters tapped" (Zof Bloodbog's land half,
     -- Headless Skaab's creature). The one arm a permanent's OWN printed text
