@@ -833,8 +833,9 @@ minusFive = 1
 -- Grist on the battlefield under alice's control with this many loyalty counters.
 -- PLACED and not cast, unlike jaceOnBattlefield: no case below is about CR 306.5b,
 -- and the -5 needs more loyalty than the printed 3 -- the +1 that would climb
--- there is the half of the card pawl cannot write (#1932). Each case asserts the
--- starting loyalty the fixture put on before reading what the cost took off.
+-- there is the half of the card pawl cannot write (#1932). The -5 case is the one
+-- whose loyalty is not the printed 3, so it asserts the six the fixture put on
+-- before reading what the cost took off; the -2 boards keep the printed number.
 gristWith :: Natural -> Printing.Printing -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 gristWith loyalty grist gs =
   let (oid, placed) = S.addCreature grist S.alice gs
@@ -883,10 +884,12 @@ gristAnswer decision prefer p = case p of
 -- to choose. Grist is not among them: its "as long as Grist isn't on the
 -- battlefield" ability (CR 113.6c) is switched off exactly here.
 --
--- TWO legal candidates for the reflexive ability's slot and not one, so a prompt
--- offered exactly its count cannot short-circuit; and the Mountain is the
--- permanent the slot must NOT offer, which is how "creature or planeswalker" is
--- read as a restriction rather than assumed.
+-- The reflexive ability's slot then has more candidates than its count of one --
+-- bob's Ogre and his Jace, and Grist itself, which is a planeswalker on the
+-- battlefield and so a legal choice for its own ability -- so a prompt offered
+-- exactly its count cannot short-circuit. The Mountain is the permanent the slot
+-- must NOT offer, which is how "creature or planeswalker" is read as a
+-- restriction rather than assumed.
 gristMinusTwoBoard ::
   Printing.Printing ->
   Printing.Printing ->
