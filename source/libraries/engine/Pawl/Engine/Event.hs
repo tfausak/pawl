@@ -2052,8 +2052,9 @@ apply batch candidate event =
     -- not match is left as it was. Map.adjust rather than insert: an absent id
     -- means nothing is entering, which `applies` has already ruled out.
     --
-    -- One entry is ONE event -- CR 614.1c makes the counters a permanent enters
-    -- with part of it -- so CR 614.5's "only one opportunity" spends this row
+    -- One entry is ONE event -- CR 122.6 covers a permanent given counters as it
+    -- enters, and CR 614.12 lets that rider come from a source other than the
+    -- permanent itself -- so CR 614.5's "only one opportunity" spends this row
     -- across EVERY pending kind its pattern matches, here, in this one
     -- application. The nested counter-placement loop this arm replaced raised a
     -- WouldPutCounters event per kind and so handed the row an opportunity per

@@ -6732,9 +6732,10 @@ entryCountersSpec s registry = Spec.describe s "The counters a Create says its t
 -- graveyard to the battlefield with a hexproof counter and an indestructible
 -- counter on it." -- oracle checked on Scryfall) gives one permanent TWO KINDS
 -- of entry counter from ONE effect, which is the board the rule needs:
--- CR 614.1c makes both counters part of the permanent's single entry event, so a
--- scaling row whose pattern matches every kind gets ONE opportunity covering
--- both, not one per kind.
+-- CR 122.6 makes both counters part of the permanent's single entry event even
+-- though the rider comes from Perennation rather than the permanent's own text
+-- (CR 614.12), so a scaling row whose pattern matches every kind gets ONE
+-- opportunity covering both, not one per kind.
 --
 -- The arithmetic alone cannot say that -- scaling two kinds together and scaling
 -- each separately give the same numbers -- so the board makes the NUMBER of
@@ -6785,12 +6786,12 @@ perennationSpec s registry = Spec.describe s "Perennation (CR 614.5)" $ do
          in (asked, newestNamed pikerName after, after)
   -- The control, and the setup every case below rests on: one effect, two kinds,
   -- one counter each, and nothing on the board that could scale either.
-  Spec.it s "CR 614.1c the returned permanent enters with one counter of each kind" $ do
+  Spec.it s "CR 122.6 the returned permanent enters with one counter of each kind" $ do
     built <- board False
     case returnIt True built of
       (asked, Just oid, after) -> do
         Spec.assertEqWith s "a hexproof counter and an indestructible counter" (hexproofs oid after, indestructibles oid after) (1, 1)
-        Spec.assertEqWith s "and with one row modifying the entry there was nothing to order" asked 0
+        Spec.assertEqWith s "and with no row in the CR 616.1 pool there was nothing to order" asked 0
       _ -> Spec.assertFailure s "the card did not return to the battlefield"
   -- The rule itself. Both kinds move together under whichever row the ONE order
   -- put first, and the mixed pairs (1, 0) and (0, 1) -- which a per-kind
@@ -6817,7 +6818,12 @@ ordersEntry seasonFirst seasonId p = case p of
     asked <- State.get
     State.put (asked + 1)
     let wantSeason = if asked <= (0 :: Int) then seasonFirst else not seasonFirst
-    pure (maybe 0 Int.toNaturalSaturating (List.findIndex ((== wantSeason) . (== seasonId) . ReplacementEntry.source) entries))
+    pure
+      ( maybe
+          (error "Pawl.ReplacementSpec.ordersEntry: no matching row offered")
+          Int.toNaturalSaturating
+          (List.findIndex ((== wantSeason) . (== seasonId) . ReplacementEntry.source) entries)
+      )
   _ -> pure (S.identityAnswer p)
 
 -- CR 122.6 with CR 107.3c: an entry rider whose COUNT is not a number. Printlifter
